@@ -4,7 +4,7 @@ import { AdminModalDialog } from "./admin-modal-dialog";
 type LifecycleAction = "ACKNOWLEDGE" | "SNOOZE" | "RESOLVE";
 
 export type AdminOperationActionMessage = {
-  kind: "conflict" | "error" | "success";
+  kind: "conflict" | "error" | "success" | "unknown-outcome";
   text: string;
 };
 
@@ -12,6 +12,7 @@ type Props = {
   allowedActions: readonly LifecycleAction[];
   pending: boolean;
   message: AdminOperationActionMessage | null;
+  confirmationKey?: string;
   now?: () => Date;
   onAcknowledge: () => void;
   onSnooze: (snoozedUntil: string) => void;
@@ -24,20 +25,23 @@ export function AdminOperationStateActions({
   allowedActions,
   pending,
   message,
+  confirmationKey,
   now = () => new Date(),
   onAcknowledge,
   onSnooze,
   onResolve,
 }: Props) {
-  const [resolveOpen, setResolveOpen] = useState(false);
+  const [openConfirmationKey, setOpenConfirmationKey] = useState<string | null>(null);
   const resolveTriggerRef = useRef<HTMLElement | null>(null);
+  const activeConfirmationKey = confirmationKey ?? "resolve";
+  const resolveOpen = openConfirmationKey === activeConfirmationKey;
 
   function snooze(hours: number) {
     onSnooze(new Date(now().getTime() + hours * HOUR_MS).toISOString());
   }
 
   function confirmResolve() {
-    setResolveOpen(false);
+    setOpenConfirmationKey(null);
     onResolve();
   }
 
@@ -71,7 +75,7 @@ export function AdminOperationStateActions({
             type="button"
             className="btn btn-secondary"
             disabled={pending}
-            onClick={() => setResolveOpen(true)}
+            onClick={() => setOpenConfirmationKey(activeConfirmationKey)}
           >
             해결 확인
           </button>
@@ -91,13 +95,13 @@ export function AdminOperationStateActions({
         <AdminModalDialog
           titleId="resolve-title"
           triggerRef={resolveTriggerRef}
-          onRequestClose={() => setResolveOpen(false)}
+          onRequestClose={() => setOpenConfirmationKey(null)}
           backdropTestId="resolve-backdrop"
         >
           <h4 id="resolve-title">해결 상태 확인</h4>
           <p>현재 source를 다시 검증해 신호가 사라졌을 때만 해결됩니다.</p>
           <div className="admin-operation-actions__dialog-buttons">
-            <button type="button" className="btn btn-secondary" onClick={() => setResolveOpen(false)}>
+            <button type="button" className="btn btn-secondary" onClick={() => setOpenConfirmationKey(null)}>
               닫기
             </button>
             <button type="button" className="btn btn-primary" disabled={pending} onClick={confirmResolve}>

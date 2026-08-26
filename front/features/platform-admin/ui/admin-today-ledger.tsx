@@ -1,23 +1,24 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { ADMIN_SHELL_LAYOUT_MEDIA_QUERY } from "@/features/platform-admin/model/admin-route-catalog";
-import type { AdminOperationsView } from "@/features/platform-admin/model/platform-admin-operations-model";
+import type {
+  AdminOperationsSearchMode,
+  AdminOperationsView,
+  AdminOperationsWorkViewId,
+} from "@/features/platform-admin/model/platform-admin-operations-model";
+import type { AdminSafeActionState } from "./admin-action-dock";
 import type { AdminPageState, AdminStateSource } from "./admin-state-panel";
 import { AdminOperationMobileDetail } from "./admin-operation-mobile-detail";
 import { AdminOperationsInspector } from "./admin-operations-inspector";
 import { AdminOperationsQueue } from "./admin-operations-queue";
-import { AdminPageFrame } from "./admin-page-frame";
+import { AdminPageContext } from "./admin-page-context";
 import { AdminStatePanel } from "./admin-state-panel";
+import { AdminTodayControls, type AdminTodayFilters } from "./admin-today-controls";
 
 export const ADMIN_TODAY_HEADING = "오늘의 운영 케이스";
 export const ADMIN_TODAY_DESCRIPTION =
   "감지된 운영 신호를 영향과 최신성에 따라 확인하고 상태를 기록합니다.";
 
-export type AdminTodayFilters = {
-  state: string;
-  severity: string;
-  source: string;
-  assignee: string;
-};
+export type { AdminTodayFilters };
 
 type HistoryEvent = {
   fromState: string | null;
@@ -39,11 +40,23 @@ type Props = {
   refreshing?: boolean;
   hasNextPage?: boolean;
   loadingMore?: boolean;
+  mode?: AdminOperationsSearchMode;
+  query?: string;
+  workView?: AdminOperationsWorkViewId;
+  pendingCount?: number;
+  urgentCount?: number;
+  urgentAnnouncement?: string | null;
+  actionState?: AdminSafeActionState;
+  actionReason?: ReactNode;
   onFilterChange: (key: keyof AdminTodayFilters, value: string) => void;
-  onSelectCase: (caseId: string) => void;
+  onSelectCase: (caseId: string, options?: { mode?: AdminOperationsSearchMode }) => void;
   onLoadMore?: () => void;
   onRetrySource?: (sourceType: AdminOperationsView["sources"][number]["sourceType"]) => void;
   onClearFilters?: () => void;
+  onViewChange?: (id: string) => void;
+  onQueryChange?: (value: string) => void;
+  onApplyPending?: () => void;
+  onBackToList?: () => void;
 };
 
 export function AdminTodayLedger({
@@ -57,14 +70,26 @@ export function AdminTodayLedger({
   refreshing = false,
   hasNextPage = false,
   loadingMore = false,
+  mode,
+  query = "",
+  workView = "briefing",
+  pendingCount = 0,
+  urgentCount = 0,
+  urgentAnnouncement = null,
+  actionState,
+  actionReason,
   onFilterChange,
   onSelectCase,
   onLoadMore,
   onRetrySource,
   onClearFilters,
+  onViewChange,
+  onQueryChange,
+  onApplyPending,
+  onBackToList,
 }: Props) {
   const mobileLayout = useMobileOperationsLayout();
-  const filtered = hasActiveTodayFilters(filters);
+  const filtered = hasActiveTodayFilters(filters) || Boolean(query.trim());
   const pageState = deriveTodayPageState(view);
   const emptyCopy = filtered
     ? {
@@ -83,6 +108,19 @@ export function AdminTodayLedger({
       available: false,
     }));
 
+  const inspector = (
+    <AdminOperationsInspector
+      selectedCase={view.selectedCase}
+      history={history}
+      lifecycleControls={lifecycleControls}
+      detailLoading={detailLoading}
+      detailUnavailable={detailUnavailable}
+      permissionDenied={permissionDenied}
+      actionState={actionState}
+      actionReason={actionReason}
+    />
+  );
+
   const workSurface = view.items.length === 0 ? null : mobileLayout ? (
     <AdminOperationMobileDetail
       view={view}
@@ -91,7 +129,11 @@ export function AdminTodayLedger({
       detailLoading={detailLoading}
       detailUnavailable={detailUnavailable}
       permissionDenied={permissionDenied}
+      actionState={actionState}
+      actionReason={actionReason}
+      mode={mode}
       onSelectCase={onSelectCase}
+      onBack={onBackToList}
       hasNextPage={hasNextPage}
       loadingMore={loadingMore}
       onLoadMore={onLoadMore}
@@ -106,21 +148,17 @@ export function AdminTodayLedger({
         loadingMore={loadingMore}
         onLoadMore={onLoadMore}
       />
-      <AdminOperationsInspector
-        selectedCase={view.selectedCase}
-        history={history}
-        lifecycleControls={lifecycleControls}
-        detailLoading={detailLoading}
-        detailUnavailable={detailUnavailable}
-        permissionDenied={permissionDenied}
-      />
+      {inspector}
     </div>
   );
 
   return (
-    <AdminPageFrame
+    <AdminPageContext
+      eyebrow="오늘"
       heading={ADMIN_TODAY_HEADING}
       description={ADMIN_TODAY_DESCRIPTION}
+      freshness={`${view.generatedAtLabel} 기준`}
+      scope={view.sourceStatusLabel}
       action={
         <p className="admin-today-ledger__summary" aria-label="운영 케이스 요약">
           {view.mobileSummary.open} · {view.mobileSummary.critical} · {view.mobileSummary.assignedToMe}
@@ -128,53 +166,20 @@ export function AdminTodayLedger({
       }
     >
       <div className="admin-today-ledger">
-        <div className="admin-today-ledger__toolbar" aria-label="운영 케이스 필터">
-          <FilterSelect
-            label="상태 필터"
-            value={filters.state}
-            onChange={(value) => onFilterChange("state", value)}
-            options={[
-              ["", "모든 상태"],
-              ["open", "미확인"],
-              ["acknowledged", "확인됨"],
-              ["snoozed", "보류됨"],
-              ["resolved", "해결됨"],
-            ]}
-          />
-          <FilterSelect
-            label="심각도 필터"
-            value={filters.severity}
-            onChange={(value) => onFilterChange("severity", value)}
-            options={[
-              ["", "모든 심각도"],
-              ["critical", "긴급"],
-              ["warning", "경고"],
-              ["ready", "준비"],
-              ["info", "정보"],
-            ]}
-          />
-          <FilterSelect
-            label="Source 필터"
-            value={filters.source}
-            onChange={(value) => onFilterChange("source", value)}
-            options={[
-              ["", "모든 source"],
-              ["club_readiness", "클럽 준비"],
-              ["notification", "알림"],
-              ["ai_job", "AI 작업"],
-              ["closing_risk", "모임 마감"],
-            ]}
-          />
-          <label className="admin-today-ledger__assignee admin-operation-control--touch">
-            <input
-              type="checkbox"
-              checked={filters.assignee === "me"}
-              onChange={(event) => onFilterChange("assignee", event.target.checked ? "me" : "")}
-            />
-            내 담당만
-          </label>
-          {refreshing ? <span className="admin-today-ledger__refresh" role="status">새 신호 확인 중</span> : null}
-        </div>
+        <AdminTodayControls
+          workViews={view.workViews}
+          activeView={workView}
+          query={query}
+          filters={filters}
+          pendingCount={pendingCount}
+          urgentCount={urgentCount}
+          refreshing={refreshing}
+          urgentAnnouncement={urgentAnnouncement}
+          onViewChange={onViewChange ?? (() => undefined)}
+          onQueryChange={onQueryChange ?? (() => undefined)}
+          onFilterChange={onFilterChange}
+          onApplyPending={onApplyPending}
+        />
 
         {view.sources.length > 0 ? (
           <section className="admin-operation-sources" aria-labelledby="admin-operation-sources-title">
@@ -220,7 +225,7 @@ export function AdminTodayLedger({
           {workSurface}
         </AdminStatePanel>
       </div>
-    </AdminPageFrame>
+    </AdminPageContext>
   );
 }
 
@@ -236,34 +241,6 @@ function deriveTodayPageState(view: AdminOperationsView): AdminPageState {
   if (view.sources.some((source) => isFetchFailedTodaySource(source.status))) return "partial";
   if (view.items.length === 0) return "empty";
   return "ready";
-}
-
-function FilterSelect({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: ReadonlyArray<readonly [string, string]>;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="admin-today-ledger__filter">
-      <span>{label}</span>
-      <select
-        className="admin-operation-control--touch"
-        aria-label={label}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {options.map(([optionValue, optionLabel]) => (
-          <option value={optionValue} key={optionValue || "all"}>{optionLabel}</option>
-        ))}
-      </select>
-    </label>
-  );
 }
 
 function useMobileOperationsLayout(): boolean {

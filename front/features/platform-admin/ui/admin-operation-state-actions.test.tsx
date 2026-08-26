@@ -98,4 +98,36 @@ describe("AdminOperationStateActions", () => {
       "최신 상태를 다시 불러왔습니다. 내용을 확인한 뒤 다시 시도해 주세요.",
     );
   });
+
+  it("closes a stale resolve confirmation when the confirmation key changes", async () => {
+    const user = userEvent.setup();
+    const { rerender, props } = renderActions({
+      confirmationKey: "case-notification:3:ACKNOWLEDGE,SNOOZE,RESOLVE",
+    });
+
+    await user.click(screen.getByRole("button", { name: "해결 확인" }));
+    expect(screen.getByRole("dialog", { name: "해결 상태 확인" })).toBeInTheDocument();
+
+    rerender(
+      <AdminOperationStateActions
+        {...props}
+        confirmationKey="case-notification:4:SNOOZE,RESOLVE"
+      />,
+    );
+
+    expect(screen.queryByRole("dialog", { name: "해결 상태 확인" })).not.toBeInTheDocument();
+    expect(props.onResolve).not.toHaveBeenCalled();
+  });
+
+  it("announces unknown-outcome without treating it as success", () => {
+    renderActions({
+      message: {
+        kind: "unknown-outcome",
+        text: "명령 응답을 확인하지 못했습니다. 최신 상태를 확인한 뒤 다시 시도해 주세요.",
+      },
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("명령 응답을 확인하지 못했습니다.");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
 });

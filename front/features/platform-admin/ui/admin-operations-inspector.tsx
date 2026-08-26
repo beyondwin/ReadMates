@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import type { AdminOperationCaseView } from "@/features/platform-admin/model/platform-admin-operations-model";
-import { AdminActionDock } from "./admin-action-dock";
+import { AdminSafeActionDock, type AdminSafeActionState } from "./admin-action-dock";
+import { AdminCaseDocket } from "./admin-case-docket";
 
 type SafeHistoryEvent = {
   fromState: string | null;
@@ -19,6 +20,8 @@ type Props = {
   detailLoading?: boolean;
   detailUnavailable?: boolean;
   permissionDenied?: boolean;
+  actionState?: AdminSafeActionState;
+  actionReason?: ReactNode;
 };
 
 const HISTORY_LABELS: Record<string, string> = {
@@ -64,6 +67,8 @@ export function AdminOperationsInspector({
   detailLoading = false,
   detailUnavailable = false,
   permissionDenied = false,
+  actionState = "ready",
+  actionReason,
 }: Props) {
   if (!selectedCase) {
     return (
@@ -80,83 +85,98 @@ export function AdminOperationsInspector({
     selectedCase.source.generatedAt,
     selectedCase.source.lastSuccessfulAt,
   );
+  const authorityDenied = permissionDenied || actionState === "forbidden";
 
   return (
-    <section className="admin-operations-inspector" aria-label="운영 케이스 상세">
-      <header className="admin-operations-inspector__header">
-        <div className="admin-operations-inspector__state-line">
+    <AdminCaseDocket
+      label="운영 케이스 상세"
+      title={<span className="admin-operation-wrap">{selectedCase.summary.title}</span>}
+      identity={<code className="admin-operation-wrap">{selectedCase.id}</code>}
+      status={
+        <span className="admin-operations-inspector__state-line">
           <span>심각도 · {selectedCase.severityLabel}</span>
           <span>현재 상태 · {selectedCase.stateLabel}</span>
           {selectedCase.reopenCount > 0 ? <span>해결 후 재개방 {selectedCase.reopenCount}회</span> : null}
+        </span>
+      }
+      evidence={
+        <div className="admin-operations-inspector">
+          <p className="admin-operation-wrap">{selectedCase.summary.description}</p>
+          <dl className="admin-operations-inspector__facts">
+            <div>
+              <dt>영향 범위</dt>
+              <dd>{selectedCase.impactLabel}</dd>
+            </div>
+            <div>
+              <dt>관측 source</dt>
+              <dd>{selectedCase.sourceLabel}</dd>
+            </div>
+            <div>
+              <dt>최신성</dt>
+              <dd>{freshness}</dd>
+            </div>
+            <div>
+              <dt>최초 관측</dt>
+              <dd>{selectedCase.ageLabel}</dd>
+            </div>
+            <div>
+              <dt>케이스 식별자</dt>
+              <dd><code className="admin-operation-wrap">{selectedCase.id}</code></dd>
+            </div>
+          </dl>
         </div>
-        <h2 className="h2 admin-operation-wrap">{selectedCase.summary.title}</h2>
-        <p className="admin-operation-wrap">{selectedCase.summary.description}</p>
-      </header>
-
-      <dl className="admin-operations-inspector__facts">
-        <div>
-          <dt>영향 범위</dt>
-          <dd>{selectedCase.impactLabel}</dd>
+      }
+      related={
+        <Link className="btn btn-primary admin-operations-inspector__detail-link admin-operation-control--touch" to={selectedCase.detailHref}>
+          {SOURCE_DETAIL_LABELS[selectedCase.sourceType] ?? "운영 상세에서 확인"}
+        </Link>
+      }
+      history={
+        <div className="admin-operations-inspector__history">
+          <h3 className="h3">케이스 이력</h3>
+          {history.length === 0 ? (
+            <p className="admin-operations-inspector__empty">표시할 상태 변경 이력이 없습니다.</p>
+          ) : (
+            <ol>
+              {history.map((event) => (
+                <li key={`${event.caseVersion}:${event.occurredAt}`}>
+                  <strong>{HISTORY_LABELS[event.reasonCode] ?? "상태 변경 기록"}</strong>
+                  <span>
+                    {CASE_STATE_LABELS[event.toState] ?? "상태 확인"} · {formatTime(event.occurredAt)}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
         </div>
-        <div>
-          <dt>관측 source</dt>
-          <dd>{selectedCase.sourceLabel}</dd>
+      }
+      actions={
+        <div className="admin-operations-inspector__lifecycle" aria-label="케이스 상태 관리">
+          <h3 className="h3">상태 관리</h3>
+          {detailLoading ? <p role="status">최신 상태를 확인하고 있습니다.</p> : null}
+          {detailUnavailable && !permissionDenied ? (
+            <p role="alert">상세 이력을 불러오지 못했습니다. 목록 정보는 계속 확인할 수 있습니다.</p>
+          ) : null}
+          {authorityDenied ? (
+            <p className="admin-operations-inspector__permission" role="alert">
+              상태 변경 권한이 더 이상 유효하지 않습니다. 새로고침 후 권한을 확인해 주세요.
+            </p>
+          ) : lifecycleControls ? (
+            <AdminSafeActionDock
+              level="L1"
+              authority="allowed"
+              state={actionState}
+              reason={actionReason}
+              primary={lifecycleControls}
+            />
+          ) : (
+            <p className="admin-operations-inspector__permission">
+              현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.
+            </p>
+          )}
         </div>
-        <div>
-          <dt>최신성</dt>
-          <dd>{freshness}</dd>
-        </div>
-        <div>
-          <dt>최초 관측</dt>
-          <dd>{selectedCase.ageLabel}</dd>
-        </div>
-        <div>
-          <dt>케이스 식별자</dt>
-          <dd><code className="admin-operation-wrap">{selectedCase.id}</code></dd>
-        </div>
-      </dl>
-
-      <Link className="btn btn-primary admin-operations-inspector__detail-link admin-operation-control--touch" to={selectedCase.detailHref}>
-        {SOURCE_DETAIL_LABELS[selectedCase.sourceType] ?? "운영 상세에서 확인"}
-      </Link>
-
-      <div className="admin-operations-inspector__history">
-        <h3 className="h3">케이스 이력</h3>
-        {history.length === 0 ? (
-          <p className="admin-operations-inspector__empty">표시할 상태 변경 이력이 없습니다.</p>
-        ) : (
-          <ol>
-            {history.map((event) => (
-              <li key={`${event.caseVersion}:${event.occurredAt}`}>
-                <strong>{HISTORY_LABELS[event.reasonCode] ?? "상태 변경 기록"}</strong>
-                <span>
-                  {CASE_STATE_LABELS[event.toState] ?? "상태 확인"} · {formatTime(event.occurredAt)}
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
-
-      <div className="admin-operations-inspector__lifecycle" aria-label="케이스 상태 관리">
-        <h3 className="h3">상태 관리</h3>
-        {detailLoading ? <p role="status">최신 상태를 확인하고 있습니다.</p> : null}
-        {detailUnavailable && !permissionDenied ? (
-          <p role="alert">상세 이력을 불러오지 못했습니다. 목록 정보는 계속 확인할 수 있습니다.</p>
-        ) : null}
-        {permissionDenied ? (
-          <p className="admin-operations-inspector__permission" role="alert">
-            상태 변경 권한이 더 이상 유효하지 않습니다. 새로고침 후 권한을 확인해 주세요.
-          </p>
-        ) : lifecycleControls ? (
-          <AdminActionDock primary={lifecycleControls} />
-        ) : (
-          <p className="admin-operations-inspector__permission">
-            현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.
-          </p>
-        )}
-      </div>
-    </section>
+      }
+    />
   );
 }
 

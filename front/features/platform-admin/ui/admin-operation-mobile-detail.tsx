@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { AdminOperationsView } from "@/features/platform-admin/model/platform-admin-operations-model";
+import type { AdminSafeActionState } from "./admin-action-dock";
 import { AdminOperationsInspector } from "./admin-operations-inspector";
 import { AdminOperationsQueue } from "./admin-operations-queue";
 
@@ -21,7 +22,11 @@ type Props = {
   permissionDenied?: boolean;
   hasNextPage?: boolean;
   loadingMore?: boolean;
-  onSelectCase: (caseId: string) => void;
+  mode?: "list" | "detail";
+  actionState?: AdminSafeActionState;
+  actionReason?: ReactNode;
+  onSelectCase: (caseId: string, options?: { mode?: "list" | "detail" }) => void;
+  onBack?: () => void;
   onLoadMore?: () => void;
 };
 
@@ -34,7 +39,11 @@ export function AdminOperationMobileDetail({
   permissionDenied = false,
   hasNextPage = false,
   loadingMore = false,
+  mode,
+  actionState,
+  actionReason,
   onSelectCase,
+  onBack,
   onLoadMore,
 }: Props) {
   const [detailCaseId, setDetailCaseId] = useState<string | null>(null);
@@ -42,7 +51,10 @@ export function AdminOperationMobileDetail({
   const backButtonRef = useRef<HTMLButtonElement>(null);
   const restoreSelectionRef = useRef(false);
   const listScrollPositionRef = useRef({ left: 0, top: 0 });
-  const showDetail = detailCaseId !== null && view.selectedCase?.id === detailCaseId;
+  const controlled = mode !== undefined;
+  const showDetail = controlled
+    ? mode === "detail" && view.selectedCase != null
+    : detailCaseId !== null && view.selectedCase?.id === detailCaseId;
 
   useEffect(() => {
     if (showDetail) backButtonRef.current?.focus({ preventScroll: true });
@@ -71,7 +83,8 @@ export function AdminOperationMobileDetail({
           className="btn btn-secondary admin-operation-mobile-detail__back admin-operation-control--touch"
           onClick={() => {
             restoreSelectionRef.current = true;
-            setDetailCaseId(null);
+            if (onBack) onBack();
+            else setDetailCaseId(null);
           }}
         >
           목록으로
@@ -83,6 +96,8 @@ export function AdminOperationMobileDetail({
           detailLoading={detailLoading}
           detailUnavailable={detailUnavailable}
           permissionDenied={permissionDenied}
+          actionState={actionState}
+          actionReason={actionReason}
         />
       </div>
     );
@@ -95,8 +110,8 @@ export function AdminOperationMobileDetail({
         selectedCaseId={view.selectedCaseId}
         onSelectCase={(caseId) => {
           listScrollPositionRef.current = { left: window.scrollX, top: window.scrollY };
-          onSelectCase(caseId);
-          setDetailCaseId(caseId);
+          onSelectCase(caseId, { mode: "detail" });
+          if (!controlled) setDetailCaseId(caseId);
         }}
         hasNextPage={hasNextPage}
         loadingMore={loadingMore}

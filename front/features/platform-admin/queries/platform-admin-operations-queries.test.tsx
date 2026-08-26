@@ -27,6 +27,7 @@ import {
 import {
   adminOperationsKeys,
   platformAdminOperationCaseQuery,
+  platformAdminOperationCasePagesQuery,
   platformAdminOperationCasesQuery,
   useAcknowledgeAdminOperationCaseMutation,
   useResolveAdminOperationCaseMutation,
@@ -165,6 +166,7 @@ describe("platform admin operations queries", () => {
     const activeOptions = platformAdminOperationCasesQuery({}, { active: true });
     const inactiveOptions = platformAdminOperationCasesQuery({}, { active: false });
     const unspecifiedOptions = platformAdminOperationCasesQuery({});
+    const activePages = platformAdminOperationCasePagesQuery({}, { active: true });
     if (typeof activeOptions.refetchInterval !== "function") {
       throw new Error("Expected functional refetchInterval");
     }
@@ -174,14 +176,31 @@ describe("platform admin operations queries", () => {
     if (typeof unspecifiedOptions.refetchInterval !== "function") {
       throw new Error("Expected functional refetchInterval");
     }
+    if (typeof activePages.refetchInterval !== "function") {
+      throw new Error("Expected functional pages refetchInterval");
+    }
 
     visibility.mockReturnValue("visible");
     expect(activeOptions.refetchInterval({} as never)).toBe(15_000);
+    expect(activePages.refetchInterval({} as never)).toBe(15_000);
     expect(inactiveOptions.refetchInterval({} as never)).toBe(false);
     expect(unspecifiedOptions.refetchInterval({} as never)).toBe(false);
 
     visibility.mockReturnValue("hidden");
     expect(activeOptions.refetchInterval({} as never)).toBe(false);
+    expect(activePages.refetchInterval({} as never)).toBe(false);
+  });
+
+  it("keeps infinite-query pages on one cursor-free key so continuation stays in the same cache", () => {
+    const withCursor = platformAdminOperationCasePagesQuery({
+      states: ["OPEN"],
+      cursor: "opaque-cursor",
+    });
+    const withoutCursor = platformAdminOperationCasePagesQuery({ states: ["OPEN"] });
+
+    expect(withCursor.queryKey).toEqual(withoutCursor.queryKey);
+    expect(withCursor.queryKey.at(-1)).toMatchObject({ cursor: null });
+    expect(withoutCursor.initialPageParam).toBeNull();
   });
 
   it.each([
@@ -235,5 +254,26 @@ describe("platform admin operations queries", () => {
     expect(client.getQueryState(detailKey)?.isInvalidated).toBe(false);
     expect(client.getQueryData(listKey)).toEqual(listResponse);
     expect(client.getQueryData(detailKey)).toEqual(detailResponse);
+  });
+
+  it.each([
+    ["acknowledge", useAcknowledgeAdminOperationCaseMutation, acknowledgeAdminOperationCase, { caseId, expectedVersion: 3 }],
+    [
+      "snooze",
+      useSnoozeAdminOperationCaseMutation,
+      snoozeAdminOperationCase,
+      { caseId, expectedVersion: 3, snoozedUntil: "2026-08-05T00:00:00Z" },
+    ],
+    ["resolve", useResolveAdminOperationCaseMutation, resolveAdminOperationCase, { caseId, expectedVersion: 3 }],
+  ] as const)("does not retry a failed %s mutation", async (_name, useHook, api, variables) => {
+    vi.mocked(api).mockRejectedValue(new Error("network lost"));
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useHook(), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync(variables as never).catch(() => undefined);
+    });
+
+    expect(api).toHaveBeenCalledTimes(1);
   });
 });

@@ -66,6 +66,28 @@ describe("AdminOperationsQueue", () => {
     expect(row).toHaveAttribute("aria-selected", "true");
   });
 
+  it("keeps locators stable and wraps a long safe identifier", () => {
+    render(
+      <AdminOperationsQueue
+        items={[
+          queueItem({
+            id: "case-notification-opaque-identifier-that-wraps-safely",
+            locatorLabel: "02",
+            scopeLabel: "읽는사이",
+          }),
+        ]}
+        selectedCaseId="case-notification-opaque-identifier-that-wraps-safely"
+        onSelectCase={vi.fn()}
+      />,
+    );
+
+    const row = screen.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ });
+    expect(row).toHaveTextContent("02");
+    expect(row).toHaveTextContent("읽는사이");
+    expect(row).toHaveClass("admin-operation-control--touch");
+    expect(row.querySelector(".admin-operation-wrap")).not.toBeNull();
+  });
+
   it("keeps filtered-empty copy local to the queue when no rows match", () => {
     render(
       <AdminOperationsQueue items={[]} selectedCaseId={null} onSelectCase={vi.fn()} />,

@@ -1,11 +1,13 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, useLocation, useNavigate } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ReadmatesTransportError } from "@/shared/api/errors";
 import type {
   AdminOperationCase,
   AdminOperationCaseDetailResponse,
+  AdminOperationCaseFilter,
   AdminOperationCasesResponse,
 } from "@/features/platform-admin/api/platform-admin-operations-contracts";
 import type { PlatformAdminCapabilities } from "@/features/platform-admin/model/platform-admin-capabilities";
@@ -134,22 +136,36 @@ function seedCapabilities(
   client.setQueryData(platformAdminCapabilitiesQuery().queryKey, capabilities);
 }
 
+function seedCasePages(
+  client: QueryClient,
+  items: AdminOperationCase[],
+  pages: AdminOperationCasesResponse[] = [listResponse(items)],
+  extraFilters: AdminOperationCaseFilter[] = [],
+) {
+  const response = pages[0] ?? listResponse(items);
+  const pageData = { pages, pageParams: pages.map((_, index) => (index === 0 ? null : `cursor-page-${index + 1}`)) };
+  const filters: AdminOperationCaseFilter[] = [
+    {},
+    { states: ["OPEN"] },
+    { states: ["OPEN", "ACKNOWLEDGED"] },
+    { states: ["OPEN"], sources: ["NOTIFICATION"] },
+    { states: ["OPEN", "ACKNOWLEDGED"], sources: ["NOTIFICATION"] },
+    { states: ["OPEN", "ACKNOWLEDGED", "SNOOZED"], assignee: "ME" },
+    ...extraFilters,
+  ];
+  for (const filter of filters) {
+    client.setQueryData(platformAdminOperationCasesQuery(filter).queryKey, response);
+    client.setQueryData(platformAdminOperationCasePagesQuery(filter).queryKey, pageData);
+  }
+}
+
 function seededClient(items = [operationCase()]) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
   });
   seedCapabilities(client);
   client.setQueryData(memberQueryKey, memberSnapshot);
-  client.setQueryData(platformAdminOperationCasesQuery().queryKey, listResponse(items));
-  client.setQueryData(platformAdminOperationCasesQuery({ states: ["OPEN"] }).queryKey, listResponse(items));
-  client.setQueryData(platformAdminOperationCasePagesQuery().queryKey, {
-    pages: [listResponse(items)],
-    pageParams: [null],
-  });
-  client.setQueryData(platformAdminOperationCasePagesQuery({ states: ["OPEN"] }).queryKey, {
-    pages: [listResponse(items)],
-    pageParams: [null],
-  });
+  seedCasePages(client, items);
   for (const item of items) {
     client.setQueryData(platformAdminOperationCaseQuery(item.id).queryKey, detailResponse(item));
   }
@@ -253,19 +269,12 @@ describe("AdminTodayRoute", () => {
   });
 
   it("never lets an older detail version overwrite a newer polled list lifecycle", async () => {
-    const user = userEvent.setup();
     const currentListCase = operationCase({
       state: "ACKNOWLEDGED",
       version: 5,
       allowedActions: ["SNOOZE", "RESOLVE"],
     });
     const staleDetailCase = operationCase({ state: "OPEN", version: 4 });
-    operationsApi.acknowledge.mockResolvedValue({
-      schema: "admin.operation_cases.v1",
-      ...currentListCase,
-      state: "ACKNOWLEDGED",
-      version: 6,
-    });
     const client = seededClient([currentListCase]);
     client.setQueryData(
       platformAdminOperationCaseQuery(currentListCase.id).queryKey,
@@ -276,15 +285,12 @@ describe("AdminTodayRoute", () => {
 
     expect(await screen.findAllByText("현재 상태 · 확인됨")).toHaveLength(2);
     expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "4시간 보류", exact: true }));
-
-    await waitFor(() => {
-      expect(operationsApi.snooze).toHaveBeenCalledWith(
-        "case-notification",
-        5,
-        expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
-      );
-    });
+    expect(screen.getByRole("group", { name: "작업" }).closest("[data-state]")).toHaveAttribute(
+      "data-state",
+      "stale",
+    );
+    expect(screen.getByRole("button", { name: "4시간 보류", exact: true })).toBeDisabled();
+    expect(operationsApi.snooze).not.toHaveBeenCalled();
   });
 
   it("loads cursor continuations into one queue while preserving filters and selection", async () => {
@@ -373,11 +379,7 @@ describe("AdminTodayRoute", () => {
     };
     const response = { ...listResponse(), sources: [operationCase().source, unavailable] };
     const client = seededClient();
-    client.setQueryData(platformAdminOperationCasesQuery().queryKey, response);
-    client.setQueryData(platformAdminOperationCasePagesQuery().queryKey, {
-      pages: [response],
-      pageParams: [null],
-    });
+    seedCasePages(client, [operationCase()], [response]);
     operationsApi.fetchList.mockResolvedValue(response);
     renderRoute(client, "/admin/today?case=case-notification");
 
@@ -572,5 +574,262 @@ describe("AdminTodayRoute", () => {
       expect(pages.every((query) => query.isDisabled() || query.state.fetchStatus === "idle")).toBe(true);
     });
     expect(operationsApi.fetchList).not.toHaveBeenCalled();
+  });
+
+  it("does not strip a missing case from the URL or silently select another row", async () => {
+    renderRoute(seededClient(), "/admin/today?case=case-missing");
+
+    expect(await screen.findByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
+    expect(screen.getByLabelText("current location")).toHaveTextContent("/admin/today?case=case-missing");
+    expect(screen.getByLabelText("current location")).not.toHaveTextContent("case=case-notification");
+    expect(screen.queryByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/, pressed: true })).not.toBeInTheDocument();
+  });
+
+  it("freezes displayed order on a first-page poll after continuation and announces critical once", async () => {
+    const user = userEvent.setup();
+    const first = operationCase({ id: "case-first", severity: "CRITICAL", firstObservedAt: "2026-08-04T07:00:00Z" });
+    const continuation = operationCase({
+      id: "case-continued",
+      severity: "WARNING",
+      firstObservedAt: "2026-08-04T08:00:00Z",
+    });
+    const client = seededClient([first, continuation]);
+    const pages = [
+      { ...listResponse([first]), nextCursor: "cursor-page-2" },
+      listResponse([continuation]),
+    ];
+    seedCasePages(client, [first, continuation], pages);
+    client.setQueryData(platformAdminOperationCaseQuery(continuation.id).queryKey, detailResponse(continuation));
+
+    renderRoute(client, "/admin/today?case=case-first");
+    expect(await screen.findAllByRole("button", { name: /알림 전달 실패/ })).toHaveLength(2);
+
+    const polledFirst = operationCase({
+      id: "case-first",
+      severity: "CRITICAL",
+      version: 9,
+      firstObservedAt: "2026-08-04T07:00:00Z",
+    });
+    const pendingWarning = operationCase({ id: "case-new-warning", severity: "WARNING" });
+    const pendingCritical = operationCase({
+      id: "case-new-critical",
+      severity: "CRITICAL",
+      summaryCode: "SESSION_CLOSING_BLOCKED",
+    });
+    const polledPages = [
+      {
+        ...listResponse([pendingCritical, polledFirst, pendingWarning]),
+        nextCursor: "cursor-page-2",
+        generatedAt: "2026-08-04T10:15:00Z",
+        counts: { open: 4, critical: 2, assignedToMe: 1, snoozed: 0 },
+      },
+      listResponse([continuation]),
+    ];
+
+    act(() => {
+      seedCasePages(client, [polledFirst, continuation], polledPages);
+    });
+
+    expect(screen.queryByRole("button", { name: /모임 마감이 완료되지 않았습니다/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /알림 전달 실패/ })).toHaveLength(2);
+    expect(await screen.findByRole("button", { name: "새 항목 2개 적용" })).toBeInTheDocument();
+    expect(screen.getByText("긴급 1건")).toBeInTheDocument();
+    expect(await screen.findByText("새 긴급 신호 1건")).toHaveAttribute("aria-live", "polite");
+
+    act(() => {
+      seedCasePages(client, [polledFirst, continuation], polledPages);
+    });
+    expect(screen.getAllByText("새 긴급 신호 1건")).toHaveLength(1);
+
+    await user.click(screen.getByRole("button", { name: "새 항목 2개 적용" }));
+    expect(await screen.findByRole("button", { name: /모임 마감이 완료되지 않았습니다/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "새 항목 2개 적용" })).not.toBeInTheDocument();
+  });
+
+  it("locks lifecycle actions for a non-authoritative source and pending removal", async () => {
+    const selected = operationCase({
+      source: {
+        ...operationCase().source,
+        authoritative: false,
+        status: "PARTIAL",
+      },
+    });
+    const client = seededClient([selected]);
+    renderRoute(client, "/admin/today?case=case-notification");
+
+    expect(await screen.findByRole("button", { name: "확인 처리" })).toBeDisabled();
+    expect(screen.getByRole("group", { name: "작업" }).closest("[data-state]")).toHaveAttribute(
+      "data-state",
+      "stale",
+    );
+    expect(operationsApi.acknowledge).not.toHaveBeenCalled();
+  });
+
+  it("cannot mutate when OWNER has empty allowedActions", async () => {
+    renderRoute(
+      seededClient([operationCase({ allowedActions: [] })]),
+      "/admin/today?case=case-notification",
+    );
+
+    expect(await screen.findByText("현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
+    expect(operationsApi.acknowledge).not.toHaveBeenCalled();
+  });
+
+  it("cannot mutate when SUPPORT allowedActions stay empty even if the role is labeled OWNER", async () => {
+    const client = seededClient([operationCase({ allowedActions: [] })]);
+    seedCapabilities(client, {
+      ...ownerCapabilities,
+      role: "OWNER",
+      capabilities: [...ownerCapabilities.capabilities],
+    });
+
+    renderRoute(client, "/admin/today?case=case-notification");
+
+    expect(await screen.findByText("현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "해결 확인" })).not.toBeInTheDocument();
+    expect(operationsApi.acknowledge).not.toHaveBeenCalled();
+    expect(operationsApi.resolve).not.toHaveBeenCalled();
+  });
+
+  it("does not announce L1 success until list and detail have been refetched", async () => {
+    const user = userEvent.setup();
+    const acknowledged = operationCase({
+      state: "ACKNOWLEDGED",
+      version: 4,
+      allowedActions: ["SNOOZE", "RESOLVE"],
+    });
+    let releaseDetail: (() => void) | undefined;
+    operationsApi.acknowledge.mockResolvedValue({
+      schema: "admin.operation_cases.v1",
+      ...acknowledged,
+    });
+    operationsApi.fetchList.mockResolvedValue(listResponse([acknowledged]));
+    operationsApi.fetchDetail.mockImplementation(
+      () => new Promise((resolve) => {
+        releaseDetail = () => resolve(detailResponse(acknowledged));
+      }),
+    );
+    renderRoute(seededClient(), "/admin/today?case=case-notification");
+
+    await user.click(await screen.findByRole("button", { name: "확인 처리" }));
+
+    expect(screen.queryByText("케이스 상태를 반영했습니다.")).not.toBeInTheDocument();
+    expect(operationsApi.acknowledge).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      releaseDetail?.();
+    });
+
+    expect(await screen.findByText("케이스 상태를 반영했습니다.")).toBeInTheDocument();
+    expect(operationsApi.fetchDetail).toHaveBeenCalled();
+    expect(operationsApi.fetchList).toHaveBeenCalled();
+    expect(operationsApi.acknowledge).toHaveBeenCalledTimes(1);
+  });
+
+  it("enters unknown-outcome on response loss, reconciles, and performs zero blind retry", async () => {
+    const user = userEvent.setup();
+    operationsApi.acknowledge.mockRejectedValue(new ReadmatesTransportError());
+    const client = seededClient();
+    renderRoute(client, "/admin/today?case=case-notification");
+
+    await user.click(await screen.findByRole("button", { name: "확인 처리" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("명령 응답을 확인하지 못했습니다.");
+    expect(screen.getByRole("group", { name: "작업" }).closest("[data-state]")).toHaveAttribute(
+      "data-state",
+      "unknown-outcome",
+    );
+    await waitFor(() => expect(operationsApi.fetchList).toHaveBeenCalled());
+    await waitFor(() => expect(operationsApi.fetchDetail).toHaveBeenCalled());
+    expect(operationsApi.acknowledge).toHaveBeenCalledTimes(1);
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(operationsApi.acknowledge).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a mutation result on the captured case instead of the later selection", async () => {
+    const user = userEvent.setup();
+    const second = operationCase({
+      id: "case-second",
+      summaryCode: "CLUB_SETUP_REQUIRED",
+      firstObservedAt: "2026-08-04T09:00:00Z",
+    });
+    let releaseAck: (() => void) | undefined;
+    operationsApi.acknowledge.mockImplementation(
+      () => new Promise((resolve) => {
+        releaseAck = () => resolve({
+          schema: "admin.operation_cases.v1",
+          ...operationCase({ state: "ACKNOWLEDGED", version: 4, allowedActions: ["SNOOZE", "RESOLVE"] }),
+        });
+      }),
+    );
+    operationsApi.fetchList.mockResolvedValue(listResponse([
+      operationCase({ state: "ACKNOWLEDGED", version: 4, allowedActions: ["SNOOZE", "RESOLVE"] }),
+      second,
+    ]));
+    operationsApi.fetchDetail.mockResolvedValue(detailResponse(second));
+    const client = seededClient([operationCase(), second]);
+    renderRoute(client, "/admin/today?case=case-notification");
+
+    await user.click(await screen.findByRole("button", { name: "확인 처리" }));
+    await user.click(screen.getByRole("button", { name: /클럽 설정이 필요합니다/ }));
+
+    await act(async () => {
+      releaseAck?.();
+    });
+
+    expect(screen.queryByText("케이스 상태를 반영했습니다.")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("current location")).toHaveTextContent("case=case-second");
+  });
+
+  it("retries continuation failure without replacing last-known-good rows", async () => {
+    const user = userEvent.setup();
+    const first = operationCase({ id: "case-first", severity: "CRITICAL" });
+    operationsApi.fetchList.mockImplementation(async (filter: { cursor?: string }) => {
+      if (filter.cursor === "cursor-page-2") {
+        throw Object.assign(new Error("unavailable"), { status: 503, code: "UNAVAILABLE" });
+      }
+      return { ...listResponse([first]), nextCursor: "cursor-page-2" };
+    });
+    renderRoute(freshClient(), "/admin/today?case=case-first&state=open&source=notification");
+
+    expect(await screen.findByRole("button", { name: /알림 전달 실패/ })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "운영 케이스 더 보기" }));
+
+    expect(await screen.findByRole("button", { name: "운영 케이스 더 보기" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /알림 전달 실패/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText("운영 케이스를 불러오지 못했습니다")).not.toBeInTheDocument();
+  });
+
+  it("uses a mobile list/detail URL and restores row focus after Back", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("matchMedia", vi.fn().mockImplementation(() => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })));
+    renderRoute(seededClient(), "/admin/today?case=case-notification");
+
+    expect(await screen.findByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "운영 케이스 상세" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("current location")).toHaveTextContent("case=case-notification");
+      expect(screen.getByLabelText("current location")).toHaveTextContent("mode=detail");
+    });
+    expect(screen.getByRole("button", { name: "목록으로" })).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "목록으로" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("current location")).not.toHaveTextContent("mode=detail");
+    });
+    expect(screen.getByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ })).toHaveFocus();
+    vi.unstubAllGlobals();
   });
 });

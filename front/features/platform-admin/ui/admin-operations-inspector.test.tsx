@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import type { AdminOperationCaseView } from "@/features/platform-admin/model/platform-admin-operations-model";
+import { findNestedLiveRegions } from "@/shared/testing/accessibility-checks";
 import { AdminOperationsInspector } from "./admin-operations-inspector";
 
 const selectedCase: AdminOperationCaseView = {
@@ -79,6 +80,75 @@ describe("AdminOperationsInspector", () => {
     expect(screen.queryByText("PRIVATE_HISTORY_CODE")).not.toBeInTheDocument();
     expect(screen.getByRole("group", { name: "작업" })).toHaveClass("admin-action-dock");
     expect(screen.getByRole("button", { name: "확인 처리" })).toBeInTheDocument();
+  });
+
+  it("renders the case docket with a wrapping safe id, L1 dock, and no receipt timeline", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <AdminOperationsInspector
+          selectedCase={{
+            ...selectedCase,
+            id: "case-notification-opaque-identifier-that-wraps-safely",
+          }}
+          history={[]}
+          lifecycleControls={<button type="button">확인 처리</button>}
+          actionState="ready"
+        />
+      </MemoryRouter>,
+    );
+
+    const docket = screen.getByRole("region", { name: "운영 케이스 상세" });
+    expect(docket).toHaveClass("admin-case-docket");
+    expect(screen.getAllByText("case-notification-opaque-identifier-that-wraps-safely").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("case-notification-opaque-identifier-that-wraps-safely").every(
+        (node) => node.classList.contains("admin-operation-wrap"),
+      ),
+    ).toBe(true);
+    expect(screen.getByRole("group", { name: "작업" }).closest("[data-level]")).toHaveAttribute(
+      "data-level",
+      "L1",
+    );
+    expect(container.querySelector(".admin-receipt-timeline")).toBeNull();
+    expect(findNestedLiveRegions(container)).toEqual([]);
+  });
+
+  it("locks the L1 dock for stale and unknown-outcome without nested live regions", () => {
+    const { rerender, container } = render(
+      <MemoryRouter>
+        <AdminOperationsInspector
+          selectedCase={selectedCase}
+          history={[]}
+          lifecycleControls={<button type="button">확인 처리</button>}
+          actionState="stale"
+          actionReason="최신 상태가 아닙니다."
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("group", { name: "작업" }).closest("[data-state]")).toHaveAttribute(
+      "data-state",
+      "stale",
+    );
+    expect(screen.getByRole("button", { name: "확인 처리" })).toBeDisabled();
+
+    rerender(
+      <MemoryRouter>
+        <AdminOperationsInspector
+          selectedCase={selectedCase}
+          history={[]}
+          lifecycleControls={<button type="button">확인 처리</button>}
+          actionState="unknown-outcome"
+          actionReason="명령 응답을 확인하지 못했습니다."
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("group", { name: "작업" }).closest("[data-state]")).toHaveAttribute(
+      "data-state",
+      "unknown-outcome",
+    );
+    expect(findNestedLiveRegions(container)).toEqual([]);
   });
 
   it("shows the permission boundary without lifecycle controls for support", () => {

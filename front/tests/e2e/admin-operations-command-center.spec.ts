@@ -413,14 +413,16 @@ test("mobile presents list then detail then restores the list", async ({ page })
 
   await expect(page.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
   await page.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ }).click();
+  await expect(page).toHaveURL(/mode=detail/);
   await expect(page.getByRole("button", { name: "목록으로" })).toBeFocused();
   await expect(page.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
-  await expect(page.getByRole("group", { name: "작업" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "작업", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "목록으로" }).click();
   await expect(page.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
   await expect(page).toHaveURL(/case=case-notification/);
   await expect(page).toHaveURL(/source=notification/);
+  await expect(page).not.toHaveURL(/mode=detail/);
 });
 
 test("768px uses drill-in rather than stacked columns", async ({ page }) => {
@@ -433,11 +435,13 @@ test("768px uses drill-in rather than stacked columns", async ({ page }) => {
   await expect(page.locator(".admin-today-ledger__columns")).toHaveCount(0);
 
   await page.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ }).click();
+  await expect(page).toHaveURL(/mode=detail/);
   await expect(page.getByRole("button", { name: "목록으로" })).toBeFocused();
-  await expect(page.getByRole("group", { name: "작업" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "작업", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "목록으로" }).click();
   await expect(page.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
   await expect(page).toHaveURL(/source=notification/);
+  await expect(page).not.toHaveURL(/mode=detail/);
 });
 
 test("Escape close backdrop and navigation never confirm resolution", async ({ page }) => {

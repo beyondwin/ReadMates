@@ -41,10 +41,14 @@ export function AdminOperationsQueue({
               onClick={() => onSelectCase(item.id)}
             >
               <span className="admin-operations-queue__headline">
+                {item.locatorLabel ? (
+                  <span className="admin-operations-queue__locator">{item.locatorLabel}</span>
+                ) : null}
                 <strong className="admin-operation-wrap">{item.summary.title}</strong>
                 <span className="admin-operations-queue__severity">{item.severityLabel}</span>
               </span>
               <span className="admin-operations-queue__context">
+                {item.scopeLabel ? <span className="admin-operation-wrap">{item.scopeLabel}</span> : null}
                 <span>현재 상태 · {item.stateLabel}</span>
                 <span>{item.sourceLabel}</span>
                 <span>{item.impactLabel}</span>

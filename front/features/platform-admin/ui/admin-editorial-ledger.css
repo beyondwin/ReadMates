@@ -175,6 +175,72 @@
   }
 }
 
+.admin-today-controls,
+.admin-today-ledger,
+.admin-today-ledger__columns,
+.admin-operations-queue,
+.admin-operation-mobile-detail {
+  min-width: 0;
+}
+
+.admin-today-ledger {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.admin-today-ledger__columns {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: var(--space-md);
+  align-items: start;
+}
+
+.admin-today-controls .admin-work-view-bar__action,
+.admin-today-controls select,
+.admin-today-controls button,
+.admin-today-controls .admin-operation-control--touch,
+.admin-today-ledger .admin-operation-control--touch,
+.admin-operations-queue__row,
+.admin-operation-mobile-detail__back {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.admin-today-urgent-notice,
+.admin-operations-queue__locator,
+.admin-today-ledger .admin-operation-wrap {
+  overflow-wrap: anywhere;
+}
+
+.admin-today-urgent-notice {
+  margin: 0;
+  color: var(--stale);
+}
+
+.admin-today-controls :focus-visible,
+.admin-today-ledger :focus-visible,
+.admin-operations-queue :focus-visible,
+.admin-operation-mobile-detail :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px var(--focus-ring-soft);
+}
+
+@media (max-width: 768px) {
+  .admin-today-controls,
+  .admin-today-ledger {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-today-controls .admin-work-view-bar__action,
+  .admin-today-controls select,
+  .admin-today-controls button,
+  .admin-operation-mobile-detail__back {
+    width: 100%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .admin-page-context,
   .admin-page-context *,
@@ -199,7 +265,23 @@
   .admin-safe-action-dock,
   .admin-safe-action-dock *,
   .admin-safe-action-dock *::before,
-  .admin-safe-action-dock *::after {
+  .admin-safe-action-dock *::after,
+  .admin-today-controls,
+  .admin-today-controls *,
+  .admin-today-controls *::before,
+  .admin-today-controls *::after,
+  .admin-today-ledger,
+  .admin-today-ledger *,
+  .admin-today-ledger *::before,
+  .admin-today-ledger *::after,
+  .admin-operations-queue,
+  .admin-operations-queue *,
+  .admin-operations-queue *::before,
+  .admin-operations-queue *::after,
+  .admin-operation-mobile-detail,
+  .admin-operation-mobile-detail *,
+  .admin-operation-mobile-detail *::before,
+  .admin-operation-mobile-detail *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

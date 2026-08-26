@@ -105,7 +105,7 @@ describe("AdminOperationMobileDetail", () => {
 
     expect(screen.queryByRole("region", { name: "운영 케이스 큐" })).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toBeInTheDocument();
-    expect(screen.getByText(selected.id)).toHaveClass("admin-operation-wrap");
+    expect(screen.getAllByText(selected.id).every((node) => node.classList.contains("admin-operation-wrap"))).toBe(true);
     expect(screen.getByRole("button", { name: "목록으로" })).toHaveFocus();
     expect(screen.getByRole("group", { name: "작업" })).toHaveClass("admin-action-dock");
 
@@ -153,6 +153,64 @@ describe("AdminOperationMobileDetail", () => {
       "admin-operation-control--touch",
     );
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
+  });
+
+  it("keeps list/detail ownership on the mode prop and restores row focus after Back", async () => {
+    const user = userEvent.setup();
+    const selected = operationCase();
+    const onBack = vi.fn();
+    const { rerender } = render(
+      <MemoryRouter>
+        <AdminOperationMobileDetail
+          view={operationsView(selected)}
+          history={[]}
+          lifecycleControls={<button type="button">확인 처리</button>}
+          mode="list"
+          onSelectCase={vi.fn()}
+          onBack={onBack}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /긴 한글 운영 케이스 제목/ }));
+    expect(screen.queryByRole("region", { name: "운영 케이스 상세" })).not.toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter>
+        <AdminOperationMobileDetail
+          view={operationsView(selected)}
+          history={[]}
+          lifecycleControls={<button type="button">확인 처리</button>}
+          mode="detail"
+          onSelectCase={vi.fn()}
+          onBack={onBack}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("button", { name: "목록으로" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "목록으로" })).toHaveClass("admin-operation-control--touch");
+    expect(screen.getAllByText(selected.id).every((node) => node.classList.contains("admin-operation-wrap"))).toBe(true);
+
+    await user.click(screen.getByRole("button", { name: "목록으로" }));
+    expect(onBack).toHaveBeenCalledOnce();
+    expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter>
+        <AdminOperationMobileDetail
+          view={operationsView(selected)}
+          history={[]}
+          lifecycleControls={<button type="button">확인 처리</button>}
+          mode="list"
+          onSelectCase={vi.fn()}
+          onBack={onBack}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("button", { name: /긴 한글 운영 케이스 제목/ })).toHaveFocus();
   });
 
   it("renders an honest empty queue without a disabled fake action", () => {

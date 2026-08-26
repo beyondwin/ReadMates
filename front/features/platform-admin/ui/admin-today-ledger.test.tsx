@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import path from "node:path";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
@@ -10,9 +11,11 @@ import type {
   AdminOperationSourceFreshnessView,
   AdminOperationsView,
 } from "@/features/platform-admin/model/platform-admin-operations-model";
+import { findNestedLiveRegions } from "@/shared/testing/accessibility-checks";
 import { AdminTodayLedger } from "./admin-today-ledger";
 
 const GLOBALS_CSS = readFileSync("src/styles/globals.css", "utf8");
+const LEDGER_CSS = readFileSync(path.resolve("features/platform-admin/ui/admin-editorial-ledger.css"), "utf8");
 
 const emptyView: AdminOperationsView = {
   generatedAt: "2026-08-04T10:00:00Z",
@@ -31,6 +34,12 @@ const emptyView: AdminOperationsView = {
   },
   allSourcesAvailable: true,
   sourceStatusLabel: "전체 신호 정상",
+  workViews: [
+    { id: "briefing", label: "오늘의 브리핑", count: 0 },
+    { id: "mine", label: "내 담당", count: 0 },
+    { id: "snoozed", label: "보류", count: 0 },
+    { id: "resolved-today", label: "오늘 해결", count: null },
+  ],
   nextCursor: null,
 };
 
@@ -356,6 +365,91 @@ describe("AdminTodayLedger", () => {
     expect(GLOBALS_CSS).toMatch(
       /\.admin-today-ledger__filter select[\s\S]*min-height:\s*44px/,
     );
+    expect(LEDGER_CSS).toMatch(/\.admin-today-ledger[\s\S]*min-height:\s*44px/);
+    expect(LEDGER_CSS).not.toMatch(
+      /@media \(max-width: 768px\)[\s\S]{0,400}\.admin-today-ledger__columns[\s\S]{0,200}grid-template-columns:\s*1fr/,
+    );
+    expect(LEDGER_CSS).toContain("overflow-wrap: anywhere");
+  });
+
+  it("composes a persistent desktop ledger and docket without a receipt timeline", () => {
+    stubMatchMedia(false);
+    const { container } = render(
+      <MemoryRouter>
+        <AdminTodayLedger
+          view={populatedView()}
+          filters={{ state: "", severity: "", source: "", assignee: "" }}
+          history={[]}
+          lifecycleControls={<button type="button">확인 처리</button>}
+          query=""
+          workView="briefing"
+          pendingCount={0}
+          urgentCount={0}
+          onFilterChange={vi.fn()}
+          onSelectCase={vi.fn()}
+          onViewChange={vi.fn()}
+          onQueryChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(container.querySelector(".admin-today-ledger__columns")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toHaveClass("admin-case-docket");
+    expect(container.querySelector(".admin-receipt-timeline")).toBeNull();
+    expect(screen.getByRole("button", { name: "오늘의 브리핑 0" })).toHaveAttribute("aria-pressed", "true");
+    expect(findNestedLiveRegions(container)).toEqual([]);
+  });
+
+  it("follows the mobile mode prop instead of stacking columns or inventing local detail", async () => {
+    const user = userEvent.setup();
+    const onSelectCase = vi.fn();
+    const onBackToList = vi.fn();
+    stubMatchMedia(true);
+    const { container, rerender } = render(
+      <MemoryRouter>
+        <AdminTodayLedger
+          view={populatedView()}
+          filters={{ state: "", severity: "", source: "", assignee: "" }}
+          history={[]}
+          lifecycleControls={<button type="button">확인 처리</button>}
+          mode="list"
+          onFilterChange={vi.fn()}
+          onSelectCase={onSelectCase}
+          onBackToList={onBackToList}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(container.querySelector(".admin-today-ledger__columns")).toBeNull();
+    expect(screen.getByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "운영 케이스 상세" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /알림 전달 실패/ }));
+    expect(onSelectCase).toHaveBeenCalledWith("case-notification", { mode: "detail" });
+    expect(screen.queryByRole("region", { name: "운영 케이스 상세" })).not.toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter>
+        <AdminTodayLedger
+          view={populatedView()}
+          filters={{ state: "", severity: "", source: "", assignee: "" }}
+          history={[]}
+          lifecycleControls={<button type="button">확인 처리</button>}
+          mode="detail"
+          onFilterChange={vi.fn()}
+          onSelectCase={onSelectCase}
+          onBackToList={onBackToList}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "목록으로" })).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "목록으로" }));
+    expect(onBackToList).toHaveBeenCalledOnce();
+    expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toBeInTheDocument();
   });
 
   it("keeps partial-source cases interactive and retries only an unavailable source once", async () => {
@@ -462,7 +556,7 @@ describe("AdminTodayLedger", () => {
 
     expect(screen.getByText("일부만 확인됨")).toBeInTheDocument();
     expect(screen.getByText(/확인된 내용은 그대로 사용할 수 있습니다/)).toBeInTheDocument();
-    expect(screen.getByText("일부 신호 확인 불가")).toBeInTheDocument();
+    expect(screen.getAllByText("일부 신호 확인 불가").length).toBeGreaterThan(0);
     expect(screen.getByText("일부 확인 불가 · 마지막 정상 18:40")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /알림 전달 실패/ })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "알림 다시 확인" })).not.toBeInTheDocument();
