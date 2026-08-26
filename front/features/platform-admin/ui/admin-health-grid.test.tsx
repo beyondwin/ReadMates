@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import path from "node:path";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
@@ -9,8 +10,12 @@ import type {
   PlatformHealthSnapshot,
 } from "@/features/platform-admin/model/platform-admin-health-model";
 import { AdminHealthGrid } from "@/features/platform-admin/ui/admin-health-grid";
+import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 
-const GLOBALS_CSS = readFileSync("src/styles/globals.css", "utf8");
+const LEDGER_CSS = readFileSync(
+  path.resolve("features/platform-admin/ui/admin-editorial-ledger.css"),
+  "utf8",
+);
 
 const HEALTH_SNAPSHOT: PlatformHealthSnapshot = {
   schema: "platform.health_snapshot.v1",
@@ -162,6 +167,33 @@ function renderGrid(props: Partial<GridProps> = {}) {
 describe("AdminHealthGrid", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("composes page context and an evidence ledger without case lifecycle chrome", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <AdminHealthGrid
+          snapshot={HEALTH_SNAPSHOT}
+          loading={false}
+          error={false}
+          fetching={false}
+          onRefresh={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("heading", { level: 1, name: "서비스 건강" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByText("서비스")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "서비스 건강" })).toHaveClass("admin-page-frame");
+    expect(screen.getByRole("region", { name: "서비스 신호" })).toHaveClass("admin-evidence-ledger");
+    expect(screen.getByText("정상 갱신 완료")).toBeInTheDocument();
+    expect(container.querySelector(".admin-case-docket")).toBeNull();
+    expect(container.querySelector(".admin-action-dock")).toBeNull();
+    expect(container.querySelector(".admin-safe-action-dock")).toBeNull();
+    expect(container.querySelector(".admin-receipt-timeline")).toBeNull();
+    expect(container.querySelector(".admin-work-view-bar")).toBeNull();
+    expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });
 
   it("renders six health cards plus a separate deploy strip from the seven-card snapshot", () => {
@@ -379,13 +411,56 @@ describe("AdminHealthGrid", () => {
     expect(screen.queryByTestId("admin-health-skeleton")).not.toBeInTheDocument();
   });
 
-  it("keeps health card actions on the 44px contract and stills the skeleton", () => {
-    expect(GLOBALS_CSS).toMatch(/\.admin-health-grid__refresh\s*\{[^}]*min-height:\s*44px/);
-    expect(GLOBALS_CSS).toMatch(/\.admin-health-card__drill[\s\S]*min-height:\s*44px/);
-    expect(GLOBALS_CSS).toMatch(/\.admin-health-card__retry[\s\S]*min-height:\s*44px/);
-    expect(GLOBALS_CSS).toMatch(
-      /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.admin-health-card--skeleton[\s\S]*animation:\s*none/,
+  it("locks 44px targets and reduced motion in the scoped health ledger stylesheet", () => {
+    expect(LEDGER_CSS).toMatch(/\.admin-health-grid[\s\S]*min-height:\s*44px/);
+    expect(LEDGER_CSS).toContain(".admin-health-grid");
+    expect(LEDGER_CSS).toContain("prefers-reduced-motion");
+    expect(LEDGER_CSS).toContain(":focus-visible");
+    expect(LEDGER_CSS).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.admin-health-grid[\s\S]*animation-duration:\s*0\.01ms/,
     );
+    expect(LEDGER_CSS).not.toMatch(/backdrop-filter|linear-gradient/);
+  });
+
+  it("does not import route, query, or API modules", () => {
+    const source = readFileSync(
+      path.resolve("features/platform-admin/ui/admin-health-grid.tsx"),
+      "utf8",
+    );
+    expect(source).not.toContain("platform-admin-queries");
+    expect(source).not.toContain("platform-admin-health-api");
+    expect(source).not.toContain("admin-health-route");
+    expect(/fetch\s*\(/.test(source)).toBe(false);
+  });
+
+  it("omits evidence count while loading or unavailable", () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <AdminHealthGrid
+          snapshot={null}
+          loading
+          error={false}
+          fetching={false}
+          onRefresh={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("region", { name: "서비스 신호" })).toBeInTheDocument();
+    expect(screen.queryByText(/건$/)).not.toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter>
+        <AdminHealthGrid
+          snapshot={null}
+          loading={false}
+          error
+          fetching={false}
+          onRefresh={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("region", { name: "서비스 신호" })).toBeInTheDocument();
+    expect(screen.queryByText(/건$/)).not.toBeInTheDocument();
   });
 
   it.each(["STALE", "UNAVAILABLE"] as const)(

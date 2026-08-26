@@ -154,6 +154,29 @@ describe("AdminHealthCard", () => {
     expect(screen.queryByRole("link", { name: /자세히/ })).toBeNull();
   });
 
+  it("keeps source-specific retry and one drill without case or receipt chrome", async () => {
+    const user = userEvent.setup();
+    const onRetry = vi.fn();
+    renderCard(
+      card({
+        status: "UNKNOWN",
+        metric: null,
+        reason: "prometheus_unreachable",
+      }),
+      { onRetry },
+    );
+
+    await user.click(screen.getByRole("button", { name: "Outbox backlog 다시 확인" }));
+    expect(onRetry).toHaveBeenCalledWith("outbox_backlog");
+    expect(screen.getByRole("link", { name: /자세히/ })).toHaveAttribute(
+      "href",
+      "/admin/notifications?focus=outbox_backlog",
+    );
+    expect(document.querySelector(".admin-case-docket")).toBeNull();
+    expect(document.querySelector(".admin-action-dock")).toBeNull();
+    expect(document.querySelector(".admin-receipt-timeline")).toBeNull();
+  });
+
   it("does not render NaN for invalid last checked timestamps", () => {
     renderCard(card({ lastCheckedAt: "not-a-date" }));
     expect(screen.queryByText(/NaN/)).toBeNull();

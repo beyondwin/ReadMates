@@ -6,7 +6,10 @@ import { MemoryRouter } from "react-router";
 import * as api from "@/features/platform-admin/api/platform-admin-health-api";
 import { AdminHealthRoute } from "@/features/platform-admin/route/admin-health-route";
 import type { PlatformHealthSnapshotResponse } from "@/features/platform-admin/api/platform-admin-health-contracts";
-import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
+import {
+  findNestedLiveRegions,
+  findUnnamedInteractiveElements,
+} from "@/shared/testing/accessibility-checks";
 
 const HEALTH_SNAPSHOT: PlatformHealthSnapshotResponse = {
   schema: "platform.health_snapshot.v1",
@@ -134,7 +137,14 @@ describe("AdminHealthRoute", () => {
     const { container } = renderRoute();
     expect(screen.getByRole("heading", { name: "서비스 건강" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "서비스 건강" })).toHaveClass("admin-page-frame");
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(await screen.findByRole("heading", { name: "Outbox backlog" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "서비스 신호" })).toHaveClass("admin-evidence-ledger");
+    expect(container.querySelector(".admin-case-docket")).toBeNull();
+    expect(container.querySelector(".admin-action-dock")).toBeNull();
+    expect(container.querySelector(".admin-safe-action-dock")).toBeNull();
+    expect(container.querySelector(".admin-receipt-timeline")).toBeNull();
+    expect(findNestedLiveRegions(container)).toEqual([]);
     expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
     expect(screen.getByRole("heading", { name: "Kafka consumer lag" })).toBeInTheDocument();
@@ -155,6 +165,7 @@ describe("AdminHealthRoute", () => {
     renderRoute();
 
     expect(screen.getByRole("heading", { name: "서비스 건강" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "서비스 신호" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toBeInTheDocument();
     expect(screen.getByTestId("admin-health-skeleton")).toBeInTheDocument();
     expect(screen.queryByText("Outbox backlog")).not.toBeInTheDocument();
@@ -186,6 +197,7 @@ describe("AdminHealthRoute", () => {
     renderRoute();
 
     expect(await screen.findByText("정상 갱신 완료")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "서비스 신호" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "새로고침" }));
 
     expect(await screen.findByText("마지막 정상 갱신 2분 5초 전")).toBeInTheDocument();

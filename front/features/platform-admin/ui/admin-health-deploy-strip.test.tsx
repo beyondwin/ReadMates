@@ -58,6 +58,18 @@ describe("AdminHealthDeployStrip", () => {
     expect(screen.getByText(/진행 중/)).toBeInTheDocument();
   });
 
+  it("keeps last-known-good rows without current-green evidence or action chrome", () => {
+    render(
+      <AdminHealthDeployStrip evidenceState="ok" lastKnown entries={[entry()]} />,
+    );
+
+    expect(screen.getByText(/deploy-dev-001/)).toBeInTheDocument();
+    expect(document.querySelector(".admin-health-deploy-strip__dot--ok")).toBeNull();
+    expect(document.querySelector(".admin-health-deploy-strip__dot--last-known")).not.toBeNull();
+    expect(document.querySelector(".admin-action-dock")).toBeNull();
+    expect(document.querySelector(".admin-receipt-timeline")).toBeNull();
+  });
+
   it("uses attempt id, image tag, and started timestamp as visible row context", () => {
     const { container } = render(<AdminHealthDeployStrip evidenceState="ok" entries={[entry()]} />);
 

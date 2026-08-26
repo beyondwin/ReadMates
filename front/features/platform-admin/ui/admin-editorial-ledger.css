@@ -308,6 +308,74 @@
   }
 }
 
+.admin-health-grid,
+.admin-health-grid .admin-page-context,
+.admin-health-grid .admin-evidence-ledger {
+  min-width: 0;
+}
+
+.admin-health-grid {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.admin-health-grid .admin-health-grid__refresh,
+.admin-health-grid .admin-health-card__drill,
+.admin-health-grid .admin-health-card__retry,
+.admin-health-grid .admin-page-frame__action .btn,
+.admin-health-grid .admin-page-frame__action button,
+.admin-health-grid .admin-evidence-ledger__controls .btn,
+.admin-health-grid .admin-evidence-ledger__controls button {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.admin-health-grid .admin-health-card,
+.admin-health-grid .admin-health-card__time,
+.admin-health-grid .admin-health-card__drill,
+.admin-health-grid .admin-health-deploy-strip__title,
+.admin-health-grid .admin-health-deploy-strip__time,
+.admin-health-grid .admin-page-context__freshness,
+.admin-health-grid .admin-page-context__scope {
+  overflow-wrap: anywhere;
+}
+
+.admin-health-grid :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px var(--focus-ring-soft);
+}
+
+@media (max-width: 768px) {
+  .admin-health-grid,
+  .admin-health-grid .admin-health-grid__cards,
+  .admin-health-grid .admin-health-grid__strip-header,
+  .admin-health-grid .admin-health-card__footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-health-grid .admin-health-grid__refresh,
+  .admin-health-grid .admin-health-card__drill,
+  .admin-health-grid .admin-health-card__retry,
+  .admin-health-grid .admin-page-frame__action .btn,
+  .admin-health-grid .admin-page-frame__action button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-health-grid,
+  .admin-health-grid *,
+  .admin-health-grid *::before,
+  .admin-health-grid *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .admin-page-context,
   .admin-page-context *,
