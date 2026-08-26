@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import userEvent from "@testing-library/user-event";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter } from "react-router";
@@ -518,6 +520,7 @@ describe("HostMembersPage", () => {
     const contentContainer = document.querySelector("main > section.container") as HTMLElement | null;
     expect(page).not.toBeNull();
     expect(page).toHaveClass("rm-host-editorial-ledger");
+    expect(page).toHaveClass("rm-host-editorial-ledger--context");
     expect(headerEyebrow?.tagName).toBe("DIV");
     expect(contentContainer).not.toBeNull();
     expect(contentContainer).toHaveClass("rm-host-members-page__body");
@@ -529,6 +532,8 @@ describe("HostMembersPage", () => {
       "rm-host-editorial-ledger__heading",
     );
     expect(page?.querySelector(".page-header-compact")?.querySelectorAll("[style]")).toHaveLength(0);
+    const css = readFileSync(path.resolve("features/host/ui/host-editorial-ledger.css"), "utf8");
+    expect(css).not.toContain(".rm-host-editorial-ledger :is(a.btn, button.btn)");
   });
 
   it("labels viewer members as browsing members instead of approval pending", async () => {

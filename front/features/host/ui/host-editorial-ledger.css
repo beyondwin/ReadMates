@@ -1,4 +1,5 @@
-/* Host route-specific editorial ledger. Reuses design-system tokens only. */
+/* Host route-specific editorial ledger. Reuses design-system tokens only.
+   Members/notifications use --context for page chrome only; do not restyle domain .btn. */
 
 .rm-host-editorial-ledger {
   min-width: 0;
@@ -69,13 +70,11 @@
   padding-bottom: var(--space-2xl);
 }
 
-.rm-host-editorial-ledger :is(a.btn, button.btn),
 .rm-host-editorial-ledger__action {
   min-width: 44px;
   min-height: 44px;
 }
 
-.rm-host-editorial-ledger :is(a.btn, button.btn):focus-visible,
 .rm-host-editorial-ledger__action:focus-visible,
 .rm-host-editorial-ledger__heading:focus-visible {
   outline: 2px solid var(--focus-ring);
@@ -170,7 +169,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .rm-host-editorial-ledger :is(a.btn, button.btn),
   .rm-host-editorial-ledger__action {
     width: 100%;
   }

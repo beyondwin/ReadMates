@@ -18,7 +18,7 @@ export function HostMembersRoute({ LinkComponent }: { LinkComponent?: HostMember
   );
 
   return (
-    <main className="rm-host-members-page rm-host-editorial-ledger">
+    <main className="rm-host-members-page rm-host-editorial-ledger rm-host-editorial-ledger--context">
       <section className="page-header-compact">
         <div className="container rm-host-editorial-ledger__context">
           <div className="eyebrow rm-host-editorial-ledger__eyebrow">운영 · 멤버 관리</div>

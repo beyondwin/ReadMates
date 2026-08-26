@@ -91,5 +91,8 @@ describe("host notifications UI boundary", () => {
     );
     expect(route).toContain("host-editorial-ledger.css");
     expect(page).not.toContain("host-editorial-ledger.css");
+    expect(route).toContain("rm-host-editorial-ledger--context");
+    const css = readFileSync(resolve(repoRoot, "features/host/ui/host-editorial-ledger.css"), "utf8");
+    expect(css).not.toContain(".rm-host-editorial-ledger :is(a.btn, button.btn)");
   });
 });

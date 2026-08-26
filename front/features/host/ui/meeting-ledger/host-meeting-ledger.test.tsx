@@ -353,8 +353,12 @@ describe("HostMeetingLedger", () => {
     expect(root!.querySelector("[role='tablist']")).toBeNull();
     expect(root!.querySelectorAll("[style]")).toHaveLength(0);
     expect(findNestedLiveRegions(root!)).toEqual([]);
-    expect(root!.querySelector(".rm-host-editorial-ledger__identity")).toHaveTextContent("2026.04.15");
-    expect(root!.querySelector(".rm-host-editorial-ledger__identity")).toHaveTextContent("진행 중");
+    expect(root!.querySelector(".rm-host-editorial-ledger__identity")).toHaveTextContent(
+      "2026.04.15 · 멤버와 준비 중",
+    );
+    expect(root!.querySelector(".rm-host-editorial-ledger__identity")?.textContent).not.toMatch(
+      /진행 중|공개됨|종료/,
+    );
     expect(within(root!).getAllByRole("link", { name: "지금 다루는 모임 열기" })).toHaveLength(1);
     expect(within(root!).getByRole("link", { name: "지금 다루는 모임 열기" })).toHaveClass(
       "rm-host-editorial-ledger__action",
@@ -385,5 +389,27 @@ describe("HostMeetingLedger", () => {
     );
     expect(screen.getByRole("alert")).toHaveClass("rm-host-editorial-ledger__state");
     expect(root.querySelectorAll("[style]")).toHaveLength(0);
+  });
+
+  it.each([
+    ["DRAFT", "모임 작성 중"],
+    ["OPEN", "멤버와 준비 중"],
+    ["CLOSED", "기록 정리 중"],
+    ["PUBLISHED", "공개 완료"],
+  ] as const)("uses the exact host status label on home identity for %s", (state, label) => {
+    render(
+      <MemoryRouter>
+        <HostMeetingLedger
+          overviewOnly
+          items={[{ sessionId: "home-1", state, date: "2026-04-15" }]}
+          LinkComponent={TestLink}
+        />
+      </MemoryRouter>,
+    );
+
+    const identity = document.querySelector(".rm-host-editorial-ledger__identity");
+    expect(identity).toHaveTextContent(`2026.04.15 · ${label}`);
+    expect(identity).not.toHaveTextContent("공개됨");
+    expect(identity).not.toHaveTextContent("종료");
   });
 });

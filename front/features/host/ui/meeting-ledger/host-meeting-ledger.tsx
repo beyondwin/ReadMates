@@ -40,10 +40,10 @@ function ignoreUpcomingAccessScope() {}
 function ignoreUpcomingCreate() {}
 
 function meetingStateLabel(state: MeetingListItem["state"]) {
-  if (state === "OPEN") return "진행 중";
-  if (state === "DRAFT") return "작성 중";
-  if (state === "PUBLISHED") return "공개됨";
-  return "종료";
+  if (state === "DRAFT") return "모임 작성 중";
+  if (state === "OPEN") return "멤버와 준비 중";
+  if (state === "PUBLISHED") return "공개 완료";
+  return "기록 정리 중";
 }
 
 function HostHomeAttention({

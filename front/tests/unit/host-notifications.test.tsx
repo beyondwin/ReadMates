@@ -533,7 +533,9 @@ describe("HostNotificationsRoute", () => {
     renderNotificationsRoute();
 
     expect(await screen.findByRole("heading", { name: "알림 발송 작업대" })).toBeInTheDocument();
-    expect(document.querySelector(".rm-host-editorial-ledger")).not.toBeNull();
+    expect(document.querySelector(".rm-host-editorial-ledger")).toHaveClass(
+      "rm-host-editorial-ledger--context",
+    );
     expect(screen.getByRole("heading", { level: 1, name: "알림 발송 작업대" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "새 알림 발송" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "최근 수동 발송" })).toBeInTheDocument();

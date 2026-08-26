@@ -160,7 +160,7 @@ export function HostNotificationsRoute() {
   };
 
   return (
-    <div className="rm-host-editorial-ledger">
+    <div className="rm-host-editorial-ledger rm-host-editorial-ledger--context">
       <HostNotificationsPage
       clubSlug={context.clubSlug}
       summary={summaryQuery.data ?? { pending: 0, failed: 0, dead: 0, sentLast24h: 0, latestFailures: [] }}
