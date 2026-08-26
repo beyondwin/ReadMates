@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
@@ -453,5 +455,31 @@ describe("HostSessionWorkspace", () => {
     expect(onLocationChange).toHaveBeenCalledWith({ panel: "focus", source: "manual" });
     expect(screen.queryByRole("dialog", { name: "변경 내역" })).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
+  });
+
+  it("keeps work surfaces without a second Focus Deck chrome", () => {
+    render(
+      <WorkspaceHarness
+        view={viewFor({ ...baseInput, state: "OPEN" })}
+        chrome={false}
+        pendingUndo={{
+          description: "출석을 바꿨습니다.",
+          onUndo: vi.fn(),
+          onOpenHistory: vi.fn(),
+          onDismiss: vi.fn(),
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "지금 할 일" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "출석" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "기록" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "되돌리기" })).toBeVisible();
+  });
+
+  it("does not import meeting-focus-facts", () => {
+    const source = readFileSync(path.join(process.cwd(), "features/host/ui/session-workspace/host-session-workspace.tsx"), "utf8");
+    expect(source).not.toMatch("meeting-focus-facts");
   });
 });

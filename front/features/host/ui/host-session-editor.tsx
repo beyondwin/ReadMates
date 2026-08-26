@@ -119,6 +119,7 @@ import {
   SessionRecordApplyDialog,
   type HostSessionRecordApplyReview,
 } from "./session-editor/session-record-apply-dialog";
+import { MeetingFocusFacts } from "./meeting-workspace/meeting-focus-facts";
 import { HostSessionWorkspace } from "./session-workspace/host-session-workspace";
 import {
   WorkspaceTrashTombstone,
@@ -1254,8 +1255,19 @@ export default function HostSessionEditor({
     }
     if (kind === "PUBLISH_RECORD") {
       requestLifecycleConfirm("publish");
+      return;
     }
-  }, [changeLocation, displayedWorkspaceView.primaryAction.kind, recordWorkflow, requestLifecycleConfirm]);
+    if (kind === "VIEW_PUBLIC_RECORD") {
+      const href = displaySession?.state === "PUBLISHED" && session
+        ? scopedHostRedirectHref(`/app/sessions/${encodeURIComponent(session.sessionId)}`)
+        : null;
+      if (href) {
+        const link = document.createElement("a");
+        link.href = href;
+        link.click();
+      }
+    }
+  }, [changeLocation, displaySession?.state, displayedWorkspaceView.primaryAction.kind, recordWorkflow, requestLifecycleConfirm, session]);
 
   useLayoutEffect(() => {
     if (!primaryActionRef) return;
@@ -1315,9 +1327,10 @@ export default function HostSessionEditor({
 
   return (
     <EditorRoot className="rm-host-session-editor">
-      {composeDeck ? <HostSessionWorkspace
+      <HostSessionWorkspace
+        chrome={composeDeck}
         view={displayedWorkspaceView}
-        facts={meetingWorkspaceView.facts}
+        facts={composeDeck ? <MeetingFocusFacts facts={meetingWorkspaceView.facts} /> : null}
         header={{
           returnHref: showReturnLink ? returnTarget.href : null,
           returnLabel: showReturnLink ? returnTarget.label : null,
@@ -1505,7 +1518,9 @@ export default function HostSessionEditor({
               emptyMessage={emptyManagementMessage}
               onUpdateAttendance={updateAttendance}
             />
-          ) : null
+          ) : (
+            <></>
+          )
         }
         recordsPanel={
           visitedPanels.has("records") || activePanel === "records" ? (
@@ -1576,7 +1591,9 @@ export default function HostSessionEditor({
                 기본 정보를 저장한 뒤 기록을 작성할 수 있습니다.
               </div>
             )
-          ) : null
+          ) : (
+            <></>
+          )
         }
         historyPanel={
           visitedPanels.has("history") || activePanel === "history" ? (
@@ -1599,42 +1616,7 @@ export default function HostSessionEditor({
             <div className="surface-quiet small" style={{ padding: 14 }}>아직 변경 기록이 없습니다</div>
           )
         }
-      /> : (
-        <>
-          {(meetingTask === "responses" || displayedWorkspaceView.primaryAction.kind === "REVIEW_MEMBER_INPUT") && session ? (
-            <div id="workspace-member-responses" tabIndex={-1}>
-              <MeetingResponseLedger
-                rows={session.attendees
-                  .filter((attendee) => (attendee.participationStatus ?? "ACTIVE") === "ACTIVE")
-                  .map((attendee, index) => ({
-                    membershipId: attendee.membershipId,
-                    displayName: attendee.displayName,
-                    secondaryLabel: `참여자 ${index + 1}`,
-                    response: attendee.rsvpStatus === "DECLINED"
-                      ? "NOT_GOING"
-                      : attendee.rsvpStatus === "MAYBE"
-                        ? "UNSURE"
-                        : attendee.rsvpStatus,
-                    attendance: attendanceStatuses[attendee.membershipId] ?? attendee.attendanceStatus,
-                    attendanceRevision: attendee.attendanceRevision,
-                    questionCount: null,
-                    recentResponseLabel: null,
-                  }))}
-                onAttendanceChange={(membershipId, attendance) => void updateAttendance(membershipId, attendance)}
-                onBulkAttendanceChange={(membershipIds, attendance) => void updateBulkAttendance(membershipIds, attendance)}
-              />
-            </div>
-          ) : null}
-          {meetingTask === "attendance" || workspaceLocation.panel === "attendance" ? (
-            <AttendancePanel
-              session={session}
-              attendanceStatuses={attendanceStatuses}
-              emptyMessage={emptyManagementMessage}
-              onUpdateAttendance={updateAttendance}
-            />
-          ) : null}
-        </>
-      )}
+      />
 
       {recordWorkflow?.confirmation.message ? (
         <div

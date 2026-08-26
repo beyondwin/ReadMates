@@ -1,17 +1,11 @@
 import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import type {
-  HostFocusFact,
   HostSessionWorkspaceLocation,
   HostSessionWorkspacePanel,
   HostSessionWorkspaceView,
 } from "@/features/host/model/host-session-workspace-model";
-import type { HostMeetingRecordReadiness } from "@/features/host/model/host-meeting-record-readiness";
 import type { HostSessionEditorLinkComponent } from "@/features/host/ui/session-editor/session-editor-links";
 import { DefaultLinkComponent } from "@/features/host/ui/session-editor/session-editor-links";
-import {
-  MeetingFocusFacts,
-  type MeetingAudienceProjection,
-} from "@/features/host/ui/meeting-workspace/meeting-focus-facts";
 import { WorkspaceFocusCard } from "./workspace-focus-card";
 import { WorkspaceHeader, type WorkspaceHeaderModel } from "./workspace-header";
 import { WorkspacePanel } from "./workspace-panel";
@@ -49,16 +43,14 @@ export type HostSessionWorkspaceProps = {
   descriptionOverride?: string | null;
   focusContent?: ReactNode;
   relatedWork?: ReactNode;
-  facts?: readonly HostFocusFact[];
-  projections?: readonly MeetingAudienceProjection[];
-  recordReadiness?: HostMeetingRecordReadiness;
-  onRetryReadiness?: () => void;
+  facts?: ReactNode;
   recovery?: ReactNode;
   panel?: ReactNode;
   basicPanel?: ReactNode;
   attendancePanel?: ReactNode;
   recordsPanel?: ReactNode;
   historyPanel?: ReactNode;
+  chrome?: boolean;
   LinkComponent?: HostSessionEditorLinkComponent;
 };
 
@@ -100,22 +92,21 @@ export function HostSessionWorkspace({
   focusContent,
   relatedWork,
   facts,
-  projections,
-  recordReadiness,
-  onRetryReadiness,
   recovery,
   panel,
   basicPanel = null,
   attendancePanel,
   recordsPanel,
   historyPanel = null,
+  chrome = true,
   LinkComponent = DefaultLinkComponent,
 }: HostSessionWorkspaceProps) {
   const basicOpen = location.panel === "basic";
   const historyOpen = location.panel === "history";
   const attendanceOpen = location.panel === "attendance";
   const recordsOpen = location.panel === "records";
-  const sheetOpen = basicOpen || historyOpen;
+  const hasSheets = basicPanel != null || historyPanel != null;
+  const sheetOpen = hasSheets && (basicOpen || historyOpen);
   const statusLabel = hostStatusLabel(view.statusLabel);
   const sheetRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
@@ -188,43 +179,40 @@ export function HostSessionWorkspace({
     <div className="rm-host-session-workspace">
       <div className="rm-host-session-workspace__chrome" inert={sheetOpen || undefined}>
       <div className="rm-host-session-workspace__frame">
-        <WorkspaceHeader
-          header={header}
-          statusLabel={statusLabel}
-          basicOpen={basicOpen}
-          historyOpen={historyOpen}
-          onOpenBasic={() => changePanel(basicOpen ? focusLocation() : panelLocation("basic"))}
-          onOpenHistory={() => changePanel(historyOpen ? focusLocation() : panelLocation("history"))}
-          LinkComponent={LinkComponent}
-        />
+        {chrome ? (
+          <WorkspaceHeader
+            header={header}
+            statusLabel={statusLabel}
+            basicOpen={basicOpen}
+            historyOpen={historyOpen}
+            onOpenBasic={() => changePanel(basicOpen ? focusLocation() : panelLocation("basic"))}
+            onOpenHistory={() => changePanel(historyOpen ? focusLocation() : panelLocation("history"))}
+            LinkComponent={LinkComponent}
+          />
+        ) : null}
 
         <div className="rm-host-session-workspace__layout">
           <div className="rm-host-session-workspace__main">
-            <WorkspaceFocusCard
-              view={view}
-              onPrimaryAction={onPrimaryAction}
-              primaryActionDisabled={disabled}
-              primaryActionReason={primaryActionReason}
-              publicRecordHref={publicRecordHref}
-              reverseAction={reverseAction}
-              onCreateRevision={onCreateRevision}
-              error={error}
-              descriptionOverride={descriptionOverride}
-              LinkComponent={LinkComponent}
-            >
-              {focusContent}
-            </WorkspaceFocusCard>
+            {chrome ? (
+              <WorkspaceFocusCard
+                view={view}
+                onPrimaryAction={onPrimaryAction}
+                primaryActionDisabled={disabled}
+                primaryActionReason={primaryActionReason}
+                publicRecordHref={publicRecordHref}
+                reverseAction={reverseAction}
+                onCreateRevision={onCreateRevision}
+                error={error}
+                descriptionOverride={descriptionOverride}
+                LinkComponent={LinkComponent}
+              >
+                {focusContent}
+              </WorkspaceFocusCard>
+            ) : focusContent}
 
-            {facts && facts.length > 0 ? (
-              <MeetingFocusFacts
-                facts={facts}
-                projections={projections}
-                recordReadiness={recordReadiness}
-                onRetryReadiness={onRetryReadiness}
-              />
-            ) : null}
+            {chrome ? facts : null}
 
-            {relatedWork}
+            {chrome ? relatedWork : null}
 
             {draftSaveLabel ? (
               <p className="small rm-host-session-workspace__save-state">{draftSaveLabel}</p>
@@ -267,6 +255,7 @@ export function HostSessionWorkspace({
         </div>
       </div>
 
+      {chrome ? (
       <div className="rm-host-session-workspace__sticky-cta rm-host-session-workspace__footer-cta">
         {showPublicLink && publicRecordHref ? (
           <LinkComponent
@@ -286,8 +275,10 @@ export function HostSessionWorkspace({
           </button>
         )}
       </div>
+      ) : null}
       </div>
 
+      {hasSheets ? (
       <div
         className="rm-host-session-workspace__sheet-backdrop"
         hidden={!sheetOpen}
@@ -332,6 +323,7 @@ export function HostSessionWorkspace({
           </div>
         </div>
       </div>
+      ) : null}
     </div>
   );
 }

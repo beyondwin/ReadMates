@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { buildHostMeetingWorkspace } from "@/features/host/model/host-session-workspace-model";
+import { buildMeetingAudienceProjections } from "./meeting-audience-projections";
 import { MeetingFocusFacts } from "./meeting-focus-facts";
 
 const openFacts = buildHostMeetingWorkspace({
@@ -29,6 +30,25 @@ describe("MeetingFocusFacts", () => {
     expect(within(region).queryByText("확인 필요")).not.toBeInTheDocument();
     expect(within(region).queryByText(/완료율|퍼센트|진행 중|대기/)).not.toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "진행 상황" })).not.toBeInTheDocument();
+  });
+
+  it("keeps HOST_ONLY audience and public placement independent of publication readiness", () => {
+    expect(buildMeetingAudienceProjections({
+      visibility: "HOST_ONLY",
+      lifecycle: "CLOSED",
+    })).toEqual([
+      { audience: "호스트", result: "운영 기록과 초안 계속 편집" },
+      { audience: "게스트·멤버", result: "호스트만 확인" },
+      { audience: "공개 기록", result: "공개 기록에 게시 안 됨" },
+    ]);
+    expect(buildMeetingAudienceProjections({
+      visibility: "PUBLIC",
+      lifecycle: "PUBLISHED",
+    })).toEqual([
+      { audience: "호스트", result: "운영 기록과 초안 계속 편집" },
+      { audience: "게스트·멤버", result: "게스트·멤버 노트에서 읽음" },
+      { audience: "공개 기록", result: "공개 기록에 게시" },
+    ]);
   });
 
   it("rehomes judgment projections as audience and public facts", () => {

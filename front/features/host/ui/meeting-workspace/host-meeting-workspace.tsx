@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import type {
   HostFocusFact,
   HostMeetingWorkspaceView,
@@ -9,7 +9,13 @@ import type { HostMeetingRecordReadiness } from "@/features/host/model/host-meet
 import { commitHostMeetingFirstUsable } from "@/shared/observability/host-meeting-performance";
 import { HostSessionWorkspace } from "@/features/host/ui/session-workspace/host-session-workspace";
 import type { WorkspaceHeaderModel } from "@/features/host/ui/session-workspace/workspace-header";
-import { type MeetingAudienceProjection } from "./meeting-focus-facts";
+import type { HostSessionEditorLinkComponent } from "@/features/host/ui/session-editor/session-editor-links";
+import type {
+  WorkspacePendingUndo,
+  WorkspaceRestoreNotice,
+  WorkspaceUndoConfirm,
+} from "@/features/host/ui/session-workspace/workspace-undo-bar";
+import { MeetingFocusFacts, type MeetingAudienceProjection } from "./meeting-focus-facts";
 import { MeetingRelatedWork } from "./meeting-related-work";
 
 export type HostMeetingWorkspaceProps = {
@@ -18,12 +24,24 @@ export type HostMeetingWorkspaceProps = {
   facts: readonly HostFocusFact[];
   focusContent?: ReactNode;
   relatedWork?: ReactNode;
+  projections?: readonly MeetingAudienceProjection[];
   recordReadiness?: HostMeetingRecordReadiness;
   panel?: ReactNode;
   recovery?: ReactNode;
+  publicRecordHref?: string | null;
+  onCreateRevision?: (() => void) | null;
+  reverseAction?: { label: string; onClick: () => void } | null;
+  onOpenBasic?: () => void;
+  onOpenHistory?: () => void;
+  pendingUndo?: WorkspacePendingUndo | null;
+  undoConfirm?: WorkspaceUndoConfirm | null;
+  restoreNotice?: WorkspaceRestoreNotice | null;
   onPrimaryAction: () => void;
   onRetryReadiness?: () => void;
+  LinkComponent?: HostSessionEditorLinkComponent;
 };
+
+const focusOnlyLocation: HostSessionWorkspaceLocation = { panel: "focus", source: "manual" };
 
 function sessionViewFromMeeting(view: HostMeetingWorkspaceView): HostSessionWorkspaceView {
   const panel = view.primaryAction.task === "attendance"
@@ -43,37 +61,29 @@ function sessionViewFromMeeting(view: HostMeetingWorkspaceView): HostSessionWork
   };
 }
 
-function audienceProjections(view: HostMeetingWorkspaceView): readonly MeetingAudienceProjection[] {
-  return [
-    { audience: "호스트", result: "운영 기록과 초안 계속 편집" },
-    {
-      audience: "게스트·멤버",
-      result: view.lifecycle === "PUBLISHED" ? "게스트·멤버 노트에서 읽음" : "허용된 아카이브에서 읽음",
-    },
-    {
-      audience: "공개 기록",
-      result: view.publicationReady ? "공개 기록에 게시" : "공개 기록에 게시 안 됨",
-    },
-  ];
-}
-
 export function HostMeetingWorkspace({
   view,
   header,
   facts,
   focusContent,
   relatedWork,
+  projections,
   recordReadiness,
   panel,
   recovery,
+  publicRecordHref = null,
+  onCreateRevision = null,
+  reverseAction = null,
+  onOpenBasic,
+  onOpenHistory,
+  pendingUndo = null,
+  undoConfirm = null,
+  restoreNotice = null,
   onPrimaryAction,
   onRetryReadiness,
+  LinkComponent,
 }: HostMeetingWorkspaceProps) {
   const workspaceRef = useRef<HTMLDivElement>(null);
-  const [location, setLocation] = useState<HostSessionWorkspaceLocation>({
-    panel: "focus",
-    source: "manual",
-  });
 
   useLayoutEffect(() => {
     const control = workspaceRef.current?.querySelector<HTMLElement>(
@@ -87,21 +97,35 @@ export function HostMeetingWorkspace({
       <HostSessionWorkspace
         view={sessionViewFromMeeting(view)}
         header={header}
-        location={location}
-        onLocationChange={setLocation}
+        location={focusOnlyLocation}
+        onLocationChange={(next) => {
+          if (next.panel === "basic") onOpenBasic?.();
+          if (next.panel === "history") onOpenHistory?.();
+        }}
         onPrimaryAction={onPrimaryAction}
         primaryActionDisabled={view.primaryAction.disabled}
         primaryActionReason={view.primaryAction.reason ?? null}
-        facts={facts}
-        projections={audienceProjections(view)}
-        recordReadiness={recordReadiness}
-        onRetryReadiness={onRetryReadiness}
+        publicRecordHref={publicRecordHref}
+        onCreateRevision={onCreateRevision}
+        reverseAction={reverseAction}
+        facts={(
+          <MeetingFocusFacts
+            facts={facts}
+            projections={projections}
+            recordReadiness={recordReadiness}
+            onRetryReadiness={onRetryReadiness}
+          />
+        )}
         relatedWork={relatedWork ?? <MeetingRelatedWork tasks={view.relatedTasks} />}
         recovery={recovery}
+        pendingUndo={pendingUndo}
+        undoConfirm={undoConfirm}
+        restoreNotice={restoreNotice}
         focusContent={focusContent}
         panel={panel}
         basicPanel={null}
         historyPanel={null}
+        LinkComponent={LinkComponent}
       />
     </div>
   );

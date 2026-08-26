@@ -384,6 +384,52 @@ describe("HostSessionEditor", () => {
     expect(document.querySelector(".rm-host-session-editor")).toBeInTheDocument();
   });
 
+  it("keeps basic info and trash when composeDeck is false", () => {
+    render(
+      <HostSessionEditorForTest
+        session={openSession}
+        composeDeck={false}
+        initialLocation={{ panel: "basic", source: "manual" }}
+      />,
+    );
+
+    expect(screen.queryByRole("region", { name: "지금 할 일" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("모임 제목")).toBeVisible();
+    expect(screen.getByRole("button", { name: "휴지통으로 이동" })).toBeInTheDocument();
+  });
+
+  it("keeps undo when composeDeck is false", () => {
+    render(
+      <HostSessionEditorForTest
+        session={openSession}
+        composeDeck={false}
+        pendingUndo={{
+          description: "출석을 바꿨습니다.",
+          onUndo: vi.fn(),
+          onOpenHistory: vi.fn(),
+          onDismiss: vi.fn(),
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent("출석을 바꿨습니다.");
+    expect(screen.getByRole("button", { name: "되돌리기" })).toBeVisible();
+  });
+
+  it("keeps the record workspace when composeDeck is false", () => {
+    render(
+      <HostSessionEditorForTest
+        session={session}
+        recordWorkflow={recordWorkflow("MEMBER")}
+        composeDeck={false}
+        initialLocation={{ panel: "records", source: "manual" }}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "정리본" })).toBeVisible();
+    expect(screen.getByRole("tablist", { name: "초안 만들기" })).toBeVisible();
+  });
+
   it("requires restore workflows to expose completion as a promise", () => {
     expect(restoreReturnsPromise).toBe(true);
   });
@@ -634,11 +680,11 @@ describe("HostSessionEditor", () => {
     await user.click(screen.getByRole("button", { name: "모임 정보" }));
     expect(await screen.findByLabelText("모임 제목")).toBeVisible();
 
-    await user.click(within(screen.getByRole("listitem", { name: /기록/ })).getByRole("button"));
+    await user.click(within(screen.getByRole("region", { name: "기록" })).getByRole("button", { name: /열기|접기/ }));
     expect(screen.getByLabelText("공개 요약")).toBeVisible();
     expect(screen.getByLabelText("모임 제목")).not.toBeVisible();
 
-    await user.click(within(screen.getByRole("listitem", { name: /출석/ })).getByRole("button"));
+    await user.click(within(screen.getByRole("region", { name: "출석" })).getByRole("button", { name: /열기|접기/ }));
     expect(screen.getByRole("heading", { name: "출석 확정 명단" })).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "변경 내역" }));
@@ -657,7 +703,7 @@ describe("HostSessionEditor", () => {
     await user.clear(screen.getByLabelText("모임 제목"));
     await user.type(screen.getByLabelText("모임 제목"), "수정 중인 모임 제목");
 
-    await user.click(within(screen.getByRole("listitem", { name: /기록/ })).getByRole("button"));
+    await user.click(within(screen.getByRole("region", { name: "기록" })).getByRole("button", { name: /열기|접기/ }));
     await user.clear(screen.getByLabelText("공개 요약"));
     await user.type(screen.getByLabelText("공개 요약"), "수정 중인 공개 요약");
 
@@ -665,7 +711,7 @@ describe("HostSessionEditor", () => {
     await user.click(screen.getByRole("button", { name: "모임 정보" }));
     expect(screen.getByLabelText("모임 제목")).toHaveValue("수정 중인 모임 제목");
 
-    await user.click(within(screen.getByRole("listitem", { name: /기록/ })).getByRole("button"));
+    await user.click(within(screen.getByRole("region", { name: "기록" })).getByRole("button", { name: /열기|접기/ }));
     expect(screen.getByLabelText("공개 요약")).toHaveValue("수정 중인 공개 요약");
   });
 
@@ -688,7 +734,7 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(within(screen.getByRole("listitem", { name: /기록/ })).getByRole("button"));
+    await user.click(within(screen.getByRole("region", { name: "기록" })).getByRole("button", { name: /열기|접기/ }));
     await user.click(screen.getByLabelText("한줄평 1 · 테스트 멤버"));
     await user.keyboard("{Enter}");
 
@@ -778,7 +824,7 @@ describe("HostSessionEditor", () => {
     expect(screen.getByRole("button", { name: "휴지통으로 이동" })).toBeVisible();
     expect(screen.queryByText("운영 순서")).not.toBeInTheDocument();
 
-    await user.click(within(screen.getByRole("listitem", { name: /출석/ })).getByRole("button"));
+    await user.click(within(screen.getByRole("region", { name: "출석" })).getByRole("button", { name: /열기|접기/ }));
     expect(screen.queryByRole("button", { name: "휴지통으로 이동" })).not.toBeInTheDocument();
   });
 
@@ -1654,8 +1700,9 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    expect(screen.getByText("게스트·멤버 노트 게시 완료")).toBeVisible();
+    expect(screen.getByText("공개 완료")).toBeVisible();
     expect(screen.queryByText("기록 정리 중")).not.toBeInTheDocument();
+    expect(screen.queryByText("게스트·멤버 노트 게시 완료")).not.toBeInTheDocument();
   });
 
   it("scopes the public-result href through the existing app-link helper", () => {
@@ -1989,7 +2036,7 @@ describe("HostSessionEditor", () => {
     await user.click(within(screen.getByRole("dialog", { name: "게스트·멤버 노트에 기록 게시" })).getByRole("button", { name: "게스트·멤버 노트에 기록 게시" }));
 
     expect(publishSession).toHaveBeenCalledWith(closedSession.sessionId);
-    expect(await screen.findByText("게스트·멤버 노트 게시 완료")).toBeVisible();
+    expect(await screen.findByText("공개 완료")).toBeVisible();
     expect(await screen.findByRole("status")).toHaveTextContent("게스트·멤버 노트에 기록을 게시했습니다.");
   });
 
@@ -2748,7 +2795,7 @@ describe("HostSessionEditor", () => {
       const aiWorkspace = screen.getByTestId("aigen-tab");
       await user.click(screen.getByRole("button", { name: "모임 정보" }));
       expect(aiWorkspace).not.toBeVisible();
-      await user.click(within(screen.getByRole("listitem", { name: /기록/ })).getByRole("button"));
+      await user.click(within(screen.getByRole("region", { name: "기록" })).getByRole("button", { name: /열기|접기/ }));
 
       expect(screen.getByTestId("aigen-tab")).toBe(aiWorkspace);
       expect(aiWorkspace).not.toBeVisible();

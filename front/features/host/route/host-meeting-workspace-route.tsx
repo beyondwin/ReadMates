@@ -39,6 +39,7 @@ import {
   type ReverseLifecycleConfirmKind,
 } from "@/features/host/model/host-session-lifecycle-model";
 import { HostMeetingWorkspace } from "@/features/host/ui/meeting-workspace/host-meeting-workspace";
+import { buildMeetingAudienceProjections } from "@/features/host/ui/meeting-workspace/meeting-audience-projections";
 import { MeetingRelatedWork } from "@/features/host/ui/meeting-workspace/meeting-related-work";
 import { MeetingNotificationWorkspace } from "@/features/host/ui/meeting-workspace/meeting-notification-workspace";
 import type { HostSessionRecordsChangedEvent } from "./host-session-editor-route";
@@ -652,6 +653,7 @@ export function HostMeetingWorkspaceRoute({
       ?? (baseQuery.isFetching ? "최신 모임 상태를 확인하고 있습니다." : undefined),
   };
   const convergence = buildPublicConvergenceStatus(convergenceQuery.data);
+  const reverse = reverseLifecycleAction(session.state);
 
   return (
     <HostMeetingWorkspace
@@ -665,7 +667,30 @@ export function HostMeetingWorkspaceRoute({
       }}
       facts={workspace.facts}
       relatedWork={<MeetingRelatedWork tasks={workspace.relatedTasks} LinkComponent={LinkComponent} />}
+      projections={buildMeetingAudienceProjections({
+        visibility: session.visibility,
+        lifecycle: session.state,
+      })}
       recordReadiness={recordReadiness}
+      publicRecordHref={session.state === "PUBLISHED"
+        ? `/app/sessions/${encodeURIComponent(session.sessionId)}`
+        : null}
+      onCreateRevision={session.state === "PUBLISHED"
+        ? () => changeMeetingLocation({ task: "records", overviewEditOpen: false, recordSource: "manual" })
+        : null}
+      reverseAction={reverse
+        ? { label: reverse.label, onClick: requestLifecycleReverse }
+        : null}
+      onOpenBasic={() => changeMeetingLocation({
+        task: "overview",
+        overviewEditOpen: true,
+        recordSource: "manual",
+      })}
+      onOpenHistory={() => changeMeetingLocation({
+        task: "history",
+        overviewEditOpen: false,
+        recordSource: "manual",
+      })}
       panel={
         <MeetingPanel
           panel={resolvedPanel}
@@ -705,6 +730,7 @@ export function HostMeetingWorkspaceRoute({
         editorPrimaryActionRef.current?.();
       }}
       onRetryReadiness={recordRetry}
+      LinkComponent={LinkComponent}
     />
   );
 }

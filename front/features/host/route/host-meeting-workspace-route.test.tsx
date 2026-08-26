@@ -409,9 +409,35 @@ describe("host meeting workspace route", () => {
     setRecordPanel(status);
     renderRoute("?task=overview", { session: { state: "PUBLISHED" } });
 
-    expect(await screen.findAllByRole("button", { name: "공개 기록 보기" })).not.toHaveLength(0);
+    expect(await screen.findAllByRole("link", { name: "공개 기록 보기" })).not.toHaveLength(0);
     expectNoRecordMutationActions();
     expect(routeMocks.panelQueryInput?.recordPrerequisite).toBe(true);
+  });
+
+  it("keeps HOST_ONLY audience and does not treat ready publication as public placement", async () => {
+    setRecordPanel("ready", {
+      facts: {
+        hasDraft: true,
+        draftLiveBaseStale: false,
+        validationIssueCount: 0,
+        hasAppliedRecord: true,
+        publicationReady: true,
+      },
+    });
+    renderRoute("?task=overview", { session: { state: "CLOSED" } });
+
+    expect(await screen.findByText("호스트만 확인")).toBeVisible();
+    expect(screen.getByText("공개 기록에 게시 안 됨")).toBeVisible();
+    expect(screen.queryByText("공개 기록에 게시")).not.toBeInTheDocument();
+  });
+
+  it("opens 모임 정보 through the route-owned panel instead of an empty inert sheet", async () => {
+    const { router } = renderRoute("?task=overview");
+    await userEvent.setup().click(await screen.findByRole("button", { name: "모임 정보" }));
+
+    expect(router.state.location.search).toMatch(/section=basic/);
+    expect(screen.queryByRole("dialog", { name: "모임 정보" })).not.toBeInTheDocument();
+    expect(document.querySelector(".rm-host-session-workspace__cta--desktop")?.closest("[inert]")).toBeNull();
   });
 
   it("does not enable the record prerequisite on OPEN overview", async () => {

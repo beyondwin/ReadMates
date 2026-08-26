@@ -11,6 +11,7 @@ import {
   type HostMeetingWorkspaceView,
 } from "@/features/host/model/host-session-workspace-model";
 import { HostMeetingWorkspace, type HostMeetingWorkspaceProps } from "./host-meeting-workspace";
+import { buildMeetingAudienceProjections } from "./meeting-audience-projections";
 import { MeetingRelatedWork } from "./meeting-related-work";
 
 const view: HostMeetingWorkspaceView = buildHostMeetingWorkspace({
@@ -34,6 +35,7 @@ const props: HostMeetingWorkspaceProps = {
   },
   facts: view.facts,
   relatedWork: <MeetingRelatedWork tasks={view.relatedTasks} />,
+  projections: buildMeetingAudienceProjections({ visibility: "MEMBER", lifecycle: "OPEN" }),
   recovery: <p data-testid="focus-deck-recovery">최근 변경을 되돌릴 수 있습니다.</p>,
   panel: <div data-testid="focus-deck-panel">현재 작업 내용</div>,
   onPrimaryAction: vi.fn(),
@@ -208,5 +210,118 @@ describe("HostMeetingWorkspace", () => {
     expect(within(related).getByRole("link", { name: "알림" })).toHaveAttribute("href", expect.stringContaining("section=notifications"));
     expect(within(related).getByRole("link", { name: "변경 내역" })).toHaveAttribute("href", expect.stringContaining("section=history"));
     expect(within(related).queryByText("확인 필요")).not.toBeInTheDocument();
+  });
+
+  it("does not open empty inert sheets from header secondary actions", async () => {
+    const onOpenBasic = vi.fn();
+    const onOpenHistory = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <HostMeetingWorkspace
+        {...props}
+        onOpenBasic={onOpenBasic}
+        onOpenHistory={onOpenHistory}
+      />,
+    );
+
+    const cta = screen.getAllByRole("button", { name: "실제 출석 확인" })[0]!;
+    await user.click(screen.getByRole("button", { name: "모임 정보" }));
+    expect(onOpenBasic).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(cta.closest("[inert]")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "변경 내역" }));
+    expect(onOpenHistory).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(cta.closest("[inert]")).toBeNull();
+  });
+
+  it("does not treat publication readiness as public placement", () => {
+    const recordReadiness = {
+      status: "ready" as const,
+      observedAt: "2026-08-25T01:02:03.000Z",
+      facts: {
+        hasDraft: true,
+        draftLiveBaseStale: false,
+        validationIssueCount: 0,
+        hasAppliedRecord: true,
+        publicationReady: true,
+      },
+    };
+    const closed = buildHostMeetingWorkspace({
+      currentUrl: "https://readmates.test/clubs/alpha/app/host/sessions/11111111-1111-1111-1111-111111111111",
+      state: "CLOSED",
+      meetingDate: "2026-08-20",
+      today: "2026-08-26",
+      unansweredResponseCount: 0,
+      unknownAttendanceCount: 0,
+      recordReadiness,
+    });
+
+    render(
+      <HostMeetingWorkspace
+        {...props}
+        view={closed}
+        facts={closed.facts}
+        relatedWork={<MeetingRelatedWork tasks={closed.relatedTasks} />}
+        projections={buildMeetingAudienceProjections({ visibility: "HOST_ONLY", lifecycle: "CLOSED" })}
+        recordReadiness={recordReadiness}
+      />,
+    );
+
+    const facts = screen.getByRole("region", { name: "진행 목록" });
+    expect(within(facts).getByText("호스트만 확인")).toBeVisible();
+    expect(within(facts).getByText("공개 기록에 게시 안 됨")).toBeVisible();
+    expect(within(facts).queryByText("공개 기록에 게시")).not.toBeInTheDocument();
+  });
+
+  it("wires PUBLISHED public-result CTAs to the same href and create-revision callback", async () => {
+    const onCreateRevision = vi.fn();
+    const user = userEvent.setup();
+    const published = buildHostMeetingWorkspace({
+      currentUrl: "https://readmates.test/clubs/alpha/app/host/sessions/11111111-1111-1111-1111-111111111111",
+      state: "PUBLISHED",
+      meetingDate: "2026-08-20",
+      today: "2026-08-26",
+      unansweredResponseCount: 0,
+      unknownAttendanceCount: 0,
+      recordReadiness: { status: "pending" },
+    });
+
+    render(
+      <HostMeetingWorkspace
+        {...props}
+        view={published}
+        facts={published.facts}
+        relatedWork={<MeetingRelatedWork tasks={published.relatedTasks} />}
+        projections={buildMeetingAudienceProjections({ visibility: "PUBLIC", lifecycle: "PUBLISHED" })}
+        publicRecordHref="/app/sessions/11111111-1111-1111-1111-111111111111"
+        onCreateRevision={onCreateRevision}
+      />,
+    );
+
+    const links = screen.getAllByRole("link", { name: "공개 기록 보기" });
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveAttribute("href", expect.stringContaining("/app/sessions/11111111-1111-1111-1111-111111111111"));
+    expect(links[1]).toHaveAttribute("href", expect.stringContaining("/app/sessions/11111111-1111-1111-1111-111111111111"));
+    await user.click(screen.getByRole("button", { name: "수정본 만들기" }));
+    expect(onCreateRevision).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders pending undo in the recovery slot", () => {
+    render(
+      <HostMeetingWorkspace
+        {...props}
+        pendingUndo={{
+          description: "출석을 바꿨습니다.",
+          onUndo: vi.fn(),
+          onOpenHistory: vi.fn(),
+          onDismiss: vi.fn(),
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent("출석을 바꿨습니다.");
+    expect(screen.getByRole("button", { name: "되돌리기" })).toBeVisible();
   });
 });
