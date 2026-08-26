@@ -1,0 +1,208 @@
+/* Admin Editorial Operations Ledger. Reuses design-system tokens only. */
+
+.admin-page-context,
+.admin-work-view-bar,
+.admin-evidence-ledger,
+.admin-case-docket,
+.admin-receipt-timeline,
+.admin-safe-action-dock {
+  min-width: 0;
+  color: var(--ink-900);
+}
+
+.admin-page-context {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.admin-page-context__eyebrow,
+.admin-page-context__freshness,
+.admin-page-context__scope,
+.admin-page-context__authority {
+  margin: 0;
+  color: var(--ink-600);
+  overflow-wrap: anywhere;
+}
+
+.admin-page-context__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm) var(--space-md);
+}
+
+.admin-work-view-bar,
+.admin-work-view-bar__views,
+.admin-work-view-bar__pending,
+.admin-evidence-ledger__header,
+.admin-case-docket__actions,
+.admin-safe-action-dock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.admin-work-view-bar {
+  justify-content: space-between;
+}
+
+.admin-work-view-bar__search input,
+.admin-work-view-bar__action,
+.admin-evidence-ledger__controls .btn,
+.admin-evidence-ledger__controls button,
+.admin-case-docket__actions .btn,
+.admin-case-docket__actions button,
+.admin-safe-action-dock .btn,
+.admin-safe-action-dock button,
+.admin-safe-action-dock a {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.admin-work-view-bar__search input {
+  width: min(100%, 24rem);
+  padding-inline: var(--space-sm);
+  border: 1px solid var(--line);
+  background: var(--paper-50);
+  color: var(--ink-900);
+}
+
+.admin-work-view-bar__urgent {
+  margin: 0;
+  color: var(--stale);
+  overflow-wrap: anywhere;
+}
+
+.admin-evidence-ledger,
+.admin-case-docket,
+.admin-receipt-timeline {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.admin-evidence-ledger__title,
+.admin-case-docket__title {
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.admin-evidence-ledger__count,
+.admin-case-docket__identity,
+.admin-case-docket__status,
+.admin-receipt-timeline__id,
+.admin-receipt-timeline__time {
+  margin: 0;
+  color: var(--ink-600);
+  overflow-wrap: anywhere;
+}
+
+.admin-case-docket,
+.admin-receipt-timeline,
+.admin-state-panel--stale .admin-state-panel__notice {
+  padding: var(--space-panel-tight);
+  border: 1px solid var(--line);
+  background: var(--paper-50);
+}
+
+.admin-state-panel--stale .admin-state-panel__notice {
+  border-color: var(--stale-line);
+  background: var(--stale-soft);
+}
+
+.admin-case-docket__identity {
+  padding-left: var(--space-sm);
+  border-left: 2px solid var(--accent);
+  color: var(--ink-900);
+  font-weight: 650;
+}
+
+.admin-receipt-timeline__entries {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-receipt-timeline__entry {
+  display: grid;
+  gap: var(--space-2xs);
+  min-width: 0;
+  padding: var(--space-xs) 0;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+.admin-receipt-timeline__entry--unknown,
+.admin-receipt-timeline__entry--failed {
+  border-color: var(--stale-line);
+}
+
+.admin-safe-action-dock__reason {
+  color: var(--ink-600);
+  overflow-wrap: anywhere;
+}
+
+.admin-page-context :focus-visible,
+.admin-work-view-bar :focus-visible,
+.admin-evidence-ledger :focus-visible,
+.admin-case-docket :focus-visible,
+.admin-receipt-timeline :focus-visible,
+.admin-safe-action-dock :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px var(--focus-ring-soft);
+}
+
+@media (max-width: 768px) {
+  .admin-work-view-bar,
+  .admin-work-view-bar__views,
+  .admin-evidence-ledger__header,
+  .admin-case-docket__actions,
+  .admin-safe-action-dock {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-work-view-bar__action,
+  .admin-case-docket__actions .btn,
+  .admin-case-docket__actions button,
+  .admin-safe-action-dock .btn,
+  .admin-safe-action-dock button,
+  .admin-safe-action-dock a {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-page-context,
+  .admin-page-context *,
+  .admin-page-context *::before,
+  .admin-page-context *::after,
+  .admin-work-view-bar,
+  .admin-work-view-bar *,
+  .admin-work-view-bar *::before,
+  .admin-work-view-bar *::after,
+  .admin-evidence-ledger,
+  .admin-evidence-ledger *,
+  .admin-evidence-ledger *::before,
+  .admin-evidence-ledger *::after,
+  .admin-case-docket,
+  .admin-case-docket *,
+  .admin-case-docket *::before,
+  .admin-case-docket *::after,
+  .admin-receipt-timeline,
+  .admin-receipt-timeline *,
+  .admin-receipt-timeline *::before,
+  .admin-receipt-timeline *::after,
+  .admin-safe-action-dock,
+  .admin-safe-action-dock *,
+  .admin-safe-action-dock *::before,
+  .admin-safe-action-dock *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

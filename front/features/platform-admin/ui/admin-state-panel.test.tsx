@@ -6,14 +6,23 @@ const ALL_STATES: AdminPageState[] = [
   "loading",
   "empty",
   "partial",
+  "stale",
   "unavailable",
   "forbidden",
   "ready",
 ];
 
 describe("AdminStatePanel", () => {
-  it("exposes the six page states used by the workspace grammar", () => {
-    expect(ALL_STATES).toEqual(["loading", "empty", "partial", "unavailable", "forbidden", "ready"]);
+  it("exposes the page states used by the workspace grammar", () => {
+    expect(ALL_STATES).toEqual([
+      "loading",
+      "empty",
+      "partial",
+      "stale",
+      "unavailable",
+      "forbidden",
+      "ready",
+    ]);
   });
 
   it("announces loading through a single status region without a duplicate aria-live", () => {
@@ -85,6 +94,26 @@ describe("AdminStatePanel", () => {
     expect(forbidden).toHaveTextContent("권한이 없습니다");
     expect(forbidden).toHaveTextContent("이 화면을 볼 권한이 없습니다.");
     expect(forbidden).not.toHaveAttribute("aria-live");
+  });
+
+  it("keeps stale rows readable and announces freshness without a nested live region", () => {
+    render(
+      <AdminStatePanel
+        state="stale"
+        action={<button type="button">다시 불러오기</button>}
+      >
+        <p>마지막 확인 행</p>
+      </AdminStatePanel>,
+    );
+
+    const notice = screen.getByRole("status");
+    expect(notice).toHaveTextContent("최신 상태가 아닙니다");
+    expect(notice).not.toHaveAttribute("aria-live");
+    expect(screen.getByText("마지막 확인 행")).toBeInTheDocument();
+    expect(screen.getByText("마지막 확인 행").closest("[role='status']")).toBeNull();
+    expect(screen.getByRole("button", { name: "다시 불러오기" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("status")).toHaveLength(1);
   });
 
   it("prefers slot copy over default strings", () => {

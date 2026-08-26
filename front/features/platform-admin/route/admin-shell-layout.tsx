@@ -22,27 +22,20 @@ import { canAdmin } from "@/features/platform-admin/model/platform-admin-capabil
 import {
   installPlatformAdminAuthorityLossHandler,
   platformAdminCapabilitiesQuery,
-  platformAdminSummaryQuery,
   subscribePlatformAdminAuthorityLoss,
   useCommitPlatformAdminOnboardingMutation,
   usePreviewPlatformAdminOnboardingMutation,
 } from "@/features/platform-admin/queries/platform-admin-queries";
-import { platformAdminOperationCasesQuery } from "@/features/platform-admin/queries/platform-admin-operations-queries";
-import { buildAdminOperationsView } from "@/features/platform-admin/model/platform-admin-operations-model";
 import { AdminBreadcrumb } from "@/features/platform-admin/ui/admin-breadcrumb";
-import {
-  AdminCommandStatus,
-  type AdminCommandStatusProps,
-} from "@/features/platform-admin/ui/admin-command-status";
 import { AdminLayoutNav } from "@/features/platform-admin/ui/admin-layout-nav";
 import { AdminOnboardingModal } from "@/features/platform-admin/ui/admin-onboarding-modal";
 import { AdminWorkspaceSwitcher } from "@/features/platform-admin/ui/admin-workspace-switcher";
 import { PlatformAdminOnboardingWizard } from "@/features/platform-admin/ui/platform-admin-onboarding-wizard";
-import type { AdminOperationCasesResponse } from "@/features/platform-admin/api/platform-admin-operations-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { logoutCurrentSession } from "@/shared/auth/session-api";
 import { AdminBreadcrumbProvider } from "./admin-breadcrumb-context";
 import { useAdminBreadcrumbExtra } from "./admin-breadcrumb-hook";
+import "@/features/platform-admin/ui/admin-editorial-ledger.css";
 
 export function AdminShellLayout({
   auth = null,
@@ -62,11 +55,6 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
   const [workspaceMenuEpoch, setWorkspaceMenuEpoch] = useState(0);
   const capabilitiesQuery = useQuery({
     ...platformAdminCapabilitiesQuery(),
-    enabled: !authorityLost,
-  });
-  useQuery({ ...platformAdminSummaryQuery(), enabled: !authorityLost });
-  const operationsQuery = useQuery({
-    ...platformAdminOperationCasesQuery({}, { active: true }),
     enabled: !authorityLost,
   });
   const location = useLocation();
@@ -89,10 +77,6 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
   const capabilities = capabilitiesQuery.data ?? null;
   const canCreateClub =
     capabilities != null && canAdmin(capabilities, "CREATE_CLUB");
-  const commandStatus = deriveCommandStatus(
-    operationsQuery.data,
-    operationsQuery.isError,
-  );
 
   const routePath = derivePathSegment(location.pathname);
   const onboardingOpen =
@@ -200,7 +184,6 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
           />
         </div>
       </header>
-      <AdminCommandStatus {...commandStatus} />
       <div className="admin-shell__body">
         <aside className="admin-shell__nav">
           <AdminLayoutNav capabilities={capabilities} ariaLabel="Admin 콘솔" />
@@ -229,21 +212,6 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
       ) : null}
     </div>
   );
-}
-
-function deriveCommandStatus(
-  operations: AdminOperationCasesResponse | undefined,
-  isError: boolean,
-): AdminCommandStatusProps {
-  if (isError) return { state: "unavailable" };
-  if (!operations) return { state: "loading" };
-  const view = buildAdminOperationsView(operations, null);
-  return {
-    state: "ready",
-    sourceStatusLabel: view.sourceStatusLabel,
-    openCount: operations.counts.open,
-    generatedAtLabel: view.generatedAtLabel,
-  };
 }
 
 function focusAdminMain(event: MouseEvent<HTMLAnchorElement>) {

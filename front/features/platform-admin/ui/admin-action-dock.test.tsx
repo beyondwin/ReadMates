@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import { AdminActionDock } from "./admin-action-dock";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+import { AdminActionDock, AdminSafeActionDock } from "./admin-action-dock";
 
 const GLOBALS_CSS = readFileSync("src/styles/globals.css", "utf8");
 
@@ -37,5 +38,54 @@ describe("AdminActionDock", () => {
     expect(dockBlock).toContain("env(safe-area-inset-bottom");
     expect(dockBlock).toMatch(/min-height:\s*44px/);
     expect(dockBlock).toContain("prefers-reduced-motion: reduce");
+  });
+});
+
+describe("AdminSafeActionDock", () => {
+  it.each(["denied", "stale", "unknown-outcome"] as const)(
+    "does not trigger the primary callback when %s",
+    async (mode) => {
+      const onPrimary = vi.fn();
+      const user = userEvent.setup();
+      render(
+        <AdminSafeActionDock
+          level="L1"
+          authority={mode === "denied" ? "denied" : "allowed"}
+          state={mode === "denied" ? "ready" : mode}
+          reason="지금은 실행할 수 없습니다"
+          primary={
+            <button type="button" onClick={onPrimary}>
+              확인 처리
+            </button>
+          }
+        />,
+      );
+
+      const dock = screen.getByRole("group", { name: "작업" });
+      expect(dock).toHaveClass("admin-action-dock");
+      await user.click(screen.getByRole("button", { name: "확인 처리" }));
+      expect(onPrimary).not.toHaveBeenCalled();
+      expect(screen.getByText("지금은 실행할 수 없습니다")).toBeInTheDocument();
+    },
+  );
+
+  it("keeps a ready allowed primary clickable", async () => {
+    const onPrimary = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <AdminSafeActionDock
+        level="L1"
+        authority="allowed"
+        state="ready"
+        primary={
+          <button type="button" onClick={onPrimary}>
+            확인 처리
+          </button>
+        }
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "확인 처리" }));
+    expect(onPrimary).toHaveBeenCalledOnce();
   });
 });

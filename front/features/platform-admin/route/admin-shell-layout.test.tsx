@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import {
   act,
   fireEvent,
@@ -55,6 +57,7 @@ vi.mock(
     ...(await importOriginal<
       typeof import("@/features/platform-admin/api/platform-admin-api")
     >()),
+    fetchPlatformAdminSummary: vi.fn(),
     previewPlatformAdminOnboarding: vi.fn(),
     commitPlatformAdminOnboarding: vi.fn(),
   }),
@@ -64,6 +67,7 @@ import { logoutCurrentSession } from "@/shared/auth/session-api";
 import { fetchAdminOperationCases } from "@/features/platform-admin/api/platform-admin-operations-api";
 import {
   commitPlatformAdminOnboarding,
+  fetchPlatformAdminSummary,
   previewPlatformAdminOnboarding,
 } from "@/features/platform-admin/api/platform-admin-api";
 import { AdminShellLayout } from "./admin-shell-layout";
@@ -241,6 +245,7 @@ describe("AdminShellLayout", () => {
   beforeEach(() => {
     vi.mocked(logoutCurrentSession).mockReset();
     vi.mocked(fetchAdminOperationCases).mockReset();
+    vi.mocked(fetchPlatformAdminSummary).mockReset();
     vi.mocked(previewPlatformAdminOnboarding).mockReset();
     vi.mocked(commitPlatformAdminOnboarding).mockReset();
   });
@@ -249,12 +254,11 @@ describe("AdminShellLayout", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders the command status, ledger navigation, and breadcrumb", () => {
+  it("renders ledger navigation and breadcrumb without a shell-owned command status", () => {
     const { container } = renderShell("/admin/today");
     expect(screen.getAllByText("OWNER").length).toBeGreaterThan(0);
-    expect(container.querySelector(".admin-command-status")).toHaveTextContent(
-      "전체 신호 정상 · 8건 활성 · 19:00 기준",
-    );
+    expect(container.querySelector(".admin-command-status")).toBeNull();
+    expect(screen.queryByText("전체 신호 정상 · 8건 활성 · 19:00 기준")).not.toBeInTheDocument();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "오늘" })).toBeInTheDocument();
     expect(screen.getByText("서비스")).toBeInTheDocument();
@@ -266,9 +270,12 @@ describe("AdminShellLayout", () => {
     expect(screen.queryByText("도메인 조치")).not.toBeInTheDocument();
   });
 
-  it("preserves the shell and route content when an operations summary is unavailable", async () => {
+  it("does not poll operations or summary for a shell-owned command status", async () => {
     vi.mocked(fetchAdminOperationCases).mockRejectedValue(
       new Error("operations unavailable"),
+    );
+    vi.mocked(fetchPlatformAdminSummary).mockRejectedValue(
+      new Error("summary unavailable"),
     );
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -276,8 +283,6 @@ describe("AdminShellLayout", () => {
       },
     });
     installPlatformAdminAuthorityLossHandler(queryClient);
-    queryClient.setQueryData(platformAdminSummaryQuery().queryKey, summary);
-    queryClient.setQueryData(platformAdminClubsQuery().queryKey, clubs);
     queryClient.setQueryData(
       platformAdminCapabilitiesQuery().queryKey,
       ownerCapabilities,
@@ -301,11 +306,23 @@ describe("AdminShellLayout", () => {
 
     expect(screen.getByText("today content")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "오늘" })).toBeInTheDocument();
+    expect(document.querySelector(".admin-command-status")).toBeNull();
     await waitFor(() => {
-      expect(screen.getByRole("status")).toHaveTextContent(
-        "운영 신호 확인 불가 · 잠시 후 다시 확인",
-      );
+      expect(screen.queryByText("운영 신호 확인 불가")).not.toBeInTheDocument();
     });
+    expect(fetchAdminOperationCases).not.toHaveBeenCalled();
+    expect(fetchPlatformAdminSummary).not.toHaveBeenCalled();
+  });
+
+  it("imports the scoped editorial ledger stylesheet from the shell layout", () => {
+    const source = readFileSync(
+      path.resolve("features/platform-admin/route/admin-shell-layout.tsx"),
+      "utf8",
+    );
+    expect(source).toContain("admin-editorial-ledger.css");
+    expect(source).not.toContain("AdminCommandStatus");
+    expect(source).not.toContain("platformAdminOperationCasesQuery");
+    expect(source).not.toContain("platformAdminSummaryQuery");
   });
 
   it("does not render a global header 새 클럽 CTA", () => {

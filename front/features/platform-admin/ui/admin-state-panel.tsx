@@ -1,6 +1,13 @@
 import type { ReactNode } from "react";
 
-export type AdminPageState = "loading" | "empty" | "partial" | "unavailable" | "forbidden" | "ready";
+export type AdminPageState =
+  | "loading"
+  | "empty"
+  | "partial"
+  | "stale"
+  | "unavailable"
+  | "forbidden"
+  | "ready";
 
 export type AdminStateSource = {
   id: string;
@@ -30,6 +37,10 @@ const DEFAULT_COPY: Record<Exclude<AdminPageState, "ready">, { title: string; de
   partial: {
     title: "일부만 확인됨",
     description: "실패한 원천은 아래에 표시합니다. 확인된 내용은 그대로 사용할 수 있습니다.",
+  },
+  stale: {
+    title: "최신 상태가 아닙니다",
+    description: "관측 시각이 지난 근거입니다. 새로 고친 뒤 작업을 이어가세요.",
   },
   unavailable: {
     title: "지금은 확인할 수 없습니다",
@@ -76,9 +87,9 @@ export function AdminStatePanel({
     </>
   );
 
-  if (state === "partial") {
+  if (state === "partial" || state === "stale") {
     return (
-      <div className="admin-state-panel admin-state-panel--partial">
+      <div className={`admin-state-panel admin-state-panel--${state}`}>
         <div className="admin-state-panel__notice" role="status">
           {notice}
         </div>
