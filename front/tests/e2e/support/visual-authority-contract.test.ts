@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+
+import { afterEach, describe, expect, it } from "vitest";
 import type { Locator, Page } from "@playwright/test";
 import {
   VISUAL_AUTHORITY_VIEWPORTS,
@@ -8,10 +10,73 @@ import {
   expectVisibleFocus,
 } from "./visual-authority-contract";
 
-function pageWithOverflow(overflow: number): Page {
-  return {
-    evaluate: async () => overflow,
+const originalGetComputedStyle = window.getComputedStyle;
+const originalMatchMedia = window.matchMedia;
+const restores: Array<() => void> = [];
+
+afterEach(() => {
+  while (restores.length > 0) {
+    restores.pop()?.();
+  }
+  window.getComputedStyle = originalGetComputedStyle;
+  window.matchMedia = originalMatchMedia;
+  document.body.replaceChildren();
+});
+
+function stubOwnProperty(target: object, key: string, value: unknown) {
+  const existing = Object.getOwnPropertyDescriptor(target, key);
+  Object.defineProperty(target, key, { configurable: true, get: () => value });
+  restores.push(() => {
+    if (existing) {
+      Object.defineProperty(target, key, existing);
+      return;
+    }
+    Reflect.deleteProperty(target, key);
+  });
+}
+
+function installLayout(metrics: { scrollWidth: number; clientWidth: number; innerWidth: number }) {
+  stubOwnProperty(document.documentElement, "scrollWidth", metrics.scrollWidth);
+  stubOwnProperty(document.documentElement, "clientWidth", metrics.clientWidth);
+  stubOwnProperty(window, "innerWidth", metrics.innerWidth);
+}
+
+function createPage() {
+  const emulateMediaCalls: unknown[] = [];
+  const page = {
+    emulateMedia: async (media: { reducedMotion?: "reduce" | "no-preference" | null }) => {
+      emulateMediaCalls.push(media);
+    },
+    evaluate: async (fn: (arg?: unknown) => unknown, arg?: unknown) => fn(arg),
   } as unknown as Page;
+  return { page, emulateMediaCalls };
+}
+
+function installMotion(options: {
+  matches: boolean;
+  styles?: Array<{ el: Element; animationDuration: string; transitionDuration: string }>;
+}) {
+  const styleMap = new Map(options.styles?.map((item) => [item.el, item]) ?? []);
+  window.getComputedStyle = ((element: Element) => {
+    const entry = styleMap.get(element);
+    return {
+      animationDuration: entry?.animationDuration ?? "0s",
+      transitionDuration: entry?.transitionDuration ?? "0s",
+    };
+  }) as typeof getComputedStyle;
+  window.matchMedia = ((query: string) =>
+    ({
+      matches: options.matches && query.includes("prefers-reduced-motion"),
+      media: query,
+      onchange: null,
+      addListener() {},
+      removeListener() {},
+      addEventListener() {},
+      removeEventListener() {},
+      dispatchEvent() {
+        return false;
+      },
+    }) as MediaQueryList);
 }
 
 function locatorWithBox(box: { width: number; height: number } | null): Locator {
@@ -30,21 +95,6 @@ function locatorWithFocus(metrics: {
   } as unknown as Locator;
 }
 
-function pageWithMotion(motion: {
-  matches: boolean;
-  animationDuration: string;
-  transitionDuration: string;
-}): { page: Page; emulateMediaCalls: unknown[] } {
-  const emulateMediaCalls: unknown[] = [];
-  const page = {
-    emulateMedia: async (media: { reducedMotion?: "reduce" | "no-preference" | null }) => {
-      emulateMediaCalls.push(media);
-    },
-    evaluate: async () => motion,
-  } as unknown as Page;
-  return { page, emulateMediaCalls };
-}
-
 describe("visual authority contract", () => {
   it("locks the six host/admin proof viewports", () => {
     expect(VISUAL_AUTHORITY_VIEWPORTS).toEqual({
@@ -58,15 +108,27 @@ describe("visual authority contract", () => {
   });
 
   it("allows overflow within the default 1px tolerance", async () => {
-    await expect(expectNoHorizontalOverflow(pageWithOverflow(1))).resolves.toBeUndefined();
+    installLayout({ scrollWidth: 1001, clientWidth: 1000, innerWidth: 1000 });
+    await expect(expectNoHorizontalOverflow(createPage().page)).resolves.toBeUndefined();
   });
 
   it("fails when overflow exceeds the default 1px tolerance", async () => {
-    await expect(expectNoHorizontalOverflow(pageWithOverflow(2))).rejects.toThrow(/1px/);
+    installLayout({ scrollWidth: 1002, clientWidth: 1000, innerWidth: 1000 });
+    await expect(expectNoHorizontalOverflow(createPage().page)).rejects.toThrow(/1px/);
   });
 
   it("honors an explicit overflow tolerance", async () => {
-    await expect(expectNoHorizontalOverflow(pageWithOverflow(2), 2)).resolves.toBeUndefined();
+    installLayout({ scrollWidth: 1002, clientWidth: 1000, innerWidth: 1000 });
+    await expect(expectNoHorizontalOverflow(createPage().page, 2)).resolves.toBeUndefined();
+  });
+
+  it("measures overflow against documentElement.clientWidth, not window.innerWidth", async () => {
+    const { page } = createPage();
+    installLayout({ scrollWidth: 1010, clientWidth: 1000, innerWidth: 1015 });
+    await expect(expectNoHorizontalOverflow(page)).rejects.toThrow(/10px/);
+
+    installLayout({ scrollWidth: 1000, clientWidth: 1000, innerWidth: 985 });
+    await expect(expectNoHorizontalOverflow(page)).resolves.toBeUndefined();
   });
 
   it("fails targets smaller than the default 44px minimum", async () => {
@@ -99,27 +161,34 @@ describe("visual authority contract", () => {
     ).rejects.toThrow(/focus/i);
   });
 
-  it("enables reduced motion and rejects lingering animation", async () => {
-    const passing = pageWithMotion({
+  it("enables reduced motion and rejects lingering descendant animation", async () => {
+    const child = document.createElement("div");
+    document.body.append(child);
+
+    const passing = createPage();
+    installMotion({
       matches: true,
-      animationDuration: "0.001ms",
-      transitionDuration: "0.001ms",
+      styles: [
+        { el: document.documentElement, animationDuration: "0s", transitionDuration: "0s" },
+        { el: child, animationDuration: "0.001ms", transitionDuration: "0.001ms" },
+      ],
     });
     await expect(expectReducedMotion(passing.page)).resolves.toBeUndefined();
     expect(passing.emulateMediaCalls).toEqual([{ reducedMotion: "reduce" }]);
 
-    const lingering = pageWithMotion({
+    const lingering = createPage();
+    installMotion({
       matches: true,
-      animationDuration: "200ms",
-      transitionDuration: "0s",
+      styles: [
+        { el: document.documentElement, animationDuration: "0s", transitionDuration: "0s" },
+        { el: document.body, animationDuration: "0s", transitionDuration: "0s" },
+        { el: child, animationDuration: "200ms", transitionDuration: "0s" },
+      ],
     });
     await expect(expectReducedMotion(lingering.page)).rejects.toThrow(/reduced motion/i);
 
-    const unmatched = pageWithMotion({
-      matches: false,
-      animationDuration: "0s",
-      transitionDuration: "0s",
-    });
+    const unmatched = createPage();
+    installMotion({ matches: false });
     await expect(expectReducedMotion(unmatched.page)).rejects.toThrow(/reduced motion/i);
   });
 });

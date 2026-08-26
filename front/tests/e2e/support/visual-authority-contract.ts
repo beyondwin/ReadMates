@@ -12,7 +12,7 @@ export const VISUAL_AUTHORITY_VIEWPORTS = {
 
 export async function expectNoHorizontalOverflow(page: Page, tolerance = 1): Promise<void> {
   const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - window.innerWidth,
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   assert.ok(
     overflow <= tolerance,
@@ -43,38 +43,54 @@ export async function expectVisibleFocus(locator: Locator): Promise<void> {
   assert.ok(visible, "expected a visible focus ring");
 }
 
-function maxCssDurationSeconds(value: string): number {
-  return Math.max(
-    0,
-    ...value.split(",").map((part) => {
-      const trimmed = part.trim();
-      const amount = Number.parseFloat(trimmed);
-      if (Number.isNaN(amount)) {
-        return 0;
-      }
-      if (trimmed.endsWith("ms")) {
-        return amount / 1000;
-      }
-      return amount;
-    }),
-  );
-}
-
 export async function expectReducedMotion(page: Page): Promise<void> {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  const motion = await page.evaluate(() => {
-    const style = getComputedStyle(document.documentElement);
+  const motion = await page.evaluate((maxSeconds) => {
+    const maxCssDurationSeconds = (value: string) =>
+      Math.max(
+        0,
+        ...value.split(",").map((part) => {
+          const trimmed = part.trim();
+          const amount = Number.parseFloat(trimmed);
+          if (Number.isNaN(amount)) {
+            return 0;
+          }
+          if (trimmed.endsWith("ms")) {
+            return amount / 1000;
+          }
+          return amount;
+        }),
+      );
+
+    const lingering: Array<{ tag: string; animationDuration: string; transitionDuration: string }> = [];
+    for (const element of document.querySelectorAll("*")) {
+      const style = getComputedStyle(element);
+      const animationDuration = style.animationDuration;
+      const transitionDuration = style.transitionDuration;
+      if (
+        maxCssDurationSeconds(animationDuration) > maxSeconds ||
+        maxCssDurationSeconds(transitionDuration) > maxSeconds
+      ) {
+        lingering.push({
+          tag: element.tagName.toLowerCase(),
+          animationDuration,
+          transitionDuration,
+        });
+      }
+    }
+
     return {
       matches: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-      animationDuration: style.animationDuration,
-      transitionDuration: style.transitionDuration,
+      lingering,
     };
-  });
+  }, 0.02);
   assert.ok(motion.matches, "expected reduced motion preference to match");
-  const animation = maxCssDurationSeconds(motion.animationDuration);
-  const transition = maxCssDurationSeconds(motion.transitionDuration);
-  assert.ok(
-    animation <= 0.02 && transition <= 0.02,
-    `reduced motion still animates (animation ${motion.animationDuration}, transition ${motion.transitionDuration})`,
+  assert.equal(
+    motion.lingering.length,
+    0,
+    `reduced motion still animates (${motion.lingering
+      .slice(0, 5)
+      .map((item) => `${item.tag} animation ${item.animationDuration}, transition ${item.transitionDuration}`)
+      .join("; ")})`,
   );
 }
