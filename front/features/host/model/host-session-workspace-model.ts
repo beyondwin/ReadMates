@@ -453,7 +453,14 @@ function isValidIsoDate(value: string): boolean {
  * @deprecated Internal Task 5→8 compatibility only. New code uses
  * HostMeetingLocation and HostMeetingTask.
  */
-export type HostSessionWorkspacePanel = "focus" | "basic" | "attendance" | "records" | "history";
+export type HostSessionWorkspacePanel =
+  | "focus"
+  | "basic"
+  | "responses"
+  | "attendance"
+  | "records"
+  | "notifications"
+  | "history";
 
 /** @deprecated Internal Task 5→8 compatibility only. */
 export type HostSessionWorkspaceLocation = {

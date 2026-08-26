@@ -1,4 +1,5 @@
 import { useEffect, useRef, type KeyboardEvent, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import type { HostSessionRestorePreviewItemView } from "@/features/host/model/host-session-editor-view-model";
 
 export type WorkspacePendingUndo = {
@@ -58,6 +59,7 @@ export function WorkspaceUndoBar({
   const handleDialogKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape" && !confirm?.submitting) {
       event.preventDefault();
+      event.stopPropagation();
       closeConfirm();
       return;
     }
@@ -123,12 +125,13 @@ export function WorkspaceUndoBar({
         </div>
       ) : null}
 
-      {confirm ? (
+      {confirm ? createPortal(
         <div
           role="dialog"
           aria-modal="true"
           aria-label="이 변경을 되돌릴까요?"
           className="rm-host-action-dialog-backdrop"
+          tabIndex={-1}
           onKeyDown={handleDialogKeyDown}
           onMouseDown={(event) => {
             if (event.target === event.currentTarget && !confirm.submitting) {
@@ -173,7 +176,8 @@ export function WorkspaceUndoBar({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </>
   );

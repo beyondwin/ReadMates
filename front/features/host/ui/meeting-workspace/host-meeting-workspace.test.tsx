@@ -79,6 +79,63 @@ describe("HostMeetingWorkspace", () => {
     expect(following(related, recovery)).toBe(true);
     expect(following(recovery, panel)).toBe(true);
     expect(panel).toHaveTextContent("현재 작업 내용");
+    expect(screen.getByRole("main")).toBeInTheDocument();
+    expect(screen.getAllByRole("main")).toHaveLength(1);
+  });
+
+  it("opens 모임 정보 as a Focus Deck sheet and inerts the deck chrome", async () => {
+    const user = userEvent.setup();
+    const onLocationChange = vi.fn();
+    const { rerender } = render(
+      <HostMeetingWorkspace
+        {...props}
+        location={{ panel: "focus", source: "manual" }}
+        onLocationChange={onLocationChange}
+        panel={<label>모임 제목<input defaultValue="시트 제목" /></label>}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "모임 정보" }));
+    expect(onLocationChange).toHaveBeenCalledWith({ panel: "basic", source: "manual" });
+
+    rerender(
+      <HostMeetingWorkspace
+        {...props}
+        location={{ panel: "basic", source: "manual" }}
+        onLocationChange={onLocationChange}
+        panel={<label>모임 제목<input defaultValue="시트 제목" /></label>}
+      />,
+    );
+
+    const sheet = screen.getByRole("dialog", { name: "모임 정보" });
+    expect(sheet).toHaveAttribute("aria-modal", "true");
+    expect(within(sheet).getByLabelText("모임 제목")).toBeVisible();
+    expect(document.querySelector(".rm-host-session-workspace__chrome")).toHaveAttribute("inert");
+    expect(screen.getByRole("region", { name: "지금 할 일" }).closest("[inert]")).not.toBeNull();
+    expect(screen.getAllByRole("main")).toHaveLength(1);
+    expect(document.querySelectorAll(".rm-host-session-workspace")).toHaveLength(1);
+  });
+
+  it.each([
+    ["responses", "참석 응답"],
+    ["attendance", "출석"],
+    ["records", "모임 기록"],
+    ["notifications", "알림"],
+    ["history", "변경 내역"],
+  ] as const)("opens %s as a Focus Deck sheet from location", (panel, title) => {
+    render(
+      <HostMeetingWorkspace
+        {...props}
+        location={{ panel, source: "manual" }}
+        panel={<p>{title} 내용</p>}
+      />,
+    );
+
+    const sheet = screen.getByRole("dialog", { name: title });
+    expect(sheet).toHaveAttribute("aria-modal", "true");
+    expect(within(sheet).getByText(`${title} 내용`)).toBeVisible();
+    expect(document.querySelector(".rm-host-session-workspace__chrome")).toHaveAttribute("inert");
+    expect(screen.getAllByRole("main")).toHaveLength(1);
   });
 
   it("keeps one desktop and one mobile primary CTA on the same callback", async () => {

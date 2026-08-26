@@ -140,7 +140,28 @@ describe("HostSessionWorkspace", () => {
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     await user.click(within(screen.getByRole("region", { name: "출석" })).getByRole("button", { name: "열기" }));
     expect(onLocationChange).toHaveBeenCalledWith({ panel: "attendance", source: "manual" });
-    expect(screen.getByText("출석 편집")).toBeVisible();
+  });
+
+  it("opens 출석 as a modal sheet from location", () => {
+    render(
+      <WorkspaceHarness
+        view={viewFor({
+          ...baseInput,
+          state: "OPEN",
+          meetingDate: "2026-08-21",
+          today: "2026-08-21",
+          unknownAttendanceCount: 2,
+        })}
+        panel={<p>출석 편집</p>}
+        initialLocation={{ panel: "attendance", source: "manual" }}
+      />,
+    );
+
+    const sheet = screen.getByRole("dialog", { name: "출석" });
+    expect(sheet).toHaveAttribute("aria-modal", "true");
+    expect(within(sheet).getByText("출석 편집")).toBeVisible();
+    expect(document.querySelector(".rm-host-session-workspace__chrome")).toHaveAttribute("inert");
+    expect(document.querySelectorAll(".rm-host-session-workspace")).toHaveLength(1);
   });
 
   it("shows CLOSED import-first with duplicated 정리본 올리기 and no page tabs", async () => {
@@ -462,6 +483,7 @@ describe("HostSessionWorkspace", () => {
       <WorkspaceHarness
         view={viewFor({ ...baseInput, state: "OPEN" })}
         chrome={false}
+        initialLocation={{ panel: "records", source: "manual" }}
         pendingUndo={{
           description: "출석을 바꿨습니다.",
           onUndo: vi.fn(),
@@ -473,8 +495,10 @@ describe("HostSessionWorkspace", () => {
 
     expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "지금 할 일" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "출석" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "기록" })).toBeVisible();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(document.querySelector(".rm-host-session-workspace")).not.toBeInTheDocument();
+    expect(document.querySelector(".rm-host-session-workspace-surface")).toBeInTheDocument();
+    expect(screen.getByText("기록 편집")).toBeVisible();
     expect(screen.getByRole("button", { name: "되돌리기" })).toBeVisible();
   });
 

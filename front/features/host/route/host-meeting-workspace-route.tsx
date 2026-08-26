@@ -29,7 +29,6 @@ import { registerHostSensitiveState } from "@/features/host/storage/host-sensiti
 import { SessionHistoryPanel } from "@/features/host/ui/session-editor/session-history-panel";
 import { HostSessionNotificationActions } from "@/features/host/ui/session-editor/session-editor-notifications";
 import { SessionLifecycleConfirmDialog } from "@/features/host/ui/session-editor/session-lifecycle-confirm-dialog";
-import { WorkspacePanel } from "@/features/host/ui/session-workspace/workspace-panel";
 import { type WorkspacePendingUndo, type WorkspaceUndoConfirm } from "@/features/host/ui/session-workspace/workspace-undo-bar";
 import {
   buildHostSessionRestorePreviewItemView,
@@ -87,8 +86,10 @@ function todayIsoDate() {
 
 function compatibilityLocation(location: HostMeetingLocation) {
   if (location.overviewEditOpen) return { panel: "basic" as const, source: "manual" as const };
+  if (location.task === "responses") return { panel: "responses" as const, source: "manual" as const };
   if (location.task === "attendance") return { panel: "attendance" as const, source: "manual" as const };
   if (location.task === "records") return { panel: "records" as const, source: location.recordSource };
+  if (location.task === "notifications") return { panel: "notifications" as const, source: "manual" as const };
   if (location.task === "history") return { panel: "history" as const, source: "manual" as const };
   return { panel: "focus" as const, source: "manual" as const };
 }
@@ -112,8 +113,10 @@ function meetingLocationFromCompatibility(
   next: ReturnType<typeof compatibilityLocation>,
 ): HostMeetingLocation {
   if (next.panel === "basic") return { task: "overview", overviewEditOpen: true, recordSource: "manual" };
+  if (next.panel === "responses") return { task: "responses", overviewEditOpen: false, recordSource: "manual" };
   if (next.panel === "attendance") return { task: "attendance", overviewEditOpen: false, recordSource: "manual" };
   if (next.panel === "records") return { task: "records", overviewEditOpen: false, recordSource: next.source };
+  if (next.panel === "notifications") return { task: "notifications", overviewEditOpen: false, recordSource: "manual" };
   if (next.panel === "history") return { task: "history", overviewEditOpen: false, recordSource: "manual" };
   return current.task === "responses"
     ? { task: "responses", overviewEditOpen: false, recordSource: "manual" }
@@ -236,17 +239,34 @@ export function HostMeetingWorkspaceRoute({
       void navigate(canonicalHref, { replace: true, state: routerLocation.state });
     }
   }, [currentUrl, navigate, routerLocation.state]);
+  const captureOriginatingFocus = useCallback(() => {
+    if (isOverlayLocation(meetingLocation)) return;
+    if (document.activeElement instanceof HTMLElement) {
+      originatingFocusRef.current = document.activeElement;
+    }
+  }, [meetingLocation]);
   const changeMeetingLocation = useCallback((next: HostMeetingLocation, options?: { close?: boolean }) => {
-    if (options?.close && overlayPushedRef.current) {
+    const href = buildHostMeetingUrl(currentUrl, next);
+    if (options?.close) {
+      const shouldPop = overlayPushedRef.current;
       overlayPushedRef.current = false;
-      void navigate(-1);
+      if (shouldPop) {
+        void navigate(-1);
+        return;
+      }
+      if (href === currentUrl) return;
+      void navigate(href, { replace: true, state: routerLocation.state });
       return;
     }
-    const href = buildHostMeetingUrl(currentUrl, next);
     if (href === currentUrl) return;
     const opening = isOverlayLocation(next) && !isOverlayLocation(meetingLocation);
-    overlayPushedRef.current = opening;
-    void navigate(href, { replace: !opening, state: routerLocation.state });
+    const switchingOverlay = isOverlayLocation(next) && isOverlayLocation(meetingLocation);
+    if (opening) overlayPushedRef.current = true;
+    if (!isOverlayLocation(next)) overlayPushedRef.current = false;
+    void navigate(href, {
+      replace: switchingOverlay || !opening,
+      state: routerLocation.state,
+    });
   }, [currentUrl, meetingLocation, navigate, routerLocation.state]);
   const closeMeetingPanel = useCallback(() => {
     changeMeetingLocation(overviewMeetingLocation(), { close: true });
@@ -266,7 +286,6 @@ export function HostMeetingWorkspaceRoute({
     const previousPanel = previousPanelRef.current;
     previousPanelRef.current = nextPanel;
     if (previousPanel === "focus" && nextPanel !== "focus") {
-      overlayPushedRef.current = true;
       if (!originatingFocusRef.current && document.activeElement instanceof HTMLElement) {
         originatingFocusRef.current = document.activeElement;
       }
@@ -294,17 +313,6 @@ export function HostMeetingWorkspaceRoute({
     }
     return undefined;
   }, [meetingLocation]);
-  useEffect(() => {
-    if (!isOverlayLocation(meetingLocation)) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
-      event.preventDefault();
-      closeMeetingPanel();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [closeMeetingPanel, meetingLocation]);
 
   const [pendingUndo, setPendingUndo] = useState<{
     routeIdentity: string;
@@ -552,7 +560,52 @@ export function HostMeetingWorkspaceRoute({
         request: { expectedCurrentHash: historyUndoConfirm.expectedCurrentHash },
       });
       setHistoryUndoConfirm(null);
-    } catch {
+    } catch (error) {
+      const code = error && typeof error === "object" && "code" in error
+        ? String((error as { code?: unknown }).code ?? "")
+        : "";
+      if (code === "HOST_SESSION_RESTORE_STALE" || (error && typeof error === "object" && "status" in error && error.status === 409)) {
+        try {
+          const previewQuery = hostSessionRestorePreviewQuery(
+            sessionId,
+            historyUndoConfirm.changeId,
+            context,
+          );
+          queryClient.removeQueries({ queryKey: previewQuery.queryKey });
+          const preview = await queryClient.fetchQuery({
+            ...previewQuery,
+            staleTime: 0,
+          });
+          if (!preview.canRestore) {
+            setHistoryUndoConfirm(null);
+            setHistoryRestoreNotice({
+              routeIdentity,
+              changeId: historyUndoConfirm.changeId,
+              message: hostSessionRestoreBlockedExplanation(preview.blockedReason),
+            });
+            return;
+          }
+          setHistoryUndoConfirm({
+            routeIdentity,
+            changeId: preview.changeId,
+            expectedCurrentHash: preview.expectedCurrentHash,
+            items: preview.items.map((item) => buildHostSessionRestorePreviewItemView(item)),
+            submitting: false,
+            error: "되돌리지 못했습니다. 최신 변경 내역을 확인한 뒤 다시 시도해 주세요.",
+            onConfirm: () => undefined,
+            onCancel: () => undefined,
+          });
+          return;
+        } catch {
+          setHistoryUndoConfirm(null);
+          setHistoryRestoreNotice({
+            routeIdentity,
+            changeId: historyUndoConfirm.changeId,
+            message: "되돌릴 내용을 확인하지 못했습니다. 변경 내역에서 다시 시도해 주세요.",
+          });
+          return;
+        }
+      }
       setHistoryUndoConfirm((current) => current?.routeIdentity === routeIdentity ? {
         ...current,
         submitting: false,
@@ -647,52 +700,36 @@ export function HostMeetingWorkspaceRoute({
         || baseQuery.isError
         || !currentVersionVectorAvailable;
       return (
-        <WorkspacePanel
-          id="workspace-panel-history"
-          title="변경 내역"
-          expanded
-          variant="sheet"
-          onToggle={closeMeetingPanel}
-        >
-          <SessionHistoryPanel
-            key={`${routeIdentity}:${historySensitiveResetVersion}`}
-            items={historyCleared ? [] : history.items}
-            nextCursor={historyCleared ? null : history.nextCursor}
-            expectedDraftRevision={historyAuthorityData?.draft?.draftRevision ?? null}
-            restoring={restoreRevision.isPending || restoreChange.isPending || lifecycleSubmitting}
-            recoveryActionsDisabled={recoveryActionsDisabled}
-            onLoadMore={(cursor) => queryClient.fetchQuery(hostSessionRecordHistoryQuery(sessionId, { limit: 30, cursor }, context)).then(() => undefined)}
-            onRestore={({ revisionId, expectedDraftRevision }) => restoreRevision.mutateAsync({
-              sessionId,
-              revisionId,
-              request: { expectedDraftRevision },
-            }).then(() => undefined)}
-            onRestoreCompleted={() => changeMeetingLocation({ task: "records", overviewEditOpen: false, recordSource: "manual" })}
-            onRestoreChange={(changeId) => startChangeRestore(changeId)}
-            onReverseLifecycle={requestLifecycleReverse}
-          />
-        </WorkspacePanel>
+        <SessionHistoryPanel
+          key={`${routeIdentity}:${historySensitiveResetVersion}`}
+          items={historyCleared ? [] : history.items}
+          nextCursor={historyCleared ? null : history.nextCursor}
+          expectedDraftRevision={historyAuthorityData?.draft?.draftRevision ?? null}
+          restoring={restoreRevision.isPending || restoreChange.isPending || lifecycleSubmitting}
+          recoveryActionsDisabled={recoveryActionsDisabled}
+          onLoadMore={(cursor) => queryClient.fetchQuery(hostSessionRecordHistoryQuery(sessionId, { limit: 30, cursor }, context)).then(() => undefined)}
+          onRestore={({ revisionId, expectedDraftRevision }) => restoreRevision.mutateAsync({
+            sessionId,
+            revisionId,
+            request: { expectedDraftRevision },
+          }).then(() => undefined)}
+          onRestoreCompleted={() => changeMeetingLocation({ task: "records", overviewEditOpen: false, recordSource: "manual" })}
+          onRestoreChange={(changeId) => startChangeRestore(changeId)}
+          onReverseLifecycle={requestLifecycleReverse}
+        />
       );
     },
     (notifications) => (
-      <WorkspacePanel
-        id="workspace-panel-notifications"
-        title="알림"
-        expanded
-        variant="sheet"
-        onToggle={closeMeetingPanel}
-      >
-        <MeetingNotificationWorkspace>
-          <HostSessionNotificationActions
-            sessionId={session.sessionId}
-            state={session.state}
-            visibility={session.visibility}
-            feedbackDocumentUploaded={session.feedbackDocument.uploaded}
-            dispatches={notifications.items}
-            LinkComponent={LinkComponent}
-          />
-        </MeetingNotificationWorkspace>
-      </WorkspacePanel>
+      <MeetingNotificationWorkspace>
+        <HostSessionNotificationActions
+          sessionId={session.sessionId}
+          state={session.state}
+          visibility={session.visibility}
+          feedbackDocumentUploaded={session.feedbackDocument.uploaded}
+          dispatches={notifications.items}
+          LinkComponent={LinkComponent}
+        />
+      </MeetingNotificationWorkspace>
     ),
   );
 
@@ -777,6 +814,11 @@ export function HostMeetingWorkspaceRoute({
     <>
     <HostMeetingWorkspace
       view={{ ...workspace, primaryAction }}
+      location={compatibilityLocation(meetingLocation)}
+      onLocationChange={(next) => {
+        captureOriginatingFocus();
+        navigation.onChange(next);
+      }}
       header={{
         sessionNumber: session.sessionNumber,
         title: session.title || session.bookTitle || "모임",
@@ -785,7 +827,16 @@ export function HostMeetingWorkspaceRoute({
         location: session.locationLabel,
       }}
       facts={workspace.facts}
-      relatedWork={<MeetingRelatedWork tasks={workspace.relatedTasks} LinkComponent={LinkComponent} />}
+      relatedWork={(
+        <MeetingRelatedWork
+          tasks={workspace.relatedTasks}
+          LinkComponent={LinkComponent}
+          onOpenTask={(item) => {
+            captureOriginatingFocus();
+            changeMeetingLocation(parseHostMeetingLocation(new URL(item.href, "https://readmates.invalid").search));
+          }}
+        />
+      )}
       projections={buildMeetingAudienceProjections({
         visibility: session.visibility,
         lifecycle: session.state,
@@ -800,26 +851,6 @@ export function HostMeetingWorkspaceRoute({
       reverseAction={reverse
         ? { label: reverse.label, onClick: requestLifecycleReverse }
         : null}
-      onOpenBasic={() => {
-        if (document.activeElement instanceof HTMLElement) {
-          originatingFocusRef.current = document.activeElement;
-        }
-        changeMeetingLocation({
-          task: "overview",
-          overviewEditOpen: true,
-          recordSource: "manual",
-        });
-      }}
-      onOpenHistory={() => {
-        if (document.activeElement instanceof HTMLElement) {
-          originatingFocusRef.current = document.activeElement;
-        }
-        changeMeetingLocation({
-          task: "history",
-          overviewEditOpen: false,
-          recordSource: "manual",
-        });
-      }}
       panel={
         <MeetingPanel
           panel={resolvedPanel}
@@ -854,7 +885,7 @@ export function HostMeetingWorkspaceRoute({
         }
         if (workspace.primaryAction.kind === "FINISH_SESSION") {
           if (meetingLocation.task !== "overview") {
-            changeMeetingLocation(overviewMeetingLocation());
+            closeMeetingPanel();
             return;
           }
           requestLifecycle("close");

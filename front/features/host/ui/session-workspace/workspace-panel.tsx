@@ -75,12 +75,13 @@ export function WorkspacePanel({
         return;
       }
       event.preventDefault();
+      event.stopPropagation();
       event.stopImmediatePropagation();
       restoreOrigin(originRef.current);
       onToggle();
     };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
   }, [expanded, isSheet, onToggle]);
 
   const handleSheetKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {

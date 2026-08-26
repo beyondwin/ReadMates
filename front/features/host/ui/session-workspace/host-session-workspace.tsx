@@ -42,8 +42,18 @@ export type HostSessionWorkspaceProps = {
   attendancePanel?: ReactNode;
   recordsPanel?: ReactNode;
   historyPanel?: ReactNode;
+  notificationsPanel?: ReactNode;
   chrome?: boolean;
   LinkComponent?: HostSessionEditorLinkComponent;
+};
+
+const overlayCopy: Record<Exclude<HostSessionWorkspacePanel, "focus">, { id: string; title: string; eyebrow?: string }> = {
+  basic: { id: "workspace-panel-basic", title: "모임 정보", eyebrow: "기본 정보" },
+  responses: { id: "workspace-panel-responses", title: "참석 응답" },
+  attendance: { id: "workspace-panel-attendance", title: "출석", eyebrow: "참석 명단" },
+  records: { id: "workspace-panel-records", title: "모임 기록", eyebrow: "모임 기록" },
+  notifications: { id: "workspace-panel-notifications", title: "알림" },
+  history: { id: "workspace-panel-history", title: "변경 내역", eyebrow: "작업 기록" },
 };
 
 function focusLocation(): HostSessionWorkspaceLocation {
@@ -57,6 +67,24 @@ function panelLocation(panel: HostSessionWorkspacePanel, source: HostSessionWork
 function hostStatusLabel(label: HostSessionWorkspaceView["statusLabel"]): "모임 작성 중" | "멤버와 준비 중" | "기록 정리 중" | "공개 완료" {
   if (label === "게스트·멤버 노트 게시 완료") return "공개 완료";
   return label;
+}
+
+function namedOverlayBody(
+  panel: Exclude<HostSessionWorkspacePanel, "focus">,
+  bodies: {
+    basicPanel: ReactNode;
+    attendancePanel: ReactNode;
+    recordsPanel: ReactNode;
+    historyPanel: ReactNode;
+    notificationsPanel: ReactNode;
+  },
+) {
+  if (panel === "basic") return bodies.basicPanel;
+  if (panel === "history") return bodies.historyPanel;
+  if (panel === "attendance") return bodies.attendancePanel;
+  if (panel === "records") return bodies.recordsPanel;
+  if (panel === "notifications") return bodies.notificationsPanel;
+  return null;
 }
 
 export function HostSessionWorkspace({
@@ -85,20 +113,35 @@ export function HostSessionWorkspace({
   attendancePanel,
   recordsPanel,
   historyPanel = null,
+  notificationsPanel = null,
   chrome = true,
   LinkComponent = DefaultLinkComponent,
 }: HostSessionWorkspaceProps) {
+  const overlayPanel = location.panel === "focus" ? null : location.panel;
+  const overlayMeta = overlayPanel ? overlayCopy[overlayPanel] : null;
+  const overlayBody = overlayPanel == null
+    ? null
+    : panel ?? namedOverlayBody(overlayPanel, {
+      basicPanel,
+      attendancePanel,
+      recordsPanel,
+      historyPanel,
+      notificationsPanel,
+    });
+  const deckOwned = panel != null;
+  const sheetPanel = overlayPanel === "basic" || overlayPanel === "history"
+    || (deckOwned && overlayPanel != null);
+  const sheetOpen = Boolean(chrome && sheetPanel && overlayMeta && overlayBody != null);
+  const chromeInert = sheetOpen && deckOwned;
   const basicOpen = location.panel === "basic";
   const historyOpen = location.panel === "history";
   const attendanceOpen = location.panel === "attendance";
   const recordsOpen = location.panel === "records";
-  const hasSheets = basicPanel != null || historyPanel != null;
-  const sheetOpen = hasSheets && (basicOpen || historyOpen);
   const statusLabel = hostStatusLabel(view.statusLabel);
   const triggerRef = useRef<HTMLElement | null>(null);
 
   const changePanel = (next: HostSessionWorkspaceLocation) => {
-    const openingOverlay = (next.panel === "basic" || next.panel === "history") && !sheetOpen;
+    const openingOverlay = next.panel !== "focus" && !sheetOpen;
     if (openingOverlay && document.activeElement instanceof HTMLElement) {
       triggerRef.current = document.activeElement;
     }
@@ -122,45 +165,59 @@ export function HostSessionWorkspace({
   const publishBlocked = view.primaryAction.kind === "PUBLISH_RECORD" && !view.publicationReady;
   const disabled = primaryActionDisabled || publishBlocked;
   const showPublicLink = Boolean(publicRecordHref) && view.primaryAction.kind === "VIEW_PUBLIC_RECORD";
+  const undoBar = (
+    <WorkspaceUndoBar
+      pendingUndo={pendingUndo}
+      confirm={undoConfirm}
+      restoreNotice={restoreNotice}
+    />
+  );
+
+  if (!chrome) {
+    return (
+      <div className="rm-host-session-workspace-surface">
+        {focusContent}
+        {recovery}
+        {undoBar}
+        {overlayBody}
+      </div>
+    );
+  }
 
   return (
     <div className="rm-host-session-workspace">
-      <div className="rm-host-session-workspace__chrome" inert={sheetOpen || undefined}>
+      <div className="rm-host-session-workspace__chrome" inert={chromeInert || undefined}>
       <div className="rm-host-session-workspace__frame">
-        {chrome ? (
-          <WorkspaceHeader
-            header={header}
-            statusLabel={statusLabel}
-            basicOpen={basicOpen}
-            historyOpen={historyOpen}
-            onOpenBasic={() => changePanel(basicOpen ? focusLocation() : panelLocation("basic"))}
-            onOpenHistory={() => changePanel(historyOpen ? focusLocation() : panelLocation("history"))}
-            LinkComponent={LinkComponent}
-          />
-        ) : null}
+        <WorkspaceHeader
+          header={header}
+          statusLabel={statusLabel}
+          basicOpen={basicOpen}
+          historyOpen={historyOpen}
+          onOpenBasic={() => changePanel(basicOpen ? focusLocation() : panelLocation("basic"))}
+          onOpenHistory={() => changePanel(historyOpen ? focusLocation() : panelLocation("history"))}
+          LinkComponent={LinkComponent}
+        />
 
         <div className="rm-host-session-workspace__layout">
           <div className="rm-host-session-workspace__main">
-            {chrome ? (
-              <WorkspaceFocusCard
-                view={view}
-                onPrimaryAction={onPrimaryAction}
-                primaryActionDisabled={disabled}
-                primaryActionReason={primaryActionReason}
-                publicRecordHref={publicRecordHref}
-                reverseAction={reverseAction}
-                onCreateRevision={onCreateRevision}
-                error={error}
-                descriptionOverride={descriptionOverride}
-                LinkComponent={LinkComponent}
-              >
-                {focusContent}
-              </WorkspaceFocusCard>
-            ) : focusContent}
+            <WorkspaceFocusCard
+              view={view}
+              onPrimaryAction={onPrimaryAction}
+              primaryActionDisabled={disabled}
+              primaryActionReason={primaryActionReason}
+              publicRecordHref={publicRecordHref}
+              reverseAction={reverseAction}
+              onCreateRevision={onCreateRevision}
+              error={error}
+              descriptionOverride={descriptionOverride}
+              LinkComponent={LinkComponent}
+            >
+              {focusContent}
+            </WorkspaceFocusCard>
 
-            {chrome ? facts : null}
+            {facts}
 
-            {chrome ? relatedWork : null}
+            {relatedWork}
 
             {draftSaveLabel ? (
               <p className="small rm-host-session-workspace__save-state">{draftSaveLabel}</p>
@@ -168,13 +225,11 @@ export function HostSessionWorkspace({
 
             {recovery}
 
-            <WorkspaceUndoBar
-              pendingUndo={pendingUndo}
-              confirm={undoConfirm}
-              restoreNotice={restoreNotice}
-            />
+            {undoBar}
 
-            {attendancePanel ? (
+            {location.panel === "focus" ? panel : null}
+
+            {!deckOwned && attendancePanel ? (
               <WorkspacePanel
                 id="workspace-panel-attendance"
                 title="출석"
@@ -186,7 +241,7 @@ export function HostSessionWorkspace({
               </WorkspacePanel>
             ) : null}
 
-            {recordsPanel ? (
+            {!deckOwned && recordsPanel ? (
               <WorkspacePanel
                 id="workspace-panel-records"
                 title="기록"
@@ -197,13 +252,10 @@ export function HostSessionWorkspace({
                 {recordsPanel}
               </WorkspacePanel>
             ) : null}
-
-            {panel}
           </div>
         </div>
       </div>
 
-      {chrome ? (
       <div className="rm-host-session-workspace__sticky-cta rm-host-session-workspace__footer-cta">
         {showPublicLink && publicRecordHref ? (
           <LinkComponent
@@ -223,36 +275,45 @@ export function HostSessionWorkspace({
           </button>
         )}
       </div>
-      ) : null}
       </div>
 
-      {hasSheets ? (
-        <>
-          {basicPanel != null ? (
-            <WorkspacePanel
-              id="workspace-panel-basic"
-              title="모임 정보"
-              eyebrow="기본 정보"
-              expanded={basicOpen}
-              variant="sheet"
-              onToggle={closeSheet}
-            >
-              {basicPanel}
-            </WorkspacePanel>
-          ) : null}
-          {historyPanel != null ? (
-            <WorkspacePanel
-              id="workspace-panel-history"
-              title="변경 내역"
-              eyebrow="작업 기록"
-              expanded={historyOpen}
-              variant="sheet"
-              onToggle={closeSheet}
-            >
-              {historyPanel}
-            </WorkspacePanel>
-          ) : null}
-        </>
+      {deckOwned && sheetOpen && overlayMeta ? (
+        <WorkspacePanel
+          id={overlayMeta.id}
+          title={overlayMeta.title}
+          eyebrow={overlayMeta.eyebrow}
+          expanded
+          variant="sheet"
+          onToggle={closeSheet}
+        >
+          {overlayBody}
+        </WorkspacePanel>
+      ) : null}
+
+      {!deckOwned && basicPanel != null ? (
+        <WorkspacePanel
+          id="workspace-panel-basic"
+          title="모임 정보"
+          eyebrow="기본 정보"
+          expanded={basicOpen}
+          variant="sheet"
+          onToggle={closeSheet}
+        >
+          {basicPanel}
+        </WorkspacePanel>
+      ) : null}
+
+      {!deckOwned && historyPanel != null ? (
+        <WorkspacePanel
+          id="workspace-panel-history"
+          title="변경 내역"
+          eyebrow="작업 기록"
+          expanded={historyOpen}
+          variant="sheet"
+          onToggle={closeSheet}
+        >
+          {historyPanel}
+        </WorkspacePanel>
       ) : null}
     </div>
   );

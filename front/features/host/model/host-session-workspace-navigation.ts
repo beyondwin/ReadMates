@@ -399,8 +399,10 @@ function isCompatibilityPanel(
   value: string,
 ): value is Exclude<HostSessionWorkspacePanel, "focus"> {
   return value === "basic"
+    || value === "responses"
     || value === "attendance"
     || value === "records"
+    || value === "notifications"
     || value === "history";
 }
 

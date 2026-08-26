@@ -90,4 +90,18 @@ describe("WorkspacePanel", () => {
     await user.keyboard("{Escape}");
     expect(onToggle).not.toHaveBeenCalled();
   });
+
+  it("consumes sheet Escape before other document listeners", async () => {
+    const user = userEvent.setup();
+    const other = vi.fn();
+    document.addEventListener("keydown", other);
+    render(<PanelHarness variant="sheet" />);
+
+    await user.click(screen.getByRole("button", { name: "모임 정보" }));
+    await user.keyboard("{Escape}");
+
+    expect(other).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: "모임 정보" })).not.toBeInTheDocument();
+    document.removeEventListener("keydown", other);
+  });
 });

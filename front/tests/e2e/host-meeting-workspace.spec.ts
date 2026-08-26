@@ -38,6 +38,8 @@ test("host sees one Focus Deck with related-work links and independent publicati
   await openMeeting(page, sessionId);
 
   await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+  await expect(page.getByRole("main")).toHaveCount(1);
+  await expect(page.locator(".rm-host-session-workspace")).toHaveCount(1);
   await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "관련 작업" })).toBeVisible();
   await expect(page.getByRole("link", { name: /참석 응답/ })).toHaveAttribute("href", /section=responses/);
@@ -50,7 +52,12 @@ test("host sees one Focus Deck with related-work links and independent publicati
   const attendance = page.getByRole("link", { name: /실제 출석/ });
   await attendance.click();
   await expect(page).toHaveURL(/section=attendance/);
-  await expect(page.getByRole("heading", { name: "출석", exact: true })).toBeVisible();
+  const attendanceSheet = page.getByRole("dialog", { name: "출석" });
+  await expect(attendanceSheet).toBeVisible();
+  await expect(attendanceSheet).toHaveAttribute("aria-modal", "true");
+  await expect(attendanceSheet.getByRole("heading", { name: "출석", exact: true })).toBeVisible();
+  await expect(page.locator(".rm-host-session-workspace")).toHaveCount(1);
+  await expect(page.getByRole("main")).toHaveCount(1);
 });
 
 test("mobile info sheet is modal, keyboard-dismissible, and restores its trigger", async ({ page }) => {
@@ -90,5 +97,5 @@ test("record panel failure does not remove basic meeting work and exposes retry"
   await expect(page.getByRole("heading", { level: 1 })).toContainText(BOOK_TITLE);
   await expect(page.getByRole("navigation", { name: "관련 작업" })).toBeVisible();
   await expect(page.getByRole("link", { name: "참석 응답" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "모임 기록 다시 시도" }).first()).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "모임 기록" }).getByRole("button", { name: "모임 기록 다시 시도" })).toBeVisible();
 });

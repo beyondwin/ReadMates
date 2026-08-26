@@ -145,7 +145,7 @@ async function expectOneMainAndOrderedHeadings(page: Page): Promise<void> {
       .map((node) => Number(node.tagName.slice(1)));
     return { mainCount: mains.length, headingLevels: headings };
   });
-  expect(headingLevels.mainCount).toBeLessThanOrEqual(1);
+  expect(headingLevels.mainCount).toBe(1);
   expect(headingLevels.headingLevels[0]).toBe(1);
   for (let index = 1; index < headingLevels.headingLevels.length; index += 1) {
     expect(headingLevels.headingLevels[index]! - headingLevels.headingLevels[index - 1]!)
@@ -268,7 +268,8 @@ async function captureWorkspaceViewport(
 ): Promise<void> {
   for (const viewport of VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await expect(page.locator(".rm-host-session-workspace").first()).toBeVisible();
+    await expect(page.locator(".rm-host-session-workspace")).toHaveCount(1);
+    await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
     await expectNoHorizontalOverflow(page);
     if (viewport.width >= 1280) {
       await expectNoLegacyEditorChrome(page);
@@ -569,10 +570,11 @@ test.describe("focus workspace recovery journey", () => {
       }
     }
     await expect(attend).toHaveAttribute("aria-pressed", "true");
-    const finish = page.getByRole("button", { name: "모임 마치기", exact: true }).first();
-    await expect(finish).toBeVisible();
-    await finish.click();
+    const attendanceSheet = page.getByRole("dialog", { name: "출석" });
+    await expect(attendanceSheet).toBeVisible();
+    await attendanceSheet.getByRole("button", { name: "접기" }).click();
     await expect(page).not.toHaveURL(/section=attendance/);
+    const finish = page.getByRole("button", { name: "모임 마치기", exact: true }).first();
     await expect(finish).toBeVisible();
     await finish.click();
     await confirmLifecycle(page, "모임 마치기", "모임 마치기");
@@ -736,6 +738,8 @@ test.describe("focus workspace recovery journey", () => {
     await expect(attend).toBeVisible();
     await attend.click();
     await expect(attend).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("dialog", { name: "출석" }).getByRole("button", { name: "접기" }).click();
+    await expect(page).not.toHaveURL(/section=attendance/);
 
     await page.getByRole("button", { name: "작성 중으로 되돌리기" }).click();
     await confirmLifecycle(page, "작성 중으로 되돌리기", "작성 중으로 되돌리기", "실수로 상태를 바꿈");
@@ -860,8 +864,9 @@ test.describe("focus workspace recovery journey", () => {
     await openWorkspace(page, sessionId);
     await expectOneMainAndOrderedHeadings(page);
 
-    const basicTrigger = page.getByRole("button", { name: "모임 정보" });
-    const historyTrigger = page.getByRole("button", { name: "변경 내역" }).first();
+    const workspaceHeader = page.locator(".rm-host-session-workspace__header");
+    const basicTrigger = workspaceHeader.getByRole("button", { name: "모임 정보" });
+    const historyTrigger = workspaceHeader.getByRole("button", { name: "변경 내역" });
     const primaryCta = page.locator("button.rm-host-session-workspace__cta--desktop");
     const attendanceDisclosure = page.getByRole("link", { name: /실제 출석/ });
     const recordsDisclosure = page.getByRole("link", { name: "모임 기록" });

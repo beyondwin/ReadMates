@@ -31,6 +31,8 @@ export type HostMeetingWorkspaceProps = {
   publicRecordHref?: string | null;
   onCreateRevision?: (() => void) | null;
   reverseAction?: { label: string; onClick: () => void } | null;
+  location?: HostSessionWorkspaceLocation;
+  onLocationChange?: (next: HostSessionWorkspaceLocation) => void;
   onOpenBasic?: () => void;
   onOpenHistory?: () => void;
   pendingUndo?: WorkspacePendingUndo | null;
@@ -41,7 +43,7 @@ export type HostMeetingWorkspaceProps = {
   LinkComponent?: HostSessionEditorLinkComponent;
 };
 
-const focusOnlyLocation: HostSessionWorkspaceLocation = { panel: "focus", source: "manual" };
+const defaultLocation: HostSessionWorkspaceLocation = { panel: "focus", source: "manual" };
 
 function sessionViewFromMeeting(view: HostMeetingWorkspaceView): HostSessionWorkspaceView {
   const panel = view.primaryAction.task === "attendance"
@@ -74,6 +76,8 @@ export function HostMeetingWorkspace({
   publicRecordHref = null,
   onCreateRevision = null,
   reverseAction = null,
+  location = defaultLocation,
+  onLocationChange,
   onOpenBasic,
   onOpenHistory,
   pendingUndo = null,
@@ -93,12 +97,16 @@ export function HostMeetingWorkspace({
   }, [view.primaryAction.kind, view.primaryAction.label]);
 
   return (
-    <div ref={workspaceRef} className="rm-focus-deck">
+    <main ref={workspaceRef} className="rm-focus-deck">
       <HostSessionWorkspace
         view={sessionViewFromMeeting(view)}
         header={header}
-        location={focusOnlyLocation}
+        location={location}
         onLocationChange={(next) => {
+          if (onLocationChange) {
+            onLocationChange(next);
+            return;
+          }
           if (next.panel === "basic") onOpenBasic?.();
           if (next.panel === "history") onOpenHistory?.();
         }}
@@ -123,10 +131,8 @@ export function HostMeetingWorkspace({
         restoreNotice={restoreNotice}
         focusContent={focusContent}
         panel={panel}
-        basicPanel={null}
-        historyPanel={null}
         LinkComponent={LinkComponent}
       />
-    </div>
+    </main>
   );
 }
