@@ -1,6 +1,7 @@
 import type {
   AdminOperationAssigneeFilter,
   AdminOperationCase,
+  AdminOperationCaseCounts,
   AdminOperationCaseFilter,
   AdminOperationCaseState,
   AdminOperationCasesResponse,
@@ -25,6 +26,8 @@ const SOURCE_TYPES: readonly AdminOperationSourceType[] = [
   "CLOSING_RISK",
 ];
 const ASSIGNEES: readonly AdminOperationAssigneeFilter[] = ["ME"];
+const WORK_VIEW_IDS = ["briefing", "mine", "snoozed", "resolved-today"] as const;
+const SEARCH_MODES = ["list", "detail"] as const;
 
 const SUMMARY_LABELS: Record<AdminOperationSummaryCode, AdminOperationSummaryLabel> = {
   CLUB_SETUP_REQUIRED: {
@@ -101,10 +104,27 @@ const SEOUL_TIME = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
 });
 
+const SEOUL_DATE = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+export type AdminOperationsWorkViewId = (typeof WORK_VIEW_IDS)[number];
+
+export type AdminOperationsSearchMode = (typeof SEARCH_MODES)[number];
+
 export type AdminOperationsSearchState = {
   caseId: string | null;
+  mode: AdminOperationsSearchMode;
+  workView: AdminOperationsWorkViewId;
+  query: string;
   filter: AdminOperationCaseFilter;
 };
+
+type AdminOperationsSearchInput = Pick<AdminOperationsSearchState, "caseId" | "filter"> &
+  Partial<Pick<AdminOperationsSearchState, "mode" | "workView" | "query">>;
 
 export type AdminOperationSummaryLabel = {
   title: string;
@@ -112,12 +132,21 @@ export type AdminOperationSummaryLabel = {
 };
 
 export type AdminOperationCaseView = AdminOperationCase & {
+  locatorLabel?: string;
+  scopeLabel?: string;
   summary: AdminOperationSummaryLabel;
   severityLabel: string;
   stateLabel: string;
   sourceLabel: string;
   impactLabel: string;
   ageLabel: string;
+  lastObservedLabel?: string;
+};
+
+export type AdminOperationWorkView = {
+  id: AdminOperationsWorkViewId;
+  label: string;
+  count: number | null;
 };
 
 export type AdminOperationSourceFreshnessView = AdminOperationSourceFreshness & {
@@ -141,8 +170,10 @@ export type AdminOperationsView = {
   items: AdminOperationCaseView[];
   selectedCase: AdminOperationCaseView | null;
   selectedCaseId: string | null;
+  selectionExcluded?: boolean;
   selectionFellBack: boolean;
   sources: AdminOperationSourceFreshnessView[];
+  workViews?: AdminOperationWorkView[];
   mobileSummary: AdminOperationMobileSummary;
   allSourcesAvailable: boolean;
   sourceStatusLabel: string;
@@ -158,6 +189,9 @@ export function parseAdminOperationsSearch(params: URLSearchParams): AdminOperat
 
   return {
     caseId: nonBlank(params.get("case")),
+    mode: parseSearchMode(params.get("mode")),
+    workView: parseWorkView(params.get("view")),
+    query: nonBlank(params.get("q")) ?? "",
     filter: {
       ...(states.length > 0 ? { states } : {}),
       ...(severities.length > 0 ? { severities } : {}),
@@ -168,9 +202,12 @@ export function parseAdminOperationsSearch(params: URLSearchParams): AdminOperat
   };
 }
 
-export function serializeAdminOperationsSearch(state: AdminOperationsSearchState): URLSearchParams {
+export function serializeAdminOperationsSearch(state: AdminOperationsSearchInput): URLSearchParams {
   const params = new URLSearchParams();
   const caseId = nonBlank(state.caseId);
+  const workView = parseWorkView(state.workView ?? null);
+  const query = nonBlank(state.query ?? null);
+  const mode = parseSearchMode(state.mode ?? null);
   const states = allowlistedValues(state.filter.states, CASE_STATES);
   const severities = allowlistedValues(state.filter.severities, SEVERITIES);
   const sources = allowlistedValues(state.filter.sources, SOURCE_TYPES);
@@ -178,12 +215,70 @@ export function serializeAdminOperationsSearch(state: AdminOperationsSearchState
   const cursor = nonBlank(state.filter.cursor ?? null);
 
   if (caseId) params.set("case", caseId);
+  if (workView !== "briefing") params.set("view", workView);
+  if (query) params.set("q", query);
+  if (mode !== "list") params.set("mode", mode);
   setListParam(params, "state", states);
   setListParam(params, "severity", severities);
   setListParam(params, "source", sources);
   if (assignee) params.set("assignee", assignee.toLowerCase());
   if (cursor) params.set("cursor", cursor);
   return params;
+}
+
+export function adminOperationsScopeKey(
+  workView: AdminOperationsWorkViewId,
+  filter: AdminOperationCaseFilter,
+): string {
+  return JSON.stringify({
+    workView,
+    states: allowlistedValues(filter.states, CASE_STATES),
+    severities: allowlistedValues(filter.severities, SEVERITIES),
+    sources: allowlistedValues(filter.sources, SOURCE_TYPES),
+    assignee: parseAllowedValue(filter.assignee ?? null, ASSIGNEES) ?? null,
+    limit: typeof filter.limit === "number" ? filter.limit : null,
+  });
+}
+
+export function effectiveAdminOperationsFilter(
+  state: AdminOperationsSearchState,
+): AdminOperationCaseFilter {
+  const workViewFilter: AdminOperationCaseFilter = state.workView === "mine"
+    ? { states: ["OPEN", "ACKNOWLEDGED", "SNOOZED"], assignee: "ME" }
+    : state.workView === "snoozed"
+      ? { states: ["SNOOZED"] }
+      : state.workView === "resolved-today"
+        ? { states: ["RESOLVED"] }
+        : { states: ["OPEN", "ACKNOWLEDGED"] };
+  return mergeOperationFilters(workViewFilter, state.filter);
+}
+
+export function buildAdminOperationWorkViews(
+  counts: AdminOperationCaseCounts,
+): AdminOperationWorkView[] {
+  return [
+    { id: "briefing", label: "오늘의 브리핑", count: Math.max(0, counts.open - counts.snoozed) },
+    { id: "mine", label: "내 담당", count: counts.assignedToMe },
+    { id: "snoozed", label: "보류", count: counts.snoozed },
+    { id: "resolved-today", label: "오늘 해결", count: null },
+  ];
+}
+
+export function filterAdminOperationItems(
+  items: readonly AdminOperationCaseView[],
+  state: AdminOperationsSearchState,
+  now: Date,
+): AdminOperationCaseView[] {
+  const today = seoulDateKey(now);
+  const query = state.query.trim().toLocaleLowerCase("ko-KR");
+  return items.filter((item) => {
+    if (state.workView === "resolved-today") {
+      if (!item.resolvedAt || seoulDateKey(new Date(item.resolvedAt)) !== today) return false;
+    }
+    if (!query) return true;
+    return [item.summary.title, item.sourceLabel, item.scopeLabel ?? ""]
+      .some((value) => value.toLocaleLowerCase("ko-KR").includes(query));
+  });
 }
 
 export function adminOperationSummaryLabel(code: string): AdminOperationSummaryLabel {
@@ -197,14 +292,20 @@ export function buildAdminOperationsView(
   response: AdminOperationCasesResponse,
   requestedCaseId: string | null,
   now: Date = new Date(),
+  clubNames: ReadonlyMap<string, string> = new Map(),
+  orderMode: "sorted" | "preserve" = "sorted",
 ): AdminOperationsView {
-  const items = response.items
-    .map((item) => buildCaseView(item, now))
-    .sort(compareOperationCases);
+  const caseViews = response.items.map((item) => buildCaseView(item, now, clubNames));
+  const orderedItems = orderMode === "preserve" ? caseViews : [...caseViews].sort(compareOperationCases);
+  const items = orderedItems.map((item, index) => ({
+    ...item,
+    locatorLabel: String(orderedItems.length - index).padStart(2, "0"),
+  }));
   const requested = requestedCaseId
     ? items.find((item) => item.id === requestedCaseId) ?? null
     : null;
-  const selectedCase = requested ?? items[0] ?? null;
+  const selectionExcluded = requestedCaseId !== null && requested === null;
+  const selectedCase = requestedCaseId === null ? items[0] ?? null : requested;
   const sources = response.sources.map(buildSourceFreshnessView);
   const allSourcesAvailable = sources.every((source) => source.status === "AVAILABLE");
 
@@ -214,8 +315,10 @@ export function buildAdminOperationsView(
     items,
     selectedCase,
     selectedCaseId: selectedCase?.id ?? null,
-    selectionFellBack: requestedCaseId !== null && requestedCaseId !== selectedCase?.id,
+    selectionExcluded,
+    selectionFellBack: selectionExcluded,
     sources,
+    workViews: buildAdminOperationWorkViews(response.counts),
     mobileSummary: buildMobileSummary(response),
     allSourcesAvailable,
     sourceStatusLabel: allSourcesAvailable ? "전체 신호 정상" : "일부 신호 확인 불가",
@@ -223,15 +326,35 @@ export function buildAdminOperationsView(
   };
 }
 
-function buildCaseView(item: AdminOperationCase, now: Date): AdminOperationCaseView {
+function buildCaseView(
+  item: AdminOperationCase,
+  now: Date,
+  clubNames: ReadonlyMap<string, string>,
+): Omit<AdminOperationCaseView, "locatorLabel"> {
   return {
     ...item,
+    scopeLabel: item.clubId ? clubNames.get(item.clubId) ?? "클럽 정보 확인 필요" : "플랫폼 전체",
     summary: adminOperationSummaryLabel(item.summaryCode),
     severityLabel: SEVERITY_LABELS[item.severity] ?? "상태 확인",
     stateLabel: STATE_LABELS[item.state] ?? "상태 확인",
     sourceLabel: SOURCE_LABELS[item.sourceType] ?? "운영 신호",
     impactLabel: `영향 ${item.impactCount}건`,
     ageLabel: formatAge(item.firstObservedAt, now),
+    lastObservedLabel: formatTime(item.lastObservedAt),
+  };
+}
+
+function mergeOperationFilters(
+  base: AdminOperationCaseFilter,
+  explicit: AdminOperationCaseFilter,
+): AdminOperationCaseFilter {
+  return {
+    ...base,
+    ...explicit,
+    states: explicit.states?.length ? explicit.states : base.states,
+    severities: explicit.severities?.length ? explicit.severities : base.severities,
+    sources: explicit.sources?.length ? explicit.sources : base.sources,
+    assignee: explicit.assignee ?? base.assignee,
   };
 }
 
@@ -299,6 +422,27 @@ function formatTime(value: string): string {
 function timestamp(value: string): number {
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed;
+}
+
+function seoulDateKey(value: Date): string {
+  const parts = SEOUL_DATE.formatToParts(value);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((entry) => entry.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+function parseWorkView(value: string | null): AdminOperationsWorkViewId {
+  const normalized = value?.trim().toLocaleLowerCase("en-US");
+  return normalized && WORK_VIEW_IDS.includes(normalized as AdminOperationsWorkViewId)
+    ? normalized as AdminOperationsWorkViewId
+    : "briefing";
+}
+
+function parseSearchMode(value: string | null): AdminOperationsSearchMode {
+  const normalized = value?.trim().toLocaleLowerCase("en-US");
+  return normalized && SEARCH_MODES.includes(normalized as AdminOperationsSearchMode)
+    ? normalized as AdminOperationsSearchMode
+    : "list";
 }
 
 function parseAllowedList<T extends string>(value: string | null, allowed: readonly T[]): T[] {
