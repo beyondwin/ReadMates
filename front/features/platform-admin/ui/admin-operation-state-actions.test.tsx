@@ -91,6 +91,15 @@ describe("AdminOperationStateActions", () => {
     expect(screen.getByRole("status")).toHaveTextContent("상태를 반영하고 있습니다.");
   });
 
+  it("disables controls without in-flight copy when locked and not pending", () => {
+    renderActions({ pending: false, disabled: true });
+
+    expect(screen.getByRole("button", { name: "확인 처리" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "4시간 보류", exact: true })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "해결 확인" })).toBeDisabled();
+    expect(screen.queryByText("상태를 반영하고 있습니다.")).not.toBeInTheDocument();
+  });
+
   it("announces a refresh-required conflict", () => {
     renderActions({ message: { kind: "conflict", text: "다른 운영자가 먼저 상태를 변경했습니다." } });
 

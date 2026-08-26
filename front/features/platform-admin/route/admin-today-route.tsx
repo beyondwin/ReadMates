@@ -60,6 +60,7 @@ import { isReadmatesTransportError } from "@/shared/api/errors";
 type MutationTarget = {
   caseId: string;
   version: number;
+  confirmationKey: string;
 };
 
 export function AdminTodayRoute() {
@@ -285,6 +286,17 @@ export function AdminTodayRoute() {
   }
 
   const currentCase = view.selectedCase;
+  const confirmationKey = currentCase
+    ? `${currentCase.id}:${currentCase.version}:${currentCase.allowedActions.join(",")}`
+    : undefined;
+  if (
+    actionState === "complete"
+    && mutationTarget
+    && confirmationKey
+    && confirmationKey !== mutationTarget.confirmationKey
+  ) {
+    setActionState("ready");
+  }
   const pendingRemoval = Boolean(
     currentCase && snapshot?.pendingRemovalIds.includes(currentCase.id),
   );
@@ -296,19 +308,23 @@ export function AdminTodayRoute() {
   );
   const commandState = deriveCommandState({
     permissionDenied: mutationPermissionDenied || hasHttpStatus(detailQuery.error, 403),
-    actionState,
+    actionState: actionState === "complete"
+      && confirmationKey
+      && mutationTarget
+      && confirmationKey !== mutationTarget.confirmationKey
+      ? "ready"
+      : actionState,
     mutationPending,
     detailBehindList,
     pendingRemoval,
     nonAuthoritative,
   });
   const commandReason = commandReasonCopy(commandState);
-  const pending = detailQuery.isPending
-    || mutationPending
-    || commandState === "stale"
+  const pending = mutationPending || commandState === "pending";
+  const actionDisabled = commandState === "stale"
     || commandState === "unknown-outcome"
     || commandState === "forbidden"
-    || commandState === "pending";
+    || commandState === "complete";
 
   async function reconcileAuthoritativeState(caseId: string) {
     await Promise.all([
@@ -327,11 +343,20 @@ export function AdminTodayRoute() {
       setActionMessage(null);
       setActionState("pending");
     }
+    const detailKey = adminOperationsKeys.detail(target.caseId);
+    const listKey = adminOperationsKeys.pages(effectiveFilter);
+    const beforeDetailAt = queryClient.getQueryState(detailKey)?.dataUpdatedAt ?? 0;
+    const beforeListAt = queryClient.getQueryState(listKey)?.dataUpdatedAt ?? 0;
     try {
       await operation();
       if (!isCurrentMutationTarget(target)) return;
-      const detailState = queryClient.getQueryState(adminOperationsKeys.detail(target.caseId));
-      if (detailState?.status !== "success") {
+      if (!isPostMutationAuthoritative({
+        detail: queryClient.getQueryState(detailKey),
+        list: queryClient.getQueryState(listKey),
+        beforeDetailAt,
+        beforeListAt,
+        expectedMinVersion: target.version,
+      })) {
         setActionState("unknown-outcome");
         setActionMessage({
           kind: "unknown-outcome",
@@ -404,24 +429,22 @@ export function AdminTodayRoute() {
   }
 
   const permissionDenied = mutationPermissionDenied || hasHttpStatus(detailQuery.error, 403);
-  const confirmationKey = currentCase
-    ? `${currentCase.id}:${currentCase.version}:${currentCase.allowedActions.join(",")}`
-    : undefined;
   const lifecycleControls = !permissionDenied && currentCase && currentCase.allowedActions.length > 0 ? (
     <AdminOperationStateActions
       allowedActions={currentCase.allowedActions}
       pending={pending}
+      disabled={actionDisabled}
       message={mutationTarget?.caseId === currentCase.id ? actionMessage : null}
       confirmationKey={confirmationKey}
       onAcknowledge={() => void runMutation(
-        { caseId: currentCase.id, version: currentCase.version },
+        { caseId: currentCase.id, version: currentCase.version, confirmationKey: confirmationKey ?? "" },
         () => acknowledgeMutation.mutateAsync({
           caseId: currentCase.id,
           expectedVersion: currentCase.version,
         }),
       )}
       onSnooze={(snoozedUntil) => void runMutation(
-        { caseId: currentCase.id, version: currentCase.version },
+        { caseId: currentCase.id, version: currentCase.version, confirmationKey: confirmationKey ?? "" },
         () => snoozeMutation.mutateAsync({
           caseId: currentCase.id,
           expectedVersion: currentCase.version,
@@ -429,7 +452,7 @@ export function AdminTodayRoute() {
         }),
       )}
       onResolve={() => void runMutation(
-        { caseId: currentCase.id, version: currentCase.version },
+        { caseId: currentCase.id, version: currentCase.version, confirmationKey: confirmationKey ?? "" },
         () => resolveMutation.mutateAsync({
           caseId: currentCase.id,
           expectedVersion: currentCase.version,
@@ -569,6 +592,21 @@ function viewFromSnapshot(
     selectionFellBack: selectionExcluded,
     workViews: built.workViews,
   };
+}
+
+function isPostMutationAuthoritative(input: {
+  detail: { status: string; dataUpdatedAt: number; data?: unknown } | undefined;
+  list: { status: string; dataUpdatedAt: number } | undefined;
+  beforeDetailAt: number;
+  beforeListAt: number;
+  expectedMinVersion: number;
+}): boolean {
+  if (!input.detail || input.detail.status !== "success") return false;
+  if (!input.list || input.list.status !== "success") return false;
+  if (input.detail.dataUpdatedAt <= input.beforeDetailAt) return false;
+  if (input.list.dataUpdatedAt <= input.beforeListAt) return false;
+  const version = (input.detail.data as { item?: { version?: number } } | undefined)?.item?.version;
+  return typeof version === "number" && version > input.expectedMinVersion;
 }
 
 function deriveCommandState(input: {

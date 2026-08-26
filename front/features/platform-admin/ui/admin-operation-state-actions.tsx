@@ -11,6 +11,7 @@ export type AdminOperationActionMessage = {
 type Props = {
   allowedActions: readonly LifecycleAction[];
   pending: boolean;
+  disabled?: boolean;
   message: AdminOperationActionMessage | null;
   confirmationKey?: string;
   now?: () => Date;
@@ -24,6 +25,7 @@ const HOUR_MS = 60 * 60 * 1_000;
 export function AdminOperationStateActions({
   allowedActions,
   pending,
+  disabled = false,
   message,
   confirmationKey,
   now = () => new Date(),
@@ -35,6 +37,7 @@ export function AdminOperationStateActions({
   const resolveTriggerRef = useRef<HTMLElement | null>(null);
   const activeConfirmationKey = confirmationKey ?? "resolve";
   const resolveOpen = openConfirmationKey === activeConfirmationKey;
+  const locked = pending || disabled;
 
   function snooze(hours: number) {
     onSnooze(new Date(now().getTime() + hours * HOUR_MS).toISOString());
@@ -49,22 +52,22 @@ export function AdminOperationStateActions({
     <div className="admin-operation-actions">
       <div className="admin-operation-actions__controls">
         {allowedActions.includes("ACKNOWLEDGE") ? (
-          <button type="button" className="btn btn-secondary" disabled={pending} onClick={onAcknowledge}>
+          <button type="button" className="btn btn-secondary" disabled={locked} onClick={onAcknowledge}>
             확인 처리
           </button>
         ) : null}
         {allowedActions.includes("SNOOZE") ? (
           <>
-            <button type="button" className="btn btn-secondary" disabled={pending} onClick={() => snooze(1)}>
+            <button type="button" className="btn btn-secondary" disabled={locked} onClick={() => snooze(1)}>
               1시간 보류
             </button>
-            <button type="button" className="btn btn-secondary" disabled={pending} onClick={() => snooze(4)}>
+            <button type="button" className="btn btn-secondary" disabled={locked} onClick={() => snooze(4)}>
               4시간 보류
             </button>
-            <button type="button" className="btn btn-secondary" disabled={pending} onClick={() => snooze(24)}>
+            <button type="button" className="btn btn-secondary" disabled={locked} onClick={() => snooze(24)}>
               24시간 보류
             </button>
-            <button type="button" className="btn btn-secondary" disabled={pending} onClick={() => snooze(168)}>
+            <button type="button" className="btn btn-secondary" disabled={locked} onClick={() => snooze(168)}>
               7일 보류
             </button>
           </>
@@ -74,7 +77,7 @@ export function AdminOperationStateActions({
             ref={resolveTriggerRef}
             type="button"
             className="btn btn-secondary"
-            disabled={pending}
+            disabled={locked}
             onClick={() => setOpenConfirmationKey(activeConfirmationKey)}
           >
             해결 확인
@@ -104,7 +107,7 @@ export function AdminOperationStateActions({
             <button type="button" className="btn btn-secondary" onClick={() => setOpenConfirmationKey(null)}>
               닫기
             </button>
-            <button type="button" className="btn btn-primary" disabled={pending} onClick={confirmResolve}>
+            <button type="button" className="btn btn-primary" disabled={locked} onClick={confirmResolve}>
               신호 재검증 후 해결
             </button>
           </div>

@@ -148,6 +148,7 @@ describe("AdminOperationsInspector", () => {
       "data-state",
       "unknown-outcome",
     );
+    expect(screen.queryByText("상태를 반영하고 있습니다.")).not.toBeInTheDocument();
     expect(findNestedLiveRegions(container)).toEqual([]);
   });
 

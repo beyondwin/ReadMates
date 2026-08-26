@@ -529,10 +529,17 @@ describe("AdminTodayRoute", () => {
 
   it("announces success after a lifecycle mutation without starting mutation polling", async () => {
     const user = userEvent.setup();
+    const acknowledged = operationCase({
+      state: "ACKNOWLEDGED",
+      version: 4,
+      allowedActions: ["SNOOZE", "RESOLVE"],
+    });
     operationsApi.acknowledge.mockResolvedValue({
       schema: "admin.operation_cases.v1",
-      ...operationCase({ state: "ACKNOWLEDGED", version: 4, allowedActions: ["SNOOZE", "RESOLVE"] }),
+      ...acknowledged,
     });
+    operationsApi.fetchList.mockResolvedValue(listResponse([acknowledged]));
+    operationsApi.fetchDetail.mockResolvedValue(detailResponse(acknowledged));
     renderRoute(seededClient(), "/admin/today?case=case-notification");
 
     await user.click(await screen.findByRole("button", { name: "확인 처리" }));
@@ -540,6 +547,87 @@ describe("AdminTodayRoute", () => {
     expect(await screen.findByText("케이스 상태를 반영했습니다.")).toBeInTheDocument();
     expect(operationsApi.acknowledge).toHaveBeenCalledTimes(1);
     expect(operationsApi.acknowledge).toHaveBeenCalledWith("case-notification", 3);
+  });
+
+  it("returns L1 complete to ready so a follow-up snooze can run on the same case", async () => {
+    const user = userEvent.setup();
+    const acknowledged = operationCase({
+      state: "ACKNOWLEDGED",
+      version: 4,
+      allowedActions: ["SNOOZE", "RESOLVE"],
+    });
+    operationsApi.acknowledge.mockResolvedValue({
+      schema: "admin.operation_cases.v1",
+      ...acknowledged,
+    });
+    operationsApi.fetchList.mockResolvedValue(listResponse([acknowledged]));
+    operationsApi.fetchDetail.mockResolvedValue(detailResponse(acknowledged));
+    operationsApi.snooze.mockResolvedValue({
+      schema: "admin.operation_cases.v1",
+      ...acknowledged,
+      state: "SNOOZED",
+      version: 5,
+      allowedActions: ["ACKNOWLEDGE", "RESOLVE"],
+    });
+    renderRoute(seededClient(), "/admin/today?case=case-notification");
+
+    await user.click(await screen.findByRole("button", { name: "확인 처리" }));
+    expect(await screen.findByText("케이스 상태를 반영했습니다.")).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByRole("group", { name: "작업" }).closest("[data-state]")).toHaveAttribute(
+        "data-state",
+        "ready",
+      );
+    });
+    expect(screen.queryByText("상태를 반영하고 있습니다.")).not.toBeInTheDocument();
+    const snooze = screen.getByRole("button", { name: "4시간 보류", exact: true });
+    expect(snooze).toBeEnabled();
+    await user.click(snooze);
+
+    await waitFor(() => {
+      expect(operationsApi.snooze).toHaveBeenCalledWith(
+        "case-notification",
+        4,
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+      );
+    });
+  });
+
+  it("does not treat a failed post-mutation refetch as L1 success", async () => {
+    const user = userEvent.setup();
+    const acknowledged = operationCase({
+      state: "ACKNOWLEDGED",
+      version: 4,
+      allowedActions: ["SNOOZE", "RESOLVE"],
+    });
+    operationsApi.acknowledge.mockResolvedValue({
+      schema: "admin.operation_cases.v1",
+      ...acknowledged,
+    });
+    operationsApi.fetchList.mockRejectedValue(
+      Object.assign(new Error("unavailable"), { status: 503, code: "UNAVAILABLE" }),
+    );
+    operationsApi.fetchDetail.mockRejectedValue(
+      Object.assign(new Error("unavailable"), { status: 503, code: "UNAVAILABLE" }),
+    );
+    renderRoute(seededClient(), "/admin/today?case=case-notification");
+
+    await user.click(await screen.findByRole("button", { name: "확인 처리" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("group", { name: "작업" }).closest("[data-state]")).toHaveAttribute(
+        "data-state",
+        "unknown-outcome",
+      );
+    });
+    expect(screen.getAllByText(/명령 응답을 확인하지 못했습니다/).length).toBeGreaterThan(0);
+    expect(screen.queryByText("케이스 상태를 반영했습니다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("상태를 반영하고 있습니다.")).not.toBeInTheDocument();
+    expect(operationsApi.acknowledge).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(operationsApi.fetchDetail).toHaveBeenCalled());
+    await waitFor(() => expect(operationsApi.fetchList).toHaveBeenCalled());
+    expect(operationsApi.acknowledge).toHaveBeenCalledTimes(1);
   });
 
   it("stops Today polling after 403 purge without clearing member queries", async () => {
@@ -662,6 +750,8 @@ describe("AdminTodayRoute", () => {
       "data-state",
       "stale",
     );
+    expect(screen.getByText("최신 상태가 아닙니다. 다시 확인한 뒤 작업을 이어가세요.")).toBeInTheDocument();
+    expect(screen.queryByText("상태를 반영하고 있습니다.")).not.toBeInTheDocument();
     expect(operationsApi.acknowledge).not.toHaveBeenCalled();
   });
 
@@ -741,6 +831,7 @@ describe("AdminTodayRoute", () => {
       "data-state",
       "unknown-outcome",
     );
+    expect(screen.queryByText("상태를 반영하고 있습니다.")).not.toBeInTheDocument();
     await waitFor(() => expect(operationsApi.fetchList).toHaveBeenCalled());
     await waitFor(() => expect(operationsApi.fetchDetail).toHaveBeenCalled());
     expect(operationsApi.acknowledge).toHaveBeenCalledTimes(1);
