@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   adminCommandRecovery,
   type AdminCommandRecovery,
@@ -104,6 +104,39 @@ export function AdminClubDomainCommandPanel({
   const draftEpoch = useRef(0);
   const draftLocked = confirmPending || confirmInFlight;
 
+  const [manageArmed, setManageArmed] = useState(canManageDomains);
+
+  function purgeCommandState() {
+    draftEpoch.current += 1;
+    setDraft({ hostname: "", kind: "CUSTOM_DOMAIN", isPrimary: false });
+    setPreview(null);
+    setConfirmed(false);
+    setIntentKey(null);
+    setReceipt(null);
+    setRecovery(null);
+    setConfirmInFlight(false);
+    recheckIntentKeys.current.clear();
+  }
+
+  if (!canManageDomains && manageArmed) {
+    setManageArmed(false);
+    setDraft({ hostname: "", kind: "CUSTOM_DOMAIN", isPrimary: false });
+    setPreview(null);
+    setConfirmed(false);
+    setIntentKey(null);
+    setReceipt(null);
+    setRecovery(null);
+    setConfirmInFlight(false);
+  } else if (canManageDomains && !manageArmed) {
+    setManageArmed(true);
+  }
+
+  useEffect(() => {
+    if (canManageDomains) return;
+    draftEpoch.current += 1;
+    recheckIntentKeys.current.clear();
+  }, [canManageDomains]);
+
   function updateDraft(next: typeof draft) {
     draftEpoch.current += 1;
     setDraft(next);
@@ -129,6 +162,10 @@ export function AdminClubDomainCommandPanel({
       setReceipt(null);
     } catch (error) {
       if (draftEpoch.current !== epoch) return;
+      if (isAuthorityLossError(error)) {
+        purgeCommandState();
+        return;
+      }
       setRecovery(adminCommandRecovery(error));
     }
   }
@@ -147,6 +184,10 @@ export function AdminClubDomainCommandPanel({
       setReceipt(next);
       setRecovery(null);
     } catch (error) {
+      if (isAuthorityLossError(error)) {
+        purgeCommandState();
+        return;
+      }
       const nextRecovery = adminCommandRecovery(error);
       setRecovery(nextRecovery);
       if (
@@ -177,6 +218,10 @@ export function AdminClubDomainCommandPanel({
       recheckIntentKeys.current.delete(domain.id);
       setRecovery(null);
     } catch (error) {
+      if (isAuthorityLossError(error)) {
+        purgeCommandState();
+        return;
+      }
       const nextRecovery = adminCommandRecovery(error);
       setRecovery(nextRecovery);
       if (nextRecovery.kind !== "RETRY_SAME_INTENT") {
@@ -329,7 +374,7 @@ export function AdminClubDomainCommandPanel({
           ) : null}
         </div>
       ) : null}
-      {recovery ? (
+      {canManageDomains && recovery ? (
         <div className="danger" role="alert">
           <p>{recovery.message}</p>
           {recovery.kind === "REFRESH_STATE" ? (
@@ -343,7 +388,7 @@ export function AdminClubDomainCommandPanel({
           ) : null}
         </div>
       ) : null}
-      {receipt ? (
+      {canManageDomains && receipt ? (
         <div className="admin-club-detail__receipt" aria-live="polite">
           <strong>명령 접수 완료</strong>
           <span>receipt {receipt.receiptId}</span>
@@ -355,4 +400,10 @@ export function AdminClubDomainCommandPanel({
       ) : null}
     </section>
   );
+}
+
+function isAuthorityLossError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const status = "status" in error ? error.status : undefined;
+  return status === 401 || status === 403;
 }

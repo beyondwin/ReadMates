@@ -3,9 +3,12 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PlatformAdminClubDetail } from "@/features/platform-admin/api/platform-admin-contracts";
+import { apiErrorFromResponse } from "@/shared/api/errors";
 import {
+  installPlatformAdminAuthorityLossHandler,
   platformAdminCapabilitiesQuery,
   platformAdminClubDetailQuery,
+  platformAdminKeys,
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { platformAdminSupportLedgerInfiniteQuery } from "@/features/platform-admin/queries/platform-admin-support-queries";
 import { platformAdminClubOperationsQuery } from "@/features/platform-admin/queries/platform-admin-club-operations-queries";
@@ -74,10 +77,24 @@ const detail: PlatformAdminClubDetail = {
   ],
 };
 
+async function forbiddenError() {
+  return apiErrorFromResponse(
+    new Response(
+      JSON.stringify({
+        code: "PERMISSION_DENIED",
+        message: "이 작업을 수행할 권한이 없습니다.",
+        status: 403,
+      }),
+      { status: 403, headers: { "Content-Type": "application/json" } },
+    ),
+  );
+}
+
 function renderRoute(
   club: PlatformAdminClubDetail | null = detail,
   capabilities = ["VIEW_CLUBS", "MANAGE_CLUBS", "MANAGE_CLUB_DOMAINS"],
   seedSupportGrants = true,
+  initialEntry = "/admin/clubs/c-1",
 ) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -85,6 +102,7 @@ function renderRoute(
       mutations: { retry: false },
     },
   });
+  installPlatformAdminAuthorityLossHandler(queryClient);
   if (club)
     queryClient.setQueryData(
       platformAdminClubDetailQuery("c-1").queryKey,
@@ -149,12 +167,13 @@ function renderRoute(
   const view = render(
     <QueryClientProvider client={queryClient}>
       <AdminBreadcrumbProvider>
-        <MemoryRouter initialEntries={["/admin/clubs/c-1"]}>
+        <MemoryRouter initialEntries={[initialEntry]}>
           <Routes>
             <Route
               path="/admin/clubs/:clubId"
               element={<AdminClubDetailRoute />}
             />
+            <Route path="/admin/clubs" element={<div>clubs list</div>} />
           </Routes>
         </MemoryRouter>
       </AdminBreadcrumbProvider>
@@ -312,6 +331,155 @@ describe("AdminClubDetailRoute", () => {
     expect(
       screen.queryByRole("button", { name: "도메인 추가 미리보기" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("returns through the validated list URL and falls back for unsafe returnTo", () => {
+    const valid = renderRoute(
+      detail,
+      ["VIEW_CLUBS", "MANAGE_CLUBS", "MANAGE_CLUB_DOMAINS"],
+      true,
+      "/admin/clubs/c-1?returnTo=%2Fadmin%2Fclubs%3Fsearch%3Dalpha%26lifecycle%3DACTIVE&focusId=c-1&scrollTop=240",
+    );
+    expect(screen.getByRole("link", { name: "← 클럽 목록" })).toHaveAttribute(
+      "href",
+      "/admin/clubs?search=alpha&lifecycle=ACTIVE",
+    );
+    valid.unmount();
+
+    const external = renderRoute(
+      detail,
+      ["VIEW_CLUBS"],
+      true,
+      "/admin/clubs/c-1?returnTo=https://external.example/admin/clubs&focusId=c-1&scrollTop=12",
+    );
+    expect(screen.getByRole("link", { name: "← 클럽 목록" })).toHaveAttribute(
+      "href",
+      "/admin/clubs",
+    );
+    external.unmount();
+
+    renderRoute(
+      detail,
+      ["VIEW_CLUBS"],
+      true,
+      "/admin/clubs/c-1?returnTo=%2Fadmin%2Ftoday&focusId=c-1",
+    );
+    expect(screen.getByRole("link", { name: "← 클럽 목록" })).toHaveAttribute(
+      "href",
+      "/admin/clubs",
+    );
+  });
+
+  it("gates MANAGE_CLUBS and MANAGE_CLUB_DOMAINS independently of role names", () => {
+    const domainsOnly = renderRoute(detail, ["VIEW_CLUBS", "MANAGE_CLUB_DOMAINS"]);
+    expect(
+      screen.queryByRole("button", { name: "공개 정보 저장" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "공개 전환 미리보기" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "도메인 추가 미리보기" }),
+    ).toBeInTheDocument();
+    domainsOnly.unmount();
+
+    renderRoute(detail, ["VIEW_CLUBS", "MANAGE_CLUBS"]);
+    expect(
+      screen.getByRole("button", { name: "공개 정보 저장" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "도메인 추가 미리보기" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("purges metadata draft, visibility preview, confirmation, and receipt when MANAGE_CLUBS is lost", async () => {
+    vi.mocked(previewPlatformAdminClubVisibility).mockResolvedValue({
+      previewId: "preview-1",
+      expiresAt: "2026-08-24T01:00:00Z",
+      currentVisibility: "PRIVATE",
+      targetVisibility: "PUBLIC",
+      impactCodes: ["PUBLIC_DISCOVERY_ENABLED"],
+      requestFingerprintPrefix: "abcd1234",
+    });
+    const { queryClient } = renderRoute();
+    fireEvent.change(screen.getByRole("textbox", { name: "클럽 이름" }), {
+      target: { value: "Draft Alpha" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "공개 전환 미리보기" }));
+    await screen.findByText("PUBLIC_DISCOVERY_ENABLED");
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "영향을 확인했습니다" }),
+    );
+
+    queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, {
+      schemaVersion: 1,
+      role: "OWNER",
+      status: "ACTIVE",
+      capabilities: ["VIEW_CLUBS"],
+      generatedAt: "2026-08-24T00:00:00Z",
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "클럽 이름" })).toHaveValue(
+        "Alpha",
+      ),
+    );
+    expect(screen.queryByText("PUBLIC_DISCOVERY_ENABLED")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("checkbox", { name: "영향을 확인했습니다" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/receipt-/)).not.toBeInTheDocument();
+
+    queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, {
+      schemaVersion: 1,
+      role: "OWNER",
+      status: "ACTIVE",
+      capabilities: ["VIEW_CLUBS", "MANAGE_CLUBS", "MANAGE_CLUB_DOMAINS"],
+      generatedAt: "2026-08-24T00:00:00Z",
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "공개 전환 미리보기" }),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("textbox", { name: "클럽 이름" })).toHaveValue(
+      "Alpha",
+    );
+    expect(screen.queryByText("PUBLIC_DISCOVERY_ENABLED")).not.toBeInTheDocument();
+  });
+
+  it("purges visibility command state on 403 without retrying", async () => {
+    vi.mocked(previewPlatformAdminClubVisibility).mockResolvedValue({
+      previewId: "preview-1",
+      expiresAt: "2026-08-24T01:00:00Z",
+      currentVisibility: "PRIVATE",
+      targetVisibility: "PUBLIC",
+      impactCodes: ["PUBLIC_DISCOVERY_ENABLED"],
+      requestFingerprintPrefix: "abcd1234",
+    });
+    vi.mocked(confirmPlatformAdminClubVisibility).mockRejectedValue(
+      await forbiddenError(),
+    );
+    const { queryClient } = renderRoute();
+    fireEvent.click(screen.getByRole("button", { name: "공개 전환 미리보기" }));
+    await screen.findByText("PUBLIC_DISCOVERY_ENABLED");
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "영향을 확인했습니다" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "공개 전환 확정" }));
+
+    await waitFor(() => {
+      expect(
+        queryClient.getQueryData(platformAdminKeys.capabilities()),
+      ).toBeUndefined();
+      expect(
+        screen.queryByText("PUBLIC_DISCOVERY_ENABLED"),
+      ).not.toBeInTheDocument();
+    });
+    expect(
+      screen.queryByRole("button", { name: "공개 전환 확정" }),
+    ).not.toBeInTheDocument();
+    expect(confirmPlatformAdminClubVisibility).toHaveBeenCalledTimes(1);
   });
 
   it("keeps rejected visibility and domain previews inside their error surfaces", async () => {

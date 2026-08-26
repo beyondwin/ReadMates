@@ -241,6 +241,73 @@
   }
 }
 
+.admin-clubs-ledger,
+.admin-clubs-ledger__scroller {
+  min-width: 0;
+}
+
+.admin-clubs-ledger .admin-page-context,
+.admin-clubs-ledger .admin-work-view-bar,
+.admin-clubs-ledger .admin-evidence-ledger {
+  min-width: 0;
+}
+
+.admin-clubs-ledger .admin-work-view-bar {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.admin-clubs-ledger .admin-clubs__query .input,
+.admin-clubs-ledger .admin-clubs__query select,
+.admin-clubs-ledger .admin-clubs__query button,
+.admin-clubs-ledger .admin-clubs__load-more .btn,
+.admin-clubs-ledger .admin-page-frame__action .btn,
+.admin-clubs-ledger .admin-page-frame__action a,
+.admin-clubs-ledger .admin-clubs__table a {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.admin-clubs-ledger__scroller {
+  max-height: min(70vh, 52rem);
+  overflow: auto;
+}
+
+.admin-clubs-ledger :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px var(--focus-ring-soft);
+}
+
+@media (max-width: 768px) {
+  .admin-clubs-ledger .admin-work-view-bar,
+  .admin-clubs-ledger .admin-clubs__query {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-clubs-ledger .admin-clubs__query .input,
+  .admin-clubs-ledger .admin-clubs__query select,
+  .admin-clubs-ledger .admin-clubs__query button,
+  .admin-clubs-ledger .admin-clubs__load-more .btn,
+  .admin-clubs-ledger .admin-page-frame__action .btn,
+  .admin-clubs-ledger .admin-page-frame__action a {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-clubs-ledger,
+  .admin-clubs-ledger *,
+  .admin-clubs-ledger *::before,
+  .admin-clubs-ledger *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .admin-page-context,
   .admin-page-context *,

@@ -286,3 +286,15 @@ test("revision conflict keeps the operator on detail and offers authoritative re
     page.getByRole("heading", { name: "읽는사이", exact: true }),
   ).toBeVisible();
 });
+
+test("rejects a different primary area as club detail return state", async ({
+  page,
+}) => {
+  await routePlatformAdminShell(page);
+  await page.goto(
+    `/admin/clubs/${CLUB_ID}?returnTo=${encodeURIComponent("/admin/today")}&focusId=${CLUB_ID}`,
+  );
+  await expect(
+    page.getByRole("link", { name: "← 클럽 목록" }),
+  ).toHaveAttribute("href", "/admin/clubs");
+});

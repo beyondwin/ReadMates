@@ -725,6 +725,98 @@ describe("AdminShellLayout", () => {
     expect(queryClient.getQueryState(filteredKey)).toBeDefined();
   });
 
+  it("closes onboarding and purges the draft when CREATE_CLUB is lost", async () => {
+    const { queryClient } = renderShell("/admin/clubs?search=alpha&onboarding=1");
+    fireEvent.change(screen.getByRole("textbox", { name: "클럽 이름" }), {
+      target: { value: "Draft Club" },
+    });
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, {
+      schemaVersion: 1,
+      role: "OWNER",
+      status: "ACTIVE",
+      capabilities: supportViewCapabilities,
+      generatedAt: "2026-08-22T00:00:00Z",
+    });
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+
+    queryClient.setQueryData(
+      platformAdminCapabilitiesQuery().queryKey,
+      ownerCapabilities,
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("sends the created club through a validated clubs return path", async () => {
+    vi.mocked(previewPlatformAdminOnboarding).mockResolvedValue({
+      previewId: "preview-1",
+      expiresAt: "2026-08-24T01:00:00Z",
+      clubSlug: "new-club",
+      firstHostKind: "NEW_USER",
+      requiredConfirmation: null,
+      impactCodes: ["CLUB_CREATED"],
+      prerequisiteCodes: [],
+      requestFingerprintPrefix: "abcd1234",
+    });
+    vi.mocked(commitPlatformAdminOnboarding).mockResolvedValue({
+      receiptId: "receipt-1",
+      club: {
+        clubId: "club-new",
+        slug: "new-club",
+        name: "New Club",
+        tagline: "",
+        about: "",
+        status: "ACTIVE",
+        publicVisibility: "PRIVATE",
+        domainCount: 0,
+        domainActionRequiredCount: 0,
+        notificationFailureCount: 0,
+        aiFailureCount: 0,
+        firstHostOnboardingState: "INVITED",
+        adminRevision: 1,
+      },
+      originStatus: "SUCCEEDED",
+      firstHostKind: "INVITATION_CREATED",
+      invitationDelivery: "PENDING",
+    });
+    const { router } = renderShell(
+      "/admin/clubs?search=alpha&visibility=PRIVATE&onboarding=1",
+    );
+    for (const [name, value] of [
+      ["클럽 이름", "New Club"],
+      ["Slug", "new-club"],
+      ["Tagline", "함께 읽는 모임"],
+      ["About", "공개 소개"],
+      ["첫 호스트 이메일", "fixture@example.test"],
+      ["첫 호스트 이름", "Fixture Host"],
+    ] as const) {
+      fireEvent.change(screen.getByRole("textbox", { name }), {
+        target: { value },
+      });
+    }
+    fireEvent.click(screen.getByRole("button", { name: "미리 확인" }));
+    await screen.findByText("CLUB_CREATED");
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "온보딩 영향을 확인했습니다" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "클럽 생성 확정" }));
+    await screen.findByText(/receipt-1/);
+    fireEvent.click(
+      screen.getByRole("button", { name: "생성된 클럽 상세로 이동" }),
+    );
+    expect(router.state.location.pathname).toBe("/admin/clubs/club-new");
+    expect(router.state.location.search).toContain(
+      "returnTo=%2Fadmin%2Fclubs%3Fsearch%3Dalpha",
+    );
+    expect(router.state.location.search).toContain("visibility%3DPRIVATE");
+    expect(router.state.location.search).not.toContain("onboarding");
+    expect(router.state.location.search).toContain("focusId=club-new");
+  });
+
   it.each(["preview", "commit"] as const)(
     "purges admin state when onboarding %s loses authority",
     async (phase) => {

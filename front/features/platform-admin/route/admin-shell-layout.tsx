@@ -18,6 +18,8 @@ import {
   adminWorkspaceAccountLabel,
   deriveAdminWorkspaceDestinations,
 } from "@/features/platform-admin/model/admin-workspace-switcher-model";
+import { buildAdminDetailHref } from "@/features/platform-admin/model/admin-route-state";
+import { platformAdminClubListHref } from "@/features/platform-admin/model/platform-admin-club-list-filters";
 import { canAdmin } from "@/features/platform-admin/model/platform-admin-capabilities";
 import {
   installPlatformAdminAuthorityLossHandler,
@@ -79,8 +81,8 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
     capabilities != null && canAdmin(capabilities, "CREATE_CLUB");
 
   const routePath = derivePathSegment(location.pathname);
-  const onboardingOpen =
-    searchParams.get("onboarding") === "1" && canCreateClub;
+  const onboardingRequested = searchParams.get("onboarding") === "1";
+  const onboardingOpen = onboardingRequested && canCreateClub;
   const blocker = useBlocker(
     useCallback(
       ({ currentLocation, nextLocation }) => {
@@ -100,6 +102,32 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
   useEffect(() => {
     allowOnboardingNavigation.current = false;
   }, [location.key]);
+
+  if (!canCreateClub && (isWizardDirty || onboardingEffectPending)) {
+    setIsWizardDirty(false);
+    setOnboardingEffectPending(false);
+  }
+
+  useEffect(() => {
+    if (capabilities == null || canCreateClub || !onboardingRequested) return;
+    allowOnboardingNavigation.current = true;
+    const next = new URLSearchParams(searchParams);
+    next.delete("onboarding");
+    navigate(
+      {
+        pathname: location.pathname,
+        search: next.toString() ? `?${next.toString()}` : "",
+      },
+      { replace: true },
+    );
+  }, [
+    canCreateClub,
+    capabilities,
+    location.pathname,
+    navigate,
+    onboardingRequested,
+    searchParams,
+  ]);
 
   useEffect(() => {
     if (blocker.state !== "blocked") return;
@@ -199,13 +227,21 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
           onRequestClose={closeOnboarding}
         >
           <PlatformAdminOnboardingWizard
+            enabled={canCreateClub}
             onPreview={previewOnboarding.mutateAsync}
             onCommit={commitOnboarding.mutateAsync}
             onDirtyChange={setIsWizardDirty}
             onEffectPendingChange={setOnboardingEffectPending}
             onViewClub={(clubId) => {
               allowOnboardingNavigation.current = true;
-              navigate(`/admin/clubs/${clubId}`, { replace: true });
+              navigate(
+                buildAdminDetailHref(`/admin/clubs/${clubId}`, {
+                  returnTo: platformAdminClubListHref(searchParams),
+                  focusId: clubId,
+                  scrollTop: 0,
+                }),
+                { replace: true },
+              );
             }}
           />
         </AdminOnboardingModal>

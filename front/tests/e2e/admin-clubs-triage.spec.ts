@@ -351,7 +351,7 @@ test.describe("admin clubs registry", () => {
     await routeAdminClubs(page);
 
     await page.goto("/admin/clubs");
-    await expect(page.getByRole("heading", { name: "클럽" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "클럽", exact: true })).toBeVisible();
 
     await expect(
       page.getByRole("searchbox", { name: "클럽 검색" }),
@@ -377,6 +377,33 @@ test.describe("admin clubs registry", () => {
       .first();
     await firstClubLink.click();
     await expect(page).toHaveURL(/\/admin\/clubs\/.+/);
+    await expect(page).toHaveURL(/returnTo=/);
+    await expect(page).toHaveURL(/focusId=/);
+    await expect(page).toHaveURL(/visibility%3DPRIVATE/);
+
+    await page.getByRole("link", { name: "← 클럽 목록" }).click();
+    await expect(page).toHaveURL(/\/admin\/clubs\?/);
+    await expect(page).toHaveURL(/visibility=PRIVATE/);
+    await expect(page.getByRole("combobox", { name: "공개 상태" })).toHaveValue(
+      "PRIVATE",
+    );
+    await expect(
+      page.getByRole("link", { name: "Broken Club" }),
+    ).toBeFocused();
+  });
+
+  test("falls back to the clubs list when detail return state is unsafe", async ({
+    page,
+  }) => {
+    await routeAdminClubs(page);
+    await page.goto(
+      "/admin/clubs/crit-club?returnTo=https://external.example/admin/clubs&focusId=crit-club&scrollTop=12",
+    );
+    await expect(
+      page.getByRole("link", { name: "← 클럽 목록" }),
+    ).toHaveAttribute("href", "/admin/clubs");
+    await page.getByRole("link", { name: "← 클럽 목록" }).click();
+    await expect(page).toHaveURL(/\/admin\/clubs$/);
   });
 
   test("previews and explicitly confirms durable onboarding without exposing delivery secrets", async ({
@@ -539,7 +566,7 @@ test.describe("admin clubs registry", () => {
     for (const viewport of viewports) {
       await page.setViewportSize(viewport);
       await page.goto("/admin/clubs");
-      await expect(page.getByRole("heading", { name: "클럽" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "클럽", exact: true })).toBeVisible();
       const hasHorizontalOverflow = await page.evaluate(
         () =>
           document.documentElement.scrollWidth >

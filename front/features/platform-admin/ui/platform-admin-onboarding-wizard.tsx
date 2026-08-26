@@ -38,6 +38,7 @@ export type PlatformAdminOnboardingResultView = {
 };
 
 type Props = {
+  enabled?: boolean;
   onPreview: (
     request: PlatformAdminOnboardingDraft,
   ) => Promise<PlatformAdminOnboardingPreviewView>;
@@ -59,6 +60,7 @@ const BLOCKING_PREREQUISITES = new Set([
 ]);
 
 export function PlatformAdminOnboardingWizard({
+  enabled = true,
   onPreview,
   onCommit,
   onViewClub,
@@ -91,6 +93,40 @@ export function PlatformAdminOnboardingWizard({
     () => onDirtyChange?.(isDirty && result === null),
     [isDirty, onDirtyChange, result],
   );
+  const [authorityArmed, setAuthorityArmed] = useState(enabled);
+
+  function purgeOnboardingState() {
+    requestEpoch.current += 1;
+    setRequest(EMPTY_REQUEST);
+    setPreview(null);
+    setConfirmed(false);
+    setConfirmationPhrase("");
+    setIntentKey(null);
+    setResult(null);
+    setRecovery(null);
+    setPreviewPending(false);
+    setEffectPending(false);
+  }
+
+  if (!enabled && authorityArmed) {
+    setAuthorityArmed(false);
+    setRequest(EMPTY_REQUEST);
+    setPreview(null);
+    setConfirmed(false);
+    setConfirmationPhrase("");
+    setIntentKey(null);
+    setResult(null);
+    setRecovery(null);
+    setPreviewPending(false);
+    setEffectPending(false);
+  } else if (enabled && !authorityArmed) {
+    setAuthorityArmed(true);
+  }
+
+  useEffect(() => {
+    if (enabled) return;
+    requestEpoch.current += 1;
+  }, [enabled]);
 
   function update(next: PlatformAdminOnboardingDraft) {
     requestEpoch.current += 1;
@@ -116,6 +152,10 @@ export function PlatformAdminOnboardingWizard({
       setIntentKey(crypto.randomUUID());
     } catch (error) {
       if (requestEpoch.current !== epoch) return;
+      if (isAuthorityLossError(error)) {
+        purgeOnboardingState();
+        return;
+      }
       setRecovery(adminCommandRecovery(error));
     } finally {
       setPreviewPending(false);
@@ -138,6 +178,10 @@ export function PlatformAdminOnboardingWizard({
       const created = await onCommit(command);
       setResult(created);
     } catch (error) {
+      if (isAuthorityLossError(error)) {
+        purgeOnboardingState();
+        return;
+      }
       const nextRecovery = adminCommandRecovery(error);
       setRecovery(nextRecovery);
       if (
@@ -389,4 +433,10 @@ function Field({
       />
     </label>
   );
+}
+
+function isAuthorityLossError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const status = "status" in error ? error.status : undefined;
+  return status === 401 || status === 403;
 }

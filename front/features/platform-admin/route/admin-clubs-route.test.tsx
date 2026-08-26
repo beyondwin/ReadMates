@@ -66,21 +66,13 @@ function renderRoute(
   initialEntry = "/admin/clubs",
   capabilities = ["VIEW_CLUBS", "CREATE_CLUB"],
   additionalPage?: PlatformAdminClub[] | null,
+  locationState?: { focusId?: string | null; scrollTop?: number },
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
   const url = new URL(initialEntry, "https://example.test");
-  const filters = {
-    search: url.searchParams.get("search") || undefined,
-    lifecycle: (url.searchParams.get("lifecycle") || undefined) as
-      | "ACTIVE"
-      | undefined,
-    visibility: (url.searchParams.get("visibility") || undefined) as
-      | "PRIVATE"
-      | undefined,
-    limit: 25,
-  };
+  const filters = platformAdminClubListFiltersFromSearch(url.searchParams);
   const pages =
     additionalPage === null
       ? [{ items, nextCursor: "cursor-2" }]
@@ -113,7 +105,18 @@ function renderRoute(
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[initialEntry]}>
+      <MemoryRouter
+        initialEntries={[
+          locationState
+            ? {
+                pathname: url.pathname,
+                search: url.search,
+                hash: url.hash,
+                state: locationState,
+              }
+            : initialEntry,
+        ]}
+      >
         <LocationProbe />
         <Routes>
           <Route path="/admin/clubs" element={<AdminClubsRoute />} />
@@ -133,10 +136,10 @@ describe("AdminClubsRoute", () => {
       screen.getByRole("searchbox", { name: "클럽 검색" }),
     ).toBeInTheDocument();
     expect(screen.getByText("alpha")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Alpha" })).toHaveAttribute(
-      "href",
-      "/admin/clubs/c-1",
-    );
+    const href = screen.getByRole("link", { name: "Alpha" }).getAttribute("href");
+    expect(href).toContain("/admin/clubs/c-1");
+    expect(href).toContain("returnTo=%2Fadmin%2Fclubs");
+    expect(href).toContain("focusId=c-1");
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });
 
@@ -241,6 +244,68 @@ describe("AdminClubsRoute", () => {
     renderRoute([club], "/admin/clubs", ["VIEW_CLUBS"], [later]);
     expect(screen.getAllByRole("link", { name: /Alpha/ })).toHaveLength(1);
     expect(screen.queryByText("Alpha stale duplicate")).not.toBeInTheDocument();
+  });
+
+  it("encodes the current registry filters, row focus, and scroll into the detail href", () => {
+    const { container } = renderRoute(
+      [club],
+      "/admin/clubs?search=alpha&lifecycle=ACTIVE&visibility=PRIVATE&domainStatus=ACTION_REQUIRED&onboardingState=MISSING&onboarding=1",
+    );
+    const scroller = container.querySelector(
+      ".admin-clubs-ledger__scroller",
+    ) as HTMLElement;
+    Object.defineProperty(scroller, "scrollTop", {
+      configurable: true,
+      value: 240,
+    });
+    fireEvent.scroll(scroller);
+
+    const href = screen.getByRole("link", { name: "Alpha" }).getAttribute("href");
+    expect(href).toContain("/admin/clubs/c-1?");
+    expect(href).toContain("returnTo=%2Fadmin%2Fclubs%3Fsearch%3Dalpha");
+    expect(href).toContain("lifecycle%3DACTIVE");
+    expect(href).toContain("visibility%3DPRIVATE");
+    expect(href).toContain("domainStatus%3DACTION_REQUIRED");
+    expect(href).toContain("onboardingState%3DMISSING");
+    expect(href).not.toContain("onboarding%3D1");
+    expect(href).toContain("focusId=c-1");
+    expect(href).toContain("scrollTop=240");
+  });
+
+  it("restores row focus and scroll when returning to the filtered list", async () => {
+    const { container } = renderRoute(
+      [club],
+      "/admin/clubs?search=alpha",
+      ["VIEW_CLUBS", "CREATE_CLUB"],
+      undefined,
+      { focusId: "c-1", scrollTop: 240 },
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("link", { name: "Alpha" })).toHaveFocus(),
+    );
+    expect(
+      (container.querySelector(".admin-clubs-ledger__scroller") as HTMLElement)
+        .scrollTop,
+    ).toBe(240);
+  });
+
+  it("ignores unsafe restored focus and unbounded scroll", async () => {
+    const { container } = renderRoute(
+      [club],
+      "/admin/clubs",
+      ["VIEW_CLUBS", "CREATE_CLUB"],
+      undefined,
+      { focusId: "../evil", scrollTop: 1_000_001 },
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("link", { name: "Alpha" })).not.toHaveFocus(),
+    );
+    expect(
+      (container.querySelector(".admin-clubs-ledger__scroller") as HTMLElement)
+        .scrollTop,
+    ).toBe(0);
   });
 
   it("keeps page-one rows and retries the same cursor after page-two failure", async () => {

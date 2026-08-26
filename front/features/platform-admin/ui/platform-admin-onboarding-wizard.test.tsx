@@ -375,4 +375,52 @@ describe("PlatformAdminOnboardingWizard", () => {
       onCommit.mock.calls[1][0].idempotencyKey,
     );
   });
+
+  it("purges onboarding draft, preview, confirmation, idempotency, and receipt on authority loss", async () => {
+    const onCommit = vi.fn().mockResolvedValue(result);
+    const { rerender } = render(
+      <PlatformAdminOnboardingWizard
+        enabled
+        onPreview={vi.fn().mockResolvedValue(preview)}
+        onCommit={onCommit}
+      />,
+    );
+    fillDraft();
+    fireEvent.click(screen.getByRole("button", { name: "미리 확인" }));
+    await screen.findByText("CLUB_CREATED");
+    fireEvent.change(screen.getByRole("textbox", { name: "확인 문구" }), {
+      target: { value: "ASSIGN_EXISTING_USER_AS_HOST" },
+    });
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "온보딩 영향을 확인했습니다" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "클럽 생성 확정" }));
+    expect(await screen.findByText(/receipt-1/)).toBeInTheDocument();
+
+    rerender(
+      <PlatformAdminOnboardingWizard
+        enabled={false}
+        onPreview={vi.fn()}
+        onCommit={onCommit}
+      />,
+    );
+    expect(screen.getByRole("textbox", { name: "클럽 이름" })).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "Slug" })).toHaveValue("");
+    expect(screen.queryByText("CLUB_CREATED")).not.toBeInTheDocument();
+    expect(screen.queryByText(/receipt-1/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("checkbox", { name: "온보딩 영향을 확인했습니다" }),
+    ).not.toBeInTheDocument();
+
+    rerender(
+      <PlatformAdminOnboardingWizard
+        enabled
+        onPreview={vi.fn()}
+        onCommit={onCommit}
+      />,
+    );
+    expect(screen.getByRole("textbox", { name: "클럽 이름" })).toHaveValue("");
+    expect(screen.queryByText("CLUB_CREATED")).not.toBeInTheDocument();
+    expect(screen.queryByText(/receipt-1/)).not.toBeInTheDocument();
+  });
 });

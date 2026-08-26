@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
+import { parseAdminRouteReturnState } from "@/features/platform-admin/model/admin-route-state";
 import type {
   PlatformAdminClubCommandReceipt,
   PlatformAdminClubDetail,
@@ -12,8 +13,11 @@ import {
   type AdminCommandRecovery,
 } from "@/features/platform-admin/model/platform-admin-command-recovery";
 import {
+  installPlatformAdminAuthorityLossHandler,
+  isPlatformAdminAuthorityLossError,
   platformAdminCapabilitiesQuery,
   platformAdminClubDetailQuery,
+  subscribePlatformAdminAuthorityLoss,
   useCheckPlatformAdminDomainProvisioningMutation,
   useConfirmPlatformAdminClubVisibilityMutation,
   useConfirmPlatformAdminDomainMutation,
@@ -21,6 +25,7 @@ import {
   usePreviewPlatformAdminDomainMutation,
   useUpdatePlatformAdminClubMutation,
 } from "@/features/platform-admin/queries/platform-admin-queries";
+import { AdminPageContext } from "@/features/platform-admin/ui/admin-page-context";
 import { flattenSupportGrantLedgerPages } from "@/features/platform-admin/model/platform-admin-support-model";
 import { platformAdminSupportLedgerInfiniteQuery } from "@/features/platform-admin/queries/platform-admin-support-queries";
 import { platformAdminClubOperationsQuery } from "@/features/platform-admin/queries/platform-admin-club-operations-queries";
@@ -28,9 +33,13 @@ import { AdminClubOperationsPage } from "@/features/platform-admin/ui/admin-club
 import { AdminClubDomainCommandPanel } from "@/features/platform-admin/ui/domain-provisioning-panel";
 import { useAdminBreadcrumbExtra } from "./admin-breadcrumb-hook";
 
+const CLUBS_ALLOWED = { fallback: "/admin/clubs", allowedPath: "/admin/clubs" };
+
 export function AdminClubDetailRoute() {
   const { clubId = "" } = useParams<{ clubId: string }>();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  const returnState = parseAdminRouteReturnState(searchParams, CLUBS_ALLOWED);
   const detailQuery = useQuery(platformAdminClubDetailQuery(clubId));
   const capabilities = useQuery(platformAdminCapabilitiesQuery()).data ?? null;
   const canViewOperations =
@@ -52,6 +61,10 @@ export function AdminClubDetailRoute() {
     setExtra(club?.name ?? null);
     return () => setExtra(null);
   }, [club?.name, setExtra]);
+  useEffect(() => {
+    installPlatformAdminAuthorityLossHandler(queryClient);
+    return subscribePlatformAdminAuthorityLoss(() => undefined);
+  }, [queryClient]);
   useEffect(() => {
     const queryKey = platformAdminSupportLedgerInfiniteQuery({
       clubId,
@@ -78,9 +91,7 @@ export function AdminClubDetailRoute() {
         >
           다시 시도
         </button>
-        <Link to="/admin/clubs" className="btn btn-ghost btn-sm">
-          ← 클럽 목록
-        </Link>
+        <ClubsReturnLink returnState={returnState} />
       </section>
     );
 
@@ -89,25 +100,13 @@ export function AdminClubDetailRoute() {
   const canManageDomains =
     capabilities != null && canAdmin(capabilities, "MANAGE_CLUB_DOMAINS");
   return (
-    <section
-      className="admin-club-detail"
-      aria-labelledby="admin-club-detail-title"
-    >
-      <header className="admin-club-detail__header">
-        <div>
-          <p className="eyebrow">Club control</p>
-          <h1 id="admin-club-detail-title" className="h1 editorial">
-            {club.name}
-          </h1>
-          <p className="muted">
-            revision {club.adminRevision} · {club.status} ·{" "}
-            {club.publicVisibility}
-          </p>
-        </div>
-        <Link to="/admin/clubs" className="btn btn-ghost btn-sm">
-          ← 클럽 목록
-        </Link>
-      </header>
+    <section className="admin-club-detail" aria-label="클럽 상세">
+      <AdminPageContext
+        eyebrow="Club control"
+        heading={club.name}
+        description={`revision ${club.adminRevision} · ${club.status} · ${club.publicVisibility}`}
+        action={<ClubsReturnLink returnState={returnState} />}
+      />
       <ClubMetadataPanel
         key={club.adminRevision}
         club={club}
@@ -159,6 +158,25 @@ export function AdminClubDetailRoute() {
         </section>
       ) : null}
     </section>
+  );
+}
+
+function ClubsReturnLink({
+  returnState,
+}: {
+  returnState: ReturnType<typeof parseAdminRouteReturnState>;
+}) {
+  return (
+    <Link
+      to={returnState.returnTo}
+      state={{
+        focusId: returnState.focusId,
+        scrollTop: returnState.scrollTop,
+      }}
+      className="btn btn-ghost btn-sm"
+    >
+      ← 클럽 목록
+    </Link>
   );
 }
 
@@ -216,6 +234,17 @@ function ClubMetadataPanel({
   const recovery = mutation.isError
     ? adminCommandRecovery(mutation.error)
     : null;
+  const [manageArmed, setManageArmed] = useState(canManage);
+  if (!canManage && manageArmed) {
+    setManageArmed(false);
+    setDraft({
+      name: club.name,
+      tagline: club.tagline,
+      about: club.about,
+    });
+  } else if (canManage && !manageArmed) {
+    setManageArmed(true);
+  }
   return (
     <section
       className="surface admin-club-detail__panel"
@@ -274,7 +303,7 @@ function ClubMetadataPanel({
           />
         </label>
       </div>
-      {recovery ? (
+      {canManage && recovery ? (
         <div role="alert" className="danger">
           <p>{recovery.message}</p>
           {recovery.kind === "REFRESH_STATE" ? (
@@ -335,6 +364,17 @@ function VisibilityPanel({
   const [receipt, setReceipt] =
     useState<PlatformAdminClubCommandReceipt | null>(null);
   const [recovery, setRecovery] = useState<AdminCommandRecovery | null>(null);
+  const [manageArmed, setManageArmed] = useState(canManage);
+  if (!canManage && manageArmed) {
+    setManageArmed(false);
+    setPreview(null);
+    setConfirmed(false);
+    setIntentKey(null);
+    setReceipt(null);
+    setRecovery(null);
+  } else if (canManage && !manageArmed) {
+    setManageArmed(true);
+  }
   async function previewIntent() {
     setRecovery(null);
     try {
@@ -347,6 +387,14 @@ function VisibilityPanel({
       setReceipt(null);
       setIntentKey(crypto.randomUUID());
     } catch (error) {
+      if (isPlatformAdminAuthorityLossError(error)) {
+        setPreview(null);
+        setConfirmed(false);
+        setIntentKey(null);
+        setReceipt(null);
+        setRecovery(null);
+        return;
+      }
       setRecovery(adminCommandRecovery(error));
     }
   }
@@ -363,6 +411,14 @@ function VisibilityPanel({
       setReceipt(result);
       setRecovery(null);
     } catch (error) {
+      if (isPlatformAdminAuthorityLossError(error)) {
+        setPreview(null);
+        setConfirmed(false);
+        setIntentKey(null);
+        setReceipt(null);
+        setRecovery(null);
+        return;
+      }
       const nextRecovery = adminCommandRecovery(error);
       setRecovery(nextRecovery);
       if (
@@ -405,7 +461,7 @@ function VisibilityPanel({
           {target === "PUBLIC" ? "공개 전환 미리보기" : "비공개 전환 미리보기"}
         </button>
       ) : null}
-      {preview ? (
+      {canManage && preview ? (
         <div className="admin-club-detail__review" aria-live="polite">
           <p>
             <strong>
@@ -442,7 +498,7 @@ function VisibilityPanel({
           </button>
         </div>
       ) : null}
-      {recovery ? (
+      {canManage && recovery ? (
         <div role="alert" className="danger">
           <p>{recovery.message}</p>
           {recovery.kind === "REFRESH_STATE" ? (
@@ -456,7 +512,7 @@ function VisibilityPanel({
           ) : null}
         </div>
       ) : null}
-      {receipt ? <ReceiptStatus receipt={receipt} /> : null}
+      {canManage && receipt ? <ReceiptStatus receipt={receipt} /> : null}
     </section>
   );
 }

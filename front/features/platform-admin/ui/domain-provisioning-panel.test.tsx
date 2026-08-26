@@ -27,12 +27,13 @@ function renderPanel(
     >[0],
   ) => Promise<DomainProvisioningPreview>,
   onConfirm = vi.fn().mockResolvedValue(receipt),
+  canManageDomains = true,
 ) {
   return render(
     <AdminClubDomainCommandPanel
       revision={7}
       domains={[]}
-      canManageDomains
+      canManageDomains={canManageDomains}
       previewPending={false}
       confirmPending={false}
       recheckPending={false}
@@ -150,6 +151,64 @@ describe("AdminClubDomainCommandPanel request binding", () => {
     expect(screen.queryByText("DOMAIN_CREATED")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "도메인 추가 확정" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("purges domain draft, preview, confirmation, idempotency, and receipt when MANAGE_CLUB_DOMAINS is lost", async () => {
+    const onConfirm = vi.fn().mockResolvedValue(receipt);
+    const { rerender } = renderPanel(vi.fn().mockResolvedValue(preview), onConfirm);
+    fireEvent.change(screen.getByRole("textbox", { name: "Hostname" }), {
+      target: { value: "first.example.test" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "도메인 추가 미리보기" }),
+    );
+    await screen.findByText("DOMAIN_CREATED");
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "도메인 영향을 확인했습니다" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "도메인 추가 확정" }));
+    expect(await screen.findByText(/receipt-1/)).toBeInTheDocument();
+
+    rerender(
+      <AdminClubDomainCommandPanel
+        revision={7}
+        domains={[]}
+        canManageDomains={false}
+        previewPending={false}
+        confirmPending={false}
+        recheckPending={false}
+        onRefresh={vi.fn()}
+        onPreview={vi.fn()}
+        onConfirm={onConfirm}
+        onRecheck={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText("DOMAIN_CREATED")).not.toBeInTheDocument();
+    expect(screen.queryByText(/receipt-1/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Hostname" }),
+    ).not.toBeInTheDocument();
+
+    rerender(
+      <AdminClubDomainCommandPanel
+        revision={7}
+        domains={[]}
+        canManageDomains
+        previewPending={false}
+        confirmPending={false}
+        recheckPending={false}
+        onRefresh={vi.fn()}
+        onPreview={vi.fn()}
+        onConfirm={onConfirm}
+        onRecheck={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("textbox", { name: "Hostname" })).toHaveValue("");
+    expect(screen.queryByText("DOMAIN_CREATED")).not.toBeInTheDocument();
+    expect(screen.queryByText(/receipt-1/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("checkbox", { name: "도메인 영향을 확인했습니다" }),
     ).not.toBeInTheDocument();
   });
 });
