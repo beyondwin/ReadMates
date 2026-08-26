@@ -187,7 +187,15 @@ describe("visual-authority browser gate", () => {
   it("wires the visual-authority browser gate in CI without dropping host performance", () => {
     expect(ciWorkflow).toContain("pnpm test:e2e:visual-authority-browsers");
     expect(ciWorkflow).toContain("pnpm test:host-workspace-performance");
+    expect(ciWorkflow).toContain("pnpm test:admin-editorial-ledger-performance");
+    expect(ciWorkflow.indexOf("pnpm test:host-workspace-performance"))
+      .toBeLessThan(ciWorkflow.indexOf("pnpm test:admin-editorial-ledger-performance"));
     expect(performanceConfigSource).toContain("tests/performance/host-meeting-workspace-performance.spec.ts");
+    expect(performanceConfigSource).toContain("tests/performance/admin-editorial-ledger-performance.spec.ts");
     expect(performanceConfigSource).toContain("chromium-performance");
+    expect(performanceConfigSource).toContain("chromium-admin-performance");
+    expect(frontPackageJson.scripts?.["test:e2e:visual-authority-browsers"]).toContain("--project=firefox-admin");
+    expect(frontPackageJson.scripts?.["test:host-workspace-performance"]).toContain("--project=chromium-performance");
+    expect(frontPackageJson.scripts?.["test:admin-editorial-ledger-performance"]).toContain("--project=chromium-admin-performance");
   });
 });

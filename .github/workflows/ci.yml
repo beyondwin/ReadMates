@@ -373,12 +373,24 @@ jobs:
       - name: Run production host workspace performance budget
         run: pnpm test:host-workspace-performance
 
+      - name: Run production admin editorial ledger performance budget
+        run: pnpm test:admin-editorial-ledger-performance
+
       - name: Upload public-safe host workspace performance summary
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: host-workspace-performance-summary
           path: front/output/performance/host-meeting-workspace-summary.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload public-safe admin editorial ledger performance summary
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: admin-editorial-ledger-performance-summary
+          path: front/output/performance/admin-editorial-ledger-summary.json
           if-no-files-found: error
           retention-days: 14
 

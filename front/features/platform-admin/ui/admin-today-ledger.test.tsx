@@ -11,6 +11,11 @@ import type {
   AdminOperationSourceFreshnessView,
   AdminOperationsView,
 } from "@/features/platform-admin/model/platform-admin-operations-model";
+import {
+  ADMIN_EDITORIAL_LEDGER_PERFORMANCE_METRICS,
+  beginAdminEditorialLedgerRouteCommit,
+  resetAdminEditorialLedgerPerformanceStateForTests,
+} from "@/shared/observability/admin-editorial-ledger-performance";
 import { findNestedLiveRegions } from "@/shared/testing/accessibility-checks";
 import { AdminTodayLedger } from "./admin-today-ledger";
 
@@ -162,6 +167,24 @@ function stubMatchMedia(matches: boolean | ((query: string) => boolean)) {
 describe("AdminTodayLedger", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    resetAdminEditorialLedgerPerformanceStateForTests();
+  });
+
+  it("commits first usable after the search control is laid out", () => {
+    beginAdminEditorialLedgerRouteCommit();
+    render(
+      <MemoryRouter>
+        <AdminTodayLedger
+          view={populatedView()}
+          filters={{ state: "", severity: "", source: "", assignee: "" }}
+          history={[]}
+          lifecycleControls={null}
+          onFilterChange={vi.fn()}
+          onSelectCase={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    expect(performance.getEntriesByName(ADMIN_EDITORIAL_LEDGER_PERFORMANCE_METRICS.routeDataToUsable)).toHaveLength(1);
   });
 
   it("renders a compact command heading, filters, and an honest empty state", () => {

@@ -1,4 +1,11 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import {
+  beginAdminEditorialLedgerCaseSelection,
+  beginAdminEditorialLedgerFilterCommit,
+  commitAdminEditorialLedgerFilterRaf,
+  commitAdminEditorialLedgerFirstUsable,
+  commitAdminEditorialLedgerPollMergeRaf,
+} from "@/shared/observability/admin-editorial-ledger-performance";
 import { ADMIN_SHELL_LAYOUT_MEDIA_QUERY } from "@/features/platform-admin/model/admin-route-catalog";
 import type {
   AdminOperationsSearchMode,
@@ -89,8 +96,25 @@ export function AdminTodayLedger({
   onBackToList,
 }: Props) {
   const mobileLayout = useMobileOperationsLayout();
+  const ledgerRef = useRef<HTMLDivElement>(null);
   const filtered = hasActiveTodayFilters(filters) || Boolean(query.trim());
   const pageState = deriveTodayPageState(view);
+
+  useLayoutEffect(() => {
+    const control = ledgerRef.current?.querySelector<HTMLElement>(
+      "input[type='search'][aria-label='이미 불러온 사건 검색']",
+    );
+    if (control) commitAdminEditorialLedgerFirstUsable();
+  }, [view.items.length, view.generatedAt]);
+
+  useLayoutEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      commitAdminEditorialLedgerFilterRaf();
+      commitAdminEditorialLedgerPollMergeRaf();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [view.generatedAt, view.items, view.selectedCaseId]);
+
   const emptyCopy = filtered
     ? {
         title: "조건에 맞는 운영 케이스가 없습니다",
@@ -132,7 +156,10 @@ export function AdminTodayLedger({
       actionState={actionState}
       actionReason={actionReason}
       mode={mode}
-      onSelectCase={onSelectCase}
+      onSelectCase={(caseId, options) => {
+        beginAdminEditorialLedgerCaseSelection(caseId);
+        onSelectCase(caseId, options);
+      }}
       onBack={onBackToList}
       hasNextPage={hasNextPage}
       loadingMore={loadingMore}
@@ -143,7 +170,10 @@ export function AdminTodayLedger({
       <AdminOperationsQueue
         items={view.items}
         selectedCaseId={view.selectedCaseId}
-        onSelectCase={onSelectCase}
+        onSelectCase={(caseId) => {
+          beginAdminEditorialLedgerCaseSelection(caseId);
+          onSelectCase(caseId);
+        }}
         hasNextPage={hasNextPage}
         loadingMore={loadingMore}
         onLoadMore={onLoadMore}
@@ -165,7 +195,7 @@ export function AdminTodayLedger({
         </p>
       }
     >
-      <div className="admin-today-ledger">
+      <div className="admin-today-ledger" ref={ledgerRef}>
         <AdminTodayControls
           workViews={view.workViews}
           activeView={workView}
@@ -176,7 +206,10 @@ export function AdminTodayLedger({
           refreshing={refreshing}
           urgentAnnouncement={urgentAnnouncement}
           onViewChange={onViewChange ?? (() => undefined)}
-          onQueryChange={onQueryChange ?? (() => undefined)}
+          onQueryChange={(value) => {
+            beginAdminEditorialLedgerFilterCommit();
+            onQueryChange?.(value);
+          }}
           onFilterChange={onFilterChange}
           onApplyPending={onApplyPending}
         />

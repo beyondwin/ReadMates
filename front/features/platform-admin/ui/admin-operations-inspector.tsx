@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useLayoutEffect, type ReactNode } from "react";
+import { commitAdminEditorialLedgerCaseDocket } from "@/shared/observability/admin-editorial-ledger-performance";
 import { Link } from "react-router";
 import type { AdminOperationCaseView } from "@/features/platform-admin/model/platform-admin-operations-model";
 import { AdminSafeActionDock, type AdminSafeActionState } from "./admin-action-dock";
@@ -70,6 +71,10 @@ export function AdminOperationsInspector({
   actionState = "ready",
   actionReason,
 }: Props) {
+  useLayoutEffect(() => {
+    if (selectedCase) commitAdminEditorialLedgerCaseDocket(selectedCase.id);
+  }, [selectedCase]);
+
   if (!selectedCase) {
     return (
       <section className="admin-operations-inspector" aria-label="운영 케이스 상세">

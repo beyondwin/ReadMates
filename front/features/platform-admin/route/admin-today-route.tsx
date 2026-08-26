@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useInsertionEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import type {
@@ -56,6 +56,10 @@ import {
 } from "@/features/platform-admin/ui/admin-today-ledger";
 import { combineAdminOperationCasePages } from "./admin-today-data";
 import { isReadmatesTransportError } from "@/shared/api/errors";
+import {
+  beginAdminEditorialLedgerPollMerge,
+  beginAdminEditorialLedgerRouteCommit,
+} from "@/shared/observability/admin-editorial-ledger-performance";
 
 type MutationTarget = {
   caseId: string;
@@ -95,6 +99,8 @@ export function AdminTodayRoute() {
     announcement: string | null;
   }>({ scopeKey: "", announcedIds: [], announcement: null });
   const selectedIdRef = useRef<string | null>(null);
+  const measuredRouteIdentityRef = useRef(false);
+  const seenLatestGeneratedAtRef = useRef<string | null>(null);
 
   useEffect(() => {
     installPlatformAdminAuthorityLossHandler(queryClient);
@@ -201,6 +207,23 @@ export function AdminTodayRoute() {
   useEffect(() => {
     selectedIdRef.current = selectedCaseId;
   }, [selectedCaseId]);
+
+  useInsertionEffect(() => {
+    if (!view || !snapshot) return;
+    if (!measuredRouteIdentityRef.current) {
+      measuredRouteIdentityRef.current = true;
+      beginAdminEditorialLedgerRouteCommit(listQuery.dataUpdatedAt);
+    }
+    const latestAt = snapshot.latest.generatedAt;
+    if (seenLatestGeneratedAtRef.current === null) {
+      seenLatestGeneratedAtRef.current = latestAt;
+      return;
+    }
+    if (seenLatestGeneratedAtRef.current !== latestAt) {
+      seenLatestGeneratedAtRef.current = latestAt;
+      beginAdminEditorialLedgerPollMerge();
+    }
+  }, [listQuery.dataUpdatedAt, snapshot, view]);
 
   useEffect(() => {
     if (!detailBehindList || !selectedCaseId || !canViewToday) return;
