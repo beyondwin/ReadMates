@@ -112,6 +112,20 @@ describe("WorkspaceTrashTombstone", () => {
     expect(screen.getAllByRole("button", { name: "방금 삭제한 모임 복구" })[0]).toBeEnabled();
   });
 
+  it("keeps the 7-day remaining copy as the tombstone fact", () => {
+    render(
+      <WorkspaceTrashTombstone
+        {...trash}
+        remainingCopy="남은 복원 기간 7일"
+        onRestore={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("남은 복원 기간 7일")).toBeVisible();
+    expect(screen.getByText("이 모임은 휴지통에 있습니다.")).toBeVisible();
+    expect(screen.queryByText("복원할 수 없는 모임")).not.toBeInTheDocument();
+  });
+
   it("shows the other OPEN session link and resolution condition on restore conflict", () => {
     render(
       <WorkspaceTrashTombstone

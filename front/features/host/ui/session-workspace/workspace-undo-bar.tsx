@@ -76,7 +76,7 @@ export function WorkspaceUndoBar({
   return (
     <>
       {pendingUndo ? (
-        <div className="rm-workspace-undo-bar" role="status">
+        <div className="rm-workspace-undo-bar" role="status" aria-live="polite">
           <div>
             <p className="small" style={{ margin: 0 }}>{pendingUndo.description}</p>
             {pendingUndo.error ? (
@@ -103,7 +103,7 @@ export function WorkspaceUndoBar({
           </div>
         </div>
       ) : restoreNotice ? (
-        <div className="rm-workspace-undo-bar" role="status">
+        <div className="rm-workspace-undo-bar" role="status" aria-live="polite">
           <div>
             <p role="alert" className="small" style={{ color: "var(--danger)", margin: 0 }}>
               {restoreNotice.message}

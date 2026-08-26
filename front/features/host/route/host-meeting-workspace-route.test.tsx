@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import type { ReactNode } from "react";
+import { createMemoryRouter, Link as RouterLink, RouterProvider, useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HostMeetingWorkspaceRoute } from "./host-meeting-workspace-route";
+import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { hostMeetingWorkspaceLoaderFactory } from "./host-meeting-workspace-data";
 import {
   hostPublicConvergenceQuery,
@@ -27,6 +29,7 @@ const routeMocks = vi.hoisted(() => ({
   reopenSession: vi.fn(),
   unpublishSession: vi.fn(),
   returnSessionToDraft: vi.fn(),
+  saveSession: vi.fn(),
 }));
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const OBSERVED_AT = "2026-08-25T01:02:03.000Z";
@@ -65,16 +68,67 @@ vi.mock("./host-meeting-workspace-actions", () => ({
     reopenSession: routeMocks.reopenSession,
     unpublishSession: routeMocks.unpublishSession,
     returnSessionToDraft: routeMocks.returnSessionToDraft,
+    saveSession: routeMocks.saveSession,
   }),
 }));
 
+function TestLink({
+  to,
+  children,
+  className,
+}: {
+  to: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  const location = useLocation();
+  return <RouterLink to={scopedAppLinkTarget(location.pathname, to)} className={className}>{children}</RouterLink>;
+}
+
 vi.mock("@/features/host/ui/host-session-editor", () => ({
-  default: ({ returnTarget }: { returnTarget?: { href: string } }) => (
-    <>
-      <button type="button">기본 정보 편집</button>
-      <output aria-label="return target">{returnTarget?.href ?? "purged"}</output>
-    </>
-  ),
+  default: ({
+    returnTarget,
+    navigation,
+    meetingTask,
+    actions,
+  }: {
+    returnTarget?: { href: string };
+    navigation?: {
+      location: { panel: string; source: string };
+      onChange: (next: { panel: string; source: string }) => void;
+    };
+    meetingTask?: string;
+    actions?: { saveSession: (sessionId: string, request: unknown) => Promise<Response> };
+  }) => {
+    const panel = navigation?.location.panel ?? "focus";
+    return (
+      <>
+        <button type="button">기본 정보 편집</button>
+        <output aria-label="return target">{returnTarget?.href ?? "purged"}</output>
+        <output aria-label="active panel">{panel}</output>
+        <output aria-label="meeting task">{meetingTask ?? ""}</output>
+        {panel === "basic" ? (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void actions?.saveSession(SESSION_ID, { title: "저장한 제목" });
+            }}
+          >
+            <label>
+              모임 제목
+              <input name="title" defaultValue="모임" />
+            </label>
+            <button type="submit">기본 정보 저장</button>
+          </form>
+        ) : null}
+        {panel === "attendance" || meetingTask === "attendance" ? (
+          <section aria-labelledby="mock-attendance-title">
+            <h2 id="mock-attendance-title">실제 출석</h2>
+          </section>
+        ) : null}
+      </>
+    );
+  },
 }));
 
 function loaderArgs(search = "") {
@@ -136,7 +190,12 @@ function renderRoute(search: string, extras: {
     {
       path: "/clubs/:clubSlug/app/host/sessions/:sessionId",
       loader: () => ({ sessionId: SESSION_ID, mode: "active" }),
-      element: <HostMeetingWorkspaceRoute returnTarget={{ href: "/private-return", label: "돌아가기" }} />,
+      element: (
+        <HostMeetingWorkspaceRoute
+          returnTarget={{ href: "/private-return", label: "돌아가기" }}
+          LinkComponent={TestLink}
+        />
+      ),
     },
   ], { initialEntries: [`/clubs/reading-sai/app/host/sessions/${SESSION_ID}${search}`] });
   const rendered = render(
@@ -163,6 +222,9 @@ describe("host meeting workspace route", () => {
     routeMocks.reopenSession.mockReset().mockResolvedValue({ ok: true });
     routeMocks.unpublishSession.mockReset().mockResolvedValue({ ok: true });
     routeMocks.returnSessionToDraft.mockReset().mockResolvedValue({ ok: true });
+    routeMocks.saveSession.mockReset().mockResolvedValue(new Response(JSON.stringify({
+      changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO", undoAvailable: true },
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
   });
 
   it("shows origin commit and pending public convergence as separate route-owned facts", async () => {
@@ -299,13 +361,13 @@ describe("host meeting workspace route", () => {
     };
     const { router, unmount } = renderRoute("?section=history");
     await user.click(await screen.findByRole("button", { name: "이 버전으로 초안 만들기" }));
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: /작업 초안을 만들까요/ })).toBeInTheDocument();
 
     await act(() => hostSensitiveStorage.clearClub("other-club"));
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: /작업 초안을 만들까요/ })).toBeInTheDocument();
 
     await act(() => hostSensitiveStorage.clearClub("reading-sai"));
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: /작업 초안을 만들까요/ })).not.toBeInTheDocument();
     await act(() => router.navigate("?section=overview"));
     expect(await screen.findByLabelText("return target")).toHaveTextContent("purged");
 
@@ -436,8 +498,194 @@ describe("host meeting workspace route", () => {
     await userEvent.setup().click(await screen.findByRole("button", { name: "모임 정보" }));
 
     expect(router.state.location.search).toMatch(/section=basic/);
-    expect(screen.queryByRole("dialog", { name: "모임 정보" })).not.toBeInTheDocument();
-    expect(document.querySelector(".rm-host-session-workspace__cta--desktop")?.closest("[inert]")).toBeNull();
+    expect(await screen.findByLabelText("모임 제목")).toBeVisible();
+    expect(screen.getByRole("button", { name: "기본 정보 저장" })).toBeInTheDocument();
+  });
+
+  it.each([
+    ["basic", "모임 제목"],
+    ["attendance", "실제 출석"],
+    ["records", "모임 기록을 불러오는 중입니다."],
+    ["notifications", "아직 발송한 알림이 없습니다"],
+    ["history", "변경 내역을 불러오는 중입니다."],
+  ] as const)("opens the %s panel from a direct deep link", async (section, content) => {
+    if (section === "notifications") {
+      routeMocks.panelStates = {
+        record: { kind: "loading" },
+        history: { kind: "loading" },
+        historyAuthority: { kind: "loading" },
+        notifications: { kind: "known-empty", data: { items: [], nextCursor: null } },
+      };
+    }
+    renderRoute(`?section=${section}&keep=1#note`);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "모임" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "지금 할 일" })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "관련 작업" })).toBeInTheDocument();
+    if (section === "attendance") {
+      expect(screen.getByRole("heading", { name: content })).toBeVisible();
+    } else if (section === "basic") {
+      expect(screen.getByLabelText(content)).toBeVisible();
+    } else {
+      expect(screen.getByText(content)).toBeVisible();
+    }
+  });
+
+  it("closes the originating panel on Escape and restores that control", async () => {
+    const user = userEvent.setup();
+    const { router } = renderRoute("?keep=1#note");
+    const trigger = await screen.findByRole("button", { name: "모임 정보" });
+    await user.click(trigger);
+
+    expect(router.state.location.search).toMatch(/section=basic/);
+    expect(router.state.location.search).toMatch(/keep=1/);
+    expect(router.state.location.hash).toBe("#note");
+    expect(await screen.findByLabelText("모임 제목")).toBeVisible();
+
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(router.state.location.search).not.toMatch(/section=basic/));
+    expect(router.state.location.search).toMatch(/keep=1/);
+    expect(router.state.location.hash).toBe("#note");
+    expect(trigger).toHaveFocus();
+  });
+
+  it("restores section, source, unrelated params and originating focus on Back/Forward", async () => {
+    const user = userEvent.setup();
+    const { router } = renderRoute("?keep=1#note");
+    const records = await screen.findByRole("link", { name: "모임 기록" });
+    await user.click(records);
+
+    await waitFor(() => expect(router.state.location.search).toMatch(/section=records/));
+    expect(router.state.location.search).toMatch(/keep=1/);
+    expect(router.state.location.hash).toBe("#note");
+
+    await act(() => router.navigate("?keep=1&section=records&source=json#note"));
+    expect(router.state.location.search).toBe("?keep=1&section=records&source=json");
+    expect(router.state.location.hash).toBe("#note");
+
+    await act(() => router.navigate(-1));
+    await waitFor(() => expect(router.state.location.search).toMatch(/section=records/));
+    expect(router.state.location.search).not.toMatch(/source=json/);
+    expect(records).toHaveFocus();
+
+    await act(() => router.navigate(-1));
+    await waitFor(() => expect(router.state.location.search).not.toMatch(/section=/));
+    expect(router.state.location.search).toMatch(/keep=1/);
+    expect(router.state.location.hash).toBe("#note");
+  });
+
+  it("keeps Focus Deck and sibling links usable when a records panel is unavailable", async () => {
+    const retry = vi.fn();
+    routeMocks.panelStates = {
+      record: { kind: "unavailable", retry },
+      history: { kind: "loading" },
+      historyAuthority: { kind: "loading" },
+      notifications: { kind: "loading" },
+      recordReadiness: { status: "unavailable", observedAt: null, retryable: true },
+    };
+    renderRoute("?section=records");
+
+    expect(await screen.findByText("모임 기록을 불러오지 못했습니다.")).toBeVisible();
+    expect(screen.getByRole("heading", { level: 1, name: "모임" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "지금 할 일" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "참석 응답" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "실제 출석" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "알림" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "변경 내역" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "지금 할 일" })).toBeVisible();
+
+    await userEvent.setup().click(screen.getAllByRole("button", { name: "모임 기록 다시 시도" })[0]!);
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows latest restore values and requires reconfirmation after 409", async () => {
+    const user = userEvent.setup();
+    routeMocks.fetchRestorePreview.mockResolvedValue({
+      sessionId: SESSION_ID,
+      changeId: "change-1",
+      kind: "BASIC_INFO",
+      items: [{ field: "title", currentValue: "현재 제목", targetValue: "이전 제목", sensitive: false }],
+      expectedCurrentHash: "current-hash",
+      canRestore: true,
+      blockedReason: null,
+    });
+    routeMocks.restoreChange.mockRejectedValue({
+      code: "HOST_SESSION_RESTORE_STALE",
+      status: 409,
+    });
+    routeMocks.panelStates = {
+      record: { kind: "loading" },
+      history: { kind: "ready", data: historyPage(changeRestoreItem()) },
+      historyAuthority: { kind: "ready", data: { draft: null } },
+      notifications: { kind: "loading" },
+    };
+    renderRoute("?section=history");
+
+    await user.click(await screen.findByRole("button", { name: "이 변경 되돌리기" }));
+    const dialog = await screen.findByRole("dialog", { name: "이 변경을 되돌릴까요?" });
+    expect(dialog).toHaveTextContent("현재 제목 → 이전 제목");
+    await user.click(within(dialog).getByRole("button", { name: "되돌리기" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("최신 변경 내역을 확인한 뒤 다시 시도해 주세요");
+    expect(dialog).toHaveTextContent("현재 제목 → 이전 제목");
+    expect(routeMocks.restoreChange).toHaveBeenCalledTimes(1);
+
+    routeMocks.restoreChange.mockResolvedValueOnce({ undoAvailable: false });
+    await user.click(within(dialog).getByRole("button", { name: "되돌리기" }));
+    await waitFor(() => expect(routeMocks.restoreChange).toHaveBeenCalledTimes(2));
+  });
+
+  it("queries authoritative restore preview after response loss instead of retrying blindly", async () => {
+    const user = userEvent.setup();
+    routeMocks.fetchRestorePreview.mockRejectedValue(new Error("network"));
+    routeMocks.panelStates = {
+      record: { kind: "loading" },
+      history: { kind: "ready", data: historyPage(changeRestoreItem()) },
+      historyAuthority: { kind: "ready", data: { draft: null } },
+      notifications: { kind: "loading" },
+    };
+    const { router } = renderRoute("?section=history");
+
+    await user.click(await screen.findByRole("button", { name: "이 변경 되돌리기" }));
+    expect(await screen.findByText("되돌릴 내용을 확인하지 못했습니다. 변경 내역에서 다시 시도해 주세요.")).toBeVisible();
+    expect(routeMocks.restoreChange).not.toHaveBeenCalled();
+
+    await act(() => router.navigate("?task=overview"));
+    expect(await screen.findByText("되돌릴 내용을 확인하지 못했습니다. 변경 내역에서 다시 시도해 주세요.")).toBeVisible();
+    routeMocks.fetchRestorePreview.mockResolvedValue({
+      sessionId: SESSION_ID,
+      changeId: "change-1",
+      kind: "BASIC_INFO",
+      items: [{ field: "title", currentValue: "현재", targetValue: "이전", sensitive: false }],
+      expectedCurrentHash: "current-hash",
+      canRestore: true,
+      blockedReason: null,
+    });
+    await user.click(screen.getByRole("button", { name: "다시 시도" }));
+    await waitFor(() => expect(routeMocks.fetchRestorePreview).toHaveBeenCalledTimes(2));
+    expect(routeMocks.restoreChange).not.toHaveBeenCalled();
+  });
+
+  it("places overview undo in the Focus Deck recovery slot", async () => {
+    const user = userEvent.setup();
+    renderRoute("?section=basic");
+
+    await user.click(await screen.findByRole("button", { name: "기본 정보 저장" }));
+    expect(await screen.findByText("모임 정보를 저장했습니다.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "되돌리기" })).toBeVisible();
+  });
+
+  it("purges pending undo on authority loss and does not auto-retry restore", async () => {
+    const user = userEvent.setup();
+    renderRoute("?section=basic");
+    await user.click(await screen.findByRole("button", { name: "기본 정보 저장" }));
+    expect(await screen.findByText("모임 정보를 저장했습니다.")).toBeVisible();
+
+    await act(() => hostSensitiveStorage.clearClub("reading-sai"));
+    expect(screen.queryByText("모임 정보를 저장했습니다.")).not.toBeInTheDocument();
+    expect(routeMocks.restoreChange).not.toHaveBeenCalled();
+    expect(routeMocks.fetchRestorePreview).not.toHaveBeenCalled();
   });
 
   it("does not enable the record prerequisite on OPEN overview", async () => {

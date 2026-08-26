@@ -8,7 +8,8 @@ import type { HostMeetingRecordReadiness } from "@/features/host/model/host-meet
 import { buildHostMeetingWorkspace, type HostMeetingLocation, type HostMeetingTask } from "@/features/host/model/host-session-workspace-model";
 import { formatDateTimeLabel } from "@/shared/ui/readmates-display";
 import { buildHostMeetingUrl, canonicalizeLegacyHostMeetingUrl, parseHostMeetingLocation } from "@/features/host/model/host-session-workspace-navigation";
-import type { ManualNotificationDispatchListResponse } from "@/features/host/api/host-contracts";
+import type { HostSessionDetailResponse, ManualNotificationDispatchListResponse } from "@/features/host/api/host-contracts";
+import type { HostSessionChangeReceipt } from "@/features/host/api/host-session-recovery-contracts";
 import type { HostSessionHistoryPage, HostSessionRecordEditor, HostSessionReverseRequest } from "@/features/host/api/host-session-record-contracts";
 import {
   hostSessionDetailQuery,
@@ -28,15 +29,17 @@ import { registerHostSensitiveState } from "@/features/host/storage/host-sensiti
 import { SessionHistoryPanel } from "@/features/host/ui/session-editor/session-history-panel";
 import { HostSessionNotificationActions } from "@/features/host/ui/session-editor/session-editor-notifications";
 import { SessionLifecycleConfirmDialog } from "@/features/host/ui/session-editor/session-lifecycle-confirm-dialog";
-import { WorkspaceUndoBar, type WorkspaceUndoConfirm } from "@/features/host/ui/session-workspace/workspace-undo-bar";
+import { WorkspacePanel } from "@/features/host/ui/session-workspace/workspace-panel";
+import { type WorkspacePendingUndo, type WorkspaceUndoConfirm } from "@/features/host/ui/session-workspace/workspace-undo-bar";
 import {
   buildHostSessionRestorePreviewItemView,
   hostSessionRestoreBlockedExplanation,
 } from "@/features/host/model/host-session-editor-view-model";
+import { wrapHostSessionEditorActionsForUndo } from "@/features/host/route/host-session-editor-actions";
 import {
   lifecycleConfirmCopy,
   reverseLifecycleAction,
-  type ReverseLifecycleConfirmKind,
+  type SessionLifecycleConfirmKind,
 } from "@/features/host/model/host-session-lifecycle-model";
 import { HostMeetingWorkspace } from "@/features/host/ui/meeting-workspace/host-meeting-workspace";
 import { buildMeetingAudienceProjections } from "@/features/host/ui/meeting-workspace/meeting-audience-projections";
@@ -88,6 +91,20 @@ function compatibilityLocation(location: HostMeetingLocation) {
   if (location.task === "records") return { panel: "records" as const, source: location.recordSource };
   if (location.task === "history") return { panel: "history" as const, source: "manual" as const };
   return { panel: "focus" as const, source: "manual" as const };
+}
+
+function panelKey(location: HostMeetingLocation): "focus" | "basic" | HostMeetingTask {
+  if (location.overviewEditOpen) return "basic";
+  if (location.task === "overview") return "focus";
+  return location.task;
+}
+
+function isOverlayLocation(location: HostMeetingLocation) {
+  return panelKey(location) !== "focus";
+}
+
+function overviewMeetingLocation(): HostMeetingLocation {
+  return { task: "overview", overviewEditOpen: false, recordSource: "manual" };
 }
 
 function meetingLocationFromCompatibility(
@@ -210,47 +227,92 @@ export function HostMeetingWorkspaceRoute({
     () => parseHostMeetingLocation(routerLocation.search),
     [routerLocation.search],
   );
-  const pendingSheetFocusRef = useRef<"basic" | "history" | null>(null);
+  const originatingFocusRef = useRef<HTMLElement | null>(null);
+  const previousPanelRef = useRef(panelKey(meetingLocation));
+  const overlayPushedRef = useRef(false);
   useEffect(() => {
     const canonicalHref = canonicalizeLegacyHostMeetingUrl(currentUrl);
     if (canonicalHref && canonicalHref !== currentUrl) {
       void navigate(canonicalHref, { replace: true, state: routerLocation.state });
     }
   }, [currentUrl, navigate, routerLocation.state]);
-  const changeMeetingLocation = useCallback((next: HostMeetingLocation) => {
+  const changeMeetingLocation = useCallback((next: HostMeetingLocation, options?: { close?: boolean }) => {
+    if (options?.close && overlayPushedRef.current) {
+      overlayPushedRef.current = false;
+      void navigate(-1);
+      return;
+    }
     const href = buildHostMeetingUrl(currentUrl, next);
-    if (href !== currentUrl) void navigate(href, { state: routerLocation.state });
-  }, [currentUrl, navigate, routerLocation.state]);
+    if (href === currentUrl) return;
+    const opening = isOverlayLocation(next) && !isOverlayLocation(meetingLocation);
+    overlayPushedRef.current = opening;
+    void navigate(href, { replace: !opening, state: routerLocation.state });
+  }, [currentUrl, meetingLocation, navigate, routerLocation.state]);
+  const closeMeetingPanel = useCallback(() => {
+    changeMeetingLocation(overviewMeetingLocation(), { close: true });
+  }, [changeMeetingLocation]);
   const navigation = useMemo(() => ({
     location: compatibilityLocation(meetingLocation),
     onChange: (next: ReturnType<typeof compatibilityLocation>) => {
-      const currentPanel = compatibilityLocation(meetingLocation).panel;
-      if (next.panel === "focus" && (currentPanel === "basic" || currentPanel === "history")) {
-        pendingSheetFocusRef.current = currentPanel;
+      if (next.panel === "focus") {
+        closeMeetingPanel();
+        return;
       }
       changeMeetingLocation(meetingLocationFromCompatibility(meetingLocation, next));
     },
-  }), [changeMeetingLocation, meetingLocation]);
+  }), [changeMeetingLocation, closeMeetingPanel, meetingLocation]);
   useEffect(() => {
-    const pendingPanel = pendingSheetFocusRef.current;
-    if (!pendingPanel || meetingLocation.overviewEditOpen || meetingLocation.task === "history") return;
-    let remainingFrames = 10;
-    let frame = 0;
-    const focusTrigger = () => {
-      const trigger = document.querySelector<HTMLElement>(
-        `[aria-controls="workspace-panel-${pendingPanel}"]`,
-      );
-      if (trigger) {
-        trigger.focus();
-        pendingSheetFocusRef.current = null;
-        return;
+    const nextPanel = panelKey(meetingLocation);
+    const previousPanel = previousPanelRef.current;
+    previousPanelRef.current = nextPanel;
+    if (previousPanel === "focus" && nextPanel !== "focus") {
+      overlayPushedRef.current = true;
+      if (!originatingFocusRef.current && document.activeElement instanceof HTMLElement) {
+        originatingFocusRef.current = document.activeElement;
       }
-      remainingFrames -= 1;
-      if (remainingFrames > 0) frame = requestAnimationFrame(focusTrigger);
+      return;
+    }
+    if (previousPanel !== "focus" && nextPanel === "focus") {
+      overlayPushedRef.current = false;
+      const fallback = document.querySelector<HTMLElement>(
+        `[aria-controls="workspace-panel-${previousPanel}"]`,
+      );
+      const target = originatingFocusRef.current ?? fallback;
+      originatingFocusRef.current = null;
+      let remainingFrames = 10;
+      let frame = 0;
+      const focusTrigger = () => {
+        if (target?.isConnected) {
+          target.focus();
+          return;
+        }
+        remainingFrames -= 1;
+        if (remainingFrames > 0) frame = requestAnimationFrame(focusTrigger);
+      };
+      frame = requestAnimationFrame(focusTrigger);
+      return () => cancelAnimationFrame(frame);
+    }
+    return undefined;
+  }, [meetingLocation]);
+  useEffect(() => {
+    if (!isOverlayLocation(meetingLocation)) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+      event.preventDefault();
+      closeMeetingPanel();
     };
-    frame = requestAnimationFrame(focusTrigger);
-    return () => cancelAnimationFrame(frame);
-  }, [meetingLocation.overviewEditOpen, meetingLocation.task]);
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [closeMeetingPanel, meetingLocation]);
+
+  const [pendingUndo, setPendingUndo] = useState<{
+    routeIdentity: string;
+    receipt: HostSessionChangeReceipt;
+    description: string;
+    error: string | null;
+    sessionState?: HostSessionDetailResponse["state"];
+  } | null>(null);
 
   const handleSessionRecordsChanged = useCallback(async (changedSessionId: string) => {
     await Promise.all([
@@ -259,6 +321,27 @@ export function HostMeetingWorkspaceRoute({
     ]);
   }, [clubSlug, context, onSessionRecordsChanged, queryClient]);
   const actions = useHostMeetingWorkspaceActions(context, handleSessionRecordsChanged);
+  const captureChangeReceipt = useCallback((
+    receipt: HostSessionChangeReceipt,
+    description: string,
+    sessionState?: HostSessionDetailResponse["state"],
+  ) => {
+    if (!receipt.undoAvailable) {
+      setPendingUndo(null);
+      return;
+    }
+    setPendingUndo({
+      routeIdentity: `${context.clubSlug}:${sessionId}`,
+      receipt,
+      description,
+      error: null,
+      sessionState,
+    });
+  }, [context.clubSlug, sessionId]);
+  const editorActions = useMemo(
+    () => wrapHostSessionEditorActionsForUndo(actions, captureChangeReceipt),
+    [actions, captureChangeReceipt],
+  );
   const baseQuery = useQuery({
     ...hostSessionDetailQuery(sessionId, context),
     enabled: loaderData.mode === "active",
@@ -298,7 +381,7 @@ export function HostMeetingWorkspaceRoute({
   } | null>(null);
   const [lifecycleConfirm, setLifecycleConfirm] = useState<{
     routeIdentity: string;
-    kind: ReverseLifecycleConfirmKind;
+    kind: SessionLifecycleConfirmKind;
   } | null>(null);
   const [lifecycleSubmitting, setLifecycleSubmitting] = useState(false);
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
@@ -321,6 +404,7 @@ export function HostMeetingWorkspaceRoute({
         setHistorySensitiveResetVersion((current) => current + 1);
         setHistoryUndoConfirm(null);
         setHistoryRestoreNotice(null);
+        setPendingUndo(null);
         setLifecycleConfirm(null);
         setLifecycleSubmitting(false);
         setLifecycleError(null);
@@ -477,18 +561,27 @@ export function HostMeetingWorkspaceRoute({
     }
   };
 
-  const requestLifecycleReverse = () => {
-    const reverse = reverseLifecycleAction(session.state);
-    if (!reverse || lifecycleSubmitting) return;
+  const requestLifecycle = (kind: SessionLifecycleConfirmKind) => {
+    if (lifecycleSubmitting) return;
     lifecycleRestoreFocusRef.current = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null;
     setLifecycleError(null);
-    setLifecycleConfirm({ routeIdentity, kind: reverse.kind });
+    setLifecycleConfirm({ routeIdentity, kind });
+  };
+
+  const requestLifecycleReverse = () => {
+    const reverse = reverseLifecycleAction(session.state);
+    if (!reverse) return;
+    requestLifecycle(reverse.kind);
   };
 
   const confirmLifecycleReverse = async (request?: HostSessionReverseRequest) => {
-    if (!lifecycleConfirm || lifecycleConfirm.routeIdentity !== routeIdentity || !request || lifecycleSubmitting) return;
+    if (!lifecycleConfirm || lifecycleConfirm.routeIdentity !== routeIdentity || lifecycleSubmitting) return;
+    const needsReason = lifecycleConfirm.kind === "reopen"
+      || lifecycleConfirm.kind === "unpublish"
+      || lifecycleConfirm.kind === "return-to-draft";
+    if (needsReason && !request) return;
     setLifecycleSubmitting(true);
     setLifecycleError(null);
     try {
@@ -496,7 +589,13 @@ export function HostMeetingWorkspaceRoute({
         ? await actions.reopenSession(sessionId, request)
         : lifecycleConfirm.kind === "unpublish"
           ? await actions.unpublishSession(sessionId, request)
-          : await actions.returnSessionToDraft(sessionId, request);
+          : lifecycleConfirm.kind === "return-to-draft"
+            ? await actions.returnSessionToDraft(sessionId, request)
+            : lifecycleConfirm.kind === "publish"
+              ? await actions.publishSession(sessionId)
+              : lifecycleConfirm.kind === "open"
+                ? await actions.openSession(sessionId)
+                : await actions.closeSession(sessionId);
       if (!result.ok) {
         setLifecycleError(result.message);
         return;
@@ -548,7 +647,13 @@ export function HostMeetingWorkspaceRoute({
         || baseQuery.isError
         || !currentVersionVectorAvailable;
       return (
-        <>
+        <WorkspacePanel
+          id="workspace-panel-history"
+          title="변경 내역"
+          expanded
+          variant="sheet"
+          onToggle={closeMeetingPanel}
+        >
           <SessionHistoryPanel
             key={`${routeIdentity}:${historySensitiveResetVersion}`}
             items={historyCleared ? [] : history.items}
@@ -566,51 +671,28 @@ export function HostMeetingWorkspaceRoute({
             onRestoreChange={(changeId) => startChangeRestore(changeId)}
             onReverseLifecycle={requestLifecycleReverse}
           />
-          <WorkspaceUndoBar
-            pendingUndo={null}
-            confirm={!recoveryActionsDisabled && historyUndoConfirm?.routeIdentity === routeIdentity ? {
-              items: historyUndoConfirm.items,
-              submitting: historyUndoConfirm.submitting,
-              error: historyUndoConfirm.error,
-              onConfirm: () => void confirmChangeRestore(),
-              onCancel: () => setHistoryUndoConfirm(null),
-            } : null}
-            restoreNotice={!recoveryActionsDisabled && historyRestoreNotice?.routeIdentity === routeIdentity ? {
-              message: historyRestoreNotice.message,
-              onRetry: () => void startChangeRestore(historyRestoreNotice.changeId),
-              onOpenHistory: () => undefined,
-              onDismiss: () => setHistoryRestoreNotice(null),
-            } : null}
-          />
-          {!recoveryActionsDisabled && lifecycleConfirm?.routeIdentity === routeIdentity ? (
-            <SessionLifecycleConfirmDialog
-              copy={lifecycleConfirmCopy(lifecycleConfirm.kind)}
-              errorMessage={lifecycleError}
-              openSessionHref={null}
-              submitting={lifecycleSubmitting}
-              restoreFocusRef={lifecycleRestoreFocusRef}
-              onClose={() => {
-                if (lifecycleSubmitting) return;
-                setLifecycleConfirm(null);
-                setLifecycleError(null);
-              }}
-              onConfirm={(request) => void confirmLifecycleReverse(request)}
-            />
-          ) : null}
-        </>
+        </WorkspacePanel>
       );
     },
     (notifications) => (
-      <MeetingNotificationWorkspace>
-        <HostSessionNotificationActions
-          sessionId={session.sessionId}
-          state={session.state}
-          visibility={session.visibility}
-          feedbackDocumentUploaded={session.feedbackDocument.uploaded}
-          dispatches={notifications.items}
-          LinkComponent={LinkComponent}
-        />
-      </MeetingNotificationWorkspace>
+      <WorkspacePanel
+        id="workspace-panel-notifications"
+        title="알림"
+        expanded
+        variant="sheet"
+        onToggle={closeMeetingPanel}
+      >
+        <MeetingNotificationWorkspace>
+          <HostSessionNotificationActions
+            sessionId={session.sessionId}
+            state={session.state}
+            visibility={session.visibility}
+            feedbackDocumentUploaded={session.feedbackDocument.uploaded}
+            dispatches={notifications.items}
+            LinkComponent={LinkComponent}
+          />
+        </MeetingNotificationWorkspace>
+      </WorkspacePanel>
     ),
   );
 
@@ -620,7 +702,7 @@ export function HostMeetingWorkspaceRoute({
         composeDeck={false}
         primaryActionRef={editorPrimaryActionRef}
         session={session}
-      actions={actions}
+      actions={editorActions}
       clubSlug={clubSlug}
       LinkComponent={LinkComponent}
       returnTarget={returnStatePurged ? undefined : returnTarget}
@@ -654,8 +736,45 @@ export function HostMeetingWorkspaceRoute({
   };
   const convergence = buildPublicConvergenceStatus(convergenceQuery.data);
   const reverse = reverseLifecycleAction(session.state);
+  const pendingUndoView: WorkspacePendingUndo | null = pendingUndo?.routeIdentity === routeIdentity
+    ? {
+      description: pendingUndo.description,
+      error: pendingUndo.error,
+      onUndo: () => {
+        void startChangeRestore(pendingUndo.receipt.changeId);
+      },
+      onOpenHistory: () => changeMeetingLocation({
+        task: "history",
+        overviewEditOpen: false,
+        recordSource: "manual",
+      }),
+      onDismiss: () => setPendingUndo(null),
+    }
+    : null;
+  const undoConfirmView = historyUndoConfirm?.routeIdentity === routeIdentity
+    ? {
+      items: historyUndoConfirm.items,
+      submitting: historyUndoConfirm.submitting,
+      error: historyUndoConfirm.error,
+      onConfirm: () => void confirmChangeRestore(),
+      onCancel: () => setHistoryUndoConfirm(null),
+    }
+    : null;
+  const restoreNoticeView = historyRestoreNotice?.routeIdentity === routeIdentity
+    ? {
+      message: historyRestoreNotice.message,
+      onRetry: () => void startChangeRestore(historyRestoreNotice.changeId),
+      onOpenHistory: () => changeMeetingLocation({
+        task: "history",
+        overviewEditOpen: false,
+        recordSource: "manual",
+      }),
+      onDismiss: () => setHistoryRestoreNotice(null),
+    }
+    : null;
 
   return (
+    <>
     <HostMeetingWorkspace
       view={{ ...workspace, primaryAction }}
       header={{
@@ -681,16 +800,26 @@ export function HostMeetingWorkspaceRoute({
       reverseAction={reverse
         ? { label: reverse.label, onClick: requestLifecycleReverse }
         : null}
-      onOpenBasic={() => changeMeetingLocation({
-        task: "overview",
-        overviewEditOpen: true,
-        recordSource: "manual",
-      })}
-      onOpenHistory={() => changeMeetingLocation({
-        task: "history",
-        overviewEditOpen: false,
-        recordSource: "manual",
-      })}
+      onOpenBasic={() => {
+        if (document.activeElement instanceof HTMLElement) {
+          originatingFocusRef.current = document.activeElement;
+        }
+        changeMeetingLocation({
+          task: "overview",
+          overviewEditOpen: true,
+          recordSource: "manual",
+        });
+      }}
+      onOpenHistory={() => {
+        if (document.activeElement instanceof HTMLElement) {
+          originatingFocusRef.current = document.activeElement;
+        }
+        changeMeetingLocation({
+          task: "history",
+          overviewEditOpen: false,
+          recordSource: "manual",
+        });
+      }}
       panel={
         <MeetingPanel
           panel={resolvedPanel}
@@ -719,18 +848,58 @@ export function HostMeetingWorkspaceRoute({
         </div>
       ) : null}
       onPrimaryAction={() => {
-        if (meetingLocation.task !== workspace.primaryAction.task) {
+        if (workspace.primaryAction.kind === "OPEN_SESSION") {
+          requestLifecycle("open");
+          return;
+        }
+        if (workspace.primaryAction.kind === "FINISH_SESSION") {
+          if (meetingLocation.task !== "overview") {
+            changeMeetingLocation(overviewMeetingLocation());
+            return;
+          }
+          requestLifecycle("close");
+          return;
+        }
+        if (workspace.primaryAction.kind === "PUBLISH_RECORD") {
+          requestLifecycle("publish");
+          return;
+        }
+        const recordSource = workspace.primaryAction.kind === "UPLOAD_RECORD"
+          ? "json"
+          : meetingLocation.recordSource;
+        const alreadyThere = meetingLocation.task === workspace.primaryAction.task
+          && (workspace.primaryAction.kind !== "UPLOAD_RECORD" || meetingLocation.recordSource === "json");
+        if (!alreadyThere) {
           changeMeetingLocation({
             task: workspace.primaryAction.task,
             overviewEditOpen: false,
-            recordSource: "manual",
+            recordSource,
           });
           return;
         }
         editorPrimaryActionRef.current?.();
       }}
       onRetryReadiness={recordRetry}
+      pendingUndo={pendingUndoView}
+      undoConfirm={undoConfirmView}
+      restoreNotice={restoreNoticeView}
       LinkComponent={LinkComponent}
     />
+    {lifecycleConfirm?.routeIdentity === routeIdentity ? (
+      <SessionLifecycleConfirmDialog
+        copy={lifecycleConfirmCopy(lifecycleConfirm.kind)}
+        errorMessage={lifecycleError}
+        openSessionHref={null}
+        submitting={lifecycleSubmitting}
+        restoreFocusRef={lifecycleRestoreFocusRef}
+        onClose={() => {
+          if (lifecycleSubmitting) return;
+          setLifecycleConfirm(null);
+          setLifecycleError(null);
+        }}
+        onConfirm={(request) => void confirmLifecycleReverse(request)}
+      />
+    ) : null}
+    </>
   );
 }

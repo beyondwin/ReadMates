@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type {
   HostSessionWorkspaceLocation,
   HostSessionWorkspacePanel,
@@ -15,14 +15,6 @@ import {
   type WorkspaceRestoreNotice,
   type WorkspaceUndoConfirm,
 } from "./workspace-undo-bar";
-
-const focusableSelector = [
-  "button:not([disabled])",
-  "a[href]",
-  "select:not([disabled])",
-  "textarea:not([disabled])",
-  "input:not([disabled])",
-].join(", ");
 
 export type HostSessionWorkspaceProps = {
   view: HostSessionWorkspaceView;
@@ -60,11 +52,6 @@ function focusLocation(): HostSessionWorkspaceLocation {
 
 function panelLocation(panel: HostSessionWorkspacePanel, source: HostSessionWorkspaceLocation["source"] = "manual"): HostSessionWorkspaceLocation {
   return { panel, source };
-}
-
-function visibleFocusable(root: HTMLElement) {
-  return Array.from(root.querySelectorAll<HTMLElement>(focusableSelector))
-    .filter((element) => !element.closest("[hidden]"));
 }
 
 function hostStatusLabel(label: HostSessionWorkspaceView["statusLabel"]): "모임 작성 중" | "멤버와 준비 중" | "기록 정리 중" | "공개 완료" {
@@ -108,7 +95,6 @@ export function HostSessionWorkspace({
   const hasSheets = basicPanel != null || historyPanel != null;
   const sheetOpen = hasSheets && (basicOpen || historyOpen);
   const statusLabel = hostStatusLabel(view.statusLabel);
-  const sheetRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
 
   const changePanel = (next: HostSessionWorkspaceLocation) => {
@@ -118,14 +104,6 @@ export function HostSessionWorkspace({
     }
     onLocationChange(next);
   };
-
-  useEffect(() => {
-    if (!sheetOpen) {
-      return;
-    }
-    const first = sheetRef.current ? visibleFocusable(sheetRef.current)[0] : null;
-    first?.focus();
-  }, [sheetOpen, basicOpen, historyOpen]);
 
   const sheetWasOpenRef = useRef(false);
   useEffect(() => {
@@ -140,36 +118,6 @@ export function HostSessionWorkspace({
   }, [sheetOpen]);
 
   const closeSheet = () => changePanel(focusLocation());
-  const handleSheetKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      if (document.querySelectorAll('[role="dialog"][aria-modal="true"]').length > 1) {
-        return;
-      }
-      event.preventDefault();
-      closeSheet();
-      return;
-    }
-    if (event.key !== "Tab" || !sheetRef.current) {
-      return;
-    }
-    const focusable = visibleFocusable(sheetRef.current);
-    if (focusable.length === 0) {
-      event.preventDefault();
-      return;
-    }
-    const first = focusable[0]!;
-    const last = focusable[focusable.length - 1]!;
-    const active = document.activeElement;
-    if (event.shiftKey && (active === first || !sheetRef.current.contains(active))) {
-      event.preventDefault();
-      last.focus();
-      return;
-    }
-    if (!event.shiftKey && (active === last || !sheetRef.current.contains(active))) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
   const primaryLabel = view.primaryAction.label;
   const publishBlocked = view.primaryAction.kind === "PUBLISH_RECORD" && !view.publicationReady;
   const disabled = primaryActionDisabled || publishBlocked;
@@ -279,25 +227,8 @@ export function HostSessionWorkspace({
       </div>
 
       {hasSheets ? (
-      <div
-        className="rm-host-session-workspace__sheet-backdrop"
-        hidden={!sheetOpen}
-        onMouseDown={(event) => {
-          if (event.target === event.currentTarget) {
-            closeSheet();
-          }
-        }}
-      >
-        <div
-          ref={sheetRef}
-          className="rm-host-session-workspace__sheet rm-host-session-workspace__sheet--bottom"
-          role="dialog"
-          aria-modal={sheetOpen}
-          aria-labelledby={basicOpen ? "workspace-panel-basic-title" : "workspace-panel-history-title"}
-          tabIndex={-1}
-          onKeyDown={handleSheetKeyDown}
-        >
-          <div hidden={!basicOpen}>
+        <>
+          {basicPanel != null ? (
             <WorkspacePanel
               id="workspace-panel-basic"
               title="모임 정보"
@@ -308,8 +239,8 @@ export function HostSessionWorkspace({
             >
               {basicPanel}
             </WorkspacePanel>
-          </div>
-          <div hidden={!historyOpen}>
+          ) : null}
+          {historyPanel != null ? (
             <WorkspacePanel
               id="workspace-panel-history"
               title="변경 내역"
@@ -320,9 +251,8 @@ export function HostSessionWorkspace({
             >
               {historyPanel}
             </WorkspacePanel>
-          </div>
-        </div>
-      </div>
+          ) : null}
+        </>
       ) : null}
     </div>
   );
