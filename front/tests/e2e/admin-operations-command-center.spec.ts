@@ -7,6 +7,10 @@ import type {
 } from "@/features/platform-admin/api/platform-admin-operations-contracts";
 import type { PlatformAdminCapability } from "@/features/platform-admin/model/platform-admin-capabilities";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import {
+  VISUAL_AUTHORITY_VIEWPORTS,
+  expectNoHorizontalOverflow,
+} from "./support/visual-authority-contract";
 
 const OWNER_CAPABILITIES: readonly PlatformAdminCapability[] = [
   "VIEW_TODAY",
@@ -407,11 +411,12 @@ test("unavailable-source retry performs exactly one list refetch and no lifecycl
 });
 
 test("mobile presents list then detail then restores the list", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(VISUAL_AUTHORITY_VIEWPORTS.mobile);
   await installOperationsHarness(page);
   await page.goto("/admin/today?case=case-notification&source=notification");
 
   await expect(page.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
   await page.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ }).click();
   await expect(page).toHaveURL(/mode=detail/);
   await expect(page.getByRole("button", { name: "목록으로" })).toBeFocused();
@@ -426,7 +431,7 @@ test("mobile presents list then detail then restores the list", async ({ page })
 });
 
 test("768px uses drill-in rather than stacked columns", async ({ page }) => {
-  await page.setViewportSize({ width: 768, height: 1024 });
+  await page.setViewportSize(VISUAL_AUTHORITY_VIEWPORTS.tabletNarrow);
   await installOperationsHarness(page);
   await page.goto("/admin/today?case=case-notification&source=notification");
 

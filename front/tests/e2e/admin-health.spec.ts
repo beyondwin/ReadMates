@@ -3,6 +3,7 @@ import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { PlatformAdminRole } from "@/features/platform-admin/api/platform-admin-contracts";
 import type { PlatformHealthSnapshotResponse } from "@/features/platform-admin/api/platform-admin-health-contracts";
 import { routeEmptyAdminOperations } from "./admin-operations-e2e-fixtures";
+import { expectMinimumTargetSize, expectNoHorizontalOverflow } from "./support/visual-authority-contract";
 
 const OWNER_CAPABILITIES = [
   "VIEW_TODAY",
@@ -221,6 +222,8 @@ test("operator views /admin/health grid", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "서비스 건강" })).toBeVisible();
   await expect(page.getByRole("region", { name: "서비스 신호" })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await expectMinimumTargetSize(page.getByRole("button", { name: "새로고침" }));
   await expect(page.locator(".admin-case-docket")).toHaveCount(0);
   await expect(page.locator(".admin-action-dock")).toHaveCount(0);
   await expect(page.locator(".admin-receipt-timeline")).toHaveCount(0);

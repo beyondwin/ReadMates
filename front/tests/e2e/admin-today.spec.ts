@@ -2,6 +2,12 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { PlatformAdminRole } from "@/features/platform-admin/api/platform-admin-contracts";
 import type { PlatformAdminCapability } from "@/features/platform-admin/model/platform-admin-capabilities";
+import {
+  VISUAL_AUTHORITY_VIEWPORTS,
+  expectMinimumTargetSize,
+  expectNoHorizontalOverflow,
+  expectReducedMotion,
+} from "./support/visual-authority-contract";
 
 const GENERATED_AT = "2026-08-04T10:00:00Z";
 
@@ -169,7 +175,7 @@ test("support can inspect a case without lifecycle controls", async ({ page }) =
 });
 
 test("768px uses mobile drill-in instead of stacked columns", async ({ page }) => {
-  await page.setViewportSize({ width: 768, height: 1024 });
+  await page.setViewportSize(VISUAL_AUTHORITY_VIEWPORTS.tabletNarrow);
   await routePlatformAdminToday(page, "OWNER");
   await page.goto("/admin/today?case=case-notification");
 
@@ -192,17 +198,17 @@ test("768px uses mobile drill-in instead of stacked columns", async ({ page }) =
 });
 
 test("320px completes the list-to-detail flow without horizontal page overflow", async ({ page }) => {
-  await page.setViewportSize({ width: 320, height: 720 });
+  await page.setViewportSize(VISUAL_AUTHORITY_VIEWPORTS.mobileNarrow);
   await routePlatformAdminToday(page, "OWNER");
   await page.goto("/admin/today?case=case-notification");
+  await expectReducedMotion(page);
 
   await expect(page.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
-  await expect.poll(async () => page.evaluate(() => document.documentElement.scrollWidth))
-    .toBeLessThanOrEqual(320);
+  await expectNoHorizontalOverflow(page);
 
   await page.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ }).click();
   await expect(page.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
   await expect(page.getByRole("group", { name: "작업", exact: true })).toBeVisible();
-  await expect.poll(async () => page.evaluate(() => document.documentElement.scrollWidth))
-    .toBeLessThanOrEqual(320);
+  await expectNoHorizontalOverflow(page);
+  await expectMinimumTargetSize(page.getByRole("button", { name: "목록으로" }));
 });

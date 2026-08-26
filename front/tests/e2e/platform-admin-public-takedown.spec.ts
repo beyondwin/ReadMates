@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { routeEmptyAdminOperations } from "./admin-operations-e2e-fixtures";
+import { expectNoHorizontalOverflow } from "./support/visual-authority-contract";
 
 const CLUB_ID = "10000000-0000-4000-8000-000000000001";
 const SESSION_ID = "20000000-0000-4000-8000-000000000002";
@@ -125,6 +126,7 @@ test("OWNER without EMERGENCY_PUBLIC_TAKEDOWN cannot submit a takedown", async (
 
   await page.goto("/admin/public-takedown");
   await expect(page.getByText("긴급 회수 권한이 없습니다.")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
   await expect(page.getByLabel("클럽 ID")).toHaveCount(0);
   expect(mutationCalls).toBe(0);
 });

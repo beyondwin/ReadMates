@@ -2,6 +2,10 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { PlatformAdminRole } from "@/features/platform-admin/api/platform-admin-contracts";
 import { routeEmptyAdminOperations } from "./admin-operations-e2e-fixtures";
+import {
+  VISUAL_AUTHORITY_VIEWPORTS,
+  expectNoHorizontalOverflow,
+} from "./support/visual-authority-contract";
 
 const CLUB_ID = "club-1";
 
@@ -258,19 +262,14 @@ test("owner views club operations closing risks without mobile horizontal overfl
   page,
 }) => {
   await routePlatformAdminShell(page);
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(VISUAL_AUTHORITY_VIEWPORTS.mobile);
 
   await page.goto(`/admin/clubs/${CLUB_ID}`);
   await expect(
     page.getByRole("heading", { name: "클로징 확인 필요" }),
   ).toBeVisible();
   await expect(page.getByText("No.07 · 페인트")).toBeVisible();
-
-  const width = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-  }));
-  expect(width.scrollWidth).toBeLessThanOrEqual(width.clientWidth);
+  await expectNoHorizontalOverflow(page);
 });
 
 test("revision conflict keeps the operator on detail and offers authoritative refresh", async ({

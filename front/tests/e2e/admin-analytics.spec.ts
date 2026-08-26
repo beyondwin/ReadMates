@@ -2,6 +2,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import type { PlatformAdminRole } from "@/features/platform-admin/api/platform-admin-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { routeEmptyAdminOperations } from "./admin-operations-e2e-fixtures";
+import { expectNoHorizontalOverflow } from "./support/visual-authority-contract";
 
 function platformAdminAuth(role: PlatformAdminRole): AuthMeResponse {
   const email = `${role.toLowerCase()}@example.com`;
@@ -148,6 +149,7 @@ test("owner reviews admin analytics overview and switches window", async ({ page
   await page.goto("/admin/analytics");
 
   await expect(page.getByRole("heading", { name: "분석" })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
   await expect(page.getByText("80%")).toBeVisible();
   await expect(page.getByRole("heading", { name: "KPI 추세" })).toBeVisible();
   const trendTable = page.getByRole("table", { name: "KPI 추세" });

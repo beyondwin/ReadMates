@@ -2,6 +2,11 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import type { PlatformAdminRole } from "@/features/platform-admin/api/platform-admin-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { routeEmptyAdminOperations } from "./admin-operations-e2e-fixtures";
+import {
+  VISUAL_AUTHORITY_VIEWPORTS,
+  expectMinimumTargetSize,
+  expectNoHorizontalOverflow,
+} from "./support/visual-authority-contract";
 
 function platformAdminAuth(role: PlatformAdminRole): AuthMeResponse {
   const email = `${role.toLowerCase()}@example.com`;
@@ -171,9 +176,10 @@ test("owner captures audit operation summary visual evidence on desktop and mobi
   await routePlatformAdminShell(page, "OWNER");
   await routeAudit(page);
 
-  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.setViewportSize(VISUAL_AUTHORITY_VIEWPORTS.desktopWide);
   await page.goto("/admin/audit");
   await expect(page.getByRole("heading", { name: "감사" })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
   await expect(page.getByText("운영 판단")).toBeVisible();
   await expectNoAuditPrivateSentinels(page);
   const desktopScreenshot = await page.screenshot({
@@ -182,12 +188,14 @@ test("owner captures audit operation summary visual evidence on desktop and mobi
   });
   expect(desktopScreenshot.byteLength).toBeGreaterThan(10_000);
 
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(VISUAL_AUTHORITY_VIEWPORTS.mobile);
   await page.goto("/admin/audit");
   await expect(page.getByRole("heading", { name: "감사" })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
   await page.getByRole("button", { name: /support grant가 생성되었습니다/ }).click();
   await expect(page).toHaveURL(/mode=detail/);
   await expect(page.getByText("확인 필요")).toBeVisible();
+  await expectMinimumTargetSize(page.getByRole("button", { name: "목록으로" }));
   await page.getByRole("button", { name: "목록으로" }).click();
   await expect(page).not.toHaveURL(/mode=detail/);
   await expect(page.getByRole("button", { name: /support grant가 생성되었습니다/ })).toBeFocused();

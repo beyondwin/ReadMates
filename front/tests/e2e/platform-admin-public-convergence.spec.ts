@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { routeEmptyAdminOperations } from "./admin-operations-e2e-fixtures";
+import { expectNoHorizontalOverflow } from "./support/visual-authority-contract";
 
 const IDS = {
   club: "10000000-0000-4000-8000-000000000001",
@@ -67,6 +68,7 @@ test("provider retry appends a higher attempt under one convergence without repe
   await page.route(`**/api/bff/api/admin/public-takedowns/${IDS.receipt}/convergence`, (route) => json(route, 200, convergence));
 
   await page.goto("/admin/public-takedown");
+  await expectNoHorizontalOverflow(page);
   await page.getByLabel("클럽 ID").fill(IDS.club);
   await page.getByLabel("모임 ID").fill(IDS.session);
   await page.getByLabel("공개 기록 ID").fill(IDS.publication);

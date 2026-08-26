@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { routeEmptyAdminOperations } from "./admin-operations-e2e-fixtures";
+import { expectNoHorizontalOverflow } from "./support/visual-authority-contract";
 
 const CLUB_ID = "club-1";
 const SUBJECT_ID = "support-1";
@@ -138,6 +139,7 @@ test("owner searches support subject then creates and revokes grant", async ({ p
   await routeSupport(page);
 
   await page.goto(`/admin/support?clubId=${CLUB_ID}`);
+  await expectNoHorizontalOverflow(page);
 
   await page.getByPlaceholder("이름 또는 이메일").fill("admin-support@example.com");
   await page.getByRole("button", { name: "검색" }).click();

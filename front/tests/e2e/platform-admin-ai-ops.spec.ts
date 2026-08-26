@@ -2,6 +2,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { PlatformAdminRole } from "@/features/platform-admin/api/platform-admin-contracts";
 import { routeEmptyAdminOperations } from "./admin-operations-e2e-fixtures";
+import { expectNoHorizontalOverflow } from "./support/visual-authority-contract";
 
 function platformAdminAuth(role: PlatformAdminRole): AuthMeResponse {
   const email = `${role.toLowerCase()}@example.com`;
@@ -153,6 +154,7 @@ test("platform support can read AI Ops but cannot force cancel", async ({ page }
   await page.goto("/admin/ai-ops");
 
   await expect(page.getByRole("heading", { name: "AI 운영" })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
   await expect(page.getByText("Book")).toBeVisible();
   await expect(page.getByRole("button", { name: "강제 취소 검토" })).toHaveCount(0);
 });

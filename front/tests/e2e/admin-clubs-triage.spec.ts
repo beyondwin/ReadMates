@@ -2,6 +2,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { PlatformAdminRole } from "@/features/platform-admin/api/platform-admin-contracts";
 import { routeEmptyAdminOperations } from "./admin-operations-e2e-fixtures";
+import { expectMinimumTargetSize, expectNoHorizontalOverflow } from "./support/visual-authority-contract";
 
 function platformAdminAuth(role: PlatformAdminRole): AuthMeResponse {
   const email = `${role.toLowerCase()}@example.test`;
@@ -352,6 +353,8 @@ test.describe("admin clubs registry", () => {
 
     await page.goto("/admin/clubs");
     await expect(page.getByRole("heading", { name: "클럽", exact: true })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    await expectMinimumTargetSize(page.getByRole("link", { name: "새 클럽" }));
 
     await expect(
       page.getByRole("searchbox", { name: "클럽 검색" }),
