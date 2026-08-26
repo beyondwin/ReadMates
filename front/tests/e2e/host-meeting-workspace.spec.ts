@@ -5,6 +5,13 @@ import {
   loginWithGoogleFixture,
   resetSeedGoogleLogins,
 } from "./readmates-e2e-db";
+import {
+  VISUAL_AUTHORITY_VIEWPORTS,
+  expectMinimumTargetSize,
+  expectNoHorizontalOverflow,
+  expectReducedMotion,
+  expectVisibleFocus,
+} from "./support/visual-authority-contract";
 
 const CLUB_SLUG = "reading-sai";
 const HOST_PATH = `/clubs/${CLUB_SLUG}/app/host`;
@@ -48,8 +55,14 @@ test("host sees one Focus Deck with related-work links and independent publicati
   await expect(page.getByRole("tablist")).toHaveCount(0);
   await expect(page.getByText(/\d+\/\d+ 완료/)).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: "현재 모임 작업" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "모임 작업 목차" })).toHaveCount(0);
+  await expectReducedMotion(page);
+  await expectNoHorizontalOverflow(page);
+  await expectMinimumTargetSize(page.locator(".rm-host-session-workspace__cta--desktop"));
 
   const attendance = page.getByRole("link", { name: /실제 출석/ });
+  await attendance.focus();
+  await expectVisibleFocus(attendance);
   await attendance.click();
   await expect(page).toHaveURL(/section=attendance/);
   const attendanceSheet = page.getByRole("dialog", { name: "출석" });
@@ -67,8 +80,11 @@ test("mobile info sheet is modal, keyboard-dismissible, and restores its trigger
     state: "OPEN",
     date: "2026-08-25",
   });
-  await page.setViewportSize({ width: 320, height: 720 });
+  await page.setViewportSize(VISUAL_AUTHORITY_VIEWPORTS.mobileNarrow);
   await openMeeting(page, sessionId);
+  await expectReducedMotion(page);
+  await expectNoHorizontalOverflow(page);
+  await expectMinimumTargetSize(page.locator(".rm-host-session-workspace__cta--mobile"));
   const trigger = page.getByRole("button", { name: "모임 정보" });
   await trigger.click();
   const sheet = page.getByRole("dialog", { name: "모임 정보" });
@@ -77,7 +93,7 @@ test("mobile info sheet is modal, keyboard-dismissible, and restores its trigger
   await page.keyboard.press("Escape");
   await expect(sheet).toBeHidden();
   await expect(trigger).toBeFocused();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
+  await expectVisibleFocus(trigger);
 });
 
 test("record panel failure does not remove basic meeting work and exposes retry", async ({ page }) => {

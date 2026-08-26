@@ -38,6 +38,11 @@
   background: color-mix(in oklch, var(--bg) 96%, var(--paper-200));
 }
 
+.rm-focus-deck .rm-host-session-workspace__cta--desktop,
+.rm-focus-deck .rm-host-session-workspace__cta--mobile {
+  min-height: 44px;
+}
+
 .rm-focus-deck__facts,
 .rm-focus-deck__related,
 .rm-focus-deck__convergence {

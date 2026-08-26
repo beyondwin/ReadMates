@@ -5,10 +5,16 @@ import {
   isHostSessionDetailRequest,
   routeHostEditorShell,
 } from "./aigen-test-fixtures";
+import {
+  expectMinimumTargetSize,
+  expectNoHorizontalOverflow,
+  expectReducedMotion,
+  expectVisibleFocus,
+} from "./support/visual-authority-contract";
 
 const CLUB_SLUG = "club-a";
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
-const PATH = `/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}?section=responses`;
+const PATH = `/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}`;
 
 function meeting(): HostSessionDetailResponse {
   return {
@@ -42,29 +48,53 @@ async function routeWorkspace(page: Page) {
 }
 
 test("host workspace keeps its essential semantics and keyboard path across focused browsers", async ({ page }, testInfo) => {
-  await page.emulateMedia({ reducedMotion: "reduce" });
   await routeWorkspace(page);
   await page.goto(PATH);
+  await expectReducedMotion(page);
 
   await expect(page.getByRole("main")).toHaveCount(1);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("긴 한글 모임 제목");
+  await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "관련 작업" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "진행 목록" })).toBeVisible();
+  await expect(page.getByRole("tablist")).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "현재 모임 작업" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "모임 작업 목차" })).toHaveCount(0);
+  await expectNoHorizontalOverflow(page);
+
+  const responses = page.getByRole("link", { name: /참석 응답/ });
+  await responses.click();
+  await expect(page).toHaveURL(/section=responses/);
+  const responsesSheet = page.getByRole("dialog", { name: "참석 응답" });
+  await expect(responsesSheet).toBeVisible();
+  await expect(responsesSheet).toHaveAttribute("aria-modal", "true");
   await expect(page.locator(".rm-meeting-response-ledger__row")).toHaveCount(500);
   await expect(page.getByRole("searchbox", { name: "참여자 검색" })).toBeVisible();
   await expect(page.getByRole("combobox", { name: /합성 독자 1 Reader with a long name 실제 출석/ })).toBeVisible();
 
+  await page.keyboard.press("Escape");
+  await expect(responsesSheet).toBeHidden();
+
   if (testInfo.project.name === "webkit-mobile-host") {
-    const trigger = page.getByRole("button", { name: "모임 작업 목차" });
-    await trigger.click();
-    const dialog = page.getByRole("dialog", { name: "모임 작업 목차" });
+    const trigger = page.getByRole("button", { name: "모임 정보" });
+    await trigger.focus();
+    await page.keyboard.press("Enter");
+    const dialog = page.getByRole("dialog", { name: "모임 정보" });
+    await expect(dialog).toBeVisible();
     await expect(dialog).toHaveAttribute("aria-modal", "true");
-    await expect(dialog.getByRole("navigation", { name: "모임 작업 목차" })).toBeVisible();
     await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
     await expect(trigger).toBeFocused();
+    await expectMinimumTargetSize(page.locator(".rm-host-session-workspace__cta--mobile"));
   } else {
-    await expect(page.getByRole("navigation", { name: "현재 모임 작업" })).toBeVisible();
-    await page.getByRole("link", { name: /실제 출석/ }).focus();
+    const attendance = page.getByRole("link", { name: /실제 출석/ });
+    await attendance.focus();
+    await expectVisibleFocus(attendance);
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/section=attendance/);
-    await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
+    const attendanceSheet = page.getByRole("dialog", { name: "출석" });
+    await expect(attendanceSheet).toBeVisible();
+    await expect(attendanceSheet).toHaveAttribute("aria-modal", "true");
+    await expectMinimumTargetSize(page.locator(".rm-host-session-workspace__cta--desktop"));
   }
 });
