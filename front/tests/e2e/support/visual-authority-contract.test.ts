@@ -138,6 +138,7 @@ describe("visual authority contract", () => {
 
   it("accepts 44px targets and an explicit minimum", async () => {
     await expect(expectMinimumTargetSize(locatorWithBox({ width: 44, height: 44 }))).resolves.toBeUndefined();
+    await expect(expectMinimumTargetSize(locatorWithBox({ width: 44, height: 43.999 }))).resolves.toBeUndefined();
     await expect(expectMinimumTargetSize(locatorWithBox({ width: 40, height: 40 }), 40)).resolves.toBeUndefined();
   });
 

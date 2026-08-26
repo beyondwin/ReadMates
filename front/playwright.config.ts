@@ -6,7 +6,9 @@ delete process.env.NO_COLOR;
 
 const port = Number(process.env.PLAYWRIGHT_PORT ?? 3100);
 const workers = Number(process.env.PLAYWRIGHT_WORKERS ?? 1);
-const hostWorkspaceSmokeOnly = process.env.READMATES_HOST_WORKSPACE_SMOKE_ONLY === "true";
+const visualAuthoritySmokeOnly =
+  process.env.READMATES_VISUAL_AUTHORITY_SMOKE_ONLY === "true" ||
+  process.env.READMATES_HOST_WORKSPACE_SMOKE_ONLY === "true";
 const baseURL = `http://localhost:${port}`;
 const loopbackBaseURL = `http://127.0.0.1:${port}`;
 const allowedOrigins = `${baseURL},${loopbackBaseURL}`;
@@ -46,7 +48,7 @@ export default defineConfig({
     baseURL,
     trace: "on-first-retry",
   },
-  webServer: hostWorkspaceSmokeOnly ? [
+  webServer: visualAuthoritySmokeOnly ? [
     {
       command: `pnpm exec vite --host 127.0.0.1 --port ${shellQuote(port)}`,
       url: `${baseURL}/login`,
@@ -101,6 +103,16 @@ export default defineConfig({
     {
       name: "webkit-mobile-host",
       testMatch: ["tests/e2e/host-meeting-workspace-browser-smoke.spec.ts"],
+      use: { ...devices["iPhone 13"], trace: "off" },
+    },
+    {
+      name: "firefox-admin",
+      testMatch: ["tests/e2e/admin-editorial-ledger-browser-smoke.spec.ts"],
+      use: { ...devices["Desktop Firefox"], trace: "off" },
+    },
+    {
+      name: "webkit-mobile-admin",
+      testMatch: ["tests/e2e/admin-editorial-ledger-browser-smoke.spec.ts"],
       use: { ...devices["iPhone 13"], trace: "off" },
     },
   ],

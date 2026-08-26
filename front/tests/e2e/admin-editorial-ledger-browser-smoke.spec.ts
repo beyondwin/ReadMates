@@ -48,6 +48,7 @@ test("Today L1 uses explicit allowedActions rather than role", async ({ page }) 
 });
 
 test("Today with empty allowedActions keeps OWNER read-only", async ({ page }) => {
+  await page.setViewportSize(VISUAL_AUTHORITY_VIEWPORTS.desktopWide);
   await routeAdminEditorialLedgerShell(page, {
     capabilities: TODAY_VIEW_CAPABILITIES,
     authRole: "OWNER",
@@ -79,7 +80,9 @@ test("Clubs list-detail-return restores focus inside /admin", async ({ page }) =
   await expect(page).toHaveURL(/focusId=club-1/);
   await expect(page.getByRole("link", { name: "← 클럽 목록" })).toBeVisible();
 
-  await page.getByRole("link", { name: "← 클럽 목록" }).click();
+  const backToList = page.getByRole("link", { name: "← 클럽 목록" });
+  await backToList.focus();
+  await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/admin\/clubs/);
   await expect(page.getByRole("link", { name: "Broken Club" })).toBeFocused();
 });

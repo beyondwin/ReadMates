@@ -367,8 +367,8 @@ jobs:
       - name: Install focused Playwright browsers
         run: pnpm exec playwright install --with-deps chromium firefox webkit
 
-      - name: Run focused host workspace browser smoke
-        run: pnpm test:e2e:host-workspace-browsers
+      - name: Run focused visual-authority browser smoke
+        run: pnpm test:e2e:visual-authority-browsers
 
       - name: Run production host workspace performance budget
         run: pnpm test:host-workspace-performance

@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const port = Number(process.env.PLAYWRIGHT_PERFORMANCE_PORT ?? 3200);
+// Host production-preview budget. Vite-only visual-authority browsers live in playwright.config.ts.
 
 export default defineConfig({
   testDir: ".",

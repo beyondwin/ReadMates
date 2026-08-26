@@ -23,8 +23,9 @@ export async function expectNoHorizontalOverflow(page: Page, tolerance = 1): Pro
 export async function expectMinimumTargetSize(locator: Locator, minimum = 44): Promise<void> {
   const box = await locator.boundingBox();
   assert.ok(box, "interactive target is not visible");
+  const subpixel = 0.05;
   assert.ok(
-    box.width >= minimum && box.height >= minimum,
+    box.width + subpixel >= minimum && box.height + subpixel >= minimum,
     `target ${box.width}x${box.height} is smaller than ${minimum}px`,
   );
 }
