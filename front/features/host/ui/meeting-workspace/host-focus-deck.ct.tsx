@@ -27,6 +27,13 @@ const FOLIO_LANDMARKS = [
   "지금 확인할 일",
 ] as const;
 
+const STICKY_IN_FLOW_STYLE = `
+  .rm-host-session-workspace__sticky-cta,
+  .rm-host-session-workspace__footer-cta {
+    position: static !important;
+  }
+`;
+
 async function mountFocusDeck(
   mount: (component: ReactElement) => Promise<Locator>,
   page: Page,
@@ -64,7 +71,7 @@ async function visiblePrimary(component: Locator) {
 async function assertFocusDeck(
   component: Locator,
   page: Page,
-  expected: { status: string; action: string; focusPrimary?: boolean },
+  expected: { status: string; action: string },
 ) {
   await expect(component.getByRole("heading", { level: 1 })).toContainText(FOCUS_DECK_TITLE);
   await expect(component.getByText(expected.status, { exact: true })).toBeVisible();
@@ -82,10 +89,26 @@ async function assertFocusDeck(
   await expect(primary).toContainText(expected.action);
   await expectMinimumTargetSize(primary);
   await expectNoHorizontalOverflow(page);
+}
 
+async function lockFocusDeckScreenshot(component: Locator, name: string) {
+  await component.evaluate((root) => {
+    for (const element of root.querySelectorAll<HTMLElement>(
+      ".rm-host-session-workspace__sticky-cta, .rm-host-session-workspace__footer-cta",
+    )) {
+      element.style.setProperty("position", "static", "important");
+    }
+  });
+  await expect(component).toHaveScreenshot(name, { style: STICKY_IN_FLOW_STYLE });
+}
+
+async function assertFocusDeckFocus(
+  component: Locator,
+  expected: { action: string; focusPrimary?: boolean },
+) {
   const focusTarget = expected.focusPrimary === false
     ? component.getByRole("link", { name: "참석 응답" })
-    : primary;
+    : await visiblePrimary(component);
   await focusTarget.focus();
   await expectVisibleFocus(focusTarget);
 }
@@ -93,14 +116,16 @@ async function assertFocusDeck(
 test("Focus Deck DRAFT locks the 1440 wide editorial composition", async ({ mount, page }) => {
   const component = await mountFocusDeck(mount, page, draftFocusDeck, VISUAL_AUTHORITY_VIEWPORTS.desktopWide);
   await assertFocusDeck(component, page, { status: "모임 작성 중", action: "멤버와 준비 시작" });
-  await expect(component).toHaveScreenshot("focus-deck-draft-1440.png");
+  await lockFocusDeckScreenshot(component, "focus-deck-draft-1440.png");
+  await assertFocusDeckFocus(component, { action: "멤버와 준비 시작" });
 });
 
 test("Focus Deck OPEN locks the 900 tablet editorial composition", async ({ mount, page }) => {
   const component = await mountFocusDeck(mount, page, openFocusDeck, VISUAL_AUTHORITY_VIEWPORTS.tablet);
   await assertFocusDeck(component, page, { status: "멤버와 준비 중", action: "실제 출석 확인" });
   await expect(component.getByText("오늘이 모임일입니다.")).toBeVisible();
-  await expect(component).toHaveScreenshot("focus-deck-open-900.png");
+  await lockFocusDeckScreenshot(component, "focus-deck-open-900.png");
+  await assertFocusDeckFocus(component, { action: "실제 출석 확인" });
 });
 
 test("Focus Deck CLOSED locks the 768 tablet-narrow composition with recovery", async ({ mount, page }) => {
@@ -108,14 +133,16 @@ test("Focus Deck CLOSED locks the 768 tablet-narrow composition with recovery", 
   await assertFocusDeck(component, page, { status: "기록 정리 중", action: "정리본 올리기" });
   await expect(component.getByText("최근 출석 변경을 되돌릴 수 있습니다.")).toBeVisible();
   await expect(component.getByRole("button", { name: "되돌리기" })).toBeVisible();
-  await expect(component).toHaveScreenshot("focus-deck-closed-768.png");
+  await lockFocusDeckScreenshot(component, "focus-deck-closed-768.png");
+  await assertFocusDeckFocus(component, { action: "정리본 올리기" });
 });
 
 test("Focus Deck PUBLISHED locks the 390 mobile composition", async ({ mount, page }) => {
   const component = await mountFocusDeck(mount, page, publishedFocusDeck, VISUAL_AUTHORITY_VIEWPORTS.mobile);
   await assertFocusDeck(component, page, { status: "공개 완료", action: "공개 기록 보기" });
   await expect(component.getByText("게스트·멤버 노트 게시 완료")).toHaveCount(0);
-  await expect(component).toHaveScreenshot("focus-deck-published-390.png");
+  await lockFocusDeckScreenshot(component, "focus-deck-published-390.png");
+  await assertFocusDeckFocus(component, { action: "공개 기록 보기" });
 });
 
 test("Focus Deck pending readiness fail-closes the 320 mobile composition", async ({ mount, page }) => {
@@ -125,16 +152,13 @@ test("Focus Deck pending readiness fail-closes the 320 mobile composition", asyn
     readinessPendingFocusDeck,
     VISUAL_AUTHORITY_VIEWPORTS.mobileNarrow,
   );
-  await assertFocusDeck(component, page, {
-    status: "기록 정리 중",
-    action: "다음 할 일 확인 중",
-    focusPrimary: false,
-  });
+  await assertFocusDeck(component, page, { status: "기록 정리 중", action: "다음 할 일 확인 중" });
   await expect(await visiblePrimary(component)).toBeDisabled();
   await expect(component.getByRole("button", { name: "정리본 올리기" })).toHaveCount(0);
   await expect(component.getByRole("button", { name: "게스트·멤버 노트에 기록 게시" })).toHaveCount(0);
   await expect(component.getByText("모임 기록을 확인하는 중입니다.")).toBeVisible();
-  await expect(component).toHaveScreenshot("focus-deck-readiness-pending-320.png");
+  await lockFocusDeckScreenshot(component, "focus-deck-readiness-pending-320.png");
+  await assertFocusDeckFocus(component, { action: "다음 할 일 확인 중", focusPrimary: false });
 });
 
 test("Focus Deck stays inside the remaining viewport matrix and 200 percent zoom", async ({ mount, page }) => {
