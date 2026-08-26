@@ -24,7 +24,7 @@ export function WorkspaceHeader({
   LinkComponent = DefaultLinkComponent,
 }: {
   header: WorkspaceHeaderModel;
-  statusLabel: HostSessionWorkspaceView["statusLabel"] | "새 모임";
+  statusLabel: HostSessionWorkspaceView["statusLabel"] | "공개 완료" | "새 모임";
   basicOpen: boolean;
   historyOpen: boolean;
   onOpenBasic: () => void;

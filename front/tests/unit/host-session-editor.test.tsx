@@ -377,8 +377,8 @@ afterEach(() => {
 });
 
 describe("HostSessionEditor", () => {
-  it("does not create a nested main landmark when embedded in Meeting Folio", () => {
-    render(<HostSessionEditorForTest session={openSession} embeddedInMeetingFolio />);
+  it("does not create a nested main landmark when composed into the Focus Deck", () => {
+    render(<HostSessionEditorForTest session={openSession} composeDeck={false} />);
 
     expect(screen.queryByRole("main")).not.toBeInTheDocument();
     expect(document.querySelector(".rm-host-session-editor")).toBeInTheDocument();
@@ -593,7 +593,7 @@ describe("HostSessionEditor", () => {
     expect(screen.queryByText("이번 모임")).not.toBeInTheDocument();
     expect(screen.queryByText("D-18")).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "지금 할 일" })).toBeVisible();
-    expect(screen.getByRole("list", { name: "진행 상황" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "진행 목록" })).toBeVisible();
   });
 
   it("renders base meeting work without requiring the unopened record workflow", () => {

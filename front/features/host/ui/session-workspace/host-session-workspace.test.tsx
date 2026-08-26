@@ -87,7 +87,11 @@ describe("HostSessionWorkspace", () => {
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "모임 정보" })).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByRole("button", { name: "변경 내역" })).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getByRole("list", { name: "진행 상황" })).toBeVisible();
+    expect(screen.queryByRole("list", { name: "진행 상황" })).not.toBeInTheDocument();
+
+    const header = screen.getByRole("banner");
+    const focus = screen.getByRole("region", { name: "지금 할 일" });
+    expect(Boolean(header.compareDocumentPosition(focus) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
   });
 
   it("reviews member input while OPEN before the meeting date", async () => {
@@ -132,7 +136,7 @@ describe("HostSessionWorkspace", () => {
     expect(screen.getByText("멤버와 준비 중")).toBeVisible();
     expect(screen.getAllByRole("button", { name: "실제 출석 확인" })).toHaveLength(2);
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
-    await user.click(within(screen.getByRole("listitem", { name: /출석/ })).getByRole("button"));
+    await user.click(within(screen.getByRole("region", { name: "출석" })).getByRole("button", { name: "열기" }));
     expect(onLocationChange).toHaveBeenCalledWith({ panel: "attendance", source: "manual" });
     expect(screen.getByText("출석 편집")).toBeVisible();
   });
@@ -212,7 +216,8 @@ describe("HostSessionWorkspace", () => {
       />,
     );
 
-    expect(screen.getByText("게스트·멤버 노트 게시 완료")).toBeVisible();
+    expect(screen.getByText("공개 완료")).toBeVisible();
+    expect(screen.queryByText("게스트·멤버 노트 게시 완료")).not.toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "공개 기록 보기" })).toHaveLength(2);
     expect(screen.getByRole("button", { name: "수정본 만들기" })).toBeVisible();
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();

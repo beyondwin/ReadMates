@@ -1,15 +1,20 @@
 import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import type {
+  HostFocusFact,
   HostSessionWorkspaceLocation,
   HostSessionWorkspacePanel,
   HostSessionWorkspaceView,
 } from "@/features/host/model/host-session-workspace-model";
+import type { HostMeetingRecordReadiness } from "@/features/host/model/host-meeting-record-readiness";
 import type { HostSessionEditorLinkComponent } from "@/features/host/ui/session-editor/session-editor-links";
 import { DefaultLinkComponent } from "@/features/host/ui/session-editor/session-editor-links";
+import {
+  MeetingFocusFacts,
+  type MeetingAudienceProjection,
+} from "@/features/host/ui/meeting-workspace/meeting-focus-facts";
 import { WorkspaceFocusCard } from "./workspace-focus-card";
 import { WorkspaceHeader, type WorkspaceHeaderModel } from "./workspace-header";
 import { WorkspacePanel } from "./workspace-panel";
-import { WorkspaceProgressList } from "./workspace-progress-list";
 import {
   WorkspaceUndoBar,
   type WorkspacePendingUndo,
@@ -44,12 +49,17 @@ export type HostSessionWorkspaceProps = {
   descriptionOverride?: string | null;
   focusContent?: ReactNode;
   relatedWork?: ReactNode;
-  basicPanel: ReactNode;
+  facts?: readonly HostFocusFact[];
+  projections?: readonly MeetingAudienceProjection[];
+  recordReadiness?: HostMeetingRecordReadiness;
+  onRetryReadiness?: () => void;
+  recovery?: ReactNode;
+  panel?: ReactNode;
+  basicPanel?: ReactNode;
   attendancePanel?: ReactNode;
   recordsPanel?: ReactNode;
-  historyPanel: ReactNode;
+  historyPanel?: ReactNode;
   LinkComponent?: HostSessionEditorLinkComponent;
-  embeddedInMeetingFolio?: boolean;
 };
 
 function focusLocation(): HostSessionWorkspaceLocation {
@@ -63,6 +73,11 @@ function panelLocation(panel: HostSessionWorkspacePanel, source: HostSessionWork
 function visibleFocusable(root: HTMLElement) {
   return Array.from(root.querySelectorAll<HTMLElement>(focusableSelector))
     .filter((element) => !element.closest("[hidden]"));
+}
+
+function hostStatusLabel(label: HostSessionWorkspaceView["statusLabel"]): "모임 작성 중" | "멤버와 준비 중" | "기록 정리 중" | "공개 완료" {
+  if (label === "게스트·멤버 노트 게시 완료") return "공개 완료";
+  return label;
 }
 
 export function HostSessionWorkspace({
@@ -84,19 +99,24 @@ export function HostSessionWorkspace({
   descriptionOverride = null,
   focusContent,
   relatedWork,
-  basicPanel,
+  facts,
+  projections,
+  recordReadiness,
+  onRetryReadiness,
+  recovery,
+  panel,
+  basicPanel = null,
   attendancePanel,
   recordsPanel,
-  historyPanel,
+  historyPanel = null,
   LinkComponent = DefaultLinkComponent,
-  embeddedInMeetingFolio = false,
 }: HostSessionWorkspaceProps) {
   const basicOpen = location.panel === "basic";
   const historyOpen = location.panel === "history";
   const attendanceOpen = location.panel === "attendance";
   const recordsOpen = location.panel === "records";
   const sheetOpen = basicOpen || historyOpen;
-  const statusLabel = view.statusLabel;
+  const statusLabel = hostStatusLabel(view.statusLabel);
   const sheetRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
 
@@ -168,38 +188,15 @@ export function HostSessionWorkspace({
     <div className="rm-host-session-workspace">
       <div className="rm-host-session-workspace__chrome" inert={sheetOpen || undefined}>
       <div className="rm-host-session-workspace__frame">
-        {!embeddedInMeetingFolio ? (
-          <WorkspaceHeader
-            header={header}
-            statusLabel={statusLabel}
-            basicOpen={basicOpen}
-            historyOpen={historyOpen}
-            onOpenBasic={() => changePanel(basicOpen ? focusLocation() : panelLocation("basic"))}
-            onOpenHistory={() => changePanel(historyOpen ? focusLocation() : panelLocation("history"))}
-            LinkComponent={LinkComponent}
-          />
-        ) : (
-          <nav className="rm-host-session-workspace__secondary" aria-label="모임 문서 도구">
-            <button
-              type="button"
-              className="btn btn-quiet btn-sm"
-              aria-expanded={basicOpen}
-              aria-controls="workspace-panel-basic"
-              onClick={() => changePanel(basicOpen ? focusLocation() : panelLocation("basic"))}
-            >
-              모임 정보
-            </button>
-            <button
-              type="button"
-              className="btn btn-quiet btn-sm"
-              aria-expanded={historyOpen}
-              aria-controls="workspace-panel-history"
-              onClick={() => changePanel(historyOpen ? focusLocation() : panelLocation("history"))}
-            >
-              변경 내역
-            </button>
-          </nav>
-        )}
+        <WorkspaceHeader
+          header={header}
+          statusLabel={statusLabel}
+          basicOpen={basicOpen}
+          historyOpen={historyOpen}
+          onOpenBasic={() => changePanel(basicOpen ? focusLocation() : panelLocation("basic"))}
+          onOpenHistory={() => changePanel(historyOpen ? focusLocation() : panelLocation("history"))}
+          LinkComponent={LinkComponent}
+        />
 
         <div className="rm-host-session-workspace__layout">
           <div className="rm-host-session-workspace__main">
@@ -217,6 +214,29 @@ export function HostSessionWorkspace({
             >
               {focusContent}
             </WorkspaceFocusCard>
+
+            {facts && facts.length > 0 ? (
+              <MeetingFocusFacts
+                facts={facts}
+                projections={projections}
+                recordReadiness={recordReadiness}
+                onRetryReadiness={onRetryReadiness}
+              />
+            ) : null}
+
+            {relatedWork}
+
+            {draftSaveLabel ? (
+              <p className="small rm-host-session-workspace__save-state">{draftSaveLabel}</p>
+            ) : null}
+
+            {recovery}
+
+            <WorkspaceUndoBar
+              pendingUndo={pendingUndo}
+              confirm={undoConfirm}
+              restoreNotice={restoreNotice}
+            />
 
             {attendancePanel ? (
               <WorkspacePanel
@@ -241,28 +261,13 @@ export function HostSessionWorkspace({
                 {recordsPanel}
               </WorkspacePanel>
             ) : null}
+
+            {panel}
           </div>
-
-          {!embeddedInMeetingFolio ? <aside className="rm-host-session-workspace__rail">
-            <WorkspaceProgressList
-              progress={view.progress}
-              onSelect={(panel) => changePanel(panelLocation(panel, panel === "records" ? location.source : "manual"))}
-            />
-            {draftSaveLabel ? (
-              <p className="small rm-host-session-workspace__save-state">{draftSaveLabel}</p>
-            ) : null}
-            {relatedWork}
-          </aside> : relatedWork ? <aside className="rm-host-session-workspace__related">{relatedWork}</aside> : null}
         </div>
-
-        <WorkspaceUndoBar
-          pendingUndo={pendingUndo}
-          confirm={undoConfirm}
-          restoreNotice={restoreNotice}
-        />
       </div>
 
-      {!embeddedInMeetingFolio ? <div className="rm-host-session-workspace__sticky-cta rm-host-session-workspace__footer-cta">
+      <div className="rm-host-session-workspace__sticky-cta rm-host-session-workspace__footer-cta">
         {showPublicLink && publicRecordHref ? (
           <LinkComponent
             to={publicRecordHref}
@@ -280,7 +285,7 @@ export function HostSessionWorkspace({
             {primaryLabel}
           </button>
         )}
-      </div> : null}
+      </div>
       </div>
 
       <div

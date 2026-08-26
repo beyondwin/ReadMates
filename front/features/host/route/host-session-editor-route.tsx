@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import {
   useLoaderData,
   useLocation,
@@ -648,7 +648,8 @@ export function EditHostSessionRecordWorkflow({
     onChange: () => undefined,
   },
   recordFreshness,
-  embeddedInMeetingFolio = false,
+  composeDeck = true,
+  primaryActionRef,
 }: {
   session: HostSessionDetailResponse;
   recordEditor: HostSessionRecordEditor;
@@ -674,7 +675,8 @@ export function EditHostSessionRecordWorkflow({
     observedAt: string;
     onRetry: () => void;
   };
-  embeddedInMeetingFolio?: boolean;
+  composeDeck?: boolean;
+  primaryActionRef?: MutableRefObject<(() => void) | null>;
 }) {
   const queryClient = useQueryClient();
   const saveMutation = useSaveHostSessionRecordDraftMutation(context);
@@ -1191,7 +1193,8 @@ export function EditHostSessionRecordWorkflow({
   return (
     <>
       <HostSessionEditor
-        embeddedInMeetingFolio={embeddedInMeetingFolio}
+        composeDeck={composeDeck}
+        primaryActionRef={primaryActionRef}
         session={session}
         notificationDispatches={notificationDispatches}
         returnTarget={returnStatePurged ? undefined : returnTarget}

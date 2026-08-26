@@ -2,6 +2,7 @@ import {
   type ChangeEvent,
   type CSSProperties,
   type FormEvent,
+  type MutableRefObject,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -44,9 +45,16 @@ import {
 
 import {
   buildHostSessionEditorOverview,
-  hasAppliedSessionRecord,
 } from "@/features/host/model/host-session-editor-view-model";
-import { buildHostSessionWorkspace } from "@/features/host/model/host-session-workspace-model";
+import {
+  buildHostMeetingWorkspace,
+  type HostMeetingWorkspaceView,
+  type HostSessionWorkspaceView,
+} from "@/features/host/model/host-session-workspace-model";
+import {
+  mapHostMeetingRecordFacts,
+  type HostMeetingRecordReadiness,
+} from "@/features/host/model/host-meeting-record-readiness";
 import {
   classifyHostSessionTrashRestoreFailure,
   isReverseLifecycleKind,
@@ -240,7 +248,9 @@ export default function HostSessionEditor({
   undoConfirm = null,
   restoreNotice = null,
   meetingTask,
-  embeddedInMeetingFolio = false,
+  composeDeck = true,
+  primaryActionRef,
+  recordReadiness,
 }: {
   session?: HostSessionDetailResponse | null;
   notificationDispatches?: ManualNotificationDispatchListItem[];
@@ -263,7 +273,9 @@ export default function HostSessionEditor({
   undoConfirm?: WorkspaceUndoConfirm | null;
   restoreNotice?: WorkspaceRestoreNotice | null;
   meetingTask?: HostMeetingTask;
-  embeddedInMeetingFolio?: boolean;
+  composeDeck?: boolean;
+  primaryActionRef?: MutableRefObject<(() => void) | null>;
+  recordReadiness?: HostMeetingRecordReadiness;
 }) {
   const resolvedScheduleDefaults = scheduleDefaultsLoadState?.defaults ?? scheduleDefaults ?? null;
 
@@ -528,45 +540,43 @@ export default function HostSessionEditor({
   const unknownAttendanceCount = (session?.attendees ?? []).filter((attendee) => (
     attendanceStatuses[attendee.membershipId] ?? attendee.attendanceStatus
   ) === "UNKNOWN").length;
-  const appliedRecord = hasAppliedSessionRecord({
-    liveRevision: recordWorkflow?.editor.liveRevision ?? 0,
-    liveSnapshot: recordWorkflow?.editor.liveSnapshot ?? null,
-  });
-  const workspaceView = useMemo(() => {
-    if (isNewSession) {
-      return buildHostSessionWorkspace({
-        state: "DRAFT",
-        meetingDate: date,
-        today: todayIsoDate(),
-        unknownAttendanceCount: 0,
-        hasRecordDraft: false,
-        recordDraftStale: false,
-        recordValidationIssueCount: 0,
-        hasAppliedRecord: false,
-        publicationReady: false,
-      });
-    }
-    return buildHostSessionWorkspace({
-      state: sessionState ?? "DRAFT",
+  const unansweredResponseCount = (session?.attendees ?? []).filter((attendee) => (
+    (attendee.participationStatus ?? "ACTIVE") === "ACTIVE"
+    && attendee.rsvpStatus === "NO_RESPONSE"
+  )).length;
+  const meetingWorkspaceView = useMemo(() => {
+    const resolvedRecordReadiness: HostMeetingRecordReadiness = recordReadiness
+      ?? (recordWorkflow
+        ? {
+            status: "ready",
+            observedAt: recordWorkflow.editor.draft?.updatedAt ?? recordWorkflow.editor.liveSessionUpdatedAt,
+            facts: mapHostMeetingRecordFacts(recordWorkflow.editor),
+          }
+        : sessionState === "CLOSED" || sessionState === "PUBLISHED"
+          ? { status: "pending" }
+          : { status: "not-required" });
+    return buildHostMeetingWorkspace({
+      currentUrl: "/",
+      state: isNewSession ? "DRAFT" : sessionState ?? "DRAFT",
       meetingDate: date,
       today: todayIsoDate(),
-      unknownAttendanceCount,
-      hasRecordDraft: Boolean(recordWorkflow?.editor.draft),
-      recordDraftStale: Boolean(recordWorkflow?.editor.draftLiveBaseStale),
-      recordValidationIssueCount: recordWorkflow?.editor.validationSummary.issues.length ?? 0,
-      hasAppliedRecord: appliedRecord,
-      publicationReady: appliedRecord
-        && !recordWorkflow?.editor.draftLiveBaseStale
-        && (recordWorkflow?.editor.validationSummary.issues.length ?? 0) === 0,
+      unansweredResponseCount: isNewSession ? 0 : unansweredResponseCount,
+      unknownAttendanceCount: isNewSession ? 0 : unknownAttendanceCount,
+      recordReadiness: isNewSession ? { status: "not-required" } : resolvedRecordReadiness,
     });
   }, [
-    appliedRecord,
     date,
     isNewSession,
+    recordReadiness,
     recordWorkflow,
     sessionState,
+    unansweredResponseCount,
     unknownAttendanceCount,
   ]);
+  const workspaceView = useMemo(
+    () => sessionViewFromMeeting(meetingWorkspaceView),
+    [meetingWorkspaceView],
+  );
 
   // ---------------------------------------------------------------------------
   // Stable dispatch helpers
@@ -1247,6 +1257,16 @@ export default function HostSessionEditor({
     }
   }, [changeLocation, displayedWorkspaceView.primaryAction.kind, recordWorkflow, requestLifecycleConfirm]);
 
+  useLayoutEffect(() => {
+    if (!primaryActionRef) return;
+    primaryActionRef.current = handlePrimaryAction;
+    return () => {
+      if (primaryActionRef.current === handlePrimaryAction) {
+        primaryActionRef.current = null;
+      }
+    };
+  }, [handlePrimaryAction, primaryActionRef]);
+
   const retryLifecycle = useCallback(() => {
     if (lifecycleConfirm) {
       void confirmLifecycle();
@@ -1262,7 +1282,7 @@ export default function HostSessionEditor({
     }
   }, [confirmLifecycle, displayedWorkspaceView.primaryAction.kind, lifecycleConfirm, requestLifecycleConfirm]);
 
-  const EditorRoot = embeddedInMeetingFolio ? "div" : "main";
+  const EditorRoot = composeDeck ? "main" : "div";
 
   if (trashedSession) {
     return (
@@ -1295,9 +1315,9 @@ export default function HostSessionEditor({
 
   return (
     <EditorRoot className="rm-host-session-editor">
-      <HostSessionWorkspace
-        embeddedInMeetingFolio={embeddedInMeetingFolio}
+      {composeDeck ? <HostSessionWorkspace
         view={displayedWorkspaceView}
+        facts={meetingWorkspaceView.facts}
         header={{
           returnHref: showReturnLink ? returnTarget.href : null,
           returnLabel: showReturnLink ? returnTarget.label : null,
@@ -1579,7 +1599,42 @@ export default function HostSessionEditor({
             <div className="surface-quiet small" style={{ padding: 14 }}>아직 변경 기록이 없습니다</div>
           )
         }
-      />
+      /> : (
+        <>
+          {(meetingTask === "responses" || displayedWorkspaceView.primaryAction.kind === "REVIEW_MEMBER_INPUT") && session ? (
+            <div id="workspace-member-responses" tabIndex={-1}>
+              <MeetingResponseLedger
+                rows={session.attendees
+                  .filter((attendee) => (attendee.participationStatus ?? "ACTIVE") === "ACTIVE")
+                  .map((attendee, index) => ({
+                    membershipId: attendee.membershipId,
+                    displayName: attendee.displayName,
+                    secondaryLabel: `참여자 ${index + 1}`,
+                    response: attendee.rsvpStatus === "DECLINED"
+                      ? "NOT_GOING"
+                      : attendee.rsvpStatus === "MAYBE"
+                        ? "UNSURE"
+                        : attendee.rsvpStatus,
+                    attendance: attendanceStatuses[attendee.membershipId] ?? attendee.attendanceStatus,
+                    attendanceRevision: attendee.attendanceRevision,
+                    questionCount: null,
+                    recentResponseLabel: null,
+                  }))}
+                onAttendanceChange={(membershipId, attendance) => void updateAttendance(membershipId, attendance)}
+                onBulkAttendanceChange={(membershipIds, attendance) => void updateBulkAttendance(membershipIds, attendance)}
+              />
+            </div>
+          ) : null}
+          {meetingTask === "attendance" || workspaceLocation.panel === "attendance" ? (
+            <AttendancePanel
+              session={session}
+              attendanceStatuses={attendanceStatuses}
+              emptyMessage={emptyManagementMessage}
+              onUpdateAttendance={updateAttendance}
+            />
+          ) : null}
+        </>
+      )}
 
       {recordWorkflow?.confirmation.message ? (
         <div
@@ -1633,6 +1688,24 @@ export default function HostSessionEditor({
       ) : null}
     </EditorRoot>
   );
+}
+
+function sessionViewFromMeeting(view: HostMeetingWorkspaceView): HostSessionWorkspaceView {
+  const panel = view.primaryAction.task === "attendance"
+    ? "attendance" as const
+    : view.primaryAction.task === "records"
+      ? "records" as const
+      : "focus" as const;
+  return {
+    statusLabel: view.statusLabel === "공개 완료" ? "게스트·멤버 노트 게시 완료" : view.statusLabel,
+    primaryAction: {
+      kind: view.primaryAction.kind,
+      label: view.primaryAction.label,
+      panel,
+    },
+    progress: [],
+    publicationReady: view.publicationReady === true,
+  };
 }
 
 function todayIsoDate() {

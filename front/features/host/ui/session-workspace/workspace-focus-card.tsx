@@ -45,6 +45,10 @@ const FOCUS_COPY: Record<string, WorkspaceFocusCopy> = {
     title: "공개 기록 보기",
     description: "멤버에게 보이는 결과입니다.",
   },
+  CONFIRM_NEXT_ACTION: {
+    title: "다음 할 일 확인 중",
+    description: "모임 기록을 확인한 뒤에 다음 작업을 결정합니다.",
+  },
 };
 
 function focusCopyFor(kind: string, descriptionOverride?: string | null): WorkspaceFocusCopy {

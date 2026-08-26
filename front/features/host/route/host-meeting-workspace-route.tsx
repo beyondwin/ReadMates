@@ -38,10 +38,8 @@ import {
   reverseLifecycleAction,
   type ReverseLifecycleConfirmKind,
 } from "@/features/host/model/host-session-lifecycle-model";
-import {
-  HostMeetingWorkspace,
-  type MeetingPanelViewModel,
-} from "@/features/host/ui/meeting-workspace/host-meeting-workspace";
+import { HostMeetingWorkspace } from "@/features/host/ui/meeting-workspace/host-meeting-workspace";
+import { MeetingRelatedWork } from "@/features/host/ui/meeting-workspace/meeting-related-work";
 import { MeetingNotificationWorkspace } from "@/features/host/ui/meeting-workspace/meeting-notification-workspace";
 import type { HostSessionRecordsChangedEvent } from "./host-session-editor-route";
 import { useHostMeetingWorkspaceActions } from "./host-meeting-workspace-actions";
@@ -133,12 +131,50 @@ function recordReadinessForMeeting(
     : { status: "not-required" };
 }
 
-function recordObservationAnnouncements(readiness: HostMeetingRecordReadiness) {
-  if (readiness.status !== "stale") return [];
-  return [{
-    kind: "status" as const,
-    message: `${formatDateTimeLabel(readiness.observedAt)}에 확인한 내용을 표시합니다. 최신 확인이 필요한 행동은 잠시 사용할 수 없습니다.`,
-  }];
+type MeetingPanelViewModel =
+  | { kind: "loading"; task: HostMeetingTask }
+  | { kind: "known-empty"; task: HostMeetingTask; content: ReactNode }
+  | { kind: "unavailable"; task: HostMeetingTask }
+  | { kind: "stale-cached"; task: HostMeetingTask; content: ReactNode; observedAt: string }
+  | { kind: "ready"; task: HostMeetingTask; content: ReactNode };
+
+const panelCopy: Record<HostMeetingTask, { label: string; empty: string }> = {
+  overview: { label: "개요", empty: "아직 표시할 개요가 없습니다" },
+  responses: { label: "참석 응답", empty: "아직 참석 응답이 없습니다" },
+  attendance: { label: "실제 출석", empty: "아직 출석 대상이 없습니다" },
+  records: { label: "모임 기록", empty: "아직 모임 기록이 없습니다" },
+  notifications: { label: "알림", empty: "아직 발송한 알림이 없습니다" },
+  history: { label: "변경 내역", empty: "아직 변경 기록이 없습니다" },
+};
+
+function MeetingPanel({ panel, onRetry }: { panel: MeetingPanelViewModel; onRetry: () => void }) {
+  const copy = panelCopy[panel.task];
+  if (panel.kind === "loading") {
+    return <p role="status" className="rm-meeting-panel-state">{copy.label}을 불러오는 중입니다.</p>;
+  }
+  if (panel.kind === "known-empty") {
+    return <div role="status" className="rm-meeting-panel-state"><p>{copy.empty}</p>{panel.content}</div>;
+  }
+  if (panel.kind === "unavailable") {
+    return (
+      <div role="alert" className="rm-meeting-panel-state is-error">
+        <p>{copy.label}을 불러오지 못했습니다.</p>
+        <button type="button" className="btn btn-quiet btn-sm" onClick={onRetry}>{copy.label} 다시 시도</button>
+      </div>
+    );
+  }
+  if (panel.kind === "stale-cached") {
+    return (
+      <div className="rm-meeting-panel-state__stale">
+        <div role="status" className="rm-meeting-panel-state">
+          {formatDateTimeLabel(panel.observedAt)}에 확인한 내용을 표시합니다. 최신 확인이 필요한 행동은 잠시 사용할 수 없습니다.
+          <button type="button" className="btn btn-quiet btn-sm" onClick={onRetry}>최신 내용 확인</button>
+        </div>
+        {panel.content}
+      </div>
+    );
+  }
+  return <>{panel.content}</>;
 }
 
 function panelForTask(
@@ -267,6 +303,7 @@ export function HostMeetingWorkspaceRoute({
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
   const lifecycleRestoreFocusRef = useRef<HTMLElement | null>(null);
   const measuredRouteIdentityRef = useRef<string | null>(null);
+  const editorPrimaryActionRef = useRef<(() => void) | null>(null);
 
   useInsertionEffect(() => {
     if (!baseQuery.data || measuredRouteIdentityRef.current === routeIdentity) return;
@@ -327,50 +364,44 @@ export function HostMeetingWorkspaceRoute({
         </DeferredHostWorkspace>
       );
     }
+    const loadingView = buildHostMeetingWorkspace({
+      currentUrl,
+      state: "DRAFT",
+      meetingDate: "",
+      today: todayIsoDate(),
+      unansweredResponseCount: 0,
+      unknownAttendanceCount: 0,
+      recordReadiness: { status: "not-required" },
+    });
     return (
       <HostMeetingWorkspace
-        identity={{
-          title: "모임",
-          lifecycle: "DRAFT",
-          statusLabel: "모임 정보를 확인하는 중",
+        view={{
+          ...loadingView,
+          primaryAction: {
+            kind: "LOADING",
+            label: "모임 확인 중",
+            task: "overview",
+            disabled: true,
+          },
         }}
-        activeTask={meetingLocation.task}
-        tasks={buildHostMeetingWorkspace({
-          currentUrl,
-          state: "DRAFT",
-          meetingDate: "",
-          today: todayIsoDate(),
-          unansweredResponseCount: 0,
-          unknownAttendanceCount: 0,
-          recordReadiness: { status: "not-required" },
-        }).tasks}
-        primaryAction={{ kind: "LOADING", label: "모임 확인 중", disabled: true }}
-        panel={baseQuery.isError
-          ? { kind: "unavailable", task: meetingLocation.task }
-          : { kind: "loading", task: meetingLocation.task }}
-        judgment={{
-          title: "현재 상태",
-          summary: "권한과 모임 상태를 확인한 뒤 안전한 작업을 표시합니다.",
-          checks: [],
-          projections: [
-            { audience: "호스트", result: "확인 중" },
-            { audience: "게스트·멤버", result: "확인 중" },
-            { audience: "공개 기록", result: "확인 중" },
-          ],
-        }}
-        announcements={[]}
-        LinkComponent={LinkComponent}
-        onTaskLinkActivated={() => undefined}
+        header={{ sessionNumber: null, title: "모임" }}
+        facts={loadingView.facts}
+        relatedWork={<MeetingRelatedWork tasks={loadingView.relatedTasks} LinkComponent={LinkComponent} />}
+        panel={
+          <MeetingPanel
+            panel={baseQuery.isError
+              ? { kind: "unavailable", task: meetingLocation.task }
+              : { kind: "loading", task: meetingLocation.task }}
+            onRetry={() => void baseQuery.refetch()}
+          />
+        }
         onPrimaryAction={() => undefined}
-        onRetryPanel={() => void baseQuery.refetch()}
+        onRetryReadiness={() => void baseQuery.refetch()}
       />
     );
   }
 
   const session = baseQuery.data;
-  const recordData = panelStates.record.kind === "ready" || panelStates.record.kind === "stale-cached"
-    ? panelStates.record.data
-    : null;
   const activeAttendees = session.attendees.filter((item) => (item.participationStatus ?? "ACTIVE") === "ACTIVE");
   const unknownAttendanceCount = activeAttendees.filter((item) => item.attendanceStatus === "UNKNOWN").length;
   const recordReadiness = recordReadinessForMeeting(session.state, panelStates.recordReadiness);
@@ -483,7 +514,8 @@ export function HostMeetingWorkspaceRoute({
     (recordEditor, stale) => (
       <DeferredHostWorkspace>
         <EditHostSessionRecordWorkflow
-          embeddedInMeetingFolio
+          composeDeck={false}
+          primaryActionRef={editorPrimaryActionRef}
           session={session}
         recordEditor={recordEditor}
         historyPage={{ items: [], nextCursor: null }}
@@ -584,7 +616,8 @@ export function HostMeetingWorkspaceRoute({
   const baseContent = (
     <DeferredHostWorkspace>
       <HostSessionEditor
-        embeddedInMeetingFolio
+        composeDeck={false}
+        primaryActionRef={editorPrimaryActionRef}
         session={session}
       actions={actions}
       clubSlug={clubSlug}
@@ -612,76 +645,66 @@ export function HostMeetingWorkspaceRoute({
               : { kind: "loading", task: meetingLocation.task }
       : { kind: "ready", task: meetingLocation.task, content: baseContent };
 
-  const guestMemberProjection = session.visibility === "HOST_ONLY"
-    ? "호스트만 확인"
-    : session.state === "PUBLISHED"
-      ? "게스트·멤버 노트에서 읽음"
-      : "허용된 아카이브에서 읽음";
-  const publicProjection = session.visibility === "PUBLIC" && session.state === "PUBLISHED"
-    ? "공개 기록에 게시"
-    : "공개 기록에 게시 안 됨";
   const primaryAction = {
-    kind: workspace.primaryAction.kind,
-    label: workspace.primaryAction.label,
+    ...workspace.primaryAction,
     disabled: workspace.primaryAction.disabled || baseQuery.isFetching || baseQuery.isError,
     reason: workspace.primaryAction.reason
-      ?? (baseQuery.isFetching ? "최신 모임 상태를 확인하고 있습니다." : null),
+      ?? (baseQuery.isFetching ? "최신 모임 상태를 확인하고 있습니다." : undefined),
   };
+  const convergence = buildPublicConvergenceStatus(convergenceQuery.data);
 
   return (
     <HostMeetingWorkspace
-      identity={{
+      view={{ ...workspace, primaryAction }}
+      header={{
+        sessionNumber: session.sessionNumber,
         title: session.title || session.bookTitle || "모임",
-        bookTitle: session.title ? session.bookTitle : null,
-        number: session.sessionNumber,
-        lifecycle: session.state,
-        statusLabel: workspace.statusLabel,
-        dateLabel: [session.date, session.startTime].filter(Boolean).join(" · "),
-        locationLabel: session.locationLabel,
+        date: session.date,
+        time: session.startTime,
+        location: session.locationLabel,
       }}
-      activeTask={meetingLocation.task}
-      tasks={workspace.tasks}
-      LinkComponent={LinkComponent}
-      primaryAction={primaryAction}
-      panel={resolvedPanel}
-      judgment={{
-        title: meetingLocation.task === "records" ? "반영 전 확인" : "지금 확인할 일",
-        summary: session.state === "PUBLISHED"
-          ? "게시된 기록은 기존 독자 표면을 유지한 채 수정본으로 교체합니다."
-          : "모임 상태와 노출 결과를 따로 확인한 뒤 현재 작업을 실행합니다.",
-        checks: [
-          ...(unknownAttendanceCount > 0 ? [`실제 출석 확인 전 ${unknownAttendanceCount}명`] : []),
-          "알림은 자동으로 보내지 않음",
-          ...(recordData?.draftLiveBaseStale ? ["현재 기록과 초안의 기준 버전이 다름"] : []),
-        ],
-        projections: [
-          { audience: "호스트", result: "운영 기록과 초안 계속 편집" },
-          { audience: "게스트·멤버", result: guestMemberProjection },
-          { audience: "공개 기록", result: publicProjection },
-        ],
-        convergence: buildPublicConvergenceStatus(convergenceQuery.data),
-        secondaryActions: recordRetry ? (
-          <button type="button" className="btn btn-quiet btn-sm" onClick={recordRetry}>
-            {panelStates.record.kind === "stale-cached" ? "최신 내용 확인" : "모임 기록 다시 시도"}
-          </button>
-        ) : undefined,
-      }}
-      announcements={recordObservationAnnouncements(recordReadiness)}
-      onTaskLinkActivated={() => undefined}
+      facts={workspace.facts}
+      relatedWork={<MeetingRelatedWork tasks={workspace.relatedTasks} LinkComponent={LinkComponent} />}
+      recordReadiness={recordReadiness}
+      panel={
+        <MeetingPanel
+          panel={resolvedPanel}
+          onRetry={() => {
+            if (panel?.kind === "unavailable" || panel?.kind === "stale-cached") panel.retry();
+          }}
+        />
+      }
+      recovery={convergence ? (
+        <div className={`rm-focus-deck__convergence is-${convergence.tone}`}>
+          <p className="rm-focus-deck__convergence-origin">{convergence.originLabel}</p>
+          <p role={convergence.tone === "failed" ? "alert" : "status"}>{convergence.providerLabel}</p>
+          <p className="small muted">{convergence.expectation}</p>
+          {convergence.canRetry ? (
+            <button
+              type="button"
+              className="btn btn-quiet btn-sm"
+              onClick={() => {
+                const convergenceId = convergenceQuery.data?.convergenceId;
+                if (convergenceId) void retryConvergence.mutateAsync({ sessionId, convergenceId });
+              }}
+            >
+              공개 캐시 회수 다시 시도
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       onPrimaryAction={() => {
         if (meetingLocation.task !== workspace.primaryAction.task) {
-          changeMeetingLocation({ task: workspace.primaryAction.task, overviewEditOpen: false, recordSource: "manual" });
+          changeMeetingLocation({
+            task: workspace.primaryAction.task,
+            overviewEditOpen: false,
+            recordSource: "manual",
+          });
           return;
         }
-        document.querySelector<HTMLButtonElement>(".rm-meeting-folio__work .rm-host-session-workspace__cta--desktop")?.click();
+        editorPrimaryActionRef.current?.();
       }}
-      onRetryPanel={() => {
-        if (panel?.kind === "unavailable" || panel?.kind === "stale-cached") panel.retry();
-      }}
-      onRetryConvergence={() => {
-        const convergenceId = convergenceQuery.data?.convergenceId;
-        if (convergenceId) void retryConvergence.mutateAsync({ sessionId, convergenceId });
-      }}
+      onRetryReadiness={recordRetry}
     />
   );
 }
