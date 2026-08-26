@@ -1,8 +1,15 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { AdminNotificationsPage } from "@/features/platform-admin/ui/admin-notifications-page";
+
+const LEDGER_CSS = readFileSync(
+  path.resolve("features/platform-admin/ui/admin-editorial-ledger.css"),
+  "utf8",
+);
 import type {
   AdminNotificationDelivery,
   AdminNotificationOperationsSnapshot,
@@ -113,10 +120,40 @@ describe("AdminNotificationsPage", () => {
   it("shows immutable receipt counts and disabled pending convergence separately", () => {
     renderPage({ replayResult });
 
+    expect(screen.getByRole("region", { name: "명령 기록" })).toBeInTheDocument();
     expect(screen.getByText(/영수증 00000000-0000-4000-8000-000000005901/)).toBeInTheDocument();
     expect(screen.getByText(/재처리 1건 · 건너뜀 1건/)).toBeInTheDocument();
     expect(screen.getByText(/TARGET_STATE_CHANGED 1/)).toBeInTheDocument();
     expect(screen.getByText(/효과 대기 · 현재 비활성/)).toBeInTheDocument();
+    expect(screen.queryByText("공개 반영 추적")).not.toBeInTheDocument();
+  });
+
+  it("renders an L2 receipt timeline only after an actual replay receipt", () => {
+    const { rerender } = renderPage({ replayPreview });
+
+    expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
+    expect(document.querySelector(".admin-safe-action-dock")).toHaveAttribute("data-level", "L2");
+
+    rerender(
+      <AdminNotificationsPage
+        snapshot={snapshot}
+        events={[event]}
+        deliveries={[delivery]}
+        focus={null}
+        replayPreview={replayPreview}
+        replayReason="retry delivery"
+        canReplay
+        busy={false}
+        error={null}
+        success={null}
+        replayResult={replayResult}
+        onPreviewReplay={vi.fn()}
+        onConfirmReplay={vi.fn()}
+        onReplayReasonChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("region", { name: "명령 기록" })).toBeInTheDocument();
   });
 
   it("renders masked recipients without raw email fixture", () => {
@@ -144,10 +181,33 @@ describe("AdminNotificationsPage", () => {
     expect(onReasonChange).toHaveBeenCalled();
   });
 
-  it("shows support role permission message", () => {
+  it("shows a capability denial instead of a role-derived replay control", () => {
     renderPage({ canReplay: false });
 
-    expect(screen.getByText("현재 역할은 재처리를 실행할 수 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("현재 권한으로는 재처리를 실행할 수 없습니다.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "대상 확인" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "재처리 확정" })).toBeDisabled();
+  });
+
+  it("locks 44px targets and reduced motion in the scoped notifications stylesheet", () => {
+    expect(LEDGER_CSS).toMatch(/\.admin-notifications[\s\S]*min-height:\s*44px/);
+    expect(LEDGER_CSS).toContain(".admin-notifications");
+    expect(LEDGER_CSS).toContain("prefers-reduced-motion");
+    expect(LEDGER_CSS).toContain(":focus-visible");
+    expect(LEDGER_CSS).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.admin-notifications[\s\S]*animation-duration:\s*0\.01ms/,
+    );
+    expect(LEDGER_CSS).not.toMatch(/backdrop-filter|linear-gradient/);
+  });
+
+  it("does not import route, query, or API modules", () => {
+    const source = readFileSync(
+      path.resolve("features/platform-admin/ui/admin-notifications-page.tsx"),
+      "utf8",
+    );
+    expect(source).not.toContain("platform-admin-queries");
+    expect(source).not.toContain("platform-admin-notifications-api");
+    expect(source).not.toContain("admin-notifications-route");
+    expect(/fetch\s*\(/.test(source)).toBe(false);
   });
 });

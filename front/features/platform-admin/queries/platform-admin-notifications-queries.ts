@@ -69,6 +69,7 @@ function normalizedFilters(filters: ReturnType<typeof normalizeFilters>): AdminN
 export function usePreviewAdminNotificationReplayMutation() {
   return useMutation({
     mutationKey: platformAdminNotificationsKeys.all,
+    retry: 0,
     mutationFn: (filter: AdminNotificationReplayFilter = {}) => previewAdminNotificationReplay(filter),
   });
 }
@@ -77,6 +78,7 @@ export function useConfirmAdminNotificationReplayMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationKey: platformAdminNotificationsKeys.all,
+    retry: 0,
     mutationFn: (request: AdminNotificationReplayConfirmRequest) => confirmAdminNotificationReplay(request),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: platformAdminNotificationsKeys.all }),
   });

@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import type {
   AdminNotificationDelivery,
   AdminNotificationOperationsSnapshot,
@@ -6,6 +5,10 @@ import type {
   AdminNotificationReplayPreview,
   AdminNotificationReplayConfirmResult,
 } from "@/features/platform-admin/model/platform-admin-notifications-model";
+import { AdminEvidenceLedger } from "./admin-evidence-ledger";
+import { AdminPageContext } from "./admin-page-context";
+import { AdminReceiptTimeline } from "./admin-receipt-timeline";
+import { AdminSafeActionDock, type AdminSafeActionState } from "./admin-action-dock";
 
 export type AdminNotificationsPageProps = {
   snapshot: AdminNotificationOperationsSnapshot | null;
@@ -55,155 +58,212 @@ export function AdminNotificationsPage({
   onLoadMoreDeliveries,
 }: AdminNotificationsPageProps) {
   const confirmDisabled = !replayPreview || !replayReason.trim() || !canReplay || busy;
+  const dockState = replayDockState({ canReplay, busy, replayResult });
 
   return (
-    <section className="admin-notifications" aria-labelledby="admin-notifications-title">
-      <header className="admin-notifications__header">
-        <div>
-          <p className="eyebrow">S5 Operations</p>
-          <h1 id="admin-notifications-title" className="h1 editorial">
-            알림 / Outbox 운영
-          </h1>
-        </div>
-        <p className="admin-notifications__timestamp">
-          {snapshot ? `생성 ${formatTimestamp(snapshot.generatedAt)}` : "요약을 불러오지 못함"}
-        </p>
-      </header>
+    <section className="admin-notifications">
+      <AdminPageContext
+        eyebrow="S5 Operations"
+        heading="알림 / Outbox 운영"
+        freshness={snapshot ? `생성 ${formatTimestamp(snapshot.generatedAt)}` : "요약을 불러오지 못함"}
+        authority={canReplay ? "재처리 가능" : "재처리 권한 없음"}
+      >
+        {focus ? <FocusBanner focus={focus} /> : null}
+        {error ? <p className="admin-notifications__error" role="alert">{error}</p> : null}
+        {success ? <p className="admin-notifications__success" role="status">{success}</p> : null}
 
-      {focus ? <FocusBanner focus={focus} /> : null}
-      {error ? <p className="admin-notifications__error" role="alert">{error}</p> : null}
-      {success ? <p className="admin-notifications__success" role="status">{success}</p> : null}
-
-      {snapshot ? (
-        <div className="admin-notifications__summary" aria-label="알림 운영 요약">
-          <Metric label="Outbox pending" value={snapshot.outboxSummary.pending} />
-          <Metric label="Outbox failed" value={snapshot.outboxSummary.failed + snapshot.outboxSummary.dead} />
-          <Metric label="Delivery pending" value={snapshot.deliverySummary.pending} />
-          <Metric label="Delivery failed" value={snapshot.deliverySummary.failed + snapshot.deliverySummary.dead} />
-          <Metric label="Relay stale" value={snapshot.relaySummary.stalePublishing + snapshot.relaySummary.staleSending} />
-        </div>
-      ) : null}
-
-      <div className="admin-notifications__grid">
-        <section className="admin-notifications__panel" aria-labelledby="admin-notifications-failures-title">
-          <h2 id="admin-notifications-failures-title" className="h3 editorial">Failure clusters</h2>
-          {snapshot?.failureClusters.length ? (
-            <ul className="admin-notifications__cluster-list">
-              {snapshot.failureClusters.map((cluster) => (
-                <li key={`${cluster.status}-${cluster.safeErrorCode}`}>
-                  <span>{cluster.safeErrorCode}</span>
-                  <strong>{cluster.count}</strong>
-                  <em>{cluster.status}</em>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="muted">집계된 실패 cluster가 없습니다.</p>
-          )}
-        </section>
-
-        <section className="admin-notifications__panel" aria-labelledby="admin-notifications-replay-title">
-          <div className="admin-notifications__panel-heading">
-            <h2 id="admin-notifications-replay-title" className="h3 editorial">Replay</h2>
-            {busy ? <span className="platform-admin-domain-status">처리 중</span> : null}
+        {snapshot ? (
+          <div className="admin-notifications__summary" aria-label="알림 운영 요약">
+            <Metric label="Outbox pending" value={snapshot.outboxSummary.pending} />
+            <Metric label="Outbox failed" value={snapshot.outboxSummary.failed + snapshot.outboxSummary.dead} />
+            <Metric label="Delivery pending" value={snapshot.deliverySummary.pending} />
+            <Metric label="Delivery failed" value={snapshot.deliverySummary.failed + snapshot.deliverySummary.dead} />
+            <Metric label="Relay stale" value={snapshot.relaySummary.stalePublishing + snapshot.relaySummary.staleSending} />
           </div>
-          {!canReplay ? <p className="muted">현재 역할은 재처리를 실행할 수 없습니다.</p> : null}
-          {replayPreview ? (
-            <div className="admin-notifications__preview">
-              <p>
-                대상 <strong>{replayPreview.matchedCount}</strong>건 · 제외 {replayPreview.excludedCount}건
-              </p>
-              <p className="small muted">만료 {formatTimestamp(replayPreview.expiresAt)}</p>
-              {Object.entries(replayPreview.estimatedByStatus).map(([status, count]) => (
-                <span key={status} className="platform-admin-domain-status">{status} {count}</span>
-              ))}
-              {replayPreview.warnings.map((warning) => (
-                <span key={warning} className="admin-notifications__safe-code">{warning}</span>
-              ))}
+        ) : null}
+
+        <div className="admin-notifications__grid">
+          <section className="admin-notifications__panel" aria-labelledby="admin-notifications-failures-title">
+            <h2 id="admin-notifications-failures-title" className="h3 editorial">Failure clusters</h2>
+            {snapshot?.failureClusters.length ? (
+              <ul className="admin-notifications__cluster-list">
+                {snapshot.failureClusters.map((cluster) => (
+                  <li key={`${cluster.status}-${cluster.safeErrorCode}`}>
+                    <span>{cluster.safeErrorCode}</span>
+                    <strong>{cluster.count}</strong>
+                    <em>{cluster.status}</em>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted">집계된 실패 cluster가 없습니다.</p>
+            )}
+          </section>
+
+          <section className="admin-notifications__panel" aria-labelledby="admin-notifications-replay-title">
+            <div className="admin-notifications__panel-heading">
+              <h2 id="admin-notifications-replay-title" className="h3 editorial">Replay</h2>
             </div>
-          ) : (
-            <p className="muted">실패/Dead delivery를 확인한 뒤 사유를 남기고 재처리합니다.</p>
-          )}
-          <label className="admin-notifications__reason">
-            <span>처리 사유</span>
-            <textarea
-              value={replayReason}
-              disabled={busy || reasonLocked}
-              onChange={(event) => onReplayReasonChange(event.currentTarget.value)}
-              rows={3}
-              placeholder="예: 공급자 복구 후 실패 delivery 재처리"
+            {replayPreview ? (
+              <div className="admin-notifications__preview">
+                <p>
+                  대상 <strong>{replayPreview.matchedCount}</strong>건 · 제외 {replayPreview.excludedCount}건
+                </p>
+                <p className="small muted">만료 {formatTimestamp(replayPreview.expiresAt)}</p>
+                {Object.entries(replayPreview.estimatedByStatus).map(([status, count]) => (
+                  <span key={status} className="platform-admin-domain-status">{status} {count}</span>
+                ))}
+                {replayPreview.warnings.map((warning) => (
+                  <span key={warning} className="admin-notifications__safe-code">{warning}</span>
+                ))}
+              </div>
+            ) : (
+              <p className="muted">실패/Dead delivery를 확인한 뒤 사유를 남기고 재처리합니다.</p>
+            )}
+            <label className="admin-notifications__reason">
+              <span>처리 사유</span>
+              <textarea
+                value={replayReason}
+                disabled={!canReplay || busy || reasonLocked}
+                onChange={(event) => onReplayReasonChange(event.currentTarget.value)}
+                rows={3}
+                placeholder="예: 공급자 복구 후 실패 delivery 재처리"
+              />
+            </label>
+            <AdminSafeActionDock
+              level="L2"
+              authority={canReplay ? "allowed" : "denied"}
+              state={dockState}
+              reason={!canReplay ? "현재 권한으로는 재처리를 실행할 수 없습니다." : undefined}
+              status={busy ? <span className="platform-admin-domain-status">처리 중</span> : undefined}
+              secondary={
+                <button
+                  type="button"
+                  className="btn btn-quiet btn-sm"
+                  disabled={!canReplay || busy || reasonLocked}
+                  onClick={() => void onPreviewReplay()}
+                >
+                  대상 확인
+                </button>
+              }
+              primary={
+                <button type="button" className="btn btn-primary btn-sm" disabled={confirmDisabled} onClick={() => void onConfirmReplay()}>
+                  {replayResult?.effectStatus === "PENDING" ? "효과 상태 새로고침" : "재처리 확정"}
+                </button>
+              }
             />
-          </label>
-          <div className="admin-notifications__actions">
-            <button
-              type="button"
-              className="btn btn-quiet btn-sm"
-              disabled={!canReplay || busy || reasonLocked}
-              onClick={() => void onPreviewReplay()}
-            >
-              대상 확인
-            </button>
-            <button type="button" className="btn btn-primary btn-sm" disabled={confirmDisabled} onClick={() => void onConfirmReplay()}>
-              {replayResult?.effectStatus === "PENDING" ? "효과 상태 새로고침" : "재처리 확정"}
-            </button>
-          </div>
-          {replayResult ? <ReplayReceipt result={replayResult} /> : null}
-        </section>
-      </div>
+            {replayResult ? <ReplayReceipt result={replayResult} /> : null}
+          </section>
+        </div>
 
-      <LedgerSection title="Outbox ledger" empty="표시할 outbox event가 없습니다.">
-        {events.map((event) => (
-          <article key={event.eventId} className="admin-notifications__row">
-            <div>
-              <p className="admin-notifications__row-title">{event.club.name} · {event.eventType}</p>
-              <p className="small muted">{event.source} · attempts {event.attemptCount} · {formatTimestamp(event.updatedAt)}</p>
+        <AdminEvidenceLedger
+          label="Outbox ledger"
+          count={events.length > 0 ? events.length : undefined}
+          state={events.length > 0 ? "ready" : "empty"}
+          title={events.length > 0 ? undefined : "표시할 outbox event가 없습니다."}
+          controls={
+            hasMoreEvents ? (
+              <button type="button" className="btn btn-quiet btn-sm" disabled={loadingMoreEvents} onClick={() => void onLoadMoreEvents?.()}>
+                {loadingMoreEvents ? "불러오는 중" : "Outbox 더 보기"}
+              </button>
+            ) : null
+          }
+        >
+          {events.length > 0 ? (
+            <div className="admin-notifications__rows">
+              {events.map((item) => (
+                <article key={item.eventId} className="admin-notifications__row">
+                  <div>
+                    <p className="admin-notifications__row-title">{item.club.name} · {item.eventType}</p>
+                    <p className="small muted">{item.source} · attempts {item.attemptCount} · {formatTimestamp(item.updatedAt)}</p>
+                  </div>
+                  <span className="platform-admin-domain-status">{item.status}</span>
+                  {item.safeErrorCode ? <span className="admin-notifications__safe-code">{item.safeErrorCode}</span> : null}
+                </article>
+              ))}
             </div>
-            <span className="platform-admin-domain-status">{event.status}</span>
-            {event.safeErrorCode ? <span className="admin-notifications__safe-code">{event.safeErrorCode}</span> : null}
-          </article>
-        ))}
-      </LedgerSection>
-      {hasMoreEvents ? (
-        <button type="button" className="btn btn-quiet btn-sm" disabled={loadingMoreEvents} onClick={() => void onLoadMoreEvents?.()}>
-          {loadingMoreEvents ? "불러오는 중" : "Outbox 더 보기"}
-        </button>
-      ) : null}
+          ) : null}
+        </AdminEvidenceLedger>
 
-      <LedgerSection title="Delivery ledger" empty="표시할 delivery가 없습니다.">
-        {deliveries.map((delivery) => (
-          <article key={delivery.deliveryId} className="admin-notifications__row">
-            <div>
-              <p className="admin-notifications__row-title">
-                {delivery.club.name} · {delivery.channel} · {delivery.maskedRecipient ?? "recipient masked"}
-              </p>
-              <p className="small muted">attempts {delivery.attemptCount} · {formatTimestamp(delivery.updatedAt)}</p>
+        <AdminEvidenceLedger
+          label="Delivery ledger"
+          count={deliveries.length > 0 ? deliveries.length : undefined}
+          state={deliveries.length > 0 ? "ready" : "empty"}
+          title={deliveries.length > 0 ? undefined : "표시할 delivery가 없습니다."}
+          controls={
+            hasMoreDeliveries ? (
+              <button type="button" className="btn btn-quiet btn-sm" disabled={loadingMoreDeliveries} onClick={() => void onLoadMoreDeliveries?.()}>
+                {loadingMoreDeliveries ? "불러오는 중" : "Delivery 더 보기"}
+              </button>
+            ) : null
+          }
+        >
+          {deliveries.length > 0 ? (
+            <div className="admin-notifications__rows">
+              {deliveries.map((item) => (
+                <article key={item.deliveryId} className="admin-notifications__row">
+                  <div>
+                    <p className="admin-notifications__row-title">
+                      {item.club.name} · {item.channel} · {item.maskedRecipient ?? "recipient masked"}
+                    </p>
+                    <p className="small muted">attempts {item.attemptCount} · {formatTimestamp(item.updatedAt)}</p>
+                  </div>
+                  <span className="platform-admin-domain-status">{item.status}</span>
+                  {item.safeErrorCode ? <span className="admin-notifications__safe-code">{item.safeErrorCode}</span> : null}
+                </article>
+              ))}
             </div>
-            <span className="platform-admin-domain-status">{delivery.status}</span>
-            {delivery.safeErrorCode ? <span className="admin-notifications__safe-code">{delivery.safeErrorCode}</span> : null}
-          </article>
-        ))}
-      </LedgerSection>
-      {hasMoreDeliveries ? (
-        <button type="button" className="btn btn-quiet btn-sm" disabled={loadingMoreDeliveries} onClick={() => void onLoadMoreDeliveries?.()}>
-          {loadingMoreDeliveries ? "불러오는 중" : "Delivery 더 보기"}
-        </button>
-      ) : null}
+          ) : null}
+        </AdminEvidenceLedger>
+      </AdminPageContext>
     </section>
   );
 }
 
 function ReplayReceipt({ result }: { result: AdminNotificationReplayConfirmResult }) {
   const availability = result.effectAvailability === "DISABLED" ? " · 현재 비활성" : "";
+  const skipped = Object.entries(result.skippedReasonCounts).map(([reason, count]) => (
+    <p key={reason} className="small muted">{reason} {count}</p>
+  ));
   return (
-    <div className="admin-notifications__preview" role="status">
-      <p>영수증 {result.receiptId}</p>
-      <p>재처리 {result.replayedCount}건 · 건너뜀 {result.skippedCount}건</p>
-      {Object.entries(result.skippedReasonCounts).map(([reason, count]) => (
-        <p key={reason} className="small muted">{reason} {count}</p>
-      ))}
-      <p>효과 {effectLabel(result.effectStatus)}{availability}</p>
-    </div>
+    <AdminReceiptTimeline
+      level="L2"
+      receiptId={`영수증 ${result.receiptId}`}
+      entries={[
+        {
+          key: "replay",
+          label: `재처리 ${result.replayedCount}건 · 건너뜀 ${result.skippedCount}건`,
+          state: "succeeded",
+          detail: skipped.length > 0 ? <>{skipped}</> : undefined,
+        },
+        {
+          key: "effect",
+          label: `효과 ${effectLabel(result.effectStatus)}${availability}`,
+          state:
+            result.effectStatus === "SUCCEEDED"
+              ? "succeeded"
+              : result.effectStatus === "FAILED"
+                ? "failed"
+                : "pending",
+        },
+      ]}
+    />
   );
+}
+
+function replayDockState({
+  canReplay,
+  busy,
+  replayResult,
+}: {
+  canReplay: boolean;
+  busy: boolean;
+  replayResult: AdminNotificationReplayConfirmResult | null;
+}): AdminSafeActionState {
+  if (!canReplay) return "forbidden";
+  if (busy) return "pending";
+  if (replayResult && replayResult.effectStatus !== "PENDING") return "complete";
+  return "ready";
 }
 
 function effectLabel(status: AdminNotificationReplayConfirmResult["effectStatus"]) {
@@ -229,15 +289,6 @@ function FocusBanner({ focus }: { focus: string }) {
         ? "Notification dispatch 상태에서 이동했습니다. 최근 성공과 실패 분포를 함께 확인하세요."
         : "Health drill-down에서 이동했습니다.";
   return <p className="admin-notifications__focus">{copy}</p>;
-}
-
-function LedgerSection({ title, empty, children }: { title: string; empty: string; children: ReactNode[] }) {
-  return (
-    <section className="admin-notifications__ledger" aria-labelledby={`${title.replace(/\s+/g, "-").toLowerCase()}-title`}>
-      <h2 id={`${title.replace(/\s+/g, "-").toLowerCase()}-title`} className="h3 editorial">{title}</h2>
-      {children.length > 0 ? <div className="admin-notifications__rows">{children}</div> : <p className="muted">{empty}</p>}
-    </section>
-  );
 }
 
 function formatTimestamp(value: string) {

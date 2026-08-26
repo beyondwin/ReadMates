@@ -423,3 +423,70 @@
     scroll-behavior: auto !important;
   }
 }
+
+.admin-notifications,
+.admin-notifications .admin-page-context,
+.admin-notifications .admin-evidence-ledger,
+.admin-notifications .admin-safe-action-dock,
+.admin-notifications .admin-receipt-timeline {
+  min-width: 0;
+}
+
+.admin-notifications {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.admin-notifications .admin-safe-action-dock .btn,
+.admin-notifications .admin-safe-action-dock button,
+.admin-notifications .admin-notifications__reason textarea,
+.admin-notifications .admin-evidence-ledger__controls .btn,
+.admin-notifications .admin-evidence-ledger__controls button {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.admin-notifications .admin-notifications__row-title,
+.admin-notifications .admin-notifications__focus,
+.admin-notifications .admin-notifications__error,
+.admin-notifications .admin-page-context__freshness,
+.admin-notifications .admin-page-context__authority,
+.admin-notifications .admin-safe-action-dock__reason {
+  overflow-wrap: anywhere;
+}
+
+.admin-notifications :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px var(--focus-ring-soft);
+}
+
+@media (max-width: 768px) {
+  .admin-notifications,
+  .admin-notifications .admin-notifications__grid,
+  .admin-notifications .admin-notifications__summary,
+  .admin-notifications .admin-notifications__actions,
+  .admin-notifications .admin-safe-action-dock {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-notifications .admin-safe-action-dock .btn,
+  .admin-notifications .admin-safe-action-dock button,
+  .admin-notifications .admin-evidence-ledger__controls .btn,
+  .admin-notifications .admin-evidence-ledger__controls button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-notifications,
+  .admin-notifications *,
+  .admin-notifications *::before,
+  .admin-notifications *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

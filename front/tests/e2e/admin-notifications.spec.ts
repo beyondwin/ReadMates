@@ -31,7 +31,11 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
   await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 }
 
-async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Promise<void> {
+async function routePlatformAdminShell(
+  page: Page,
+  role: PlatformAdminRole,
+  capabilities: string[] = ["VIEW_NOTIFICATION_OPERATIONS", "REPLAY_NOTIFICATIONS"],
+): Promise<void> {
   await routeEmptyAdminOperations(page);
   await page.route("**/api/bff/api/auth/me**", async (route) => {
     await json(route, 200, platformAdminAuth(role));
@@ -50,7 +54,7 @@ async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Pro
       schemaVersion: 1,
       role,
       status: "ACTIVE",
-      capabilities: ["VIEW_NOTIFICATION_OPERATIONS", "REPLAY_NOTIFICATIONS"],
+      capabilities,
       generatedAt: "2026-08-25T00:00:00Z",
     });
   });
@@ -59,7 +63,8 @@ async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Pro
   });
 }
 
-async function routeNotifications(page: Page): Promise<void> {
+async function routeNotifications(page: Page): Promise<{ previewCount: number }> {
+  const counts = { previewCount: 0 };
   await page.route("**/api/bff/api/admin/notifications/snapshot", async (route) => {
     await json(route, 200, {
       generatedAt: "2026-05-27T00:00:00Z",
@@ -111,6 +116,7 @@ async function routeNotifications(page: Page): Promise<void> {
     });
   });
   await page.route("**/api/bff/api/admin/notifications/replay-preview", async (route) => {
+    counts.previewCount += 1;
     await json(route, 200, {
       previewId: "preview-1",
       selectionHash: "a".repeat(64),
@@ -133,6 +139,7 @@ async function routeNotifications(page: Page): Promise<void> {
       convergenceId: "00000000-0000-4000-8000-000000005902",
     });
   });
+  return counts;
 }
 
 test("owner operates admin notification ledgers and replay", async ({ page }) => {
@@ -155,5 +162,30 @@ test("owner operates admin notification ledgers and replay", async ({ page }) =>
   await page.getByLabel("처리 사유").fill("provider recovered");
   await expect(page.getByRole("button", { name: "재처리 확정" })).toBeEnabled();
   await page.getByRole("button", { name: "재처리 확정" }).click();
+  await expect(page.getByRole("region", { name: "명령 기록" })).toBeVisible();
   await expect(page.getByText("재처리 2건 · 건너뜀 0건")).toBeVisible();
+});
+
+test("operator with REPLAY_NOTIFICATIONS can preview replay", async ({ page }) => {
+  await routePlatformAdminShell(page, "OPERATOR", [
+    "VIEW_NOTIFICATION_OPERATIONS",
+    "REPLAY_NOTIFICATIONS",
+  ]);
+  await routeNotifications(page);
+
+  await page.goto("/admin/notifications");
+  await page.getByRole("button", { name: "대상 확인" }).click();
+  await expect(page.getByText(/대상 2건/)).toBeVisible();
+});
+
+test("owner without REPLAY_NOTIFICATIONS cannot start replay", async ({ page }) => {
+  await routePlatformAdminShell(page, "OWNER", ["VIEW_NOTIFICATION_OPERATIONS"]);
+  const counts = await routeNotifications(page);
+
+  await page.goto("/admin/notifications");
+  await expect(page.getByText("현재 권한으로는 재처리를 실행할 수 없습니다.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "대상 확인" })).toBeDisabled();
+  await page.getByRole("button", { name: "대상 확인" }).click({ force: true });
+  await expect(page.getByText(/대상 2건/)).toHaveCount(0);
+  expect(counts.previewCount).toBe(0);
 });
