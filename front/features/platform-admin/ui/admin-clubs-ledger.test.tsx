@@ -76,6 +76,59 @@ describe("AdminClubsLedger", () => {
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });
 
+  it("passes the real page state and omits count while loading or unavailable", () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <AdminClubsLedger
+          clubs={[club]}
+          filters={{}}
+          searchDraft=""
+          pageState="loading"
+          canCreateClub={false}
+          onboardingHref="/admin/clubs"
+          focusId={null}
+          scrollTop={0}
+          hasNextPage={false}
+          loadingMore={false}
+          onSearchChange={vi.fn()}
+          onFilterChange={vi.fn()}
+          onRetry={vi.fn()}
+          onLoadMore={vi.fn()}
+          onScrollChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("클럽을 불러오는 중입니다.")).toBeInTheDocument();
+    expect(screen.queryByText("1건")).not.toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter>
+        <AdminClubsLedger
+          clubs={[club]}
+          filters={{}}
+          searchDraft=""
+          pageState="unavailable"
+          canCreateClub={false}
+          onboardingHref="/admin/clubs"
+          focusId={null}
+          scrollTop={0}
+          hasNextPage={false}
+          loadingMore={false}
+          onSearchChange={vi.fn()}
+          onFilterChange={vi.fn()}
+          onRetry={vi.fn()}
+          onLoadMore={vi.fn()}
+          onScrollChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    expect(
+      screen.getByText("클럽 목록을 불러오지 못했습니다."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("1건")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Alpha" })).not.toBeInTheDocument();
+  });
+
   it("restores row focus and bounded scroll after returning from detail", async () => {
     const { container } = renderLedger({ focusId: "c-1", scrollTop: 240 });
     const scroller = container.querySelector(
@@ -86,6 +139,75 @@ describe("AdminClubsLedger", () => {
       expect(screen.getByRole("link", { name: "Alpha" })).toHaveFocus(),
     );
     expect(scroller.scrollTop).toBe(240);
+  });
+
+  it("consumes restore once the target exists and does not re-yank on later updates", async () => {
+    const later: AdminClubsLedgerClub = {
+      ...club,
+      clubId: "c-2",
+      slug: "beta",
+      name: "Beta",
+      href: "/admin/clubs/c-2",
+    };
+    const { container, rerender } = render(
+      <MemoryRouter>
+        <AdminClubsLedger
+          clubs={[club]}
+          filters={{ search: "alpha" }}
+          searchDraft="alpha"
+          pageState="ready"
+          canCreateClub
+          onboardingHref="/admin/clubs?search=alpha&onboarding=1"
+          restoreKey="return-1"
+          focusId="c-1"
+          scrollTop={240}
+          hasNextPage={false}
+          loadingMore={false}
+          onSearchChange={vi.fn()}
+          onFilterChange={vi.fn()}
+          onRetry={vi.fn()}
+          onLoadMore={vi.fn()}
+          onScrollChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    const scroller = container.querySelector(
+      ".admin-clubs-ledger__scroller",
+    ) as HTMLElement;
+    await waitFor(() =>
+      expect(screen.getByRole("link", { name: "Alpha" })).toHaveFocus(),
+    );
+    expect(scroller.scrollTop).toBe(240);
+
+    screen.getByRole("searchbox", { name: "클럽 검색" }).focus();
+    scroller.scrollTop = 12;
+
+    rerender(
+      <MemoryRouter>
+        <AdminClubsLedger
+          clubs={[club, later]}
+          filters={{ search: "alpha" }}
+          searchDraft="alpha"
+          pageState="ready"
+          canCreateClub
+          onboardingHref="/admin/clubs?search=alpha&onboarding=1"
+          restoreKey="return-1"
+          focusId="c-1"
+          scrollTop={240}
+          hasNextPage
+          loadingMore={false}
+          onSearchChange={vi.fn()}
+          onFilterChange={vi.fn()}
+          onRetry={vi.fn()}
+          onLoadMore={vi.fn()}
+          onScrollChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("searchbox", { name: "클럽 검색" })).toHaveFocus();
+    expect(scroller.scrollTop).toBe(12);
+    expect(screen.getByRole("link", { name: "Alpha" })).not.toHaveFocus();
   });
 
   it("rejects unsafe focus ids and unbounded scroll offsets", async () => {

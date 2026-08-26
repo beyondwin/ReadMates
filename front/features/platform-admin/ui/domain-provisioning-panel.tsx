@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   adminCommandRecovery,
   type AdminCommandRecovery,
@@ -55,18 +55,7 @@ type DomainRecheckRequest = {
   expectedStatus: DomainStatus;
 };
 
-export function AdminClubDomainCommandPanel({
-  revision,
-  domains,
-  canManageDomains,
-  previewPending,
-  confirmPending,
-  recheckPending,
-  onRefresh,
-  onPreview,
-  onConfirm,
-  onRecheck,
-}: {
+type AdminClubDomainCommandPanelProps = {
   revision: number;
   domains: DomainProvisioningItem[];
   canManageDomains: boolean;
@@ -84,7 +73,31 @@ export function AdminClubDomainCommandPanel({
     domainId: string,
     request: DomainRecheckRequest,
   ) => Promise<DomainProvisioningReceipt>;
-}) {
+};
+
+export function AdminClubDomainCommandPanel(
+  props: AdminClubDomainCommandPanelProps,
+) {
+  return (
+    <AdminClubDomainCommandPanelInner
+      key={props.canManageDomains ? "manage" : "view"}
+      {...props}
+    />
+  );
+}
+
+function AdminClubDomainCommandPanelInner({
+  revision,
+  domains,
+  canManageDomains,
+  previewPending,
+  confirmPending,
+  recheckPending,
+  onRefresh,
+  onPreview,
+  onConfirm,
+  onRecheck,
+}: AdminClubDomainCommandPanelProps) {
   const [draft, setDraft] = useState<{
     hostname: string;
     kind: DomainKind;
@@ -100,14 +113,13 @@ export function AdminClubDomainCommandPanel({
   );
   const [recovery, setRecovery] = useState<AdminCommandRecovery | null>(null);
   const [confirmInFlight, setConfirmInFlight] = useState(false);
-  const recheckIntentKeys = useRef(new Map<string, string>());
   const draftEpoch = useRef(0);
+  const recheckIntentKeys = useRef(new Map<string, string>());
   const draftLocked = confirmPending || confirmInFlight;
-
-  const [manageArmed, setManageArmed] = useState(canManageDomains);
 
   function purgeCommandState() {
     draftEpoch.current += 1;
+    recheckIntentKeys.current.clear();
     setDraft({ hostname: "", kind: "CUSTOM_DOMAIN", isPrimary: false });
     setPreview(null);
     setConfirmed(false);
@@ -115,27 +127,7 @@ export function AdminClubDomainCommandPanel({
     setReceipt(null);
     setRecovery(null);
     setConfirmInFlight(false);
-    recheckIntentKeys.current.clear();
   }
-
-  if (!canManageDomains && manageArmed) {
-    setManageArmed(false);
-    setDraft({ hostname: "", kind: "CUSTOM_DOMAIN", isPrimary: false });
-    setPreview(null);
-    setConfirmed(false);
-    setIntentKey(null);
-    setReceipt(null);
-    setRecovery(null);
-    setConfirmInFlight(false);
-  } else if (canManageDomains && !manageArmed) {
-    setManageArmed(true);
-  }
-
-  useEffect(() => {
-    if (canManageDomains) return;
-    draftEpoch.current += 1;
-    recheckIntentKeys.current.clear();
-  }, [canManageDomains]);
 
   function updateDraft(next: typeof draft) {
     draftEpoch.current += 1;
@@ -171,6 +163,7 @@ export function AdminClubDomainCommandPanel({
   }
   async function confirmIntent() {
     if (!preview || !intentKey) return;
+    const epoch = draftEpoch.current;
     const command = {
       previewId: preview.previewId,
       idempotencyKey: intentKey,
@@ -181,9 +174,11 @@ export function AdminClubDomainCommandPanel({
     setConfirmInFlight(true);
     try {
       const next = await onConfirm(command);
+      if (draftEpoch.current !== epoch) return;
       setReceipt(next);
       setRecovery(null);
     } catch (error) {
+      if (draftEpoch.current !== epoch) return;
       if (isAuthorityLossError(error)) {
         purgeCommandState();
         return;

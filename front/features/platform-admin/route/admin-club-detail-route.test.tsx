@@ -448,6 +448,96 @@ describe("AdminClubDetailRoute", () => {
     expect(screen.queryByText("PUBLIC_DISCOVERY_ENABLED")).not.toBeInTheDocument();
   });
 
+  it("does not resurrect metadata recovery when MANAGE_CLUBS is restored", async () => {
+    vi.mocked(updatePlatformAdminClubMetadata).mockRejectedValue({
+      code: "REVISION_CONFLICT",
+    });
+    const { queryClient } = renderRoute();
+    fireEvent.click(screen.getByRole("button", { name: "공개 정보 저장" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("최신 상태");
+
+    queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, {
+      schemaVersion: 1,
+      role: "OWNER",
+      status: "ACTIVE",
+      capabilities: ["VIEW_CLUBS"],
+      generatedAt: "2026-08-24T00:00:00Z",
+    });
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "공개 정보 저장" }),
+      ).not.toBeInTheDocument(),
+    );
+
+    queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, {
+      schemaVersion: 1,
+      role: "OWNER",
+      status: "ACTIVE",
+      capabilities: ["VIEW_CLUBS", "MANAGE_CLUBS", "MANAGE_CLUB_DOMAINS"],
+      generatedAt: "2026-08-24T00:00:00Z",
+    });
+    expect(
+      await screen.findByRole("button", { name: "공개 정보 저장" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("ignores a visibility preview that arrives after MANAGE_CLUBS is restored", async () => {
+    let resolvePreview:
+      | ((
+          value: Awaited<ReturnType<typeof previewPlatformAdminClubVisibility>>,
+        ) => void)
+      | undefined;
+    vi.mocked(previewPlatformAdminClubVisibility).mockReturnValue(
+      new Promise((resolve) => {
+        resolvePreview = resolve;
+      }),
+    );
+    const { queryClient } = renderRoute();
+    fireEvent.click(screen.getByRole("button", { name: "공개 전환 미리보기" }));
+
+    queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, {
+      schemaVersion: 1,
+      role: "OWNER",
+      status: "ACTIVE",
+      capabilities: ["VIEW_CLUBS"],
+      generatedAt: "2026-08-24T00:00:00Z",
+    });
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "공개 전환 미리보기" }),
+      ).not.toBeInTheDocument(),
+    );
+
+    queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, {
+      schemaVersion: 1,
+      role: "OWNER",
+      status: "ACTIVE",
+      capabilities: ["VIEW_CLUBS", "MANAGE_CLUBS", "MANAGE_CLUB_DOMAINS"],
+      generatedAt: "2026-08-24T00:00:00Z",
+    });
+    expect(
+      await screen.findByRole("button", { name: "공개 전환 미리보기" }),
+    ).toBeInTheDocument();
+
+    resolvePreview?.({
+      previewId: "preview-late",
+      expiresAt: "2026-08-24T01:00:00Z",
+      currentVisibility: "PRIVATE",
+      targetVisibility: "PUBLIC",
+      impactCodes: ["PUBLIC_DISCOVERY_ENABLED"],
+      requestFingerprintPrefix: "abcd1234",
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "공개 전환 미리보기" }),
+      ).toBeEnabled(),
+    );
+    expect(
+      screen.queryByText("PUBLIC_DISCOVERY_ENABLED"),
+    ).not.toBeInTheDocument();
+  });
+
   it("purges visibility command state on 403 without retrying", async () => {
     vi.mocked(previewPlatformAdminClubVisibility).mockResolvedValue({
       previewId: "preview-1",

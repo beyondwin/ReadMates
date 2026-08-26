@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
   AdminClubDomainCommandPanel,
@@ -152,6 +152,60 @@ describe("AdminClubDomainCommandPanel request binding", () => {
     expect(
       screen.queryByRole("button", { name: "도메인 추가 확정" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("ignores a domain preview that arrives after MANAGE_CLUB_DOMAINS is restored", async () => {
+    let resolvePreview:
+      | ((value: DomainProvisioningPreview) => void)
+      | undefined;
+    const { rerender } = renderPanel(
+      () =>
+        new Promise((resolve) => {
+          resolvePreview = resolve;
+        }),
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "Hostname" }), {
+      target: { value: "late.example.test" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "도메인 추가 미리보기" }),
+    );
+
+    rerender(
+      <AdminClubDomainCommandPanel
+        revision={7}
+        domains={[]}
+        canManageDomains={false}
+        previewPending={false}
+        confirmPending={false}
+        recheckPending={false}
+        onRefresh={vi.fn()}
+        onPreview={vi.fn()}
+        onConfirm={vi.fn()}
+        onRecheck={vi.fn()}
+      />,
+    );
+    rerender(
+      <AdminClubDomainCommandPanel
+        revision={7}
+        domains={[]}
+        canManageDomains
+        previewPending={false}
+        confirmPending={false}
+        recheckPending={false}
+        onRefresh={vi.fn()}
+        onPreview={vi.fn()}
+        onConfirm={vi.fn()}
+        onRecheck={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("textbox", { name: "Hostname" })).toHaveValue("");
+    await act(async () => {
+      resolvePreview?.(preview);
+      await Promise.resolve();
+    });
+    expect(screen.queryByText("DOMAIN_CREATED")).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Hostname" })).toHaveValue("");
   });
 
   it("purges domain draft, preview, confirmation, idempotency, and receipt when MANAGE_CLUB_DOMAINS is lost", async () => {

@@ -290,6 +290,38 @@ describe("AdminClubsRoute", () => {
     ).toBe(240);
   });
 
+  it("does not re-apply return restore after the user moves focus, scroll, or loads more", async () => {
+    vi.mocked(fetchPlatformAdminClubs).mockResolvedValue({
+      items: [{ ...club, clubId: "c-2", name: "Beta" }],
+      nextCursor: null,
+    });
+    const { container } = renderRoute(
+      [club],
+      "/admin/clubs",
+      ["VIEW_CLUBS", "CREATE_CLUB"],
+      null,
+      { focusId: "c-1", scrollTop: 240 },
+    );
+    const scroller = container.querySelector(
+      ".admin-clubs-ledger__scroller",
+    ) as HTMLElement;
+    await waitFor(() =>
+      expect(screen.getByRole("link", { name: "Alpha" })).toHaveFocus(),
+    );
+    expect(scroller.scrollTop).toBe(240);
+
+    const search = screen.getByRole("searchbox", { name: "클럽 검색" });
+    search.focus();
+    scroller.scrollTop = 12;
+    fireEvent.scroll(scroller);
+
+    fireEvent.click(screen.getByRole("button", { name: "더 보기" }));
+    expect(await screen.findByRole("link", { name: "Beta" })).toBeInTheDocument();
+    expect(search).toHaveFocus();
+    expect(scroller.scrollTop).toBe(12);
+    expect(screen.getByRole("link", { name: "Alpha" })).not.toHaveFocus();
+  });
+
   it("ignores unsafe restored focus and unbounded scroll", async () => {
     const { container } = renderRoute(
       [club],

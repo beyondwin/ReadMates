@@ -47,6 +47,8 @@ type Props = {
   onboardingHref: string;
   focusId: string | null;
   scrollTop: number;
+  restoreKey?: string;
+  onRestoreConsumed?: () => void;
   hasNextPage: boolean;
   loadingMore: boolean;
   loadMoreError?: boolean;
@@ -66,6 +68,8 @@ export function AdminClubsLedger({
   onboardingHref,
   focusId,
   scrollTop,
+  restoreKey,
+  onRestoreConsumed,
   hasNextPage,
   loadingMore,
   loadMoreError = false,
@@ -76,6 +80,7 @@ export function AdminClubsLedger({
   onScrollChange,
 }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const appliedRestoreKeyRef = useRef<string | null>(null);
   const safeFocusId =
     focusId && FOCUS_ID_PATTERN.test(focusId) ? focusId : null;
   const safeScrollTop =
@@ -84,16 +89,44 @@ export function AdminClubsLedger({
     scrollTop <= MAX_SCROLL_TOP
       ? scrollTop
       : 0;
+  const effectiveRestoreKey =
+    restoreKey ?? `${safeFocusId ?? ""}:${safeScrollTop}`;
 
   useEffect(() => {
+    if (appliedRestoreKeyRef.current === effectiveRestoreKey) return;
+    const target = safeFocusId
+      ? document.getElementById(`admin-club-row-${safeFocusId}`)
+      : null;
+    if (safeFocusId && !target) {
+      if (
+        pageState === "ready" ||
+        pageState === "empty" ||
+        pageState === "unavailable"
+      ) {
+        appliedRestoreKeyRef.current = effectiveRestoreKey;
+        onRestoreConsumed?.();
+      }
+      return;
+    }
+    if (!safeFocusId && safeScrollTop <= 0) {
+      appliedRestoreKeyRef.current = effectiveRestoreKey;
+      return;
+    }
     const scroller = scrollerRef.current;
     if (scroller && safeScrollTop > 0) {
       scroller.scrollTop = safeScrollTop;
     }
-    if (!safeFocusId) return;
-    const target = document.getElementById(`admin-club-row-${safeFocusId}`);
     target?.focus();
-  }, [safeFocusId, safeScrollTop, clubs]);
+    appliedRestoreKeyRef.current = effectiveRestoreKey;
+    onRestoreConsumed?.();
+  }, [
+    clubs,
+    effectiveRestoreKey,
+    onRestoreConsumed,
+    pageState,
+    safeFocusId,
+    safeScrollTop,
+  ]);
 
   return (
     <div className="admin-clubs admin-clubs-ledger">
@@ -165,12 +198,30 @@ export function AdminClubsLedger({
 
         <AdminEvidenceLedger
           label="클럽 레지스트리"
-          count={clubs.length}
-          state="ready"
-        >
-          {pageState === "unavailable" ? (
-            <div className="surface admin-clubs__state" role="alert">
-              <p>클럽 목록을 불러오지 못했습니다.</p>
+          count={
+            pageState === "loading" || pageState === "unavailable"
+              ? undefined
+              : clubs.length
+          }
+          state={pageState}
+          title={
+            pageState === "empty"
+              ? "조건에 맞는 클럽이 없습니다."
+              : pageState === "unavailable"
+                ? "클럽 목록을 불러오지 못했습니다."
+                : pageState === "loading"
+                  ? "클럽을 불러오는 중입니다."
+                  : undefined
+          }
+          description={
+            pageState === "empty" ||
+            pageState === "loading" ||
+            pageState === "unavailable"
+              ? ""
+              : undefined
+          }
+          action={
+            pageState === "unavailable" ? (
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
@@ -178,12 +229,10 @@ export function AdminClubsLedger({
               >
                 다시 시도
               </button>
-            </div>
-          ) : pageState === "loading" ? (
-            <p className="muted admin-clubs__state">클럽을 불러오는 중입니다.</p>
-          ) : pageState === "empty" ? (
-            <p className="muted admin-clubs__state">조건에 맞는 클럽이 없습니다.</p>
-          ) : (
+            ) : undefined
+          }
+        >
+          {pageState === "ready" ? (
             <div
               ref={scrollerRef}
               className="admin-clubs__table-wrap admin-clubs-ledger__scroller"
@@ -256,7 +305,7 @@ export function AdminClubsLedger({
                 </tbody>
               </table>
             </div>
-          )}
+          ) : null}
         </AdminEvidenceLedger>
 
         {hasNextPage ? (

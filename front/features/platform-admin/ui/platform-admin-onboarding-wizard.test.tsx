@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
   PlatformAdminOnboardingWizard,
@@ -374,6 +374,46 @@ describe("PlatformAdminOnboardingWizard", () => {
     expect(onCommit.mock.calls[0][0].idempotencyKey).toBe(
       onCommit.mock.calls[1][0].idempotencyKey,
     );
+  });
+
+  it("ignores an onboarding preview that arrives after authority is restored", async () => {
+    let resolvePreview:
+      | ((value: PlatformAdminOnboardingPreviewView) => void)
+      | undefined;
+    const { rerender } = render(
+      <PlatformAdminOnboardingWizard
+        enabled
+        onPreview={() =>
+          new Promise((resolve) => {
+            resolvePreview = resolve;
+          })
+        }
+        onCommit={vi.fn()}
+      />,
+    );
+    fillDraft();
+    fireEvent.click(screen.getByRole("button", { name: "미리 확인" }));
+    rerender(
+      <PlatformAdminOnboardingWizard
+        enabled={false}
+        onPreview={vi.fn()}
+        onCommit={vi.fn()}
+      />,
+    );
+    rerender(
+      <PlatformAdminOnboardingWizard
+        enabled
+        onPreview={vi.fn()}
+        onCommit={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("textbox", { name: "클럽 이름" })).toHaveValue("");
+    await act(async () => {
+      resolvePreview?.(preview);
+      await Promise.resolve();
+    });
+    expect(screen.queryByText("CLUB_CREATED")).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "클럽 이름" })).toHaveValue("");
   });
 
   it("purges onboarding draft, preview, confirmation, idempotency, and receipt on authority loss", async () => {

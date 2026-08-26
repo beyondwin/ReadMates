@@ -59,7 +59,16 @@ const BLOCKING_PREREQUISITES = new Set([
   "CLUB_DOMAIN_CONFLICT",
 ]);
 
-export function PlatformAdminOnboardingWizard({
+export function PlatformAdminOnboardingWizard(props: Props) {
+  return (
+    <PlatformAdminOnboardingWizardInner
+      key={props.enabled === false ? "off" : "on"}
+      {...props}
+    />
+  );
+}
+
+function PlatformAdminOnboardingWizardInner({
   enabled = true,
   onPreview,
   onCommit,
@@ -88,13 +97,11 @@ export function PlatformAdminOnboardingWizard({
   const confirmationPhraseMatches =
     preview?.requiredConfirmation == null ||
     confirmationPhrase.trim() === preview.requiredConfirmation;
-  const busy = previewPending || effectPending;
+  const busy = !enabled || previewPending || effectPending;
   useEffect(
     () => onDirtyChange?.(isDirty && result === null),
     [isDirty, onDirtyChange, result],
   );
-  const [authorityArmed, setAuthorityArmed] = useState(enabled);
-
   function purgeOnboardingState() {
     requestEpoch.current += 1;
     setRequest(EMPTY_REQUEST);
@@ -107,26 +114,6 @@ export function PlatformAdminOnboardingWizard({
     setPreviewPending(false);
     setEffectPending(false);
   }
-
-  if (!enabled && authorityArmed) {
-    setAuthorityArmed(false);
-    setRequest(EMPTY_REQUEST);
-    setPreview(null);
-    setConfirmed(false);
-    setConfirmationPhrase("");
-    setIntentKey(null);
-    setResult(null);
-    setRecovery(null);
-    setPreviewPending(false);
-    setEffectPending(false);
-  } else if (enabled && !authorityArmed) {
-    setAuthorityArmed(true);
-  }
-
-  useEffect(() => {
-    if (enabled) return;
-    requestEpoch.current += 1;
-  }, [enabled]);
 
   function update(next: PlatformAdminOnboardingDraft) {
     requestEpoch.current += 1;

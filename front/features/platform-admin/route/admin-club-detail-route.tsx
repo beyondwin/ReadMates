@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router";
 import { parseAdminRouteReturnState } from "@/features/platform-admin/model/admin-route-state";
@@ -108,13 +108,13 @@ export function AdminClubDetailRoute() {
         action={<ClubsReturnLink returnState={returnState} />}
       />
       <ClubMetadataPanel
-        key={club.adminRevision}
+        key={`${club.adminRevision}-${canManageClub ? "manage" : "view"}`}
         club={club}
         canManage={canManageClub}
         onRefresh={() => void detailQuery.refetch()}
       />
       <VisibilityPanel
-        key={`visibility-${club.adminRevision}-${club.publicVisibility}`}
+        key={`visibility-${club.adminRevision}-${club.publicVisibility}-${canManageClub ? "manage" : "view"}`}
         clubId={clubId}
         revision={club.adminRevision}
         current={club.publicVisibility}
@@ -122,7 +122,7 @@ export function AdminClubDetailRoute() {
         onRefresh={() => void detailQuery.refetch()}
       />
       <ClubDomainPanel
-        key={`domains-${club.adminRevision}-${club.domains.map((domain) => `${domain.id}:${domain.status}`).join("|")}`}
+        key={`domains-${club.adminRevision}-${canManageDomains ? "manage" : "view"}-${club.domains.map((domain) => `${domain.id}:${domain.status}`).join("|")}`}
         clubId={clubId}
         revision={club.adminRevision}
         domains={club.domains}
@@ -197,6 +197,12 @@ function ClubDomainPanel({
   const confirmMutation = useConfirmPlatformAdminDomainMutation(clubId);
   const recheckMutation =
     useCheckPlatformAdminDomainProvisioningMutation(clubId);
+  useEffect(() => {
+    if (canManageDomains) return;
+    previewMutation.reset();
+    confirmMutation.reset();
+    recheckMutation.reset();
+  }, [canManageDomains, confirmMutation, previewMutation, recheckMutation]);
 
   return (
     <AdminClubDomainCommandPanel
@@ -234,17 +240,10 @@ function ClubMetadataPanel({
   const recovery = mutation.isError
     ? adminCommandRecovery(mutation.error)
     : null;
-  const [manageArmed, setManageArmed] = useState(canManage);
-  if (!canManage && manageArmed) {
-    setManageArmed(false);
-    setDraft({
-      name: club.name,
-      tagline: club.tagline,
-      about: club.about,
-    });
-  } else if (canManage && !manageArmed) {
-    setManageArmed(true);
-  }
+  useEffect(() => {
+    if (canManage) return;
+    mutation.reset();
+  }, [canManage, mutation]);
   return (
     <section
       className="surface admin-club-detail__panel"
@@ -364,35 +363,42 @@ function VisibilityPanel({
   const [receipt, setReceipt] =
     useState<PlatformAdminClubCommandReceipt | null>(null);
   const [recovery, setRecovery] = useState<AdminCommandRecovery | null>(null);
-  const [manageArmed, setManageArmed] = useState(canManage);
-  if (!canManage && manageArmed) {
-    setManageArmed(false);
+  const commandEpochRef = useRef(0);
+
+  function purgeVisibilityState() {
+    commandEpochRef.current += 1;
+    previewMutation.reset();
+    confirmMutation.reset();
     setPreview(null);
     setConfirmed(false);
     setIntentKey(null);
     setReceipt(null);
     setRecovery(null);
-  } else if (canManage && !manageArmed) {
-    setManageArmed(true);
   }
+
+  useEffect(() => {
+    if (canManage) return;
+    previewMutation.reset();
+    confirmMutation.reset();
+  }, [canManage, confirmMutation, previewMutation]);
+
   async function previewIntent() {
+    const epoch = commandEpochRef.current;
     setRecovery(null);
     try {
       const result = await previewMutation.mutateAsync({
         expectedAdminRevision: revision,
         targetVisibility: target,
       });
+      if (commandEpochRef.current !== epoch) return;
       setPreview(result);
       setConfirmed(false);
       setReceipt(null);
       setIntentKey(crypto.randomUUID());
     } catch (error) {
+      if (commandEpochRef.current !== epoch) return;
       if (isPlatformAdminAuthorityLossError(error)) {
-        setPreview(null);
-        setConfirmed(false);
-        setIntentKey(null);
-        setReceipt(null);
-        setRecovery(null);
+        purgeVisibilityState();
         return;
       }
       setRecovery(adminCommandRecovery(error));
@@ -400,6 +406,7 @@ function VisibilityPanel({
   }
   async function confirmIntent() {
     if (!preview || !intentKey) return;
+    const epoch = commandEpochRef.current;
     try {
       const result = await confirmMutation.mutateAsync({
         previewId: preview.previewId,
@@ -408,15 +415,13 @@ function VisibilityPanel({
         targetVisibility: target,
         confirmed: true,
       });
+      if (commandEpochRef.current !== epoch) return;
       setReceipt(result);
       setRecovery(null);
     } catch (error) {
+      if (commandEpochRef.current !== epoch) return;
       if (isPlatformAdminAuthorityLossError(error)) {
-        setPreview(null);
-        setConfirmed(false);
-        setIntentKey(null);
-        setReceipt(null);
-        setRecovery(null);
+        purgeVisibilityState();
         return;
       }
       const nextRecovery = adminCommandRecovery(error);

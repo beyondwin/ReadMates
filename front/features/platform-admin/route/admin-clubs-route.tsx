@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { useLocation, useSearchParams } from "react-router";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 import {
   clubTriageReasons,
   clubTriageSeverity,
@@ -32,8 +32,12 @@ const CLUBS_ALLOWED = { fallback: "/admin/clubs", allowedPath: "/admin/clubs" };
 
 export function AdminClubsRoute() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [scrollTop, setScrollTop] = useState(0);
+  const [consumedRestoreKey, setConsumedRestoreKey] = useState<string | null>(
+    null,
+  );
   const filters = platformAdminClubListFiltersFromSearch(searchParams);
   const capabilities = useQuery(platformAdminCapabilitiesQuery()).data ?? null;
   const canCreateClub =
@@ -44,10 +48,46 @@ export function AdminClubsRoute() {
     return `?${next.toString()}`;
   }, [searchParams]);
   const returnTo = platformAdminClubListHref(searchParams);
-  const restore = parseAdminRouteReturnState(
+  const parsedRestore = parseAdminRouteReturnState(
     restoreParams(searchParams, location.state, returnTo),
     CLUBS_ALLOWED,
   );
+  const restorePending = consumedRestoreKey !== location.key;
+  const restore = restorePending
+    ? parsedRestore
+    : { ...parsedRestore, focusId: null, scrollTop: 0 };
+  const consumeRestore = useCallback(() => {
+    if (consumedRestoreKey === location.key) return;
+    setConsumedRestoreKey(location.key);
+    const next = new URLSearchParams(searchParams);
+    const hadRestoreParams = next.has("focusId") || next.has("scrollTop");
+    next.delete("focusId");
+    next.delete("scrollTop");
+    const state = location.state;
+    const hasRestoreState = Boolean(
+      state &&
+        typeof state === "object" &&
+        ((state as { focusId?: unknown }).focusId != null ||
+          (state as { scrollTop?: unknown }).scrollTop != null),
+    );
+    if (!hadRestoreParams && !hasRestoreState) return;
+    navigate(
+      {
+        pathname: location.pathname,
+        search: next.toString() ? `?${next.toString()}` : "",
+        hash: location.hash,
+      },
+      { replace: true, state: {} },
+    );
+  }, [
+    consumedRestoreKey,
+    location.hash,
+    location.key,
+    location.pathname,
+    location.state,
+    navigate,
+    searchParams,
+  ]);
   const clubsQuery = useInfiniteQuery(platformAdminClubsInfiniteQuery(filters));
   const clubs = useMemo(() => {
     const seen = new Set<string>();
@@ -112,6 +152,8 @@ export function AdminClubsRoute() {
       onboardingHref={onboardingHref}
       focusId={restore.focusId}
       scrollTop={restore.scrollTop}
+      restoreKey={location.key}
+      onRestoreConsumed={consumeRestore}
       hasNextPage={Boolean(clubsQuery.hasNextPage)}
       loadingMore={clubsQuery.isFetchingNextPage}
       loadMoreError={clubsQuery.isFetchNextPageError}

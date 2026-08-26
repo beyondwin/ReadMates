@@ -9,6 +9,8 @@ export type AdminEvidenceLedgerProps = {
   label: string;
   count?: number;
   state: AdminPageState;
+  title?: ReactNode;
+  description?: ReactNode;
   sources?: readonly AdminStateSource[];
   controls?: ReactNode;
   action?: ReactNode;
@@ -19,6 +21,8 @@ export function AdminEvidenceLedger({
   label,
   count,
   state,
+  title,
+  description,
   sources,
   controls,
   action,
@@ -31,7 +35,13 @@ export function AdminEvidenceLedger({
         {count != null ? <p className="admin-evidence-ledger__count">{count}건</p> : null}
         {controls ? <div className="admin-evidence-ledger__controls">{controls}</div> : null}
       </header>
-      <AdminStatePanel state={state} sources={sources} action={action}>
+      <AdminStatePanel
+        state={state}
+        title={title}
+        description={description}
+        sources={sources}
+        action={action}
+      >
         {children}
       </AdminStatePanel>
     </section>
