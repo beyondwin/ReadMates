@@ -174,27 +174,47 @@ describe("MeetingNotificationRail", () => {
 
     expect(screen.getByText("미응답 2명")).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /미응답 2명/ })).toBeChecked();
+    expect(screen.getByRole("button", { name: /미응답 2명에게 미리보기/ })).toBeInTheDocument();
   });
 
-  it("shows a 140-character counter and workbench link for long-form copy", async () => {
-    const user = userEvent.setup();
+  it("does not offer an unbound short-notice textarea and points long-form to the workbench", () => {
     renderRail();
 
-    expect(screen.getByText(/0\s*\/\s*140/)).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "짧은 공지" })).not.toBeInTheDocument();
+    expect(screen.getByText(/발송 본문은 템플릿입니다/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /알림 작업대/ })).toHaveAttribute(
       "href",
       defaultProps.workbenchHref,
     );
-
-    await user.type(screen.getByRole("textbox", { name: "짧은 공지" }), "짧은 리마인드");
-    expect(screen.getByText(/7\s*\/\s*140/)).toBeInTheDocument();
   });
 
-  it("shows the confirmed-attendee nudge prohibition reason in reminder context", () => {
+  it("shows confirmed attendees as a disabled remind choice with the nudge prohibition", () => {
     renderRail();
 
-    expect(
-      screen.getByText(/참석 확정 멤버에게는 재촉 알림을 보내지 않습니다/),
-    ).toBeInTheDocument();
+    const confirmed = screen.getByRole("radio", {
+      name: /참석 확정.*재촉 알림을 보내지 않습니다/,
+    });
+    expect(confirmed).toBeDisabled();
+    expect(confirmed).not.toBeChecked();
+  });
+
+  it("locks SELECTED_MEMBERS to non-responders without a recipient picker", async () => {
+    const user = userEvent.setup();
+    const onPreview = vi.fn().mockResolvedValue(undefined);
+    renderRail({ onPreview });
+
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/멤버 검색|직접 선택/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: "전원" }));
+    expect(screen.getByRole("button", { name: /전원에게 미리보기/ })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: /미응답 2명/ }));
+    await user.click(screen.getByRole("button", { name: /미응답 2명에게 미리보기/ }));
+
+    expect(onPreview).toHaveBeenCalled();
+    const draft = onPreview.mock.calls.at(-1)?.[0];
+    expect(draft.recipientMode).toBe("SELECTED_MEMBERS");
+    expect(draft.selectedMembershipIds).toEqual(["m-silent-1", "m-silent-2"]);
   });
 });

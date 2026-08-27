@@ -40,6 +40,8 @@ export type HostNotificationComposerProps = {
   recommendedRecipientLabel?: string;
   recipientModes?: readonly HostNotificationRecipientMode[];
   recipientModeLabels?: Partial<Record<HostNotificationRecipientMode, string>>;
+  disabledRecipientModes?: Partial<Record<HostNotificationRecipientMode, string>>;
+  hideRecipientPicker?: boolean;
 };
 
 const channelOptions: Array<[ManualNotificationRequestedChannels, string]> = [
@@ -79,6 +81,8 @@ export function HostNotificationComposer({
   recommendedRecipientLabel = recommendedLabel(eventType),
   recipientModes = publicationRecipientModes,
   recipientModeLabels,
+  disabledRecipientModes,
+  hideRecipientPicker = false,
 }: HostNotificationComposerProps) {
   const isWorkbench = presentation === "workbench";
   const template = options.templates.find((item) => item.eventType === eventType);
@@ -161,23 +165,28 @@ export function HostNotificationComposer({
             {visibleRecipientModes.map((mode) => {
               const recommended = mode !== "RECOMMENDED"
                 && mode === template?.defaultAudience;
+              const disabledReason = disabledRecipientModes?.[mode];
               return (
                 <label
                   key={mode}
                   className="rm-notification-choice-card"
                   data-selected={draft.recipientMode === mode ? "true" : "false"}
+                  data-disabled={disabledReason ? "true" : "false"}
                 >
                   <input
                     type="radio"
                     name="notification-recipient-mode"
-                    aria-label={recipientLabel(mode)}
+                    aria-label={disabledReason
+                      ? `${recipientLabel(mode)}: ${disabledReason}`
+                      : recipientLabel(mode)}
                     checked={draft.recipientMode === mode}
+                    disabled={Boolean(disabledReason)}
                     onChange={() => updateDraft({ recipientMode: mode })}
                   />
                   <span className="rm-notification-choice-card__mark" aria-hidden="true">✓</span>
-                  {recommended ? <span className="badge">추천</span> : null}
+                  {recommended && !disabledReason ? <span className="badge">추천</span> : null}
                   <strong>{recipientLabel(mode)}</strong>
-                  <span>{recipientDescription(mode)}</span>
+                  <span>{disabledReason ?? recipientDescription(mode)}</span>
                 </label>
               );
             })}
@@ -191,9 +200,12 @@ export function HostNotificationComposer({
               const label = mode === "RECOMMENDED"
                 ? "추천 대상"
                 : recipientLabel(mode);
+              const disabledReason = disabledRecipientModes?.[mode];
               const ariaLabel = mode === "RECOMMENDED"
                 ? `${label} · ${recommendedRecipientLabel}`
-                : label;
+                : disabledReason
+                  ? `${label}: ${disabledReason}`
+                  : label;
               return (
                 <label key={mode}>
                   <input
@@ -201,11 +213,15 @@ export function HostNotificationComposer({
                     name="notification-recipient-mode"
                     aria-label={ariaLabel}
                     checked={draft.recipientMode === mode}
+                    disabled={Boolean(disabledReason)}
                     onChange={() => updateDraft({ recipientMode: mode })}
                   />{" "}
                   {label}
                   {mode === "RECOMMENDED" ? (
                     <> <span className="tiny muted">{recommendedRecipientLabel}</span></>
+                  ) : null}
+                  {disabledReason ? (
+                    <> <span className="tiny muted">{disabledReason}</span></>
                   ) : null}
                 </label>
               );
@@ -214,7 +230,7 @@ export function HostNotificationComposer({
         )}
       </fieldset>
 
-      {draft.recipientMode === "SELECTED_MEMBERS" ? (
+      {draft.recipientMode === "SELECTED_MEMBERS" && !hideRecipientPicker ? (
         <NotificationRecipientPicker
           members={options.members.items}
           selectedMembershipIds={draft.selectedMembershipIds}

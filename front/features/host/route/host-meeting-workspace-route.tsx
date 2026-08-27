@@ -55,7 +55,6 @@ import {
   hostNotificationManualDispatchesQuery,
   hostNotificationManualOptionsQuery,
   hostNotificationPolicyQuery,
-  hostNotificationSummaryQuery,
   useConfirmManualNotificationMutation,
   usePreviewManualNotificationMutation,
   useUpdateHostNotificationPolicyMutation,
@@ -424,10 +423,6 @@ export function HostMeetingWorkspaceRoute({
     ...hostNotificationPolicyQuery(context),
     enabled: notificationQueriesEnabled,
   });
-  const summaryQuery = useQuery({
-    ...hostNotificationSummaryQuery(context),
-    enabled: notificationQueriesEnabled,
-  });
   const reminderDispatchesQuery = useQuery({
     ...hostNotificationManualDispatchesQuery({
       sessionId: notificationSessionId,
@@ -632,7 +627,6 @@ export function HostMeetingWorkspaceRoute({
     sessionId,
     eventType: "SESSION_REMINDER_DUE",
   }).toString()}`;
-  void summaryQuery.data;
   const notificationRail = showNotificationRail ? (
     <MeetingNotificationRail
       policy={policyQuery.data}

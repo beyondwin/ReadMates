@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState } from "react";
 import {
   type HostNotificationComposerDraft,
   type HostNotificationRecipientMode,
@@ -13,12 +13,14 @@ import { formatDateLabel } from "@/shared/ui/readmates-display";
 import { HostNotificationComposer } from "@/features/host/ui/notifications/host-notification-composer";
 import type { MeetingResponseLedgerRow } from "./meeting-response-ledger";
 
-const SHORT_NOTICE_LIMIT = 140;
-
 const REMINDER_RECIPIENT_MODES = [
   "SELECTED_MEMBERS",
   "ALL_ACTIVE_MEMBERS",
+  "CONFIRMED_ATTENDEES",
 ] as const satisfies readonly HostNotificationRecipientMode[];
+
+const CONFIRMED_DISABLED_REASON =
+  "참석 확정 멤버에게는 재촉 알림을 보내지 않습니다.";
 
 export function nonResponderMembershipIds(
   rows: ReadonlyArray<MeetingResponseLedgerRow>,
@@ -84,6 +86,19 @@ function buildInitialDraft(
   };
 }
 
+function previewLabelFor(
+  draft: HostNotificationComposerDraft,
+  nonResponderLabel: string,
+): string {
+  if (draft.recipientMode === "SELECTED_MEMBERS") {
+    return `${nonResponderLabel}에게 미리보기`;
+  }
+  if (draft.recipientMode === "ALL_ACTIVE_MEMBERS") {
+    return "전원에게 미리보기";
+  }
+  return "알림 미리보기";
+}
+
 export function MeetingNotificationRail({
   policy,
   policyPending,
@@ -112,6 +127,7 @@ export function MeetingNotificationRail({
     () => (options ? buildInitialDraft(options, nonResponderIds) : null),
     [options, nonResponderIds],
   );
+  // Mode/channel edits only. SELECTED_MEMBERS ids stay locked to non-responders.
   const [draftOverride, setDraftOverride] = useState<HostNotificationComposerDraft | null>(null);
   const draft = useMemo(() => {
     if (!draftSeed) return null;
@@ -125,10 +141,30 @@ export function MeetingNotificationRail({
         contentRevision: draftSeed.contentRevision,
       };
     }
-    return { ...draftOverride, contentRevision: draftSeed.contentRevision };
+    return {
+      ...draftOverride,
+      selectedMembershipIds: [],
+      contentRevision: draftSeed.contentRevision,
+    };
   }, [draftOverride, draftSeed, nonResponderIds]);
-  const setDraft = setDraftOverride;
-  const [shortNotice, setShortNotice] = useState("");
+
+  const handleDraftChange = (next: HostNotificationComposerDraft) => {
+    if (next.recipientMode === "CONFIRMED_ATTENDEES") {
+      return;
+    }
+    if (next.recipientMode === "SELECTED_MEMBERS") {
+      setDraftOverride({
+        ...next,
+        selectedMembershipIds: nonResponderIds,
+      });
+      return;
+    }
+    setDraftOverride({
+      ...next,
+      selectedMembershipIds: [],
+    });
+  };
+
   const [policySaving, setPolicySaving] = useState(false);
 
   const reminderEnabled = policy?.sessionReminderEnabled ?? false;
@@ -249,27 +285,11 @@ export function MeetingNotificationRail({
       </div>
 
       <div className="rm-meeting-notification-rail__composer">
-        <div className="eyebrow">짧은 공지</div>
+        <div className="eyebrow">리마인드 발송</div>
         <p className="small muted" style={{ margin: "4px 0 10px" }}>
-          미응답 멤버에게 짧은 리마인드를 보냅니다. 참석 확정 멤버에게는 재촉 알림을 보내지 않습니다.
+          발송 본문은 템플릿입니다. 미응답 멤버를 기본 대상으로 두고, 장문·본문 편집은{" "}
+          <a href={workbenchHref}>알림 작업대</a>에서만 할 수 있습니다.
         </p>
-
-        <label className="stack" style={{ "--stack": "6px" } as CSSProperties}>
-          <span className="label">짧은 공지</span>
-          <textarea
-            aria-label="짧은 공지"
-            rows={3}
-            value={shortNotice}
-            maxLength={SHORT_NOTICE_LIMIT}
-            placeholder="예) 이번 주 모임 참석 여부를 알려주세요."
-            onChange={(event) => setShortNotice(event.currentTarget.value)}
-          />
-          <span className="tiny muted">
-            {shortNotice.length} / {SHORT_NOTICE_LIMIT}
-            {" · "}
-            <a href={workbenchHref}>길게 쓰려면 알림 작업대로</a>
-          </span>
-        </label>
 
         {options && draft ? (
           <HostNotificationComposer
@@ -279,7 +299,7 @@ export function MeetingNotificationRail({
             preview={preview}
             busy={busy}
             error={error}
-            onDraftChange={setDraft}
+            onDraftChange={handleDraftChange}
             onSearch={onSearch}
             onLoadMore={onLoadMore}
             onPreview={() => onPreview(draft)}
@@ -287,12 +307,17 @@ export function MeetingNotificationRail({
             onSkip={() => undefined}
             presentation="dialog"
             showSkip={false}
-            previewButtonLabel={`${nonResponderLabel}에게 미리보기`}
+            previewButtonLabel={previewLabelFor(draft, nonResponderLabel)}
             recipientModes={REMINDER_RECIPIENT_MODES}
             recipientModeLabels={{
               SELECTED_MEMBERS: nonResponderLabel,
               ALL_ACTIVE_MEMBERS: "전원",
+              CONFIRMED_ATTENDEES: "참석 확정",
             }}
+            disabledRecipientModes={{
+              CONFIRMED_ATTENDEES: CONFIRMED_DISABLED_REASON,
+            }}
+            hideRecipientPicker
           />
         ) : (
           <p className="small muted" role="status">알림 작성 정보를 불러오는 중입니다.</p>
