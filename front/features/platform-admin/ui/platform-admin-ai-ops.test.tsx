@@ -213,9 +213,9 @@ describe("PlatformAdminAiOps", () => {
   });
 
   it("shows errors without hiding the ledger", () => {
-    render(<PlatformAdminAiOps role="OPERATOR" summary={summary} jobs={[runningJob]} error="AI Ops 로딩 실패" />);
+    render(<PlatformAdminAiOps role="OPERATOR" summary={summary} jobs={[runningJob]} error="AI 작업 로딩 실패" />);
 
-    expect(screen.getByRole("alert")).toHaveTextContent("AI Ops 로딩 실패");
+    expect(screen.getByRole("alert")).toHaveTextContent("AI 작업 로딩 실패");
     expect(screen.getByText(/Book/)).toBeInTheDocument();
   });
 
@@ -433,7 +433,7 @@ describe("PlatformAdminAiOps", () => {
     expect(screen.queryByText("공개 반영 추적")).not.toBeInTheDocument();
   });
 
-  it("locks 44px targets and reduced motion in the scoped AI Ops stylesheet", () => {
+  it("locks 44px targets and reduced motion in the scoped AI 작업 stylesheet", () => {
     expect(LEDGER_CSS).toMatch(/\.admin-ai-ops[\s\S]*min-height:\s*44px/);
     expect(LEDGER_CSS).toContain(".admin-ai-ops");
     expect(LEDGER_CSS).toContain(":focus-visible");

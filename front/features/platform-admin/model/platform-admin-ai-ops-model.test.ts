@@ -82,7 +82,7 @@ describe("aiOpsPathFromFilter", () => {
   });
 });
 
-describe("AI Ops paged ledger", () => {
+describe("AI 작업 paged ledger", () => {
   it("keeps page order while removing a duplicate cursor-boundary job", () => {
     const job = (jobId: string) => ({ jobId } as never);
     expect(
@@ -94,7 +94,7 @@ describe("AI Ops paged ledger", () => {
   });
 });
 
-describe("AI Ops error classification", () => {
+describe("AI 작업 error classification", () => {
   it("distinguishes disabled 404, unavailable 5xx, conflict, and transport unknown", () => {
     expect(classifyAiOpsError(Object.assign(new Error("missing"), { status: 404, code: "RESOURCE_NOT_FOUND" })))
       .toEqual({ kind: "DISABLED", status: 404, code: "RESOURCE_NOT_FOUND", message: "missing" });

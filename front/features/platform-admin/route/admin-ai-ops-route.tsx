@@ -26,6 +26,7 @@ import {
   platformAdminSummaryQuery,
   subscribePlatformAdminAuthorityLoss,
 } from "@/features/platform-admin/queries/platform-admin-queries";
+import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
 import {
   PlatformAdminAiOps,
   type PlatformAdminAiOpsCommandState,
@@ -67,7 +68,7 @@ export function AdminAiOpsRoute() {
   if (disabled) {
     return (
       <section className="admin-ai-ops admin-ai-ops--disabled" aria-labelledby="admin-ai-ops-title">
-        <h1 id="admin-ai-ops-title" className="h1 editorial">AI Ops</h1>
+        <h1 id="admin-ai-ops-title" className="h1 editorial">{ADMIN_COPY.heading.aiOps}</h1>
         <div className="admin-ai-ops__disabled-card">
           <p className="eyebrow">기능 비활성</p>
           <p className="body">AI generation 운영 기능이 현재 비활성 상태입니다.</p>
@@ -79,7 +80,7 @@ export function AdminAiOpsRoute() {
   if (!adminSummaryQuery.data || !capabilitiesQuery.data) {
     return (
       <section className="admin-ai-ops" aria-labelledby="admin-ai-ops-title">
-        <h1 id="admin-ai-ops-title" className="h1 editorial">AI Ops</h1>
+        <h1 id="admin-ai-ops-title" className="h1 editorial">{ADMIN_COPY.heading.aiOps}</h1>
         <p className="platform-admin-ai-ops__error" role="status" aria-label="관리자 권한 확인 중">
           관리자 권한을 다시 확인하고 있습니다.
         </p>
@@ -236,7 +237,7 @@ function AiOpsCommandSession({
 
   return (
     <section className="admin-ai-ops" aria-labelledby="admin-ai-ops-title">
-      <h1 id="admin-ai-ops-title" className="h1 editorial">AI Ops</h1>
+      <h1 id="admin-ai-ops-title" className="h1 editorial">{ADMIN_COPY.heading.aiOps}</h1>
       <PlatformAdminAiOps
         role={role}
         canManageActions={canManageActions}

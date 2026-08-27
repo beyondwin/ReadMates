@@ -7,6 +7,7 @@ import type {
 import { AdminSafeActionDock, type AdminSafeActionState } from "@/features/platform-admin/ui/admin-action-dock";
 import { AdminEvidenceLedger } from "@/features/platform-admin/ui/admin-evidence-ledger";
 import { AdminModalDialog } from "@/features/platform-admin/ui/admin-modal-dialog";
+import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
 import { AdminPageContext } from "@/features/platform-admin/ui/admin-page-context";
 import { AdminReceiptTimeline } from "@/features/platform-admin/ui/admin-receipt-timeline";
 
@@ -142,7 +143,7 @@ export function PlatformAdminAiOps({
   return (
     <section className="platform-admin-ai-ops admin-ai-ops">
       <AdminPageContext
-        eyebrow="S5 Operations"
+        eyebrow={ADMIN_COPY.eyebrow.aiOps}
         heading="AI 운영"
         freshness={loading ? "동기화 중" : undefined}
         authority={canAct ? "명령 가능" : "변경 권한 없음"}

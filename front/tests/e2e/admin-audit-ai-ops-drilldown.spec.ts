@@ -143,10 +143,10 @@ test("owner drills from an AI_OPS audit row into the affected club's ai-ops jobs
   await page.getByRole("button", { name: /AI 커밋 재시도를 실행했습니다/ }).click();
 
   const detail = page.getByRole("region", { name: "감사 이벤트 상세" });
-  await detail.getByRole("link", { name: /AI Ops에서 보기/ }).click();
+  await detail.getByRole("link", { name: /AI 작업에서 보기/ }).click();
 
   await expect(page).toHaveURL(/\/admin\/ai-ops\?clubId=club-1&jobId=job-1/);
-  await expect(page.getByRole("heading", { name: "AI Ops", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "AI 작업", level: 1 })).toBeVisible();
   await expect(page.getByText("Club One", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "전체 보기" })).toBeVisible();
 
@@ -165,7 +165,7 @@ test("job-targeted drilldown remains exact when the club-filtered list is empty"
 
   await page.goto("/admin/audit");
   await page.getByRole("button", { name: /AI 커밋 재시도를 실행했습니다/ }).click();
-  await page.getByRole("region", { name: "감사 이벤트 상세" }).getByRole("link", { name: /AI Ops에서 보기/ }).click();
+  await page.getByRole("region", { name: "감사 이벤트 상세" }).getByRole("link", { name: /AI 작업에서 보기/ }).click();
 
   await expect(page).toHaveURL(/\/admin\/ai-ops\?clubId=club-1&jobId=job-1/);
   await expect(page.getByText("Club One")).toBeVisible();

@@ -142,7 +142,7 @@ export function AdminClubOperationsPage({
               className="btn btn-ghost btn-sm"
               to={`/admin/ai-ops?clubId=${snapshot.club.clubId}`}
             >
-              AI Ops
+              AI 작업
             </Link>
           </Panel>
         </div>

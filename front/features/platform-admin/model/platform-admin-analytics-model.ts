@@ -103,7 +103,7 @@ const KPI_ACTIONS: Record<KpiKey, AnalyticsKpiAction> = {
   ACTIVE_MEMBERS: { label: "클럽 운영 보기", href: "/admin/clubs" },
   SESSION_COMPLETION: { label: "클럽 운영 보기", href: "/admin/clubs" },
   RSVP_RATE: { label: "클럽 운영 보기", href: "/admin/clubs" },
-  AI_COST_PER_SESSION: { label: "AI Ops 보기", href: "/admin/ai-ops" },
+  AI_COST_PER_SESSION: { label: "AI 작업 보기", href: "/admin/ai-ops" },
   NOTIFICATION_DELIVERY: { label: "알림 운영 보기", href: "/admin/notifications" },
 };
 

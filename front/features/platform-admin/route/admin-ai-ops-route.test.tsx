@@ -161,9 +161,9 @@ beforeEach(() => {
 });
 
 describe("AdminAiOpsRoute", () => {
-  it("renders the AI Ops heading and delegates to PlatformAdminAiOps", () => {
+  it("renders the AI 작업 heading and delegates to PlatformAdminAiOps", () => {
     const { container } = renderRoute();
-    expect(screen.getByRole("heading", { name: /AI Ops/, level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /AI 작업/, level: 1 })).toBeInTheDocument();
     expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });

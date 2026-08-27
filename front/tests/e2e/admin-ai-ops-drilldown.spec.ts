@@ -114,7 +114,7 @@ test("owner drills from a failure code into the affected jobs", async ({ page })
 
   await page.goto("/admin/ai-ops");
 
-  await expect(page.getByRole("heading", { name: "AI Ops", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "AI 작업", level: 1 })).toBeVisible();
   await expect(page.getByText("표시할 AI job이 없습니다.")).toBeVisible();
 
   await page.getByRole("button", { name: /PROVIDER_RATE_LIMITED/ }).click();

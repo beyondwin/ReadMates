@@ -157,7 +157,7 @@ describe("AdminAuditLedger", () => {
 
     const detail = screen.getByRole("region", { name: "감사 이벤트 상세" });
     expect(within(detail).getByText("후속 화면 있음")).toBeInTheDocument();
-    expect(within(detail).getByRole("link", { name: /AI Ops에서 보기/ })).toHaveAttribute(
+    expect(within(detail).getByRole("link", { name: /AI 작업에서 보기/ })).toHaveAttribute(
       "href",
       "/admin/ai-ops?clubId=club-7&jobId=job-1",
     );

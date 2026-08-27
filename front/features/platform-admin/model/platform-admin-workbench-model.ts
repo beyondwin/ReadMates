@@ -1,6 +1,8 @@
 import type { AdminNotificationOperationsSnapshot } from "@/features/platform-admin/model/platform-admin-notifications-model";
 import type { PlatformAdminTodayClosingRisk } from "@/features/platform-admin/model/platform-admin-domain-types";
 
+const AI_OPS_LABEL = "AI 작업";
+
 export type PlatformAdminRole = "OWNER" | "OPERATOR" | "SUPPORT";
 export type PlatformAdminClubStatus = "SETUP_REQUIRED" | "ACTIVE" | "SUSPENDED" | "ARCHIVED";
 export type PlatformAdminClubPublicVisibility = "PRIVATE" | "PUBLIC";
@@ -390,7 +392,7 @@ function buildAiQueueItems(
       type: "ai",
       clubId: null,
       slug: "platform",
-      name: "AI Ops",
+      name: AI_OPS_LABEL,
       severity: "info",
       reason: "AI generation이 비활성 상태입니다.",
       primaryActionLabel: "AI 비활성",
@@ -406,9 +408,9 @@ function buildAiQueueItems(
       type: "partial-error",
       clubId: null,
       slug: "platform",
-      name: "AI Ops",
+      name: AI_OPS_LABEL,
       severity: "warn",
-      reason: "AI Ops 작업 목록을 확인하지 못했습니다.",
+      reason: "AI 작업 목록을 확인하지 못했습니다.",
       primaryActionLabel: "AI 확인 불가",
       badges: ["ai unavailable"],
       sortRank: 36,
@@ -622,7 +624,7 @@ function buildSelectedAction(
   if (item.type === "ai") {
     return {
       kind: "open-ai-ops",
-      label: "AI Ops 열기",
+      label: `${AI_OPS_LABEL} 열기`,
       href: item.href,
       disabled: false,
       reason: null,
@@ -708,7 +710,7 @@ function buildDrillLinks(
     links.push({ label: "알림 운영", href: item.href });
   }
   if (item.type === "ai") {
-    links.push({ label: "AI Ops", href: item.href });
+    links.push({ label: AI_OPS_LABEL, href: item.href });
   }
   if (item.type === "closing-risk") {
     links.push({ label: item.primaryActionLabel, href: item.href });

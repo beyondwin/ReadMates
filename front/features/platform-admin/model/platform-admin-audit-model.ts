@@ -194,7 +194,7 @@ export type AdminAuditOperationSummary = {
 
 export function buildAdminAuditOperationSummary(item: AdminAuditLedgerItem): AdminAuditOperationSummary {
   const nextHref = aiOpsDrilldownForAuditItem(item);
-  const nextLabel = nextHref ? "AI Ops에서 보기" : null;
+  const nextLabel = nextHref ? "AI 작업에서 보기" : null;
 
   if (item.metadataState === "UNAVAILABLE") {
     return {

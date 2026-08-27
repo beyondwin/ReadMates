@@ -118,17 +118,17 @@ describe("buildAdminAuditOperationSummary", () => {
       label: "세부 정보 제한",
       detail: "안전 정책 또는 source 상태 때문에 세부 정보를 표시하지 않습니다.",
       nextHref: "/admin/ai-ops?clubId=club-1&jobId=job-1",
-      nextLabel: "AI Ops에서 보기",
+      nextLabel: "AI 작업에서 보기",
     });
   });
 
-  it("surfaces AI Ops drilldown as follow-up when the event succeeded", () => {
+  it("surfaces AI 작업 drilldown as follow-up when the event succeeded", () => {
     expect(buildAdminAuditOperationSummary(auditItem())).toEqual({
       state: "FOLLOW_UP_AVAILABLE",
       label: "후속 화면 있음",
       detail: "AI 운영 화면에서 같은 클럽 범위로 이어서 확인할 수 있습니다.",
       nextHref: "/admin/ai-ops?clubId=club-1&jobId=job-1",
-      nextLabel: "AI Ops에서 보기",
+      nextLabel: "AI 작업에서 보기",
     });
   });
 

@@ -63,9 +63,9 @@ describe("AdminAnalyticsOverviewView", () => {
     expect(screen.getByText("2026-05-15")).toBeInTheDocument();
     expect(screen.getByText("75%")).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "클럽 운영 보기" }).at(0)).toHaveAttribute("href", "/admin/clubs");
-    expect(screen.getByRole("link", { name: "AI Ops 보기" })).toHaveAttribute("href", "/admin/ai-ops");
+    expect(screen.getByRole("link", { name: "AI 작업 보기" })).toHaveAttribute("href", "/admin/ai-ops");
     expect(screen.getByRole("link", { name: "알림 운영 보기" })).toHaveAttribute("href", "/admin/notifications");
-    expect(screen.getByRole("link", { name: "AI Ops 보기" })).toHaveClass("small");
+    expect(screen.getByRole("link", { name: "AI 작업 보기" })).toHaveClass("small");
     expect(screen.getByRole("link", { name: "알림 운영 보기" })).toHaveClass("small");
     expect(screen.getByRole("button", { name: "CSV 내려받기" })).toBeEnabled();
   });

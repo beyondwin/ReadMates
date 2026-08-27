@@ -148,7 +148,7 @@ async function routePlatformAdminShell(
   });
 }
 
-test("platform support can read AI Ops but cannot force cancel", async ({ page }) => {
+test("platform support can read AI 작업 but cannot force cancel", async ({ page }) => {
   await routePlatformAdminShell(page, "SUPPORT");
 
   await page.goto("/admin/ai-ops");
@@ -159,7 +159,7 @@ test("platform support can read AI Ops but cannot force cancel", async ({ page }
   await expect(page.getByRole("button", { name: "강제 취소 검토" })).toHaveCount(0);
 });
 
-test("platform owner sees AI Ops action affordance when job is actionable", async ({ page }) => {
+test("platform owner sees AI 작업 action affordance when job is actionable", async ({ page }) => {
   await routePlatformAdminShell(page, "OWNER");
 
   await page.goto("/admin/ai-ops");
