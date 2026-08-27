@@ -237,7 +237,7 @@ export function AdminTargetLedgerInline({ entries, moreHref }: {
 - 명령 모달의 확인 버튼 라벨을 행위 문장으로("작업 {id} 강제 취소").
 
 **Steps:**
-- [ ] 테스트: ① H1이 정확히 1개 ② 멈춤 라벨 ③ 확인 버튼 행위 문장 → 구현 → 통과 → 공통 게이트 → CT 재잠금 → Commit: `feat(admin): ai job ledger polish` → **릴리스 체크포인트 5**
+- [x] 테스트: ① H1이 정확히 1개 ② 멈춤 라벨 ③ 확인 버튼 행위 문장 → 구현 → 통과 → 공통 게이트 → CT 재잠금 → Commit: `feat(admin): ai job ledger polish` → **릴리스 체크포인트 5**
 
 ---
 

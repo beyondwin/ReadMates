@@ -163,8 +163,15 @@ beforeEach(() => {
 describe("AdminAiOpsRoute", () => {
   it("renders the AI 작업 heading and delegates to PlatformAdminAiOps", () => {
     const { container } = renderRoute();
-    expect(screen.getByRole("heading", { name: /AI 작업/, level: 1 })).toBeInTheDocument();
-    expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole("heading", { name: /AI 작업/, level: 1 })).toHaveAttribute(
+      "id",
+      "admin-ai-ops-title",
+    );
+    expect(container.querySelector(".admin-ai-ops")).toHaveAttribute(
+      "aria-labelledby",
+      "admin-ai-ops-title",
+    );
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });
 
@@ -220,8 +227,29 @@ describe("AdminAiOpsRoute", () => {
 
   it("fails closed without crashing while admin authority caches are absent", () => {
     expect(() => renderRoute("/admin/ai-ops", { seedAdminContext: false, pages: [[runningJob]] })).not.toThrow();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole("heading", { level: 1, name: "AI 작업" })).toHaveAttribute(
+      "id",
+      "admin-ai-ops-title",
+    );
+    expect(screen.getByText("운영 · AI 작업")).toBeInTheDocument();
     expect(screen.getByRole("status", { name: "관리자 권한 확인 중" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "강제 취소 검토" })).not.toBeInTheDocument();
+  });
+
+  it("keeps a single PageContext H1 when AI generation ops is disabled", async () => {
+    renderRoute("/admin/ai-ops", {
+      summaryError: Object.assign(new Error("missing"), { status: 404, code: "RESOURCE_NOT_FOUND" }),
+      jobsError: Object.assign(new Error("missing"), { status: 404, code: "RESOURCE_NOT_FOUND" }),
+    });
+
+    expect(await screen.findByText("기능 비활성")).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole("heading", { level: 1, name: "AI 작업" })).toHaveAttribute(
+      "id",
+      "admin-ai-ops-title",
+    );
+    expect(screen.getByText("운영 · AI 작업")).toBeInTheDocument();
   });
 
   it("purges an in-flight safe command when platform authority is lost", async () => {
@@ -258,7 +286,7 @@ describe("AdminAiOpsRoute", () => {
     });
 
     expect(screen.queryByRole("dialog", { name: "강제 취소 확인" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "강제 취소 확인" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "작업 job-1 강제 취소" })).not.toBeInTheDocument();
     act(() => {
       queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, {
         schemaVersion: 1,
@@ -309,7 +337,7 @@ describe("AdminAiOpsRoute", () => {
     renderRoute("/admin/ai-ops", { pages: [[runningJob]] });
 
     await userEvent.click(screen.getByRole("button", { name: "강제 취소 검토" }));
-    await userEvent.click(await screen.findByRole("button", { name: "강제 취소 확인" }));
+    await userEvent.click(await screen.findByRole("button", { name: "작업 job-1 강제 취소" }));
     await userEvent.click(await screen.findByRole("button", { name: "같은 명령으로 다시 확인" }));
 
     await waitFor(() => expect(confirmForceCancelPlatformAdminAiJob).toHaveBeenCalledTimes(2));
@@ -345,7 +373,7 @@ describe("AdminAiOpsRoute", () => {
     const { queryClient } = renderRoute("/admin/ai-ops", { pages: [[runningJob]] });
 
     await userEvent.click(screen.getByRole("button", { name: "강제 취소 검토" }));
-    await userEvent.click(await screen.findByRole("button", { name: "강제 취소 확인" }));
+    await userEvent.click(await screen.findByRole("button", { name: "작업 job-1 강제 취소" }));
 
     await waitFor(() => {
       expect(confirmForceCancelPlatformAdminAiJob).toHaveBeenCalledTimes(1);

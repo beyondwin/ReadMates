@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   ADMIN_COPY,
+  aiJobConfirmAction,
+  aiJobInProgressLabel,
+  aiJobStallLabel,
   auditOutcomeLabel,
   clubLifecycleLabel,
   clubVisibilityLabel,
@@ -109,5 +112,12 @@ describe("admin-copy", () => {
     expect(deliveryLedgerStatusLabel("DEAD")).toBe("실패");
     expect(deliveryLedgerStatusLabel("SKIPPED")).toBe("SKIPPED");
     expect(deliveryAttemptBadge(2)).toBe("2차 시도");
+  });
+
+  it("AI 작업 경과·멈춤·확인 문장을 고정 형식으로 만든다", () => {
+    expect(aiJobInProgressLabel(5)).toBe("5분째 진행");
+    expect(aiJobStallLabel(20)).toBe("멈춤 의심 · 20분");
+    expect(aiJobConfirmAction("job-1", "FORCE_CANCEL")).toBe("작업 job-1 강제 취소");
+    expect(aiJobConfirmAction("job-2", "RETRY_COMMIT")).toBe("작업 job-2 커밋 복구");
   });
 });

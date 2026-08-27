@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import type { PlatformAdminAiOpsAction } from "@/features/platform-admin/api/platform-admin-contracts";
+import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
 import { canAdmin } from "@/features/platform-admin/model/platform-admin-capabilities";
 import {
   aiOpsFilterFromSearchParams,
@@ -26,8 +27,9 @@ import {
   platformAdminSummaryQuery,
   subscribePlatformAdminAuthorityLoss,
 } from "@/features/platform-admin/queries/platform-admin-queries";
-import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
+import { AdminPageContext } from "@/features/platform-admin/ui/admin-page-context";
 import {
+  ADMIN_AI_OPS_HEADING_ID,
   PlatformAdminAiOps,
   type PlatformAdminAiOpsCommandState,
   type PlatformAdminAiOpsJobView,
@@ -67,23 +69,33 @@ export function AdminAiOpsRoute() {
 
   if (disabled) {
     return (
-      <section className="admin-ai-ops admin-ai-ops--disabled" aria-labelledby="admin-ai-ops-title">
-        <h1 id="admin-ai-ops-title" className="h1 editorial">{ADMIN_COPY.heading.aiOps}</h1>
-        <div className="admin-ai-ops__disabled-card">
-          <p className="eyebrow">기능 비활성</p>
-          <p className="body">AI generation 운영 기능이 현재 비활성 상태입니다.</p>
-        </div>
+      <section className="admin-ai-ops admin-ai-ops--disabled" aria-labelledby={ADMIN_AI_OPS_HEADING_ID}>
+        <AdminPageContext
+          headingId={ADMIN_AI_OPS_HEADING_ID}
+          eyebrow={ADMIN_COPY.eyebrow.aiOps}
+          heading={ADMIN_COPY.heading.aiOps}
+        >
+          <div className="admin-ai-ops__disabled-card">
+            <p className="eyebrow">기능 비활성</p>
+            <p className="body">AI generation 운영 기능이 현재 비활성 상태입니다.</p>
+          </div>
+        </AdminPageContext>
       </section>
     );
   }
 
   if (!adminSummaryQuery.data || !capabilitiesQuery.data) {
     return (
-      <section className="admin-ai-ops" aria-labelledby="admin-ai-ops-title">
-        <h1 id="admin-ai-ops-title" className="h1 editorial">{ADMIN_COPY.heading.aiOps}</h1>
-        <p className="platform-admin-ai-ops__error" role="status" aria-label="관리자 권한 확인 중">
-          관리자 권한을 다시 확인하고 있습니다.
-        </p>
+      <section className="admin-ai-ops" aria-labelledby={ADMIN_AI_OPS_HEADING_ID}>
+        <AdminPageContext
+          headingId={ADMIN_AI_OPS_HEADING_ID}
+          eyebrow={ADMIN_COPY.eyebrow.aiOps}
+          heading={ADMIN_COPY.heading.aiOps}
+        >
+          <p className="platform-admin-ai-ops__error" role="status" aria-label="관리자 권한 확인 중">
+            관리자 권한을 다시 확인하고 있습니다.
+          </p>
+        </AdminPageContext>
       </section>
     );
   }
@@ -236,7 +248,7 @@ function AiOpsCommandSession({
   }
 
   return (
-    <section className="admin-ai-ops" aria-label={ADMIN_COPY.heading.aiOps}>
+    <section className="admin-ai-ops" aria-labelledby={ADMIN_AI_OPS_HEADING_ID}>
       <PlatformAdminAiOps
         role={role}
         canManageActions={canManageActions}

@@ -736,11 +736,16 @@
 }
 
 .admin-ai-ops .platform-admin-ai-ops__job-title,
+.admin-ai-ops .platform-admin-ai-ops__job-elapsed,
 .admin-ai-ops .platform-admin-ai-ops__error,
 .admin-ai-ops .admin-page-context__freshness,
 .admin-ai-ops .admin-page-context__authority,
 .admin-ai-ops .admin-safe-action-dock__reason {
   overflow-wrap: anywhere;
+}
+
+.admin-ai-ops .platform-admin-ai-ops__job-elapsed--stalled {
+  color: var(--stale);
 }
 
 .admin-ai-ops :focus-visible {

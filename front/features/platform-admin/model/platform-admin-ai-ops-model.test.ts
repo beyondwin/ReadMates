@@ -8,6 +8,7 @@ import {
   aiOpsSearchFromFilter,
   aiOpsWindowFromSearchParams,
   classifyAiOpsError,
+  formatAiJobElapsedLabel,
   mergeAiOpsJobPages,
   hasActiveAiOpsFilter,
 } from "./platform-admin-ai-ops-model";
@@ -91,6 +92,52 @@ describe("AI 작업 paged ledger", () => {
         { items: [job("job-2"), job("job-3")], nextCursor: null },
       ]).map((item) => item.jobId),
     ).toEqual(["job-1", "job-2", "job-3"]);
+  });
+});
+
+describe("AI 작업 elapsed labels", () => {
+  const now = new Date("2026-05-18T00:21:00Z");
+
+  it("labels an in-progress job with elapsed minutes", () => {
+    expect(
+      formatAiJobElapsedLabel(
+        {
+          status: "RUNNING",
+          createdAt: "2026-05-18T00:16:00Z",
+          lastUpdatedAt: "2026-05-18T00:20:00Z",
+          staleCandidate: false,
+        },
+        now,
+      ),
+    ).toBe("5분째 진행");
+  });
+
+  it("warns when an in-progress job has stalled past the threshold", () => {
+    expect(
+      formatAiJobElapsedLabel(
+        {
+          status: "RUNNING",
+          createdAt: "2026-05-18T00:00:00Z",
+          lastUpdatedAt: "2026-05-18T00:01:00Z",
+          staleCandidate: true,
+        },
+        now,
+      ),
+    ).toBe("멈춤 의심 · 20분");
+  });
+
+  it("omits elapsed labels for terminal jobs", () => {
+    expect(
+      formatAiJobElapsedLabel(
+        {
+          status: "FAILED",
+          createdAt: "2026-05-18T00:00:00Z",
+          lastUpdatedAt: "2026-05-18T00:01:00Z",
+          staleCandidate: false,
+        },
+        now,
+      ),
+    ).toBeNull();
   });
 });
 

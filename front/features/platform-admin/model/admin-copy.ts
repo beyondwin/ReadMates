@@ -122,3 +122,15 @@ export const deliveryLedgerStatusLabel = fromMap({
 export function deliveryAttemptBadge(attemptCount: number): string {
   return `${attemptCount}차 시도`;
 }
+
+export function aiJobInProgressLabel(minutes: number): string {
+  return `${minutes}분째 진행`;
+}
+
+export function aiJobStallLabel(minutes: number): string {
+  return `멈춤 의심 · ${minutes}분`;
+}
+
+export function aiJobConfirmAction(jobId: string, action: "FORCE_CANCEL" | "RETRY_COMMIT"): string {
+  return action === "FORCE_CANCEL" ? `작업 ${jobId} 강제 취소` : `작업 ${jobId} 커밋 복구`;
+}

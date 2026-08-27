@@ -105,6 +105,17 @@ describe("PlatformAdminAiOps", () => {
     expect(section.textContent).not.toContain("result");
   });
 
+  it("warns when an in-progress job has stalled past the threshold", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-18T00:21:00Z"));
+    try {
+      render(<PlatformAdminAiOps role="OWNER" summary={summary} jobs={[runningJob]} />);
+      expect(screen.getByText("멈춤 의심 · 20분")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("opens preview instead of executing an actionable job", async () => {
     const onRequestPreview = vi.fn();
     const user = userEvent.setup();
@@ -150,7 +161,7 @@ describe("PlatformAdminAiOps", () => {
     expect(within(dialog).getByText(/00112233/)).toBeInTheDocument();
     expect(dialog.contains(document.activeElement)).toBe(true);
 
-    await userEvent.click(within(dialog).getByRole("button", { name: "강제 취소 확인" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "작업 job-1 강제 취소" }));
     expect(onConfirmCommand).toHaveBeenCalledTimes(1);
     trigger.remove();
   });
@@ -440,6 +451,7 @@ describe("PlatformAdminAiOps", () => {
     expect(LEDGER_CSS).toMatch(
       /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.admin-ai-ops[\s\S]*animation-duration:\s*0\.01ms/,
     );
+    expect(LEDGER_CSS).toContain("platform-admin-ai-ops__job-elapsed--stalled");
     expect(LEDGER_CSS).not.toMatch(/backdrop-filter|linear-gradient/);
   });
 });
