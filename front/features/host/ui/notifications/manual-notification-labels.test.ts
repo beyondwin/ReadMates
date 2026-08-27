@@ -27,7 +27,7 @@ describe("manual notification presentation copy", () => {
   });
 
   it("never exposes known session enums", () => {
-    expect(manualSessionStateLabel("OPEN")).toBe("진행 중");
+    expect(manualSessionStateLabel("OPEN")).toBe("준비 중");
     expect(manualSessionVisibilityLabel("HOST_ONLY")).toBe("호스트 전용");
     expect(manualSessionVisibilityLabel("MEMBER")).toBe("게스트 공개");
     expect(manualSessionVisibilityLabel("PUBLIC")).toBe("게스트 공개 · 공개 기록에 게시");

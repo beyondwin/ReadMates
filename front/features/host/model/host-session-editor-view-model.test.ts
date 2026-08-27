@@ -45,10 +45,10 @@ function overviewInput() {
 describe("host session editor view model", () => {
   it.each([
     [null, "새 예정 모임"],
-    ["DRAFT", "예정"],
+    ["DRAFT", "작성 중"],
     ["OPEN", "준비 중"],
-    ["CLOSED", "마감"],
-    ["PUBLISHED", "공개"],
+    ["CLOSED", "기록 정리 중"],
+    ["PUBLISHED", "게시됨"],
   ] as const)("maps %s to compact mobile lifecycle copy", (state, expected) => {
     expect(compactSessionLifecycleLabel(state)).toBe(expected);
   });

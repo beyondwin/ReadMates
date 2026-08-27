@@ -1,3 +1,4 @@
+import { hostMeetingLifecycleLabel } from "@/shared/model/meeting-language";
 import { compatibilityExposureLabel, type SessionAccessScope } from "./session-exposure-model";
 import type { HostSessionChangeReceipt } from "./host-view-types";
 
@@ -263,20 +264,8 @@ export function recordVisibilityDescription(visibility: SessionRecordVisibility)
 }
 
 export function hostSessionStateLabel(state?: HostSessionState) {
-  if (state === "OPEN") {
-    return "열림";
-  }
-
-  if (state === "PUBLISHED") {
-    return "공개됨";
-  }
-
-  if (state === "CLOSED") {
-    return "닫힘";
-  }
-
-  if (state === "DRAFT") {
-    return "예정";
+  if (state === "DRAFT" || state === "OPEN" || state === "CLOSED" || state === "PUBLISHED") {
+    return hostMeetingLifecycleLabel(state);
   }
 
   return "저장 전";

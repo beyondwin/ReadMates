@@ -12,7 +12,7 @@ const row: HostMeetingListRow = {
   ordinal: 7,
   title: "함께 읽는 모임",
   meetingDate: "2026-08-30",
-  lifecycleLabel: "진행 중",
+  lifecycleLabel: "준비 중",
   nextAction: { label: "모임 열기", href: "/app/host/sessions/open-1" },
   readerProjection: "멤버에게 보임 · 공개 사이트에는 숨김",
   attention: ["참석 응답 확인"],
@@ -97,7 +97,7 @@ describe("HostMeetingList", () => {
       "rm-host-editorial-ledger__action",
     );
     expect(root!.querySelector(".rm-host-editorial-ledger__row .eyebrow")).toHaveTextContent("No.7");
-    expect(root!.querySelector(".rm-host-editorial-ledger__row .eyebrow")).toHaveTextContent("진행 중");
+    expect(root!.querySelector(".rm-host-editorial-ledger__row .eyebrow")).toHaveTextContent("준비 중");
     expect(within(root!).getByText("멤버에게 보임 · 공개 사이트에는 숨김")).toBeInTheDocument();
     expect(within(root!).getByText("참석 응답 확인")).toBeInTheDocument();
     expect(within(root!).getByRole("button", { name: "더 보기" })).toBeInTheDocument();

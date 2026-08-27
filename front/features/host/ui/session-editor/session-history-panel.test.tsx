@@ -230,7 +230,7 @@ describe("SessionHistoryPanel", () => {
     );
 
     expect(screen.getByText("다시 준비 중으로")).toBeVisible();
-    expect(screen.getByText("마감 → 준비 중")).toBeVisible();
+    expect(screen.getByText("기록 정리 중 → 준비 중")).toBeVisible();
     expect(screen.getByText("이전 클라이언트에서 사유 없이 변경됨")).toBeVisible();
     expect(screen.getByText("<img src=x onerror=alert(1)>keep as text")).toBeVisible();
     expect(document.querySelector("img")).toBeNull();
@@ -441,7 +441,7 @@ describe("SessionHistoryPanel", () => {
     );
 
     expect(screen.getByText("휴지통으로 이동")).toBeVisible();
-    expect(screen.getByText("예정 → 삭제")).toBeVisible();
+    expect(screen.getByText("작성 중 → 삭제")).toBeVisible();
     expect(screen.getByText("빈 모임 삭제")).toBeVisible();
     expect(screen.queryByText("EMPTY_SESSION_DELETED")).not.toBeInTheDocument();
   });

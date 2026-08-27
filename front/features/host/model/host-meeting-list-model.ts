@@ -1,4 +1,5 @@
 import type { HostSessionListItem } from "@/features/host/api/host-contracts";
+import { hostMeetingLifecycleLabel } from "@/shared/model/meeting-language";
 import { resolvedSessionExposure, sessionExposureCopy } from "./session-exposure-model";
 
 export type HostMeetingListRow = {
@@ -23,7 +24,7 @@ export type HostMeetingListState = {
 };
 
 function lifecycleLabel(state: HostSessionListItem["state"]) {
-  return state === "OPEN" ? "진행 중" : "작성 중";
+  return hostMeetingLifecycleLabel(state);
 }
 
 function attentionLabels(item: HostSessionListItem) {

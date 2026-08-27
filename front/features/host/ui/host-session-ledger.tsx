@@ -9,7 +9,7 @@ import {
 } from "@/features/host/model/host-session-ledger-model";
 import { hostMeetingHref } from "@/features/host/model/host-meeting-ledger-model";
 import { resolvedSessionExposure, sessionExposureCopy } from "@/features/host/model/session-exposure-model";
-import { formatMeetingOrdinal } from "@/shared/model/meeting-language";
+import { formatMeetingOrdinal, hostMeetingLifecycleLabel } from "@/shared/model/meeting-language";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 import { readmatesReturnState } from "@/shared/routing/readmates-route-state";
 
@@ -67,12 +67,7 @@ function sessionRecordHref(sessionId: string) {
 }
 
 function stateLabel(state: HostSessionLedgerItem["state"]) {
-  return {
-    DRAFT: "예정",
-    OPEN: "진행 중",
-    CLOSED: "종료",
-    PUBLISHED: "공개됨",
-  }[state];
+  return hostMeetingLifecycleLabel(state);
 }
 
 function exposureLabel(item: HostSessionLedgerItem) {

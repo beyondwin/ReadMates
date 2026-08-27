@@ -56,7 +56,7 @@ describe("hostMeetingListRows", () => {
   it("links an active meeting directly to its work surface", () => {
     expect(hostMeetingListRows([item("open-1", "OPEN")])).toMatchObject([
       {
-        lifecycleLabel: "진행 중",
+        lifecycleLabel: "준비 중",
         nextAction: { label: "모임 열기", href: "/app/host/sessions/open-1" },
       },
     ]);

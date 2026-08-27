@@ -3,7 +3,7 @@ import type {
   HostSessionHistoryRecovery,
   HostSessionRestoreItem,
 } from "@/features/host/api/host-session-recovery-contracts";
-import { formatPublicationAction } from "@/shared/model/meeting-language";
+import { formatPublicationAction, hostMeetingLifecycleLabel } from "@/shared/model/meeting-language";
 import { lifecycleReasonLabel } from "./host-session-lifecycle-model";
 import {
   recordVisibilityLabel,
@@ -153,13 +153,6 @@ const changedFieldLabels: Record<string, string> = {
   highlights: "하이라이트",
   oneLineReviews: "한줄평",
   feedbackDocument: "피드백 문서",
-};
-
-const compactSessionLifecycleLabels: Record<HostSessionState, string> = {
-  DRAFT: "예정",
-  OPEN: "준비 중",
-  CLOSED: "마감",
-  PUBLISHED: "공개",
 };
 
 const historySourceLabels: Record<NonNullable<HostSessionHistoryItem["revisionSource"]>, string> = {
@@ -355,13 +348,13 @@ function lifecycleStateTransitionLabel(fromState: string | null | undefined, toS
 
 function historyStateLabel(state: string | null | undefined): string {
   if (state === "DRAFT" || state === "OPEN" || state === "CLOSED" || state === "PUBLISHED") {
-    return compactSessionLifecycleLabels[state];
+    return hostMeetingLifecycleLabel(state);
   }
   return "삭제";
 }
 
 export function compactSessionLifecycleLabel(state: HostSessionState | null): string {
-  return state === null ? "새 예정 모임" : compactSessionLifecycleLabels[state];
+  return state === null ? "새 예정 모임" : hostMeetingLifecycleLabel(state);
 }
 
 function buildDraftOverview(input: HostSessionEditorOverviewInput): HostSessionEditorOverview["draft"] {

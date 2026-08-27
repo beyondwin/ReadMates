@@ -16,7 +16,6 @@ const ALLOWED_KINDS: ReadonlySet<MeetingLanguageAllowlistKind> = new Set([
   "technical-login-session",
   "wire-storage-compatibility",
   "historical-fixture",
-  "canonical-host-status-label",
 ]);
 
 type CopyHit = {

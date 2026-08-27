@@ -4,6 +4,8 @@ import type {
   ManualNotificationRequestedChannels,
 } from "@/features/host/model/host-view-types";
 import { compatibilityExposureLabel } from "@/features/host/model/session-exposure-model";
+import { hostMeetingLifecycleLabel } from "@/shared/model/meeting-language";
+import type { SessionState } from "@/shared/model/readmates-types";
 
 export const manualChannelLabels: Record<ManualNotificationRequestedChannels, string> = {
   BOTH: "앱 + 이메일",
@@ -39,15 +41,13 @@ export const manualTemplateDescriptions: Record<HostNotificationEventType, strin
   SESSION_RECORD_UPDATED: "수정된 모임 기록을 멤버에게 안내합니다.",
 };
 
-const sessionStateLabels: Record<string, string> = {
-  DRAFT: "예정",
-  OPEN: "진행 중",
-  PUBLISHED: "공개됨",
-  CLOSED: "종료",
-};
+const SESSION_STATES = new Set<SessionState>(["DRAFT", "OPEN", "CLOSED", "PUBLISHED"]);
 
 export function manualSessionStateLabel(value: string): string {
-  return sessionStateLabels[value] ?? "상태 확인 필요";
+  if (SESSION_STATES.has(value as SessionState)) {
+    return hostMeetingLifecycleLabel(value as SessionState);
+  }
+  return "상태 확인 필요";
 }
 
 export function manualSessionVisibilityLabel(value: string): string {
