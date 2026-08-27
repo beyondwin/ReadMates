@@ -1334,7 +1334,7 @@ const HostSessionListItemSchema = z.object({
   state: sessionStateSchema,
   visibility: z.enum(["HOST_ONLY", "MEMBER", "PUBLIC"]),
   accessScope: z.enum(["HOST_ONLY", "GUEST_READABLE"]).optional(),
-  siteVisibility: z.enum(["HIDDEN", "LISTED"]).optional(),
+  siteVisibility: z.enum(["HIDDEN", "PUBLIC_RECORD"]).optional(),
   recordStatus: z.enum(["NOT_STARTED", "INCOMPLETE", "COMPLETE"]),
   needsAttention: z.boolean(),
   hasDraft: z.boolean(),

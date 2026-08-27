@@ -61,6 +61,8 @@ const closedPastPage = {
     locationLabel: "온라인",
     state: "CLOSED",
     visibility: "MEMBER",
+    accessScope: "GUEST_READABLE",
+    siteVisibility: "PUBLIC_RECORD",
     recordStatus: "INCOMPLETE",
     needsAttention: true,
     hasDraft: false,
