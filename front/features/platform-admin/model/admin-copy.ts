@@ -25,6 +25,16 @@ export const ADMIN_COPY = {
     relayStale: "중계 지연",
   },
   receipt: "영수증",
+  alarm: {
+    attention: "주의",
+    noUnacknowledged: "미확인 신호 없음",
+    unacknowledged: "미확인 신호",
+    serviceOk: "서비스 정상",
+    serviceDegraded: "서비스 주의",
+    unavailable: "신호 확인 불가",
+    openToday: "오늘 열기",
+    asOfSuffix: "기준",
+  },
 } as const;
 
 function fromMap(map: Record<string, string>) {

@@ -45,6 +45,13 @@ vi.mock(
 );
 
 vi.mock(
+  "@/features/platform-admin/api/platform-admin-health-api",
+  () => ({
+    fetchPlatformAdminHealthSnapshot: vi.fn(),
+  }),
+);
+
+vi.mock(
   "@/features/platform-admin/api/platform-admin-capabilities-api",
   () => ({
     fetchPlatformAdminCapabilities: vi.fn(),
@@ -65,11 +72,13 @@ vi.mock(
 
 import { logoutCurrentSession } from "@/shared/auth/session-api";
 import { fetchAdminOperationCases } from "@/features/platform-admin/api/platform-admin-operations-api";
+import { fetchPlatformAdminHealthSnapshot } from "@/features/platform-admin/api/platform-admin-health-api";
 import {
   commitPlatformAdminOnboarding,
   fetchPlatformAdminSummary,
   previewPlatformAdminOnboarding,
 } from "@/features/platform-admin/api/platform-admin-api";
+import { platformAdminHealthSnapshotQuery } from "@/features/platform-admin/queries/platform-admin-health-queries";
 import { AdminShellLayout } from "./admin-shell-layout";
 
 const summary: PlatformAdminSummaryResponse = {
@@ -153,6 +162,37 @@ const operations: AdminOperationCasesResponse = {
   nextCursor: null,
 };
 
+const quietOperations: AdminOperationCasesResponse = {
+  ...operations,
+  counts: { open: 0, critical: 0, assignedToMe: 0, snoozed: 0 },
+};
+
+const healthSnapshot = {
+  schema: "platform.health_snapshot.v1" as const,
+  generatedAt: "2026-08-04T10:00:00Z",
+  lastSuccessfulAt: "2026-08-04T10:00:00Z",
+  refreshState: "FRESH" as const,
+  staleAgeSeconds: 0,
+  cards: [
+    {
+      id: "outbox_backlog",
+      title: "Outbox backlog",
+      status: "OK" as const,
+      metric: { value: 0, unit: "rows", label: "pending" },
+      thresholds: { warn: 100, crit: 1000 },
+      lastCheckedAt: "2026-08-04T10:00:00Z",
+      source: "IN_PROCESS" as const,
+      drill: null,
+      reason: null,
+      deployStrip: null,
+    },
+  ],
+};
+
+const alarmOperationsQuery = platformAdminOperationCasesQuery({
+  states: ["OPEN", "ACKNOWLEDGED"],
+});
+
 const auth = {
   authenticated: true,
   userId: "platform-owner-user",
@@ -192,6 +232,7 @@ function renderShell(
     operations?: AdminOperationCasesResponse;
     summary?: PlatformAdminSummaryResponse;
     capabilities?: PlatformAdminCapabilities;
+    health?: typeof healthSnapshot;
     initialEntries?: string[];
     initialIndex?: number;
   } = {},
@@ -213,7 +254,15 @@ function renderShell(
   );
   queryClient.setQueryData(
     platformAdminOperationCasesQuery().queryKey,
-    opts.operations ?? operations,
+    opts.operations ?? quietOperations,
+  );
+  queryClient.setQueryData(
+    alarmOperationsQuery.queryKey,
+    opts.operations ?? quietOperations,
+  );
+  queryClient.setQueryData(
+    platformAdminHealthSnapshotQuery().queryKey,
+    opts.health ?? healthSnapshot,
   );
   queryClient.setQueryData(memberQueryKey, memberSnapshot);
   const router = createMemoryRouter(
@@ -245,6 +294,7 @@ describe("AdminShellLayout", () => {
   beforeEach(() => {
     vi.mocked(logoutCurrentSession).mockReset();
     vi.mocked(fetchAdminOperationCases).mockReset();
+    vi.mocked(fetchPlatformAdminHealthSnapshot).mockReset();
     vi.mocked(fetchPlatformAdminSummary).mockReset();
     vi.mocked(previewPlatformAdminOnboarding).mockReset();
     vi.mocked(commitPlatformAdminOnboarding).mockReset();
@@ -270,12 +320,12 @@ describe("AdminShellLayout", () => {
     expect(screen.queryByText("도메인 조치")).not.toBeInTheDocument();
   });
 
-  it("does not poll operations or summary for a shell-owned command status", async () => {
+  it("still renders the shell when alarm summary queries reject", async () => {
     vi.mocked(fetchAdminOperationCases).mockRejectedValue(
       new Error("operations unavailable"),
     );
-    vi.mocked(fetchPlatformAdminSummary).mockRejectedValue(
-      new Error("summary unavailable"),
+    vi.mocked(fetchPlatformAdminHealthSnapshot).mockRejectedValue(
+      new Error("health unavailable"),
     );
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -308,10 +358,12 @@ describe("AdminShellLayout", () => {
     expect(screen.getByRole("link", { name: "오늘" })).toBeInTheDocument();
     expect(document.querySelector(".admin-command-status")).toBeNull();
     await waitFor(() => {
-      expect(screen.queryByText("운영 신호 확인 불가")).not.toBeInTheDocument();
+      expect(screen.getByRole("status")).toHaveTextContent("신호 확인 불가");
     });
-    expect(fetchAdminOperationCases).not.toHaveBeenCalled();
-    expect(fetchPlatformAdminSummary).not.toHaveBeenCalled();
+    expect(screen.getByRole("link", { name: "오늘 열기" })).toHaveAttribute(
+      "href",
+      "/admin/today",
+    );
   });
 
   it("imports the scoped editorial ledger stylesheet from the shell layout", () => {
@@ -321,8 +373,9 @@ describe("AdminShellLayout", () => {
     );
     expect(source).toContain("admin-editorial-ledger.css");
     expect(source).not.toContain("AdminCommandStatus");
-    expect(source).not.toContain("platformAdminOperationCasesQuery");
     expect(source).not.toContain("platformAdminSummaryQuery");
+    expect(source).toContain("AdminAlarmBar");
+    expect(source).toContain("useAdminAlarmSummary");
   });
 
   it("does not render a global header 새 클럽 CTA", () => {

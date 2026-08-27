@@ -28,6 +28,8 @@ import {
   useCommitPlatformAdminOnboardingMutation,
   usePreviewPlatformAdminOnboardingMutation,
 } from "@/features/platform-admin/queries/platform-admin-queries";
+import { useAdminAlarmSummary } from "@/features/platform-admin/queries/admin-alarm-summary";
+import { AdminAlarmBar } from "@/features/platform-admin/ui/admin-alarm-bar";
 import { AdminBreadcrumb } from "@/features/platform-admin/ui/admin-breadcrumb";
 import { AdminLayoutNav } from "@/features/platform-admin/ui/admin-layout-nav";
 import { AdminOnboardingModal } from "@/features/platform-admin/ui/admin-onboarding-modal";
@@ -217,6 +219,7 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
           <AdminLayoutNav capabilities={capabilities} ariaLabel="Admin 콘솔" />
         </aside>
         <main id="admin-main" className="admin-shell__main" tabIndex={-1}>
+          <AdminShellAlarmBar />
           <Outlet />
         </main>
       </div>
@@ -248,6 +251,11 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
       ) : null}
     </div>
   );
+}
+
+function AdminShellAlarmBar() {
+  const { summary, state } = useAdminAlarmSummary();
+  return <AdminAlarmBar summary={summary} state={state} />;
 }
 
 function focusAdminMain(event: MouseEvent<HTMLAnchorElement>) {

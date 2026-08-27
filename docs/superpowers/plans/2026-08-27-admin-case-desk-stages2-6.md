@@ -75,10 +75,12 @@ export function useAdminAlarmSummary(): { summary: AdminAlarmSummary | null; sta
 - Consumes: 기존 오늘 신호 쿼리(`front/features/platform-admin/queries/`의 operations/today 쿼리)와 health snapshot 쿼리를 **읽기 전용으로 합성**. 새 서버 호출을 만들지 않는다. 둘 다 실패하면 `state: "unavailable"`로 조용한 한 줄("신호 확인 불가 · 오늘 열기")만 렌더.
 
 **Steps:**
-- [ ] 테스트 작성: ① attention 1건이면 warn 텍스트+대표 한 줄+as-of 렌더 ② 0건이면 무채색 "미확인 신호 없음 · 서비스 정상" 한 줄 ③ unavailable이면 role="status"로 "신호 확인 불가" (색 없음) ④ 어떤 상태에서도 링크 "오늘 열기"가 `/admin/today`로 존재.
-- [ ] 실패 확인 → 구현(마크업은 목업 `design/mockups/2026-08-27-admin-case-desk/adm-a-today-desktop.html`의 `.alarm-bar` 구조 준용: 좌 warn 요약, 중앙 보조 텍스트, 우 mono as-of) → 통과 확인.
-- [ ] 셸 통합: `AdminShellLayoutInner`에서 브레드크럼 아래·Outlet 위에 `<AdminAlarmBar …/>` 1회. 훅 실패가 셸 렌더를 막지 않음을 테스트(쿼리 reject 모킹)로 고정.
-- [ ] Commit: `feat(admin): resident alarm summary bar`
+- [x] 테스트 작성: ① attention 1건이면 warn 텍스트+대표 한 줄+as-of 렌더 ② 0건이면 무채색 "미확인 신호 없음 · 서비스 정상" 한 줄 ③ unavailable이면 role="status"로 "신호 확인 불가" (색 없음) ④ 어떤 상태에서도 링크 "오늘 열기"가 `/admin/today`로 존재.
+- [x] 실패 확인 → 구현(마크업은 목업 `design/mockups/2026-08-27-admin-case-desk/adm-a-today-desktop.html`의 `.alarm-bar` 구조 준용: 좌 warn 요약, 중앙 보조 텍스트, 우 mono as-of) → 통과 확인.
+- [x] 셸 통합: `AdminShellLayoutInner`에서 브레드크럼 아래·Outlet 위에 `<AdminAlarmBar …/>` 1회. 훅 실패가 셸 렌더를 막지 않음을 테스트(쿼리 reject 모킹)로 고정.
+- [x] Commit: `feat(admin): resident alarm summary bar`
+
+> 실행 노트: `AdminAlarmSummary`는 ui↔queries 순환을 피하려고 `model/admin-alarm-summary.ts`에 두고 양쪽에서 re-export. 클럽 이름은 operations/health 응답에 없어 headline은 summaryCode 라벨만 사용(가짜 클럽명 없음). 알람 바는 `main` 안·Outlet 위에 1회 렌더.
 
 ### Task 2-2: 서비스 건강 페이지를 서사형으로 재구성
 

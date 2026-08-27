@@ -15,6 +15,64 @@
   gap: var(--space-sm);
 }
 
+.admin-alarm-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  padding: 9px 0 12px;
+  margin-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text-3);
+  font-size: var(--type-size-label);
+  line-height: var(--type-leading-label);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.admin-alarm-bar__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--stale);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.admin-alarm-bar__live::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--stale);
+  flex-shrink: 0;
+}
+
+.admin-alarm-bar__secondary {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-alarm-bar__today {
+  display: inline-flex;
+  align-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  color: var(--text-3);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.admin-alarm-bar__asof {
+  margin-left: auto;
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-4);
+  white-space: nowrap;
+}
+
 .admin-page-context__eyebrow,
 .admin-page-context__freshness,
 .admin-page-context__scope,
