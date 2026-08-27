@@ -29,7 +29,8 @@ function findDescriptor(routePath: string): AdminRouteDescriptor | null {
 
 function buildParts(descriptor: AdminRouteDescriptor, extra?: string | null): string[] {
   const parts: string[] = [];
-  const isPrimaryLeaf = descriptor.path === "today" || descriptor.path === "clubs";
+  const isPrimaryLeaf =
+    descriptor.group == null || descriptor.path === "today" || descriptor.path === "clubs";
   if (!isPrimaryLeaf) {
     parts.push(descriptor.groupLabel);
   }

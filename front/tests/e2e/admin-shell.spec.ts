@@ -9,6 +9,7 @@ const OWNER_CAPABILITIES = [
   "REPLAY_NOTIFICATIONS",
   "VIEW_AI_OPERATIONS",
   "MANAGE_AI_OPERATIONS",
+  "EMERGENCY_PUBLIC_TAKEDOWN",
   "VIEW_SUPPORT",
   "MANAGE_SUPPORT_ACCESS",
   "VIEW_AUDIT",
@@ -202,8 +203,11 @@ function adminShellSuite() {
     await expect(page.getByRole("heading", { name: "오늘의 운영 케이스" })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByRole("link", { name: "오늘" })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByRole("link", { name: "클럽" })).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByText("서비스", { exact: true })).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByText("검토", { exact: true })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByText("파이프라인", { exact: true })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByText("원장", { exact: true })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByText("서비스", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByText("검토", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByRole("link", { name: "긴급 공개 회수" })).toBeVisible();
     await expect(page.getByText("Command")).toHaveCount(0);
     await expect(page.getByRole("link", { name: "사건" })).toHaveCount(0);
     await expect(page.getByRole("banner").getByRole("link", { name: "새 클럽" })).toHaveCount(0);

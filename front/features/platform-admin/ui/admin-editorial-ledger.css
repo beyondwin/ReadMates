@@ -990,3 +990,33 @@
     scroll-behavior: auto !important;
   }
 }
+
+.admin-layout-nav {
+  min-height: calc(100vh - 160px);
+  align-content: start;
+}
+
+.admin-layout-nav[data-layout="compact"] {
+  min-height: 0;
+}
+
+.admin-layout-nav__pinned {
+  display: grid;
+  gap: 4px;
+  margin: auto 0 0;
+  padding: 18px 0 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.admin-layout-nav[data-layout="compact"] .admin-layout-nav__pinned {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.admin-layout-nav__count {
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+}

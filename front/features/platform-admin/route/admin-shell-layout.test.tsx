@@ -311,13 +311,25 @@ describe("AdminShellLayout", () => {
     expect(screen.queryByText("전체 신호 정상 · 8건 활성 · 19:00 기준")).not.toBeInTheDocument();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "오늘" })).toBeInTheDocument();
-    expect(screen.getByText("서비스")).toBeInTheDocument();
-    expect(screen.getByText("검토")).toBeInTheDocument();
+    expect(screen.getByText("파이프라인")).toBeInTheDocument();
+    expect(screen.getByText("원장")).toBeInTheDocument();
+    expect(screen.queryByText("서비스", { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByText("검토")).not.toBeInTheDocument();
     expect(screen.queryByText("Command")).not.toBeInTheDocument();
     expect(screen.getByText("today content")).toBeInTheDocument();
     expect(screen.queryByText("조치 필요 클럽")).not.toBeInTheDocument();
     expect(screen.queryByText("공개 준비")).not.toBeInTheDocument();
     expect(screen.queryByText("도메인 조치")).not.toBeInTheDocument();
+  });
+
+  it("shows a mono attention count beside 오늘 from the alarm summary", () => {
+    renderShell("/admin/today", { operations });
+    const today = within(screen.getByRole("navigation", { name: "Admin 콘솔" })).getByRole(
+      "link",
+      { name: "오늘" },
+    );
+    expect(today.querySelector(".admin-layout-nav__count")).toHaveTextContent("7");
+    expect(today.querySelector(".admin-layout-nav__count")).toHaveClass("ledger-number");
   });
 
   it("still renders the shell when alarm summary queries reject", async () => {

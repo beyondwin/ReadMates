@@ -12,13 +12,15 @@ import type { PlatformAdminCapabilities } from "@/features/platform-admin/model/
 export function AdminLayoutNav({
   capabilities,
   ariaLabel = "플랫폼 관리 메뉴",
+  todayCount = null,
 }: {
   capabilities: PlatformAdminCapabilities | null | undefined;
   ariaLabel?: string;
+  todayCount?: number | null;
 }) {
   const location = useLocation();
   const compact = useAdminShellCompactLayout();
-  const areas = useMemo(() => visibleAdminNav(capabilities), [capabilities]);
+  const { areas, pinned } = useMemo(() => visibleAdminNav(capabilities), [capabilities]);
 
   return (
     <nav
@@ -41,6 +43,11 @@ export function AdminLayoutNav({
                     aria-current={areaActive ? "page" : undefined}
                   >
                     <span className="admin-layout-nav__item-label">{area.label}</span>
+                    {area.id === "today" && todayCount != null && todayCount > 0 ? (
+                      <span className="admin-layout-nav__count ledger-number" aria-hidden="true">
+                        {todayCount}
+                      </span>
+                    ) : null}
                   </Link>
                 ) : (
                   <>
@@ -67,6 +74,18 @@ export function AdminLayoutNav({
               </li>
             );
           })}
+        </ul>
+      ) : null}
+      {pinned.length > 0 ? (
+        <ul className="admin-layout-nav__pinned">
+          {pinned.map((route) => (
+            <li key={route.path}>
+              <NavItem
+                route={route}
+                isActive={isAdminRouteActive(location.pathname, route.path)}
+              />
+            </li>
+          ))}
         </ul>
       ) : null}
     </nav>

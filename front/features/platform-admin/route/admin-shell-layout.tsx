@@ -79,6 +79,7 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
   );
 
   const capabilities = capabilitiesQuery.data ?? null;
+  const alarm = useAdminAlarmSummary();
   const canCreateClub =
     capabilities != null && canAdmin(capabilities, "CREATE_CLUB");
 
@@ -216,10 +217,14 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
       </header>
       <div className="admin-shell__body">
         <aside className="admin-shell__nav">
-          <AdminLayoutNav capabilities={capabilities} ariaLabel="Admin 콘솔" />
+          <AdminLayoutNav
+            capabilities={capabilities}
+            ariaLabel="Admin 콘솔"
+            todayCount={alarm.summary?.attention.count ?? null}
+          />
         </aside>
         <main id="admin-main" className="admin-shell__main" tabIndex={-1}>
-          <AdminShellAlarmBar />
+          <AdminAlarmBar summary={alarm.summary} state={alarm.state} />
           <Outlet />
         </main>
       </div>
@@ -251,11 +256,6 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
       ) : null}
     </div>
   );
-}
-
-function AdminShellAlarmBar() {
-  const { summary, state } = useAdminAlarmSummary();
-  return <AdminAlarmBar summary={summary} state={state} />;
 }
 
 function focusAdminMain(event: MouseEvent<HTMLAnchorElement>) {

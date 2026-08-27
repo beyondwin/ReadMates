@@ -29,19 +29,28 @@ describe("AdminBreadcrumb", () => {
     expect(screen.queryByText("Command")).not.toBeInTheDocument();
   });
 
-  it("nests service health under 서비스 with the unified Korean label", () => {
+  it("nests service health under 파이프라인 with the unified Korean label", () => {
     render(<AdminBreadcrumb routePath="health" />);
-    expect(screen.getByText("서비스")).toBeInTheDocument();
+    expect(screen.getByText("파이프라인")).toBeInTheDocument();
     expect(screen.getByText("서비스 건강")).toBeInTheDocument();
     expect(screen.queryByText("사건")).not.toBeInTheDocument();
     expect(screen.queryByText("Operations")).not.toBeInTheDocument();
+    expect(screen.queryByText("서비스", { exact: true })).not.toBeInTheDocument();
   });
 
-  it("nests analytics under 검토", () => {
+  it("nests analytics under 원장", () => {
     render(<AdminBreadcrumb routePath="analytics" />);
-    expect(screen.getByText("검토")).toBeInTheDocument();
+    expect(screen.getByText("원장")).toBeInTheDocument();
     expect(screen.getByText("분석 부록")).toBeInTheDocument();
     expect(screen.queryByText("Review")).not.toBeInTheDocument();
+    expect(screen.queryByText("검토")).not.toBeInTheDocument();
     expect(screen.queryByText(/준비 중/)).not.toBeInTheDocument();
+  });
+
+  it("renders emergency public takedown without a primary group parent", () => {
+    render(<AdminBreadcrumb routePath="public-takedown" />);
+    expect(screen.getByText("긴급 공개 회수")).toBeInTheDocument();
+    expect(screen.queryByText("비상 레인")).not.toBeInTheDocument();
+    expect(screen.queryByText("파이프라인")).not.toBeInTheDocument();
   });
 });
