@@ -5,6 +5,7 @@ import {
   formatMeetingOrdinal,
   formatMeetingProjection,
   formatPublicationAction,
+  hostMeetingLifecycleLabel,
   MEETING_APPLY_LABEL,
   MEETING_ATTENDANCE_LABEL,
   MEETING_NOUN,
@@ -29,10 +30,10 @@ describe("canonical meeting language", () => {
   });
 
   it("labels host and member/guest lifecycle independently of public placement", () => {
-    expect(formatMeetingLifecycle("DRAFT", "host")).toBe("모임 작성 중");
-    expect(formatMeetingLifecycle("OPEN", "host")).toBe("멤버와 준비 중");
+    expect(formatMeetingLifecycle("DRAFT", "host")).toBe("작성 중");
+    expect(formatMeetingLifecycle("OPEN", "host")).toBe("준비 중");
     expect(formatMeetingLifecycle("CLOSED", "host")).toBe("기록 정리 중");
-    expect(formatMeetingLifecycle("PUBLISHED", "host")).toBe("게스트·멤버 노트 게시 완료");
+    expect(formatMeetingLifecycle("PUBLISHED", "host")).toBe("게시됨");
 
     expect(formatMeetingLifecycle("DRAFT", "member")).toBe("예정 모임");
     expect(formatMeetingLifecycle("OPEN", "member")).toBe("이번 모임");
@@ -45,6 +46,13 @@ describe("canonical meeting language", () => {
     expect(formatMeetingLifecycle("PUBLISHED", "guest")).toBe("지난 모임 기록");
 
     expect(formatMeetingLifecycle("PUBLISHED", "public")).toBe("공개 기록");
+  });
+
+  it("exposes the typed host lifecycle dictionary for host surfaces", () => {
+    expect(hostMeetingLifecycleLabel("DRAFT")).toBe("작성 중");
+    expect(hostMeetingLifecycleLabel("OPEN")).toBe("준비 중");
+    expect(hostMeetingLifecycleLabel("CLOSED")).toBe("기록 정리 중");
+    expect(hostMeetingLifecycleLabel("PUBLISHED")).toBe("게시됨");
   });
 
   it("keeps 참석 응답, 실제 출석, and 기록에 반영 as canonical action nouns", () => {

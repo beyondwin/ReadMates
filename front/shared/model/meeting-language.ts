@@ -16,12 +16,18 @@ export const MEETING_RESPONSE_LABEL = "참석 응답";
 export const MEETING_ATTENDANCE_LABEL = "실제 출석";
 export const MEETING_APPLY_LABEL = "기록에 반영";
 
-const HOST_LIFECYCLE: Record<SessionState, string> = {
-  DRAFT: "모임 작성 중",
-  OPEN: "멤버와 준비 중",
+export type HostMeetingLifecycleLabel = "작성 중" | "준비 중" | "기록 정리 중" | "게시됨";
+
+const HOST_LIFECYCLE: Record<SessionState, HostMeetingLifecycleLabel> = {
+  DRAFT: "작성 중",
+  OPEN: "준비 중",
   CLOSED: "기록 정리 중",
-  PUBLISHED: "게스트·멤버 노트 게시 완료",
+  PUBLISHED: "게시됨",
 };
+
+export function hostMeetingLifecycleLabel(state: SessionState): HostMeetingLifecycleLabel {
+  return HOST_LIFECYCLE[state];
+}
 
 const MEMBER_GUEST_LIFECYCLE: Record<SessionState, string> = {
   DRAFT: "예정 모임",
