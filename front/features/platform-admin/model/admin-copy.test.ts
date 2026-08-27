@@ -24,6 +24,9 @@ describe("admin-copy", () => {
     expect(ADMIN_COPY.heading.clubsLedger).toBe("클럽 장부");
     expect(ADMIN_COPY.heading.delivery).toBe("배달 원장");
     expect(ADMIN_COPY.heading.recentChanges).toBe("최근에 바뀐 것");
+    expect(ADMIN_COPY.targetLedger.heading).toBe("이 대상의 최근 기입");
+    expect(ADMIN_COPY.targetLedger.more).toBe("전체 기입 보기");
+    expect(ADMIN_COPY.targetLedger.empty).toBe("표시할 기입이 없습니다.");
     expect(ADMIN_COPY.metric.outboxPending).toBe("발송 대기");
     expect(ADMIN_COPY.metric.outboxFailed).toBe("발송 실패");
     expect(ADMIN_COPY.metric.deliveryPending).toBe("배달 대기");

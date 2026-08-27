@@ -77,9 +77,14 @@ describe("AdminOperationsInspector", () => {
       "href",
       "/admin/notifications?focus=delivery",
     );
-    expect(screen.getByText("신호가 처음 감지됨")).toBeInTheDocument();
-    expect(screen.getByText("상태 변경 기록")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "이 대상의 최근 기입" })).toBeInTheDocument();
+    expect(screen.getByText("신호가 처음 감지됨 · 미확인")).toBeInTheDocument();
+    expect(screen.getByText("상태 변경 기록 · 확인됨")).toBeInTheDocument();
     expect(screen.queryByText("PRIVATE_HISTORY_CODE")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "전체 기입 보기" })).toHaveAttribute(
+      "href",
+      "/admin/audit?target=case-notification",
+    );
     expect(screen.getByRole("group", { name: "작업" })).toHaveClass("admin-action-dock");
     expect(screen.getByRole("button", { name: "확인 처리" })).toBeInTheDocument();
   });
@@ -358,5 +363,88 @@ describe("AdminOperationsInspector", () => {
 
     expect(onSnooze).toHaveBeenCalledOnce();
     expect(onSnooze).toHaveBeenCalledWith("2026-08-11T10:00:00.000Z", "중복 신호로 판단");
+  });
+
+  it("renders at most three recent case-history sentences and the audit prefilter href", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <AdminOperationsInspector
+          selectedCase={{ ...selectedCase, clubId: "club-reading-sai" }}
+          history={[
+            {
+              fromState: null,
+              toState: "OPEN",
+              action: null,
+              reasonCode: "SIGNAL_OPENED",
+              occurredAt: "2026-08-04T08:00:00Z",
+              caseVersion: 1,
+            },
+            {
+              fromState: "OPEN",
+              toState: "ACKNOWLEDGED",
+              action: "ACKNOWLEDGE",
+              reasonCode: "OPERATOR_ACKNOWLEDGED",
+              occurredAt: "2026-08-04T08:10:00Z",
+              caseVersion: 2,
+            },
+            {
+              fromState: "ACKNOWLEDGED",
+              toState: "SNOOZED",
+              action: "SNOOZE",
+              reasonCode: "OPERATOR_SNOOZED",
+              occurredAt: "2026-08-04T08:20:00Z",
+              caseVersion: 3,
+            },
+            {
+              fromState: "SNOOZED",
+              toState: "OPEN",
+              action: null,
+              reasonCode: "SIGNAL_REOPENED",
+              occurredAt: "2026-08-04T08:30:00Z",
+              caseVersion: 4,
+            },
+          ]}
+          lifecycleControls={null}
+        />
+      </MemoryRouter>,
+    );
+
+    const rows = [...container.querySelectorAll(".ledger-inline .li")];
+    expect(rows).toHaveLength(3);
+    expect(rows.map((row) => row.querySelector("time")?.textContent)).toEqual([
+      "8.4 17:30",
+      "8.4 17:20",
+      "8.4 17:10",
+    ]);
+    expect(rows.map((row) => row.querySelector("span")?.textContent)).toEqual([
+      "신호 재감지로 다시 열림 · 미확인",
+      "운영자가 보류함 · 보류됨",
+      "운영자가 확인함 · 확인됨",
+    ]);
+    expect(screen.queryByText("신호가 처음 감지됨 · 미확인")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "전체 기입 보기" })).toHaveAttribute(
+      "href",
+      "/admin/audit?target=club-reading-sai",
+    );
+  });
+
+  it("omits invented ledger rows when case detail history is empty", () => {
+    render(
+      <MemoryRouter>
+        <AdminOperationsInspector
+          selectedCase={selectedCase}
+          history={[]}
+          lifecycleControls={null}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("heading", { name: "이 대상의 최근 기입" })).toBeInTheDocument();
+    expect(screen.getByText("표시할 기입이 없습니다.")).toBeInTheDocument();
+    expect(document.querySelectorAll(".ledger-inline .li")).toHaveLength(0);
+    expect(screen.getByRole("link", { name: "전체 기입 보기" })).toHaveAttribute(
+      "href",
+      "/admin/audit?target=case-notification",
+    );
   });
 });

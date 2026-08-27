@@ -1,9 +1,11 @@
 import { useLayoutEffect, type ReactNode } from "react";
 import { commitAdminEditorialLedgerCaseDocket } from "@/shared/observability/admin-editorial-ledger-performance";
 import { Link } from "react-router";
+import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
 import type { AdminOperationCaseView } from "@/features/platform-admin/model/platform-admin-operations-model";
 import { AdminSafeActionDock, type AdminSafeActionState } from "./admin-action-dock";
 import { AdminCaseDocket } from "./admin-case-docket";
+import { AdminTargetLedgerInline } from "./admin-target-ledger-inline";
 
 type SafeHistoryEvent = {
   fromState: string | null;
@@ -66,6 +68,15 @@ const CASE_STATE_LABELS: Record<string, string> = {
 const KOREAN_TIME = new Intl.DateTimeFormat("ko-KR", {
   dateStyle: "medium",
   timeStyle: "short",
+  timeZone: "Asia/Seoul",
+});
+
+const LEDGER_TIME = new Intl.DateTimeFormat("ko-KR", {
+  month: "numeric",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
   timeZone: "Asia/Seoul",
 });
 
@@ -148,21 +159,13 @@ export function AdminOperationsInspector({
       }
       history={
         <div className="admin-operations-inspector__history">
-          <h3 className="h3">케이스 이력</h3>
-          {history.length === 0 ? (
-            <p className="admin-operations-inspector__empty">표시할 상태 변경 이력이 없습니다.</p>
-          ) : (
-            <ol>
-              {history.map((event) => (
-                <li key={`${event.caseVersion}:${event.occurredAt}`}>
-                  <strong>{HISTORY_LABELS[event.reasonCode] ?? "상태 변경 기록"}</strong>
-                  <span>
-                    {CASE_STATE_LABELS[event.toState] ?? "상태 확인"} · {formatTime(event.occurredAt)}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          )}
+          <div className="sec-h">
+            <h3>{ADMIN_COPY.targetLedger.heading}</h3>
+          </div>
+          <AdminTargetLedgerInline
+            entries={targetLedgerEntries(history)}
+            moreHref={targetLedgerHref(selectedCase)}
+          />
         </div>
       }
       actions={
@@ -198,6 +201,36 @@ export function AdminOperationsInspector({
 function formatTime(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "시각 확인 필요" : KOREAN_TIME.format(date);
+}
+
+function formatLedgerTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "시각 확인 필요";
+  const parts = LEDGER_TIME.formatToParts(date);
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  const hour = parts.find((part) => part.type === "hour")?.value;
+  const minute = parts.find((part) => part.type === "minute")?.value;
+  if (!month || !day || !hour || !minute) return formatTime(value);
+  return `${month}.${day} ${hour}:${minute}`;
+}
+
+function targetLedgerEntries(history: readonly SafeHistoryEvent[]) {
+  return [...history]
+    .sort((left, right) => {
+      const byTime = Date.parse(right.occurredAt) - Date.parse(left.occurredAt);
+      if (byTime !== 0 && Number.isFinite(byTime)) return byTime;
+      return right.caseVersion - left.caseVersion;
+    })
+    .slice(0, 3)
+    .map((event) => ({
+      at: formatLedgerTime(event.occurredAt),
+      sentence: `${HISTORY_LABELS[event.reasonCode] ?? "상태 변경 기록"} · ${CASE_STATE_LABELS[event.toState] ?? "상태 확인"}`,
+    }));
+}
+
+function targetLedgerHref(selectedCase: AdminOperationCaseView): string {
+  return `/admin/audit?target=${encodeURIComponent(selectedCase.clubId ?? selectedCase.id)}`;
 }
 
 function DocketNav({ traversal }: { traversal: AdminCaseTraversal }) {

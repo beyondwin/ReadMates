@@ -152,8 +152,8 @@ export function AdminTargetLedgerInline({ entries, moreHref }: {
 - Consumes: 케이스 상세 응답의 기존 history/관련 링크 데이터. 감사 API 추가 호출 금지 — 상세에 이미 있는 이력만 문장화하고, `moreHref`는 audit 화면 프리필터 쿼리(4-1에서 지원)로 링크.
 
 **Steps:**
-- [ ] 테스트: 3건 렌더 + 시각 mono + "전체 기입 보기" 링크 href 검증 → 구현(목업 `.ledger-inline` 준용) → 통과 → 공통 게이트 → CT 재잠금 → Commit: `feat(admin): inline target ledger in docket`
-- [ ] **릴리스 체크포인트 3**
+- [x] 테스트: 3건 렌더 + 시각 mono + "전체 기입 보기" 링크 href 검증 → 구현(목업 `.ledger-inline` 준용) → 통과 → 공통 게이트 → CT 재잠금 → Commit: `feat(admin): inline target ledger in docket`
+- [x] **릴리스 체크포인트 3**
 
 ---
 

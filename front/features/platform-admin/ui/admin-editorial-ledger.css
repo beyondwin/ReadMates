@@ -205,6 +205,67 @@
   min-height: 44px;
 }
 
+.sec-h {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 30px 0 8px;
+  min-width: 0;
+}
+
+.sec-h h2,
+.sec-h h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.sec-h::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.ledger-inline {
+  margin-top: 10px;
+  min-width: 0;
+}
+
+.ledger-inline .li {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 14px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: var(--type-size-label);
+  color: var(--text-3);
+  overflow-wrap: anywhere;
+}
+
+.ledger-inline .li time {
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-4);
+}
+
+.ledger-inline__empty {
+  margin: 0;
+  padding: 8px 0;
+  color: var(--text-3);
+  font-size: var(--type-size-label);
+  overflow-wrap: anywhere;
+}
+
+.ledger-inline__more {
+  display: inline-flex;
+  align-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  color: var(--text-2);
+  text-underline-offset: 3px;
+}
+
 .admin-operation-actions__duration,
 .admin-operation-actions__reason {
   display: grid;

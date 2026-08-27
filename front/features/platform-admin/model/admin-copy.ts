@@ -18,6 +18,11 @@ export const ADMIN_COPY = {
     delivery: "배달 원장",
     recentChanges: "최근에 바뀐 것",
   },
+  targetLedger: {
+    heading: "이 대상의 최근 기입",
+    more: "전체 기입 보기",
+    empty: "표시할 기입이 없습니다.",
+  },
   metric: {
     outboxPending: "발송 대기",
     outboxFailed: "발송 실패",
