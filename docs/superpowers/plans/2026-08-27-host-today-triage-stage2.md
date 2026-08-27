@@ -10,6 +10,8 @@
 
 **Spec:** `docs/development/2026-08-27-readmates-host-triage-diary-redesign-design.md` §4.1, §6, §7. 시안: `docs/development/host-redesign-mockups/01-home-desktop.png`, `04-mobile.png`.
 
+ADR impact: new — ADR-0046
+
 ## Global Constraints
 
 - 상태 라벨은 `@/shared/model/meeting-language`의 `hostMeetingLifecycleLabel`만 사용(1단계 산출). 하드코딩 금지.

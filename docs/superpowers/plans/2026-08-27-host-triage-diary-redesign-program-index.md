@@ -2,6 +2,8 @@
 
 스펙 `docs/development/2026-08-27-readmates-host-triage-diary-redesign-design.md`(§9 단계적 구현)의 실행 계획 묶음. 순서대로 실행하며, 각 단계는 독립 릴리스 가능하다. 각 계획의 Task 0(앵커 재확인)을 건너뛰지 않는다 — 앞 단계가 코드를 바꾼 뒤 문서의 파일·행 참조가 낡았을 수 있다.
 
+ADR impact: new — ADR-0046
+
 | 순서 | 계획 문서 | 범위 | 선행 조건 |
 | --- | --- | --- | --- |
 | 1 | `2026-08-27-host-meeting-language-stage1.md` | 용어·상태 사전 통일 (라벨 단일화, 화면 불변) | 없음 |

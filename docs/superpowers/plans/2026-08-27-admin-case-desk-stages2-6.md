@@ -11,6 +11,8 @@
 **Spec:** `docs/development/2026-08-27-readmates-admin-case-desk-narrative-redesign-design.md`
 **선행:** `docs/superpowers/plans/2026-08-27-admin-language-stage1.md` 완료 후 시작.
 
+ADR impact: new — ADR-0047
+
 ## Global Constraints
 
 - 스펙 §6 용어 사전과 §5 명령 마찰 3등급, §7 페이지 타입 3종(데스크형/원장형/서사형)이 모든 태스크에 암묵 적용된다.
@@ -250,10 +252,10 @@ export function AdminTargetLedgerInline({ entries, moreHref }: {
 - 그룹 재편: `services`→`pipeline`(라벨 "파이프라인": 배달 원장·AI 작업·서비스 건강), `review`→`ledger`(라벨 "원장": 운영 기입·접근 원장·분석 부록). `AdminRouteGroup` 타입 값 교체(`"services" | "review"` → `"pipeline" | "ledger"`) 및 참조 전부 갱신.
 - 긴급 공개 회수는 그룹에서 빼서 내비 최하단 고정 링크(비상 레인) — `visibleAdminNav`에 `pinned: AdminRouteDescriptor[]` 반환 추가.
 - URL 경로는 전부 유지(리다이렉트 불필요 — 그룹은 표시 개념). 오늘 케이스 카운트 배지: 알람 훅의 attention.count를 내비 "오늘" 항목 옆 mono 숫자로 (Task 2-1 재사용).
-- `front/DESIGN.md` §Editorial Operations Ledger를 새 구성(케이스 데스크·서사·4축)으로 갱신하고, ADR-0046을 Accepted로 승격 + ADR-0045 superseded 표기 + ADR-0039 내비 축 서술 갱신 + 인덱스 동기화 (스펙 §10 승격 조건 충족 시에만).
+- `front/DESIGN.md` §Editorial Operations Ledger를 새 구성(케이스 데스크·서사·4축)으로 갱신하고, ADR-0047을 Accepted로 승격 + ADR-0045 superseded 표기 + ADR-0039 내비 축 서술 갱신 + 인덱스 동기화 (스펙 §10 승격 조건 충족 시에만).
 
 **Steps:**
-- [ ] 테스트 갱신(그룹 라벨·pinned) → 구현 → 통과 → 공통 게이트 전체 + CT 재잠금 + e2e 전체 → 문서·ADR 동기화 커밋 분리(`docs(adr): accept ADR-0046 …`) → Commit: `feat(admin): four-axis navigation` → **릴리스 체크포인트 6 (최종)**
+- [ ] 테스트 갱신(그룹 라벨·pinned) → 구현 → 통과 → 공통 게이트 전체 + CT 재잠금 + e2e 전체 → 문서·ADR 동기화 커밋 분리(`docs(adr): accept ADR-0047 …`) → Commit: `feat(admin): four-axis navigation` → **릴리스 체크포인트 6 (최종)**
 
 ---
 

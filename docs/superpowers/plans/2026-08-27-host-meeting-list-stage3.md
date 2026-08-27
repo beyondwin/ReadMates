@@ -10,6 +10,8 @@
 
 **Spec:** 설계 문서 §4.2(목록 두 불릿), §5, §7. 시안: `docs/development/host-redesign-mockups/05-home-desktop-b.png`(차례 문법 — 홈이 아니라 목록에 적용).
 
+ADR impact: new — ADR-0046
+
 ## Global Constraints
 
 - 상태 라벨은 `hostMeetingLifecycleLabel`만 사용.

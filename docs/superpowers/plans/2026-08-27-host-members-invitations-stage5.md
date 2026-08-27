@@ -12,6 +12,8 @@
 
 **Spec:** 설계 문서 §4.3, §5, §6. 시안: `docs/development/host-redesign-mockups/03-members-desktop.png` (원장 문법 참고 — 불참 누계 열은 이 단계 비범위).
 
+ADR impact: new — ADR-0046
+
 ## Global Constraints
 
 - 라벨: 초대 중단은 "중지"(§5 — 현행 UI의 "취소됨"을 교체), 소프트한 상태 표현은 텍스트 병기.

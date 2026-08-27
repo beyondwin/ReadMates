@@ -10,6 +10,8 @@
 
 **Spec:** 설계 문서 §3(3탭 표), §9 6단계.
 
+ADR impact: new — ADR-0046
+
 ## Global Constraints
 
 - 3탭: 오늘(`/app/host`) · 모임(`/sessions`) · 멤버(`/members`). 알림 작업대(`/notifications`)는 화면 유지 + 1차 내비 없음(진입은 오늘 큐·다이어리 발송 액션).

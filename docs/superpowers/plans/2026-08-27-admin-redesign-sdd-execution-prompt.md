@@ -2,6 +2,8 @@
 
 아래 전문을 새 에이전트 세션에 그대로 붙여넣어 실행한다. (이 파일 자체는 실행 대상이 아니라 프롬프트 보관본이다.)
 
+ADR impact: new — ADR-0047
+
 ---
 
 /subagent-driven-development 스킬로 ReadMates 어드민 재설계를 처음부터 끝까지 구현해줘. 너는 컨트롤러다. 아래 계약을 그대로 따른다.
@@ -20,7 +22,7 @@
 2. 저장소 라우터 `AGENTS.md`와 `docs/agents/front.md`, `docs/agents/design.md`, `docs/agents/execution.md`, `front/AGENTS.md`를 읽는다. 프런트 검증 명령·공개 저장소 안전 규칙은 이 문서들이 권위다.
 3. 다음 문서를 읽는다 (권위 순서대로):
    - 스펙(최상위 권위): `docs/development/2026-08-27-readmates-admin-case-desk-narrative-redesign-design.md`
-   - ADR: `docs/development/adr/0046-admin-case-desk-narrative-composition.md`
+   - ADR: `docs/development/adr/0047-admin-case-desk-narrative-composition.md`
    - 계획 1: `docs/superpowers/plans/2026-08-27-admin-language-stage1.md`
    - 계획 2: `docs/superpowers/plans/2026-08-27-admin-case-desk-stages2-6.md` (안의 **적응 실행 규약**은 모든 태스크에 구속력이 있다)
    - 시각 참고(권위 아님): `design/mockups/2026-08-27-admin-case-desk/README.md`와 PNG들, 현행 권위 `front/DESIGN.md`
@@ -30,7 +32,7 @@
 
 1. **계획 1 (1단계: 용어 사전 통일)** 을 SDD 태스크 루프로 완주한다. Task 1~8. 같은 모양의 소규모 문자열 치환 태스크는 SDD의 배치 규칙대로 한 번에 묶어 dispatch해도 된다.
 2. 계획 1의 최종 게이트(lint/test/build/e2e/CT 재잠금) 통과 후, **계획 2 (2~6단계)** 를 이어서 완주한다. 단계 순서 고정: 2 → 3 → 4 → 5 → 6. 각 단계 끝의 공통 검증 게이트와 릴리스 체크포인트(CHANGELOG Unreleased 한 줄)를 지킨다.
-3. 6단계 완료 + 전체 게이트 green + `front/DESIGN.md` 갱신이 끝났을 때만 ADR-0046을 Accepted로 승격하고 ADR-0045 superseded / ADR-0039 내비 축 서술 / ADR 인덱스를 동기화한다. 조건 미충족이면 Proposed로 남기고 사유를 보고한다.
+3. 6단계 완료 + 전체 게이트 green + `front/DESIGN.md` 갱신이 끝났을 때만 ADR-0047을 Accepted로 승격하고 ADR-0045 superseded / ADR-0039 내비 축 서술 / ADR 인덱스를 동기화한다. 조건 미충족이면 Proposed로 남기고 사유를 보고한다.
 4. 두 계획 모두 끝나면 merge-base 기준 최종 whole-branch 리뷰(가장 유능한 모델) → 1회 fix wave → 잔여 findings 판결까지 SDD 절차대로.
 
 ## 3. 판단 기준 (Ruling 시 권위 순서)
@@ -52,5 +54,5 @@
 - 실행한 검증 명령과 결과 / 건너뛴 검증과 이유
 - **Rulings I made**: ledger의 모든 `Ruling:` 항목을 순서대로, 각각 "틀렸을 경우의 비용" 포함 (누락 금지)
 - `## 실행 중 발견`에 쌓인 서버 후속·이월 결함 목록
-- ADR-0046 상태(Accepted 승격 여부와 근거)
+- ADR-0047 상태(Accepted 승격 여부와 근거)
 - finishing-a-development-branch 옵션 제시

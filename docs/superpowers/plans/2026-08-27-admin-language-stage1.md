@@ -10,6 +10,8 @@
 
 **Spec:** `docs/development/2026-08-27-readmates-admin-case-desk-narrative-redesign-design.md` (§6 용어 사전, §9 1단계)
 
+ADR impact: new — ADR-0047
+
 ## Global Constraints
 
 - 라벨 사전(스펙 §6 그대로): 케이스 / 오늘(내비·브레드크럼 동일) / AI 작업 / 배달 원장 / 운영 기입 / 접근 원장 / 분석 부록 / 영수증 / 결과 값 성공·실패·차단·진행.

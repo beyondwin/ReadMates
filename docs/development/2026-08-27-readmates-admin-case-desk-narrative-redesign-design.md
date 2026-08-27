@@ -3,7 +3,7 @@
 - 날짜: 2026-08-27
 - 표면: Platform admin (`/admin/**`)
 - 상태: 설계 방향 승인됨 (A안 케이스 데스크 + B안 운영 서사 조합)
-- ADR impact: **supersede/update** — ADR-0045의 admin composition을 대체, ADR-0039의 운영 문법은 계승하되 내비 축과 화면 셸을 재정의. 신규 `Proposed` ADR-0046.
+- ADR impact: **supersede/update** — ADR-0045의 admin composition을 대체, ADR-0039의 운영 문법은 계승하되 내비 축과 화면 셸을 재정의. 신규 `Proposed` ADR-0047.
 - 관련: `front/DESIGN.md` §Editorial Operations Ledger, ADR-0039, ADR-0040, ADR-0045, `front/features/platform-admin/**`
 
 ## 1. 문제
@@ -137,7 +137,7 @@
 
 - 단계별 `pnpm --dir front lint/test/build`, 영향 라우트 `pnpm --dir front test:e2e`.
 - `front/DESIGN.md` §Editorial Operations Ledger 갱신 + tracked CT 스크린샷 재잠금.
-- ADR-0046 `Proposed → Accepted` 승격은 6단계 완료 + 시각 계약·e2e 정합 + 문서 동기화 후. 그 시점에 ADR-0045를 host·admin 모두 superseded로 정리(호스트 안 진행 여부와 함께 판단)하고 ADR-0039의 내비 축 서술을 갱신한다.
+- ADR-0047 `Proposed → Accepted` 승격은 6단계 완료 + 시각 계약·e2e 정합 + 문서 동기화 후. 그 시점에 ADR-0045를 host·admin 모두 superseded로 정리(호스트 안 진행 여부와 함께 판단)하고 ADR-0039의 내비 축 서술을 갱신한다.
 
 ## 11. 시안
 

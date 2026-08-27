@@ -10,6 +10,8 @@
 
 **Spec:** 설계 문서 §4.2(다이어리·장부 마감·자동 알림·인라인 컴포저), §4.4(다이어리 모바일·당일 출석), §6. 시안: `docs/development/host-redesign-mockups/02-meeting-desktop.png`, `06-closing-desktop.png`, `04-mobile.png`.
 
+ADR impact: new — ADR-0046
+
 ## Global Constraints
 
 - 상태 라벨은 `hostMeetingLifecycleLabel`만. 타임라인 단계명은 §4.2 고정: `모임 만들기 → 멤버와 준비 → 응답 모으는 중 → 모임 당일(출석) → 기록 정리 → 기록 게시`.

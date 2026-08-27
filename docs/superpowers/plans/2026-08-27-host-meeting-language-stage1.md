@@ -10,6 +10,8 @@
 
 **Spec:** `docs/development/2026-08-27-readmates-host-triage-diary-redesign-design.md` (§5 용어·상태 사전, §9 1단계). ADR: `docs/development/adr/0046-host-triage-home-meeting-diary-composition.md` (Proposed).
 
+ADR impact: new — ADR-0046
+
 ## Global Constraints
 
 - 스펙 §5 확정 라벨: DRAFT=`작성 중`, OPEN=`준비 중`, CLOSED=`기록 정리 중`, PUBLISHED=`게시됨`. 금지: `예정`, `모임 작성 중`, `멤버와 준비 중`(상태 라벨로), `진행 중`, `종료`, `공개됨`, `공개 완료`, `게시 완료`.
