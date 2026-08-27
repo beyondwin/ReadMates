@@ -110,6 +110,7 @@
 }
 
 .rm-meeting-toc__row {
+  position: relative;
   display: flex;
   align-items: baseline;
   gap: var(--space-sm);
@@ -220,6 +221,14 @@
     white-space: normal;
     max-width: none;
     overflow-wrap: anywhere;
+  }
+
+  /* Full-row mobile tap target — desktop TOC look unchanged. */
+  .rm-meeting-toc__title::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
   }
 
   .rm-meeting-toc__attention,

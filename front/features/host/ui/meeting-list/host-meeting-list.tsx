@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import type { HostLinkComponent, HostLinkProps } from "@/features/host/ui/host-link-types";
 import type { HostMeetingTocSections } from "@/features/host/model/host-meeting-list-model";
 import { MeetingTocRow } from "./meeting-toc-row";
@@ -68,6 +69,8 @@ export function HostMeetingList({
   trashHref,
   newMeetingHref,
   LinkComponent = DefaultLink,
+  announcement = null,
+  focusHeadingRevision = 0,
   loading = false,
   errorMessage = null,
   onRetry,
@@ -80,12 +83,23 @@ export function HostMeetingList({
   trashHref: string;
   newMeetingHref: string;
   LinkComponent?: HostMeetingListLinkComponent;
+  announcement?: string | null;
+  focusHeadingRevision?: number;
   loading?: boolean;
   errorMessage?: string | null;
   onRetry?: () => void;
 }) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const previousFocusRevision = useRef(focusHeadingRevision);
   const isEmpty = sections.upcoming.rows.length === 0 && sections.past.rows.length === 0;
   const showCreate = !loading && !errorMessage && !isEmpty;
+
+  useEffect(() => {
+    if (focusHeadingRevision > previousFocusRevision.current) {
+      headingRef.current?.focus();
+    }
+    previousFocusRevision.current = focusHeadingRevision;
+  }, [focusHeadingRevision]);
 
   return (
     <main className="rm-meeting-toc">
@@ -94,7 +108,13 @@ export function HostMeetingList({
           <div className="rm-meeting-toc__toolbar">
             <div>
               <div className="eyebrow rm-meeting-toc__eyebrow">호스트 · 예정과 기록</div>
-              <h1 className="h1 editorial rm-meeting-toc__heading">모임</h1>
+              <h1
+                ref={headingRef}
+                tabIndex={-1}
+                className="h1 editorial rm-meeting-toc__heading"
+              >
+                모임
+              </h1>
               <p className="small rm-meeting-toc__lede">
                 다가오는 모임과 지난 모임을 차례로 확인합니다.
               </p>
@@ -109,6 +129,9 @@ export function HostMeetingList({
       </section>
 
       <section className="container rm-meeting-toc__body">
+        <p className="sr-only" role="status" aria-live="polite">
+          {announcement}
+        </p>
         {errorMessage ? (
           <div className="rm-empty-state rm-meeting-toc__state" role="alert">
             <h2 className="h3 editorial rm-meeting-toc__state-title">모임을 불러오지 못했습니다</h2>

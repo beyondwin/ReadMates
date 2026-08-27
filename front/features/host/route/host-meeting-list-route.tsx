@@ -140,6 +140,8 @@ function MeetingListBody({
       trashHref={HOST_ROUTE_HREFS.trashCompatibility}
       newMeetingHref={HOST_ROUTE_HREFS.newSession}
       LinkComponent={LinkComponent}
+      announcement={visibleState.announcement}
+      focusHeadingRevision={visibleState.focusHeadingRevision}
       loading={query.isPending && !basePage}
       errorMessage={query.isError && !basePage ? "모임을 불러오지 못했습니다." : null}
       onRetry={() => void query.refetch()}

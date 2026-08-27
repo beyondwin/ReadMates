@@ -112,6 +112,34 @@ describe("HostMeetingList", () => {
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
+  it("announces cursor recovery and moves focus to the list heading", () => {
+    const { rerender } = renderList();
+
+    rerender(
+      <HostMeetingList
+        sections={populatedSections}
+        onLoadMoreUpcoming={vi.fn()}
+        onLoadMorePast={vi.fn()}
+        loadingMoreUpcoming={false}
+        loadingMorePast={false}
+        trashHref="/app/host/sessions?view=trash"
+        newMeetingHref="/app/host/sessions/new"
+        announcement="목록이 바뀌어 처음부터 다시 불러왔습니다."
+        focusHeadingRevision={1}
+      />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent("목록이 바뀌어 처음부터 다시 불러왔습니다.");
+    expect(screen.getByRole("heading", { name: "모임" })).toHaveFocus();
+  });
+
+  it("stretches the title link across the mobile row for a 44px+ tap target", () => {
+    const css = readFileSync(path.resolve("features/host/ui/meeting-list/meeting-toc.css"), "utf8");
+    expect(css).toMatch(/\.rm-meeting-toc__row\s*\{[^}]*position:\s*relative/s);
+    expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*\.rm-meeting-toc__title::after[\s\S]*inset:\s*0/);
+    expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*\.rm-meeting-toc__row[\s\S]*min-height:\s*44px/);
+  });
+
   it("loads more within each section independently", async () => {
     const onLoadMoreUpcoming = vi.fn();
     const onLoadMorePast = vi.fn();
