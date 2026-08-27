@@ -13,6 +13,8 @@
 
 ADR impact: new — ADR-0047
 
+새 세션 실행 프롬프트: `docs/superpowers/plans/2026-08-27-admin-redesign-sdd-execution-prompt.md`
+
 ## Global Constraints
 
 - 스펙 §6 용어 사전과 §5 명령 마찰 3등급, §7 페이지 타입 3종(데스크형/원장형/서사형)이 모든 태스크에 암묵 적용된다.
