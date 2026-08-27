@@ -29,9 +29,28 @@ Host와 platform admin은 같은 paper/ink primitive를 쓴다. Role-only palett
 - 데이터 사실은 badge보다 문장·표·definition list를 우선한다.
 - `prefers-reduced-motion: reduce`는 animation/transition duration을 `0.001ms`로 강제한다. visual-authority helper `expectReducedMotion`의 20ms lingering cap은 reduced-motion 환경에서만 적용한다.
 
+## Host Today triage
+
+적용 범위는 host home(오늘)이다. 페이지 타입은 오늘형(트리아지)이다.
+
+`/app/host` (등록 host) · `/clubs/:slug/app/host`
+
+`HostDashboardRoute`가 auth, club context, attention·operations·notification query, `buildHostTodayView` composition을 소유한다.
+`HostTodayPage`는 오늘형 page shell이다. DOM 순서:
+
+1. page header — eyebrow `호스트 · 오늘`, h1 `오늘`, headline lede
+2. `region "처리할 일"` — resolve queue(상한 7 + 전체 보기) 또는 zero-as-data 한 줄(`오늘 처리할 일이 없습니다 · 마지막 확인 HH:MM`)
+3. hero — 다음 모임 / 모임 당일(`오늘 모임` + primary `출석 확인 열기` → `section=attendance`) / empty(`첫 모임 만들기`)
+4. `aside "참고"` — 다가오는 일정, 클럽 상태 definition list, `운영 기록 전체 보기` quiet link (desktop rail; mobile below)
+
+오늘형은 KPI 타일·균등 카드 그리드가 아니다. Focus Deck 레이아웃을 복제하지 않는다.
+Lifecycle 상태 문구는 `hostMeetingLifecycleLabel`만 쓴다: `작성 중` / `준비 중` / `기록 정리 중` / `게시됨`.
+
+오늘형 CT 스크린샷 잠금 대상은 아직 없다(홈 CT 부재). Focus Deck CT 재잠금과 오늘형 baseline은 4단계(모임 다이어리)와 함께 일괄 수행한다.
+
 ## Host Focus Deck
 
-적용 범위는 특정 모임 canonical 경로뿐이다.
+적용 범위는 특정 모임 canonical 경로뿐이다. 페이지 타입은 현행 Focus Deck(4단계에서 다이어리형으로 재조립 예정)이다.
 
 `/clubs/:slug/app/host/sessions/:sessionId` (등록 host의 `/app/host/sessions/:sessionId`)
 
@@ -48,12 +67,12 @@ Host와 platform admin은 같은 paper/ink primitive를 쓴다. Role-only palett
 Page-level local task navigation과 judgment complementary rail은 primary composition이 아니다.
 모임 header는 `WorkspaceHeader`와 `rm-host-session-workspace__*`다.
 
-Home, list, new, members, notifications는 같은 token과 state grammar를 쓰되 Focus Deck 레이아웃을 복제하지 않는다.
+List, new, members, notifications는 같은 token과 state grammar를 쓰되 Focus Deck·오늘형 레이아웃을 복제하지 않는다.
 지운 모임 URL은 Focus Deck이 아니라 `WorkspaceTrashTombstone`이다.
 
 ### Status and primary action
 
-상태 문구는 `모임 작성 중` / `멤버와 준비 중` / `기록 정리 중` / `공개 완료`다.
+상태 문구는 `작성 중` / `준비 중` / `기록 정리 중` / `게시됨`이다(`hostMeetingLifecycleLabel`).
 Lifecycle·audience·public placement를 하나의 stepper로 합치지 않는다.
 
 | Lifecycle | 계산된 주 행동 |
@@ -134,6 +153,7 @@ Tracked screenshots는 대표 상태만 잠근다. 1024px는 viewport contract�
 | Owner | File | Locks |
 | --- | --- | --- |
 | host CT | `front/__screenshots__/features/host/ui/meeting-workspace/host-focus-deck.ct.tsx/` | `focus-deck-draft-1440.png`, `focus-deck-open-900.png`, `focus-deck-closed-768.png`, `focus-deck-published-390.png`, `focus-deck-readiness-pending-320.png` |
+| host today CT | _(없음 — 오늘형 baseline 미잠금)_ | 4단계 다이어리와 함께 Focus Deck CT 재잠금·오늘형 CT를 일괄 수행 |
 | admin CT | `front/__screenshots__/features/platform-admin/ui/admin-editorial-ledger.ct.tsx/` | `editorial-ledger-today-1440.png`, `editorial-ledger-clubs-900.png`, `editorial-ledger-service-768.png`, `editorial-ledger-review-390.png`, `editorial-ledger-case-detail-320.png` |
 
 Chromium, Firefox, mobile WebKit smoke는 host Focus Deck과 admin Today/Clubs/Service/Review 대표 흐름이다.
