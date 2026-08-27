@@ -360,7 +360,7 @@ export function AdminTodayRoute() {
     return selectedIdRef.current === target.caseId;
   }
 
-  async function runMutation(target: MutationTarget, operation: () => Promise<unknown>) {
+  async function runMutation(target: MutationTarget, operation: () => Promise<unknown>): Promise<boolean> {
     setMutationTarget(target);
     if (isCurrentMutationTarget(target)) {
       setActionMessage(null);
@@ -372,7 +372,7 @@ export function AdminTodayRoute() {
     const beforeListAt = queryClient.getQueryState(listKey)?.dataUpdatedAt ?? 0;
     try {
       await operation();
-      if (!isCurrentMutationTarget(target)) return;
+      if (!isCurrentMutationTarget(target)) return false;
       if (!isPostMutationAuthoritative({
         detail: queryClient.getQueryState(detailKey),
         list: queryClient.getQueryState(listKey),
@@ -386,22 +386,23 @@ export function AdminTodayRoute() {
           text: "명령 응답을 확인하지 못했습니다. 최신 상태를 확인한 뒤 다시 시도해 주세요.",
         });
         await reconcileAuthoritativeState(target.caseId);
-        return;
+        return false;
       }
       setActionState("complete");
       setActionMessage({ kind: "success", text: "케이스 상태를 반영했습니다." });
+      return true;
     } catch (error) {
-      if (!isCurrentMutationTarget(target)) return;
+      if (!isCurrentMutationTarget(target)) return false;
       if (hasHttpStatus(error, 403)) {
         setMutationPermissionDenied(true);
         setActionState("forbidden");
-        return;
+        return false;
       }
       if (hasAdminOperationErrorCode(error, "CASE_VERSION_CONFLICT")) {
         setActionMessage({ kind: "conflict", text: "최신 상태 확인이 필요합니다." });
         await reconcileAuthoritativeState(target.caseId);
         if (isCurrentMutationTarget(target)) setActionState("ready");
-        return;
+        return false;
       }
       if (hasAdminOperationErrorCode(error, "CASE_STILL_ACTIVE")) {
         setActionState("ready");
@@ -409,7 +410,7 @@ export function AdminTodayRoute() {
           kind: "error",
           text: "신호가 아직 활성 상태입니다. 운영 상세에서 원인을 해소한 뒤 다시 확인해 주세요.",
         });
-        return;
+        return false;
       }
       if (isUnknownOutcomeError(error)) {
         setActionState("unknown-outcome");
@@ -418,13 +419,14 @@ export function AdminTodayRoute() {
           text: adminCommandRecovery(error).message,
         });
         await reconcileAuthoritativeState(target.caseId);
-        return;
+        return false;
       }
       setActionState("ready");
       setActionMessage({
         kind: "error",
         text: "상태를 변경하지 못했습니다. 잠시 뒤 다시 시도해 주세요.",
       });
+      return false;
     }
   }
 
@@ -474,13 +476,23 @@ export function AdminTodayRoute() {
           snoozedUntil,
         }),
       )}
-      onResolve={() => void runMutation(
-        { caseId: currentCase.id, version: currentCase.version, confirmationKey: confirmationKey ?? "" },
-        () => resolveMutation.mutateAsync({
-          caseId: currentCase.id,
-          expectedVersion: currentCase.version,
-        }),
-      )}
+      onResolve={() => {
+        const nextId = nextDocketCaseId(view.items, currentCase.id);
+        void runMutation(
+          { caseId: currentCase.id, version: currentCase.version, confirmationKey: confirmationKey ?? "" },
+          () => resolveMutation.mutateAsync({
+            caseId: currentCase.id,
+            expectedVersion: currentCase.version,
+          }),
+        ).then((ok) => {
+          if (!ok) return;
+          if (nextId) {
+            writeSearch({ caseId: nextId, mode: searchState.mode });
+            return;
+          }
+          document.querySelector<HTMLElement>('[aria-label="운영 케이스 요약"]')?.focus();
+        });
+      }}
     />
   ) : null;
 
@@ -683,6 +695,12 @@ function filtersFrom(filter: AdminOperationCaseFilter): AdminTodayFilters {
     source: filter.sources?.[0]?.toLowerCase() ?? "",
     assignee: filter.assignee?.toLowerCase() ?? "",
   };
+}
+
+function nextDocketCaseId(items: readonly { id: string }[], selectedId: string): string | null {
+  const index = items.findIndex((item) => item.id === selectedId);
+  if (index < 0 || index >= items.length - 1) return null;
+  return items[index + 1]!.id;
 }
 
 function isUnknownOutcomeError(error: unknown): boolean {

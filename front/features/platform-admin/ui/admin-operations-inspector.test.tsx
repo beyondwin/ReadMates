@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { AdminOperationCaseView } from "@/features/platform-admin/model/platform-admin-operations-model";
 import { findNestedLiveRegions } from "@/shared/testing/accessibility-checks";
 import { AdminOperationsInspector } from "./admin-operations-inspector";
@@ -185,5 +186,95 @@ describe("AdminOperationsInspector", () => {
 
     expect(screen.getByText("확인 불가 · 정상 확인 기록 없음")).toBeInTheDocument();
     expect(screen.queryByText(/2026.*기준/)).not.toBeInTheDocument();
+  });
+
+  it("shows a mono docket counter as 케이스 2 / 4 with quiet previous and next controls", () => {
+    render(
+      <MemoryRouter>
+        <AdminOperationsInspector
+          selectedCase={selectedCase}
+          history={[]}
+          lifecycleControls={null}
+          traversal={{ index: 1, total: 4, onPrev: vi.fn(), onNext: vi.fn() }}
+        />
+      </MemoryRouter>,
+    );
+
+    const nav = screen.getByRole("navigation", { name: "케이스 순회" });
+    expect(nav).toHaveClass("docket-nav");
+    expect(nav).toHaveTextContent("케이스 2 / 4");
+    expect(nav.querySelector(".count")).toHaveTextContent("케이스 2 / 4");
+    expect(screen.getByRole("button", { name: "‹ 이전" })).toHaveClass("btn-quiet");
+    expect(screen.getByRole("button", { name: "다음 ›" })).toHaveClass("btn-quiet");
+    expect(screen.getByRole("button", { name: "‹ 이전" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "다음 ›" })).toBeEnabled();
+  });
+
+  it("disables the end-of-list direction when that callback is null", () => {
+    render(
+      <MemoryRouter>
+        <AdminOperationsInspector
+          selectedCase={selectedCase}
+          history={[]}
+          lifecycleControls={null}
+          traversal={{ index: 3, total: 4, onPrev: vi.fn(), onNext: null }}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("케이스 4 / 4")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "‹ 이전" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "다음 ›" })).toBeDisabled();
+  });
+
+  it("calls onNext after a resolving L1 command succeeds", async () => {
+    const user = userEvent.setup();
+    const onNext = vi.fn();
+    const { rerender } = render(
+      <MemoryRouter>
+        <AdminOperationsInspector
+          selectedCase={selectedCase}
+          history={[]}
+          lifecycleControls={<button type="button">해결 확인</button>}
+          actionState="pending"
+          traversal={{ index: 1, total: 4, onPrev: vi.fn(), onNext }}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(onNext).not.toHaveBeenCalled();
+
+    rerender(
+      <MemoryRouter>
+        <AdminOperationsInspector
+          selectedCase={{ ...selectedCase, state: "RESOLVED", stateLabel: "해결됨" }}
+          history={[]}
+          lifecycleControls={<button type="button">해결 확인</button>}
+          actionState="complete"
+          traversal={{ index: 1, total: 4, onPrev: vi.fn(), onNext }}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(onNext).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole("button", { name: "다음 ›" }));
+    expect(onNext).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns focus to the queue summary when the last case is resolved", () => {
+    render(
+      <MemoryRouter>
+        <p tabIndex={-1} aria-label="운영 케이스 요약">활성 4건</p>
+        <AdminOperationsInspector
+          selectedCase={{ ...selectedCase, state: "RESOLVED", stateLabel: "해결됨" }}
+          history={[]}
+          lifecycleControls={null}
+          actionState="complete"
+          traversal={{ index: 3, total: 4, onPrev: vi.fn(), onNext: null }}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByLabelText("운영 케이스 요약")).toHaveFocus();
   });
 });

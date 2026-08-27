@@ -175,6 +175,36 @@
   font-weight: 650;
 }
 
+.docket-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-width: 0;
+  margin-bottom: var(--space-sm);
+}
+
+.docket-nav .count {
+  min-width: 0;
+  font-family: var(--f-mono);
+  font-size: var(--type-size-label);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-4);
+  overflow-wrap: anywhere;
+}
+
+.docket-nav__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.docket-nav .btn {
+  min-width: 44px;
+  min-height: 44px;
+}
+
 .admin-receipt-timeline__entries {
   display: grid;
   gap: var(--space-xs);

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 export type AdminCaseDocketProps = {
   label: string;
   title: ReactNode;
+  nav?: ReactNode;
   identity?: ReactNode;
   status?: ReactNode;
   evidence?: ReactNode;
@@ -14,6 +15,7 @@ export type AdminCaseDocketProps = {
 export function AdminCaseDocket({
   label,
   title,
+  nav,
   identity,
   status,
   evidence,
@@ -27,6 +29,7 @@ export function AdminCaseDocket({
 
   return (
     <section className="admin-case-docket" aria-label={label}>
+      {nav != null && nav !== false ? nav : null}
       <h2 className="admin-case-docket__title">{title}</h2>
       {identity != null && identity !== false ? (
         <p className="admin-case-docket__identity">{identity}</p>

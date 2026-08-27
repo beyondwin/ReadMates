@@ -923,4 +923,62 @@ describe("AdminTodayRoute", () => {
     expect(screen.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ })).toHaveFocus();
     vi.unstubAllGlobals();
   });
+
+  it("advances to the next case after a mocked resolve success", async () => {
+    const user = userEvent.setup();
+    const cases = [
+      operationCase({
+        id: "case-a",
+        summaryCode: "NOTIFICATION_DELIVERY_FAILURE",
+        firstObservedAt: "2026-08-04T06:00:00Z",
+      }),
+      operationCase({
+        id: "case-b",
+        sourceType: "AI_JOB",
+        summaryCode: "AI_JOB_STALE",
+        firstObservedAt: "2026-08-04T07:00:00Z",
+        detailHref: "/admin/ai-ops",
+      }),
+      operationCase({
+        id: "case-c",
+        sourceType: "CLUB_READINESS",
+        summaryCode: "CLUB_SETUP_REQUIRED",
+        firstObservedAt: "2026-08-04T08:00:00Z",
+        detailHref: "/admin/clubs/club-1",
+      }),
+      operationCase({
+        id: "case-d",
+        sourceType: "CLOSING_RISK",
+        summaryCode: "SESSION_CLOSING_BLOCKED",
+        firstObservedAt: "2026-08-04T09:00:00Z",
+        detailHref: "/admin/clubs/club-1",
+      }),
+    ];
+    const resolved = operationCase({
+      ...cases[1]!,
+      state: "RESOLVED",
+      resolvedAt: "2026-08-04T10:05:00Z",
+      version: 4,
+      allowedActions: [],
+    });
+    operationsApi.resolve.mockResolvedValue({
+      schema: "admin.operation_cases.v1",
+      ...resolved,
+    });
+    operationsApi.fetchList.mockResolvedValue(listResponse([cases[0]!, resolved, cases[2]!, cases[3]!]));
+    operationsApi.fetchDetail.mockImplementation(async (caseId: string) => {
+      const item = caseId === "case-b" ? resolved : cases.find((entry) => entry.id === caseId) ?? resolved;
+      return detailResponse(item);
+    });
+    renderRoute(seededClient(cases), "/admin/today?case=case-b");
+
+    expect(await screen.findByText("케이스 2 / 4")).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "해결 확인" }));
+    await user.click(screen.getByRole("button", { name: "신호 재검증 후 해결" }));
+
+    expect(await screen.findByText("케이스 3 / 4")).toBeInTheDocument();
+    expect(screen.getByLabelText("current location")).toHaveTextContent("case=case-c");
+    expect(screen.getByRole("button", { name: /클럽 설정이 필요합니다/ })).toHaveAttribute("aria-pressed", "true");
+    expect(operationsApi.resolve).toHaveBeenCalledWith("case-b", 3);
+  });
 });

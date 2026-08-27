@@ -674,4 +674,76 @@ describe("AdminTodayLedger", () => {
     expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toHaveTextContent("영향 3건");
     expect(screen.getByRole("combobox", { name: "심각도 필터" })).toHaveValue("warning");
   });
+
+  it("moves the selected case when the docket next control is clicked", async () => {
+    const user = userEvent.setup();
+    stubMatchMedia(false);
+    const cases = [
+      operationCase({ id: "case-a", summary: { title: "첫 번째 운영 케이스", description: "하나." } }),
+      operationCase({ id: "case-b", summary: { title: "두 번째 운영 케이스", description: "둘." } }),
+      operationCase({ id: "case-c", summary: { title: "세 번째 운영 케이스", description: "셋." } }),
+      operationCase({ id: "case-d", summary: { title: "네 번째 운영 케이스", description: "넷." } }),
+    ];
+
+    function Harness() {
+      const [selectedId, setSelectedId] = useState("case-b");
+      const selected = cases.find((item) => item.id === selectedId) ?? cases[1]!;
+      return (
+        <AdminTodayLedger
+          view={populatedView(selected, { items: cases, selectedCaseId: selected.id })}
+          filters={{ state: "", severity: "", source: "", assignee: "" }}
+          history={[]}
+          lifecycleControls={null}
+          onFilterChange={vi.fn()}
+          onSelectCase={setSelectedId}
+        />
+      );
+    }
+
+    render(
+      <MemoryRouter>
+        <Harness />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("케이스 2 / 4")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /두 번째 운영 케이스/ })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("button", { name: "다음 ›" }));
+
+    expect(screen.getByText("케이스 3 / 4")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /세 번째 운영 케이스/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toHaveTextContent("세 번째 운영 케이스");
+  });
+
+  it("shows the same docket traversal in the mobile fullscreen detail", () => {
+    stubMatchMedia(true);
+    const cases = [
+      operationCase({ id: "case-a", summary: { title: "첫 번째 운영 케이스", description: "하나." } }),
+      operationCase({ id: "case-b", summary: { title: "두 번째 운영 케이스", description: "둘." } }),
+      operationCase({ id: "case-c", summary: { title: "세 번째 운영 케이스", description: "셋." } }),
+      operationCase({ id: "case-d", summary: { title: "네 번째 운영 케이스", description: "넷." } }),
+    ];
+    const selected = cases[1]!;
+
+    render(
+      <MemoryRouter>
+        <AdminTodayLedger
+          view={populatedView(selected, { items: cases, selectedCaseId: selected.id })}
+          filters={{ state: "", severity: "", source: "", assignee: "" }}
+          history={[]}
+          lifecycleControls={null}
+          mode="detail"
+          onFilterChange={vi.fn()}
+          onSelectCase={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toBeInTheDocument();
+    expect(screen.getByText("케이스 2 / 4")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "‹ 이전" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "다음 ›" })).toBeEnabled();
+    expect(screen.getByRole("navigation", { name: "케이스 순회" })).toBeInTheDocument();
+  });
 });

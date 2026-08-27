@@ -1,4 +1,4 @@
-import { useLayoutEffect, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { commitAdminEditorialLedgerCaseDocket } from "@/shared/observability/admin-editorial-ledger-performance";
 import { Link } from "react-router";
 import type { AdminOperationCaseView } from "@/features/platform-admin/model/platform-admin-operations-model";
@@ -14,6 +14,13 @@ type SafeHistoryEvent = {
   caseVersion: number;
 };
 
+export type AdminCaseTraversal = {
+  index: number;
+  total: number;
+  onPrev: (() => void) | null;
+  onNext: (() => void) | null;
+};
+
 type Props = {
   selectedCase: AdminOperationCaseView | null;
   history: readonly SafeHistoryEvent[];
@@ -23,6 +30,7 @@ type Props = {
   permissionDenied?: boolean;
   actionState?: AdminSafeActionState;
   actionReason?: ReactNode;
+  traversal?: AdminCaseTraversal;
 };
 
 const HISTORY_LABELS: Record<string, string> = {
@@ -70,10 +78,29 @@ export function AdminOperationsInspector({
   permissionDenied = false,
   actionState = "ready",
   actionReason,
+  traversal,
 }: Props) {
+  const advancedKeyRef = useRef<string | null>(null);
+  const onNext = traversal?.onNext;
+  const resolvedCaseId = selectedCase?.state === "RESOLVED" ? selectedCase.id : null;
+
   useLayoutEffect(() => {
     if (selectedCase) commitAdminEditorialLedgerCaseDocket(selectedCase.id);
   }, [selectedCase]);
+
+  useEffect(() => {
+    if (actionState !== "complete" || resolvedCaseId == null) {
+      if (actionState !== "complete") advancedKeyRef.current = null;
+      return;
+    }
+    if (advancedKeyRef.current === resolvedCaseId) return;
+    advancedKeyRef.current = resolvedCaseId;
+    if (onNext) {
+      onNext();
+      return;
+    }
+    document.querySelector<HTMLElement>('[aria-label="운영 케이스 요약"]')?.focus();
+  }, [actionState, resolvedCaseId, onNext]);
 
   if (!selectedCase) {
     return (
@@ -95,6 +122,7 @@ export function AdminOperationsInspector({
   return (
     <AdminCaseDocket
       label="운영 케이스 상세"
+      nav={traversal ? <DocketNav traversal={traversal} /> : null}
       title={<span className="admin-operation-wrap">{selectedCase.summary.title}</span>}
       identity={<code className="admin-operation-wrap">{selectedCase.id}</code>}
       status={
@@ -188,6 +216,32 @@ export function AdminOperationsInspector({
 function formatTime(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "시각 확인 필요" : KOREAN_TIME.format(date);
+}
+
+function DocketNav({ traversal }: { traversal: AdminCaseTraversal }) {
+  return (
+    <nav className="docket-nav" aria-label="케이스 순회">
+      <span className="count">케이스 {traversal.index + 1} / {traversal.total}</span>
+      <span className="docket-nav__actions">
+        <button
+          type="button"
+          className="btn btn-quiet btn-sm admin-operation-control--touch"
+          disabled={traversal.onPrev == null}
+          onClick={() => traversal.onPrev?.()}
+        >
+          ‹ 이전
+        </button>
+        <button
+          type="button"
+          className="btn btn-quiet btn-sm admin-operation-control--touch"
+          disabled={traversal.onNext == null}
+          onClick={() => traversal.onNext?.()}
+        >
+          다음 ›
+        </button>
+      </span>
+    </nav>
+  );
 }
 
 function sourceFreshnessLabel(

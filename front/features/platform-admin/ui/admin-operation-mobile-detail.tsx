@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { AdminOperationsView } from "@/features/platform-admin/model/platform-admin-operations-model";
 import type { AdminSafeActionState } from "./admin-action-dock";
-import { AdminOperationsInspector } from "./admin-operations-inspector";
+import { AdminOperationsInspector, type AdminCaseTraversal } from "./admin-operations-inspector";
 import { AdminOperationsQueue } from "./admin-operations-queue";
 
 type HistoryEvent = {
@@ -25,6 +25,7 @@ type Props = {
   mode?: "list" | "detail";
   actionState?: AdminSafeActionState;
   actionReason?: ReactNode;
+  traversal?: AdminCaseTraversal;
   onSelectCase: (caseId: string, options?: { mode?: "list" | "detail" }) => void;
   onBack?: () => void;
   onLoadMore?: () => void;
@@ -42,6 +43,7 @@ export function AdminOperationMobileDetail({
   mode,
   actionState,
   actionReason,
+  traversal,
   onSelectCase,
   onBack,
   onLoadMore,
@@ -98,6 +100,7 @@ export function AdminOperationMobileDetail({
           permissionDenied={permissionDenied}
           actionState={actionState}
           actionReason={actionReason}
+          traversal={traversal}
         />
       </div>
     );
