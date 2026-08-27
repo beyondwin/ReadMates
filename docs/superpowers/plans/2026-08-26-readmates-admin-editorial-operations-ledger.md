@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-26-readmates-host-admin-visual-authority-and-integration-design.md`
 
+ADR impact: supersede — ADR-0020, ADR-0027, ADR-0044, ADR-0045
+
 ## Global Constraints
 
 - ADR impact는 `supersede`; ADR-0045는 host plan과 공통 integration closeout이 끝나기 전 `Proposed`다.

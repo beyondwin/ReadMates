@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-26-readmates-host-admin-visual-authority-and-integration-design.md`
 
+ADR impact: supersede — ADR-0020, ADR-0027, ADR-0044, ADR-0045
+
 ## Global Constraints
 
 - ADR impact는 `supersede`다. ADR-0044와 ADR-0045는 구현 완료 전 `Proposed`를 유지하고 코드, tests, `front/DESIGN.md`, active architecture가 일치한 마지막 task에서만 `Accepted`로 승격한다.
