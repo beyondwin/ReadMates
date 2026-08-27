@@ -14,6 +14,6 @@ export type HostMembersLinkComponent = ComponentType<HostMembersLinkProps>;
 
 export type HostMemberLifecyclePath = ModelHostMemberLifecyclePath;
 export type HostViewerAction = ModelHostViewerAction;
-export type MemberTab = "active" | "viewer" | "suspended" | "inactive" | "invitations";
+export type MemberTab = "active" | "suspended" | "inactive";
 export type LifecycleDialog = null | { action: "suspend" | "deactivate"; member: HostMemberListItem };
 export type ProfileDialog = null | { member: HostMemberListItem };

@@ -9,12 +9,12 @@ import { requestMeta } from "./member-list-helpers";
 
 export function MemberPendingZone({
   viewers,
-  submittingId,
+  isRowPending,
   onActivate,
   onRelease,
 }: {
   viewers: readonly HostMemberListItem[];
-  submittingId: string | null;
+  isRowPending: (membershipId: string) => boolean;
   onActivate: (membershipId: string) => void;
   onRelease: (membershipId: string) => void;
 }): JSX.Element | null {
@@ -42,7 +42,7 @@ export function MemberPendingZone({
 
       <div className="stack" style={{ "--stack": "10px" } as CSSProperties}>
         {viewers.map((member) => {
-          const rowPending = submittingId === member.membershipId;
+          const rowPending = isRowPending(member.membershipId);
           const activateReason = disabledViewerActivationReason(rowPending);
           const releaseReason = disabledViewerDeactivateReason(member, rowPending);
           const activateDisabled = rowPending;

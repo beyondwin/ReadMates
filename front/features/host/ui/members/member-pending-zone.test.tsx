@@ -30,7 +30,7 @@ function viewer(overrides: Partial<HostMemberListItem> = {}): HostMemberListItem
 describe("MemberPendingZone", () => {
   it("renders nothing when there are no pending viewers", () => {
     const { container } = render(
-      <MemberPendingZone viewers={[]} submittingId={null} onActivate={vi.fn()} onRelease={vi.fn()} />,
+      <MemberPendingZone viewers={[]} isRowPending={() => false} onActivate={vi.fn()} onRelease={vi.fn()} />,
     );
 
     expect(container).toBeEmptyDOMElement();
@@ -55,7 +55,7 @@ describe("MemberPendingZone", () => {
     render(
       <MemberPendingZone
         viewers={viewers}
-        submittingId={null}
+        isRowPending={() => false}
         onActivate={onActivate}
         onRelease={onRelease}
       />,
@@ -84,7 +84,7 @@ describe("MemberPendingZone", () => {
     render(
       <MemberPendingZone
         viewers={[viewer()]}
-        submittingId="membership-viewer"
+        isRowPending={(membershipId) => membershipId === "membership-viewer"}
         onActivate={vi.fn()}
         onRelease={vi.fn()}
       />,

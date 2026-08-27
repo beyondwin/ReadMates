@@ -3,10 +3,8 @@ import type { MemberTab } from "./types";
 
 const tabs: Array<{ key: MemberTab; label: string }> = [
   { key: "active", label: "활성 멤버" },
-  { key: "viewer", label: "둘러보기 멤버" },
-  { key: "suspended", label: "정지됨" },
+  { key: "suspended", label: "쉬는 중" },
   { key: "inactive", label: "탈퇴/비활성" },
-  { key: "invitations", label: "초대" },
 ];
 
 export function MemberStatusFilter({

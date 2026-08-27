@@ -70,7 +70,11 @@ type MemberRowsState = {
 };
 type MemberRowsUpdate = HostMemberListItem[] | ((current: HostMemberListItem[]) => HostMemberListItem[]);
 
-export default function HostMembers({ initialMembers, actions, LinkComponent = DefaultLinkComponent }: HostMembersProps) {
+export default function HostMembers({
+  initialMembers,
+  actions,
+  LinkComponent: _LinkComponent = DefaultLinkComponent,
+}: HostMembersProps) {
   const initialPage = useMemo(() => normalizeMemberPage(initialMembers), [initialMembers]);
   const initialMembersItems = initialPage.items;
   const initialRowsState = (): MemberRowsState => ({
@@ -125,24 +129,6 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
     [members],
   );
   const viewerMembers = useMemo(() => members.filter((member) => member.status === "VIEWER"), [members]);
-  const pendingViewerSubmittingId = useMemo(() => {
-    for (const viewer of viewerMembers) {
-      if (isMembershipPending(viewer.membershipId, pendingActions)) {
-        return viewer.membershipId;
-      }
-    }
-
-    return null;
-  }, [viewerMembers, pendingActions]);
-  const currentSessionParticipants = useMemo(
-    () => activeMembers.filter((member) => member.currentSessionParticipationStatus === "ACTIVE"),
-    [activeMembers],
-  );
-  const activeMembersOutsideCurrentSession = useMemo(
-    () => activeMembers.filter((member) => member.currentSessionParticipationStatus !== "ACTIVE"),
-    [activeMembers],
-  );
-
   const openDialog = (nextDialog: Exclude<LifecycleDialog, null>, trigger: HTMLElement) => {
     dialogTriggerRef.current = trigger;
     setMessage(null);
@@ -325,14 +311,12 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
       <MemberSummary
         viewerCount={viewerMembers.length}
         activeCount={activeMembers.length}
-        currentSessionParticipantCount={currentSessionParticipants.length}
-        activeOutsideCurrentSessionCount={activeMembersOutsideCurrentSession.length}
         suspendedCount={suspendedMembers.length}
       />
 
       <MemberPendingZone
         viewers={viewerMembers}
-        submittingId={pendingViewerSubmittingId}
+        isRowPending={(membershipId) => isMembershipPending(membershipId, pendingActions)}
         onActivate={(membershipId) => {
           const member = viewerMembers.find((item) => item.membershipId === membershipId);
           if (member) {
@@ -362,17 +346,14 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
       <MemberTabPanel
         activeTab={activeTab}
         activeMembers={activeMembers}
-        viewerMembers={viewerMembers}
         suspendedMembers={suspendedMembers}
         inactiveMembers={inactiveMembers}
         pendingActions={pendingActions}
         nextCursor={visibleNextCursor}
         isLoadingMore={isLoadingMore}
-        LinkComponent={LinkComponent}
         renderProfileAction={renderProfileAction}
         onOpenDialog={openDialog}
         onSubmitLifecycle={submitLifecycle}
-        onSubmitViewerAction={submitViewerAction}
         onLoadMore={loadMoreMembers}
       />
 

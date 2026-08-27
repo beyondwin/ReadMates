@@ -1,17 +1,18 @@
-import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode } from "react";
+import {
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import type { HostMemberListItem, MembershipStatus } from "@/features/host/model/host-view-types";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { isMembershipPending, memberActionPendingReason } from "./member-action-rules";
+import { formatMembershipTenure, rosterStatusLabels } from "./member-list-helpers";
 import type { HostMemberLifecyclePath } from "./types";
-
-const statusBadgeLabels: Record<MembershipStatus, string> = {
-  INVITED: "초대됨",
-  VIEWER: "둘러보기",
-  ACTIVE: "활성",
-  SUSPENDED: "정지",
-  LEFT: "탈퇴",
-  INACTIVE: "비활성",
-};
+import "./member-ledger.css";
 
 function statusBadgeClass(status: MembershipStatus) {
   if (status === "ACTIVE") {
@@ -117,21 +118,131 @@ export function CurrentSessionAction({
   );
 }
 
+export function MemberOverflowMenu({
+  member,
+  disabled,
+  reason,
+  items,
+}: {
+  member: HostMemberListItem;
+  disabled: boolean;
+  reason: string | null;
+  items: Array<{
+    key: string;
+    label: string;
+    disabled: boolean;
+    reason: string | null;
+    onSelect: (trigger: HTMLElement) => void;
+  }>;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
+  const reasonId = `host-member-overflow-reason-${member.membershipId}`;
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <div ref={rootRef} className="rm-host-member-ledger__overflow">
+      <span style={{ display: "inline-grid", gap: 4, justifyItems: "end" }}>
+        <button
+          ref={triggerRef}
+          type="button"
+          className="btn btn-ghost btn-sm"
+          aria-label="멤버 관리 메뉴"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-controls={menuId}
+          aria-describedby={reason ? reasonId : undefined}
+          disabled={disabled}
+          onClick={() => setOpen((current) => !current)}
+        >
+          ⋯
+        </button>
+        {reason ? (
+          <span id={reasonId} className="tiny" style={{ maxWidth: 180, color: "var(--text-3)", textAlign: "right" }}>
+            {reason}
+          </span>
+        ) : null}
+      </span>
+      {open ? (
+        <div id={menuId} className="rm-host-member-ledger__menu" role="menu" aria-label={`${member.displayName} 관리`}>
+          {items.map((item) => {
+            const itemReasonId = `host-member-overflow-${item.key}-reason-${member.membershipId}`;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                role="menuitem"
+                disabled={item.disabled}
+                aria-describedby={item.reason ? itemReasonId : undefined}
+                onClick={() => {
+                  if (item.disabled) {
+                    return;
+                  }
+                  setOpen(false);
+                  item.onSelect(triggerRef.current ?? document.body);
+                }}
+              >
+                {item.label}
+                {item.reason ? (
+                  <span id={itemReasonId} className="rm-sr-only">
+                    {item.reason}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function MemberList({
   members,
   emptyText,
   sectionDescription,
-  renderMeta,
   renderProfileAction,
   renderActions,
+  renderOverflow,
   renderCurrentSessionBadge = currentSessionBadge,
 }: {
   members: HostMemberListItem[];
   emptyText: string;
   sectionDescription: string;
-  renderMeta: (member: HostMemberListItem) => string;
   renderProfileAction: (member: HostMemberListItem) => ReactNode;
   renderActions: (member: HostMemberListItem) => ReactNode;
+  renderOverflow?: (member: HostMemberListItem) => ReactNode;
   renderCurrentSessionBadge?: (member: HostMemberListItem) => { label: string; className: string };
 }) {
   if (members.length === 0) {
@@ -149,38 +260,60 @@ export function MemberList({
 
   return (
     <div className="stack" style={{ "--stack": "12px" } as CSSProperties}>
-      <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-        {sectionDescription}
-      </p>
-      {members.map((member) => (
-        <article key={member.membershipId} className="surface" style={{ padding: "18px 22px" }}>
-          <div className="row-between" style={{ alignItems: "center", gap: 18, flexWrap: "wrap" }}>
-            <div style={{ minWidth: 0 }}>
-              <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                <AvatarChip
-                  avatarKey={member.status === "LEFT" ? "cloud-green-book" : member.avatarKey}
-                  name={member.displayName}
-                  label=""
-                  sizeRole="member"
-                />
-                <h2 className="h4 editorial" style={{ margin: 0 }}>
-                  {member.displayName}
-                </h2>
-                <span className={statusBadgeClass(member.status)}>{statusBadgeLabels[member.status]}</span>
-                <span className={renderCurrentSessionBadge(member).className}>{renderCurrentSessionBadge(member).label}</span>
-                {member.role === "HOST" ? <span className="badge badge-accent badge-dot">호스트</span> : null}
-              </div>
-              <p className="small" style={{ margin: "4px 0 0", color: "var(--text-2)" }}>
-                {renderMeta(member)}
-              </p>
-            </div>
-            <div className="row" style={{ gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-              {renderProfileAction(member)}
-              {renderActions(member)}
-            </div>
-          </div>
-        </article>
-      ))}
+      <table className="rm-host-member-ledger">
+        <caption className="rm-host-member-ledger__caption small">{sectionDescription}</caption>
+        <thead>
+          <tr>
+            <th scope="col">이름</th>
+            <th scope="col">상태</th>
+            <th scope="col" className="rm-host-member-ledger__num">
+              함께한 기간
+            </th>
+            <th scope="col">이번 모임</th>
+            <th scope="col">
+              <span className="rm-sr-only">관리</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {members.map((member) => {
+            const sessionBadge = renderCurrentSessionBadge(member);
+
+            return (
+              <tr key={member.membershipId} className="rm-host-member-ledger__row" style={{ minHeight: 44, height: 44 }}>
+                <td>
+                  <div className="rm-host-member-ledger__name">
+                    <AvatarChip
+                      avatarKey={member.status === "LEFT" ? "cloud-green-book" : member.avatarKey}
+                      name={member.displayName}
+                      label=""
+                      sizeRole="member"
+                    />
+                    <h2 className="h4 editorial">{member.displayName}</h2>
+                    {member.role === "HOST" ? <span className="badge badge-accent badge-dot">호스트</span> : null}
+                  </div>
+                </td>
+                <td>
+                  <span className={statusBadgeClass(member.status)}>{rosterStatusLabels[member.status]}</span>
+                </td>
+                <td className="rm-host-member-ledger__num">
+                  <span className="mono">{formatMembershipTenure(member.joinedAt)}</span>
+                </td>
+                <td>
+                  <span className={sessionBadge.className}>{sessionBadge.label}</span>
+                </td>
+                <td>
+                  <div className="rm-host-member-ledger__actions">
+                    {renderProfileAction(member)}
+                    {renderActions(member)}
+                    {renderOverflow?.(member)}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

@@ -19,9 +19,7 @@ export function LifecyclePolicyDialog({
 }) {
   const title = dialog.action === "suspend" ? `${dialog.member.displayName}님을 정지할까요?` : `${dialog.member.displayName}님을 탈퇴 처리할까요?`;
   const description =
-    dialog.action === "suspend"
-      ? "정지하면 기존 기록은 유지되고, 새 참석 응답/질문/체크인/리뷰 작성은 막힙니다."
-      : '과거 기록은 보존되며, 다른 멤버에게는 작성자가 "탈퇴한 멤버"로 표시됩니다.';
+    `${dialog.member.displayName} 님을 ${dialog.action === "suspend" ? "쉬는 멤버로 전환" : "클럽에서 내보내기"}합니다. 참석 기록은 보존되고, 내보낸 뒤 개인 정보는 익명화됩니다.`;
   const applyNowLabel = dialog.action === "suspend" ? "이번 모임부터 바로 정지" : "이번 모임에서 제외";
   const nextSessionLabel = dialog.action === "suspend" ? "다음 모임부터 정지" : "다음 모임부터 제외";
   const confirmLabel = dialog.action === "suspend" ? "정지" : "탈퇴 처리";

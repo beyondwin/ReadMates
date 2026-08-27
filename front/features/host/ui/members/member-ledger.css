@@ -1,0 +1,123 @@
+.rm-host-member-ledger {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.rm-host-member-ledger__caption {
+  margin: 0 0 12px;
+  color: var(--text-2);
+  text-align: left;
+}
+
+.rm-host-member-ledger thead th {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-4);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.rm-host-member-ledger thead th.rm-host-member-ledger__num {
+  text-align: right;
+}
+
+.rm-host-member-ledger tbody td {
+  padding: 0 10px;
+  border-bottom: 1px solid var(--line-soft, var(--line));
+  vertical-align: middle;
+  font-size: 14px;
+}
+
+.rm-host-member-ledger__row {
+  min-height: 44px;
+  height: 44px;
+}
+
+.rm-host-member-ledger__row:hover,
+.rm-host-member-ledger__row:focus-within {
+  background: var(--bg-sub);
+}
+
+.rm-host-member-ledger__name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.rm-host-member-ledger__name .h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.rm-host-member-ledger__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.rm-host-member-ledger__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  opacity: 0;
+}
+
+.rm-host-member-ledger__row:hover .rm-host-member-ledger__actions,
+.rm-host-member-ledger__row:focus-within .rm-host-member-ledger__actions {
+  opacity: 1;
+}
+
+.rm-host-member-ledger__overflow {
+  position: relative;
+  display: inline-flex;
+}
+
+.rm-host-member-ledger__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  min-width: 148px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--bg);
+  box-shadow: 0 8px 24px rgba(22, 24, 29, 0.12);
+}
+
+.rm-host-member-ledger__menu [role="menuitem"] {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.rm-host-member-ledger__menu [role="menuitem"]:hover:not(:disabled),
+.rm-host-member-ledger__menu [role="menuitem"]:focus-visible:not(:disabled) {
+  background: var(--bg-sub);
+}
+
+.rm-host-member-ledger__menu [role="menuitem"]:disabled {
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+
+@media (hover: none) {
+  .rm-host-member-ledger__actions {
+    opacity: 1;
+  }
+}
