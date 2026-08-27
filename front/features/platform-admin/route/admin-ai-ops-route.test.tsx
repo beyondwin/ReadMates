@@ -195,7 +195,7 @@ describe("AdminAiOpsRoute", () => {
   it("keeps partial jobs visible for a transport-unknown summary and does not present missing metrics as zero", async () => {
     renderRoute("/admin/ai-ops", { pages: [[runningJob]], summaryError: new TypeError("network failed") });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("일부 AI 운영 데이터를 불러오지 못했습니다.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("일부 AI 작업 데이터를 불러오지 못했습니다.");
     expect(screen.getByText(/한강 독서회/)).toBeInTheDocument();
     expect(screen.queryByText("$0.0000")).not.toBeInTheDocument();
     expect(screen.queryByText("최근 실패 코드 없음")).not.toBeInTheDocument();

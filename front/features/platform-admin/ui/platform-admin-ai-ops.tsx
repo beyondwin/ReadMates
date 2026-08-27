@@ -144,7 +144,7 @@ export function PlatformAdminAiOps({
     <section className="platform-admin-ai-ops admin-ai-ops">
       <AdminPageContext
         eyebrow={ADMIN_COPY.eyebrow.aiOps}
-        heading="AI 운영"
+        heading={ADMIN_COPY.heading.aiOps}
         freshness={loading ? "동기화 중" : undefined}
         authority={canAct ? "명령 가능" : "변경 권한 없음"}
       >
@@ -214,7 +214,7 @@ export function PlatformAdminAiOps({
       ) : null}
 
       <AdminEvidenceLedger
-        label="AI 작업"
+        label="작업 목록"
         count={jobs.length > 0 ? jobs.length : undefined}
         state={jobsLedgerState}
         title={jobsLedgerTitle}

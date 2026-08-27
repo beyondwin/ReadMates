@@ -126,7 +126,7 @@ describe("buildAdminAuditOperationSummary", () => {
     expect(buildAdminAuditOperationSummary(auditItem())).toEqual({
       state: "FOLLOW_UP_AVAILABLE",
       label: "후속 화면 있음",
-      detail: "AI 운영 화면에서 같은 클럽 범위로 이어서 확인할 수 있습니다.",
+      detail: "AI 작업 화면에서 같은 클럽 범위로 이어서 확인할 수 있습니다.",
       nextHref: "/admin/ai-ops?clubId=club-1&jobId=job-1",
       nextLabel: "AI 작업에서 보기",
     });

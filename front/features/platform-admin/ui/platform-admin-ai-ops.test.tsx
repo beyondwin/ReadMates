@@ -83,7 +83,7 @@ describe("PlatformAdminAiOps", () => {
   it("shows safe aggregate and job metadata without raw content fields", () => {
     render(<PlatformAdminAiOps role="SUPPORT" summary={summary} jobs={[runningJob]} />);
 
-    const section = screen.getByRole("region", { name: "AI 운영" });
+    const section = screen.getByRole("region", { name: "AI 작업" });
     expect(within(section).getByText("Active")).toBeInTheDocument();
     expect(within(section).getByText("2")).toBeInTheDocument();
     expect(within(section).getByText("$0.2000")).toBeInTheDocument();
@@ -97,7 +97,7 @@ describe("PlatformAdminAiOps", () => {
   it("shows recovery revision and cleanup state without exposing generation content", () => {
     render(<PlatformAdminAiOps role="OWNER" summary={summary} jobs={[committingJob]} />);
 
-    const section = screen.getByRole("region", { name: "AI 운영" });
+    const section = screen.getByRole("region", { name: "AI 작업" });
     expect(within(section).getByText(/revision 2/)).toBeInTheDocument();
     expect(within(section).getByText(/cleanup pending/)).toBeInTheDocument();
     expect(section.textContent).not.toContain("transcript");
@@ -383,8 +383,8 @@ describe("PlatformAdminAiOps", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "AI 운영" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "AI 작업" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "AI 작업" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "작업 목록" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
     expect(screen.queryByText("공개 반영 추적")).not.toBeInTheDocument();
   });

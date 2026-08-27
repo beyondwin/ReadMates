@@ -93,7 +93,7 @@ export function AdminAiOpsRoute() {
     jobError && filter.jobId
       ? "선택한 AI 작업 상세를 불러오지 못했습니다."
       : readError
-        ? "일부 AI 운영 데이터를 불러오지 못했습니다."
+        ? "일부 AI 작업 데이터를 불러오지 못했습니다."
         : null;
 
   return (
@@ -236,8 +236,7 @@ function AiOpsCommandSession({
   }
 
   return (
-    <section className="admin-ai-ops" aria-labelledby="admin-ai-ops-title">
-      <h1 id="admin-ai-ops-title" className="h1 editorial">{ADMIN_COPY.heading.aiOps}</h1>
+    <section className="admin-ai-ops" aria-label={ADMIN_COPY.heading.aiOps}>
       <PlatformAdminAiOps
         role={role}
         canManageActions={canManageActions}

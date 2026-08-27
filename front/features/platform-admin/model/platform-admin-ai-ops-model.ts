@@ -87,7 +87,7 @@ export function classifyAiOpsError(error: unknown): AiOpsErrorClassification {
   const record = error && typeof error === "object" ? (error as Record<string, unknown>) : null;
   const status = typeof record?.status === "number" ? record.status : null;
   const code = typeof record?.code === "string" ? record.code : null;
-  const message = error instanceof Error ? error.message : "AI 운영 상태를 확인하지 못했습니다.";
+  const message = error instanceof Error ? error.message : "AI 작업 상태를 확인하지 못했습니다.";
   const kind =
     status === 404
       ? "DISABLED"
