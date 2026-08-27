@@ -36,6 +36,7 @@ export type HostSessionWorkspaceProps = {
   focusContent?: ReactNode;
   relatedWork?: ReactNode;
   facts?: ReactNode;
+  leading?: ReactNode;
   recovery?: ReactNode;
   panel?: ReactNode;
   basicPanel?: ReactNode;
@@ -102,6 +103,7 @@ export function HostSessionWorkspace({
   focusContent,
   relatedWork,
   facts,
+  leading = null,
   recovery,
   panel,
   basicPanel = null,
@@ -192,7 +194,12 @@ export function HostSessionWorkspace({
           LinkComponent={LinkComponent}
         />
 
-        <div className="rm-host-session-workspace__layout">
+        <div className={`rm-host-session-workspace__layout${leading ? " is-spread" : ""}`}>
+          {leading ? (
+            <div className="rm-host-session-workspace__leading">
+              {leading}
+            </div>
+          ) : null}
           <div className="rm-host-session-workspace__main">
             <WorkspaceFocusCard
               view={view}

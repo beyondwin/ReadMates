@@ -498,9 +498,22 @@ describe("host meeting workspace route", () => {
     });
     renderRoute("?task=overview", { session: { state: "CLOSED" } });
 
-    expect(await screen.findByText("호스트만 확인")).toBeVisible();
-    expect(screen.getByText("공개 기록에 게시 안 됨")).toBeVisible();
+    const visibility = await screen.findByRole("group", { name: "공개 상태" });
+    expect(visibility).toHaveTextContent("호스트만 확인");
+    expect(visibility).toHaveTextContent("공개 기록에 게시 안 됨");
     expect(screen.queryByText("공개 기록에 게시")).not.toBeInTheDocument();
+  });
+
+  it("assembles the diary spread with timeline and member-view link", async () => {
+    renderRoute("?task=overview");
+
+    expect(await screen.findByRole("navigation", { name: "모임의 걸음" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "멤버 시야로 보기" })).toHaveAttribute(
+      "href",
+      expect.stringContaining(`/app/sessions/${SESSION_ID}`),
+    );
+    expect(screen.getAllByRole("region", { name: "지금 할 일" })).toHaveLength(1);
+    expect(document.querySelector(".rm-meeting-diary")).not.toBeNull();
   });
 
   it("opens 모임 정보 through the route-owned panel instead of an empty inert sheet", async () => {

@@ -46,12 +46,14 @@ async function mountFocusDeck(
     <div style={{ width: "100%" }}>
       <HostMeetingWorkspace
         view={fixture.view}
+        diary={fixture.diary}
         header={fixture.header}
         facts={fixture.view.facts}
         relatedWork={<MeetingRelatedWork tasks={fixture.view.relatedTasks} />}
         projections={fixture.projections}
         recordReadiness={fixture.recordReadiness}
         publicRecordHref={fixture.publicRecordHref}
+        memberViewHref={fixture.memberViewHref}
         pendingUndo={fixture.pendingUndo}
         onCreateRevision={fixture.onCreateRevision}
         onPrimaryAction={() => undefined}

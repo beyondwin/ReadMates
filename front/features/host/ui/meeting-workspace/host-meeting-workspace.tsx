@@ -5,11 +5,13 @@ import type {
   HostSessionWorkspaceLocation,
   HostSessionWorkspaceView,
 } from "@/features/host/model/host-session-workspace-model";
+import type { HostMeetingDiaryView } from "@/features/host/model/host-meeting-diary-model";
 import type { HostMeetingRecordReadiness } from "@/features/host/model/host-meeting-record-readiness";
 import { commitHostMeetingFirstUsable } from "@/shared/observability/host-meeting-performance";
 import { HostSessionWorkspace } from "@/features/host/ui/session-workspace/host-session-workspace";
 import type { WorkspaceHeaderModel } from "@/features/host/ui/session-workspace/workspace-header";
 import type { HostSessionEditorLinkComponent } from "@/features/host/ui/session-editor/session-editor-links";
+import { DefaultLinkComponent } from "@/features/host/ui/session-editor/session-editor-links";
 import type {
   WorkspacePendingUndo,
   WorkspaceRestoreNotice,
@@ -17,9 +19,17 @@ import type {
 } from "@/features/host/ui/session-workspace/workspace-undo-bar";
 import { MeetingFocusFacts, type MeetingAudienceProjection } from "./meeting-focus-facts";
 import { MeetingRelatedWork } from "./meeting-related-work";
+import { MeetingDiaryTimeline } from "./meeting-diary-timeline";
+import "./meeting-diary.css";
+
+export type MeetingDiaryAdjacentSession = {
+  href: string;
+  sessionNumber: number;
+};
 
 export type HostMeetingWorkspaceProps = {
   view: HostMeetingWorkspaceView;
+  diary: HostMeetingDiaryView;
   header: WorkspaceHeaderModel;
   facts: readonly HostFocusFact[];
   focusContent?: ReactNode;
@@ -29,6 +39,11 @@ export type HostMeetingWorkspaceProps = {
   panel?: ReactNode;
   recovery?: ReactNode;
   publicRecordHref?: string | null;
+  memberViewHref?: string | null;
+  adjacentSessions?: {
+    previous?: MeetingDiaryAdjacentSession | null;
+    next?: MeetingDiaryAdjacentSession | null;
+  } | null;
   onCreateRevision?: (() => void) | null;
   reverseAction?: { label: string; onClick: () => void } | null;
   location?: HostSessionWorkspaceLocation;
@@ -63,8 +78,51 @@ function sessionViewFromMeeting(view: HostMeetingWorkspaceView): HostSessionWork
   };
 }
 
+function MeetingDiaryPager({
+  currentSessionNumber,
+  adjacent,
+  LinkComponent,
+}: {
+  currentSessionNumber: number | null;
+  adjacent: NonNullable<HostMeetingWorkspaceProps["adjacentSessions"]>;
+  LinkComponent: HostSessionEditorLinkComponent;
+}) {
+  const previous = adjacent.previous ?? null;
+  const next = adjacent.next ?? null;
+  if (!previous && !next) return null;
+
+  return (
+    <nav className="rm-meeting-diary__pager" aria-label="회차">
+      <span className="rm-meeting-diary__pager-chevron" aria-hidden="true">‹</span>
+      {previous ? (
+        <LinkComponent to={previous.href} className="rm-meeting-diary__pager-link">
+          No.{previous.sessionNumber}
+        </LinkComponent>
+      ) : (
+        <span className="rm-meeting-diary__pager-gap" aria-hidden="true" />
+      )}
+      {currentSessionNumber == null ? null : (
+        <>
+          <span className="rm-meeting-diary__pager-sep" aria-hidden="true">·</span>
+          <span className="rm-meeting-diary__pager-current">No.{currentSessionNumber}</span>
+        </>
+      )}
+      {next ? (
+        <>
+          <span className="rm-meeting-diary__pager-sep" aria-hidden="true">·</span>
+          <LinkComponent to={next.href} className="rm-meeting-diary__pager-link">
+            No.{next.sessionNumber}
+          </LinkComponent>
+        </>
+      ) : null}
+      <span className="rm-meeting-diary__pager-chevron" aria-hidden="true">›</span>
+    </nav>
+  );
+}
+
 export function HostMeetingWorkspace({
   view,
+  diary,
   header,
   facts,
   focusContent,
@@ -74,6 +132,8 @@ export function HostMeetingWorkspace({
   panel,
   recovery,
   publicRecordHref = null,
+  memberViewHref = null,
+  adjacentSessions = null,
   onCreateRevision = null,
   reverseAction = null,
   location = defaultLocation,
@@ -85,7 +145,7 @@ export function HostMeetingWorkspace({
   restoreNotice = null,
   onPrimaryAction,
   onRetryReadiness,
-  LinkComponent,
+  LinkComponent = DefaultLinkComponent,
 }: HostMeetingWorkspaceProps) {
   const workspaceRef = useRef<HTMLDivElement>(null);
 
@@ -96,8 +156,17 @@ export function HostMeetingWorkspace({
     if (control) commitHostMeetingFirstUsable();
   }, [view.primaryAction.kind, view.primaryAction.label]);
 
+  const showPager = Boolean(adjacentSessions?.previous || adjacentSessions?.next);
+
   return (
-    <main ref={workspaceRef} className="rm-focus-deck">
+    <main ref={workspaceRef} className="rm-meeting-diary">
+      {showPager && adjacentSessions ? (
+        <MeetingDiaryPager
+          currentSessionNumber={header.sessionNumber}
+          adjacent={adjacentSessions}
+          LinkComponent={LinkComponent}
+        />
+      ) : null}
       <HostSessionWorkspace
         view={sessionViewFromMeeting(view)}
         header={header}
@@ -116,13 +185,39 @@ export function HostMeetingWorkspace({
         publicRecordHref={publicRecordHref}
         onCreateRevision={onCreateRevision}
         reverseAction={reverseAction}
+        leading={(
+          <div className="rm-meeting-diary__left">
+            {memberViewHref ? (
+              <LinkComponent
+                to={memberViewHref}
+                className="btn btn-ghost btn-sm rm-meeting-diary__member-view"
+              >
+                멤버 시야로 보기
+              </LinkComponent>
+            ) : null}
+            {projections && projections.length > 0 ? (
+              <div className="rm-meeting-diary__visibility" role="group" aria-label="공개 상태">
+                <dl>
+                  {projections.map((item) => (
+                    <div key={item.audience}>
+                      <dt>{item.audience}</dt>
+                      <dd>{item.result}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            ) : null}
+            <MeetingDiaryTimeline diary={diary} LinkComponent={LinkComponent} />
+          </div>
+        )}
         facts={(
-          <MeetingFocusFacts
-            facts={facts}
-            projections={projections}
-            recordReadiness={recordReadiness}
-            onRetryReadiness={onRetryReadiness}
-          />
+          <div className="rm-meeting-diary__step-content">
+            <MeetingFocusFacts
+              facts={facts}
+              recordReadiness={recordReadiness}
+              onRetryReadiness={onRetryReadiness}
+            />
+          </div>
         )}
         relatedWork={relatedWork ?? <MeetingRelatedWork tasks={view.relatedTasks} />}
         recovery={recovery}

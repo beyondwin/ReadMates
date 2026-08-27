@@ -1,5 +1,8 @@
 import type { HostMeetingRecordReadiness } from "@/features/host/model/host-meeting-record-readiness";
 import {
+  buildHostMeetingDiary,
+} from "@/features/host/model/host-meeting-diary-model";
+import {
   buildHostMeetingWorkspace,
   type HostMeetingWorkspaceInput,
   type HostMeetingWorkspaceView,
@@ -33,10 +36,12 @@ export const FOCUS_DECK_RECOVERY: WorkspacePendingUndo = {
 
 export type FocusDeckFixture = {
   view: HostMeetingWorkspaceView;
+  diary: ReturnType<typeof buildHostMeetingDiary>;
   header: WorkspaceHeaderModel;
   projections: readonly MeetingAudienceProjection[];
   recordReadiness?: HostMeetingRecordReadiness;
   publicRecordHref?: string | null;
+  memberViewHref?: string | null;
   pendingUndo?: WorkspacePendingUndo | null;
   onCreateRevision?: (() => void) | null;
 };
@@ -63,20 +68,28 @@ function readyReadiness(facts: {
 
 function fixture(
   input: Omit<HostMeetingWorkspaceInput, "currentUrl">,
-  extras: Omit<FocusDeckFixture, "view" | "header" | "projections"> = {},
+  extras: Omit<FocusDeckFixture, "view" | "diary" | "header" | "projections"> = {},
 ): FocusDeckFixture {
   const view = buildHostMeetingWorkspace({
     currentUrl: FOCUS_DECK_CURRENT_URL,
     ...input,
   });
+  const diary = buildHostMeetingDiary({
+    workspace: view,
+    meetingDate: input.meetingDate,
+    today: input.today,
+    currentUrl: FOCUS_DECK_CURRENT_URL,
+  });
   return {
     view,
+    diary,
     header: FOCUS_DECK_HEADER,
     projections: buildMeetingAudienceProjections({
       visibility: input.state === "DRAFT" ? "HOST_ONLY" : "MEMBER",
       lifecycle: input.state,
     }),
     recordReadiness: input.recordReadiness,
+    memberViewHref: "/app/sessions/session-27",
     ...extras,
   };
 }

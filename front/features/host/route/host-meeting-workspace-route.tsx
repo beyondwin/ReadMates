@@ -40,6 +40,7 @@ import {
   reverseLifecycleAction,
   type SessionLifecycleConfirmKind,
 } from "@/features/host/model/host-session-lifecycle-model";
+import { buildHostMeetingDiary } from "@/features/host/model/host-meeting-diary-model";
 import { HostMeetingWorkspace } from "@/features/host/ui/meeting-workspace/host-meeting-workspace";
 import { buildMeetingAudienceProjections } from "@/features/host/ui/meeting-workspace/meeting-audience-projections";
 import { MeetingRelatedWork } from "@/features/host/ui/meeting-workspace/meeting-related-work";
@@ -466,6 +467,12 @@ export function HostMeetingWorkspaceRoute({
       unknownAttendanceCount: 0,
       recordReadiness: { status: "not-required" },
     });
+    const loadingDiary = buildHostMeetingDiary({
+      workspace: loadingView,
+      meetingDate: "",
+      today: todayIsoDate(),
+      currentUrl,
+    });
     return (
       <HostMeetingWorkspace
         view={{
@@ -477,9 +484,13 @@ export function HostMeetingWorkspaceRoute({
             disabled: true,
           },
         }}
+        diary={loadingDiary}
         header={{ sessionNumber: null, title: "모임" }}
         facts={loadingView.facts}
         relatedWork={<MeetingRelatedWork tasks={loadingView.relatedTasks} LinkComponent={LinkComponent} />}
+        memberViewHref={sessionId
+          ? `/app/sessions/${encodeURIComponent(sessionId)}`
+          : null}
         panel={
           <MeetingPanel
             panel={baseQuery.isError
@@ -509,6 +520,12 @@ export function HostMeetingWorkspaceRoute({
     unansweredResponseCount: activeAttendees.filter((item) => item.rsvpStatus === "NO_RESPONSE").length,
     unknownAttendanceCount,
     recordReadiness,
+  });
+  const diary = buildHostMeetingDiary({
+    workspace,
+    meetingDate: session.date,
+    today: todayIsoDate(),
+    currentUrl,
   });
   const baseTask = meetingLocation.task === "overview" || meetingLocation.task === "responses" || meetingLocation.task === "attendance";
   const historyAuthority = panelStates.historyAuthority;
@@ -814,6 +831,7 @@ export function HostMeetingWorkspaceRoute({
     <>
     <HostMeetingWorkspace
       view={{ ...workspace, primaryAction }}
+      diary={diary}
       location={compatibilityLocation(meetingLocation)}
       onLocationChange={(next) => {
         captureOriginatingFocus();
@@ -842,6 +860,7 @@ export function HostMeetingWorkspaceRoute({
         lifecycle: session.state,
       })}
       recordReadiness={recordReadiness}
+      memberViewHref={`/app/sessions/${encodeURIComponent(session.sessionId)}`}
       publicRecordHref={session.state === "PUBLISHED"
         ? `/app/sessions/${encodeURIComponent(session.sessionId)}`
         : null}

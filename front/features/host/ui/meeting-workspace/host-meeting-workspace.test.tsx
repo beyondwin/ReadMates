@@ -6,6 +6,7 @@ import {
   beginHostMeetingRouteCommit,
   resetHostMeetingPerformanceStateForTests,
 } from "@/shared/observability/host-meeting-performance";
+import { buildHostMeetingDiary } from "@/features/host/model/host-meeting-diary-model";
 import {
   buildHostMeetingWorkspace,
   type HostMeetingWorkspaceView,
@@ -14,8 +15,11 @@ import { HostMeetingWorkspace, type HostMeetingWorkspaceProps } from "./host-mee
 import { buildMeetingAudienceProjections } from "./meeting-audience-projections";
 import { MeetingRelatedWork } from "./meeting-related-work";
 
+const CURRENT_URL =
+  "https://readmates.test/clubs/alpha/app/host/sessions/11111111-1111-1111-1111-111111111111";
+
 const view: HostMeetingWorkspaceView = buildHostMeetingWorkspace({
-  currentUrl: "https://readmates.test/clubs/alpha/app/host/sessions/11111111-1111-1111-1111-111111111111",
+  currentUrl: CURRENT_URL,
   state: "OPEN",
   meetingDate: "2026-08-26",
   today: "2026-08-26",
@@ -24,8 +28,16 @@ const view: HostMeetingWorkspaceView = buildHostMeetingWorkspace({
   recordReadiness: { status: "not-required" },
 });
 
+const diary = buildHostMeetingDiary({
+  workspace: view,
+  meetingDate: "2026-08-26",
+  today: "2026-08-26",
+  currentUrl: CURRENT_URL,
+});
+
 const props: HostMeetingWorkspaceProps = {
   view,
+  diary,
   header: {
     sessionNumber: 12,
     title: "길어도 온전히 읽히는 모임 제목 A deliberately long English meeting title",
@@ -36,6 +48,7 @@ const props: HostMeetingWorkspaceProps = {
   facts: view.facts,
   relatedWork: <MeetingRelatedWork tasks={view.relatedTasks} />,
   projections: buildMeetingAudienceProjections({ visibility: "MEMBER", lifecycle: "OPEN" }),
+  memberViewHref: "/app/sessions/11111111-1111-1111-1111-111111111111",
   recovery: <p data-testid="focus-deck-recovery">최근 변경을 되돌릴 수 있습니다.</p>,
   panel: <div data-testid="focus-deck-panel">현재 작업 내용</div>,
   onPrimaryAction: vi.fn(),
@@ -54,7 +67,7 @@ describe("HostMeetingWorkspace", () => {
     expect(performance.getEntriesByName(HOST_MEETING_PERFORMANCE_METRICS.routeDataToUsable)).toHaveLength(1);
   });
 
-  it("renders Focus Deck order without page navigation or a judgment rail", () => {
+  it("renders the diary spread with timeline, one now-card, and member-view link", () => {
     render(<HostMeetingWorkspace {...props} />);
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
@@ -65,15 +78,26 @@ describe("HostMeetingWorkspace", () => {
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
 
     const header = screen.getByRole("banner");
+    const timeline = screen.getByRole("navigation", { name: "모임의 걸음" });
     const focus = screen.getByRole("region", { name: "지금 할 일" });
     const facts = screen.getByRole("region", { name: "진행 목록" });
     const related = screen.getByRole("navigation", { name: "관련 작업" });
     const recovery = screen.getByTestId("focus-deck-recovery");
     const panel = screen.getByTestId("focus-deck-panel");
+    const memberView = screen.getByRole("link", { name: "멤버 시야로 보기" });
 
+    expect(document.querySelector(".rm-meeting-diary")).not.toBeNull();
     expect(header).toHaveTextContent("길어도 온전히 읽히는 모임 제목");
     expect(header).toHaveTextContent("준비 중");
-    expect(following(header, focus)).toBe(true);
+    expect(within(timeline).getAllByRole("listitem")).toHaveLength(6);
+    expect(within(timeline).getByRole("listitem", { current: "step" })).toHaveTextContent("지금");
+    expect(memberView).toHaveAttribute(
+      "href",
+      "/app/sessions/11111111-1111-1111-1111-111111111111",
+    );
+    expect(screen.getAllByRole("region", { name: "지금 할 일" })).toHaveLength(1);
+    expect(following(header, timeline)).toBe(true);
+    expect(following(timeline, focus)).toBe(true);
     expect(following(focus, facts)).toBe(true);
     expect(following(facts, related)).toBe(true);
     expect(following(related, recovery)).toBe(true);
@@ -81,6 +105,33 @@ describe("HostMeetingWorkspace", () => {
     expect(panel).toHaveTextContent("현재 작업 내용");
     expect(screen.getByRole("main")).toBeInTheDocument();
     expect(screen.getAllByRole("main")).toHaveLength(1);
+  });
+
+  it("omits the session pager when adjacent ids are absent", () => {
+    render(<HostMeetingWorkspace {...props} />);
+    expect(screen.queryByRole("navigation", { name: "회차" })).not.toBeInTheDocument();
+  });
+
+  it("renders the session pager only for provided adjacent sessions", () => {
+    render(
+      <HostMeetingWorkspace
+        {...props}
+        adjacentSessions={{
+          previous: { href: "/app/host/sessions/prev", sessionNumber: 11 },
+          next: { href: "/app/host/sessions/next", sessionNumber: 13 },
+        }}
+      />,
+    );
+    const pager = screen.getByRole("navigation", { name: "회차" });
+    expect(within(pager).getByRole("link", { name: "No.11" })).toHaveAttribute(
+      "href",
+      "/app/host/sessions/prev",
+    );
+    expect(within(pager).getByText("No.12")).toBeVisible();
+    expect(within(pager).getByRole("link", { name: "No.13" })).toHaveAttribute(
+      "href",
+      "/app/host/sessions/next",
+    );
   });
 
   it("opens 모임 정보 as a Focus Deck sheet and inerts the deck chrome", async () => {
@@ -260,9 +311,11 @@ describe("HostMeetingWorkspace", () => {
     expect(within(facts).getByText("오늘이 모임일입니다.")).toBeVisible();
     expect(within(facts).getByText("실제 출석이 확인되지 않은 멤버가 1명입니다.")).toBeVisible();
     expect(within(facts).queryByText("확인 필요")).not.toBeInTheDocument();
-    expect(within(facts).getByText("호스트")).toBeVisible();
-    expect(within(facts).getByText("게스트·멤버")).toBeVisible();
-    expect(within(facts).getByText("공개 기록")).toBeVisible();
+
+    const visibility = screen.getByRole("group", { name: "공개 상태" });
+    expect(within(visibility).getByText("호스트")).toBeVisible();
+    expect(within(visibility).getByText("게스트·멤버")).toBeVisible();
+    expect(within(visibility).getByText("공개 기록")).toBeVisible();
 
     const related = screen.getByRole("navigation", { name: "관련 작업" });
     expect(within(related).getByRole("link", { name: "알림" })).toHaveAttribute("href", expect.stringContaining("section=notifications"));
@@ -328,9 +381,10 @@ describe("HostMeetingWorkspace", () => {
     );
 
     const facts = screen.getByRole("region", { name: "진행 목록" });
-    expect(within(facts).getByText("호스트만 확인")).toBeVisible();
-    expect(within(facts).getByText("공개 기록에 게시 안 됨")).toBeVisible();
-    expect(within(facts).queryByText("공개 기록에 게시")).not.toBeInTheDocument();
+    expect(within(facts).queryByText("호스트만 확인")).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "공개 상태" })).toHaveTextContent("호스트만 확인");
+    expect(screen.getByRole("group", { name: "공개 상태" })).toHaveTextContent("공개 기록에 게시 안 됨");
+    expect(screen.queryByText("공개 기록에 게시")).not.toBeInTheDocument();
   });
 
   it("wires PUBLISHED public-result CTAs to the same href and create-revision callback", async () => {
