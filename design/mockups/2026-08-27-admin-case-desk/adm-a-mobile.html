@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>어드민 A안 · 온콜 트리아지 (모바일)</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="mock.css">
+<style>
+  .m-alarm {
+    display: flex; gap: 8px; align-items: center;
+    padding: 9px 18px; border-bottom: 1px solid var(--line);
+    font-size: 12px; color: var(--warn); font-weight: 600; background: var(--warn-soft);
+  }
+  .m-case {
+    border: 1px solid var(--line); border-radius: var(--r-3); background: var(--bg-raised);
+    padding: 16px; margin-top: 12px;
+  }
+  .m-case .kind { font-size: 12px; letter-spacing: 0.06em; color: var(--text-3); font-weight: 600; }
+  .m-case .head { font-size: 15px; font-weight: 600; margin: 6px 0 3px; line-height: 1.45; }
+  .m-case .sub { font-size: 12px; color: var(--text-3); line-height: 1.6; }
+  .m-case .acts { display: flex; gap: 8px; margin-top: 14px; }
+  .m-case .acts .btn { flex: 1; min-height: 46px; }
+  .m-case.selected { border-color: var(--accent-line); box-shadow: inset 3px 0 0 var(--accent); }
+  .verdict-m { font-size: 24px; line-height: 1.4; letter-spacing: -0.015em; font-weight: 600; }
+  .note-field {
+    width: 100%; min-height: 64px; border: 1px solid var(--line); border-radius: var(--r-2);
+    background: var(--bg); padding: 10px 12px; font-size: 15px; color: var(--text-3);
+  }
+</style>
+</head>
+<body>
+<div class="m-shell" style="padding-bottom: 20px;">
+
+  <header class="m-header">
+    <div>
+      <div class="kicker">플랫폼 운영 · 오늘</div>
+      <div class="title">케이스 4건</div>
+    </div>
+    <span class="tiny" style="font-family:var(--f-mono); color:var(--text-4);">21:36</span>
+  </header>
+
+  <div class="m-alarm" role="status">주의 1건 — 밤의 독서회 알림 실패 · 서비스 정상</div>
+
+  <main class="m-main">
+
+    <section class="m-case selected" aria-label="선택된 케이스">
+      <div class="kind">파이프라인 · 알림 배달 · 케이스 1 / 4</div>
+      <h1 class="verdict-m" style="margin:10px 0 0;">밤의 독서회 알림 24건이 배달에 실패했습니다.</h1>
+      <p class="sub" style="margin:8px 0 0;">
+        재시도 소진 8건만 결정 필요 · 나머지 16건은 22:10 자동 재시도 ·
+        수동 재발송은 자동 재시도를 취소하지 않습니다.
+      </p>
+      <div class="acts">
+        <button class="btn btn-primary">8건 재발송</button>
+        <button class="btn btn-secondary">보류</button>
+      </div>
+      <label class="tiny" style="display:block; margin-top:12px; color:var(--text-4);">해소 메모 (원장에 기입됩니다)</label>
+      <div class="note-field" aria-label="해소 메모">수신 서버 일시 거부로 판단, 재발송 후 관찰</div>
+    </section>
+
+    <section aria-label="대기 케이스" style="margin-top:22px;">
+      <div class="eyebrow" style="margin-bottom:4px;">다음 케이스</div>
+      <div class="m-case">
+        <div class="kind">클럽</div>
+        <div class="head">새벽 서가 · 커스텀 도메인 검증 실패</div>
+        <div class="sub">DNS 레코드 불일치 · 5시간 경과</div>
+      </div>
+      <div class="m-case">
+        <div class="kind">AI 작업</div>
+        <div class="head">정리본 작업 1건 40분째 멈춤</div>
+        <div class="sub">결정론 경로 정상 · 중단은 데스크톱에서</div>
+      </div>
+      <div class="m-case">
+        <div class="kind">클럽</div>
+        <div class="head">목요일 밤 · 공개 전환 검토</div>
+        <div class="sub">점검 4항목 미완 · 검토는 데스크톱에서</div>
+      </div>
+    </section>
+
+    <p class="tiny" style="margin:20px 0 8px; color:var(--text-4);">
+      모바일에서는 확인·보류·재발송·메모만 가능합니다 · 파기·회수 등 되돌릴 수 없는 명령은 데스크톱 전용
+    </p>
+
+  </main>
+
+</div>
+</body>
+</html>

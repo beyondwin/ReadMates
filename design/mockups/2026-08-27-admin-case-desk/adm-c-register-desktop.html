@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>어드민 C안 · 원장책 — 오늘 기입 (데스크톱)</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="mock.css">
+<style>
+  .reg-shell { display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: 100vh; }
+  .reg-toc { border-right: 1px solid var(--line); background: var(--bg-sub); padding: 26px 20px; display: flex; flex-direction: column; }
+  .reg-toc .brand strong { display: block; font-size: 24px; letter-spacing: -0.015em; }
+  .reg-toc .brand span { font-size: 12px; color: var(--text-3); }
+  .reg-toc a { display: flex; justify-content: space-between; padding: 8px 10px; margin-top: 2px; border-radius: var(--r-2); font-size: 15px; color: var(--text-2); }
+  .reg-toc a[aria-current] { background: var(--bg); color: var(--text); font-weight: 600; box-shadow: inset 2px 0 0 var(--accent); }
+  .reg-toc a .n { font-family: var(--f-mono); font-size: 12px; color: var(--accent); }
+  .reg-toc .grp { font-size: 12px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-4); font-weight: 600; margin: 18px 0 4px; }
+  .reg-page { padding: 44px 56px 90px; max-width: 1000px; }
+  .reg-t { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  .reg-t th { text-align: left; font-size: 12px; letter-spacing: 0.06em; font-weight: 600; color: var(--text-3); padding: 8px 14px 8px 0; border-bottom: 1px solid var(--line-strong); }
+  .reg-t td { padding: 12px 14px 12px 0; border-bottom: 1px solid var(--line-soft); font-size: 15px; vertical-align: baseline; }
+  .reg-t .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--text-3); white-space: nowrap; }
+  .receipt {
+    border: 1px solid var(--line); background: var(--bg-sub);
+    border-radius: var(--r-2); padding: 14px 18px; margin-top: 12px; font-size: 15px;
+  }
+  .receipt .rid { font-family: var(--f-mono); font-size: 12px; color: var(--text-4); }
+  .sec { margin-top: 46px; }
+</style>
+</head>
+<body>
+
+<div class="reg-shell">
+
+  <nav class="reg-toc" aria-label="운영 장부 목차">
+    <div class="brand" style="margin-bottom:22px;">
+      <strong>읽는사이</strong>
+      <span>운영 장부</span>
+    </div>
+    <a href="#" aria-current="page">오늘 기입 <span class="n">4</span></a>
+    <div class="grp">장부</div>
+    <a href="#">클럽 장부</a>
+    <a href="#">배달 장부</a>
+    <a href="#">작업 장부 (AI)</a>
+    <a href="#">접근 장부</a>
+    <div class="grp">검토</div>
+    <a href="#">감사 원장</a>
+    <a href="#">분석 부록</a>
+    <a href="#">말소·회수 기록</a>
+    <div class="grp" style="margin-top:auto;">규칙</div>
+    <span class="tiny" style="color:var(--text-4); line-height:1.6; padding:0 10px;">기입은 지울 수 없습니다.<br>차단된 시도도 기록됩니다.</span>
+  </nav>
+
+  <main class="reg-page">
+
+    <div class="row-between" style="align-items:baseline;">
+      <div>
+        <p class="eyebrow" style="margin:0;">운영 장부 · 오늘 페이지</p>
+        <h1 class="h1 editorial" style="margin:8px 0 0;">2026년 8월 27일</h1>
+      </div>
+      <span class="tiny" style="font-family:var(--f-mono); color:var(--text-4);">21:36 기준 · 운영자 1인</span>
+    </div>
+
+    <p class="body-lg" style="margin:18px 0 0; max-width:64ch; color:var(--text-2);">
+      서비스는 정상. 열린 결정 네 건 — 알림 실패 한 묶음, 도메인 검증 하나,
+      멈춘 AI 작업 하나, 공개 전환 검토 하나가 기입을 기다립니다.
+    </p>
+
+    <section class="sec" aria-label="처리 대기">
+      <div class="hairline-title"><h2 class="h4" style="margin:0;">결정 대기</h2></div>
+      <table class="reg-t">
+        <thead><tr>
+          <th style="width:90px;">접수</th><th style="width:120px;">장부</th><th>내용</th><th style="width:200px;">기입</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td class="num">15:12</td>
+            <td class="small">배달</td>
+            <td>밤의 독서회 알림 24건 실패 — 소진 8건만 결정 필요, 재시도 16건은 22:10 예정</td>
+            <td><button class="btn btn-secondary btn-sm">재발송 검토</button> <button class="btn btn-quiet btn-sm">보류</button></td>
+          </tr>
+          <tr>
+            <td class="num">16:40</td>
+            <td class="small">클럽</td>
+            <td>새벽 서가 커스텀 도메인 검증 실패 — DNS 레코드 불일치</td>
+            <td><button class="btn btn-secondary btn-sm">재검증</button></td>
+          </tr>
+          <tr>
+            <td class="num">20:56</td>
+            <td class="small">작업</td>
+            <td>AI 정리본 작업 1건 40분째 진행 없음 — 결정론 경로는 정상</td>
+            <td><button class="btn btn-secondary btn-sm">중단 검토</button></td>
+          </tr>
+          <tr>
+            <td class="num">어제</td>
+            <td class="small">클럽</td>
+            <td>목요일 밤 공개 전환 요청 — 공개 전 점검 4항목 미완</td>
+            <td><button class="btn btn-secondary btn-sm">점검 열기</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="tiny" style="margin-top:10px; color:var(--text-4);">무시로 닫으려면 사유가 필요합니다 · 닫은 결정은 아래 기입으로 내려갑니다</p>
+    </section>
+
+    <section class="sec" aria-label="오늘의 기입">
+      <div class="hairline-title"><h2 class="h4" style="margin:0;">오늘의 기입</h2></div>
+      <table class="reg-t">
+        <thead><tr>
+          <th style="width:90px;">시각</th><th>기입</th><th style="width:90px;">결과</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td class="num">19:40</td>
+            <td>배포 v2.6.3 반영 — 이상 신호 없음</td>
+            <td><span class="badge badge-dot badge-ok">성공</span></td>
+          </tr>
+          <tr>
+            <td class="num">18:22</td>
+            <td>운영자가 목요일 밤 지원 접근 발급 시도 — 사유 누락으로 차단됨</td>
+            <td><span class="badge badge-dot badge-warn">차단</span></td>
+          </tr>
+          <tr>
+            <td class="num">14:02</td>
+            <td>운영자가 새벽 서가 도메인 재검증 시작 · 사유: 호스트 보고</td>
+            <td><span class="badge badge-dot badge-pending">진행</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="receipt" role="status">
+        <div class="row-between">
+          <strong><span class="badge badge-dot badge-ok" style="margin-right:8px;">완료</span>영수증 — 알림 3건 재발송</strong>
+          <span class="rid">rcpt-7d21</span>
+        </div>
+        <p class="small" style="margin:8px 0 0; color:var(--text-2);">
+          21:14 · 대상 3건 모두 도달 · 자동 재시도는 취소되지 않음 · <a href="#" style="text-decoration:underline; text-underline-offset:3px;">원장 항목 보기</a>
+        </p>
+      </div>
+    </section>
+
+  </main>
+</div>
+</body>
+</html>
