@@ -56,7 +56,7 @@ export function HostTodayQueue({
         </p>
       ) : null}
 
-      {!widgetError && items.length > 0 ? (
+      {items.length > 0 ? (
         <ul className="rm-host-today__queue-list">
           {items.map((item) => (
             <li key={item.id} className="rm-host-today__queue-row">

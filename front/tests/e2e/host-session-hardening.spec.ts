@@ -775,7 +775,7 @@ test("previous online meeting secrets stay out of create until explicit adoption
   }
 });
 
-test("home shows top-one attention and operations lists the full set including PUBLISHED", async ({ page }) => {
+test("home shows attention queue rows and operations lists the full set including PUBLISHED", async ({ page }) => {
   const publishedDraft = insertSession({
     bookTitle: "주의 공개 초안",
     state: "PUBLISHED",
@@ -804,19 +804,19 @@ test("home shows top-one attention and operations lists the full set including P
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto(HOST_PATH);
   await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/app\/host\/?$/);
-  await expect(page.getByText(/확인 필요 \d+건/)).toBeVisible();
-  const homeCountText = await page.getByText(/확인 필요 \d+건/).innerText();
-  const homeCount = Number((homeCountText.match(/(\d+)/) ?? [])[1]);
-  expect(homeCount).toBeGreaterThanOrEqual(4);
-  const homeRows = page.getByRole("list", { name: "확인 필요한 모임 기록" }).getByRole("listitem");
-  await expect(homeRows).toHaveCount(1);
-  await expect(homeRows.first()).toContainText("주의 공개 초안");
-  await expect(page.getByRole("link", { name: "모두 보기" })).toBeVisible();
+  const homeQueue = page.getByRole("region", { name: "처리할 일" });
+  await expect(page.getByText(/처리할 일 \d+건/)).toBeVisible();
+  await expect(homeQueue.getByText("주의 공개 초안")).toBeVisible();
+  await expect(homeQueue.getByText("주의 공개 미완")).toBeVisible();
+  await expect(homeQueue.getByText("주의 마감 초안")).toBeVisible();
+  await expect(homeQueue.getByText("주의 마감 미완")).toBeVisible();
+  expect(await homeQueue.getByRole("listitem").count()).toBeGreaterThanOrEqual(4);
+  await expect(page.getByRole("link", { name: "운영 기록 전체 보기" })).toBeVisible();
 
-  await page.getByRole("link", { name: "모두 보기" }).click();
+  await page.getByRole("link", { name: "운영 기록 전체 보기" }).click();
   await expect(page).toHaveURL(/\/app\/host\/operations\/?$/);
   await expect(page.getByRole("heading", { name: "운영 허브" })).toBeVisible();
-  await expect(page.getByText(`확인 필요 ${homeCount}건`)).toBeVisible();
+  await expect(page.getByText(/확인 필요 \d+건/)).toBeVisible();
   const operationsList = page.getByRole("list", { name: "확인 필요한 모임 기록" });
   await expect(operationsList.getByText("주의 공개 초안")).toBeVisible();
   await expect(operationsList.getByText("주의 공개 미완")).toBeVisible();

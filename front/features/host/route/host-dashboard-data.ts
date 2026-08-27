@@ -15,7 +15,7 @@ import { requireHostLoaderAuth } from "./host-loader-auth";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 
-export const HOST_HOME_ATTENTION_LIMIT = 1;
+export const HOST_HOME_ATTENTION_LIMIT = 7;
 
 export type HostDashboardRouteData = {
   current: CurrentSessionResponse;

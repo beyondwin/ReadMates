@@ -116,12 +116,12 @@ describe("preserveLocationSuffix", () => {
 });
 
 describe("hostDashboardLoaderFactory", () => {
-  it("requests only auth, current, the session list, and attention limit 1", async () => {
+  it("requests only auth, current, the session list, and attention limit 7", async () => {
     const fetchMock = fetchMockFor({
       "/api/bff/api/auth/me": hostAuth,
       "/api/bff/api/sessions/current": { currentSession: null },
       "/api/bff/api/host/sessions?mode=meeting&limit=50": emptyMeetingPage,
-      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=1": emptyAttention,
+      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=7": emptyAttention,
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -132,7 +132,7 @@ describe("hostDashboardLoaderFactory", () => {
       "/api/bff/api/auth/me?clubSlug=reading-sai",
       "/api/bff/api/sessions/current?clubSlug=reading-sai",
       "/api/bff/api/host/sessions?mode=meeting&limit=50&clubSlug=reading-sai",
-      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=1&clubSlug=reading-sai",
+      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=7&clubSlug=reading-sai",
     ]));
     expect(urls.some((url) => url.includes("/host/dashboard"))).toBe(false);
     expect(urls.some((url) => url.includes("/host/notifications"))).toBe(false);
@@ -167,7 +167,7 @@ describe("hostDashboardLoaderFactory", () => {
         nextCursor: null,
         summary: emptyAttention.summary,
       },
-      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=1": emptyAttention,
+      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=7": emptyAttention,
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -212,7 +212,7 @@ describe("hostDashboardLoaderFactory", () => {
         nextCursor: null,
         summary: emptyAttention.summary,
       },
-      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=1&clubSlug=reading-sai": emptyAttention,
+      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=7&clubSlug=reading-sai": emptyAttention,
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -238,7 +238,7 @@ describe("hostDashboardLoaderFactory", () => {
       "/api/bff/api/auth/me": hostAuth,
       "/api/bff/api/sessions/current": { currentSession: null },
       "/api/bff/api/host/sessions?mode=meeting&limit=50": emptyMeetingPage,
-      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=1": {
+      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=7": {
         items: [published],
         nextCursor: "more",
         summary: {
@@ -271,7 +271,7 @@ describe("hostDashboardLoaderFactory", () => {
       "/api/bff/api/auth/me": hostAuth,
       "/api/bff/api/sessions/current": { currentSession: null },
       "/api/bff/api/host/sessions?mode=meeting&limit=50": emptyMeetingPage,
-      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=1": new Response(
+      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=7": new Response(
         JSON.stringify({ message: "attention unavailable" }),
         { status: 503, headers: { "Content-Type": "application/json" } },
       ),
