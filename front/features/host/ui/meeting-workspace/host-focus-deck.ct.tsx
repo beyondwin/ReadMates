@@ -56,6 +56,7 @@ async function mountDiarySpread(
         memberViewHref={fixture.memberViewHref}
         pendingUndo={fixture.pendingUndo}
         onCreateRevision={fixture.onCreateRevision}
+        closingChecklist={fixture.closingChecklist}
         onPrimaryAction={() => undefined}
       />
     </div>,
@@ -73,15 +74,23 @@ async function visiblePrimary(component: Locator) {
 async function assertDiarySpread(
   component: Locator,
   page: Page,
-  expected: { status: string; action: string },
+  expected: {
+    status: string;
+    action: string;
+    stepRegion?: "진행 목록" | "장부 마감 체크리스트";
+  },
 ) {
+  const stepRegion = expected.stepRegion ?? "진행 목록";
   await expect(component.locator(".rm-meeting-diary")).toHaveCount(1);
   await expect(component.getByRole("heading", { level: 1 })).toContainText(FOCUS_DECK_TITLE);
   await expect(component.getByText(expected.status, { exact: true })).toBeVisible();
   await expect(component.getByRole("navigation", { name: "모임의 걸음" })).toBeVisible();
   await expect(component.getByRole("navigation", { name: "모임의 걸음" }).getByRole("listitem")).toHaveCount(6);
   await expect(component.getByRole("region", { name: "지금 할 일" })).toBeVisible();
-  await expect(component.getByRole("region", { name: "진행 목록" })).toBeVisible();
+  await expect(component.getByRole("region", { name: stepRegion })).toBeVisible();
+  if (stepRegion === "장부 마감 체크리스트") {
+    await expect(component.getByRole("region", { name: "진행 목록" })).toHaveCount(0);
+  }
   await expect(component.getByRole("navigation", { name: "관련 작업" })).toBeVisible();
   await expect(component.getByRole("link", { name: "멤버 시야로 보기" })).toBeVisible();
   await expect(component.getByRole("tablist")).toHaveCount(0);
@@ -139,7 +148,13 @@ test("Diary spread OPEN locks the 900 tablet editorial composition", async ({ mo
 
 test("Diary spread CLOSED locks the 768 tablet-narrow composition with recovery", async ({ mount, page }) => {
   const component = await mountDiarySpread(mount, page, closedFocusDeck, VISUAL_AUTHORITY_VIEWPORTS.tabletNarrow);
-  await assertDiarySpread(component, page, { status: "기록 정리 중", action: "정리본 올리기" });
+  await assertDiarySpread(component, page, {
+    status: "기록 정리 중",
+    action: "정리본 올리기",
+    stepRegion: "장부 마감 체크리스트",
+  });
+  await expect(component.getByText("장부 마감")).toBeVisible();
+  await expect(component.getByText("출석 확정")).toBeVisible();
   await expect(component.getByText("최근 출석 변경을 되돌릴 수 있습니다.")).toBeVisible();
   await expect(component.getByRole("button", { name: "되돌리기" })).toBeVisible();
   await lockDiaryScreenshot(component, "diary-closed-768.png");
@@ -162,13 +177,15 @@ test("Diary spread pending readiness fail-closes the 320 mobile composition", as
     readinessPendingFocusDeck,
     VISUAL_AUTHORITY_VIEWPORTS.mobileNarrow,
   );
-  await assertDiarySpread(component, page, { status: "기록 정리 중", action: "다음 할 일 확인 중" });
+  await assertDiarySpread(component, page, {
+    status: "기록 정리 중",
+    action: "다음 할 일 확인 중",
+    stepRegion: "장부 마감 체크리스트",
+  });
   await expect(await visiblePrimary(component)).toBeDisabled();
   await expect(component.getByRole("button", { name: "정리본 올리기" })).toHaveCount(0);
   await expect(component.getByRole("button", { name: "게스트·멤버 노트에 기록 게시" })).toHaveCount(0);
-  await expect(
-    component.getByRole("region", { name: "진행 목록" }).getByText("모임 기록을 확인하는 중입니다."),
-  ).toBeVisible();
+  await expect(component.getByRole("status")).toContainText("장부 마감을 불러오는 중입니다.");
   await lockDiaryScreenshot(component, "diary-readiness-pending-320.png");
   await assertDiaryFocus(component, { action: "다음 할 일 확인 중", focusPrimary: false });
 });
