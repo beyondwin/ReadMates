@@ -69,7 +69,7 @@ Routine refactor, component-local layout, reversible implementation detail은 AD
 | [0042](0042-purpose-separated-platform-admin-audit-cursors.md) | 플랫폼 어드민 audit cursor를 V57 digest key로 서명 | Accepted | 2026-08-24 | platform ops, security, server |
 | [0043](0043-minimize-platform-admin-support-reason-evidence.md) | 플랫폼 어드민 support access 사유 evidence를 최소화 | Accepted | 2026-08-24 | platform ops, security, server, front |
 | [0044](0044-host-focus-deck-primary-action-composition.md) | 호스트 현재 모임을 Focus Deck 단일 주 행동으로 구성 | Accepted | 2026-08-26 | product, design, front |
-| [0045](0045-host-admin-focus-deck-editorial-ledger-composition.md) | 호스트·플랫폼 관리자 composition을 Focus Deck·Editorial Operations Ledger로 고정 | Accepted (host; admin → ADR-0047) | 2026-08-26 | product, design, platform ops, front |
+| [0045](0045-host-admin-focus-deck-editorial-ledger-composition.md) | 호스트·플랫폼 관리자 composition을 Focus Deck·Editorial Operations Ledger로 고정 | Accepted | 2026-08-26 | product, design, platform ops, front |
 | [0046](0046-host-triage-home-meeting-diary-composition.md) | 호스트 워크스페이스를 오늘 트리아지 + 모임 다이어리로 재구성 | Proposed | 2026-08-27 | product, design, front |
 | [0047](0047-admin-case-desk-narrative-composition.md) | 플랫폼 어드민을 케이스 데스크 + 운영 서사로 재구성 | Accepted | 2026-08-27 | product, design, platform ops, front |
 

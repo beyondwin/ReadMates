@@ -1,6 +1,6 @@
 # ADR-0045: 호스트·플랫폼 관리자 composition을 Focus Deck·Editorial Operations Ledger로 고정
 
-- 상태: Accepted (host composition). Admin composition superseded by ADR-0047
+- 상태: Accepted
 - 결정일: 2026-08-26
 - 작성자: 제품·디자인·플랫폼 운영·프런트엔드
 - 관련: ADR-0003, ADR-0020, ADR-0039, ADR-0040, ADR-0043, ADR-0044,
