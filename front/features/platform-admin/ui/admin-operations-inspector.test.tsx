@@ -87,6 +87,13 @@ describe("AdminOperationsInspector", () => {
     );
     expect(screen.getByRole("group", { name: "작업" })).toHaveClass("admin-action-dock");
     expect(screen.getByRole("button", { name: "확인 처리" })).toBeInTheDocument();
+
+    const commands = screen.getByRole("group", { name: "작업" });
+    const ledgerHeading = screen.getByRole("heading", { name: "이 대상의 최근 기입" });
+    expect(commands.closest(".admin-case-docket__actions")?.contains(ledgerHeading)).toBe(false);
+    expect(
+      Boolean(commands.compareDocumentPosition(ledgerHeading) & Node.DOCUMENT_POSITION_FOLLOWING),
+    ).toBe(true);
   });
 
   it("renders the case docket with a wrapping safe id, L1 dock, and no receipt timeline", () => {

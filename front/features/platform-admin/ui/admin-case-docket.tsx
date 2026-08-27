@@ -40,14 +40,14 @@ export function AdminCaseDocket({
       {evidence != null && evidence !== false ? (
         <div className="admin-case-docket__evidence">{evidence}</div>
       ) : null}
-      {history != null && history !== false ? (
-        <div className="admin-case-docket__history">{history}</div>
-      ) : null}
       {related != null && related !== false ? (
         <div className="admin-case-docket__related">{related}</div>
       ) : null}
       {actions != null && actions !== false ? (
         <div className="admin-case-docket__actions">{actions}</div>
+      ) : null}
+      {history != null && history !== false ? (
+        <div className="admin-case-docket__history">{history}</div>
       ) : null}
     </section>
   );
