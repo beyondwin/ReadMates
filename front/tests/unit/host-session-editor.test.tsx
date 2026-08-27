@@ -510,7 +510,7 @@ describe("HostSessionEditor", () => {
     expect(bookAndSessionPanel).not.toBeNull();
     expect(within(bookAndSessionPanel as HTMLElement).getByText("도서 정보")).toBeVisible();
     expect(screen.queryByText("모임 문서 편집")).not.toBeInTheDocument();
-    expect(screen.getByText("모임 작성 중")).toBeVisible();
+    expect(screen.getByText("작성 중")).toBeVisible();
     expect(screen.queryByText("새 예정 모임")).not.toBeInTheDocument();
   });
 
@@ -634,8 +634,7 @@ describe("HostSessionEditor", () => {
     expect(screen.queryByText("모임 운영 문서")).not.toBeInTheDocument();
     expect(screen.queryByText("모임 운영 문서 · No.7")).not.toBeInTheDocument();
     expect(screen.getByText("No.7")).toBeVisible();
-    expect(screen.getByText("멤버와 준비 중")).toBeVisible();
-    expect(screen.queryByText("준비 중", { exact: true })).not.toBeInTheDocument();
+    expect(screen.getByText("준비 중")).toBeVisible();
     expect(screen.queryByText("이번 모임")).not.toBeInTheDocument();
     expect(screen.queryByText("D-18")).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "지금 할 일" })).toBeVisible();
@@ -1700,7 +1699,7 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    expect(screen.getByText("공개 완료")).toBeVisible();
+    expect(screen.getByText("게시됨")).toBeVisible();
     expect(screen.queryByText("기록 정리 중")).not.toBeInTheDocument();
     expect(screen.queryByText("게스트·멤버 노트 게시 완료")).not.toBeInTheDocument();
   });
@@ -2036,7 +2035,7 @@ describe("HostSessionEditor", () => {
     await user.click(within(screen.getByRole("dialog", { name: "게스트·멤버 노트에 기록 게시" })).getByRole("button", { name: "게스트·멤버 노트에 기록 게시" }));
 
     expect(publishSession).toHaveBeenCalledWith(closedSession.sessionId);
-    expect(await screen.findByText("공개 완료")).toBeVisible();
+    expect(await screen.findByText("게시됨")).toBeVisible();
     expect(await screen.findByRole("status")).toHaveTextContent("게스트·멤버 노트에 기록을 게시했습니다.");
   });
 
