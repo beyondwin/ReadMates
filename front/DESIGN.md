@@ -3,11 +3,18 @@
 이 문서는 현재 코드·테스트·tracked screenshot이 구현한 host/admin 시각 권위다.
 승인 설계나 미구현 목표를 적지 않는다. Public, guest, member composition은 이 문서로 바꾸지 않는다.
 
-- ADR-0044: 호스트 현재 모임 Focus Deck(주 행동 계산 — 다이어리형에 계승)
-- ADR-0045: host Focus Deck + admin Editorial Operations Ledger
-- ADR-0046: 오늘 트리아지 + 모임 다이어리 재구성(Proposed — Stage 6에서 Accept)
+- ADR-0044: Superseded by ADR-0046(주 행동 계산 규칙은 다이어리형에 계승)
+- ADR-0045: admin Editorial Operations Ledger 유지; host composition은 ADR-0046
+- ADR-0046: Accepted — 오늘 트리아지 + 모임 다이어리 + 3탭 셸
 - Token source: `design/system/src/styles/tokens.css`
 - Viewport contract: `front/tests/e2e/support/visual-authority-contract.ts`
+
+## Host primary chrome
+
+호스트 1차 내비게이션은 3탭이다: **오늘** · **모임** · **멤버**.
+데스크톱 top nav와 모바일 tab bar가 같은 목적지(`HOST_ROUTE_HREFS.today` / `.meetings` / `.members`)를 쓴다.
+알림 발송(`/app/host/notifications`)은 1차 탭이 아니라 오늘에서 진입하는 화면이다(모바일에서 오늘 탭 current에 포함할 수 있다).
+구 경로 replace redirect: `/records`→`/sessions`, `/operations`→오늘(`/host`), `/invitations`→`/members`.
 
 ## Shared tokens
 
@@ -51,7 +58,7 @@ Lifecycle 상태 문구는 `hostMeetingLifecycleLabel`만 쓴다: `작성 중` /
 
 ## Host Meeting Diary
 
-적용 범위는 특정 모임 canonical 경로뿐이다. 페이지 타입은 다이어리형이다(ADR-0044 Focus Deck을 스프레드로 재조립; ADR-0046은 아직 Proposed).
+적용 범위는 특정 모임 canonical 경로뿐이다. 페이지 타입은 다이어리형이다(ADR-0044 Focus Deck 주 행동 계산을 스프레드로 재조립; ADR-0046 Accepted).
 
 `/clubs/:slug/app/host/sessions/:sessionId` (등록 host의 `/app/host/sessions/:sessionId`)
 
@@ -94,7 +101,7 @@ Record-dependent action은 기존 record editor query를 readiness union으로 �
 `pending`/`stale`/`unavailable`을 `false`로 추정하지 않는다. Publication·overwrite는 ready가 아니면 잠근다.
 
 `section` query는 panel deep link다. Back/Forward와 Escape는 연 컨트롤로 focus를 되돌린다.
-한 panel 실패가 Focus Deck 전체를 막지 않는다. 모바일 sticky primary는 safe-area를 반영하고 본문 CTA와 중복 announce하지 않는다.
+한 panel 실패가 다이어리 스프레드 전체를 막지 않는다. 모바일 sticky primary는 safe-area를 반영하고 본문 CTA와 중복 announce하지 않는다.
 
 ## Editorial Operations Ledger
 

@@ -8,7 +8,8 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Highlights
 
-- **호스트·관리자 시각 권위:** 호스트 현재 모임은 Focus Deck(한 개의 `지금 할 일`과 진행 사실)을 page-level 권위로 사용하고, `/admin/**`는 Editorial Operations Ledger로 route 문법을 맞춥니다. 분석 CSV export와 알림 replay는 exact capability projection만 따르며 Today lifecycle은 서버 `allowedActions`를 역할 이름으로 재계산하지 않습니다. 서버 API·schema·auth 계약은 바꾸지 않았습니다.
+- **호스트 3탭 IA:** 호스트 1차 내비게이션을 오늘·모임·멤버로 고정했습니다. 홈(`/app/host`)은 처리할 일 큐와 다음 모임 히어로의 트리아지이고, 모임 목록이 목차·기록 장부를 흡수하며, 초대는 멤버 화면에, 운영 허브 신호는 오늘 큐에 흡수됩니다. 구 URL은 replace 리다이렉트합니다(`/records`→`/sessions`, `/operations`→오늘, `/invitations`→`/members`). 특정 모임은 다이어리 스프레드이며, 알림 발송은 1차 탭이 아닌 화면입니다. 서버 API·schema·auth 계약은 바꾸지 않았습니다.
+- **호스트·관리자 시각 권위:** 호스트 현재 모임의 단일 주 행동 계산은 다이어리형에 계승되고, `/admin/**`는 Editorial Operations Ledger로 route 문법을 맞춥니다. 분석 CSV export와 알림 replay는 exact capability projection만 따르며 Today lifecycle은 서버 `allowedActions`를 역할 이름으로 재계산하지 않습니다. 서버 API·schema·auth 계약은 바꾸지 않았습니다.
 - **플랫폼 어드민 서비스 스파인:** 관리 화면을 오늘·클럽·서비스·검토 네 영역으로 정리하고, 서버가 발급한 capability allowlist로 탐색을 제한합니다. `/admin/today`는 공통 페이지 문법(loading/empty/partial/unavailable/forbidden)과 접근 가능한 작업 dock·확인 dialog를 기준 운영 화면으로 사용합니다. 401/403이면 platform-admin 상태를 폐기합니다.
 - **플랫폼 어드민 서비스·검토 작업대:** 알림 replay와 AI recovery는 V59 typed receipt·attempt evidence로 중복 실행과 provider 결과 과장을 막고, support grant는 V60 preview/confirm과 allowlist reason evidence로 전환합니다. `/admin/audit`는 source-aware signed cursor와 body-only sensitive search를 사용하고, `/admin/analytics`는 서버가 계산한 KPI 정의·delta·availability와 capability-gated no-store CSV export를 제공합니다.
 - **플랫폼 관리자 safe command 기반:** V57의 HMAC-only claim·key-version alias와 도메인 소유 transaction protocol로 위험한 관리자 명령의 중복 실행을 막습니다. 완료 claim만 bounded purge하고 immutable domain receipt는 보존하며, digest key rotation·retirement와 DB-backed startup 검증은 불완전한 설정에서 fail closed합니다.
@@ -16,8 +17,8 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **호스트 revision·idempotency와 공개 convergence:** 호스트 mutation은 V52 revision vector와 V53 HMAC request identity/immutable receipt를 사용하고, 목록 cursor epoch와 응답 revision을 additive하게 제공합니다. V54는 공개 generation, immutable convergence receipt/event, bounded provider work queue와 host 상태 조회를 추가합니다. 새 Pages BFF/frontend는 이 계약과 함께 배포하며 구 contract가 남은 혼합 구간에는 host write gate를 유지합니다.
 - **호스트 모임 작업공간:** URL이 소유하는 member/host workspace와 전용 새 모임 route, `모임`/`기록` 언어, 모임별 작업 목차, server-owned 목록 cursor epoch를 도입했습니다. 출석 응답과 실제 출석, 참여자 snapshot, revision-guarded mutation, durable idempotency receipt를 분리해 동시 편집과 response-loss를 명시적으로 복구합니다.
 - **공개 투영 수렴과 긴급 철회:** Public origin commit/immutable receipt와 provider cache purge attempt를 분리하고, host/operator에게 provider-neutral `PENDING|SUCCEEDED|FAILED` 수렴 상태를 제공합니다. Emergency takedown은 별도 platform-admin capability, preview/confirm, redacted immutable audit와 같은 convergence ledger를 사용하며 R2a 720초 cache evidence 전에는 fail closed합니다.
-- **모임 집중 작업 화면:** 특정 모임 화면은 지금 할 일과 주 행동 하나를 먼저 보여 줍니다. 기존 단계 rail과 편집 탭 대신 같은 화면에서 기본 정보·출석·기록·변경 내역을 엽니다. 기본 정보와 출석은 바로 되돌릴 수 있고, 지운 모임은 7일 동안 휴지통에서 복구할 수 있습니다.
-- **모임 운영 장부:** 호스트 홈이 지금 다루는 모임의 모임 전·진행 중·모임 후 장부입니다. 다음 책은 여러 권 미리 넣고 멤버에게 보일 수 있으며, 기록은 정리본 파일로 올립니다. 모임 주소는 `/app/host/sessions/:sessionId`이고 `/edit`와 `/closing`은 그 화면으로 이동합니다. 새 모임은 `GET /api/host/sessions/schedule-defaults`로 최근 일정을 채우고, 내구 이력이 없는 `DRAFT`는 목록에서 휴지통으로 옮길 수 있습니다.
+- **모임 집중 작업 화면:** 특정 모임 화면은 지금 할 일과 주 행동 하나를 먼저 보여 줍니다. 기존 단계 rail과 편집 탭 대신 같은 다이어리에서 기본 정보·출석·기록·변경 내역을 엽니다. 기본 정보와 출석은 바로 되돌릴 수 있고, 지운 모임은 7일 동안 휴지통에서 복구할 수 있습니다.
+- **모임 운영·기록 경로:** 모임 주소는 `/app/host/sessions/:sessionId`이고 `/edit`와 `/closing`은 그 화면으로 이동합니다. 기록 장부·과거 검색은 모임 목록(`/sessions`)에 흡수됩니다. 다음 책은 여러 권 미리 넣고 멤버에게 보일 수 있으며, 기록은 정리본 파일로 올립니다. 새 모임은 `GET /api/host/sessions/schedule-defaults`로 최근 일정을 채우고, 내구 이력이 없는 `DRAFT`는 목록에서 휴지통으로 옮길 수 있습니다.
 - **호스트 세션 되돌리기:** 호스트가 확인 후 공개 취소, 마감 취소, 예정 환원을 한 단계씩 할 수 있습니다. 기록과 알림은 남고, 다른 진행 중 세션이 있으면 다시 열 수 없습니다.
 
 ### Fixed

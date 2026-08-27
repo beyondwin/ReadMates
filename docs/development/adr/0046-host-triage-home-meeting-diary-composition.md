@@ -1,11 +1,11 @@
 # ADR-0046: 호스트 워크스페이스를 오늘 트리아지 + 모임 다이어리로 재구성
 
-- 상태: Proposed
+- 상태: Accepted
 - 결정일: 2026-08-27
 - 작성자: design/front
 - 관련: ADR-0044, ADR-0045, ADR-0026, ADR-0038, `docs/development/2026-08-27-readmates-host-triage-diary-redesign-design.md`, `front/DESIGN.md`
 
-> 새 ADR은 승인됐지만 아직 미구현인 `Proposed`로 시작합니다. 코드·테스트·active architecture가 일치한 뒤에만 `Accepted`로 바꿉니다.
+> Stage 6 게이트에서 코드·테스트·`front/DESIGN.md`·`docs/development/architecture.md`가 일치해 `Accepted`로 승격했다.
 
 ## 컨텍스트
 

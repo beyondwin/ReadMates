@@ -1,6 +1,6 @@
 # ADR-0044: 호스트 현재 모임을 Focus Deck 단일 주 행동으로 구성
 
-- 상태: Accepted
+- 상태: Superseded by ADR-0046
 - 결정일: 2026-08-26
 - 작성자: 제품·디자인·프런트엔드
 - 관련: ADR-0003, ADR-0020, ADR-0022, ADR-0023, ADR-0027, ADR-0028, ADR-0035,
