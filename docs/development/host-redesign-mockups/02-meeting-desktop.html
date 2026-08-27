@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>호스트 · 모임 상세 — 시안 A</title>
+<link rel="stylesheet" href="./shared.css">
+<style>
+  .page { padding-bottom: 72px; }
+  .crumb { display: flex; align-items: center; justify-content: space-between; padding: 18px 0 0; }
+  .crumb a { font-size: 13px; color: var(--text-3); }
+
+  .id-wrap { padding: 26px 0 0; }
+  .id-grid { display: flex; gap: 24px; align-items: flex-start; }
+  .m-title { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; margin: 4px 0 0; }
+  .m-meta { margin-top: 8px; font-size: 14px; color: var(--text-2); }
+
+  .now-block {
+    margin-top: 26px; padding: 20px 22px;
+    background: var(--bg-sub); border: 1px solid var(--line-soft); border-radius: var(--r-3);
+    display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  }
+  .now-block .nb-label { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; color: var(--text-3); }
+  .now-block .nb-title { font-size: 16.5px; font-weight: 600; margin-top: 3px; }
+  .now-block .nb-sub { font-size: 13px; color: var(--text-3); margin-top: 2px; }
+
+  .rail-wrap { margin-top: 30px; }
+
+  .main-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); gap: 56px; margin-top: 40px; }
+
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-2); overflow: hidden; }
+  .seg button { padding: 6px 12px; font-size: 12.5px; color: var(--text-3); border-right: 1px solid var(--line-soft); }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: var(--bg-sub); color: var(--text); font-weight: 600; }
+
+  .composer { margin-top: 40px; }
+  .composer textarea {
+    width: 100%; min-height: 64px; margin-top: 12px; padding: 12px 14px;
+    font: inherit; font-size: 14px; color: var(--text);
+    background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-2); resize: vertical;
+  }
+  .composer-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+
+  .side { display: grid; gap: 44px; align-content: start; }
+</style>
+</head>
+<body>
+<header class="topnav">
+  <div class="container topnav-inner">
+    <div class="brand">읽는사이 <span class="host-mark">HOST</span></div>
+    <nav class="nav-links">
+      <a class="nav-link">오늘</a>
+      <a class="nav-link" aria-current="page">모임</a>
+      <a class="nav-link">멤버</a>
+      <a class="nav-link">기록</a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button class="btn btn-quiet btn-sm">멤버 공간으로</button>
+      <span class="avatar">진</span>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+  <div class="container">
+    <div class="crumb">
+      <a>‹ 모임 목록</a>
+      <span class="folio">NO.25 · 만든 날 2026-08-10 · 마지막 수정 2026-08-24</span>
+    </div>
+
+    <section class="id-wrap">
+      <div class="id-grid">
+        <div class="book-cover" style="width:104px;"><strong>지구 끝의 온실</strong><span>김초엽</span></div>
+        <div style="min-width:0;flex:1;">
+          <span class="state-dot st-acc">멤버와 준비 중</span>
+          <h1 class="m-title editorial">『지구 끝의 온실』</h1>
+          <p class="m-meta">김초엽 · 자이언트북스 · <span class="mono" style="font-size:13px;">2026-09-05 SAT 19:30</span> · 합정 스튜디오 · 정원 12</p>
+        </div>
+        <button class="btn btn-ghost" style="flex:0 0 auto;">기본 정보 수정</button>
+      </div>
+
+      <div class="now-block">
+        <div>
+          <div class="nb-label">지금 할 일</div>
+          <div class="nb-title">아직 응답하지 않은 멤버 3명에게 리마인드를 보내세요</div>
+          <div class="nb-sub">다음 단계 「모임 마치기」는 모임 당일부터 열립니다 · 당일에는 이 화면이 출석 확인으로 바뀌어요</div>
+        </div>
+        <button class="btn btn-primary" style="flex:0 0 auto;">리마인드 보내기</button>
+      </div>
+
+      <div class="rail-wrap phase-rail" aria-label="모임 진행 단계">
+        <div class="phase phase--done"><span class="p-num">01</span>모임 작성</div>
+        <div class="phase phase--now"><span class="p-num">02 — 지금</span>멤버와 준비</div>
+        <div class="phase"><span class="p-num">03</span>기록 정리</div>
+        <div class="phase"><span class="p-num">04</span>게시 완료</div>
+      </div>
+    </section>
+
+    <div class="main-grid">
+      <section>
+        <div class="ledger-panel" aria-label="참석 응답 원장">
+          <div class="ledger-panel-head">
+            <span class="eyebrow">참석 응답 <span class="mono" style="letter-spacing:0;">8·1·2·3</span></span>
+            <div class="seg" role="group" aria-label="필터">
+              <button aria-pressed="true">전체 14</button>
+              <button>참석 8</button>
+              <button>미정 1</button>
+              <button>불참 2</button>
+              <button>미응답 3</button>
+            </div>
+          </div>
+          <div class="ledger-rows">
+            <div class="lrow"><span class="avatar">서</span><div class="lrow-main"><div class="lrow-title">서연</div></div><span class="state-dot st-ok">참석</span><span class="lrow-num">08-19 21:02</span></div>
+            <div class="lrow"><span class="avatar">민</span><div class="lrow-main"><div class="lrow-title">민재</div><div class="lrow-sub">“조금 늦을 수도 있어요”</div></div><span class="state-dot st-ok">참석</span><span class="lrow-num">08-19 21:40</span></div>
+            <div class="lrow"><span class="avatar">유</span><div class="lrow-main"><div class="lrow-title">유진</div></div><span class="state-dot st-ok">참석</span><span class="lrow-num">08-20 09:13</span></div>
+            <div class="lrow"><span class="avatar">지</span><div class="lrow-main"><div class="lrow-title">지후</div><div class="lrow-sub">출장 일정 확인 중</div></div><span class="state-dot st-warn">미정</span><span class="lrow-num">08-21 18:26</span></div>
+            <div class="lrow"><span class="avatar">태</span><div class="lrow-main"><div class="lrow-title">태오</div></div><span class="state-dot st-mut" style="color:var(--text-3);">불참 · 미리 알림</span><span class="lrow-num">08-20 22:51</span></div>
+            <div class="lrow lrow--urgent"><span class="avatar">하</span><div class="lrow-main"><div class="lrow-title">하늘</div><div class="lrow-sub">공지 열람함</div></div><span class="state-dot st-mut">미응답</span><span class="lrow-num">—</span></div>
+            <div class="lrow lrow--urgent"><span class="avatar">도</span><div class="lrow-main"><div class="lrow-title">도윤</div><div class="lrow-sub">공지 아직 안 열어봄</div></div><span class="state-dot st-mut">미응답</span><span class="lrow-num">—</span></div>
+          </div>
+          <p class="folio" style="margin-top:10px;">응답 시각은 멤버가 마지막으로 바꾼 시각 기준</p>
+        </div>
+
+        <section class="composer ledger-panel" aria-label="공지 보내기">
+          <div class="ledger-panel-head">
+            <span class="eyebrow">짧은 공지</span>
+            <div class="seg" role="group" aria-label="받는 사람">
+              <button>전원 14</button>
+              <button>참석 8</button>
+              <button aria-pressed="true">미응답 3</button>
+            </div>
+          </div>
+          <textarea placeholder="예) 이번 주 토요일 모임 참석 여부를 알려주세요. 온실 3부까지 읽고 오시면 좋아요."></textarea>
+          <div class="composer-foot">
+            <span class="folio">0 / 140 · 길게 쓰려면 알림 워크벤치로</span>
+            <button class="btn btn-primary btn-sm">미응답 3명에게 보내기</button>
+          </div>
+        </section>
+      </section>
+
+      <aside class="side">
+        <section class="ledger-panel" aria-label="자동 알림">
+          <div class="ledger-panel-head">
+            <span class="eyebrow">자동 알림</span>
+            <button class="btn btn-quiet btn-sm" style="font-size:12px;">설정</button>
+          </div>
+          <div class="ledger-rows">
+            <div class="lrow"><div class="lrow-main"><div class="lrow-title" style="font-weight:500;">모임 공지</div><div class="lrow-sub">전원에게 발송됨</div></div><span class="state-dot st-ok">발송</span><span class="lrow-num">08-18</span></div>
+            <div class="lrow"><div class="lrow-main"><div class="lrow-title" style="font-weight:500;">일주일 전 리마인드</div><div class="lrow-sub">참석 확정 멤버에게</div></div><span class="state-dot st-acc">예정</span><span class="lrow-num">08-29</span></div>
+            <div class="lrow"><div class="lrow-main"><div class="lrow-title" style="font-weight:500;">하루 전 리마인드</div><div class="lrow-sub">참석 확정 멤버에게</div></div><span class="state-dot st-acc">예정</span><span class="lrow-num">09-04</span></div>
+          </div>
+          <p class="folio" style="margin-top:10px;">내 이름으로 나가는 알림은 여기서 미리 볼 수 있어요</p>
+        </section>
+
+        <section class="ledger-panel" aria-label="관련 작업">
+          <div class="ledger-panel-head"><span class="eyebrow">관련 작업</span></div>
+          <div class="ledger-rows">
+            <a class="lrow"><div class="lrow-main"><div class="lrow-title">발제문 쓰기</div><div class="lrow-sub">모임 전 공개 · 아직 초안 없음</div></div><span class="lrow-go">›</span></a>
+            <a class="lrow"><div class="lrow-main"><div class="lrow-title">실제 출석 확인</div><div class="lrow-sub">모임 당일부터</div></div><span class="state-dot st-mut">잠김</span></a>
+            <a class="lrow"><div class="lrow-main"><div class="lrow-title">모임 기록</div><div class="lrow-sub">마친 뒤 정리</div></div><span class="state-dot st-mut">잠김</span></a>
+            <a class="lrow"><div class="lrow-main"><div class="lrow-title">변경 내역</div></div><span class="lrow-num">6건</span></a>
+          </div>
+        </section>
+
+        <section class="ledger-panel" aria-label="공개 범위">
+          <div class="ledger-panel-head"><span class="eyebrow">공개 범위</span></div>
+          <div class="ledger-rows">
+            <div class="lrow"><div class="lrow-main"><div class="lrow-title" style="font-weight:500;">멤버에게</div></div><span class="state-dot st-ok">공개</span></div>
+            <div class="lrow"><div class="lrow-main"><div class="lrow-title" style="font-weight:500;">사이트 방문자에게</div><div class="lrow-sub">기록을 게시하면 공개 여부를 정해요</div></div><span class="state-dot st-mut">비공개</span></div>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </div>
+</main>
+</body>
+</html>

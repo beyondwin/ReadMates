@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>호스트 · 모바일 — 시안 A</title>
+<link rel="stylesheet" href="./shared.css">
+<style>
+  body { background: var(--paper-200); }
+  .stage { display: flex; gap: 48px; justify-content: center; padding: 48px 24px; align-items: flex-start; }
+  .phone-label { text-align: center; margin-bottom: 14px; }
+  .phone {
+    width: 390px; height: 780px; background: var(--bg);
+    border: 1px solid var(--line-strong); border-radius: 18px; overflow: hidden;
+    display: flex; flex-direction: column; position: relative;
+  }
+  .m-hdr {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px 12px; border-bottom: 1px solid var(--line); flex: 0 0 auto; background: var(--bg);
+  }
+  .m-hdr-title { font-size: 15px; font-weight: 650; }
+  .m-body { flex: 1; overflow: hidden; padding: 0 18px; }
+  .m-tabbar {
+    flex: 0 0 auto; display: flex; border-top: 1px solid var(--line); background: var(--bg);
+    padding: 6px 8px 18px;
+  }
+  .m-tab { flex: 1; text-align: center; font-size: 11px; color: var(--text-4); padding: 7px 0 0; }
+  .m-tab .ico { display: block; font-size: 17px; margin-bottom: 2px; }
+  .m-tab[aria-current] { color: var(--accent); font-weight: 600; }
+
+  .m-sec { margin-top: 24px; }
+  .m-sec .eyebrow { margin-bottom: 8px; font-size: 11px; }
+  .m-hero { font-size: 24px; line-height: 1.28; font-weight: 600; letter-spacing: -0.02em; margin: 0; }
+
+  .m-card {
+    border: 1px solid var(--line); border-radius: var(--r-3); padding: 16px; background: var(--bg);
+  }
+  .m-card-title { font-size: 20px; font-weight: 600; letter-spacing: -0.015em; margin-top: 6px; }
+  .m-tally { display: flex; gap: 22px; margin-top: 14px; }
+  .m-tally .t-num { font-family: var(--f-mono); font-size: 20px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .m-tally .t-label { font-size: 11px; color: var(--text-3); }
+
+  .m-lrow { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 6px 0; border-bottom: 1px solid var(--line-soft); }
+  .m-lrow .lrow-title { font-size: 15px; }
+  .m-lrow .lrow-sub { font-size: 12px; }
+
+  .checkin-btn {
+    height: 40px; padding: 0 16px; border-radius: var(--r-2); font-size: 14px; font-weight: 600;
+    border: 1px solid var(--line-strong); color: var(--text-2); flex: 0 0 auto;
+  }
+  .checkin-btn.done { border-color: transparent; background: var(--ok-soft); color: var(--ok); }
+
+  .m-foot-cta {
+    position: absolute; left: 0; right: 0; bottom: 64px; padding: 12px 18px 14px;
+    background: color-mix(in oklch, var(--bg) 94%, transparent); border-top: 1px solid var(--line);
+    display: flex; gap: 10px;
+  }
+  .m-foot-cta .btn { flex: 1; height: 46px; }
+
+  .m-seg { display: flex; border: 1px solid var(--line); border-radius: var(--r-2); overflow: hidden; margin-top: 14px; }
+  .m-seg button { flex: 1; padding: 9px 0; font-size: 13px; color: var(--text-3); border-right: 1px solid var(--line-soft); }
+  .m-seg button:last-child { border-right: 0; }
+  .m-seg button[aria-pressed="true"] { background: var(--bg-sub); color: var(--text); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <div>
+    <div class="phone-label folio">A — 호스트 홈 (모바일)</div>
+    <div class="phone">
+      <div class="m-hdr">
+        <span class="brand" style="font-size:15px;">읽는사이 <span class="host-mark">HOST</span></span>
+        <span class="folio">NO.25 · D-9</span>
+      </div>
+      <div class="m-body">
+        <div class="m-sec">
+          <h1 class="m-hero editorial">응답을 기다리는<br>멤버가 3명 있어요.</h1>
+        </div>
+
+        <div class="m-sec">
+          <div class="eyebrow">지금 살펴볼 일 · 2건</div>
+          <div class="m-lrow">
+            <span class="state-dot st-warn"></span>
+            <div class="lrow-main"><div class="lrow-title">지원 님 초대장 곧 만료</div><div class="lrow-sub">아직 열람 전 · D-3</div></div>
+            <span class="lrow-go">›</span>
+          </div>
+          <div class="m-lrow">
+            <span class="state-dot st-warn"></span>
+            <div class="lrow-main"><div class="lrow-title">24회차 기록 정리 중</div><div class="lrow-sub">요약·출석 확정 남음</div></div>
+            <span class="lrow-go">›</span>
+          </div>
+        </div>
+
+        <div class="m-sec">
+          <div class="eyebrow">다음 모임</div>
+          <div class="m-card">
+            <span class="state-dot st-acc">멤버와 준비 중</span>
+            <div class="m-card-title editorial">『지구 끝의 온실』</div>
+            <div class="lrow-sub" style="margin-top:3px;font-size:12px;color:var(--text-3);"><span class="mono">09-05 SAT 19:30</span> · 합정 스튜디오</div>
+            <div class="m-tally">
+              <div><div class="t-num">8</div><div class="t-label">참석</div></div>
+              <div><div class="t-num">1</div><div class="t-label">미정</div></div>
+              <div><div class="t-num">2</div><div class="t-label">불참</div></div>
+              <div><div class="t-num" style="color:var(--warn);">3</div><div class="t-label">미응답</div></div>
+            </div>
+            <button class="btn btn-primary" style="width:100%;height:46px;margin-top:16px;font-size:15px;">미응답 3명에게 리마인드</button>
+          </div>
+        </div>
+
+        <div class="m-sec">
+          <div class="eyebrow">최근 마감</div>
+          <div class="m-lrow">
+            <div class="lrow-main"><div class="lrow-title editorial">『소년이 온다』</div><div class="lrow-sub">참석 7/9 · 소감 5건</div></div>
+            <span class="lrow-num">NO.24</span>
+            <span class="lrow-go">›</span>
+          </div>
+        </div>
+      </div>
+      <nav class="m-tabbar">
+        <span class="m-tab" aria-current="page"><span class="ico">☰</span>오늘</span>
+        <span class="m-tab"><span class="ico">▤</span>모임</span>
+        <span class="m-tab"><span class="ico">◔</span>멤버</span>
+        <span class="m-tab"><span class="ico">▣</span>기록</span>
+      </nav>
+    </div>
+  </div>
+
+  <div>
+    <div class="phone-label folio">B — 모임 당일 · 출석 확인 (자동 전환)</div>
+    <div class="phone">
+      <div class="m-hdr">
+        <span class="m-hdr-title">오늘 모임 · 출석 확인</span>
+        <span class="folio">NO.25 · 19:30</span>
+      </div>
+      <div class="m-body">
+        <div class="m-sec" style="margin-top:18px;">
+          <div class="m-card-title editorial" style="margin-top:0;">『지구 끝의 온실』</div>
+          <div class="lrow-sub" style="margin-top:2px;font-size:12px;color:var(--text-3);">참석 예정 9명 중 <span class="mono" style="color:var(--text);">7명 도착</span> · 모임 1시간 전부터 열려요</div>
+
+          <div class="m-seg" role="group">
+            <button aria-pressed="true">아직 안 옴 2</button>
+            <button>도착 7</button>
+            <button>전체 14</button>
+          </div>
+        </div>
+
+        <div class="m-sec">
+          <div class="m-lrow">
+            <span class="avatar" style="width:34px;height:34px;font-size:13px;">지</span>
+            <div class="lrow-main"><div class="lrow-title">지후</div><div class="lrow-sub">참석 응답 · 미정이었어요</div></div>
+            <button class="checkin-btn">도착</button>
+          </div>
+          <div class="m-lrow">
+            <span class="avatar" style="width:34px;height:34px;font-size:13px;">수</span>
+            <div class="lrow-main"><div class="lrow-title">수민</div><div class="lrow-sub">참석 응답</div></div>
+            <button class="checkin-btn">도착</button>
+          </div>
+          <div class="m-lrow" style="opacity:.66;">
+            <span class="avatar" style="width:34px;height:34px;font-size:13px;">서</span>
+            <div class="lrow-main"><div class="lrow-title">서연</div><div class="lrow-sub mono">19:21 도착</div></div>
+            <button class="checkin-btn done">도착함</button>
+          </div>
+          <div class="m-lrow" style="opacity:.66;">
+            <span class="avatar" style="width:34px;height:34px;font-size:13px;">민</span>
+            <div class="lrow-main"><div class="lrow-title">민재</div><div class="lrow-sub mono">19:24 도착</div></div>
+            <button class="checkin-btn done">도착함</button>
+          </div>
+          <div class="m-lrow" style="opacity:.66;">
+            <span class="avatar" style="width:34px;height:34px;font-size:13px;">유</span>
+            <div class="lrow-main"><div class="lrow-title">유진</div><div class="lrow-sub mono">19:26 도착</div></div>
+            <button class="checkin-btn done">도착함</button>
+          </div>
+        </div>
+
+        <p class="folio" style="margin-top:14px;">잘못 눌렀다면 한 번 더 눌러 되돌릴 수 있어요</p>
+      </div>
+
+      <div class="m-foot-cta">
+        <button class="btn btn-ghost">남은 전원 참석 처리</button>
+        <button class="btn btn-primary">출석 마감</button>
+      </div>
+
+      <nav class="m-tabbar">
+        <span class="m-tab" aria-current="page"><span class="ico">☰</span>오늘</span>
+        <span class="m-tab"><span class="ico">▤</span>모임</span>
+        <span class="m-tab"><span class="ico">◔</span>멤버</span>
+        <span class="m-tab"><span class="ico">▣</span>기록</span>
+      </nav>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

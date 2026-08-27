@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>호스트 · 모임 마감(기록 정리) — 시안 A</title>
+<link rel="stylesheet" href="./shared.css">
+<style>
+  .page { padding-bottom: 72px; }
+  .crumb { display: flex; align-items: center; justify-content: space-between; padding: 18px 0 0; }
+  .crumb a { font-size: 13px; color: var(--text-3); }
+
+  .id-wrap { padding: 26px 0 0; }
+  .id-grid { display: flex; gap: 24px; align-items: flex-start; }
+  .m-title { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; margin: 4px 0 0; }
+  .m-meta { margin-top: 8px; font-size: 14px; color: var(--text-2); }
+
+  .now-block {
+    margin-top: 26px; padding: 20px 22px;
+    background: var(--bg-sub); border: 1px solid var(--line-soft); border-radius: var(--r-3);
+    display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  }
+  .now-block .nb-label { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; color: var(--text-3); }
+  .now-block .nb-title { font-size: 16.5px; font-weight: 600; margin-top: 3px; }
+  .now-block .nb-sub { font-size: 13px; color: var(--text-3); margin-top: 2px; }
+
+  .rail-wrap { margin-top: 30px; }
+  .main-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); gap: 56px; margin-top: 40px; }
+
+  /* 장부 마감 체크리스트 */
+  .close-row { display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 10px 2px; border-bottom: 1px solid var(--line-soft); }
+  .close-row:hover { background: var(--bg-sub); }
+  .step-no { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.06em; color: var(--text-4); flex: 0 0 26px; }
+  .close-title { font-size: 15px; font-weight: 600; }
+  .close-sub { font-size: 12.5px; color: var(--text-3); margin-top: 1px; }
+  .close-row.done .close-title { color: var(--text-2); font-weight: 500; }
+  .stamp { font-family: var(--f-mono); font-size: 12px; color: var(--ok); white-space: nowrap; }
+
+  .quote-strip { margin-top: 40px; }
+  .quote-strip blockquote {
+    margin: 0; padding: 14px 0; border-bottom: 1px solid var(--line-soft);
+    font-size: 14.5px; color: var(--text-2); line-height: 1.6;
+  }
+  .quote-strip .who { font-size: 12px; color: var(--text-4); margin-top: 4px; }
+  .quote-strip .rating { font-family: var(--f-mono); font-size: 12px; color: var(--text-3); }
+
+  .side { display: grid; gap: 44px; align-content: start; }
+</style>
+</head>
+<body>
+<header class="topnav">
+  <div class="container topnav-inner">
+    <div class="brand">읽는사이 <span class="host-mark">HOST</span></div>
+    <nav class="nav-links">
+      <a class="nav-link">오늘</a>
+      <a class="nav-link" aria-current="page">모임</a>
+      <a class="nav-link">멤버</a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button class="btn btn-quiet btn-sm">멤버 공간으로</button>
+      <span class="avatar">진</span>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+  <div class="container">
+    <div class="crumb">
+      <a>‹ 모임 목록</a>
+      <span class="folio">NO.24 · 모임일 2026-08-15 · 12일 경과</span>
+    </div>
+
+    <section class="id-wrap">
+      <div class="id-grid">
+        <div class="book-cover" style="width:104px;"><strong>소년이 온다</strong><span>한강</span></div>
+        <div style="min-width:0;flex:1;">
+          <span class="state-dot st-warn">기록 정리 중</span>
+          <h1 class="m-title editorial">『소년이 온다』</h1>
+          <p class="m-meta">한강 · 창비 · <span class="mono" style="font-size:13px;">2026-08-15 SAT 19:30</span> · 합정 스튜디오 · 참석 7/9</p>
+        </div>
+        <button class="btn btn-ghost" style="flex:0 0 auto;">멤버 시야로 보기</button>
+      </div>
+
+      <div class="now-block">
+        <div>
+          <div class="nb-label">지금 할 일</div>
+          <div class="nb-title">기록 초안이 준비됐어요 — 검토하고 멤버에게 게시하세요</div>
+          <div class="nb-sub">남은 일 2가지 · 게시하면 멤버 노트가 함께 공개되고, 사이트 공개는 그다음에 정해요</div>
+        </div>
+        <button class="btn btn-primary" style="flex:0 0 auto;">기록 검토하고 게시</button>
+      </div>
+
+      <div class="rail-wrap phase-rail" aria-label="모임 진행 단계">
+        <div class="phase phase--done"><span class="p-num">01</span>모임 작성</div>
+        <div class="phase phase--done"><span class="p-num">02</span>멤버와 준비</div>
+        <div class="phase phase--done"><span class="p-num">03</span>모임 당일</div>
+        <div class="phase phase--now"><span class="p-num">04 — 지금</span>기록 정리</div>
+        <div class="phase"><span class="p-num">05</span>게시</div>
+      </div>
+    </section>
+
+    <div class="main-grid">
+      <section>
+        <div class="ledger-panel" aria-label="장부 마감">
+          <div class="ledger-panel-head">
+            <span class="eyebrow">장부 마감</span>
+            <span class="folio">3/5 완료</span>
+          </div>
+          <div class="ledger-rows">
+            <div class="close-row done">
+              <span class="step-no">01</span>
+              <div class="lrow-main">
+                <div class="close-title">출석 확정</div>
+                <div class="close-sub">참석 7 · 알린 불참 1 · 무단 불참 1</div>
+              </div>
+              <span class="stamp">✓ 08-15 21:48</span>
+            </div>
+            <div class="close-row done">
+              <span class="step-no">02</span>
+              <div class="lrow-main">
+                <div class="close-title">멤버 소감 수집</div>
+                <div class="close-sub">참석 7명 중 5명 제출 · 요청은 모임 종료 시 자동 발송됐어요</div>
+              </div>
+              <button class="btn btn-quiet btn-sm">미제출 2명에게 리마인드</button>
+              <span class="stamp">✓ 자동</span>
+            </div>
+            <div class="close-row done">
+              <span class="step-no">03</span>
+              <div class="lrow-main">
+                <div class="close-title">모임 기록 초안</div>
+                <div class="close-sub">직접 쓰거나, 소감·발제를 바탕으로 초안을 만들 수 있어요 · 마지막 수정 08-26</div>
+              </div>
+              <button class="btn btn-quiet btn-sm">초안 열기</button>
+              <span class="stamp">✓ 08-26 23:10</span>
+            </div>
+            <div class="close-row">
+              <span class="step-no">04</span>
+              <div class="lrow-main">
+                <div class="close-title">피드백 문서 확인</div>
+                <div class="close-sub">멤버에게 전달될 문서를 미리 봐요 — 소감 5건과 기록 초안이 담겨요</div>
+              </div>
+              <button class="btn btn-ghost btn-sm">미리보기</button>
+            </div>
+            <div class="close-row">
+              <span class="step-no">05</span>
+              <div class="lrow-main">
+                <div class="close-title">멤버에게 게시</div>
+                <div class="close-sub">게시하면 멤버 노트가 함께 공개돼요 · 되돌리려면 정정 게시로 이력이 남아요</div>
+              </div>
+              <button class="btn btn-ghost btn-sm" disabled style="opacity:.5;">04 확인 후</button>
+            </div>
+          </div>
+          <p class="folio" style="margin-top:10px;">완료 항목은 시각이 함께 봉인돼요 · 이 페이지가 제24회차의 원장이 됩니다</p>
+        </div>
+
+        <section class="quote-strip ledger-panel" aria-label="도착한 소감">
+          <div class="ledger-panel-head">
+            <span class="eyebrow">도착한 소감</span>
+            <span class="folio">5건 · 평균 ★ 4.4</span>
+          </div>
+          <blockquote>
+            “읽는 내내 힘들었는데, 같이 얘기하고 나니 왜 끝까지 읽어야 하는 책인지 알겠어요.”
+            <div class="who">서연 <span class="rating">★ 5.0 · 08-16 09:12</span></div>
+          </blockquote>
+          <blockquote>
+            “동호 장(2장)을 다시 읽게 됐습니다. 다음에도 이런 책 골라주세요.”
+            <div class="who">민재 <span class="rating">★ 4.5 · 08-16 22:40</span></div>
+          </blockquote>
+          <blockquote>
+            “토론 질문 중 ‘기억의 책임’ 부분이 특히 좋았어요.”
+            <div class="who">유진 <span class="rating">★ 4.0 · 08-18 08:03</span></div>
+          </blockquote>
+        </section>
+      </section>
+
+      <aside class="side">
+        <section class="ledger-panel" aria-label="게시 준비 상태">
+          <div class="ledger-panel-head"><span class="eyebrow">게시 준비</span></div>
+          <div class="ledger-rows">
+            <div class="lrow"><div class="lrow-main"><div class="lrow-title" style="font-weight:500;">출석</div></div><span class="state-dot st-ok">확정됨</span></div>
+            <div class="lrow"><div class="lrow-main"><div class="lrow-title" style="font-weight:500;">기록 초안</div></div><span class="state-dot st-ok">준비됨</span></div>
+            <div class="lrow"><div class="lrow-main"><div class="lrow-title" style="font-weight:500;">소감</div><div class="lrow-sub">2명 미제출 — 게시 후에 도착하면 자동 추가</div></div><span class="state-dot st-warn">5/7</span></div>
+            <div class="lrow"><div class="lrow-main"><div class="lrow-title" style="font-weight:500;">피드백 문서</div></div><span class="state-dot st-mut">확인 전</span></div>
+          </div>
+        </section>
+
+        <section class="ledger-panel" aria-label="공개 범위">
+          <div class="ledger-panel-head"><span class="eyebrow">공개 범위</span></div>
+          <div class="ledger-rows">
+            <div class="lrow"><div class="lrow-main"><div class="lrow-title" style="font-weight:500;">멤버에게</div><div class="lrow-sub">05 게시하면 공개</div></div><span class="state-dot st-mut">게시 전</span></div>
+            <div class="lrow"><div class="lrow-main"><div class="lrow-title" style="font-weight:500;">사이트 방문자에게</div><div class="lrow-sub">게시 후 따로 결정 — 개인 노트는 포함되지 않아요</div></div><span class="state-dot st-mut">비공개</span></div>
+          </div>
+        </section>
+
+        <section class="ledger-panel" aria-label="관련 작업">
+          <div class="ledger-panel-head"><span class="eyebrow">관련 작업</span></div>
+          <div class="ledger-rows">
+            <a class="lrow"><div class="lrow-main"><div class="lrow-title">출석 기록 고치기</div><div class="lrow-sub">마감 후에도 수정할 수 있어요 — 이력이 남아요</div></div><span class="lrow-go">›</span></a>
+            <a class="lrow"><div class="lrow-main"><div class="lrow-title">변경 내역</div></div><span class="lrow-num">9건</span></a>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </div>
+</main>
+</body>
+</html>
