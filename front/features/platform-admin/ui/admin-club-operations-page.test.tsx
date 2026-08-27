@@ -56,6 +56,8 @@ describe("AdminClubOperationsPage", () => {
     );
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.getAllByText("5").length).toBeGreaterThan(0);
+    expect(screen.getByText("휴면").closest(".admin-club-operations__stat")).toHaveTextContent("1");
+    expect(screen.getByText("대기").closest(".admin-club-operations__stat")).toHaveTextContent("2");
   });
 
   it("renders snapshot heading and support grant count", () => {

@@ -167,8 +167,8 @@ export function AdminClubOperationsPage({
           </Panel>
           <Panel title="Member activity">
             <Stat label="활성" value={null} />
-            <Stat label="휴면" value={null} />
-            <Stat label="대기" value={null} />
+            <Stat label="휴면" value={deviantCount(snapshot.memberActivity.dormantCount)} />
+            <Stat label="대기" value={deviantCount(snapshot.memberActivity.pendingViewerCount)} />
           </Panel>
         </div>
         <ClosingRiskPanel snapshot={snapshot} />
