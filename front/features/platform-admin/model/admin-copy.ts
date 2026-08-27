@@ -19,6 +19,11 @@ export const ADMIN_COPY = {
     recentChanges: "최근에 바뀐 것",
     audit: "운영 기입",
     auditLedger: "기입 목록",
+    access: "접근 원장",
+    accessLedger: "발급 목록",
+  },
+  support: {
+    issue: "지원 접근 발급",
   },
   targetLedger: {
     heading: "이 대상의 최근 기입",
@@ -85,6 +90,13 @@ export const supportGrantStatusLabel = fromMap({
   EXPIRING: "만료 임박",
   EXPIRED: "만료됨",
   REVOKED: "취소됨",
+});
+
+export const supportGrantReasonLabel = fromMap({
+  INCIDENT_INVESTIGATION: "사고 조사",
+  MEMBER_ASSISTANCE: "회원 지원",
+  DATA_CORRECTION: "데이터 정정",
+  SECURITY_REVIEW: "보안 검토",
 });
 
 export const auditOutcomeLabel = fromMap({

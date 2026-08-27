@@ -835,6 +835,9 @@
 }
 
 .admin-support-workbench,
+.admin-support-workbench .admin-page-context,
+.admin-support-workbench .admin-work-view-bar,
+.admin-support-workbench .admin-evidence-ledger,
 .admin-support-workbench .admin-receipt-timeline,
 .admin-audit,
 .admin-audit .admin-page-context,

@@ -194,18 +194,18 @@ describe("AdminSupportRoute", () => {
     fireEvent.click(screen.getByRole("button", { name: "발급 검토" }));
     expect(await screen.findByText(/GRANT_SUPPORT_ACCESS/)).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "발급 확정" }));
+    fireEvent.click(screen.getByRole("button", { name: "지원 접근 발급" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("같은 요청");
     await act(() => router.navigate("/admin/other"));
     expect(router.state.location.pathname).toBe("/admin/support");
-    fireEvent.click(screen.getByRole("button", { name: "발급 확정" }));
+    fireEvent.click(screen.getByRole("button", { name: "지원 접근 발급" }));
 
     expect(await screen.findByRole("region", { name: "명령 기록" })).toHaveTextContent("receipt-1");
     const calls = vi.mocked(confirmAdminSupportGrant).mock.calls;
     expect(calls).toHaveLength(2);
     expect(calls[0]?.[0].idempotencyKey).toBe(calls[1]?.[0].idempotencyKey);
     const receipt = screen.getByLabelText("명령 영수증");
-    expect(within(receipt).getByText(/MEMBER_ASSISTANCE/)).toBeInTheDocument();
+    expect(within(receipt).getByText(/회원 지원/)).toBeInTheDocument();
     expect(within(receipt).getByText(/검토 시 사유 메모 사용/)).toBeInTheDocument();
     expect(screen.queryByText("raw private note")).not.toBeInTheDocument();
     expect(screen.queryByText(/내부 메모/)).not.toBeInTheDocument();
@@ -335,7 +335,7 @@ describe("AdminSupportRoute", () => {
     fireEvent.click(screen.getByRole("button", { name: "검색" }));
     fireEvent.click(await screen.findByRole("button", { name: /지원 대상/ }));
     fireEvent.click(screen.getByRole("button", { name: "발급 검토" }));
-    expect(await screen.findByRole("button", { name: "발급 확정" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "지원 접근 발급" })).toBeInTheDocument();
 
     act(() => client.setQueryData(platformAdminCapabilitiesQuery().queryKey, {
       schemaVersion: 1,
@@ -345,7 +345,7 @@ describe("AdminSupportRoute", () => {
       generatedAt: "2026-08-25T01:00:00Z",
     }));
 
-    await waitFor(() => expect(screen.queryByRole("button", { name: "발급 확정" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("button", { name: "지원 접근 발급" })).not.toBeInTheDocument());
     expect(screen.getByRole("searchbox", { name: "지원 대상 검색" })).toHaveValue("");
     expect(confirmAdminSupportGrant).not.toHaveBeenCalled();
   });

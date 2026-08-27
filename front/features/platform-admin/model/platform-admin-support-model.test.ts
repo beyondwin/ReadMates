@@ -3,6 +3,7 @@ import {
   SUPPORT_REASON_PRESETS,
   buildSupportGrantRiskSummary,
   flattenSupportGrantLedgerPages,
+  formatSupportGrantLedgerSentence,
   isSupportReasonPresetSafe,
   normalizeSupportGrantStatus,
   supportGrantCommandRecovery,
@@ -137,6 +138,28 @@ describe("support grant ledger", () => {
     ];
 
     expect(flattenSupportGrantLedgerPages(pages).map((item) => item.grantId)).toEqual(["grant-1", "grant-2"]);
+  });
+
+  it("sentence-izes a grant row with Korean status and reason labels", () => {
+    const grant = {
+      grantId: "grant-1",
+      clubId: "club-1",
+      clubName: "읽는사이",
+      granteeDisplayName: "지원 대상",
+      granteeMaskedEmail: "s***@example.com",
+      scope: "HOST_SUPPORT_READ" as const,
+      reasonCategory: "MEMBER_ASSISTANCE" as const,
+      notePresent: true,
+      expiresAt: "2026-08-25T12:00:00Z",
+      createdAt: "2026-08-25T10:00:00Z",
+      revokedAt: null,
+      status: "ACTIVE" as const,
+      createdByRole: "OWNER",
+    };
+
+    expect(formatSupportGrantLedgerSentence(grant)).toMatch(/읽는사이에서 지원 대상에게 지원 접근을 발급함 · 사유: 회원 지원 · 활성/);
+    expect(formatSupportGrantLedgerSentence(grant)).not.toMatch(/\bACTIVE\b/);
+    expect(formatSupportGrantLedgerSentence({ ...grant, status: "REVOKED" })).toMatch(/지원 접근을 취소함 · 사유: 회원 지원 · 취소됨/);
   });
 
   it("allows only share-safe status values in the URL", () => {

@@ -188,7 +188,9 @@ export function AdminTargetLedgerInline({ entries, moreHref }: {
 - 이력 행 문장화 + `supportGrantStatusLabel` 적용(1단계 완료분 재사용).
 
 **Steps:**
-- [ ] 테스트: ① PageContext 헤딩 ② 사유·만료 없으면 발급 버튼 disabled ③ 확인 버튼 라벨이 행위 문장 → 구현 → 통과 → Commit: `feat(admin): support access ledger with shared shell`
+- [x] 테스트: ① PageContext 헤딩 ② 사유·만료 없으면 발급 버튼 disabled ③ 확인 버튼 라벨이 행위 문장 → 구현 → 통과 → Commit: `feat(admin): support access ledger with shared shell`
+
+> 실행 노트: 전역 `useAdminAlarmSummary`(2-1)에 support 쿼리를 붙이지 않음. 이 화면 PageContext `scope`에만 `활성 접근 N건` 표기. 전역 알람 바 상주는 서버 요약 후속.
 
 ### Task 4-3: 분석 → "분석 부록" 정리
 
@@ -279,3 +281,4 @@ export function AdminTargetLedgerInline({ entries, moreHref }: {
 (실행자가 기입: 서버 후속 / 이월 결함 / 계획 이탈 결정)
 
 - 3-2: 서버에 dismiss API 없음. 무시는 기존 `SNOOZE`(최대 7일) + 사유 필수로 구현. snooze 요청 DTO는 unknown field를 거부하므로 사유를 HTTP body에 넣지 않음 — 사유 보존은 서버 후속.
+- 4-2: 활성 support grant를 전역 알람 바 attention 후보에 넣으려면 서버 요약(또는 2-1 훅의 support 쿼리)이 필요함. 이번 화면은 PageContext scope `활성 접근 N건`만 표기.

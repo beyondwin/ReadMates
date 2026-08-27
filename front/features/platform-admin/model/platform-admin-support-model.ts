@@ -1,3 +1,8 @@
+import {
+  supportGrantReasonLabel,
+  supportGrantStatusLabel,
+} from "@/features/platform-admin/model/admin-copy";
+
 export type AdminSupportSearchResult = {
   subjectId: string;
   displayName: string;
@@ -166,6 +171,28 @@ export function flattenSupportGrantLedgerPages(
     seen.add(item.grantId);
     return true;
   }));
+}
+
+export function formatSupportGrantOccurredAt(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+export function formatSupportGrantLedgerSentence(item: AdminSupportGrantLedgerItem): string {
+  const verb = item.status === "REVOKED"
+    ? "지원 접근을 취소함"
+    : item.status === "EXPIRED"
+      ? "지원 접근이 만료됨"
+      : "지원 접근을 발급함";
+  return `${formatSupportGrantOccurredAt(item.createdAt)} · ${item.clubName}에서 ${item.granteeDisplayName}에게 ${verb} · 사유: ${supportGrantReasonLabel(item.reasonCategory)} · ${supportGrantStatusLabel(item.status)}`;
 }
 
 export function supportGrantCommandRecovery(error: unknown): {

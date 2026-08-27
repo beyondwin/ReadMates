@@ -5,6 +5,7 @@ import {
   clubLifecycleLabel,
   clubVisibilityLabel,
   hostOnboardingLabel,
+  supportGrantReasonLabel,
   supportGrantStatusLabel,
 } from "./admin-copy";
 
@@ -27,6 +28,9 @@ describe("admin-copy", () => {
     expect(ADMIN_COPY.heading.recentChanges).toBe("최근에 바뀐 것");
     expect(ADMIN_COPY.heading.audit).toBe("운영 기입");
     expect(ADMIN_COPY.heading.auditLedger).toBe("기입 목록");
+    expect(ADMIN_COPY.heading.access).toBe("접근 원장");
+    expect(ADMIN_COPY.heading.accessLedger).toBe("발급 목록");
+    expect(ADMIN_COPY.support.issue).toBe("지원 접근 발급");
     expect(ADMIN_COPY.targetLedger.heading).toBe("이 대상의 최근 기입");
     expect(ADMIN_COPY.targetLedger.more).toBe("전체 기입 보기");
     expect(ADMIN_COPY.targetLedger.empty).toBe("표시할 기입이 없습니다.");
@@ -67,6 +71,13 @@ describe("admin-copy", () => {
     expect(supportGrantStatusLabel("EXPIRING")).toBe("만료 임박");
     expect(supportGrantStatusLabel("EXPIRED")).toBe("만료됨");
     expect(supportGrantStatusLabel("REVOKED")).toBe("취소됨");
+  });
+
+  it("지원 발급 사유를 한국어 라벨로 바꾼다", () => {
+    expect(supportGrantReasonLabel("INCIDENT_INVESTIGATION")).toBe("사고 조사");
+    expect(supportGrantReasonLabel("MEMBER_ASSISTANCE")).toBe("회원 지원");
+    expect(supportGrantReasonLabel("DATA_CORRECTION")).toBe("데이터 정정");
+    expect(supportGrantReasonLabel("SECURITY_REVIEW")).toBe("보안 검토");
   });
 
   it("모르는 값은 원문을 그대로 반환한다 (fail-open 라벨, 숨기지 않음)", () => {
