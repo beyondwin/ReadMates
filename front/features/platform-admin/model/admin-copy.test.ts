@@ -38,6 +38,7 @@ describe("admin-copy", () => {
     expect(ADMIN_COPY.heading.analytics).toBe("분석 부록");
     expect(ADMIN_COPY.support.issue).toBe("지원 접근 발급");
     expect(ADMIN_COPY.targetLedger.heading).toBe("이 대상의 최근 기입");
+    expect(ADMIN_COPY.targetLedger.clubHeading).toBe("이 클럽의 최근 기입");
     expect(ADMIN_COPY.targetLedger.more).toBe("전체 기입 보기");
     expect(ADMIN_COPY.targetLedger.empty).toBe("표시할 기입이 없습니다.");
     expect(ADMIN_COPY.metric.outboxPending).toBe("발송 대기");

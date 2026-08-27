@@ -36,6 +36,11 @@ vi.mock("@/features/platform-admin/api/platform-admin-support-api", () => ({
   fetchAdminSupportGrantLedger: vi.fn(),
 }));
 
+vi.mock("@/features/platform-admin/api/platform-admin-audit-api", () => ({
+  fetchAdminAuditLedger: vi.fn(),
+  searchAdminAuditLedger: vi.fn(),
+}));
+
 import {
   checkPlatformAdminDomainProvisioning,
   confirmPlatformAdminClubVisibility,
@@ -45,6 +50,8 @@ import {
   updatePlatformAdminClubMetadata,
 } from "@/features/platform-admin/api/platform-admin-api";
 import { fetchAdminSupportGrantLedger } from "@/features/platform-admin/api/platform-admin-support-api";
+import { fetchAdminAuditLedger } from "@/features/platform-admin/api/platform-admin-audit-api";
+import { platformAdminAuditLedgerInfiniteQuery } from "@/features/platform-admin/queries/platform-admin-audit-queries";
 
 const detail: PlatformAdminClubDetail = {
   clubId: "c-1",
@@ -121,6 +128,24 @@ function renderRoute(
       { pages: [{ items: [], nextCursor: null }], pageParams: [undefined] },
     );
   }
+  queryClient.setQueryData(
+    platformAdminAuditLedgerInfiniteQuery({ clubId: "c-1" }).queryKey,
+    {
+      pages: [{
+        generatedAt: "2026-08-24T00:00:00Z",
+        filters: {},
+        summary: {
+          visibleCount: 0,
+          sourceUnavailableCount: 0,
+          metadataUnavailableCount: 0,
+          unavailableSources: [],
+        },
+        items: [],
+        nextCursor: null,
+      }],
+      pageParams: [undefined],
+    },
+  );
   queryClient.setQueryData(platformAdminClubOperationsQuery("c-1").queryKey, {
     schema: "admin.club_operations_snapshot.v1",
     generatedAt: "2026-08-24T00:00:00Z",
@@ -186,6 +211,18 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(fetchPlatformAdminClub).mockResolvedValue(detail);
   vi.mocked(fetchAdminSupportGrantLedger).mockResolvedValue({ items: [], nextCursor: null });
+  vi.mocked(fetchAdminAuditLedger).mockResolvedValue({
+    generatedAt: "2026-08-24T00:00:00Z",
+    filters: {},
+    summary: {
+      visibleCount: 0,
+      sourceUnavailableCount: 0,
+      metadataUnavailableCount: 0,
+      unavailableSources: [],
+    },
+    items: [],
+    nextCursor: null,
+  });
 });
 
 describe("AdminClubDetailRoute", () => {
@@ -204,7 +241,9 @@ describe("AdminClubDetailRoute", () => {
     expect(screen.queryByText(/\bACTIVE\b/)).toBeNull();
     expect(screen.queryByText(/\bPRIVATE\b/)).toBeNull();
     expect(screen.getByText("alpha.example.test")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("alpha")).toHaveAttribute("readonly");
+    expect(screen.queryByRole("textbox", { name: "Slug" })).not.toBeInTheDocument();
+    expect(container.querySelector(".admin-club-detail__facts")).toHaveTextContent("alpha");
+    expect(screen.getByRole("button", { name: "편집" })).toBeInTheDocument();
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });
 
@@ -215,6 +254,7 @@ describe("AdminClubDetailRoute", () => {
       adminRevision: 8,
     });
     renderRoute();
+    fireEvent.click(screen.getByRole("button", { name: "편집" }));
     fireEvent.change(screen.getByRole("textbox", { name: "클럽 이름" }), {
       target: { value: "Alpha Books" },
     });
@@ -238,6 +278,7 @@ describe("AdminClubDetailRoute", () => {
       }),
     );
     renderRoute();
+    fireEvent.click(screen.getByRole("button", { name: "편집" }));
     fireEvent.change(screen.getByRole("textbox", { name: "클럽 이름" }), {
       target: { value: "Alpha Books" },
     });
@@ -249,8 +290,11 @@ describe("AdminClubDetailRoute", () => {
     expect(screen.getByRole("textbox", { name: "About" })).toBeDisabled();
     resolveSave?.({ ...detail, name: "Alpha Books", adminRevision: 8 });
     await waitFor(() =>
-      expect(screen.getByRole("textbox", { name: "클럽 이름" })).toBeEnabled(),
+      expect(screen.getByRole("button", { name: "편집" })).toBeInTheDocument(),
     );
+    expect(
+      screen.queryByRole("textbox", { name: "클럽 이름" }),
+    ).not.toBeInTheDocument();
   });
 
   it("hides the support grant metric without VIEW_SUPPORT", () => {
@@ -295,6 +339,30 @@ describe("AdminClubDetailRoute", () => {
     expect(queryClient.getQueryData(queryKey)).toBeUndefined();
   });
 
+  it("renders L2 dock primitives for visibility and domain commands", () => {
+    const { container } = renderRoute();
+    const docks = container.querySelectorAll(".admin-safe-action-dock[data-level='L2']");
+    expect(docks.length).toBeGreaterThanOrEqual(2);
+    expect(
+      screen.getByRole("button", { name: "공개 전환 미리보기" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "도메인 추가 미리보기" }),
+    ).toBeInTheDocument();
+    expect(container.querySelector(".admin-receipt-timeline")).toBeNull();
+  });
+
+  it("renders the club recent-ledger link onto the shared audit prefilter", () => {
+    renderRoute();
+    expect(
+      screen.getByRole("heading", { name: "이 클럽의 최근 기입" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "전체 기입 보기" })).toHaveAttribute(
+      "href",
+      "/admin/audit?target=c-1",
+    );
+  });
+
   it("requires preview review and explicit confirmation before a visibility command", async () => {
     vi.mocked(previewPlatformAdminClubVisibility).mockResolvedValue({
       previewId: "preview-1",
@@ -332,11 +400,17 @@ describe("AdminClubDetailRoute", () => {
     );
     expect(await screen.findByText(/receipt-1/)).toBeInTheDocument();
     expect(screen.getByText("영수증 — 명령 접수")).toBeInTheDocument();
-    expect(confirm).toBeDisabled();
+    expect(document.querySelector(".admin-receipt-timeline")).not.toBeNull();
+    expect(
+      screen.getByRole("button", { name: "공개 전환 확정" }),
+    ).toBeDisabled();
   });
 
   it("hides mutation actions without the exact capabilities", () => {
     renderRoute(detail, ["VIEW_CLUBS"]);
+    expect(
+      screen.queryByRole("button", { name: "편집" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "공개 정보 저장" }),
     ).not.toBeInTheDocument();
@@ -397,7 +471,7 @@ describe("AdminClubDetailRoute", () => {
 
     renderRoute(detail, ["VIEW_CLUBS", "MANAGE_CLUBS"]);
     expect(
-      screen.getByRole("button", { name: "공개 정보 저장" }),
+      screen.getByRole("button", { name: "편집" }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "도메인 추가 미리보기" }),
@@ -414,6 +488,7 @@ describe("AdminClubDetailRoute", () => {
       requestFingerprintPrefix: "abcd1234",
     });
     const { queryClient } = renderRoute();
+    fireEvent.click(screen.getByRole("button", { name: "편집" }));
     fireEvent.change(screen.getByRole("textbox", { name: "클럽 이름" }), {
       target: { value: "Draft Alpha" },
     });
@@ -432,10 +507,11 @@ describe("AdminClubDetailRoute", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByRole("textbox", { name: "클럽 이름" })).toHaveValue(
-        "Alpha",
-      ),
+      expect(
+        screen.queryByRole("textbox", { name: "클럽 이름" }),
+      ).not.toBeInTheDocument(),
     );
+    expect(screen.getByText("Alpha", { selector: "dd" })).toBeInTheDocument();
     expect(screen.queryByText("PUBLIC_DISCOVERY_ENABLED")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("checkbox", { name: "영향을 확인했습니다" }),
@@ -454,6 +530,7 @@ describe("AdminClubDetailRoute", () => {
         screen.getByRole("button", { name: "공개 전환 미리보기" }),
       ).toBeInTheDocument(),
     );
+    fireEvent.click(screen.getByRole("button", { name: "편집" }));
     expect(screen.getByRole("textbox", { name: "클럽 이름" })).toHaveValue(
       "Alpha",
     );
@@ -465,6 +542,7 @@ describe("AdminClubDetailRoute", () => {
       code: "REVISION_CONFLICT",
     });
     const { queryClient } = renderRoute();
+    fireEvent.click(screen.getByRole("button", { name: "편집" }));
     fireEvent.click(screen.getByRole("button", { name: "공개 정보 저장" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("최신 상태");
 
@@ -489,8 +567,9 @@ describe("AdminClubDetailRoute", () => {
       generatedAt: "2026-08-24T00:00:00Z",
     });
     expect(
-      await screen.findByRole("button", { name: "공개 정보 저장" }),
+      await screen.findByRole("button", { name: "편집" }),
     ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "편집" }));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
@@ -840,6 +919,7 @@ describe("AdminClubDetailRoute", () => {
       code: "REVISION_CONFLICT",
     });
     renderRoute();
+    fireEvent.click(screen.getByRole("button", { name: "편집" }));
     fireEvent.click(screen.getByRole("button", { name: "공개 정보 저장" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("최신 상태");
     fireEvent.click(screen.getByRole("button", { name: "최신 상태 불러오기" }));

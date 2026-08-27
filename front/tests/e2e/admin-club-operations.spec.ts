@@ -277,6 +277,7 @@ test("revision conflict keeps the operator on detail and offers authoritative re
 }) => {
   await routePlatformAdminShell(page);
   await page.goto(`/admin/clubs/${CLUB_ID}`);
+  await page.getByRole("button", { name: "편집" }).click();
   await page.getByRole("button", { name: "공개 정보 저장" }).click();
   await expect(page.getByRole("alert")).toContainText("최신 상태");
   await page.getByRole("button", { name: "최신 상태 불러오기" }).click();

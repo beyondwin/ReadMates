@@ -19,7 +19,45 @@ const snapshot: AdminClubOperationsSnapshot = {
   ],
 };
 
+const okSnapshot: AdminClubOperationsSnapshot = {
+  ...snapshot,
+  memberActivity: { activeCount: 8, dormantCount: 0, pendingViewerCount: 0, hostCount: 1 },
+  sessionProgress: { upcomingCount: 0, currentOpenCount: 0, closedCount: 0, publishedRecordCount: 0, incompleteRecordCount: 0 },
+  notificationHealth: { pending: 0, failed: 0, dead: 0, lastSuccessAt: null, failureClusters: [], recentFailed7d: 0, priorFailed7d: 0 },
+  aiUsage: { activeJobs: 0, failedRecentJobs: 0, staleCandidates: 0, costEstimateUsd: "0.0000", state: "NO_RECENT_USAGE", priorFailedJobs7d: 0 },
+};
+
+function snapshotNumbers(container: HTMLElement) {
+  return [...container.querySelectorAll(
+    ".admin-club-operations__metric strong, .admin-club-operations__stat strong",
+  )].map((node) => node.textContent);
+}
+
 describe("AdminClubOperationsPage", () => {
+  it("hides numbers on ok snapshot items and shows numbers only on deviation", () => {
+    const okView = render(
+      <MemoryRouter>
+        <AdminClubOperationsPage snapshot={okSnapshot} supportGrantCount={0} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("활성 멤버")).toBeInTheDocument();
+    expect(screen.getByText("알림 실패 (7일)")).toBeInTheDocument();
+    expect(snapshotNumbers(okView.container)).toEqual([]);
+    expect(screen.queryByText("미완료 0 · 차단 0 · 준비 0")).not.toBeInTheDocument();
+    expect(screen.queryByText("8")).not.toBeInTheDocument();
+    expect(screen.queryByText("$0.0000")).not.toBeInTheDocument();
+    okView.unmount();
+
+    render(
+      <MemoryRouter>
+        <AdminClubOperationsPage snapshot={snapshot} supportGrantCount={3} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getAllByText("5").length).toBeGreaterThan(0);
+  });
+
   it("renders snapshot heading and support grant count", () => {
     render(
       <MemoryRouter>

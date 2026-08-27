@@ -28,6 +28,7 @@ export const ADMIN_COPY = {
   },
   targetLedger: {
     heading: "이 대상의 최근 기입",
+    clubHeading: "이 클럽의 최근 기입",
     more: "전체 기입 보기",
     empty: "표시할 기입이 없습니다.",
   },
