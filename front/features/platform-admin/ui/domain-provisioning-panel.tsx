@@ -233,7 +233,7 @@ function AdminClubDomainCommandPanelInner({
     >
       <div className="admin-club-detail__panel-heading">
         <div>
-          <p className="eyebrow">Domain provisioning</p>
+          <p className="eyebrow">{ADMIN_COPY.eyebrow.domainProvisioning}</p>
           <h2 id="platform-admin-domains-title" className="h3 editorial">
             도메인
           </h2>

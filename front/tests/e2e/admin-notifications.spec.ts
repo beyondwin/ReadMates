@@ -153,7 +153,7 @@ test("owner operates admin notification ledgers and replay", async ({ page }) =>
   await expectNoHorizontalOverflow(page);
   await expectMinimumTargetSize(page.getByRole("button", { name: "대상 확인" }));
   await expect(page.getByText(/Health outbox backlog/)).toBeVisible();
-  await expect(page.getByText("Outbox pending")).toBeVisible();
+  await expect(page.getByText("발송 대기", { exact: true })).toBeVisible();
   await expect(page.getByText(/SESSION_REMINDER_DUE/)).toBeVisible();
   await expect(page.getByText(/m\*\*\*@example.com/)).toBeVisible();
   await expect(page.getByText("member1@example.com")).toHaveCount(0);

@@ -5,6 +5,10 @@ export const ADMIN_COPY = {
     aiOps: "운영 · AI 작업",
     notifications: "운영 · 배달",
     takedown: "운영 · 긴급 공개 회수",
+    identity: "식별",
+    visibility: "공개 설정",
+    domainProvisioning: "도메인 준비",
+    operationsSnapshot: "운영 스냅샷",
   },
   heading: {
     aiOps: "AI 작업",
@@ -12,6 +16,13 @@ export const ADMIN_COPY = {
     replay: "재발송",
     clubsLedger: "클럽 장부",
     delivery: "배달 원장",
+  },
+  metric: {
+    outboxPending: "발송 대기",
+    outboxFailed: "발송 실패",
+    deliveryPending: "배달 대기",
+    deliveryFailed: "배달 실패",
+    relayStale: "중계 지연",
   },
   receipt: "영수증",
 } as const;

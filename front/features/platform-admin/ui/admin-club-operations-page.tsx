@@ -17,6 +17,7 @@ import {
   type AdminClubClosingRiskItem,
   type AdminClubOperationsSnapshot,
 } from "@/features/platform-admin/model/platform-admin-club-operations-model";
+import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
 
 type AdminClubOperationsPageProps = {
   snapshot: AdminClubOperationsSnapshot;
@@ -41,7 +42,7 @@ export function AdminClubOperationsPage({
     >
       <header className="admin-club-operations__header">
         <div>
-          <p className="eyebrow">Operations snapshot</p>
+          <p className="eyebrow">{ADMIN_COPY.eyebrow.operationsSnapshot}</p>
           <h2 id="admin-club-operations-title" className="h3 editorial">
             {snapshot.club.name} 운영 스냅샷
           </h2>

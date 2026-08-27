@@ -77,11 +77,11 @@ export function AdminNotificationsPage({
 
         {snapshot ? (
           <div className="admin-notifications__summary" aria-label="알림 운영 요약">
-            <Metric label="Outbox pending" value={snapshot.outboxSummary.pending} />
-            <Metric label="Outbox failed" value={snapshot.outboxSummary.failed + snapshot.outboxSummary.dead} />
-            <Metric label="Delivery pending" value={snapshot.deliverySummary.pending} />
-            <Metric label="Delivery failed" value={snapshot.deliverySummary.failed + snapshot.deliverySummary.dead} />
-            <Metric label="Relay stale" value={snapshot.relaySummary.stalePublishing + snapshot.relaySummary.staleSending} />
+            <Metric label={ADMIN_COPY.metric.outboxPending} value={snapshot.outboxSummary.pending} />
+            <Metric label={ADMIN_COPY.metric.outboxFailed} value={snapshot.outboxSummary.failed + snapshot.outboxSummary.dead} />
+            <Metric label={ADMIN_COPY.metric.deliveryPending} value={snapshot.deliverySummary.pending} />
+            <Metric label={ADMIN_COPY.metric.deliveryFailed} value={snapshot.deliverySummary.failed + snapshot.deliverySummary.dead} />
+            <Metric label={ADMIN_COPY.metric.relayStale} value={snapshot.relaySummary.stalePublishing + snapshot.relaySummary.staleSending} />
           </div>
         ) : null}
 

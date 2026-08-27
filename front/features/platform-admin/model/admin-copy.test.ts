@@ -14,11 +14,20 @@ describe("admin-copy", () => {
     expect(ADMIN_COPY.eyebrow.aiOps).toBe("운영 · AI 작업");
     expect(ADMIN_COPY.eyebrow.notifications).toBe("운영 · 배달");
     expect(ADMIN_COPY.eyebrow.takedown).toBe("운영 · 긴급 공개 회수");
+    expect(ADMIN_COPY.eyebrow.identity).toBe("식별");
+    expect(ADMIN_COPY.eyebrow.visibility).toBe("공개 설정");
+    expect(ADMIN_COPY.eyebrow.domainProvisioning).toBe("도메인 준비");
+    expect(ADMIN_COPY.eyebrow.operationsSnapshot).toBe("운영 스냅샷");
     expect(ADMIN_COPY.heading.aiOps).toBe("AI 작업");
     expect(ADMIN_COPY.heading.failureClusters).toBe("실패 클러스터");
     expect(ADMIN_COPY.heading.replay).toBe("재발송");
     expect(ADMIN_COPY.heading.clubsLedger).toBe("클럽 장부");
     expect(ADMIN_COPY.heading.delivery).toBe("배달 원장");
+    expect(ADMIN_COPY.metric.outboxPending).toBe("발송 대기");
+    expect(ADMIN_COPY.metric.outboxFailed).toBe("발송 실패");
+    expect(ADMIN_COPY.metric.deliveryPending).toBe("배달 대기");
+    expect(ADMIN_COPY.metric.deliveryFailed).toBe("배달 실패");
+    expect(ADMIN_COPY.metric.relayStale).toBe("중계 지연");
     expect(ADMIN_COPY.receipt).toBe("영수증");
   });
 

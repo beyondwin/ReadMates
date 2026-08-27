@@ -28,6 +28,8 @@ describe("AdminClubOperationsPage", () => {
     );
 
     expect(screen.getByRole("heading", { name: "읽는사이 운영 스냅샷" })).toBeInTheDocument();
+    expect(screen.getByText("운영 스냅샷", { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText("Operations snapshot")).toBeNull();
     expect(screen.getByText("지원 grant")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
   });

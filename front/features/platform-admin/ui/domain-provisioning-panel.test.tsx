@@ -54,6 +54,8 @@ describe("AdminClubDomainCommandPanel request binding", () => {
           rejectPreview = reject;
         }),
     );
+    expect(screen.getByText("도메인 준비")).toBeInTheDocument();
+    expect(screen.queryByText("Domain provisioning")).toBeNull();
     const hostname = screen.getByRole("textbox", { name: "Hostname" });
     fireEvent.change(hostname, { target: { value: "first.example.test" } });
     fireEvent.click(

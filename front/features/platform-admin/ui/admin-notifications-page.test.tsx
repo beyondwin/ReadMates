@@ -108,7 +108,12 @@ describe("AdminNotificationsPage", () => {
     expect(screen.getByRole("heading", { name: "재발송" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "발송 대기 장부" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "배달 장부" })).toBeInTheDocument();
-    expect(screen.getByText("Outbox pending")).toBeInTheDocument();
+    expect(screen.getByText("발송 대기")).toBeInTheDocument();
+    expect(screen.getByText("발송 실패")).toBeInTheDocument();
+    expect(screen.getByText("배달 대기")).toBeInTheDocument();
+    expect(screen.getByText("배달 실패")).toBeInTheDocument();
+    expect(screen.getByText("중계 지연")).toBeInTheDocument();
+    expect(screen.queryByText("Outbox pending")).toBeNull();
     expect(screen.getAllByText("mailbox_unavailable").length).toBeGreaterThan(0);
   });
 

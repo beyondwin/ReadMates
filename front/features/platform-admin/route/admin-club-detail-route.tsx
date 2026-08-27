@@ -256,7 +256,7 @@ function ClubMetadataPanel({
     >
       <div className="admin-club-detail__panel-heading">
         <div>
-          <p className="eyebrow">Identity</p>
+          <p className="eyebrow">{ADMIN_COPY.eyebrow.identity}</p>
           <h2 id="club-metadata-title" className="h3 editorial">
             공개 정보
           </h2>
@@ -451,7 +451,7 @@ function VisibilityPanel({
     >
       <div className="admin-club-detail__panel-heading">
         <div>
-          <p className="eyebrow">Visibility</p>
+          <p className="eyebrow">{ADMIN_COPY.eyebrow.visibility}</p>
           <h2 id="visibility-title" className="h3 editorial">
             공개 상태
           </h2>

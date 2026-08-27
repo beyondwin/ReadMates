@@ -195,6 +195,12 @@ describe("AdminClubDetailRoute", () => {
     expect(screen.getByRole("heading", { name: "Alpha" })).toBeInTheDocument();
     expect(screen.getByText("revision 7 · 활성 · 비공개")).toBeInTheDocument();
     expect(screen.getByText("현재 비공개")).toBeInTheDocument();
+    expect(screen.getByText("식별")).toBeInTheDocument();
+    expect(screen.getByText("공개 설정")).toBeInTheDocument();
+    expect(screen.getByText("도메인 준비")).toBeInTheDocument();
+    expect(screen.queryByText("Identity")).toBeNull();
+    expect(screen.queryByText("Visibility")).toBeNull();
+    expect(screen.queryByText("Domain provisioning")).toBeNull();
     expect(screen.queryByText(/\bACTIVE\b/)).toBeNull();
     expect(screen.queryByText(/\bPRIVATE\b/)).toBeNull();
     expect(screen.getByText("alpha.example.test")).toBeInTheDocument();
