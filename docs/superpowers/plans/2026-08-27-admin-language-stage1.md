@@ -366,4 +366,4 @@ Expected: 0건. 매치가 나오면 위 태스크들의 사전 규칙으로 치�
 
 ## 다음 계획
 
-2단계(알람 요약 바 + 서사형 건강 페이지)는 이 계획 완료·릴리스 후 별도 플랜(`2026-08-XX-admin-alarm-bar-narrative-health.md`)으로 작성한다.
+2~6단계는 `docs/superpowers/plans/2026-08-27-admin-case-desk-stages2-6.md`에 이어진다. 이 계획(1단계) 완료 후 순차 실행한다.
