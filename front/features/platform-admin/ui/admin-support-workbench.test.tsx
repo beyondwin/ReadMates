@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -52,6 +52,14 @@ describe("AdminSupportWorkbench", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("현재 목록은 유지됩니다");
     await userEvent.click(screen.getByRole("button", { name: "다시 불러오기" }));
     expect(onLoadMore).toHaveBeenCalledOnce();
+  });
+
+  it("shows Korean grant status labels in the ledger", () => {
+    render(<AdminSupportWorkbench {...props()} />);
+    const ledger = document.querySelector(".admin-support-workbench__ledger");
+    expect(ledger).not.toBeNull();
+    expect(within(ledger!).getByText(/활성/)).toBeInTheDocument();
+    expect(within(ledger!).queryByText(/\bACTIVE\b/)).toBeNull();
   });
 
   it("starts revoke review only when the current capability permits it", async () => {

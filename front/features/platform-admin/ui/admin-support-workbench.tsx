@@ -1,3 +1,4 @@
+import { supportGrantStatusLabel } from "@/features/platform-admin/model/admin-copy";
 import type {
   AdminSupportGrantLedgerItem,
   AdminSupportGrantPreview,
@@ -181,7 +182,7 @@ export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
           <div className="admin-support-workbench__ledger">
             {props.ledger.items.map((item) => (
               <article key={item.grantId} className="admin-support-workbench__ledger-row">
-                <div><p><strong>{item.clubName}</strong> · {item.granteeDisplayName}</p><p className="small muted">{item.granteeMaskedEmail} · {item.status} · {item.reasonCategory} · {notePresenceLabel(item.notePresent)}</p></div>
+                <div><p><strong>{item.clubName}</strong> · {item.granteeDisplayName}</p><p className="small muted">{item.granteeMaskedEmail} · {supportGrantStatusLabel(item.status)} · {item.reasonCategory} · {notePresenceLabel(item.notePresent)}</p></div>
                 {props.canManage && item.status === "ACTIVE" ? <button type="button" className="btn btn-ghost btn-sm" disabled={effectLocked} onClick={() => props.revoke.onStart(item)}>권한 취소 검토</button> : null}
               </article>
             ))}
