@@ -18,6 +18,7 @@ describe("admin-copy", () => {
     expect(ADMIN_COPY.heading.failureClusters).toBe("실패 클러스터");
     expect(ADMIN_COPY.heading.replay).toBe("재발송");
     expect(ADMIN_COPY.heading.clubsLedger).toBe("클럽 장부");
+    expect(ADMIN_COPY.heading.delivery).toBe("배달 원장");
     expect(ADMIN_COPY.receipt).toBe("영수증");
   });
 

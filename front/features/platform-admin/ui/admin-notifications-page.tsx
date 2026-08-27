@@ -67,7 +67,7 @@ export function AdminNotificationsPage({
     <section className="admin-notifications">
       <AdminPageContext
         eyebrow={ADMIN_COPY.eyebrow.notifications}
-        heading="알림 / Outbox 운영"
+        heading={ADMIN_COPY.heading.delivery}
         freshness={snapshot ? `생성 ${formatTimestamp(snapshot.generatedAt)}` : "요약을 불러오지 못함"}
         authority={canReplay ? "재처리 가능" : "재처리 권한 없음"}
       >

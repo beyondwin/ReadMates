@@ -193,6 +193,10 @@ describe("AdminClubDetailRoute", () => {
     const { container } = renderRoute();
     expect(screen.getByText("운영 · 클럽 상세")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Alpha" })).toBeInTheDocument();
+    expect(screen.getByText("revision 7 · 활성 · 비공개")).toBeInTheDocument();
+    expect(screen.getByText("현재 비공개")).toBeInTheDocument();
+    expect(screen.queryByText(/\bACTIVE\b/)).toBeNull();
+    expect(screen.queryByText(/\bPRIVATE\b/)).toBeNull();
     expect(screen.getByText("alpha.example.test")).toBeInTheDocument();
     expect(screen.getByDisplayValue("alpha")).toHaveAttribute("readonly");
     expect(findUnnamedInteractiveElements(container)).toEqual([]);

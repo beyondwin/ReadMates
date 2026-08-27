@@ -11,6 +11,7 @@ export const ADMIN_COPY = {
     failureClusters: "실패 클러스터",
     replay: "재발송",
     clubsLedger: "클럽 장부",
+    delivery: "배달 원장",
   },
   receipt: "영수증",
 } as const;

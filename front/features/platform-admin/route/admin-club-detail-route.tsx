@@ -27,7 +27,11 @@ import {
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { AdminPageContext } from "@/features/platform-admin/ui/admin-page-context";
 import { flattenSupportGrantLedgerPages } from "@/features/platform-admin/model/platform-admin-support-model";
-import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
+import {
+  ADMIN_COPY,
+  clubLifecycleLabel,
+  clubVisibilityLabel,
+} from "@/features/platform-admin/model/admin-copy";
 import { platformAdminSupportLedgerInfiniteQuery } from "@/features/platform-admin/queries/platform-admin-support-queries";
 import { platformAdminClubOperationsQuery } from "@/features/platform-admin/queries/platform-admin-club-operations-queries";
 import { AdminClubOperationsPage } from "@/features/platform-admin/ui/admin-club-operations-page";
@@ -105,7 +109,7 @@ export function AdminClubDetailRoute() {
       <AdminPageContext
         eyebrow={ADMIN_COPY.eyebrow.clubDetail}
         heading={club.name}
-        description={`revision ${club.adminRevision} · ${club.status} · ${club.publicVisibility}`}
+        description={`revision ${club.adminRevision} · ${clubLifecycleLabel(club.status)} · ${clubVisibilityLabel(club.publicVisibility)}`}
         action={<ClubsReturnLink returnState={returnState} />}
       />
       <ClubMetadataPanel
@@ -452,7 +456,7 @@ function VisibilityPanel({
             공개 상태
           </h2>
         </div>
-        <span className="admin-club-detail__state">현재 {current}</span>
+        <span className="admin-club-detail__state">현재 {clubVisibilityLabel(current)}</span>
       </div>
       <p className="body">
         공개 전환은 영향을 미리 확인한 뒤 명시적으로 확정합니다.
@@ -471,7 +475,7 @@ function VisibilityPanel({
         <div className="admin-club-detail__review" aria-live="polite">
           <p>
             <strong>
-              {preview.currentVisibility} → {preview.targetVisibility}
+              {clubVisibilityLabel(preview.currentVisibility)} → {clubVisibilityLabel(preview.targetVisibility)}
             </strong>
           </p>
           <ul>

@@ -103,7 +103,7 @@ describe("AdminNotificationsPage", () => {
     renderPage();
 
     expect(screen.getByText("운영 · 배달")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "알림 / Outbox 운영" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "배달 원장" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "실패 클러스터" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "재발송" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "발송 대기 장부" })).toBeInTheDocument();

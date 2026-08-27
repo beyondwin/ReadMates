@@ -77,6 +77,7 @@ Record-dependent action은 기존 record editor query를 readiness union으로 �
 ## Editorial Operations Ledger
 
 `/admin/**` page-level 권위는 Editorial Operations Ledger다. ADR-0039의 오늘·클럽·서비스·검토 Service Spine과 exact capability catalog는 유지한다.
+라벨은 `admin-copy.ts` 사전 사용.
 
 Ready routes: `/admin/today`, `/admin/clubs`, `/admin/clubs/:clubId`, `/admin/health`, `/admin/notifications`, `/admin/ai-ops`, `/admin/public-takedown`, `/admin/support`, `/admin/audit`, `/admin/analytics`.
 

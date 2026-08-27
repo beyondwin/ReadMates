@@ -139,7 +139,7 @@ test("Notifications L2 replay requires exact REPLAY_NOTIFICATIONS", async ({ pag
   await page.goto("/admin/notifications");
   await expectReducedMotion(page);
 
-  await expect(page.getByRole("heading", { name: "알림 / Outbox 운영" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "배달 원장" })).toBeVisible();
   await expect(page.getByText("현재 권한으로는 재처리를 실행할 수 없습니다.")).toBeVisible();
   await expect(page.getByRole("button", { name: "대상 확인" })).toBeDisabled();
   await page.getByRole("button", { name: "대상 확인" }).click({ force: true });

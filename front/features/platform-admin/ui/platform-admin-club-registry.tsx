@@ -1,4 +1,9 @@
-import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
+import {
+  ADMIN_COPY,
+  clubLifecycleLabel,
+  clubVisibilityLabel,
+  hostOnboardingLabel,
+} from "@/features/platform-admin/model/admin-copy";
 
 export type PlatformAdminClubRegistryItem = {
   clubId: string;
@@ -47,9 +52,9 @@ export function PlatformAdminClubRegistry({ clubs, onSelectClub, onNewClub }: Pr
                 <strong>{club.name}</strong>
                 <span className="tiny muted">{club.slug}</span>
               </span>
-              <span className="platform-admin-domain-status">{club.publicVisibility}</span>
-              <span className="tiny muted">{club.status}</span>
-              <span className="tiny muted">host {club.firstHostOnboardingState}</span>
+              <span className="platform-admin-domain-status">{clubVisibilityLabel(club.publicVisibility)}</span>
+              <span className="tiny muted">{clubLifecycleLabel(club.status)}</span>
+              <span className="tiny muted">{hostOnboardingLabel(club.firstHostOnboardingState)}</span>
             </button>
           ))}
         </div>

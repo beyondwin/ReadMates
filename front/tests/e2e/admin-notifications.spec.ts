@@ -149,7 +149,7 @@ test("owner operates admin notification ledgers and replay", async ({ page }) =>
 
   await page.goto("/admin/notifications?focus=outbox_backlog");
 
-  await expect(page.getByRole("heading", { name: "알림 / Outbox 운영" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "배달 원장" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await expectMinimumTargetSize(page.getByRole("button", { name: "대상 확인" }));
   await expect(page.getByText(/Health outbox backlog/)).toBeVisible();
