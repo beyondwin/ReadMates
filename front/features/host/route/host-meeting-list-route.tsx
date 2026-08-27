@@ -3,10 +3,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLoaderData, useLocation, useNavigate, useParams } from "react-router";
 import { isReadmatesApiError } from "@/shared/api/errors";
 import {
+  buildHostMeetingTocSections,
   hostListCursorRecovery,
   hostMeetingListBaseRefresh,
   hostMeetingListNextCursor,
-  hostMeetingListRows,
   type HostMeetingListState,
 } from "@/features/host/model/host-meeting-list-model";
 import {
@@ -21,6 +21,7 @@ import {
 } from "./host-meeting-list-data";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
+import { HOST_ROUTE_HREFS } from "@/shared/routing/host-route-destinations";
 import "@/features/host/ui/host-editorial-ledger.css";
 
 export function HostMeetingListRoute({
@@ -120,15 +121,25 @@ function MeetingListBody({
     }
   };
 
+  // Task 2 temporary prop bridge — Task 3 wires past pages + dual load-more properly.
+  const sections = buildHostMeetingTocSections({
+    basePath: "/app/host",
+    upcomingItems: [...(basePage?.items ?? []), ...visibleState.appendedItems],
+    upcomingCursor: nextCursor,
+    pastItems: [],
+    pastCursor: null,
+  });
+
   return (
     <HostMeetingList
-      rows={hostMeetingListRows([...(basePage?.items ?? []), ...visibleState.appendedItems])}
-      nextCursor={nextCursor}
-      loadingMore={loadingMore}
-      onLoadMore={() => void loadMore()}
+      sections={sections}
+      onLoadMoreUpcoming={() => void loadMore()}
+      onLoadMorePast={() => {}}
+      loadingMoreUpcoming={loadingMore}
+      loadingMorePast={false}
+      trashHref={HOST_ROUTE_HREFS.trashCompatibility}
+      newMeetingHref={HOST_ROUTE_HREFS.newSession}
       LinkComponent={LinkComponent}
-      announcement={visibleState.announcement}
-      focusHeadingRevision={visibleState.focusHeadingRevision}
       loading={query.isPending && !basePage}
       errorMessage={query.isError && !basePage ? "모임을 불러오지 못했습니다." : null}
       onRetry={() => void query.refetch()}
