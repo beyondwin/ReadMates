@@ -981,4 +981,34 @@ describe("AdminTodayRoute", () => {
     expect(screen.getByRole("button", { name: /클럽 설정이 필요합니다/ })).toHaveAttribute("aria-pressed", "true");
     expect(operationsApi.resolve).toHaveBeenCalledWith("case-b", 3);
   });
+
+  it("returns focus to the queue summary after resolving the last case", async () => {
+    const user = userEvent.setup();
+    const last = operationCase({ id: "case-last" });
+    const resolved = operationCase({
+      id: "case-last",
+      state: "RESOLVED",
+      resolvedAt: "2026-08-04T10:05:00Z",
+      version: 4,
+      allowedActions: [],
+    });
+    operationsApi.resolve.mockResolvedValue({
+      schema: "admin.operation_cases.v1",
+      ...resolved,
+    });
+    operationsApi.fetchList.mockResolvedValue(listResponse([resolved]));
+    operationsApi.fetchDetail.mockResolvedValue(detailResponse(resolved));
+    renderRoute(seededClient([last]), "/admin/today?case=case-last");
+
+    expect(await screen.findByText("케이스 1 / 1")).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "해결 확인" }));
+    await user.click(screen.getByRole("button", { name: "신호 재검증 후 해결" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("운영 케이스 요약")).toHaveFocus();
+    });
+    expect(screen.getByLabelText("current location")).toHaveTextContent("case=case-last");
+    expect(screen.getByRole("button", { name: "다음 ›" })).toBeDisabled();
+    expect(operationsApi.resolve).toHaveBeenCalledWith("case-last", 3);
+  });
 });

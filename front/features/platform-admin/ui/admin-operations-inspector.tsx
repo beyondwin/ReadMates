@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+import { useLayoutEffect, type ReactNode } from "react";
 import { commitAdminEditorialLedgerCaseDocket } from "@/shared/observability/admin-editorial-ledger-performance";
 import { Link } from "react-router";
 import type { AdminOperationCaseView } from "@/features/platform-admin/model/platform-admin-operations-model";
@@ -80,27 +80,9 @@ export function AdminOperationsInspector({
   actionReason,
   traversal,
 }: Props) {
-  const advancedKeyRef = useRef<string | null>(null);
-  const onNext = traversal?.onNext;
-  const resolvedCaseId = selectedCase?.state === "RESOLVED" ? selectedCase.id : null;
-
   useLayoutEffect(() => {
     if (selectedCase) commitAdminEditorialLedgerCaseDocket(selectedCase.id);
   }, [selectedCase]);
-
-  useEffect(() => {
-    if (actionState !== "complete" || resolvedCaseId == null) {
-      if (actionState !== "complete") advancedKeyRef.current = null;
-      return;
-    }
-    if (advancedKeyRef.current === resolvedCaseId) return;
-    advancedKeyRef.current = resolvedCaseId;
-    if (onNext) {
-      onNext();
-      return;
-    }
-    document.querySelector<HTMLElement>('[aria-label="운영 케이스 요약"]')?.focus();
-  }, [actionState, resolvedCaseId, onNext]);
 
   if (!selectedCase) {
     return (

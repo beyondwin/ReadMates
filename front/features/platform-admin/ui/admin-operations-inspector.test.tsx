@@ -227,7 +227,7 @@ describe("AdminOperationsInspector", () => {
     expect(screen.getByRole("button", { name: "다음 ›" })).toBeDisabled();
   });
 
-  it("calls onNext after a resolving L1 command succeeds", async () => {
+  it("calls onNext only from the docket next control, not from a complete resolved state", async () => {
     const user = userEvent.setup();
     const onNext = vi.fn();
     const { rerender } = render(
@@ -242,8 +242,6 @@ describe("AdminOperationsInspector", () => {
       </MemoryRouter>,
     );
 
-    expect(onNext).not.toHaveBeenCalled();
-
     rerender(
       <MemoryRouter>
         <AdminOperationsInspector
@@ -256,25 +254,8 @@ describe("AdminOperationsInspector", () => {
       </MemoryRouter>,
     );
 
-    expect(onNext).toHaveBeenCalledTimes(1);
+    expect(onNext).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "다음 ›" }));
-    expect(onNext).toHaveBeenCalledTimes(2);
-  });
-
-  it("returns focus to the queue summary when the last case is resolved", () => {
-    render(
-      <MemoryRouter>
-        <p tabIndex={-1} aria-label="운영 케이스 요약">활성 4건</p>
-        <AdminOperationsInspector
-          selectedCase={{ ...selectedCase, state: "RESOLVED", stateLabel: "해결됨" }}
-          history={[]}
-          lifecycleControls={null}
-          actionState="complete"
-          traversal={{ index: 3, total: 4, onPrev: vi.fn(), onNext: null }}
-        />
-      </MemoryRouter>,
-    );
-
-    expect(screen.getByLabelText("운영 케이스 요약")).toHaveFocus();
+    expect(onNext).toHaveBeenCalledTimes(1);
   });
 });
