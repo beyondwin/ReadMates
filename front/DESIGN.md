@@ -20,13 +20,14 @@ Host와 platform admin은 같은 paper/ink primitive를 쓴다. Role-only palett
 | `--danger`, `--warn`/`--stale`, `--ok`/`--success` | semantic state; color만으로 상태를 구분하지 않음 |
 | `--space-*`, `--type-size-*`, `--type-leading-body` | editorial spacing and wrapping |
 | `--focus-ring`, `--focus-ring-soft` | visible focus |
-| `--motion-fast` / reduced-motion helpers | 20ms 이하; lingering animation 금지 |
+| `--motion-fast`, `--motion-page`, `--motion-reveal` | default motion 120ms / 190ms / 280ms |
 
 공통 규칙:
 
 - 최소 44px target, `overflow-wrap: anywhere`, 장문 한국어를 자른 KPI card grid가 아니다.
 - glassmorphism, glow, decorative leather/file-folder skeuomorphism을 쓰지 않는다.
 - 데이터 사실은 badge보다 문장·표·definition list를 우선한다.
+- `prefers-reduced-motion: reduce`는 animation/transition duration을 `0.001ms`로 강제한다. visual-authority helper `expectReducedMotion`의 20ms lingering cap은 reduced-motion 환경에서만 적용한다.
 
 ## Host Focus Deck
 
@@ -63,8 +64,8 @@ Lifecycle·audience·public placement를 하나의 stepper로 합치지 않는�
 | `OPEN` otherwise | `모임 마치기` |
 | `CLOSED` record pending / stale / unavailable | `다음 할 일 확인 중` (disabled, fail closed) |
 | `CLOSED` no draft | `정리본 올리기` |
-| `CLOSED` draft needs review | `반영 전 확인` 또는 기록 반영 |
-| `CLOSED` applied record ready | 게스트·멤버 노트 게시 |
+| `CLOSED` draft needs review | `반영 전 확인` 또는 `기록에 반영` |
+| `CLOSED` applied record ready | `게스트·멤버 노트에 기록 게시` |
 | `PUBLISHED` | `공개 기록 보기` |
 
 Record-dependent action은 기존 record editor query를 readiness union으로 읽는다.
