@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { HostSessionListItem } from "@/features/host/api/host-contracts";
+import type { HostSessionLedgerItem } from "./host-session-ledger-model";
 import {
+  buildHostMeetingTocSections,
   hostMeetingListBaseRefresh,
   hostListCursorRecovery,
   hostMeetingListNextCursor,
   hostMeetingListRows,
   type HostMeetingListState,
 } from "./host-meeting-list-model";
+
+const basePath = "/clubs/reading/app/host";
 
 function item(
   sessionId: string,
@@ -37,6 +41,66 @@ function item(
     ...overrides,
   };
 }
+
+function openItem(sessionNumber: number, overrides: Partial<HostSessionListItem> = {}): HostSessionListItem {
+  return item(`open-${sessionNumber}`, "OPEN", {
+    sessionNumber,
+    bookTitle: `책 ${sessionNumber}`,
+    title: `모임 ${sessionNumber}`,
+    date: "2026-09-05",
+    ...overrides,
+  });
+}
+
+function closedItem(sessionNumber: number, overrides: Partial<HostSessionLedgerItem> = {}): HostSessionLedgerItem {
+  return {
+    ...item(`closed-${sessionNumber}`, "CLOSED", {
+      sessionNumber,
+      bookTitle: `책 ${sessionNumber}`,
+      title: `모임 ${sessionNumber}`,
+      date: "2026-08-15",
+      recordStatus: "INCOMPLETE",
+    }),
+    ...overrides,
+  };
+}
+
+describe("buildHostMeetingTocSections", () => {
+  it("formats folio ordinals and lifecycle labels from the dictionary", () => {
+    const sections = buildHostMeetingTocSections({
+      basePath,
+      upcomingItems: [openItem(25)],
+      upcomingCursor: null,
+      pastItems: [],
+      pastCursor: null,
+    });
+    expect(sections.upcoming.rows[0]?.ordinalFolio).toBe("No.25");
+    expect(sections.upcoming.rows[0]?.lifecycleLabel).toBe("준비 중");
+  });
+
+  it("summarizes past rows from record status and date only (no invented tallies)", () => {
+    const sections = buildHostMeetingTocSections({
+      basePath,
+      upcomingItems: [],
+      upcomingCursor: null,
+      pastItems: [closedItem(24)],
+      pastCursor: null,
+    });
+    expect(sections.past.rows[0]?.summary).toMatch(/기록 정리 중/);
+  });
+
+  it("carries attention as text, not color-only", () => {
+    const itemWithAttention = { ...closedItem(24), needsAttention: true };
+    const sections = buildHostMeetingTocSections({
+      basePath,
+      upcomingItems: [],
+      upcomingCursor: null,
+      pastItems: [itemWithAttention],
+      pastCursor: null,
+    });
+    expect(sections.past.rows[0]?.attentionLabel).toBeTruthy();
+  });
+});
 
 describe("hostMeetingListRows", () => {
   it("preserves server order without sorting rows across pages", () => {

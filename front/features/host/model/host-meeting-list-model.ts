@@ -1,5 +1,6 @@
 import type { HostSessionListItem } from "@/features/host/api/host-contracts";
-import { hostMeetingLifecycleLabel } from "@/shared/model/meeting-language";
+import { formatMeetingOrdinal, hostMeetingLifecycleLabel } from "@/shared/model/meeting-language";
+import type { HostSessionLedgerItem } from "./host-session-ledger-model";
 import { resolvedSessionExposure, sessionExposureCopy } from "./session-exposure-model";
 
 export type HostMeetingListRow = {
@@ -13,6 +14,21 @@ export type HostMeetingListRow = {
   attention: ReadonlyArray<string>;
 };
 
+export type HostMeetingTocRow = {
+  id: string;
+  ordinalFolio: string;
+  title: string;
+  lifecycleLabel: string;
+  attentionLabel: string | null;
+  summary: string;
+  href: string;
+};
+
+export type HostMeetingTocSections = {
+  upcoming: { rows: HostMeetingTocRow[]; nextCursor: string | null };
+  past: { rows: HostMeetingTocRow[]; nextCursor: string | null };
+};
+
 export type HostMeetingListState = {
   baseUpdatedAt: number;
   appendedItems: HostSessionListItem[];
@@ -23,6 +39,11 @@ export type HostMeetingListState = {
   replaceHref: string | null;
 };
 
+type TocSourceItem = Pick<
+  HostSessionListItem,
+  "sessionId" | "sessionNumber" | "title" | "bookTitle" | "date" | "state" | "needsAttention"
+>;
+
 function lifecycleLabel(state: HostSessionListItem["state"]) {
   return hostMeetingLifecycleLabel(state);
 }
@@ -32,6 +53,76 @@ function attentionLabels(item: HostSessionListItem) {
   if (item.needsAttention) labels.push("확인 필요");
   if (item.state === "OPEN") labels.push("참석 응답 확인");
   return labels;
+}
+
+function normalizeBasePath(basePath: string): string {
+  return basePath.replace(/\/+$/, "") || "/";
+}
+
+function sessionDetailHref(basePath: string, sessionId: string): string {
+  return `${normalizeBasePath(basePath)}/sessions/${encodeURIComponent(sessionId)}`;
+}
+
+function dateMmDd(date: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) {
+    return date;
+  }
+  return `${match[2]}-${match[3]}`;
+}
+
+function tocAttentionLabel(item: Pick<TocSourceItem, "needsAttention">): string | null {
+  return item.needsAttention ? "기록 확인 필요" : null;
+}
+
+function tocTitle(item: Pick<TocSourceItem, "bookTitle" | "title">): string {
+  const bookTitle = item.bookTitle.trim();
+  return bookTitle || item.title;
+}
+
+function upcomingSummary(item: Pick<TocSourceItem, "date">): string {
+  return `${dateMmDd(item.date)} 예정일`;
+}
+
+function pastSummary(item: Pick<TocSourceItem, "state" | "date">): string {
+  // Past mono summary uses lifecycle + date only — no attendance tallies.
+  return `${hostMeetingLifecycleLabel(item.state)} · ${dateMmDd(item.date)}`;
+}
+
+function toTocRow(
+  item: TocSourceItem,
+  basePath: string,
+  kind: "upcoming" | "past",
+): HostMeetingTocRow {
+  return {
+    id: item.sessionId,
+    ordinalFolio: formatMeetingOrdinal(item.sessionNumber, "folio"),
+    title: tocTitle(item),
+    lifecycleLabel: hostMeetingLifecycleLabel(item.state),
+    attentionLabel: tocAttentionLabel(item),
+    summary: kind === "upcoming" ? upcomingSummary(item) : pastSummary(item),
+    href: sessionDetailHref(basePath, item.sessionId),
+  };
+}
+
+export function buildHostMeetingTocSections(input: {
+  basePath: string;
+  upcomingItems: readonly HostSessionListItem[];
+  upcomingCursor: string | null;
+  pastItems: readonly HostSessionLedgerItem[];
+  pastCursor: string | null;
+}): HostMeetingTocSections {
+  const basePath = normalizeBasePath(input.basePath);
+  return {
+    upcoming: {
+      rows: input.upcomingItems.map((item) => toTocRow(item, basePath, "upcoming")),
+      nextCursor: input.upcomingCursor,
+    },
+    past: {
+      rows: input.pastItems.map((item) => toTocRow(item, basePath, "past")),
+      nextCursor: input.pastCursor,
+    },
+  };
 }
 
 export function hostMeetingListRows(items: readonly HostSessionListItem[]): HostMeetingListRow[] {
