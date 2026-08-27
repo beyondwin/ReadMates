@@ -7,8 +7,12 @@ describe("canonicalMeetingPath", () => {
       .toBe("/clubs/demo/app/host/sessions/abc?section=records&source=json");
   });
 
-  it("maps /closing to the after phase", () => {
-    expect(canonicalMeetingPath("/app/host/sessions/abc/closing", ""))
-      .toBe("/app/host/sessions/abc");
+  it("maps /closing to the diary records step", () => {
+    expect(canonicalMeetingPath("/app/host/sessions/s1/closing", "")).toBe(
+      "/app/host/sessions/s1?section=records",
+    );
+    expect(canonicalMeetingPath("/app/host/sessions/s1/closing", "?foo=1")).toBe(
+      "/app/host/sessions/s1?foo=1&section=records",
+    );
   });
 });

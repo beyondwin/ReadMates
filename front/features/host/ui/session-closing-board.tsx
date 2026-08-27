@@ -1,5 +1,6 @@
 import type { AnchorHTMLAttributes, ComponentType, ReactNode } from "react";
 import type { SessionClosingBoardView, SessionClosingTone } from "@/features/host/model/session-closing-model";
+import "./session-closing-board.css";
 
 export type SessionClosingLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {
   to: string;
@@ -11,6 +12,8 @@ export type SessionClosingLinkComponent = ComponentType<SessionClosingLinkProps>
 type SessionClosingBoardProps = {
   view: SessionClosingBoardView;
   LinkComponent?: SessionClosingLinkComponent;
+  /** Embed inside the diary records step — strip page chrome (header/main shell). */
+  embedded?: boolean;
 };
 
 function PlainSessionClosingLink({ to, children, ...props }: SessionClosingLinkProps) {
@@ -21,7 +24,109 @@ function PlainSessionClosingLink({ to, children, ...props }: SessionClosingLinkP
   );
 }
 
-export function SessionClosingBoard({ view, LinkComponent = PlainSessionClosingLink }: SessionClosingBoardProps) {
+export function SessionClosingBoard({
+  view,
+  LinkComponent = PlainSessionClosingLink,
+  embedded = false,
+}: SessionClosingBoardProps) {
+  const body = (
+    <>
+      {!embedded ? (
+        <section className="rm-reading-desk rm-host-closing-board__primary" aria-label="이번 모임 다음 조치">
+          <div className="rm-host-closing-board__primary-copy">
+            <div className="eyebrow">이번 모임 다음 조치</div>
+            <p className="h3 editorial">{view.primaryAction.label}</p>
+            <p className="body muted">{view.primaryAction.reason}</p>
+          </div>
+          <span className={badgeClass(view.primaryAction.tone)}>{view.primaryAction.label}</span>
+          {view.primaryAction.href ? (
+            <LinkComponent className="btn btn-primary" to={view.primaryAction.href}>
+              {view.primaryAction.label}
+            </LinkComponent>
+          ) : null}
+        </section>
+      ) : null}
+
+      <section className="surface rm-host-closing-board__section" aria-label="장부 마감">
+        {!embedded ? <div className="eyebrow">마감 단계</div> : <div className="eyebrow">장부 마감</div>}
+        <div className="rm-host-closing-board__checklist">
+          {view.checklist.map((item, index) => (
+            <article
+              key={item.id}
+              className={`surface-quiet rm-host-closing-board__checklist-item${item.state === "DONE" ? " is-done" : ""}`}
+            >
+              <div className="row-between rm-host-closing-board__checklist-row">
+                <div className="rm-host-closing-board__checklist-copy">
+                  <span className="tiny muted rm-host-closing-board__step-no" aria-hidden="true">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <strong>{item.label}</strong>
+                </div>
+                {item.state === "DONE" && item.completedStamp ? (
+                  <span className="tiny rm-host-closing-board__stamp">{item.completedStamp}</span>
+                ) : (
+                  <span className={badgeClass(item.tone)}>{item.stateLabel}</span>
+                )}
+              </div>
+              <p className="small muted">{item.detail}</p>
+              {item.href ? (
+                <LinkComponent className="small rm-host-closing-board__item-action" to={item.href}>
+                  {item.actionLabel}
+                </LinkComponent>
+              ) : (
+                <span className="small muted rm-host-closing-board__item-action">{item.actionLabel}</span>
+              )}
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {!embedded ? (
+        <>
+          <section className="surface rm-host-closing-board__section" aria-label="호스트 멤버 공개 표면 상태">
+            <div className="eyebrow">호스트 문서 / 멤버 회고 / 공개 기록</div>
+            <div className="rm-host-closing-board__surfaces">
+              {view.surfaces.map((surface) => (
+                <article key={surface.id} className="surface-quiet rm-host-closing-board__surface">
+                  <div className="row-between rm-host-closing-board__surface-row">
+                    <h2 className="h3 editorial">{surface.title}</h2>
+                    <span className={badgeClass(surface.tone)}>{surface.title}</span>
+                  </div>
+                  <p className="body muted">{surface.detail}</p>
+                  {surface.href ? (
+                    <LinkComponent className="btn btn-quiet btn-sm" to={surface.href}>
+                      {surface.actionLabel}
+                    </LinkComponent>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="surface rm-host-closing-board__section" aria-label="마감 증거">
+            <div className="eyebrow">마감 증거</div>
+            <dl className="rm-host-closing-board__evidence">
+              {view.evidence.map((item) => (
+                <div key={item.label}>
+                  <dt className="tiny muted">{item.label}</dt>
+                  <dd className="body">{item.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </>
+      ) : null}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <section className="rm-host-closing-board rm-host-closing-board--embedded" aria-label="장부 마감 체크리스트">
+        {body}
+      </section>
+    );
+  }
+
   return (
     <main className="rm-host-closing-board">
       <section className="page-header-compact">
@@ -37,75 +142,7 @@ export function SessionClosingBoard({ view, LinkComponent = PlainSessionClosingL
         </div>
       </section>
 
-      <section className="container rm-host-closing-board__body">
-        <section className="rm-reading-desk rm-host-closing-board__primary" aria-label="이번 모임 다음 조치">
-          <div className="rm-host-closing-board__primary-copy">
-            <div className="eyebrow">이번 모임 다음 조치</div>
-            <p className="h3 editorial">{view.primaryAction.label}</p>
-            <p className="body muted">{view.primaryAction.reason}</p>
-          </div>
-          <span className={badgeClass(view.primaryAction.tone)}>{view.primaryAction.label}</span>
-          {view.primaryAction.href ? (
-            <LinkComponent className="btn btn-primary" to={view.primaryAction.href}>
-              {view.primaryAction.label}
-            </LinkComponent>
-          ) : null}
-        </section>
-
-        <section className="surface rm-host-closing-board__section" aria-label="마감 단계">
-          <div className="eyebrow">마감 단계</div>
-          <div className="rm-host-closing-board__checklist">
-            {view.checklist.map((item) => (
-              <article key={item.id} className="surface-quiet rm-host-closing-board__checklist-item">
-                <div className="row-between rm-host-closing-board__checklist-row">
-                  <strong>{item.label}</strong>
-                  <span className={badgeClass(item.tone)}>{item.stateLabel}</span>
-                </div>
-                <p className="small muted">{item.detail}</p>
-                {item.href ? (
-                  <LinkComponent className="small rm-host-closing-board__item-action" to={item.href}>
-                    {item.actionLabel}
-                  </LinkComponent>
-                ) : (
-                  <span className="small muted rm-host-closing-board__item-action">{item.actionLabel}</span>
-                )}
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="surface rm-host-closing-board__section" aria-label="호스트 멤버 공개 표면 상태">
-          <div className="eyebrow">호스트 문서 / 멤버 회고 / 공개 기록</div>
-          <div className="rm-host-closing-board__surfaces">
-            {view.surfaces.map((surface) => (
-              <article key={surface.id} className="surface-quiet rm-host-closing-board__surface">
-                <div className="row-between rm-host-closing-board__surface-row">
-                  <h2 className="h3 editorial">{surface.title}</h2>
-                  <span className={badgeClass(surface.tone)}>{surface.title}</span>
-                </div>
-                <p className="body muted">{surface.detail}</p>
-                {surface.href ? (
-                  <LinkComponent className="btn btn-quiet btn-sm" to={surface.href}>
-                    {surface.actionLabel}
-                  </LinkComponent>
-                ) : null}
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="surface rm-host-closing-board__section" aria-label="마감 증거">
-          <div className="eyebrow">마감 증거</div>
-          <dl className="rm-host-closing-board__evidence">
-            {view.evidence.map((item) => (
-              <div key={item.label}>
-                <dt className="tiny muted">{item.label}</dt>
-                <dd className="body">{item.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
-      </section>
+      <section className="container rm-host-closing-board__body">{body}</section>
     </main>
   );
 }

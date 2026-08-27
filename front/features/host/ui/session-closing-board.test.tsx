@@ -17,23 +17,25 @@ const view: SessionClosingBoardView = {
   checklist: [
     {
       id: "SESSION_CLOSED",
-      label: "모임 종료",
+      label: "출석 확정",
       detail: "닫힘",
       state: "DONE",
       stateLabel: "완료",
       tone: "ok",
       href: "/app/host/sessions/s1/edit",
       actionLabel: "확인하기",
+      completedStamp: "2026-06-18",
     },
     {
       id: "MEMBER_NOTIFICATION_SENT",
-      label: "멤버 알림",
+      label: "소감 수집",
       detail: "대기",
       state: "ACTION_REQUIRED",
       stateLabel: "조치 필요",
       tone: "warn",
       href: "/app/host/notifications",
-      actionLabel: "확인하기",
+      actionLabel: "수동 발송",
+      completedStamp: null,
     },
   ],
   surfaces: [
@@ -80,10 +82,25 @@ describe("SessionClosingBoard", () => {
     expect(screen.getByText("멤버가 지난 모임 회고로 돌아갈 알림 흐름이 아직 완성되지 않았습니다.")).toBeVisible();
     expect(screen.getByText("마감 단계")).toBeVisible();
     expect(screen.getByText("조치 필요")).toBeVisible();
+    expect(screen.getByText("출석 확정")).toBeVisible();
+    expect(screen.getByText("2026-06-18")).toBeVisible();
+    expect(screen.getByRole("link", { name: "수동 발송" })).toHaveAttribute("href", "/app/host/notifications");
     expect(screen.getByRole("link", { name: "호스트 문서 확인" })).toHaveAttribute("href", "/app/host/sessions/s1/edit");
     expect(screen.getByRole("link", { name: "멤버 회고 확인" })).toHaveAttribute("href", "/clubs/club-a/app/sessions/s1");
     expect(screen.getByRole("link", { name: "공개 기록 확인" })).toHaveAttribute("href", "/clubs/club-a/sessions/s1");
     expect(screen.getByText("최근 멤버 알림")).toBeVisible();
+  });
+
+  it("embeds without page chrome for the diary records step", () => {
+    render(<SessionClosingBoard view={view} embedded />);
+
+    expect(screen.queryByRole("heading", { name: "No.07 · E2E Book" })).toBeNull();
+    expect(screen.queryByText("이번 모임 다음 조치")).toBeNull();
+    expect(screen.queryByText("마감 증거")).toBeNull();
+    expect(screen.getByRole("region", { name: "장부 마감 체크리스트" })).toBeVisible();
+    expect(screen.getByText("장부 마감")).toBeVisible();
+    expect(screen.getByText("출석 확정")).toBeVisible();
+    expect(screen.getByText("소감 수집")).toBeVisible();
   });
 
   it("shows honest surface copy when member and public links are missing", () => {

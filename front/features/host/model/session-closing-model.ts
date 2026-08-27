@@ -37,6 +37,19 @@ export type SessionClosingStatusInput = {
   };
 };
 
+export type SessionClosingChecklistItemView = {
+  id: string;
+  label: string;
+  detail: string;
+  state: SessionClosingStatusInput["checklist"][number]["state"];
+  stateLabel: string;
+  tone: SessionClosingTone;
+  href: string | null;
+  actionLabel: string;
+  /** Mono stamp for completed rows — reuses evidence values, not a new clock. */
+  completedStamp: string | null;
+};
+
 export type SessionClosingBoardView = {
   title: string;
   subtitle: string;
@@ -48,16 +61,7 @@ export type SessionClosingBoardView = {
     tone: SessionClosingTone;
     href: string | null;
   };
-  checklist: Array<{
-    id: string;
-    label: string;
-    detail: string;
-    state: SessionClosingStatusInput["checklist"][number]["state"];
-    stateLabel: string;
-    tone: SessionClosingTone;
-    href: string | null;
-    actionLabel: string;
-  }>;
+  checklist: Array<SessionClosingChecklistItemView>;
   surfaces: Array<{
     id: "HOST" | "MEMBER" | "PUBLIC";
     title: string;
@@ -72,31 +76,56 @@ export type SessionClosingBoardView = {
   }>;
 };
 
+/** §4.2 장부 마감 5행 — server checklist ids remapped to diary vocabulary. */
+const DIARY_CHECKLIST_ORDER = [
+  "SESSION_CLOSED",
+  "MEMBER_NOTIFICATION_SENT",
+  "RECORD_PACKAGE_SAVED",
+  "FEEDBACK_DOCUMENT_READY",
+  "PUBLIC_RECORD_VISIBLE",
+] as const;
+
+const DIARY_CHECKLIST_LABEL: Record<(typeof DIARY_CHECKLIST_ORDER)[number], string> = {
+  SESSION_CLOSED: "출석 확정",
+  MEMBER_NOTIFICATION_SENT: "소감 수집",
+  RECORD_PACKAGE_SAVED: "기록 초안",
+  FEEDBACK_DOCUMENT_READY: "피드백 문서 확인",
+  PUBLIC_RECORD_VISIBLE: "멤버 게시",
+};
+
 export function getSessionClosingBoardView(status: SessionClosingStatusInput): SessionClosingBoardView {
+  const evidence = [
+    { label: "공개 요약", value: status.evidence.summaryPublished ? "저장됨" : "없음" },
+    { label: "하이라이트", value: `${nonNegative(status.evidence.highlightCount)}` },
+    { label: "한줄평", value: `${nonNegative(status.evidence.oneLinerCount)}` },
+    { label: "피드백 문서", value: feedbackLabel(status.evidence.feedbackDocumentState) },
+    { label: "최근 멤버 알림", value: notificationLabel(status.evidence.latestNotificationEvent) },
+  ];
+  const byId = new Map(status.checklist.map((item) => [item.id, item]));
+
   return {
     title: `No.${String(status.session.sessionNumber).padStart(2, "0")} · ${status.session.bookTitle}`,
     subtitle: `${status.session.meetingDate} · ${visibilityLabel(status.session.recordVisibility)}`,
     statusLabel: status.overall.label,
     statusTone: overallTone(status.overall.state),
     primaryAction: primaryAction(status),
-    checklist: status.checklist.map((item) => ({
-      id: item.id,
-      label: item.label,
-      detail: item.detail,
-      state: item.state,
-      stateLabel: checklistStateLabel(item.state),
-      tone: checklistTone(item.state),
-      href: item.href,
-      actionLabel: checklistActionLabel(item.href),
-    })),
+    checklist: DIARY_CHECKLIST_ORDER.flatMap((id) => {
+      const item = byId.get(id);
+      if (!item) return [];
+      return [{
+        id: item.id,
+        label: DIARY_CHECKLIST_LABEL[id],
+        detail: item.detail,
+        state: item.state,
+        stateLabel: checklistStateLabel(item.state),
+        tone: checklistTone(item.state),
+        href: item.href,
+        actionLabel: checklistActionLabel(id, item.href),
+        completedStamp: completedStamp(id, item.state, status, evidence),
+      }];
+    }),
     surfaces: surfaceCards(status),
-    evidence: [
-      { label: "공개 요약", value: status.evidence.summaryPublished ? "저장됨" : "없음" },
-      { label: "하이라이트", value: `${nonNegative(status.evidence.highlightCount)}` },
-      { label: "한줄평", value: `${nonNegative(status.evidence.oneLinerCount)}` },
-      { label: "피드백 문서", value: feedbackLabel(status.evidence.feedbackDocumentState) },
-      { label: "최근 멤버 알림", value: notificationLabel(status.evidence.latestNotificationEvent) },
-    ],
+    evidence,
   };
 }
 
@@ -186,8 +215,35 @@ function checklistStateLabel(state: SessionClosingStatusInput["checklist"][numbe
   }
 }
 
-function checklistActionLabel(href: string | null): string {
+function checklistActionLabel(id: string, href: string | null): string {
+  if (id === "MEMBER_NOTIFICATION_SENT" && href) return "수동 발송";
   return href ? "확인하기" : "상태 확인";
+}
+
+function completedStamp(
+  id: (typeof DIARY_CHECKLIST_ORDER)[number],
+  state: SessionClosingStatusInput["checklist"][number]["state"],
+  status: SessionClosingStatusInput,
+  evidence: SessionClosingBoardView["evidence"],
+): string | null {
+  if (state !== "DONE") return null;
+  switch (id) {
+    case "SESSION_CLOSED":
+      return status.session.meetingDate;
+    case "MEMBER_NOTIFICATION_SENT": {
+      const createdAt = status.evidence.latestNotificationEvent?.createdAt;
+      if (createdAt) return createdAt;
+      return evidence.find((item) => item.label === "최근 멤버 알림")?.value ?? null;
+    }
+    case "RECORD_PACKAGE_SAVED":
+      return evidence.find((item) => item.label === "공개 요약")?.value ?? null;
+    case "FEEDBACK_DOCUMENT_READY":
+      return evidence.find((item) => item.label === "피드백 문서")?.value ?? null;
+    case "PUBLIC_RECORD_VISIBLE":
+      return status.session.state === "PUBLISHED" ? "게시됨" : "확인됨";
+    default:
+      return null;
+  }
 }
 
 function surfaceCards(status: SessionClosingStatusInput): SessionClosingBoardView["surfaces"] {

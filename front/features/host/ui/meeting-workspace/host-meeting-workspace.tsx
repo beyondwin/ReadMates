@@ -7,6 +7,7 @@ import type {
 } from "@/features/host/model/host-session-workspace-model";
 import type { HostMeetingDiaryView } from "@/features/host/model/host-meeting-diary-model";
 import type { HostMeetingRecordReadiness } from "@/features/host/model/host-meeting-record-readiness";
+import type { SessionClosingBoardView } from "@/features/host/model/session-closing-model";
 import { commitHostMeetingFirstUsable } from "@/shared/observability/host-meeting-performance";
 import { HostSessionWorkspace } from "@/features/host/ui/session-workspace/host-session-workspace";
 import type { WorkspaceHeaderModel } from "@/features/host/ui/session-workspace/workspace-header";
@@ -17,6 +18,8 @@ import type {
   WorkspaceRestoreNotice,
   WorkspaceUndoConfirm,
 } from "@/features/host/ui/session-workspace/workspace-undo-bar";
+import { SessionClosingBoard } from "@/features/host/ui/session-closing-board";
+import type { SessionClosingLinkComponent } from "@/features/host/ui/session-closing-board";
 import { MeetingFocusFacts, type MeetingAudienceProjection } from "./meeting-focus-facts";
 import { MeetingRelatedWork } from "./meeting-related-work";
 import { MeetingDiaryTimeline } from "./meeting-diary-timeline";
@@ -36,6 +39,8 @@ export type HostMeetingWorkspaceProps = {
   relatedWork?: ReactNode;
   projections?: readonly MeetingAudienceProjection[];
   recordReadiness?: HostMeetingRecordReadiness;
+  /** CLOSED records-step content — embedded SessionClosingBoard from getSessionClosingBoardView. */
+  closingBoard?: SessionClosingBoardView | null;
   panel?: ReactNode;
   recovery?: ReactNode;
   publicRecordHref?: string | null;
@@ -129,6 +134,7 @@ export function HostMeetingWorkspace({
   relatedWork,
   projections,
   recordReadiness,
+  closingBoard = null,
   panel,
   recovery,
   publicRecordHref = null,
@@ -157,6 +163,9 @@ export function HostMeetingWorkspace({
   }, [view.primaryAction.kind, view.primaryAction.label]);
 
   const showPager = Boolean(adjacentSessions?.previous || adjacentSessions?.next);
+  const showClosingChecklist = Boolean(
+    closingBoard && (diary.currentStep === "records" || diary.currentStep === "publish"),
+  );
 
   return (
     <main ref={workspaceRef} className="rm-meeting-diary">
@@ -212,11 +221,19 @@ export function HostMeetingWorkspace({
         )}
         facts={(
           <div className="rm-meeting-diary__step-content">
-            <MeetingFocusFacts
-              facts={facts}
-              recordReadiness={recordReadiness}
-              onRetryReadiness={onRetryReadiness}
-            />
+            {showClosingChecklist && closingBoard ? (
+              <SessionClosingBoard
+                view={closingBoard}
+                embedded
+                LinkComponent={LinkComponent as SessionClosingLinkComponent}
+              />
+            ) : (
+              <MeetingFocusFacts
+                facts={facts}
+                recordReadiness={recordReadiness}
+                onRetryReadiness={onRetryReadiness}
+              />
+            )}
           </div>
         )}
         relatedWork={relatedWork ?? <MeetingRelatedWork tasks={view.relatedTasks} />}

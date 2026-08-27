@@ -110,19 +110,78 @@ describe("getSessionClosingBoardView", () => {
     },
   );
 
-  it("uses Korean checklist state labels and action labels", () => {
+  it("uses Korean checklist state labels and diary vocabulary for the five ledger rows", () => {
     const view = getSessionClosingBoardView({
       ...baseStatus,
       checklist: [
-        { id: "done", state: "DONE", label: "모임 종료", detail: "닫힘", href: "/app/host/sessions/s1/edit" },
-        { id: "needed", state: "ACTION_REQUIRED", label: "멤버 알림", detail: "대기", href: "/app/host/notifications" },
-        { id: "blocked", state: "BLOCKED", label: "피드백 문서", detail: "확인 필요", href: null },
-        { id: "na", state: "NOT_APPLICABLE", label: "공개 기록", detail: "비공개", href: null },
+        {
+          id: "SESSION_CLOSED",
+          state: "DONE",
+          label: "Session closed",
+          detail: "닫힘",
+          href: "/app/host/sessions/s1/edit",
+        },
+        {
+          id: "MEMBER_NOTIFICATION_SENT",
+          state: "ACTION_REQUIRED",
+          label: "Member notification",
+          detail: "대기",
+          href: "/app/host/notifications",
+        },
+        {
+          id: "RECORD_PACKAGE_SAVED",
+          state: "BLOCKED",
+          label: "Record package",
+          detail: "확인 필요",
+          href: null,
+        },
+        {
+          id: "FEEDBACK_DOCUMENT_READY",
+          state: "NOT_APPLICABLE",
+          label: "Feedback",
+          detail: "해당 없음",
+          href: null,
+        },
+        {
+          id: "PUBLIC_RECORD_VISIBLE",
+          state: "ACTION_REQUIRED",
+          label: "Public",
+          detail: "미게시",
+          href: "/app/host/sessions/s1/edit",
+        },
+        {
+          id: "PUBLIC_SHOWCASE_READY",
+          state: "ACTION_REQUIRED",
+          label: "Showcase",
+          detail: "중복",
+          href: null,
+        },
       ],
     });
 
-    expect(view.checklist.map((item) => item.stateLabel)).toEqual(["완료", "조치 필요", "차단", "해당 없음"]);
-    expect(view.checklist.map((item) => item.actionLabel)).toEqual(["확인하기", "확인하기", "상태 확인", "상태 확인"]);
+    expect(view.checklist.map((item) => item.label)).toEqual([
+      "출석 확정",
+      "소감 수집",
+      "기록 초안",
+      "피드백 문서 확인",
+      "멤버 게시",
+    ]);
+    expect(view.checklist.map((item) => item.stateLabel)).toEqual([
+      "완료",
+      "조치 필요",
+      "차단",
+      "해당 없음",
+      "조치 필요",
+    ]);
+    expect(view.checklist.map((item) => item.actionLabel)).toEqual([
+      "확인하기",
+      "수동 발송",
+      "상태 확인",
+      "상태 확인",
+      "확인하기",
+    ]);
+    expect(view.checklist[0]?.completedStamp).toBe("2026-06-18");
+    expect(view.checklist[1]?.completedStamp).toBeNull();
   });
 
   it("describes host member and public surfaces with role-centered Korean copy", () => {

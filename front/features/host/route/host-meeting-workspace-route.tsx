@@ -14,6 +14,7 @@ import type { HostSessionHistoryPage, HostSessionRecordEditor, HostSessionRevers
 import {
   hostSessionDetailQuery,
   hostSessionTrashDetailQuery,
+  hostSessionClosingStatusQuery,
   invalidateHostSessionRecordSurfaces,
   isHostSessionNotFoundError,
 } from "@/features/host/queries/host-session-queries";
@@ -41,6 +42,7 @@ import {
   type SessionLifecycleConfirmKind,
 } from "@/features/host/model/host-session-lifecycle-model";
 import { buildHostMeetingDiary } from "@/features/host/model/host-meeting-diary-model";
+import { getSessionClosingBoardView } from "@/features/host/model/session-closing-model";
 import { HostMeetingWorkspace } from "@/features/host/ui/meeting-workspace/host-meeting-workspace";
 import { buildMeetingAudienceProjections } from "@/features/host/ui/meeting-workspace/meeting-audience-projections";
 import { MeetingRelatedWork } from "@/features/host/ui/meeting-workspace/meeting-related-work";
@@ -362,6 +364,10 @@ export function HostMeetingWorkspaceRoute({
     ...hostPublicConvergenceQuery(sessionId, context),
     enabled: loaderData.mode === "active",
   });
+  const closingStatusQuery = useQuery({
+    ...hostSessionClosingStatusQuery(sessionId, context),
+    enabled: loaderData.mode === "active" && baseQuery.data?.state === "CLOSED",
+  });
   const retryConvergence = useRetryHostPublicConvergenceMutation(context);
   const recordPrerequisite = baseQuery.data?.state === "CLOSED" || baseQuery.data?.state === "PUBLISHED";
   const panelStates = useHostMeetingPanelQueries({
@@ -527,6 +533,9 @@ export function HostMeetingWorkspaceRoute({
     today: todayIsoDate(),
     currentUrl,
   });
+  const closingBoard = closingStatusQuery.data
+    ? getSessionClosingBoardView(closingStatusQuery.data)
+    : null;
   const baseTask = meetingLocation.task === "overview" || meetingLocation.task === "responses" || meetingLocation.task === "attendance";
   const historyAuthority = panelStates.historyAuthority;
   const historyAuthorityData = historyAuthority.kind === "ready" || historyAuthority.kind === "stale-cached"
@@ -845,6 +854,7 @@ export function HostMeetingWorkspaceRoute({
         location: session.locationLabel,
       }}
       facts={workspace.facts}
+      closingBoard={closingBoard}
       relatedWork={(
         <MeetingRelatedWork
           tasks={workspace.relatedTasks}

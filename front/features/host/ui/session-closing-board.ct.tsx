@@ -23,6 +23,7 @@ const blockedView: SessionClosingBoardView = {
       tone: "ok",
       href: "/app/host/sessions/11111111-1111-1111-1111-111111111111/edit",
       actionLabel: "확인하기",
+      completedStamp: "2026-06-18",
     },
     {
       id: "RECORD_PACKAGE_SAVED",
@@ -33,6 +34,7 @@ const blockedView: SessionClosingBoardView = {
       tone: "warn",
       href: "/app/host/sessions/11111111-1111-1111-1111-111111111111/edit?records=json",
       actionLabel: "확인하기",
+      completedStamp: null,
     },
     {
       id: "FEEDBACK_DOCUMENT_READY",
@@ -43,6 +45,7 @@ const blockedView: SessionClosingBoardView = {
       tone: "danger",
       href: null,
       actionLabel: "상태 확인",
+      completedStamp: null,
     },
   ],
   surfaces: [
@@ -53,6 +56,7 @@ const blockedView: SessionClosingBoardView = {
       tone: "danger",
       href: "/app/host/sessions/11111111-1111-1111-1111-111111111111/edit",
       actionLabel: "호스트 문서 확인",
+      completedStamp: null,
     },
     {
       id: "MEMBER",
@@ -61,6 +65,7 @@ const blockedView: SessionClosingBoardView = {
       tone: "muted",
       href: null,
       actionLabel: "멤버 회고 확인",
+      completedStamp: null,
     },
     {
       id: "PUBLIC",
@@ -69,6 +74,7 @@ const blockedView: SessionClosingBoardView = {
       tone: "muted",
       href: null,
       actionLabel: "공개 기록 확인",
+      completedStamp: null,
     },
   ],
   evidence: [
@@ -101,6 +107,7 @@ const publishedView: SessionClosingBoardView = {
       tone: "ok",
       href: "/app/host/sessions/22222222-2222-2222-2222-222222222222/edit",
       actionLabel: "확인하기",
+      completedStamp: "2026-06-18",
     },
     {
       id: "RECORD_PACKAGE_SAVED",
@@ -111,6 +118,7 @@ const publishedView: SessionClosingBoardView = {
       tone: "ok",
       href: "/app/host/sessions/22222222-2222-2222-2222-222222222222/edit?records=json",
       actionLabel: "확인하기",
+      completedStamp: "저장됨",
     },
     {
       id: "FEEDBACK_DOCUMENT_READY",
@@ -121,6 +129,7 @@ const publishedView: SessionClosingBoardView = {
       tone: "ok",
       href: "/app/feedback/22222222-2222-2222-2222-222222222222",
       actionLabel: "확인하기",
+      completedStamp: "열람 가능",
     },
   ],
   surfaces: [
@@ -131,6 +140,7 @@ const publishedView: SessionClosingBoardView = {
       tone: "ok",
       href: "/app/host/sessions/22222222-2222-2222-2222-222222222222/edit",
       actionLabel: "호스트 문서 확인",
+      completedStamp: null,
     },
     {
       id: "MEMBER",
@@ -139,6 +149,7 @@ const publishedView: SessionClosingBoardView = {
       tone: "ok",
       href: "/app/sessions/22222222-2222-2222-2222-222222222222",
       actionLabel: "멤버 회고 확인",
+      completedStamp: null,
     },
     {
       id: "PUBLIC",
@@ -147,6 +158,7 @@ const publishedView: SessionClosingBoardView = {
       tone: "ok",
       href: "/sessions/22222222-2222-2222-2222-222222222222",
       actionLabel: "공개 기록 확인",
+      completedStamp: null,
     },
   ],
   evidence: [

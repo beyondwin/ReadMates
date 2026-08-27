@@ -1,0 +1,31 @@
+.rm-host-closing-board--embedded {
+  display: grid;
+  gap: 12px;
+}
+
+.rm-host-closing-board--embedded .rm-host-closing-board__section {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.rm-host-closing-board__checklist-copy {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.rm-host-closing-board__step-no {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
+
+.rm-host-closing-board__stamp {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  color: var(--ok, var(--text-2));
+  white-space: nowrap;
+}
