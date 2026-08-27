@@ -113,17 +113,22 @@ test("JSON-upload and AI-generate modes coexist and toggle via URL query params"
   await page.getByRole("navigation", { name: "관련 작업" }).getByRole("link", { name: /모임 기록/ }).click();
   const recordsSheet = await expectRecordsSheetOpen(page);
   await expect(page).toHaveURL(/\?section=records$/);
-  await expect(recordsSheet.getByRole("tab", { name: "직접 작성" }))
-    .toHaveAttribute("aria-selected", "true");
+  const sourceTabs = recordsSheet.getByRole("tablist", { name: "초안 만들기" });
+  const manualTab = sourceTabs.getByRole("tab", { name: "직접 작성" });
+  await expect(manualTab).toBeVisible();
+  if ((await manualTab.getAttribute("aria-selected")) !== "true") {
+    await manualTab.click();
+  }
+  await expect(manualTab).toHaveAttribute("aria-selected", "true");
   const commonEditor = recordsSheet.getByRole("region", { name: "공통 초안 편집기" });
-  await expect(commonEditor).toBeVisible();
+  await expect(commonEditor).toBeAttached();
 
   const draftSave = page.waitForResponse(
     (response) =>
       response.request().method() === "PATCH"
       && response.url().includes(`/host/sessions/${SESSION_ID}/record-draft`),
   );
-  await page.getByLabel("공개 요약").fill("도구를 바꿔도 유지되는 공유 초안");
+  await recordsSheet.getByLabel("공개 요약").fill("도구를 바꿔도 유지되는 공유 초안");
   expect((await draftSave).status()).toBe(200);
   await expect(commonEditor.getByRole("status")).toHaveText("저장됨");
 

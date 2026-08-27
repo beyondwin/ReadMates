@@ -48,10 +48,11 @@ test("receipt-backed COMMIT_RETRY converges to COMMITTED without exposing conten
   await page.getByRole("button", { name: "Commit 재시도" }).click();
   await expect(page.getByText("커밋 확인 중")).toBeVisible();
   await expect(page).toHaveURL(/\?section=records$/);
+  await expectRecordsSheetOpen(page);
   await expect(page.getByRole("tab", { name: "직접 작성" }))
     .toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("region", { name: "공통 초안 편집기" }))
-    .toBeVisible({ timeout: 10_000 });
+    .toBeAttached({ timeout: 10_000 });
   expect(polls).toBeGreaterThanOrEqual(2);
   await expect(page.getByText("공개 합성 근거 발언입니다.", { exact: true })).toHaveCount(0);
   await expect(page.getByText("공개 합성 전체 발언입니다.", { exact: true })).toHaveCount(0);

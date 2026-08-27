@@ -112,6 +112,8 @@ async function confirmLifecycle(page: Page, name: string, pathIncludes: string) 
             await expect(button).toHaveAttribute("aria-pressed", "true");
           }
         }
+        await attendanceSheet.getByRole("button", { name: "접기" }).click();
+        await expect(attendanceSheet).toBeHidden();
       }
     }
     const trigger = primaryActions.getByRole("button", { name: triggerName });

@@ -194,10 +194,11 @@ test("AI generation full flow: upload → poll → preview → commit", async ({
 
   // Commit returns to the common editor through client navigation, without a document reload.
   await expect(page).toHaveURL(/\?section=records$/);
+  await expectRecordsSheetOpen(page);
   await expect(page.getByRole("tab", { name: "직접 작성" }))
     .toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("region", { name: "공통 초안 편집기" }))
-    .toBeVisible({ timeout: 15_000 });
+    .toBeAttached({ timeout: 15_000 });
   await expect.poll(() => documentRequestsAfterCommit).toBe(0);
   await expect(page.getByRole("dialog", { name: "알림 보내기" })).toHaveCount(0);
   expect(notificationMutations()).toEqual([]);

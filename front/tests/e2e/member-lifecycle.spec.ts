@@ -86,6 +86,8 @@ test("host confirms before closing a session from the editor overview", async ({
       }
       await expect(button).toHaveAttribute("aria-pressed", "true");
     }
+    await collapse.click();
+    await expect(attendancePanel).toBeHidden();
   }
   await expect(finish).toBeVisible({ timeout: 10_000 });
 
