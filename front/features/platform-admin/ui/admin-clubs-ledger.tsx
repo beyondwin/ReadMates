@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
+import {
+  ADMIN_COPY,
+  clubLifecycleLabel,
+  clubVisibilityLabel,
+  hostOnboardingLabel,
+} from "@/features/platform-admin/model/admin-copy";
 import type { AdminPageState } from "./admin-state-panel";
 import { AdminEvidenceLedger } from "./admin-evidence-ledger";
 import { AdminPageContext } from "./admin-page-context";
@@ -131,7 +137,7 @@ export function AdminClubsLedger({
   return (
     <div className="admin-clubs admin-clubs-ledger">
       <AdminPageContext
-        eyebrow="Club registry"
+        eyebrow={ADMIN_COPY.eyebrow.clubs}
         heading="클럽"
         description="서버가 검색·정렬한 클럽을 조치 신호와 함께 확인합니다."
         action={
@@ -197,7 +203,7 @@ export function AdminClubsLedger({
         />
 
         <AdminEvidenceLedger
-          label="클럽 레지스트리"
+          label={ADMIN_COPY.heading.clubsLedger}
           count={
             pageState === "loading" || pageState === "unavailable"
               ? undefined
@@ -289,8 +295,10 @@ export function AdminClubsLedger({
                           {club.name}
                         </Link>
                       </td>
-                      <td data-label="상태">{club.status}</td>
-                      <td data-label="공개">{club.publicVisibility}</td>
+                      <td data-label="상태">{clubLifecycleLabel(club.status)}</td>
+                      <td data-label="공개">
+                        {clubVisibilityLabel(club.publicVisibility)}
+                      </td>
                       <td data-label="도메인">
                         {club.domainCount}
                         {club.domainActionRequiredCount > 0
@@ -298,7 +306,7 @@ export function AdminClubsLedger({
                           : ""}
                       </td>
                       <td data-label="호스트">
-                        {club.firstHostOnboardingState}
+                        {hostOnboardingLabel(club.firstHostOnboardingState)}
                       </td>
                     </tr>
                   ))}

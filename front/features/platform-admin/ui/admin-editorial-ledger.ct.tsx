@@ -226,7 +226,7 @@ test("Clubs locks the 900 tablet editorial composition", async ({ mount, page })
     VISUAL_AUTHORITY_VIEWPORTS.tablet,
   );
   await expect(component.getByRole("heading", { name: "클럽", exact: true })).toBeVisible();
-  await expect(component.getByRole("region", { name: "클럽 레지스트리" })).toBeVisible();
+  await expect(component.getByRole("region", { name: "클럽 장부" })).toBeVisible();
   await expect(component.getByRole("link", { name: EDITORIAL_LEDGER_LONG_CLUB_NAME })).toBeVisible();
   const create = component.getByRole("link", { name: "새 클럽" });
   await expect(create).toBeVisible();

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
@@ -60,7 +60,8 @@ describe("AdminClubsLedger", () => {
     const { container } = renderLedger();
 
     expect(screen.getByRole("heading", { name: "클럽" })).toBeInTheDocument();
-    expect(screen.getByText("Club registry")).toBeInTheDocument();
+    expect(screen.getByText("운영 · 클럽")).toBeInTheDocument();
+    expect(screen.queryByText("Club registry")).toBeNull();
     expect(
       screen.getByRole("searchbox", { name: "클럽 검색" }),
     ).toHaveValue("alpha");
@@ -72,7 +73,16 @@ describe("AdminClubsLedger", () => {
       "href",
       club.href,
     );
-    expect(screen.getByRole("region", { name: "클럽 레지스트리" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "클럽 장부" })).toBeInTheDocument();
+    const row = container.querySelector(
+      '[data-club-id="c-1"]',
+    ) as HTMLElement;
+    expect(within(row).getByText("활성")).toBeInTheDocument();
+    expect(within(row).getByText("비공개")).toBeInTheDocument();
+    expect(within(row).getByText("배정됨")).toBeInTheDocument();
+    expect(within(row).queryByText("ACTIVE")).toBeNull();
+    expect(within(row).queryByText("PRIVATE")).toBeNull();
+    expect(within(row).queryByText("ASSIGNED")).toBeNull();
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });
 

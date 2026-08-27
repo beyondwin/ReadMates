@@ -1,3 +1,5 @@
+import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
+
 export type PlatformAdminClubRegistryItem = {
   clubId: string;
   slug: string;
@@ -22,7 +24,7 @@ export function PlatformAdminClubRegistry({ clubs, onSelectClub, onNewClub }: Pr
     <section className="platform-admin-clubs" aria-labelledby="platform-admin-clubs-title">
       <div className="platform-admin-domains__header">
         <div>
-          <p className="eyebrow">Club registry</p>
+          <p className="eyebrow">{ADMIN_COPY.eyebrow.clubs}</p>
           <h2 id="platform-admin-clubs-title" className="h3 editorial">
             클럽 레지스트리
           </h2>
