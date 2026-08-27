@@ -333,7 +333,32 @@
     padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px) + var(--m-nav-h, 0px));
   }
 
+  /* Align with diary single-column band (not globals' 767px) so 768–899 keeps one CTA. */
   .rm-meeting-diary .rm-host-session-workspace__cta--desktop {
+    display: none;
+  }
+
+  .rm-meeting-diary .rm-host-session-workspace__cta--mobile {
+    display: inline-flex;
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  .rm-meeting-diary .rm-host-session-workspace__sticky-cta,
+  .rm-meeting-diary .rm-host-session-workspace__footer-cta {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    padding: 12px var(--rm-workspace-gap, 16px) calc(12px + env(safe-area-inset-bottom, 0px) + var(--m-nav-h, 0px));
+    background: color-mix(in oklch, var(--bg) 92%, transparent);
+  }
+
+  .rm-meeting-diary .rm-host-session-workspace:has(.rm-host-session-workspace__sheet-backdrop:not([hidden])) .rm-host-session-workspace__footer-cta,
+  .rm-meeting-diary .rm-host-session-workspace:has(input:focus, textarea:focus, select:focus) .rm-host-session-workspace__footer-cta {
     display: none;
   }
 

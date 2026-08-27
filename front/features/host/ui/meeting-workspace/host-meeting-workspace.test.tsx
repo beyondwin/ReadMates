@@ -1,5 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   HOST_MEETING_PERFORMANCE_METRICS,
@@ -14,6 +16,11 @@ import {
 import { HostMeetingWorkspace, type HostMeetingWorkspaceProps } from "./host-meeting-workspace";
 import { buildMeetingAudienceProjections } from "./meeting-audience-projections";
 import { MeetingRelatedWork } from "./meeting-related-work";
+
+const DIARY_CSS = readFileSync(
+  path.resolve("features/host/ui/meeting-workspace/meeting-diary.css"),
+  "utf8",
+);
 
 const CURRENT_URL =
   "https://readmates.test/clubs/alpha/app/host/sessions/11111111-1111-1111-1111-111111111111";
@@ -132,6 +139,39 @@ describe("HostMeetingWorkspace", () => {
       "href",
       "/app/host/sessions/next",
     );
+  });
+
+  it("keeps a primary CTA across the diary single-column band without double-announce", () => {
+    // diary hides desktop below 900px; sticky/mobile must cover the full ≤899 range
+    // so 768–899 does not lose both CTAs (globals only reveal sticky at ≤767).
+    expect(DIARY_CSS).toMatch(
+      /@media \(max-width: 899px\)[\s\S]*\.rm-host-session-workspace__cta--desktop[\s\S]*display:\s*none/,
+    );
+    expect(DIARY_CSS).toMatch(
+      /@media \(max-width: 899px\)[\s\S]*\.rm-host-session-workspace__cta--mobile[\s\S]*display:\s*inline-flex/,
+    );
+    expect(DIARY_CSS).toMatch(
+      /@media \(max-width: 899px\)[\s\S]*\.rm-host-session-workspace__sticky-cta[\s\S]*display:\s*flex/,
+    );
+    expect(DIARY_CSS).toMatch(
+      /@media \(min-width: 900px\)[\s\S]*\.rm-host-session-workspace__cta--mobile[\s\S]*display:\s*none/,
+    );
+  });
+
+  it("puts meeting identity on the left diary page with a single h1", () => {
+    render(<HostMeetingWorkspace {...props} />);
+
+    const left = document.querySelector(".rm-host-session-workspace__leading");
+    expect(left).not.toBeNull();
+    const heading = within(left as HTMLElement).getByRole("heading", { level: 1 });
+    expect(heading).toHaveTextContent("길어도 온전히 읽히는 모임 제목");
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(left).toHaveTextContent("2026.08.26");
+    expect(left).toHaveTextContent("20:00");
+    expect(left).toHaveTextContent("온라인과 오프라인을 함께 설명하는 긴 장소");
+    expect(left).toHaveTextContent("준비 중");
+    expect(left!.contains(screen.getByRole("navigation", { name: "모임의 걸음" }))).toBe(true);
+    expect(left!.contains(screen.getByRole("link", { name: "멤버 시야로 보기" }))).toBe(true);
   });
 
   it("opens 모임 정보 as a Focus Deck sheet and inerts the deck chrome", async () => {

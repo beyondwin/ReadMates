@@ -184,19 +184,30 @@ export function HostSessionWorkspace({
     <div className="rm-host-session-workspace">
       <div className="rm-host-session-workspace__chrome" inert={chromeInert || undefined}>
       <div className="rm-host-session-workspace__frame">
-        <WorkspaceHeader
-          header={header}
-          statusLabel={view.statusLabel}
-          basicOpen={basicOpen}
-          historyOpen={historyOpen}
-          onOpenBasic={() => changePanel(basicOpen ? focusLocation() : panelLocation("basic"))}
-          onOpenHistory={() => changePanel(historyOpen ? focusLocation() : panelLocation("history"))}
-          LinkComponent={LinkComponent}
-        />
+        {leading ? null : (
+          <WorkspaceHeader
+            header={header}
+            statusLabel={view.statusLabel}
+            basicOpen={basicOpen}
+            historyOpen={historyOpen}
+            onOpenBasic={() => changePanel(basicOpen ? focusLocation() : panelLocation("basic"))}
+            onOpenHistory={() => changePanel(historyOpen ? focusLocation() : panelLocation("history"))}
+            LinkComponent={LinkComponent}
+          />
+        )}
 
         <div className={`rm-host-session-workspace__layout${leading ? " is-spread" : ""}`}>
           {leading ? (
             <div className="rm-host-session-workspace__leading">
+              <WorkspaceHeader
+                header={header}
+                statusLabel={view.statusLabel}
+                basicOpen={basicOpen}
+                historyOpen={historyOpen}
+                onOpenBasic={() => changePanel(basicOpen ? focusLocation() : panelLocation("basic"))}
+                onOpenHistory={() => changePanel(historyOpen ? focusLocation() : panelLocation("history"))}
+                LinkComponent={LinkComponent}
+              />
               {leading}
             </div>
           ) : null}
