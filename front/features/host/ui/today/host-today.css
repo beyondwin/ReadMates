@@ -271,6 +271,11 @@
   margin-top: var(--space-xl);
 }
 
+.rm-host-today__meeting-day-roster {
+  margin-top: var(--space-lg);
+  min-width: 0;
+}
+
 .rm-host-today__action:focus-visible,
 .rm-host-today__resolve:focus-visible,
 .rm-host-today__queue-all:focus-visible,

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { HostTodayView } from "@/features/host/model/host-today-model";
 import { HostTodayPage } from "./host-today-page";
@@ -111,5 +111,29 @@ describe("HostTodayPage", () => {
       "/app/host/sessions/session-open-1?section=attendance",
     );
     expect(screen.queryByText("override should not win")).not.toBeInTheDocument();
+  });
+
+  it("embeds the meeting-day attendance roster in the mobile home body", () => {
+    const meetingDayView: HostTodayView = {
+      ...viewWithTwoQueueItems,
+      headline: "오늘 모임 · 처리할 일 2건",
+      nextMeeting: {
+        sessionId: "session-open-1",
+        statusLabel: "준비 중",
+        isMeetingDay: true,
+        detailHref: "/app/host/sessions/session-open-1",
+      },
+    };
+
+    render(
+      <HostTodayPage
+        view={meetingDayView}
+        meetingDayAttendance={<section aria-label="당일 출석 명단">원탭 명단</section>}
+      />,
+    );
+
+    const hero = screen.getByRole("region", { name: "오늘 모임" });
+    expect(within(hero).getByRole("region", { name: "당일 출석 명단" })).toHaveTextContent("원탭 명단");
+    expect(TODAY_CSS).toMatch(/\.rm-host-today__meeting-day-roster/);
   });
 });

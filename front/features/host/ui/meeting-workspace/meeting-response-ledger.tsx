@@ -4,9 +4,15 @@ import {
   commitHostMeetingAttendanceRow,
   commitHostMeetingFilterRaf,
 } from "@/shared/observability/host-meeting-performance";
-
+import {
+  WorkspaceUndoBar,
+  type WorkspacePendingUndo,
+} from "@/features/host/ui/session-workspace/workspace-undo-bar";
+import "./meeting-response-ledger.css";
 type Response = "GOING" | "NOT_GOING" | "UNSURE" | "NO_RESPONSE";
 export type MeetingAttendance = "ATTENDED" | "ABSENT" | "UNKNOWN";
+export type MeetingResponseLedgerPresentation = "default" | "meetingDay";
+type MeetingDayFilter = "pending" | "arrived" | "all";
 
 export type MeetingResponseLedgerRow = {
   membershipId: string;
@@ -32,7 +38,166 @@ const attendanceLabel: Record<MeetingAttendance, string> = {
   UNKNOWN: "확인 전",
 };
 
+function isPendingAttendance(attendance: MeetingAttendance): boolean {
+  return attendance !== "ATTENDED";
+}
+
 export function MeetingResponseLedger({
+  rows,
+  onAttendanceChange,
+  onBulkAttendanceChange,
+  presentation = "default",
+  pendingUndo = null,
+}: {
+  rows: ReadonlyArray<MeetingResponseLedgerRow>;
+  onAttendanceChange: (membershipId: string, attendance: MeetingAttendance) => void;
+  onBulkAttendanceChange: (membershipIds: ReadonlyArray<string>, attendance: MeetingAttendance) => void;
+  presentation?: MeetingResponseLedgerPresentation;
+  pendingUndo?: WorkspacePendingUndo | null;
+}) {
+  if (presentation === "meetingDay") {
+    return (
+      <MeetingDayResponseLedger
+        rows={rows}
+        onAttendanceChange={onAttendanceChange}
+        onBulkAttendanceChange={onBulkAttendanceChange}
+        pendingUndo={pendingUndo}
+      />
+    );
+  }
+
+  return (
+    <DefaultMeetingResponseLedger
+      rows={rows}
+      onAttendanceChange={onAttendanceChange}
+      onBulkAttendanceChange={onBulkAttendanceChange}
+    />
+  );
+}
+
+function MeetingDayResponseLedger({
+  rows,
+  onAttendanceChange,
+  onBulkAttendanceChange,
+  pendingUndo,
+}: {
+  rows: ReadonlyArray<MeetingResponseLedgerRow>;
+  onAttendanceChange: (membershipId: string, attendance: MeetingAttendance) => void;
+  onBulkAttendanceChange: (membershipIds: ReadonlyArray<string>, attendance: MeetingAttendance) => void;
+  pendingUndo: WorkspacePendingUndo | null;
+}) {
+  const [filter, setFilter] = useState<MeetingDayFilter>("pending");
+  const pendingIds = useMemo(
+    () => rows.filter((row) => isPendingAttendance(row.attendance)).map((row) => row.membershipId),
+    [rows],
+  );
+  const counts = useMemo(() => ({
+    pending: pendingIds.length,
+    arrived: rows.filter((row) => row.attendance === "ATTENDED").length,
+    all: rows.length,
+  }), [pendingIds.length, rows]);
+  const visible = useMemo(() => {
+    if (filter === "pending") return rows.filter((row) => isPendingAttendance(row.attendance));
+    if (filter === "arrived") return rows.filter((row) => row.attendance === "ATTENDED");
+    return rows;
+  }, [filter, rows]);
+
+  useLayoutEffect(() => {
+    commitHostMeetingAttendanceRow(rows);
+  }, [rows]);
+
+  return (
+    <section
+      className="rm-meeting-response-ledger rm-meeting-response-ledger--meeting-day"
+      aria-labelledby="meeting-day-attendance-title"
+    >
+      <div className="rm-meeting-response-ledger__head">
+        <div>
+          <h2 id="meeting-day-attendance-title" className="h2 editorial">출석 확인</h2>
+        </div>
+        <div className="rm-meeting-response-ledger__segments" role="group" aria-label="출석 필터">
+          <button
+            type="button"
+            className="rm-meeting-response-ledger__segment"
+            aria-pressed={filter === "pending"}
+            onClick={() => setFilter("pending")}
+          >
+            아직 안 옴 {counts.pending}
+          </button>
+          <button
+            type="button"
+            className="rm-meeting-response-ledger__segment"
+            aria-pressed={filter === "arrived"}
+            onClick={() => setFilter("arrived")}
+          >
+            도착 {counts.arrived}
+          </button>
+          <button
+            type="button"
+            className="rm-meeting-response-ledger__segment"
+            aria-pressed={filter === "all"}
+            onClick={() => setFilter("all")}
+          >
+            전체 {counts.all}
+          </button>
+        </div>
+      </div>
+
+      {visible.length === 0 ? (
+        <p role="status" className="rm-meeting-panel-state">조건에 맞는 참여자가 없습니다.</p>
+      ) : (
+        <ul className="rm-meeting-response-ledger__rows">
+          {visible.map((row) => {
+            const arrived = row.attendance === "ATTENDED";
+            const label = arrived
+              ? `${row.displayName} · 도착함`
+              : `${row.displayName} · 도착으로 표시`;
+            return (
+              <li key={row.membershipId} className="rm-meeting-response-ledger__row rm-meeting-response-ledger__row--checkin">
+                <button
+                  type="button"
+                  className={`rm-meeting-response-ledger__checkin${arrived ? " is-arrived" : ""}`}
+                  aria-label={label}
+                  disabled={row.writeState === "saving" || arrived}
+                  onClick={() => onAttendanceChange(row.membershipId, "ATTENDED")}
+                >
+                  <span className="rm-meeting-response-ledger__person">
+                    <strong>{row.displayName}</strong>
+                    <span className="small muted">
+                      {arrived ? "도착함" : `${responseLabel[row.response]} 응답`}
+                    </span>
+                  </span>
+                  <span className="rm-meeting-response-ledger__checkin-action">
+                    {arrived ? "도착함" : "도착"}
+                  </span>
+                </button>
+                {row.writeState === "saving" ? <span role="status" className="small">저장 중</span> : null}
+                {row.writeState === "error" ? <span role="alert" className="small">저장하지 못했습니다. 다시 선택해 주세요.</span> : null}
+                {row.writeState === "conflict" ? <span role="alert" className="small">최신 출석 상태와 충돌했습니다. 새로 확인해 주세요.</span> : null}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {counts.pending > 0 ? (
+        <div className="rm-meeting-response-ledger__bulk rm-meeting-response-ledger__bulk--meeting-day">
+          <button
+            type="button"
+            className="btn btn-quiet"
+            onClick={() => onBulkAttendanceChange(pendingIds, "ATTENDED")}
+          >
+            나머지 {counts.pending}명 모두 참석
+          </button>
+        </div>
+      ) : null}
+
+      <WorkspaceUndoBar pendingUndo={pendingUndo} />
+    </section>
+  );
+}
+
+function DefaultMeetingResponseLedger({
   rows,
   onAttendanceChange,
   onBulkAttendanceChange,

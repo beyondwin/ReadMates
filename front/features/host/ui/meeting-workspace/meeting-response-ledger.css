@@ -1,0 +1,74 @@
+.rm-meeting-response-ledger__segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rm-meeting-response-ledger__segment {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--bg);
+  color: var(--text-2);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rm-meeting-response-ledger__segment[aria-pressed="true"] {
+  border-color: var(--text);
+  color: var(--text);
+  font-weight: 650;
+}
+
+.rm-meeting-response-ledger__row--checkin {
+  display: block;
+  padding: 0;
+}
+
+.rm-meeting-response-ledger__checkin {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 4px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+}
+
+.rm-meeting-response-ledger__checkin:disabled {
+  opacity: 0.66;
+}
+
+.rm-meeting-response-ledger__checkin-action {
+  flex: 0 0 auto;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 8px);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rm-meeting-response-ledger__checkin.is-arrived .rm-meeting-response-ledger__checkin-action {
+  border-color: transparent;
+  color: var(--text-3);
+}
+
+.rm-meeting-response-ledger__bulk--meeting-day {
+  position: static;
+  justify-content: stretch;
+  border-block: 0;
+  padding: 12px 0 0;
+}
+
+.rm-meeting-response-ledger__bulk--meeting-day .btn {
+  width: 100%;
+  min-height: 44px;
+}

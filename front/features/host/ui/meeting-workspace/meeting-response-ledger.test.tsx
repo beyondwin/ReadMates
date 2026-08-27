@@ -1,11 +1,18 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { MeetingResponseLedger } from "./meeting-response-ledger";
+import type { WorkspacePendingUndo } from "@/features/host/ui/session-workspace/workspace-undo-bar";
+import { MeetingResponseLedger, type MeetingResponseLedgerRow } from "./meeting-response-ledger";
 
-const rows = [
-  { membershipId: "a", displayName: "같은 이름", secondaryLabel: "A 독자", response: "GOING" as const, attendance: "UNKNOWN" as const, attendanceRevision: 1, questionCount: 2, recentResponseLabel: "오늘" },
-  { membershipId: "b", displayName: "같은 이름", secondaryLabel: "B 독자", response: "NO_RESPONSE" as const, attendance: "ABSENT" as const, attendanceRevision: 1, questionCount: 0, recentResponseLabel: null, writeState: "conflict" as const },
+const rows: MeetingResponseLedgerRow[] = [
+  { membershipId: "a", displayName: "같은 이름", secondaryLabel: "A 독자", response: "GOING", attendance: "UNKNOWN", attendanceRevision: 1, questionCount: 2, recentResponseLabel: "오늘" },
+  { membershipId: "b", displayName: "같은 이름", secondaryLabel: "B 독자", response: "NO_RESPONSE", attendance: "ABSENT", attendanceRevision: 1, questionCount: 0, recentResponseLabel: null, writeState: "conflict" },
+];
+
+const meetingDayRows: MeetingResponseLedgerRow[] = [
+  { membershipId: "pending-1", displayName: "지후", secondaryLabel: "참여자 1", response: "GOING", attendance: "UNKNOWN", attendanceRevision: 1, questionCount: null, recentResponseLabel: null },
+  { membershipId: "pending-2", displayName: "수민", secondaryLabel: "참여자 2", response: "UNSURE", attendance: "UNKNOWN", attendanceRevision: 1, questionCount: null, recentResponseLabel: null },
+  { membershipId: "arrived-1", displayName: "서연", secondaryLabel: "참여자 3", response: "GOING", attendance: "ATTENDED", attendanceRevision: 2, questionCount: null, recentResponseLabel: null },
 ];
 
 describe("MeetingResponseLedger", () => {
@@ -64,5 +71,55 @@ describe("MeetingResponseLedger", () => {
     await user.click(screen.getByRole("button", { name: "출석으로 변경" }));
     await user.click(within(screen.getByRole("dialog", { name: "일괄 실제 출석 변경 확인" })).getByRole("button", { name: "2명을 출석으로 변경" }));
     expect(onBulkAttendanceChange).toHaveBeenCalledWith(["a", "b"], "ATTENDED");
+  });
+
+  it("meetingDay presentation filters to not-yet, one-tap commits ATTENDED, bulks the rest, and shows undo", async () => {
+    const user = userEvent.setup();
+    const onAttendanceChange = vi.fn();
+    const onBulkAttendanceChange = vi.fn();
+    const pendingUndo: WorkspacePendingUndo = {
+      description: "지후 출석을 기록했습니다.",
+      onUndo: vi.fn(),
+      onOpenHistory: vi.fn(),
+      onDismiss: vi.fn(),
+    };
+
+    const { rerender } = render(
+      <MeetingResponseLedger
+        presentation="meetingDay"
+        rows={meetingDayRows}
+        onAttendanceChange={onAttendanceChange}
+        onBulkAttendanceChange={onBulkAttendanceChange}
+      />,
+    );
+
+    const segments = screen.getByRole("group", { name: "출석 필터" });
+    expect(within(segments).getByRole("button", { name: "아직 안 옴 2" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(segments).getByRole("button", { name: "도착 1" })).toHaveAttribute("aria-pressed", "false");
+    expect(within(segments).getByRole("button", { name: "전체 3" })).toHaveAttribute("aria-pressed", "false");
+
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(screen.queryByLabelText(/실제 출석/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /저장/ })).not.toBeInTheDocument();
+
+    const pendingRow = screen.getByRole("button", { name: /지후/ });
+    expect(pendingRow).toHaveClass("rm-meeting-response-ledger__checkin");
+    await user.click(pendingRow);
+    expect(onAttendanceChange).toHaveBeenCalledWith("pending-1", "ATTENDED");
+
+    await user.click(screen.getByRole("button", { name: "나머지 2명 모두 참석" }));
+    expect(onBulkAttendanceChange).toHaveBeenCalledWith(["pending-1", "pending-2"], "ATTENDED");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    rerender(
+      <MeetingResponseLedger
+        presentation="meetingDay"
+        rows={meetingDayRows}
+        onAttendanceChange={onAttendanceChange}
+        onBulkAttendanceChange={onBulkAttendanceChange}
+        pendingUndo={pendingUndo}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "되돌리기" })).toBeVisible();
   });
 });

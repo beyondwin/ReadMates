@@ -21,9 +21,11 @@ function attendanceSectionHref(detailHref: string): string {
 function MeetingDayHero({
   nextMeeting,
   LinkComponent,
+  meetingDayAttendance,
 }: {
   nextMeeting: NonNullable<HostTodayView["nextMeeting"]>;
   LinkComponent: HostLinkComponent;
+  meetingDayAttendance?: ReactNode;
 }) {
   return (
     <section className="rm-host-today__hero" aria-label="오늘 모임">
@@ -37,6 +39,11 @@ function MeetingDayHero({
           출석 확인 열기
         </LinkComponent>
       </div>
+      {meetingDayAttendance ? (
+        <div className="rm-host-today__meeting-day-roster mobile-only">
+          {meetingDayAttendance}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -134,12 +141,14 @@ function ReferenceRail({
 export function HostTodayPage({
   view,
   nextMeetingBlock,
+  meetingDayAttendance,
   widgetErrors,
   onRetryQueue,
   LinkComponent = DefaultLink,
 }: {
   view: HostTodayView;
   nextMeetingBlock?: ReactNode;
+  meetingDayAttendance?: ReactNode;
   widgetErrors?: { queue?: boolean };
   onRetryQueue?: () => void;
   LinkComponent?: HostLinkComponent;
@@ -147,7 +156,11 @@ export function HostTodayPage({
   // Meeting-day hero owns the home primary CTA; route nextMeetingBlock must not override it.
   const hero = view.nextMeeting?.isMeetingDay
     ? (
-      <MeetingDayHero nextMeeting={view.nextMeeting} LinkComponent={LinkComponent} />
+      <MeetingDayHero
+        nextMeeting={view.nextMeeting}
+        LinkComponent={LinkComponent}
+        meetingDayAttendance={meetingDayAttendance}
+      />
     )
     : (nextMeetingBlock ?? (
       <NextMeetingFallback nextMeeting={view.nextMeeting} LinkComponent={LinkComponent} />
