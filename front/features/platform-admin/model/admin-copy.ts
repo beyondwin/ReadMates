@@ -21,6 +21,7 @@ export const ADMIN_COPY = {
     auditLedger: "기입 목록",
     access: "접근 원장",
     accessLedger: "발급 목록",
+    analytics: "분석 부록",
   },
   support: {
     issue: "지원 접근 발급",

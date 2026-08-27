@@ -201,7 +201,9 @@ export function AdminTargetLedgerInline({ entries, moreHref }: {
 **요구사항:** `AdminPageContext`(제목 "분석 부록") + 로딩/오류를 `AdminStatePanel`로 통일. KPI 타일에서 **행동 링크가 없는 타일 제거 기준 적용 금지**(데이터 축소는 범위 밖) — 표기만: 표 숫자에 `ledger-number`(tnum) 클래스, KPI 수치 우측 정렬. CSV 게이트 유지.
 
 **Steps:**
-- [ ] 테스트: ① PageContext 헤딩 ② 표 셀에 tnum 클래스 ③ forbidden 시 StatePanel → 구현 → 통과 → 공통 게이트 → CT 재잠금(`admin-support-workbench` 포함) → Commit: `feat(admin): analytics appendix shell` → **릴리스 체크포인트 4**
+- [x] 테스트: ① PageContext 헤딩 ② 표 셀에 tnum 클래스 ③ forbidden 시 StatePanel → 구현 → 통과 → 공통 게이트 → CT 재잠금(`admin-support-workbench` 포함) → Commit: `feat(admin): analytics appendix shell` → **릴리스 체크포인트 4**
+
+> 실행 노트: `admin-analytics-route.tsx`는 데이터/capability 배선만 하므로 본문 변경 없음. 제목·StatePanel·tnum은 overview UI에 둠. KPI 타일은 제거하지 않음.
 
 ---
 

@@ -95,7 +95,7 @@ describe("AdminAnalyticsRoute", () => {
 
   it("renders the cached analytics overview from the URL window", () => {
     const { container } = renderRoute();
-    expect(screen.getByRole("heading", { name: "분석" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "분석 부록" })).toBeInTheDocument();
     expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
     expect(screen.getByText("75%")).toBeInTheDocument();
@@ -128,7 +128,7 @@ describe("AdminAnalyticsRoute", () => {
 
     expect(fetchAdminAnalyticsOverview).not.toHaveBeenCalled();
     expect(screen.queryByText("75%")).not.toBeInTheDocument();
-    expect(screen.getByText(/권한이 없습니다|분석 권한이 없습니다/)).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveClass("admin-state-panel--forbidden");
   });
 
   it("does not export for OWNER without EXPORT_ANALYTICS, including a direct handler click", async () => {

@@ -1,4 +1,5 @@
 import type { KeyboardEvent } from "react";
+import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
 import {
   analyticsActionForKpi,
   deltaLabel,
@@ -12,6 +13,7 @@ import {
   type AdminAnalyticsOverview,
   type AnalyticsWindow,
 } from "@/features/platform-admin/model/platform-admin-analytics-model";
+import { AdminPageContext } from "./admin-page-context";
 import { AdminStatePanel } from "./admin-state-panel";
 
 export type AdminAnalyticsOverviewViewProps = {
@@ -54,63 +56,68 @@ export function AdminAnalyticsOverviewView({
   }
 
   return (
-    <section className="admin-analytics" aria-labelledby="admin-analytics-heading">
-      <header className="admin-analytics__header">
-        <h1 id="admin-analytics-heading">분석</h1>
-        <div className="admin-analytics__windows" role="group" aria-label="분석 기간 선택">
-          {WINDOWS.map((value) => (
-            <button
-              key={value}
-              type="button"
-              className="admin-analytics__window"
-              aria-pressed={value === window}
-              onClick={() => onWindowChange(value)}
-              onKeyDown={(event) => handleWindowKeyDown(event, value)}
-            >
-              {labelWindow(value)}
-            </button>
-          ))}
-        </div>
-      </header>
-
-      {error ? <p className="admin-analytics__error" role="alert">{error}</p> : null}
-      {loading && !overview ? <p className="admin-analytics__loading">분석 데이터를 불러오는 중…</p> : null}
-      {!canView ? (
-        <AdminStatePanel
-          state="forbidden"
-          title="권한이 없습니다"
-          description="현재 권한으로는 분석을 볼 수 없습니다."
-        />
-      ) : null}
-
-      {canView && overview ? (
-        <>
-          <div className="admin-analytics__actions">
-            {canExport ? (
+    <div className="admin-analytics">
+      <AdminPageContext
+        eyebrow="검토"
+        heading={ADMIN_COPY.heading.analytics}
+        action={
+          <div className="admin-analytics__windows" role="group" aria-label="분석 기간 선택">
+            {WINDOWS.map((value) => (
               <button
+                key={value}
                 type="button"
-                className="admin-analytics__export"
-                disabled={exportStatus === "pending"}
-                onClick={onExport}
+                className="admin-analytics__window"
+                aria-pressed={value === window}
+                onClick={() => onWindowChange(value)}
+                onKeyDown={(event) => handleWindowKeyDown(event, value)}
               >
-                {exportStatus === "pending" ? "CSV 내려받는 중" : "CSV 내려받기"}
+                {labelWindow(value)}
               </button>
-            ) : (
-              <p className="admin-analytics__export-denied">현재 권한으로는 CSV를 내려받을 수 없습니다.</p>
-            )}
-            {exportStatus === "success" ? <p className="admin-analytics__export-status" role="status">CSV 파일을 내려받았습니다.</p> : null}
-            {exportStatus === "error" ? <p className="admin-analytics__export-error" role="alert">CSV 파일을 만들지 못했습니다. 다시 시도해 주세요.</p> : null}
-          </div>
-          <ul className="admin-analytics__kpis" aria-label="핵심 지표">
-            {overview.kpis.map((card) => (
-              <AdminAnalyticsKpiTile key={card.key} card={card} />
             ))}
-          </ul>
-          <AdminAnalyticsSeriesTable series={overview.series} />
-          <AdminAnalyticsBenchmarkTable benchmark={overview.clubBenchmark} />
-        </>
-      ) : null}
-    </section>
+          </div>
+        }
+      >
+        {error ? (
+          <AdminStatePanel state="unavailable" description={error} />
+        ) : null}
+        {loading && !overview ? <AdminStatePanel state="loading" /> : null}
+        {!canView ? (
+          <AdminStatePanel
+            state="forbidden"
+            title="권한이 없습니다"
+            description="현재 권한으로는 분석을 볼 수 없습니다."
+          />
+        ) : null}
+
+        {canView && overview ? (
+          <>
+            <div className="admin-analytics__actions">
+              {canExport ? (
+                <button
+                  type="button"
+                  className="admin-analytics__export"
+                  disabled={exportStatus === "pending"}
+                  onClick={onExport}
+                >
+                  {exportStatus === "pending" ? "CSV 내려받는 중" : "CSV 내려받기"}
+                </button>
+              ) : (
+                <p className="admin-analytics__export-denied">현재 권한으로는 CSV를 내려받을 수 없습니다.</p>
+              )}
+              {exportStatus === "success" ? <p className="admin-analytics__export-status" role="status">CSV 파일을 내려받았습니다.</p> : null}
+              {exportStatus === "error" ? <p className="admin-analytics__export-error" role="alert">CSV 파일을 만들지 못했습니다. 다시 시도해 주세요.</p> : null}
+            </div>
+            <ul className="admin-analytics__kpis" aria-label="핵심 지표">
+              {overview.kpis.map((card) => (
+                <AdminAnalyticsKpiTile key={card.key} card={card} />
+              ))}
+            </ul>
+            <AdminAnalyticsSeriesTable series={overview.series} />
+            <AdminAnalyticsBenchmarkTable benchmark={overview.clubBenchmark} />
+          </>
+        ) : null}
+      </AdminPageContext>
+    </div>
   );
 }
 
@@ -121,7 +128,7 @@ function AdminAnalyticsKpiTile({ card }: { card: AdminAnalyticsKpiCard }) {
     <li className={`admin-analytics__kpi${unavailable ? " admin-analytics__kpi--empty" : ""}`}>
       <span className="admin-analytics__kpi-label">{card.label || labelKpi(card.key)}</span>
       {card.definition ? <span className="admin-analytics__kpi-definition">{card.definition}</span> : null}
-      <span className="admin-analytics__kpi-value">{formatKpiValue(card)}</span>
+      <span className="admin-analytics__kpi-value ledger-number">{formatKpiValue(card)}</span>
       <span className="admin-analytics__kpi-delta">{deltaLabel(card)}</span>
       <a className="admin-analytics__kpi-action small" href={action.href}>
         {action.label}
@@ -159,7 +166,7 @@ function AdminAnalyticsSeriesTable({ series }: { series: AdminAnalyticsKpiSeries
                 {bucketStarts.map((bucketStart) => {
                   const point = item.points.find((candidate) => candidate.bucketStart === bucketStart);
                   return (
-                    <td key={bucketStart}>
+                    <td key={bucketStart} className="ledger-number">
                       {point ? formatSeriesPointValue(point, item.unit) : "데이터 부족"}
                     </td>
                   );
@@ -208,11 +215,11 @@ function AdminAnalyticsBenchmarkRowView({ row }: { row: AdminAnalyticsBenchmarkR
   return (
     <tr>
       <th scope="row">{row.name}</th>
-      <td data-label="활성 멤버">{row.activeMembers}</td>
-      <td data-label="모임 완료율">{percentOrDash(row.sessionCompletionRate)}</td>
-      <td data-label="참석 응답률">{percentOrDash(row.rsvpRate)}</td>
-      <td data-label="AI 비용">${row.aiCostUsd}</td>
-      <td data-label="알림 도달률">{percentOrDash(row.notificationDeliveryRate)}</td>
+      <td className="ledger-number" data-label="활성 멤버">{row.activeMembers}</td>
+      <td className="ledger-number" data-label="모임 완료율">{percentOrDash(row.sessionCompletionRate)}</td>
+      <td className="ledger-number" data-label="참석 응답률">{percentOrDash(row.rsvpRate)}</td>
+      <td className="ledger-number" data-label="AI 비용">${row.aiCostUsd}</td>
+      <td className="ledger-number" data-label="알림 도달률">{percentOrDash(row.notificationDeliveryRate)}</td>
     </tr>
   );
 }

@@ -30,6 +30,7 @@ describe("admin-copy", () => {
     expect(ADMIN_COPY.heading.auditLedger).toBe("기입 목록");
     expect(ADMIN_COPY.heading.access).toBe("접근 원장");
     expect(ADMIN_COPY.heading.accessLedger).toBe("발급 목록");
+    expect(ADMIN_COPY.heading.analytics).toBe("분석 부록");
     expect(ADMIN_COPY.support.issue).toBe("지원 접근 발급");
     expect(ADMIN_COPY.targetLedger.heading).toBe("이 대상의 최근 기입");
     expect(ADMIN_COPY.targetLedger.more).toBe("전체 기입 보기");

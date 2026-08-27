@@ -8,6 +8,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Highlights
 
+- **플랫폼 어드민 원장 셸 4단계:** 운영 기입·접근 원장·분석 부록을 공유 PageContext/StatePanel 문법으로 맞춥니다. 분석 표 숫자는 tabular nums로 두고 KPI 수치는 우측 정렬하며, CSV는 `EXPORT_ANALYTICS`가 있을 때만 내려받습니다.
 - **플랫폼 어드민 케이스 데스크 3단계:** 오늘 도켓에서 케이스를 이전/다음으로 순회하고, 확인·보류·무시(사유 필수)·해결 확인으로 큐를 떠나며, 이 대상의 최근 기입을 인라인으로 보여 운영 기입으로 이어집니다.
 - **플랫폼 어드민 운영 서사 2단계:** 모든 관리 화면에 상주 알람 요약 바를 두고, 서비스 건강은 한 문장 서사와 이탈 카드만 펼칩니다. 정상 신호는 숫자를 숨기고 이름만 접이식에 남깁니다.
 - **호스트·관리자 시각 권위:** 호스트 현재 모임은 Focus Deck(한 개의 `지금 할 일`과 진행 사실)을 page-level 권위로 사용하고, `/admin/**`는 Editorial Operations Ledger로 route 문법을 맞춥니다. 분석 CSV export와 알림 replay는 exact capability projection만 따르며 Today lifecycle은 서버 `allowedActions`를 역할 이름으로 재계산하지 않습니다. 서버 API·schema·auth 계약은 바꾸지 않았습니다.
