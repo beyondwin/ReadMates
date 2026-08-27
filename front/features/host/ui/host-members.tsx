@@ -160,16 +160,12 @@ export default function HostMembers({
     }
 
     setInvitationBusyId(invitationId);
-    setMessage(null);
     try {
       const response = await invitationActions.revokeInvitation(invitationId);
       if (!response.ok) {
         throw new Error("revoke-failed");
       }
       replaceInvitationsFromPage(await invitationActions.refreshInvitations({ limit: 50 }));
-      setMessage({ kind: "status", text: "초대를 중지했습니다." });
-    } catch {
-      setMessage({ kind: "alert", text: "초대 중지에 실패했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요." });
     } finally {
       setInvitationBusyId(null);
     }
@@ -181,16 +177,12 @@ export default function HostMembers({
     }
 
     setInvitationBusyId(invitation.invitationId);
-    setMessage(null);
     try {
       await createInvitation({
         email: invitation.email,
         name: invitation.name,
         applyToCurrentSession: invitation.applyToCurrentSession,
       });
-      setMessage({ kind: "status", text: "초대를 재발송했습니다." });
-    } catch {
-      setMessage({ kind: "alert", text: "재발송에 실패했습니다. 대상 이메일을 확인한 뒤 다시 시도해 주세요." });
     } finally {
       setInvitationBusyId(null);
     }

@@ -130,6 +130,26 @@ export function MemberInvitationsSection({
     }
   };
 
+  const handleRevoke = async (invitationId: string) => {
+    setMessage(null);
+    try {
+      await onRevoke(invitationId);
+      setMessage({ kind: "status", text: "초대를 중지했습니다." });
+    } catch {
+      setMessage({ kind: "alert", text: "초대 중지에 실패했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요." });
+    }
+  };
+
+  const handleReissue = async (invitation: HostInvitationListItem) => {
+    setMessage(null);
+    try {
+      await onReissue(invitation);
+      setMessage({ kind: "status", text: "초대를 재발송했습니다." });
+    } catch {
+      setMessage({ kind: "alert", text: "재발송에 실패했습니다. 대상 이메일을 확인한 뒤 다시 시도해 주세요." });
+    }
+  };
+
   return (
     <section className="rm-document-panel" aria-label="초대" style={{ padding: "18px 22px" }}>
       <header className="stack" style={{ "--stack": "6px", marginBottom: 14 } as CSSProperties}>
@@ -281,7 +301,7 @@ export function MemberInvitationsSection({
                             className="btn btn-ghost btn-sm"
                             disabled={rowBusy}
                             aria-label={`${item.email} 재발송`}
-                            onClick={() => void onReissue(item)}
+                            onClick={() => void handleReissue(item)}
                           >
                             재발송
                           </button>
@@ -292,7 +312,7 @@ export function MemberInvitationsSection({
                             className="btn btn-ghost btn-sm"
                             disabled={rowBusy}
                             aria-label={`${item.email} 중지`}
-                            onClick={() => void onRevoke(item.invitationId)}
+                            onClick={() => void handleRevoke(item.invitationId)}
                           >
                             중지
                           </button>

@@ -152,4 +152,63 @@ describe("MemberInvitationsSection", () => {
 
     expect(onRevoke).toHaveBeenCalledWith("invite-1");
   });
+
+  it("surfaces revoke and reissue feedback inside the invitations region", async () => {
+    const user = userEvent.setup();
+    const onRevoke = vi.fn(async () => undefined);
+    const onReissue = vi.fn(async () => undefined);
+    const pending = invitation();
+    const expired = invitation({
+      invitationId: "invite-expired",
+      email: "expired@example.com",
+      name: "만료 멤버",
+      status: "EXPIRED",
+      effectiveStatus: "EXPIRED",
+      canRevoke: false,
+      canReissue: true,
+    });
+
+    const { rerender } = render(
+      <MemberInvitationsSection
+        invitations={[pending]}
+        pendingCount={1}
+        onCreate={vi.fn(async () => undefined)}
+        onRevoke={onRevoke}
+        onReissue={onReissue}
+        busyId={null}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /중지/ }));
+
+    const section = screen.getByRole("region", { name: "초대" });
+    expect(within(section).getByRole("status")).toHaveTextContent("초대를 중지했습니다.");
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+
+    onRevoke.mockRejectedValueOnce(new Error("revoke-failed"));
+    await user.click(screen.getByRole("button", { name: /중지/ }));
+    expect(within(section).getByRole("alert")).toHaveTextContent("초대 중지에 실패했습니다.");
+
+    rerender(
+      <MemberInvitationsSection
+        invitations={[expired]}
+        pendingCount={0}
+        onCreate={vi.fn(async () => undefined)}
+        onRevoke={onRevoke}
+        onReissue={onReissue}
+        busyId={null}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /재발송/ }));
+    expect(within(screen.getByRole("region", { name: "초대" })).getByRole("status")).toHaveTextContent(
+      "초대를 재발송했습니다.",
+    );
+
+    onReissue.mockRejectedValueOnce(new Error("reissue-failed"));
+    await user.click(screen.getByRole("button", { name: /재발송/ }));
+    expect(within(screen.getByRole("region", { name: "초대" })).getByRole("alert")).toHaveTextContent(
+      "재발송에 실패했습니다.",
+    );
+  });
 });
