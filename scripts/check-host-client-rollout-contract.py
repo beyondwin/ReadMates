@@ -1382,7 +1382,11 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     for path in D7_ADR_SOURCES:
         source = sources[path]
         number = Path(path).name[:4]
-        status_match = re.search(r"^- 상태: (Accepted|Proposed)$", source, re.MULTILINE)
+        status_match = re.search(
+            r"^- 상태: (Accepted|Proposed|Superseded by ADR-\d{4})$",
+            source,
+            re.MULTILINE,
+        )
         if status_match is None:
             errors.append(f"ADR-{number} has no supported status")
             continue
