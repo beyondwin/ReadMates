@@ -158,9 +158,15 @@
   display: inline-flex;
   align-items: center;
   min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--text-2);
+  font: inherit;
   text-decoration: underline;
   text-underline-offset: 3px;
+  cursor: pointer;
 }
 
 .rm-host-today__hero {

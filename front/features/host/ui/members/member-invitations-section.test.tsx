@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -210,5 +212,29 @@ describe("MemberInvitationsSection", () => {
     expect(within(screen.getByRole("region", { name: "초대" })).getByRole("alert")).toHaveTextContent(
       "재발송에 실패했습니다.",
     );
+  });
+
+  it("disables every invitation row action while any row is busy", () => {
+    render(
+      <MemberInvitationsSection
+        invitations={fourStateInvitations}
+        pendingCount={1}
+        onCreate={vi.fn(async () => undefined)}
+        onRevoke={vi.fn(async () => undefined)}
+        onReissue={vi.fn(async () => undefined)}
+        busyId="invite-1"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "pending@example.com 중지" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "expired@example.com 재발송" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "revoked@example.com 재발송" })).toBeDisabled();
+  });
+
+  it("reconstructs invitation rows as a 640px list in CSS without a horizontal-scroll table", () => {
+    const css = readFileSync(path.resolve("features/host/ui/members/member-ledger.css"), "utf8");
+    expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*\.rm-host-member-ledger__row[\s\S]*grid-template-areas:/);
+    expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*overflow-x:\s*hidden/);
+    expect(css).not.toMatch(/overflow-x:\s*auto/);
   });
 });

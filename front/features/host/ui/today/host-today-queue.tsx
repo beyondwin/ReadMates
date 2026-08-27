@@ -1,4 +1,5 @@
-import type { HostTodayQueueItem } from "@/features/host/model/host-today-model";
+import { useState } from "react";
+import { HOST_TODAY_QUEUE_CAP, type HostTodayQueueItem } from "@/features/host/model/host-today-model";
 import type { HostLinkComponent, HostLinkProps } from "@/features/host/ui/host-link-types";
 
 function DefaultLink({ to, children, ...props }: HostLinkProps) {
@@ -19,7 +20,6 @@ export function HostTodayQueue({
   items,
   totalCount,
   emptyCheckedAtLabel,
-  allHref,
   widgetError = false,
   onRetry,
   LinkComponent = DefaultLink,
@@ -27,11 +27,12 @@ export function HostTodayQueue({
   items: readonly HostTodayQueueItem[];
   totalCount: number;
   emptyCheckedAtLabel: string | null;
-  allHref: string;
   widgetError?: boolean;
   onRetry?: () => void;
   LinkComponent?: HostLinkComponent;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const visibleItems = expanded ? items : items.slice(0, HOST_TODAY_QUEUE_CAP);
   return (
     <section className="rm-host-today__queue" aria-label="처리할 일">
       <div className="rm-host-today__queue-head">
@@ -56,9 +57,9 @@ export function HostTodayQueue({
         </p>
       ) : null}
 
-      {items.length > 0 ? (
+      {visibleItems.length > 0 ? (
         <ul className="rm-host-today__queue-list">
-          {items.map((item) => (
+          {visibleItems.map((item) => (
             <li key={item.id} className="rm-host-today__queue-row">
               <span className={`rm-host-today__kind rm-host-today__kind--${item.kind}`}>
                 {KIND_LABEL[item.kind]}
@@ -79,10 +80,14 @@ export function HostTodayQueue({
         </ul>
       ) : null}
 
-      {!widgetError && totalCount > items.length ? (
-        <LinkComponent to={allHref} className="rm-host-today__queue-all">
+      {!widgetError && !expanded && items.length > HOST_TODAY_QUEUE_CAP ? (
+        <button
+          type="button"
+          className="rm-host-today__queue-all"
+          onClick={() => setExpanded(true)}
+        >
           전체 보기
-        </LinkComponent>
+        </button>
       ) : null}
     </section>
   );

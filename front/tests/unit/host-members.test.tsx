@@ -354,7 +354,9 @@ describe("HostMembersPage", () => {
     expect(activeRow.getByText("활동")).toBeInTheDocument();
     expect(activeRow.getByText("4개월")).toHaveClass("mono");
     expect(activeRow.getByText("이번 모임 참여")).toBeInTheDocument();
-    expect(activeRowElement).toHaveStyle({ minHeight: "44px" });
+    expect(activeRowElement).toHaveClass("rm-host-member-ledger__row");
+    const ledgerCss = readFileSync(path.resolve("features/host/ui/members/member-ledger.css"), "utf8");
+    expect(ledgerCss).toMatch(/\.rm-host-member-ledger__row\s*\{[^}]*min-height:\s*44px/s);
 
     const outsideRowElement = screen.getByText("새").closest("tr") as HTMLElement;
     const outsideRow = within(outsideRowElement);
@@ -1200,5 +1202,44 @@ describe("HostMembersPage", () => {
       "/api/bff/api/host/members/membership-active/profile?clubSlug=reading-sai",
       expect.objectContaining({ method: "PATCH" }),
     );
+  });
+
+  it("shows the refreshed invitation row after create instead of keeping an empty ledger", async () => {
+    const user = userEvent.setup();
+    const created: HostInvitationListItem = {
+      invitationId: "invite-new",
+      email: "new@example.com",
+      name: "새멤버",
+      role: "MEMBER",
+      status: "PENDING",
+      effectiveStatus: "PENDING",
+      expiresAt: "2026-05-20T12:00:00Z",
+      acceptedAt: null,
+      createdAt: "2026-04-20T12:00:00Z",
+      canRevoke: true,
+      canReissue: true,
+      applyToCurrentSession: true,
+    };
+    const invitationActions = {
+      ...noopHostInvitationsActions,
+      createInvitation: vi.fn(async () => new Response(JSON.stringify(created), { status: 201 })),
+      refreshInvitations: vi.fn(async () => ({ items: [created], nextCursor: null })),
+    };
+
+    render(
+      <HostMembersForTest
+        initialMembers={[members[0]]}
+        initialInvitations={[]}
+        invitationActions={invitationActions}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("이름"), "새멤버");
+    await user.type(screen.getByLabelText("초대 이메일"), "new@example.com");
+    await user.click(screen.getByRole("button", { name: "초대 보내기" }));
+
+    const invitations = screen.getByRole("region", { name: "초대" });
+    expect(await within(invitations).findByText("새멤버")).toBeInTheDocument();
+    expect(invitationActions.refreshInvitations).toHaveBeenCalledWith({ limit: 50 });
   });
 });

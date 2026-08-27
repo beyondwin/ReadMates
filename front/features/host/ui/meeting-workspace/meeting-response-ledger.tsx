@@ -50,7 +50,7 @@ const attendanceLabel: Record<MeetingAttendance, string> = {
 };
 
 function isPendingAttendance(attendance: MeetingAttendance): boolean {
-  return attendance !== "ATTENDED";
+  return attendance === "UNKNOWN";
 }
 
 export function MeetingResponseLedger({

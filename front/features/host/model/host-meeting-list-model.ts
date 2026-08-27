@@ -84,9 +84,8 @@ function upcomingSummary(item: Pick<TocSourceItem, "date">): string {
   return `${dateMmDd(item.date)} 예정일`;
 }
 
-function pastSummary(item: Pick<TocSourceItem, "state" | "date">): string {
-  // Past mono summary uses lifecycle + date only — no attendance tallies.
-  return `${hostMeetingLifecycleLabel(item.state)} · ${dateMmDd(item.date)}`;
+function pastSummary(item: Pick<TocSourceItem, "date">): string {
+  return dateMmDd(item.date);
 }
 
 function toTocRow(

@@ -12,6 +12,7 @@ const rows: MeetingResponseLedgerRow[] = [
 const meetingDayRows: MeetingResponseLedgerRow[] = [
   { membershipId: "pending-1", displayName: "지후", secondaryLabel: "참여자 1", response: "GOING", attendance: "UNKNOWN", attendanceRevision: 1, questionCount: null, recentResponseLabel: null },
   { membershipId: "pending-2", displayName: "수민", secondaryLabel: "참여자 2", response: "UNSURE", attendance: "UNKNOWN", attendanceRevision: 1, questionCount: null, recentResponseLabel: null },
+  { membershipId: "absent-1", displayName: "하준", secondaryLabel: "참여자 4", response: "NOT_GOING", attendance: "ABSENT", attendanceRevision: 1, questionCount: null, recentResponseLabel: null },
   { membershipId: "arrived-1", displayName: "서연", secondaryLabel: "참여자 3", response: "GOING", attendance: "ATTENDED", attendanceRevision: 2, questionCount: null, recentResponseLabel: null },
 ];
 
@@ -96,7 +97,7 @@ describe("MeetingResponseLedger", () => {
     const segments = screen.getByRole("group", { name: "출석 필터" });
     expect(within(segments).getByRole("button", { name: "아직 안 옴 2" })).toHaveAttribute("aria-pressed", "true");
     expect(within(segments).getByRole("button", { name: "도착 1" })).toHaveAttribute("aria-pressed", "false");
-    expect(within(segments).getByRole("button", { name: "전체 3" })).toHaveAttribute("aria-pressed", "false");
+    expect(within(segments).getByRole("button", { name: "전체 4" })).toHaveAttribute("aria-pressed", "false");
 
     expect(screen.getAllByRole("listitem")).toHaveLength(2);
     expect(screen.queryByLabelText(/실제 출석/)).not.toBeInTheDocument();
@@ -109,6 +110,7 @@ describe("MeetingResponseLedger", () => {
 
     await user.click(screen.getByRole("button", { name: "나머지 2명 모두 참석" }));
     expect(onBulkAttendanceChange).toHaveBeenCalledWith(["pending-1", "pending-2"], "ATTENDED");
+    expect(onBulkAttendanceChange.mock.calls[0]?.[0]).not.toContain("absent-1");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     rerender(

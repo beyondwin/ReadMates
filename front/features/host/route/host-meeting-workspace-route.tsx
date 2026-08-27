@@ -51,9 +51,13 @@ import { MeetingNotificationRail } from "@/features/host/ui/meeting-workspace/me
 import {
   MeetingResponseLedger,
   type MeetingAttendance,
-  type MeetingResponseLedgerRow,
 } from "@/features/host/ui/meeting-workspace/meeting-response-ledger";
-import { meetingResponseLedgerRowsFromAttendees } from "@/features/host/ui/meeting-workspace/meeting-response-ledger-rows";
+import {
+  meetingDayAttendanceWriteStateFromError,
+  meetingResponseLedgerRowsFromAttendees,
+  patchMeetingDayAttendanceWriteStates,
+  type MeetingDayAttendanceWriteState,
+} from "@/features/host/ui/meeting-workspace/meeting-response-ledger-rows";
 import { buildComposerSelection } from "@/features/host/model/host-notification-composer-model";
 import type { ManualNotificationOptionsResponse, ManualNotificationPreviewResponse } from "@/features/host/model/host-view-types";
 import {
@@ -238,20 +242,6 @@ function mapAttendanceToLedger(
   if (status === "ATTENDED") return "ATTENDED";
   if (status === "ABSENT") return "ABSENT";
   return "UNKNOWN";
-}
-
-function responseRowsFromAttendees(
-  attendees: HostSessionDetailResponse["attendees"],
-): MeetingResponseLedgerRow[] {
-  return meetingResponseLedgerRowsFromAttendees(attendees.map((attendee) => ({
-    membershipId: attendee.membershipId,
-    displayName: attendee.displayName,
-    accountName: attendee.accountName,
-    rsvpStatus: attendee.rsvpStatus,
-    attendanceStatus: mapAttendanceToLedger(attendee.attendanceStatus),
-    attendanceRevision: attendee.attendanceRevision,
-    participationStatus: attendee.participationStatus,
-  })));
 }
 
 export function HostMeetingWorkspaceRoute({
@@ -473,6 +463,9 @@ export function HostMeetingWorkspaceRoute({
   const lifecycleRestoreFocusRef = useRef<HTMLElement | null>(null);
   const measuredRouteIdentityRef = useRef<string | null>(null);
   const editorPrimaryActionRef = useRef<(() => void) | null>(null);
+  const [attendanceWriteStates, setAttendanceWriteStates] = useState<
+    ReadonlyMap<string, MeetingDayAttendanceWriteState>
+  >(() => new Map());
 
   useInsertionEffect(() => {
     if (!baseQuery.data || measuredRouteIdentityRef.current === routeIdentity) return;
@@ -616,7 +609,18 @@ export function HostMeetingWorkspaceRoute({
         : { kind: "loading" as const }
     : null;
 
-  const responseRows = responseRowsFromAttendees(activeAttendees);
+  const responseRows = meetingResponseLedgerRowsFromAttendees(
+    activeAttendees.map((attendee) => ({
+      membershipId: attendee.membershipId,
+      displayName: attendee.displayName,
+      accountName: attendee.accountName,
+      rsvpStatus: attendee.rsvpStatus,
+      attendanceStatus: mapAttendanceToLedger(attendee.attendanceStatus),
+      attendanceRevision: attendee.attendanceRevision,
+      participationStatus: attendee.participationStatus,
+    })),
+    attendanceWriteStates,
+  );
   const showNotificationRail = diary.currentStep === "prepare" || diary.currentStep === "responses";
   const notificationWorkbenchHref = `/app/host/notifications?${new URLSearchParams({
     sessionId,
@@ -1008,13 +1012,23 @@ export function HostMeetingWorkspaceRoute({
     attendance: MeetingAttendance,
   ) => {
     if (membershipIds.length === 0) return;
-    await editorActions.updateAttendance(
-      sessionId,
-      membershipIds.map((membershipId) => ({
-        membershipId,
-        attendanceStatus: attendance,
-      })),
-    );
+    setAttendanceWriteStates((current) => patchMeetingDayAttendanceWriteStates(current, membershipIds, "saving"));
+    try {
+      await editorActions.updateAttendance(
+        sessionId,
+        membershipIds.map((membershipId) => ({
+          membershipId,
+          attendanceStatus: attendance,
+        })),
+      );
+      setAttendanceWriteStates((current) => patchMeetingDayAttendanceWriteStates(current, membershipIds, null));
+    } catch (error) {
+      setAttendanceWriteStates((current) => patchMeetingDayAttendanceWriteStates(
+        current,
+        membershipIds,
+        meetingDayAttendanceWriteStateFromError(error),
+      ));
+    }
   };
 
   const meetingDayAttendanceLedger = diary.currentStep === "meetingDay" ? (

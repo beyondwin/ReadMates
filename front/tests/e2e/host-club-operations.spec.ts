@@ -557,8 +557,7 @@ test.describe("focus workspace recovery journey", () => {
       });
     });
     await hostCheckin.click();
-    // Diary meeting-day ledger does not yet surface row writeState from route mutations;
-    // rejected saves must leave the check-in control available to retry.
+    await expect(page.getByText("최신 출석 상태와 충돌했습니다. 새로 확인해 주세요.")).toBeVisible();
     await expect(hostCheckin).toBeVisible();
     await expect(hostCheckin).toBeEnabled();
 

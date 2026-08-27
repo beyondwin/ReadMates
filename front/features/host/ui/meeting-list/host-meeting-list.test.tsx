@@ -23,7 +23,7 @@ const pastRow: HostMeetingTocRow = {
   title: "소년이 온다",
   lifecycleLabel: "기록 정리 중",
   attentionLabel: "기록 확인 필요",
-  summary: "기록 정리 중 · 08-15",
+  summary: "08-15",
   href: "/app/host/sessions/closed-1",
 };
 
@@ -63,6 +63,7 @@ describe("HostMeetingList", () => {
     const upcomingItem = within(upcoming).getByRole("listitem");
     expect(upcomingItem.querySelector(".rm-meeting-toc__no.mono")).toHaveTextContent("No.7");
     expect(upcomingItem.querySelector(".rm-meeting-toc__leader")).toHaveAttribute("aria-hidden");
+    expect(upcomingItem.querySelector(".rm-meeting-toc__lifecycle")).toHaveTextContent("준비 중");
     expect(upcomingItem.querySelector(".rm-meeting-toc__summary.mono")).toHaveTextContent("08-30 예정일");
     expect(within(upcomingItem).getByRole("link", { name: "지구 끝의 온실" })).toHaveAttribute(
       "href",
@@ -73,7 +74,8 @@ describe("HostMeetingList", () => {
     const pastItem = within(past).getByRole("listitem");
     expect(pastItem.querySelector(".rm-meeting-toc__no.mono")).toHaveTextContent("No.6");
     expect(pastItem.querySelector(".rm-meeting-toc__leader")).toHaveAttribute("aria-hidden");
-    expect(pastItem.querySelector(".rm-meeting-toc__summary.mono")).toHaveTextContent("기록 정리 중 · 08-15");
+    expect(pastItem.querySelector(".rm-meeting-toc__summary.mono")).toHaveTextContent("08-15");
+    expect(pastItem.querySelector(".rm-meeting-toc__lifecycle")).toHaveTextContent("기록 정리 중");
     expect(within(pastItem).getByText("기록 확인 필요")).toBeInTheDocument();
   });
 
@@ -98,17 +100,23 @@ describe("HostMeetingList", () => {
     expect(screen.queryByRole("link", { name: "휴지통" })).not.toBeInTheDocument();
   });
 
-  it("shows a retryable inline failure instead of the first-meeting empty state", async () => {
+  it("shows a retryable upcoming-section failure without hiding the past archive", async () => {
     const onRetry = vi.fn();
     renderList({
-      sections: emptySections,
+      sections: {
+        upcoming: { rows: [], nextCursor: null },
+        past: { rows: [pastRow], nextCursor: null },
+      },
       errorMessage: "모임을 불러오지 못했습니다.",
       onRetry,
     });
 
-    expect(screen.getByText("모임을 불러오지 못했습니다.")).toBeInTheDocument();
+    const upcoming = screen.getByRole("region", { name: "다가오는 모임" });
+    expect(within(upcoming).getByText("모임을 불러오지 못했습니다.")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "지난 모임" })).toBeInTheDocument();
+    expect(screen.getByText("소년이 온다")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "첫 모임 만들기" })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    await userEvent.click(within(upcoming).getByRole("button", { name: "다시 시도" }));
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
@@ -224,7 +232,8 @@ describe("HostMeetingList", () => {
         onRetry={vi.fn()}
       />,
     );
-    expect(document.querySelector(".rm-meeting-toc__state")).toHaveAttribute("role", "alert");
+    const upcoming = screen.getByRole("region", { name: "다가오는 모임" });
+    expect(within(upcoming).getByRole("alert")).toHaveTextContent("모임을 불러오지 못했습니다.");
     expect(screen.getByRole("button", { name: "다시 시도" }).closest(".rm-meeting-toc")).not.toBeNull();
   });
 

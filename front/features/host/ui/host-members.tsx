@@ -127,7 +127,7 @@ export default function HostMembers({
 
   const revokeInvitation = async (invitationId: string) => {
     if (invitationBusyId) {
-      return;
+      throw new Error("invitation-busy");
     }
 
     setInvitationBusyId(invitationId);
@@ -144,7 +144,7 @@ export default function HostMembers({
 
   const reissueInvitation = async (invitation: HostInvitationListItem) => {
     if (invitationBusyId) {
-      return;
+      throw new Error("invitation-busy");
     }
 
     setInvitationBusyId(invitation.invitationId);

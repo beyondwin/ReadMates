@@ -40,9 +40,8 @@ export function createHostInvitationsActions(
   context: { clubSlug: string },
 ): HostInvitationsActions {
   const refreshInvitations = async (page: Parameters<HostInvitationsActions["refreshInvitations"]>[0]) => {
-    const nextPage = await client.fetchQuery(hostInvitationListQuery(page, context));
     await invalidateHostInvitations(client, context);
-    return nextPage;
+    return client.fetchQuery(hostInvitationListQuery(page, context));
   };
 
   return {

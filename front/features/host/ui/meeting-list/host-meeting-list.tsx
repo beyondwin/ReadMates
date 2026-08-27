@@ -109,9 +109,10 @@ export function HostMeetingList({
   const headingRef = useRef<HTMLHeadingElement>(null);
   const previousFocusRevision = useRef(focusHeadingRevision);
   const isEmpty = !pastErrorMessage
+    && !errorMessage
     && sections.upcoming.rows.length === 0
     && sections.past.rows.length === 0;
-  const showCreate = !loading && !errorMessage && !isEmpty;
+  const showCreate = !loading && !isEmpty;
 
   useEffect(() => {
     if (focusHeadingRevision > previousFocusRevision.current) {
@@ -151,15 +152,7 @@ export function HostMeetingList({
         <p className="sr-only" role="status" aria-live="polite">
           {announcement}
         </p>
-        {errorMessage ? (
-          <div className="rm-empty-state rm-meeting-toc__state" role="alert">
-            <h2 className="h3 editorial rm-meeting-toc__state-title">모임을 불러오지 못했습니다</h2>
-            <p className="small">{errorMessage}</p>
-            <button type="button" className="btn btn-primary" onClick={onRetry}>
-              다시 시도
-            </button>
-          </div>
-        ) : loading ? (
+        {loading ? (
           <div className="rm-empty-state rm-meeting-toc__state" role="status">
             모임을 불러오는 중
           </div>
@@ -179,6 +172,8 @@ export function HostMeetingList({
               loadingMore={loadingMoreUpcoming}
               onLoadMore={onLoadMoreUpcoming}
               emptyCopy="다가오는 모임이 없습니다."
+              errorMessage={errorMessage}
+              onRetry={onRetry}
               LinkComponent={LinkComponent}
             />
             <TocSection

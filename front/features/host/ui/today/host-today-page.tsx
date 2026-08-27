@@ -181,7 +181,6 @@ export function HostTodayPage({
             items={view.queue.items}
             totalCount={view.queue.totalCount}
             emptyCheckedAtLabel={view.queue.emptyCheckedAtLabel}
-            allHref={view.queue.allHref}
             widgetError={Boolean(widgetErrors?.queue)}
             onRetry={onRetryQueue}
             LinkComponent={LinkComponent}

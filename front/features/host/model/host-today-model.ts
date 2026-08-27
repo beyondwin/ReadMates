@@ -37,7 +37,7 @@ export type HostTodayView = {
   upcoming: Array<{ sessionId: string; ordinalLabel: string; date: string; href: string }>;
 };
 
-const QUEUE_CAP = 7;
+export const HOST_TODAY_QUEUE_CAP = 7;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export function buildHostTodayView(input: {
@@ -58,7 +58,7 @@ export function buildHostTodayView(input: {
     operations: input.operations,
   });
   const totalCount = composed.length;
-  const items = composed.slice(0, QUEUE_CAP);
+  const items = composed;
 
   const nextMeeting = buildNextMeeting(input.meetings, input.today, basePath);
   const daysUntil = nextMeeting
@@ -72,7 +72,7 @@ export function buildHostTodayView(input: {
       items,
       totalCount,
       emptyCheckedAtLabel: totalCount === 0 ? input.now : null,
-      allHref: hostPath(basePath, "/operations"),
+      allHref: hostPath(basePath, "/sessions"),
     },
     upcoming: buildUpcoming(input.meetings, input.today, basePath, nextMeeting?.sessionId ?? null),
   };
@@ -173,7 +173,7 @@ function readinessQueueItem(
 
 function readinessResolveHref(basePath: string, nextAction: string | null): string {
   if (!nextAction) {
-    return hostPath(basePath, "/operations");
+    return hostPath(basePath, "/sessions");
   }
   if (nextAction.startsWith("/app/host")) {
     return hostPath(basePath, nextAction.slice("/app/host".length) || "/");
@@ -188,7 +188,7 @@ function readinessResolveHref(basePath: string, nextAction: string | null): stri
     case "NOTIFICATIONS":
       return hostPath(basePath, "/notifications");
     default:
-      return hostPath(basePath, "/operations");
+      return hostPath(basePath, "/sessions");
   }
 }
 
@@ -237,6 +237,9 @@ function buildHeadline(daysUntil: number | null, queueCount: number): string {
   const queuePart = `처리할 일 ${queueCount}건`;
   if (daysUntil === null) {
     return `다음 모임 없음 · ${queuePart}`;
+  }
+  if (daysUntil < 0) {
+    return `모임일이 지났습니다 · ${queuePart}`;
   }
   return `다음 모임까지 ${daysUntil}일 · ${queuePart}`;
 }

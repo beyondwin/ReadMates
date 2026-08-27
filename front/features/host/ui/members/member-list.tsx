@@ -280,8 +280,8 @@ export function MemberList({
             const sessionBadge = renderCurrentSessionBadge(member);
 
             return (
-              <tr key={member.membershipId} className="rm-host-member-ledger__row" style={{ minHeight: 44, height: 44 }}>
-                <td>
+              <tr key={member.membershipId} className="rm-host-member-ledger__row">
+                <td className="rm-host-member-ledger__fact">
                   <div className="rm-host-member-ledger__name">
                     <AvatarChip
                       avatarKey={member.status === "LEFT" ? "cloud-green-book" : member.avatarKey}
@@ -293,16 +293,16 @@ export function MemberList({
                     {member.role === "HOST" ? <span className="badge badge-accent badge-dot">호스트</span> : null}
                   </div>
                 </td>
-                <td>
+                <td className="rm-host-member-ledger__status">
                   <span className={statusBadgeClass(member.status)}>{rosterStatusLabels[member.status]}</span>
                 </td>
-                <td className="rm-host-member-ledger__num">
+                <td className="rm-host-member-ledger__num rm-host-member-ledger__time">
                   <span className="mono">{formatMembershipTenure(member.joinedAt)}</span>
                 </td>
-                <td>
+                <td className="rm-host-member-ledger__meta">
                   <span className={sessionBadge.className}>{sessionBadge.label}</span>
                 </td>
-                <td>
+                <td className="rm-host-member-ledger__manage">
                   <div className="rm-host-member-ledger__actions">
                     {renderProfileAction(member)}
                     {renderActions(member)}

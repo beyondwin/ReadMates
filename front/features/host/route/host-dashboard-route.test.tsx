@@ -452,4 +452,41 @@ describe("HostDashboardRoute", () => {
     });
     expect(await screen.findByRole("button", { name: "되돌리기" })).toBeVisible();
   });
+
+  it("surfaces a retryable conflict when meeting-day attendance write is rejected", async () => {
+    const user = userEvent.setup();
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    routeMocks.hostSessions = {
+      items: [{ sessionId: "open-today", state: "OPEN", date: today }],
+      nextCursor: null,
+    };
+    routeMocks.sessionDetail = {
+      sessionId: "open-today",
+      attendees: [
+        {
+          membershipId: "m-1",
+          displayName: "지후",
+          accountName: "reader-a",
+          rsvpStatus: "GOING",
+          attendanceStatus: "UNKNOWN",
+          attendanceRevision: 1,
+          participationStatus: "ACTIVE",
+        },
+      ],
+    };
+    routeMocks.updateAttendance.mockRejectedValueOnce({
+      status: 409,
+      code: "CONFLICT",
+      message: "요청한 작업이 현재 상태와 충돌합니다.",
+    });
+
+    renderRoute();
+
+    const hero = screen.getByRole("region", { name: "오늘 모임" });
+    const hostCheckin = within(hero).getByRole("button", { name: /지후/ });
+    await user.click(hostCheckin);
+    expect(await screen.findByRole("alert")).toHaveTextContent("최신 출석 상태와 충돌했습니다. 새로 확인해 주세요.");
+    expect(hostCheckin).toBeEnabled();
+  });
 });

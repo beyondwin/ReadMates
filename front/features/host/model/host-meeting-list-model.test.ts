@@ -78,7 +78,7 @@ describe("buildHostMeetingTocSections", () => {
     expect(sections.upcoming.rows[0]?.lifecycleLabel).toBe("준비 중");
   });
 
-  it("summarizes past rows from record status and date only (no invented tallies)", () => {
+  it("summarizes past rows with date only so the lifecycle chip is not doubled", () => {
     const sections = buildHostMeetingTocSections({
       basePath,
       upcomingItems: [],
@@ -86,7 +86,9 @@ describe("buildHostMeetingTocSections", () => {
       pastItems: [closedItem(24)],
       pastCursor: null,
     });
-    expect(sections.past.rows[0]?.summary).toMatch(/기록 정리 중/);
+    expect(sections.past.rows[0]?.lifecycleLabel).toBe("기록 정리 중");
+    expect(sections.past.rows[0]?.summary).toBe("08-15");
+    expect(sections.past.rows[0]?.summary).not.toMatch(/기록 정리 중/);
   });
 
   it("carries attention as text, not color-only", () => {

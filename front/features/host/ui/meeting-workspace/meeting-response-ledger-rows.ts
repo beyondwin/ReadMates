@@ -4,6 +4,8 @@ import type {
   MeetingResponseLedgerRow,
 } from "./meeting-response-ledger";
 
+export type MeetingDayAttendanceWriteState = NonNullable<MeetingResponseLedgerRow["writeState"]>;
+
 function mapRsvpToLedgerResponse(
   status: MeetingResponseLedgerAttendeeInput["rsvpStatus"],
 ): MeetingResponseLedgerRow["response"] {
@@ -13,8 +15,37 @@ function mapRsvpToLedgerResponse(
   return "NO_RESPONSE";
 }
 
+export function meetingDayAttendanceWriteStateFromError(error: unknown): "conflict" | "error" {
+  if (!error || typeof error !== "object") {
+    return "error";
+  }
+  const status = "status" in error ? Number((error as { status?: unknown }).status) : Number.NaN;
+  const code = "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
+  if (status === 409 || code === "CONFLICT" || code === "REVISION_CONFLICT") {
+    return "conflict";
+  }
+  return "error";
+}
+
+export function patchMeetingDayAttendanceWriteStates(
+  current: ReadonlyMap<string, MeetingDayAttendanceWriteState>,
+  membershipIds: ReadonlyArray<string>,
+  state: MeetingDayAttendanceWriteState | null,
+): Map<string, MeetingDayAttendanceWriteState> {
+  const next = new Map(current);
+  for (const membershipId of membershipIds) {
+    if (state == null) {
+      next.delete(membershipId);
+    } else {
+      next.set(membershipId, state);
+    }
+  }
+  return next;
+}
+
 export function meetingResponseLedgerRowsFromAttendees(
   attendees: ReadonlyArray<MeetingResponseLedgerAttendeeInput>,
+  writeStates?: ReadonlyMap<string, MeetingDayAttendanceWriteState>,
 ): MeetingResponseLedgerRow[] {
   return attendees
     .filter((attendee) => (attendee.participationStatus ?? "ACTIVE") === "ACTIVE")
@@ -27,6 +58,7 @@ export function meetingResponseLedgerRowsFromAttendees(
       attendanceRevision: attendee.attendanceRevision,
       questionCount: null,
       recentResponseLabel: null,
+      writeState: writeStates?.get(attendee.membershipId),
     }));
 }
 

@@ -121,7 +121,7 @@ export function getSessionClosingBoardView(status: SessionClosingStatusInput): S
         tone: checklistTone(item.state),
         href: item.href,
         actionLabel: checklistActionLabel(id, item.href),
-        completedStamp: completedStamp(id, item.state, status, evidence),
+        completedStamp: completedStamp(id, item.state, status),
       }];
     }),
     surfaces: surfaceCards(status),
@@ -224,7 +224,6 @@ function completedStamp(
   id: (typeof DIARY_CHECKLIST_ORDER)[number],
   state: SessionClosingStatusInput["checklist"][number]["state"],
   status: SessionClosingStatusInput,
-  evidence: SessionClosingBoardView["evidence"],
 ): string | null {
   if (state !== "DONE") return null;
   switch (id) {
@@ -232,15 +231,12 @@ function completedStamp(
       return status.session.meetingDate;
     case "MEMBER_NOTIFICATION_SENT": {
       const createdAt = status.evidence.latestNotificationEvent?.createdAt;
-      if (createdAt) return createdAt;
-      return evidence.find((item) => item.label === "최근 멤버 알림")?.value ?? null;
+      return createdAt ?? null;
     }
     case "RECORD_PACKAGE_SAVED":
-      return evidence.find((item) => item.label === "공개 요약")?.value ?? null;
     case "FEEDBACK_DOCUMENT_READY":
-      return evidence.find((item) => item.label === "피드백 문서")?.value ?? null;
     case "PUBLIC_RECORD_VISIBLE":
-      return status.session.state === "PUBLISHED" ? "게시됨" : "확인됨";
+      return null;
     default:
       return null;
   }

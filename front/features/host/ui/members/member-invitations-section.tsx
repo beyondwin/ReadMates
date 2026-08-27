@@ -244,7 +244,7 @@ export function MemberInvitationsSection({
             <tbody>
               {invitations.map((item) => {
                 const revealed = revealedIds.has(item.invitationId);
-                const rowBusy = busyId === item.invitationId || isCreating;
+                const rowBusy = busyId !== null || isCreating;
                 const timestamp =
                   item.effectiveStatus === "ACCEPTED" && item.acceptedAt
                     ? `수락 ${formatDateOnlyLabel(item.acceptedAt)}`
@@ -252,12 +252,12 @@ export function MemberInvitationsSection({
 
                 return (
                   <tr key={item.invitationId} className="rm-host-member-ledger__row">
-                    <td>
+                    <td className="rm-host-member-ledger__fact">
                       <span className="h4" style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>
                         {item.name}
                       </span>
                     </td>
-                    <td>
+                    <td className="rm-host-member-ledger__meta">
                       <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                         <span className="small" style={{ margin: 0 }}>
                           {revealed ? item.email : maskInvitationEmail(item.email)}
@@ -273,7 +273,7 @@ export function MemberInvitationsSection({
                         ) : null}
                       </div>
                     </td>
-                    <td>
+                    <td className="rm-host-member-ledger__status">
                       <div className="stack" style={{ "--stack": "2px" } as CSSProperties}>
                         <span className={inviteStatusClass(item.effectiveStatus)}>
                           {statusLabels[item.effectiveStatus]}
@@ -283,8 +283,8 @@ export function MemberInvitationsSection({
                         </span>
                       </div>
                     </td>
-                    <td className="rm-host-member-ledger__num">{timestamp}</td>
-                    <td>
+                    <td className="rm-host-member-ledger__num rm-host-member-ledger__time">{timestamp}</td>
+                    <td className="rm-host-member-ledger__manage">
                       <div className="rm-host-member-ledger__actions">
                         <button
                           type="button"

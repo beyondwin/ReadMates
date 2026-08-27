@@ -73,15 +73,16 @@ describe("buildHostTodayView", () => {
     expect(view.queue.emptyCheckedAtLabel).toBe("09:00");
   });
 
-  it("maps needs-attention records into resolve rows capped at 7", () => {
+  it("maps needs-attention records into resolve rows and keeps overflow on the same page", () => {
     const items = Array.from({ length: 9 }, (_, i) => makeLedgerItem(`s${i}`));
     const view = buildHostTodayView({
       ...base,
       attention: { items, summary: { needsAttentionCount: 9, incompletePublishedCount: 0, draftCount: 0 } },
     });
-    expect(view.queue.items).toHaveLength(7);
+    expect(view.queue.items).toHaveLength(9);
     expect(view.queue.totalCount).toBe(9);
     expect(view.queue.items[0]?.resolveLabel).not.toHaveLength(0);
+    expect(view.queue.allHref).toBe("/clubs/reading/app/host/sessions");
   });
 
   it("promotes the meeting-day flag when the active meeting is today", () => {
@@ -108,5 +109,24 @@ describe("buildHostTodayView", () => {
     expect(view.queue.items.map((i) => i.kind)).toEqual(
       expect.arrayContaining(["notification", "readiness"]),
     );
+  });
+
+  it("points unreadiness and ops overflow at sessions instead of a self-redirect", () => {
+    const view = buildHostTodayView({
+      ...base,
+      operations: makeSnapshotWithBlockingReason("다음 모임 없음"),
+    });
+    expect(view.queue.items[0]?.resolveHref).toBe("/clubs/reading/app/host/sessions");
+    expect(view.queue.allHref).toBe("/clubs/reading/app/host/sessions");
+  });
+
+  it("uses a non-negative overdue branch when the active OPEN meeting date has passed", () => {
+    const view = buildHostTodayView({
+      ...base,
+      today: "2026-09-10",
+      meetings: [{ sessionId: "s1", state: "OPEN", date: "2026-09-01" }],
+    });
+    expect(view.headline).toBe("모임일이 지났습니다 · 처리할 일 0건");
+    expect(view.headline).not.toMatch(/-\d/);
   });
 });

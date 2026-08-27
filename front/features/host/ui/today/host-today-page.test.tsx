@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import type { HostTodayView } from "@/features/host/model/host-today-model";
 import { HostTodayPage } from "./host-today-page";
@@ -38,7 +39,7 @@ const viewWithTwoQueueItems: HostTodayView = {
     ],
     totalCount: 2,
     emptyCheckedAtLabel: null,
-    allHref: "/app/host/operations",
+    allHref: "/app/host/sessions",
   },
   upcoming: [
     {
@@ -57,7 +58,7 @@ const emptyQueueView: HostTodayView = {
     items: [],
     totalCount: 0,
     emptyCheckedAtLabel: "09:00",
-    allHref: "/app/host/operations",
+    allHref: "/app/host/sessions",
   },
   upcoming: [],
 };
@@ -135,5 +136,41 @@ describe("HostTodayPage", () => {
     const hero = screen.getByRole("region", { name: "오늘 모임" });
     expect(within(hero).getByRole("region", { name: "당일 출석 명단" })).toHaveTextContent("원탭 명단");
     expect(TODAY_CSS).toMatch(/\.rm-host-today__meeting-day-roster/);
+  });
+
+  it("points 운영 기록 전체 보기 at sessions and expands the in-page queue past the cap", async () => {
+    const user = userEvent.setup();
+    const overflowView: HostTodayView = {
+      ...viewWithTwoQueueItems,
+      headline: "다음 모임까지 9일 · 처리할 일 8건",
+      queue: {
+        ...viewWithTwoQueueItems.queue,
+        totalCount: 8,
+        items: Array.from({ length: 8 }, (_, index) => ({
+          id: `record:session-${index}`,
+          kind: "record" as const,
+          title: `대기 책 ${index}`,
+          detail: "초안이 남아 있습니다",
+          agedLabel: "1일 경과",
+          resolveHref: `/app/host/sessions/session-${index}?section=records`,
+          resolveLabel: "기록 마저 쓰기",
+        })),
+      },
+    };
+
+    render(<HostTodayPage view={overflowView} />);
+
+    const opsLinks = screen.getAllByRole("link", { name: "운영 기록 전체 보기" });
+    expect(opsLinks.length).toBeGreaterThan(0);
+    for (const link of opsLinks) {
+      expect(link).toHaveAttribute("href", "/app/host/sessions");
+    }
+
+    const queue = screen.getByRole("region", { name: "처리할 일" });
+    expect(within(queue).getAllByRole("listitem")).toHaveLength(7);
+    expect(within(queue).queryByRole("link", { name: "전체 보기" })).not.toBeInTheDocument();
+    await user.click(within(queue).getByRole("button", { name: "전체 보기" }));
+    expect(within(queue).getAllByRole("listitem")).toHaveLength(8);
+    expect(within(queue).queryByRole("button", { name: "전체 보기" })).not.toBeInTheDocument();
   });
 });

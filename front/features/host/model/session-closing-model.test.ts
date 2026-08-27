@@ -247,6 +247,65 @@ describe("getSessionClosingBoardView", () => {
     expect(displayStrings(view)).not.toContain("ADMIN_ROUTE");
     expect(displayStrings(view)).not.toContain("{\"");
   });
+
+  it("leaves the stamp slot blank when a closing step has no real timestamp", () => {
+    const view = getSessionClosingBoardView({
+      ...baseStatus,
+      session: { ...baseStatus.session, state: "PUBLISHED" },
+      evidence: {
+        ...baseStatus.evidence,
+        summaryPublished: true,
+        feedbackDocumentState: "AVAILABLE",
+        latestNotificationEvent: null,
+      },
+      checklist: [
+        {
+          id: "SESSION_CLOSED",
+          state: "DONE",
+          label: "Session closed",
+          detail: "닫힘",
+          href: "/app/host/sessions/s1/edit",
+        },
+        {
+          id: "MEMBER_NOTIFICATION_SENT",
+          state: "DONE",
+          label: "Member notification",
+          detail: "완료",
+          href: "/app/host/notifications",
+        },
+        {
+          id: "RECORD_PACKAGE_SAVED",
+          state: "DONE",
+          label: "Record package",
+          detail: "저장됨",
+          href: null,
+        },
+        {
+          id: "FEEDBACK_DOCUMENT_READY",
+          state: "DONE",
+          label: "Feedback",
+          detail: "열람 가능",
+          href: null,
+        },
+        {
+          id: "PUBLIC_RECORD_VISIBLE",
+          state: "DONE",
+          label: "Public",
+          detail: "게시됨",
+          href: "/app/host/sessions/s1/edit",
+        },
+      ],
+    });
+
+    expect(view.checklist[0]?.label).toBe("출석 확정");
+    expect(view.checklist[1]?.label).toBe("소감 수집");
+    expect(view.checklist[0]?.completedStamp).toBe("2026-06-18");
+    expect(view.checklist[1]?.completedStamp).toBeNull();
+    expect(view.checklist[2]?.completedStamp).toBeNull();
+    expect(view.checklist[3]?.completedStamp).toBeNull();
+    expect(view.checklist[4]?.completedStamp).toBeNull();
+    expect(view.checklist.map((item) => item.completedStamp).join(" ")).not.toMatch(/저장됨|열람 가능|게시됨|확인됨/);
+  });
 });
 
 function displayStrings(value: unknown): string {

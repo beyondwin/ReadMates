@@ -30,7 +30,12 @@ import {
   MeetingResponseLedger,
   type MeetingAttendance,
 } from "@/features/host/ui/meeting-workspace/meeting-response-ledger";
-import { meetingResponseLedgerRowsFromAttendees } from "@/features/host/ui/meeting-workspace/meeting-response-ledger-rows";
+import {
+  meetingDayAttendanceWriteStateFromError,
+  meetingResponseLedgerRowsFromAttendees,
+  patchMeetingDayAttendanceWriteStates,
+  type MeetingDayAttendanceWriteState,
+} from "@/features/host/ui/meeting-workspace/meeting-response-ledger-rows";
 import type { WorkspacePendingUndo } from "@/features/host/ui/session-workspace/workspace-undo-bar";
 import { HOST_HOME_ATTENTION_LIMIT, type HostDashboardRouteData } from "./host-dashboard-data";
 import "@/features/host/ui/today/host-today.css";
@@ -159,30 +164,43 @@ export function HostDashboardRoute({
     description: string;
     error: string | null;
   } | null>(null);
+  const [attendanceWriteStates, setAttendanceWriteStates] = useState<
+    ReadonlyMap<string, MeetingDayAttendanceWriteState>
+  >(() => new Map());
 
   const commitMeetingDayAttendance = useCallback(async (
     membershipIds: ReadonlyArray<string>,
     attendance: MeetingAttendance,
   ) => {
     if (!meetingDaySessionId || membershipIds.length === 0) return;
-    const result = await updateAttendance({
-      sessionId: meetingDaySessionId,
-      attendance: membershipIds.map((membershipId) => ({
-        membershipId,
-        attendanceStatus: attendance,
-      })),
-    });
-    const receipt = result.changeReceipt ?? null;
-    if (receipt?.undoAvailable) {
-      setPendingAttendanceUndo({
+    setAttendanceWriteStates((current) => patchMeetingDayAttendanceWriteStates(current, membershipIds, "saving"));
+    try {
+      const result = await updateAttendance({
         sessionId: meetingDaySessionId,
-        receipt,
-        description: hostSessionChangeUndoDescription("ATTENDANCE"),
-        error: null,
+        attendance: membershipIds.map((membershipId) => ({
+          membershipId,
+          attendanceStatus: attendance,
+        })),
       });
-      return;
+      setAttendanceWriteStates((current) => patchMeetingDayAttendanceWriteStates(current, membershipIds, null));
+      const receipt = result.changeReceipt ?? null;
+      if (receipt?.undoAvailable) {
+        setPendingAttendanceUndo({
+          sessionId: meetingDaySessionId,
+          receipt,
+          description: hostSessionChangeUndoDescription("ATTENDANCE"),
+          error: null,
+        });
+        return;
+      }
+      setPendingAttendanceUndo(null);
+    } catch (error) {
+      setAttendanceWriteStates((current) => patchMeetingDayAttendanceWriteStates(
+        current,
+        membershipIds,
+        meetingDayAttendanceWriteStateFromError(error),
+      ));
     }
-    setPendingAttendanceUndo(null);
   }, [meetingDaySessionId, updateAttendance]);
 
   const meetingDayPendingUndo: WorkspacePendingUndo | null = pendingAttendanceUndo
@@ -232,7 +250,10 @@ export function HostDashboardRoute({
   const meetingDayAttendance = meetingDaySessionId && meetingDayDetailQuery.data ? (
     <MeetingResponseLedger
       presentation="meetingDay"
-      rows={meetingResponseLedgerRowsFromAttendees(meetingDayDetailQuery.data.attendees)}
+      rows={meetingResponseLedgerRowsFromAttendees(
+        meetingDayDetailQuery.data.attendees,
+        attendanceWriteStates,
+      )}
       onAttendanceChange={(membershipId, attendance) => {
         void commitMeetingDayAttendance([membershipId], attendance);
       }}
