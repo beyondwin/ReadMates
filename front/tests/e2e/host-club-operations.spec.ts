@@ -475,7 +475,7 @@ test.describe("focus workspace recovery journey", () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await openWorkspace(page, sessionId);
 
-    await expect(page.getByText("작성 중")).toBeVisible();
+    await expect(page.getByText("작성 중", { exact: true })).toBeVisible();
     await expect(visibleButton(page, "멤버와 준비 시작")).toHaveCount(1);
     await expectNoLegacyEditorChrome(page);
     await expectOneMainAndOrderedHeadings(page);
@@ -517,13 +517,13 @@ test.describe("focus workspace recovery journey", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openWorkspace(page, sessionId);
 
-    await expect(page.getByText("준비 중")).toBeVisible();
+    await expect(page.getByText("준비 중", { exact: true })).toBeVisible();
     await expect(page.getByRole("region", { name: "지금 할 일" }).getByRole("heading", { name: "멤버 응답 확인하기" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "참여자 기록" })).toBeVisible();
     await expect(page.getByRole("status", { name: "참석 응답 합계" })).toContainText("미응답 6");
     await page.waitForTimeout(500);
-    await expect(page.getByText("준비 중")).toBeVisible();
-    await expect(page.getByText("기록 정리 중")).toHaveCount(0);
+    await expect(page.getByText("준비 중", { exact: true })).toBeVisible();
+    await expect(page.getByText("기록 정리 중", { exact: true })).toHaveCount(0);
     const state = runMysql(`select state from sessions where id = '${sessionId}';`)
       .trim()
       .split("\n")
@@ -578,7 +578,7 @@ test.describe("focus workspace recovery journey", () => {
     await expect(finish).toBeVisible();
     await finish.click();
     await confirmLifecycle(page, "모임 마치기", "모임 마치기");
-    await expect(page.getByText("기록 정리 중")).toBeVisible();
+    await expect(page.getByText("기록 정리 중", { exact: true })).toBeVisible();
   });
 
   test("CLOSED JSON upload previews, drafts, applies, and publishes in one workspace", async ({ page }) => {
@@ -593,7 +593,7 @@ test.describe("focus workspace recovery journey", () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await openWorkspace(page, sessionId);
 
-    await expect(page.getByText("기록 정리 중")).toBeVisible();
+    await expect(page.getByText("기록 정리 중", { exact: true })).toBeVisible();
     await visibleButton(page, "정리본 올리기").click();
     await expect(page.getByRole("heading", { name: "정리본" })).toBeVisible();
     await page.getByLabel("정리한 파일을 여기에 놓으세요").setInputFiles({
@@ -642,7 +642,7 @@ test.describe("focus workspace recovery journey", () => {
       await expect(composer).toBeHidden();
     }
     await page.reload();
-    await expect(page.getByText("기록 정리 중")).toBeVisible();
+    await expect(page.getByText("기록 정리 중", { exact: true })).toBeVisible();
     const editorAfterReload = await page.evaluate(async ({ id, slug }) => {
       const response = await fetch(
         `/api/bff/api/host/sessions/${encodeURIComponent(id)}/record-editor?clubSlug=${encodeURIComponent(slug)}`,
@@ -657,14 +657,14 @@ test.describe("focus workspace recovery journey", () => {
     await expect(visibleButton(page, "게스트·멤버 노트에 기록 게시")).toHaveCount(1);
     await visibleButton(page, "게스트·멤버 노트에 기록 게시").click();
     await confirmLifecycle(page, "게스트·멤버 노트에 기록 게시", "게스트·멤버 노트에 기록 게시");
-    await expect(page.getByText("게시됨")).toBeVisible();
+    await expect(page.getByText("게시됨", { exact: true })).toBeVisible();
     await expect(page.getByRole("dialog", { name: "게스트·멤버 노트에서 기록 내리기" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "공개 기록 보기" }).filter({ visible: true })).toHaveCount(1);
     const createRevision = page.getByRole("button", { name: "수정본 만들기" });
     await expect(createRevision).toBeVisible();
     expect(sessionState(sessionId)).toBe("PUBLISHED");
     await createRevision.click();
-    await expect(page.getByText("게시됨")).toBeVisible();
+    await expect(page.getByText("게시됨", { exact: true })).toBeVisible();
     await expect(page.getByRole("dialog", { name: "게스트·멤버 노트에서 기록 내리기" })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "정리본" })).toBeVisible();
     expect(sessionState(sessionId)).toBe("PUBLISHED");
@@ -721,17 +721,17 @@ test.describe("focus workspace recovery journey", () => {
     await historyDialog.getByRole("button", { name: "되돌리기" }).click();
     await expect(historyDialog).toBeHidden({ timeout: 15_000 });
     await page.reload();
-    await expect(page.getByText("작성 중")).toBeVisible();
+    await expect(page.getByText("작성 중", { exact: true })).toBeVisible();
     await page.goto(`${HOST_PATH}/sessions/${sessionId}`);
     await page.getByRole("button", { name: "모임 정보" }).click();
     await expect(page.getByLabel("모임 제목")).toHaveValue(/포커스 복원 책/);
     await page.goto(`${HOST_PATH}/sessions/${sessionId}`);
-    await expect(page.getByText("작성 중")).toBeVisible();
+    await expect(page.getByText("작성 중", { exact: true })).toBeVisible();
     await expect(page.locator(".rm-host-session-workspace__sheet-backdrop")).toBeHidden();
     await expect(visibleButton(page, "멤버와 준비 시작")).toHaveCount(1);
     await visibleButton(page, "멤버와 준비 시작").click();
     await confirmLifecycle(page, "멤버에게 열기", "멤버에게 열기");
-    await expect(page.getByText("준비 중")).toBeVisible();
+    await expect(page.getByText("준비 중", { exact: true })).toBeVisible();
 
     await page.goto(`${HOST_PATH}/sessions/${sessionId}?section=attendance`);
     const attend = page.getByRole("button", { name: "호스트 참석" });
@@ -743,7 +743,7 @@ test.describe("focus workspace recovery journey", () => {
 
     await page.getByRole("button", { name: "작성 중으로 되돌리기" }).click();
     await confirmLifecycle(page, "작성 중으로 되돌리기", "작성 중으로 되돌리기", "실수로 상태를 바꿈");
-    await expect(page.getByText("작성 중")).toBeVisible();
+    await expect(page.getByText("작성 중", { exact: true })).toBeVisible();
   });
 
   test("trash tombstone stays on the same URL, restores from the list, and blocks expired restore", async ({ page }) => {
@@ -769,9 +769,9 @@ test.describe("focus workspace recovery journey", () => {
     await expect(page.getByRole("heading", { name: "휴지통에서 복원" })).toBeVisible();
     await page.getByRole("button", { name: "방금 삭제한 모임 복구", exact: true }).first().click();
     await expect(page.getByRole("status").filter({ hasText: "모임을 복원했습니다." })).toBeVisible();
-    await expect(page.getByText("작성 중")).toBeVisible();
+    await expect(page.getByText("작성 중", { exact: true })).toBeVisible();
     await page.reload();
-    await expect(page.getByText("작성 중")).toBeVisible();
+    await expect(page.getByText("작성 중", { exact: true })).toBeVisible();
 
     await openBasicSheet(page);
     await page.getByRole("button", { name: "휴지통으로 이동" }).click();
@@ -819,7 +819,7 @@ test.describe("focus workspace recovery journey", () => {
       withParticipants: true,
     });
     await page.goto(`${HOST_PATH}/sessions/${closedId}`);
-    await expect(page.getByText("기록 정리 중")).toBeVisible();
+    await expect(page.getByText("기록 정리 중", { exact: true })).toBeVisible();
     await captureWorkspaceViewport(page, testInfo, "focus-closed");
 
     await page.setViewportSize({ width: 390, height: 844 });
@@ -843,7 +843,7 @@ test.describe("focus workspace recovery journey", () => {
       date: "2026-08-20",
     });
     await page.goto(`${HOST_PATH}/sessions/${tombstoneId}`);
-    await expect(page.getByText("작성 중")).toBeVisible();
+    await expect(page.getByText("작성 중", { exact: true })).toBeVisible();
     await openBasicSheet(page);
     await page.getByRole("button", { name: "휴지통으로 이동" }).click();
     const dialog = page.getByRole("dialog", { name: "이 모임을 휴지통으로 옮길까요?" });
