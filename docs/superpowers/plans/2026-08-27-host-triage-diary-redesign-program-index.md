@@ -18,5 +18,6 @@ ADR impact: new — ADR-0046
 - 설계 스펙: `docs/development/2026-08-27-readmates-host-triage-diary-redesign-design.md`
 - ADR: `docs/development/adr/0046-host-triage-home-meeting-diary-composition.md` (Proposed — 6단계 완료 후 승격)
 - 시안(비규범): `docs/development/host-redesign-mockups/`
+- 새 세션 실행 프롬프트: `docs/superpowers/plans/2026-08-27-host-redesign-sdd-execution-prompt.md`
 
 서버 작업이 필요해 이 프로그램에서 제외된 후보(별도 스펙): 다이제스트 알림, 다단(D-7/D-1) 리마인드, 종료 시 소감 요청 자동 발송, 멤버별 참석·불참 누계 API, 명명된 초대 링크(사용 횟수 제한).
