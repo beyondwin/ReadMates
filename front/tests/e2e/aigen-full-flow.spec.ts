@@ -16,6 +16,7 @@ import type {
   StartGenerationResponse,
 } from "@/features/host/aigen/api/aigen-contracts";
 import {
+  expectRecordsSheetOpen,
   groundedTranscript,
   hostSessionDetailResponse,
   isHostSessionDetailRequest,
@@ -155,9 +156,10 @@ test("AI generation full flow: upload → poll → preview → commit", async ({
 
   // ── Navigate ──
   await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}?aigen=1`);
+  const recordsSheet = await expectRecordsSheetOpen(page);
 
   // Upload a small file
-  const fileChooser = page.getByLabel(/대본 파일/);
+  const fileChooser = recordsSheet.getByLabel(/대본 파일/);
   await fileChooser.setInputFiles({
     name: "transcript.txt",
     mimeType: "text/plain",

@@ -1,5 +1,6 @@
 import { expect, test, type Route } from "@playwright/test";
 import {
+  expectRecordsSheetOpen,
   groundedTranscript,
   hostSessionDetailResponse,
   isHostSessionDetailRequest,
@@ -58,7 +59,8 @@ test("unknown speaker is corrected before a job exists and explicit resubmit sta
   });
 
   await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}?aigen=1`);
-  await page.getByLabel(/대본 파일/).setInputFiles({
+  const recordsSheet = await expectRecordsSheetOpen(page);
+  await recordsSheet.getByLabel(/대본 파일/).setInputFiles({
     name: "transcript.txt",
     mimeType: "text/plain",
     buffer: Buffer.from(groundedTranscript([{ speaker: "확인 필요", at: "00:00", text: "공개 합성 발언입니다." }])),

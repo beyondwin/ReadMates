@@ -94,8 +94,9 @@ async function confirmLifecycle(page: Page, name: string, pathIncludes: string) 
       await expect(checkAttendance.or(finish)).toBeVisible({ timeout: 10_000 });
       if (await checkAttendance.count()) {
         await checkAttendance.click();
-        await expect(page.getByRole("region", { name: "출석" })).toBeVisible();
-        const attendButtons = page.getByRole("button", { name: /참석$/ });
+        const attendanceSheet = page.getByRole("dialog", { name: "출석" });
+        await expect(attendanceSheet).toBeVisible();
+        const attendButtons = attendanceSheet.getByRole("button", { name: /참석$/ });
         await expect(attendButtons.first()).toBeVisible();
         const attendCount = await attendButtons.count();
         for (let index = 0; index < attendCount; index += 1) {

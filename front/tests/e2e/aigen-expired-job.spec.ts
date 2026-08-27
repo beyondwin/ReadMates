@@ -16,6 +16,7 @@ import type {
   StartGenerationResponse,
 } from "@/features/host/aigen/api/aigen-contracts";
 import {
+  expectRecordsSheetOpen,
   groundedTranscript,
   hostSessionDetailResponse,
   isHostSessionDetailRequest,
@@ -94,8 +95,9 @@ test("expired job (poll 404) surfaces an error and lets the host start over", as
   );
 
   await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}?aigen=1`);
+  const recordsSheet = await expectRecordsSheetOpen(page);
 
-  await page.getByLabel(/대본 파일/).setInputFiles({
+  await recordsSheet.getByLabel(/대본 파일/).setInputFiles({
     name: "transcript.txt",
     mimeType: "text/plain",
     buffer: Buffer.from(groundedTranscript([{ speaker: "공개 회원 A", at: "00:00", text: "합성 테스트 발언입니다." }])),

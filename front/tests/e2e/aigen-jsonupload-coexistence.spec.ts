@@ -9,6 +9,7 @@
 import { expect, test, type Route } from "@playwright/test";
 import type { ClubAiDefaultResponse } from "@/features/host/aigen/api/aigen-contracts";
 import {
+  expectRecordsSheetOpen,
   hostSessionDetailResponse,
   isHostSessionDetailRequest,
   routeHostEditorShell,
@@ -109,12 +110,12 @@ test("JSON-upload and AI-generate modes coexist and toggle via URL query params"
   await expect(page.getByLabel("정리한 파일을 여기에 놓으세요")).toHaveCount(0);
 
   // 2) The record workspace defaults to manual editing and owns one shared draft.
-  await page.getByRole("link", { name: "모임 기록" }).click();
-  await expect(page.locator("#workspace-panel-records")).toBeVisible();
+  await page.getByRole("navigation", { name: "관련 작업" }).getByRole("link", { name: /모임 기록/ }).click();
+  const recordsSheet = await expectRecordsSheetOpen(page);
   await expect(page).toHaveURL(/\?section=records$/);
-  await expect(page.getByRole("tab", { name: "직접 작성" }))
+  await expect(recordsSheet.getByRole("tab", { name: "직접 작성" }))
     .toHaveAttribute("aria-selected", "true");
-  const commonEditor = page.getByRole("region", { name: "공통 초안 편집기" });
+  const commonEditor = recordsSheet.getByRole("region", { name: "공통 초안 편집기" });
   await expect(commonEditor).toBeVisible();
 
   const draftSave = page.waitForResponse(

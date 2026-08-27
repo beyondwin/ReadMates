@@ -1,6 +1,7 @@
 import { expect, test, type Route } from "@playwright/test";
 import type { CommitGenerationRequest } from "@/features/host/aigen/api/aigen-contracts";
 import {
+  expectRecordsSheetOpen,
   groundedSucceededJob,
   groundedTranscript,
   hostSessionDetailResponse,
@@ -60,7 +61,8 @@ test("host reviews grounded blocks, confirms one edit, and commits the exact rev
   });
 
   await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}?aigen=1`);
-  await page.getByLabel(/대본 파일/).setInputFiles({
+  const recordsSheet = await expectRecordsSheetOpen(page);
+  await recordsSheet.getByLabel(/대본 파일/).setInputFiles({
     name: "transcript.txt", mimeType: "text/plain",
     buffer: Buffer.from(groundedTranscript([
       { speaker: "공개 회원 A", at: "00:00", text: "공개 합성 첫 발언입니다." },

@@ -1,4 +1,4 @@
-import type { Page, Route } from "@playwright/test";
+import { expect, type Page, type Route } from "@playwright/test";
 import type { AiGenerationJobResponse, SessionImportV1 } from "@/features/host/aigen/api/aigen-contracts";
 import type { HostSessionDetailResponse } from "@/features/host/api/host-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
@@ -72,7 +72,19 @@ export function isHostSessionDetailRequest(route: Route, sessionId: string): boo
     `/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}`;
 }
 
+export async function expectRecordsSheetOpen(page: Page) {
+  const records = page.getByRole("dialog", { name: "모임 기록" });
+  await expect(records).toBeVisible();
+  await expect(records).toHaveAttribute("aria-modal", "true");
+  return records;
+}
+
 export async function routeHostEditorShell(page: Page, clubSlug: string): Promise<void> {
+  await page.route("**/api/observability/frontend-events", (route) => route.fulfill({ status: 204 }));
+  await page.route("**/api/bff/api/host/sessions/*/publication/convergence**", (route) => {
+    return route.fulfill({ status: 204 });
+  });
+
   await page.route("**/api/bff/api/auth/me**", async (route) => {
     await fulfillHostAuth(route, clubSlug);
   });

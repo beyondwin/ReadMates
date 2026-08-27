@@ -68,7 +68,7 @@ test("host confirms before closing a session from the editor overview", async ({
   await expect(checkAttendance.or(finish)).toBeVisible({ timeout: 10_000 });
   if (await checkAttendance.count()) {
     await checkAttendance.click();
-    const attendancePanel = page.getByRole("region", { name: "출석" });
+    const attendancePanel = page.getByRole("dialog", { name: "출석" });
     const collapse = attendancePanel.getByRole("button", { name: "접기" });
     await expect(collapse).toBeVisible();
     const attendButtons = attendancePanel.getByRole("button", { name: /참석$/ });
