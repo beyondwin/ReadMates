@@ -42,6 +42,14 @@ describe("adminAuditLoaderFactory", () => {
     }
   });
 
+  it("accepts a target query as the initial clubId filter without sending target to the API", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await expect(adminAuditLoaderFactory(client)({
+      request: new Request("https://readmates.example/admin/audit?target=club-reading-sai"),
+    } as never)).resolves.toBeNull();
+    expect(fetchAdminAuditLedger).toHaveBeenCalledWith({ range: "7d", clubId: "club-reading-sai" }, undefined);
+  });
+
   it("accepts a share-safe event id and detail mode without prefetching the sensitive target", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     await expect(adminAuditLoaderFactory(client)({

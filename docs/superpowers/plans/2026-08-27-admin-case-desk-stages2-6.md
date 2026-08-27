@@ -13,6 +13,8 @@
 
 ADR impact: new — ADR-0047
 
+새 세션 실행 프롬프트: `docs/superpowers/plans/2026-08-27-admin-redesign-sdd-execution-prompt.md`
+
 ## Global Constraints
 
 - 스펙 §6 용어 사전과 §5 명령 마찰 3등급, §7 페이지 타입 3종(데스크형/원장형/서사형)이 모든 태스크에 암묵 적용된다.
@@ -73,10 +75,12 @@ export function useAdminAlarmSummary(): { summary: AdminAlarmSummary | null; sta
 - Consumes: 기존 오늘 신호 쿼리(`front/features/platform-admin/queries/`의 operations/today 쿼리)와 health snapshot 쿼리를 **읽기 전용으로 합성**. 새 서버 호출을 만들지 않는다. 둘 다 실패하면 `state: "unavailable"`로 조용한 한 줄("신호 확인 불가 · 오늘 열기")만 렌더.
 
 **Steps:**
-- [ ] 테스트 작성: ① attention 1건이면 warn 텍스트+대표 한 줄+as-of 렌더 ② 0건이면 무채색 "미확인 신호 없음 · 서비스 정상" 한 줄 ③ unavailable이면 role="status"로 "신호 확인 불가" (색 없음) ④ 어떤 상태에서도 링크 "오늘 열기"가 `/admin/today`로 존재.
-- [ ] 실패 확인 → 구현(마크업은 목업 `design/mockups/2026-08-27-admin-case-desk/adm-a-today-desktop.html`의 `.alarm-bar` 구조 준용: 좌 warn 요약, 중앙 보조 텍스트, 우 mono as-of) → 통과 확인.
-- [ ] 셸 통합: `AdminShellLayoutInner`에서 브레드크럼 아래·Outlet 위에 `<AdminAlarmBar …/>` 1회. 훅 실패가 셸 렌더를 막지 않음을 테스트(쿼리 reject 모킹)로 고정.
-- [ ] Commit: `feat(admin): resident alarm summary bar`
+- [x] 테스트 작성: ① attention 1건이면 warn 텍스트+대표 한 줄+as-of 렌더 ② 0건이면 무채색 "미확인 신호 없음 · 서비스 정상" 한 줄 ③ unavailable이면 role="status"로 "신호 확인 불가" (색 없음) ④ 어떤 상태에서도 링크 "오늘 열기"가 `/admin/today`로 존재.
+- [x] 실패 확인 → 구현(마크업은 목업 `design/mockups/2026-08-27-admin-case-desk/adm-a-today-desktop.html`의 `.alarm-bar` 구조 준용: 좌 warn 요약, 중앙 보조 텍스트, 우 mono as-of) → 통과 확인.
+- [x] 셸 통합: `AdminShellLayoutInner`에서 브레드크럼 아래·Outlet 위에 `<AdminAlarmBar …/>` 1회. 훅 실패가 셸 렌더를 막지 않음을 테스트(쿼리 reject 모킹)로 고정.
+- [x] Commit: `feat(admin): resident alarm summary bar`
+
+> 실행 노트: `AdminAlarmSummary`는 ui↔queries 순환을 피하려고 `model/admin-alarm-summary.ts`에 두고 양쪽에서 re-export. 클럽 이름은 operations/health 응답에 없어 headline은 summaryCode 라벨만 사용(가짜 클럽명 없음). 알람 바는 `main` 안·Outlet 위에 1회 렌더.
 
 ### Task 2-2: 서비스 건강 페이지를 서사형으로 재구성
 
@@ -124,8 +128,10 @@ export function useAdminAlarmSummary(): { summary: AdminAlarmSummary | null; sta
 - 모바일 보류 버튼 6개 세로 나열 제거 → 보류는 단일 버튼 + 기간 선택(`<select>`: 1시간/4시간/24시간/7일).
 
 **Steps:**
-- [ ] 테스트: ① 사유 없이 무시 확정 불가 ② 기간 select 존재, 개별 보류 버튼 나열 부재 ③ 사유가 command 호출 인자에 포함.
-- [ ] 구현 → 통과 → Commit: `feat(admin): guarded queue-exit paths with reasons`
+- [x] 테스트: ① 사유 없이 무시 확정 불가 ② 기간 select 존재, 개별 보류 버튼 나열 부재 ③ 사유가 command 호출 인자에 포함.
+- [x] 구현 → 통과 → Commit: `feat(admin): guarded queue-exit paths with reasons`
+
+> 실행 노트: 서버 snooze body는 `expectedVersion`+`snoozedUntil`만 허용(unknown field 400). 무시는 SNOOZE 7일 + 사유 필수. 사유는 UI command args에만 포함하고 HTTP에는 넣지 않음. 버튼 구현은 inspector dock primary인 `AdminOperationStateActions`.
 
 ### Task 3-3: 도켓 "이 대상의 최근 기입" 인라인
 
@@ -146,8 +152,8 @@ export function AdminTargetLedgerInline({ entries, moreHref }: {
 - Consumes: 케이스 상세 응답의 기존 history/관련 링크 데이터. 감사 API 추가 호출 금지 — 상세에 이미 있는 이력만 문장화하고, `moreHref`는 audit 화면 프리필터 쿼리(4-1에서 지원)로 링크.
 
 **Steps:**
-- [ ] 테스트: 3건 렌더 + 시각 mono + "전체 기입 보기" 링크 href 검증 → 구현(목업 `.ledger-inline` 준용) → 통과 → 공통 게이트 → CT 재잠금 → Commit: `feat(admin): inline target ledger in docket`
-- [ ] **릴리스 체크포인트 3**
+- [x] 테스트: 3건 렌더 + 시각 mono + "전체 기입 보기" 링크 href 검증 → 구현(목업 `.ledger-inline` 준용) → 통과 → 공통 게이트 → CT 재잠금 → Commit: `feat(admin): inline target ledger in docket`
+- [x] **릴리스 체크포인트 3**
 
 ---
 
@@ -166,7 +172,9 @@ export function AdminTargetLedgerInline({ entries, moreHref }: {
 - **프리필터 진입 지원**: `/admin/audit?target={id}` 쿼리를 읽어 초기 필터로 적용 (Task 3-3의 moreHref가 사용).
 
 **Steps:**
-- [ ] 테스트: ① 문장형 행 렌더(사유 없음 명시 포함) ② 차단 결과 라벨 ③ target 쿼리 프리필터 ④ 드로어에 이벤트 ID 존재·행에는 부재 → 구현 → 통과 → Commit: `feat(admin): audit as sentence ledger with shared shell`
+- [x] 테스트: ① 문장형 행 렌더(사유 없음 명시 포함) ② 차단 결과 라벨 ③ target 쿼리 프리필터 ④ 드로어에 이벤트 ID 존재·행에는 부재 → 구현 → 통과 → Commit: `feat(admin): audit as sentence ledger with shared shell`
+
+> 실행 노트: `?target=`은 SAFE 쿼리로 유지하고 parse 시 `clubId`에 매핑(서버 계약 불변). 라우트 파일은 searchParams 파싱이 이미 model에 있어 변경 없음. `auditOutcomeLabel`: SUCCESS→성공, FAILED→실패, DENIED→차단, PREPARED→진행, 그 외 원문.
 
 ### Task 4-2: 지원 → "접근 원장" 재조립
 
@@ -180,7 +188,9 @@ export function AdminTargetLedgerInline({ entries, moreHref }: {
 - 이력 행 문장화 + `supportGrantStatusLabel` 적용(1단계 완료분 재사용).
 
 **Steps:**
-- [ ] 테스트: ① PageContext 헤딩 ② 사유·만료 없으면 발급 버튼 disabled ③ 확인 버튼 라벨이 행위 문장 → 구현 → 통과 → Commit: `feat(admin): support access ledger with shared shell`
+- [x] 테스트: ① PageContext 헤딩 ② 사유·만료 없으면 발급 버튼 disabled ③ 확인 버튼 라벨이 행위 문장 → 구현 → 통과 → Commit: `feat(admin): support access ledger with shared shell`
+
+> 실행 노트: 전역 `useAdminAlarmSummary`(2-1)에 support 쿼리를 붙이지 않음. 이 화면 PageContext `scope`에만 `활성 접근 N건` 표기. 전역 알람 바 상주는 서버 요약 후속.
 
 ### Task 4-3: 분석 → "분석 부록" 정리
 
@@ -191,7 +201,9 @@ export function AdminTargetLedgerInline({ entries, moreHref }: {
 **요구사항:** `AdminPageContext`(제목 "분석 부록") + 로딩/오류를 `AdminStatePanel`로 통일. KPI 타일에서 **행동 링크가 없는 타일 제거 기준 적용 금지**(데이터 축소는 범위 밖) — 표기만: 표 숫자에 `ledger-number`(tnum) 클래스, KPI 수치 우측 정렬. CSV 게이트 유지.
 
 **Steps:**
-- [ ] 테스트: ① PageContext 헤딩 ② 표 셀에 tnum 클래스 ③ forbidden 시 StatePanel → 구현 → 통과 → 공통 게이트 → CT 재잠금(`admin-support-workbench` 포함) → Commit: `feat(admin): analytics appendix shell` → **릴리스 체크포인트 4**
+- [x] 테스트: ① PageContext 헤딩 ② 표 셀에 tnum 클래스 ③ forbidden 시 StatePanel → 구현 → 통과 → 공통 게이트 → CT 재잠금(`admin-support-workbench` 포함) → Commit: `feat(admin): analytics appendix shell` → **릴리스 체크포인트 4**
+
+> 실행 노트: `admin-analytics-route.tsx`는 데이터/capability 배선만 하므로 본문 변경 없음. 제목·StatePanel·tnum은 overview UI에 둠. KPI 타일은 제거하지 않음.
 
 ---
 
@@ -209,7 +221,9 @@ export function AdminTargetLedgerInline({ entries, moreHref }: {
 - 실패 클러스터 그룹 라벨에 `클럽 · 알림 유형 · 오류 분류`를 문장으로.
 
 **Steps:**
-- [ ] 테스트: ① 경고 문장 존재 ② 시도 배지 렌더(시도 수 fixture) ③ 상태 라벨 3종 한국어 → 구현 → 통과 → Commit: `feat(admin): delivery ledger row grammar`
+- [x] 테스트: ① 경고 문장 존재 ② 시도 배지 렌더(시도 수 fixture) ③ 상태 라벨 3종 한국어 → 구현 → 통과 → Commit: `feat(admin): delivery ledger row grammar`
+
+> 실행 노트: `rg "retry" platform-admin-workbench-model.ts`는 0건. Outbox `nextAttemptAt`만 조건부 표기. Delivery DTO·클러스터 DTO에 재시도 시각/클럽/알림 유형 필드 없음 — 클러스터 문장은 로드된 ledger 행에서 보강하고 없으면 해당 절 생략. SKIPPED는 fail-open 원문. 내비 그룹은 6-2까지 유지.
 
 ### Task 5-2: 작업 원장(AI) 정리
 
@@ -223,7 +237,7 @@ export function AdminTargetLedgerInline({ entries, moreHref }: {
 - 명령 모달의 확인 버튼 라벨을 행위 문장으로("작업 {id} 강제 취소").
 
 **Steps:**
-- [ ] 테스트: ① H1이 정확히 1개 ② 멈춤 라벨 ③ 확인 버튼 행위 문장 → 구현 → 통과 → 공통 게이트 → CT 재잠금 → Commit: `feat(admin): ai job ledger polish` → **릴리스 체크포인트 5**
+- [x] 테스트: ① H1이 정확히 1개 ② 멈춤 라벨 ③ 확인 버튼 행위 문장 → 구현 → 통과 → 공통 게이트 → CT 재잠금 → Commit: `feat(admin): ai job ledger polish` → **릴리스 체크포인트 5**
 
 ---
 
@@ -269,3 +283,7 @@ export function AdminTargetLedgerInline({ entries, moreHref }: {
 ## 실행 중 발견
 
 (실행자가 기입: 서버 후속 / 이월 결함 / 계획 이탈 결정)
+
+- 3-2: 서버에 dismiss API 없음. 무시는 기존 `SNOOZE`(최대 7일) + 화면 사유 필수로 구현. snooze 요청 DTO는 unknown field를 거부하므로 사유를 HTTP body에 넣지 않음 — **무시 사유는 UI-gated이며 persist되지 않음.** 사유 보존은 서버 후속.
+- 4-2: 활성 support grant를 전역 알람 바 attention 후보에 넣으려면 서버 요약(또는 2-1 훅의 support 쿼리)이 필요함. 이번 화면은 PageContext scope `활성 접근 N건`만 표기.
+- 5-1: `platform-admin-workbench-model.ts`에 retry 필드 없음. Outbox는 `nextAttemptAt`이 있을 때만 "다음 재시도 예정" 표기. Delivery 응답에는 next-retry 필드가 없어 UI 생략(가짜 시각 없음). Failure cluster 응답은 `safeErrorCode/status/count/latestAt`만 — 클럽·알림 유형은 서버 후속. 현재는 같은 오류 코드의 로드된 outbox/delivery 행으로 문장을 보강.

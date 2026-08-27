@@ -70,7 +70,7 @@ describe("platform-admin-analytics-model", () => {
       href: "/admin/notifications",
     });
     expect(analyticsActionForKpi("AI_COST_PER_SESSION")).toEqual({
-      label: "AI Ops 보기",
+      label: "AI 작업 보기",
       href: "/admin/ai-ops",
     });
     expect(analyticsActionForKpi("SESSION_COMPLETION")).toEqual({

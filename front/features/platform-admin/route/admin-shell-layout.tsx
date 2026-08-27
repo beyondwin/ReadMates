@@ -28,6 +28,8 @@ import {
   useCommitPlatformAdminOnboardingMutation,
   usePreviewPlatformAdminOnboardingMutation,
 } from "@/features/platform-admin/queries/platform-admin-queries";
+import { useAdminAlarmSummary } from "@/features/platform-admin/queries/admin-alarm-summary";
+import { AdminAlarmBar } from "@/features/platform-admin/ui/admin-alarm-bar";
 import { AdminBreadcrumb } from "@/features/platform-admin/ui/admin-breadcrumb";
 import { AdminLayoutNav } from "@/features/platform-admin/ui/admin-layout-nav";
 import { AdminOnboardingModal } from "@/features/platform-admin/ui/admin-onboarding-modal";
@@ -77,6 +79,7 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
   );
 
   const capabilities = capabilitiesQuery.data ?? null;
+  const alarm = useAdminAlarmSummary();
   const canCreateClub =
     capabilities != null && canAdmin(capabilities, "CREATE_CLUB");
 
@@ -214,9 +217,14 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
       </header>
       <div className="admin-shell__body">
         <aside className="admin-shell__nav">
-          <AdminLayoutNav capabilities={capabilities} ariaLabel="Admin 콘솔" />
+          <AdminLayoutNav
+            capabilities={capabilities}
+            ariaLabel="Admin 콘솔"
+            todayCount={alarm.summary?.attention.count ?? null}
+          />
         </aside>
         <main id="admin-main" className="admin-shell__main" tabIndex={-1}>
+          <AdminAlarmBar summary={alarm.summary} state={alarm.state} />
           <Outlet />
         </main>
       </div>

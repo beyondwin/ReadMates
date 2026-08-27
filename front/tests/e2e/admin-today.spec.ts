@@ -156,7 +156,7 @@ test("owner sees the durable operations queue inside the admin shell", async ({ 
     "true",
   );
   await expect(page.getByRole("button", { name: "확인 처리" })).toBeEnabled();
-  await expect(page.getByRole("link", { name: "알림 운영에서 확인" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "배달 원장에서 확인" })).toHaveAttribute(
     "href",
     "/admin/notifications",
   );

@@ -31,7 +31,13 @@ class HostAuthorityContextCookieTest {
     fun `tampered and expired contexts are rejected`() {
         val session = storedSession()
         val rawValue = cookie.signedValue(session, UUID.fromString("00000000-0000-0000-0000-000000000001"))
-        val tampered = rawValue.dropLast(1) + if (rawValue.last() == 'A') "B" else "A"
+        val signatureStart = rawValue.lastIndexOf('.') + 1
+        val tampered =
+            rawValue.replaceRange(
+                signatureStart,
+                signatureStart + 1,
+                if (rawValue[signatureStart] == 'A') "B" else "A",
+            )
 
         assertNull(cookie.verify(tampered, session))
         val expiredSession = session.copy(expiresAt = OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(1))

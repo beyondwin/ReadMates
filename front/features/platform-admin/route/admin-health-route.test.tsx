@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router";
@@ -138,7 +138,7 @@ describe("AdminHealthRoute", () => {
     expect(screen.getByRole("heading", { name: "서비스 건강" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "서비스 건강" })).toHaveClass("admin-page-frame");
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(await screen.findByRole("heading", { name: "Outbox backlog" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Kafka consumer lag" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "서비스 신호" })).toHaveClass("admin-evidence-ledger");
     expect(container.querySelector(".admin-case-docket")).toBeNull();
     expect(container.querySelector(".admin-action-dock")).toBeNull();
@@ -147,12 +147,11 @@ describe("AdminHealthRoute", () => {
     expect(findNestedLiveRegions(container)).toEqual([]);
     expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
-    expect(screen.getByRole("heading", { name: "Kafka consumer lag" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Redis" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "DB pool" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Notification dispatch success" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "AI provider availability" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "최근 deploy" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Outbox backlog" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "DB pool" })).not.toBeInTheDocument();
+    expect(within(screen.getByText("정상 신호").closest("details") as HTMLElement).getByText("Outbox backlog")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "최근에 바뀐 것" })).toBeInTheDocument();
     expect(screen.getByText(/readmates-api:dev-20260526/)).toBeInTheDocument();
     expect(screen.getByText(/생성 시각/)).toBeInTheDocument();
     expect(screen.queryByText(/NaN/)).toBeNull();

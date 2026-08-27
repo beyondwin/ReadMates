@@ -2,13 +2,21 @@ import { useId, type ReactNode } from "react";
 
 export type AdminPageFrameProps = {
   heading: ReactNode;
+  headingId?: string;
   description?: ReactNode;
   action?: ReactNode;
   children?: ReactNode;
 };
 
-export function AdminPageFrame({ heading, description, action, children }: AdminPageFrameProps) {
-  const headingId = useId();
+export function AdminPageFrame({
+  heading,
+  headingId: headingIdProp,
+  description,
+  action,
+  children,
+}: AdminPageFrameProps) {
+  const generatedId = useId();
+  const headingId = headingIdProp ?? generatedId;
 
   return (
     <section className="admin-page-frame" aria-labelledby={headingId}>

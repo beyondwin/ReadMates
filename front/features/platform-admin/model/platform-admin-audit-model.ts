@@ -1,3 +1,4 @@
+import { auditOutcomeLabel } from "@/features/platform-admin/model/admin-copy";
 import {
   EMPTY_AI_OPS_FILTER,
   aiOpsPathFromFilter,
@@ -84,7 +85,11 @@ export function adminAuditFiltersFromSearchParams(params: URLSearchParams): Admi
   };
   setFilter(filters, "from", normalizedInstant(params.get("from")));
   setFilter(filters, "to", normalizedInstant(params.get("to")));
-  setFilter(filters, "clubId", normalizedIdentifier(params.get("clubId")));
+  setFilter(
+    filters,
+    "clubId",
+    normalizedIdentifier(params.get("clubId")) ?? normalizedIdentifier(params.get("target")),
+  );
   setFilter(filters, "actorRole", enumParam(params.get("actorRole"), ACTOR_ROLES));
   setFilter(filters, "sourceSlice", enumParam(params.get("sourceSlice"), SOURCE_SLICES));
   setFilter(filters, "actionCategory", enumParam(params.get("actionCategory"), ACTION_CATEGORIES));
@@ -132,6 +137,40 @@ export function mergeAdminAuditLedgerPages(pages: AdminAuditLedgerPage[]): Admin
   };
 }
 
+export function adminAuditShareSafeIdentifier(value: string | null): string | null {
+  return normalizedIdentifier(value);
+}
+
+export function adminAuditReasonLabel(item: AdminAuditLedgerItem): string {
+  const entry = item.safeMetadata.find((meta) => {
+    const label = meta.label.toLowerCase();
+    return label === "reason" || label === "reasontext" || label === "note";
+  });
+  const value = entry?.value.trim() ?? "";
+  return value || "사유 없음";
+}
+
+export function formatAdminAuditOccurredAt(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+export function formatAdminAuditLedgerSentenceBody(item: AdminAuditLedgerItem): string {
+  return `${item.actor.displayLabel}가 ${item.target.label}에 ${item.summary} · 사유: ${adminAuditReasonLabel(item)} · ${auditOutcomeLabel(item.outcome)}`;
+}
+
+export function formatAdminAuditLedgerSentence(item: AdminAuditLedgerItem): string {
+  return `${formatAdminAuditOccurredAt(item.occurredAt)} · ${formatAdminAuditLedgerSentenceBody(item)}`;
+}
+
 export function labelAdminAuditOutcome(outcome: AdminAuditOutcome): string {
   return {
     SUCCESS: "성공",
@@ -147,7 +186,7 @@ export function labelAdminAuditSourceSlice(sourceSlice: AdminAuditSourceSlice): 
     S3: "클럽 운영",
     S4: "지원 접근",
     S5: "알림",
-    S6: "AI 운영",
+    S6: "AI 작업",
     PLATFORM: "플랫폼",
     CLUB: "클럽",
   }[sourceSlice];
@@ -194,7 +233,7 @@ export type AdminAuditOperationSummary = {
 
 export function buildAdminAuditOperationSummary(item: AdminAuditLedgerItem): AdminAuditOperationSummary {
   const nextHref = aiOpsDrilldownForAuditItem(item);
-  const nextLabel = nextHref ? "AI Ops에서 보기" : null;
+  const nextLabel = nextHref ? "AI 작업에서 보기" : null;
 
   if (item.metadataState === "UNAVAILABLE") {
     return {
@@ -220,7 +259,7 @@ export function buildAdminAuditOperationSummary(item: AdminAuditLedgerItem): Adm
     return {
       state: "FOLLOW_UP_AVAILABLE",
       label: "후속 화면 있음",
-      detail: "AI 운영 화면에서 같은 클럽 범위로 이어서 확인할 수 있습니다.",
+      detail: "AI 작업 화면에서 같은 클럽 범위로 이어서 확인할 수 있습니다.",
       nextHref,
       nextLabel,
     };

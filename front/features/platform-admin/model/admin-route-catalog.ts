@@ -4,7 +4,7 @@ import {
   type PlatformAdminCapability,
 } from "@/features/platform-admin/model/platform-admin-capabilities";
 
-export type AdminRouteGroup = "today" | "clubs" | "services" | "review";
+export type AdminRouteGroup = "today" | "clubs" | "pipeline" | "ledger";
 export type AdminRouteStatus = "ready" | "coming_soon";
 export type AdminRouteSlice =
   | "S1" | "S2" | "S3" | "S4" | "S5" | "S6" | "S7" | "S8" | "S9" | "S10" | "C4";
@@ -15,7 +15,7 @@ export const ADMIN_SHELL_LAYOUT_MEDIA_QUERY = `(max-width: ${ADMIN_SHELL_LAYOUT_
 export type AdminRouteDescriptor = {
   path: string;
   label: string;
-  group: AdminRouteGroup;
+  group: AdminRouteGroup | null;
   groupLabel: string;
   slice: AdminRouteSlice;
   status: AdminRouteStatus;
@@ -35,11 +35,16 @@ export type AdminNavArea = {
   children: ReadonlyArray<AdminRouteDescriptor>;
 };
 
+export type VisibleAdminNav = {
+  areas: AdminNavArea[];
+  pinned: AdminRouteDescriptor[];
+};
+
 const PRIMARY_AREAS: ReadonlyArray<Pick<AdminNavArea, "id" | "label" | "href">> = [
   { id: "today", label: "오늘", href: "/admin/today" },
   { id: "clubs", label: "클럽", href: "/admin/clubs" },
-  { id: "services", label: "서비스" },
-  { id: "review", label: "검토" },
+  { id: "pipeline", label: "파이프라인" },
+  { id: "ledger", label: "원장" },
 ];
 
 export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
@@ -62,19 +67,10 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
     requiredCapability: "VIEW_CLUBS",
   },
   {
-    path: "health",
-    label: "서비스 건강",
-    group: "services",
-    groupLabel: "서비스",
-    slice: "S2",
-    status: "ready",
-    requiredCapability: "VIEW_SERVICE_HEALTH",
-  },
-  {
     path: "notifications",
-    label: "알림",
-    group: "services",
-    groupLabel: "서비스",
+    label: "배달 원장",
+    group: "pipeline",
+    groupLabel: "파이프라인",
     slice: "S5",
     status: "ready",
     requiredCapability: "VIEW_NOTIFICATION_OPERATIONS",
@@ -82,47 +78,56 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
   {
     path: "ai-ops",
     label: "AI 작업",
-    group: "services",
-    groupLabel: "서비스",
+    group: "pipeline",
+    groupLabel: "파이프라인",
     slice: "S1",
     status: "ready",
     requiredCapability: "VIEW_AI_OPERATIONS",
   },
   {
-    path: "public-takedown",
-    label: "긴급 공개 회수",
-    group: "services",
-    groupLabel: "서비스",
-    slice: "C4",
+    path: "health",
+    label: "서비스 건강",
+    group: "pipeline",
+    groupLabel: "파이프라인",
+    slice: "S2",
     status: "ready",
-    requiredCapability: "EMERGENCY_PUBLIC_TAKEDOWN",
-  },
-  {
-    path: "support",
-    label: "지원",
-    group: "review",
-    groupLabel: "검토",
-    slice: "S1",
-    status: "ready",
-    requiredCapability: "VIEW_SUPPORT",
+    requiredCapability: "VIEW_SERVICE_HEALTH",
   },
   {
     path: "audit",
-    label: "감사",
-    group: "review",
-    groupLabel: "검토",
+    label: "운영 기입",
+    group: "ledger",
+    groupLabel: "원장",
     slice: "S7",
     status: "ready",
     requiredCapability: "VIEW_AUDIT",
   },
   {
+    path: "support",
+    label: "접근 원장",
+    group: "ledger",
+    groupLabel: "원장",
+    slice: "S1",
+    status: "ready",
+    requiredCapability: "VIEW_SUPPORT",
+  },
+  {
     path: "analytics",
-    label: "분석",
-    group: "review",
-    groupLabel: "검토",
+    label: "분석 부록",
+    group: "ledger",
+    groupLabel: "원장",
     slice: "S8",
     status: "ready",
     requiredCapability: "VIEW_ANALYTICS",
+  },
+  {
+    path: "public-takedown",
+    label: "긴급 공개 회수",
+    group: null,
+    groupLabel: "비상 레인",
+    slice: "C4",
+    status: "ready",
+    requiredCapability: "EMERGENCY_PUBLIC_TAKEDOWN",
   },
 ];
 
@@ -138,9 +143,9 @@ export const ADMIN_CLUB_DETAIL_ROUTE: AdminRouteDescriptor = {
 
 export function visibleAdminNav(
   capabilities: PlatformAdminCapabilities | null | undefined,
-): AdminNavArea[] {
+): VisibleAdminNav {
   if (capabilities == null) {
-    return [];
+    return { areas: [], pinned: [] };
   }
 
   const areas: AdminNavArea[] = [];
@@ -160,7 +165,11 @@ export function visibleAdminNav(
     }
     areas.push({ ...area, children: routes });
   }
-  return areas;
+
+  const pinned = ADMIN_ROUTES.filter(
+    (route) => route.group == null && canAdmin(capabilities, route.requiredCapability),
+  );
+  return { areas, pinned };
 }
 
 export function isAdminAreaActive(pathname: string, area: AdminNavArea): boolean {

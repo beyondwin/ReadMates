@@ -4,6 +4,7 @@ import { AdminPageFrame } from "./admin-page-frame";
 export type AdminPageContextProps = {
   eyebrow?: ReactNode;
   heading: ReactNode;
+  headingId?: string;
   description?: ReactNode;
   freshness?: ReactNode;
   scope?: ReactNode;
@@ -15,6 +16,7 @@ export type AdminPageContextProps = {
 export function AdminPageContext({
   eyebrow,
   heading,
+  headingId,
   description,
   freshness,
   scope,
@@ -29,7 +31,7 @@ export function AdminPageContext({
       {eyebrow != null && eyebrow !== false ? (
         <p className="admin-page-context__eyebrow">{eyebrow}</p>
       ) : null}
-      <AdminPageFrame heading={heading} description={description} action={action}>
+      <AdminPageFrame heading={heading} headingId={headingId} description={description} action={action}>
         {hasMeta ? (
           <div className="admin-page-context__meta">
             {freshness != null && freshness !== false ? (

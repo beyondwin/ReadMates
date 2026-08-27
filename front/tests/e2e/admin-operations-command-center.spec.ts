@@ -339,7 +339,9 @@ test("OPERATOR snoozes with a preset while preserving selection and filters", as
   const harness = await installOperationsHarness(page, { role: "OPERATOR" });
   await openSelectedCase(page, "case=case-notification&state=open&source=notification");
 
-  await page.getByRole("button", { name: "4시간 보류", exact: true }).click();
+  await page.getByRole("button", { name: "보류" }).click();
+  await page.getByLabel("보류 사유").fill("야간 관찰");
+  await page.getByRole("button", { name: "보류 확정" }).click();
 
   await expect(page.getByRole("region", { name: "운영 케이스 상세" }).getByText("현재 상태 · 보류됨")).toBeVisible();
   await expect(page).toHaveURL(/case=case-notification/);

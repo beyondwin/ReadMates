@@ -1,3 +1,4 @@
+import { aiJobInProgressLabel, aiJobStallLabel } from "@/features/platform-admin/model/admin-copy";
 import type {
   PlatformAdminAiOpsFilters,
   PlatformAdminAiOpsJob,
@@ -87,7 +88,7 @@ export function classifyAiOpsError(error: unknown): AiOpsErrorClassification {
   const record = error && typeof error === "object" ? (error as Record<string, unknown>) : null;
   const status = typeof record?.status === "number" ? record.status : null;
   const code = typeof record?.code === "string" ? record.code : null;
-  const message = error instanceof Error ? error.message : "AI 운영 상태를 확인하지 못했습니다.";
+  const message = error instanceof Error ? error.message : "AI 작업 상태를 확인하지 못했습니다.";
   const kind =
     status === 404
       ? "DISABLED"
@@ -97,4 +98,34 @@ export function classifyAiOpsError(error: unknown): AiOpsErrorClassification {
           ? "CONFLICT"
           : "UNKNOWN";
   return { kind, status, code, message };
+}
+
+const AI_OPS_IN_PROGRESS_STATUSES = new Set(["PENDING", "RUNNING", "COMMITTING", "COMMIT_RETRY"]);
+
+export function formatAiJobElapsedLabel(
+  job: {
+    status: string;
+    createdAt: string;
+    lastUpdatedAt: string;
+    staleCandidate: boolean;
+  },
+  now: Date,
+): string | null {
+  if (!AI_OPS_IN_PROGRESS_STATUSES.has(job.status)) {
+    return null;
+  }
+  const origin = job.staleCandidate ? job.lastUpdatedAt : job.createdAt;
+  const minutes = elapsedMinutes(origin, now);
+  if (minutes == null) {
+    return null;
+  }
+  return job.staleCandidate ? aiJobStallLabel(minutes) : aiJobInProgressLabel(minutes);
+}
+
+function elapsedMinutes(value: string, now: Date): number | null {
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) {
+    return null;
+  }
+  return Math.max(0, Math.floor((now.getTime() - parsed) / 60_000));
 }

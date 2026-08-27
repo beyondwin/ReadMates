@@ -1,3 +1,4 @@
+import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
 import type { AdminOperationWorkView } from "@/features/platform-admin/model/platform-admin-operations-model";
 import { AdminWorkViewBar } from "./admin-work-view-bar";
 
@@ -44,7 +45,7 @@ export function AdminTodayControls({
         activeView={activeView}
         onViewChange={onViewChange}
         search={{
-          label: "이미 불러온 사건 검색",
+          label: ADMIN_COPY.search.loadedCases,
           value: query,
           placeholder: "제목 또는 신호",
           onChange: onQueryChange,
@@ -76,11 +77,11 @@ export function AdminTodayControls({
               ]}
             />
             <FilterSelect
-              label="Source 필터"
+              label="관측 출처 필터"
               value={filters.source}
               onChange={(value) => onFilterChange("source", value)}
               options={[
-                ["", "모든 source"],
+                ["", "모든 출처"],
                 ["club_readiness", "클럽 준비"],
                 ["notification", "알림"],
                 ["ai_job", "AI 작업"],

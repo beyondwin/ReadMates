@@ -6,6 +6,7 @@ import {
   commitAdminEditorialLedgerFirstUsable,
   commitAdminEditorialLedgerPollMergeRaf,
 } from "@/shared/observability/admin-editorial-ledger-performance";
+import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
 import { ADMIN_SHELL_LAYOUT_MEDIA_QUERY } from "@/features/platform-admin/model/admin-route-catalog";
 import type {
   AdminOperationsSearchMode,
@@ -15,7 +16,7 @@ import type {
 import type { AdminSafeActionState } from "./admin-action-dock";
 import type { AdminPageState, AdminStateSource } from "./admin-state-panel";
 import { AdminOperationMobileDetail } from "./admin-operation-mobile-detail";
-import { AdminOperationsInspector } from "./admin-operations-inspector";
+import { AdminOperationsInspector, type AdminCaseTraversal } from "./admin-operations-inspector";
 import { AdminOperationsQueue } from "./admin-operations-queue";
 import { AdminPageContext } from "./admin-page-context";
 import { AdminStatePanel } from "./admin-state-panel";
@@ -100,9 +101,15 @@ export function AdminTodayLedger({
   const filtered = hasActiveTodayFilters(filters) || Boolean(query.trim());
   const pageState = deriveTodayPageState(view);
 
+  const selectDocketCase = (caseId: string) => {
+    beginAdminEditorialLedgerCaseSelection(caseId);
+    onSelectCase(caseId, mobileLayout ? { mode: "detail" } : undefined);
+  };
+  const traversal = buildTodayCaseTraversal(view.items, view.selectedCaseId, selectDocketCase);
+
   useLayoutEffect(() => {
     const control = ledgerRef.current?.querySelector<HTMLElement>(
-      "input[type='search'][aria-label='이미 불러온 사건 검색']",
+      `input[type='search'][aria-label='${ADMIN_COPY.search.loadedCases}']`,
     );
     if (control) commitAdminEditorialLedgerFirstUsable();
   }, [view.items.length, view.generatedAt]);
@@ -142,6 +149,7 @@ export function AdminTodayLedger({
       permissionDenied={permissionDenied}
       actionState={actionState}
       actionReason={actionReason}
+      traversal={traversal}
     />
   );
 
@@ -155,6 +163,7 @@ export function AdminTodayLedger({
       permissionDenied={permissionDenied}
       actionState={actionState}
       actionReason={actionReason}
+      traversal={traversal}
       mode={mode}
       onSelectCase={(caseId, options) => {
         beginAdminEditorialLedgerCaseSelection(caseId);
@@ -190,7 +199,11 @@ export function AdminTodayLedger({
       freshness={`${view.generatedAtLabel} 기준`}
       scope={view.sourceStatusLabel}
       action={
-        <p className="admin-today-ledger__summary" aria-label="운영 케이스 요약">
+        <p
+          className="admin-today-ledger__summary"
+          tabIndex={-1}
+          aria-label="운영 케이스 요약"
+        >
           {view.mobileSummary.open} · {view.mobileSummary.critical} · {view.mobileSummary.assignedToMe}
         </p>
       }
@@ -274,6 +287,22 @@ function deriveTodayPageState(view: AdminOperationsView): AdminPageState {
   if (view.sources.some((source) => isFetchFailedTodaySource(source.status))) return "partial";
   if (view.items.length === 0) return "empty";
   return "ready";
+}
+
+function buildTodayCaseTraversal(
+  items: readonly { id: string }[],
+  selectedCaseId: string | null,
+  onSelect: (caseId: string) => void,
+): AdminCaseTraversal | undefined {
+  if (!selectedCaseId || items.length === 0) return undefined;
+  const index = items.findIndex((item) => item.id === selectedCaseId);
+  if (index < 0) return undefined;
+  return {
+    index,
+    total: items.length,
+    onPrev: index > 0 ? () => onSelect(items[index - 1]!.id) : null,
+    onNext: index < items.length - 1 ? () => onSelect(items[index + 1]!.id) : null,
+  };
 }
 
 function useMobileOperationsLayout(): boolean {

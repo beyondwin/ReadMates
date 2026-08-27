@@ -3,6 +3,12 @@ import {
   adminCommandRecovery,
   type AdminCommandRecovery,
 } from "@/features/platform-admin/model/platform-admin-command-recovery";
+import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
+import {
+  AdminSafeActionDock,
+  type AdminSafeActionState,
+} from "./admin-action-dock";
+import { AdminReceiptTimeline } from "./admin-receipt-timeline";
 
 type DomainKind = "SUBDOMAIN" | "CUSTOM_DOMAIN";
 type DomainStatus =
@@ -232,7 +238,7 @@ function AdminClubDomainCommandPanelInner({
     >
       <div className="admin-club-detail__panel-heading">
         <div>
-          <p className="eyebrow">Domain provisioning</p>
+          <p className="eyebrow">{ADMIN_COPY.eyebrow.domainProvisioning}</p>
           <h2 id="platform-admin-domains-title" className="h3 editorial">
             도메인
           </h2>
@@ -323,14 +329,6 @@ function AdminClubDomainCommandPanelInner({
               <span>기본 도메인</span>
             </label>
           </div>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            disabled={!draft.hostname || previewPending || draftLocked}
-            onClick={() => void previewIntent()}
-          >
-            도메인 추가 미리보기
-          </button>
           {preview ? (
             <div className="admin-club-detail__review" aria-live="polite">
               <p>
@@ -357,41 +355,52 @@ function AdminClubDomainCommandPanelInner({
                 />
                 <span>도메인 영향을 확인했습니다</span>
               </label>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                disabled={!confirmed || draftLocked || receipt !== null}
-                onClick={() => void confirmIntent()}
-              >
-                도메인 추가 확정
-              </button>
             </div>
           ) : null}
-        </div>
-      ) : null}
-      {canManageDomains && recovery ? (
-        <div className="danger" role="alert">
-          <p>{recovery.message}</p>
-          {recovery.kind === "REFRESH_STATE" ? (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={onRefresh}
-            >
-              최신 상태 불러오기
-            </button>
-          ) : null}
+          <AdminSafeActionDock
+            level="L2"
+            authority="allowed"
+            state={clubCommandDockState({
+              pending: previewPending || confirmPending || confirmInFlight,
+              receipt: receipt !== null,
+              recovery,
+            })}
+            reason={
+              recovery ? (
+                <CommandRecovery recovery={recovery} onRefresh={onRefresh} />
+              ) : undefined
+            }
+            secondary={
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={!draft.hostname || previewPending || draftLocked}
+                onClick={() => void previewIntent()}
+              >
+                도메인 추가 미리보기
+              </button>
+            }
+            primary={
+              preview ? (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  disabled={!confirmed || draftLocked || receipt !== null}
+                  onClick={() => void confirmIntent()}
+                >
+                  도메인 추가 확정
+                </button>
+              ) : undefined
+            }
+          />
         </div>
       ) : null}
       {canManageDomains && receipt ? (
-        <div className="admin-club-detail__receipt" aria-live="polite">
-          <strong>명령 접수 완료</strong>
-          <span>receipt {receipt.receiptId}</span>
-          <span>
-            {receipt.resultCode}
-            {receipt.convergenceState ? ` · ${receipt.convergenceState}` : ""}
-          </span>
-        </div>
+        <ClubCommandReceipt
+          receiptId={receipt.receiptId}
+          resultCode={receipt.resultCode}
+          convergenceState={receipt.convergenceState}
+        />
       ) : null}
     </section>
   );
@@ -401,4 +410,74 @@ function isAuthorityLossError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const status = "status" in error ? error.status : undefined;
   return status === 401 || status === 403;
+}
+
+function clubCommandDockState({
+  pending,
+  receipt,
+  recovery,
+}: {
+  pending: boolean;
+  receipt: boolean;
+  recovery: AdminCommandRecovery | null;
+}): AdminSafeActionState {
+  if (receipt) return "complete";
+  if (pending) return "pending";
+  if (recovery?.kind === "REFRESH_STATE") return "conflict";
+  if (recovery?.kind === "RESTART_PREVIEW" || recovery?.kind === "RESTART_INTENT") {
+    return "stale";
+  }
+  if (recovery?.kind === "RETRY_SAME_INTENT" || recovery?.kind === "CORRECT_DRAFT") {
+    return "unknown-outcome";
+  }
+  return "ready";
+}
+
+function CommandRecovery({
+  recovery,
+  onRefresh,
+}: {
+  recovery: AdminCommandRecovery;
+  onRefresh: () => void;
+}) {
+  return (
+    <div className="danger" role="alert">
+      <p>{recovery.message}</p>
+      {recovery.kind === "REFRESH_STATE" ? (
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onRefresh}>
+          최신 상태 불러오기
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function ClubCommandReceipt({
+  receiptId,
+  resultCode,
+  convergenceState,
+}: {
+  receiptId: string;
+  resultCode: string;
+  convergenceState: DomainProvisioningReceipt["convergenceState"];
+}) {
+  return (
+    <AdminReceiptTimeline
+      level="L2"
+      receiptId={`receipt ${receiptId}`}
+      entries={[
+        {
+          key: "accepted",
+          label: `${ADMIN_COPY.receipt} — 명령 접수`,
+          state:
+            convergenceState === "FAILED"
+              ? "failed"
+              : convergenceState === "PENDING"
+                ? "pending"
+                : "succeeded",
+          detail: `${resultCode}${convergenceState ? ` · ${convergenceState}` : ""}`,
+        },
+      ]}
+    />
+  );
 }

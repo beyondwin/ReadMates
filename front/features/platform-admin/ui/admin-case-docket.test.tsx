@@ -40,4 +40,24 @@ describe("AdminCaseDocket", () => {
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
     expect(findNestedLiveRegions(container)).toEqual([]);
   });
+
+  it("renders commands before the recent ledger and does not nest history in actions", () => {
+    render(
+      <AdminCaseDocket
+        label="사건 기록"
+        title="알림 실패"
+        evidence={<p>최근 실패 4건</p>}
+        related={<a href="/admin/notifications">알림 운영</a>}
+        actions={<button type="button">확인 처리</button>}
+        history={<p>이 대상의 최근 기입</p>}
+      />,
+    );
+
+    const actions = document.querySelector(".admin-case-docket__actions");
+    const history = document.querySelector(".admin-case-docket__history");
+    expect(actions).not.toBeNull();
+    expect(history).not.toBeNull();
+    expect(actions!.contains(history)).toBe(false);
+    expect(Boolean(actions!.compareDocumentPosition(history!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+  });
 });

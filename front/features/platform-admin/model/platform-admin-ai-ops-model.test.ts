@@ -8,6 +8,7 @@ import {
   aiOpsSearchFromFilter,
   aiOpsWindowFromSearchParams,
   classifyAiOpsError,
+  formatAiJobElapsedLabel,
   mergeAiOpsJobPages,
   hasActiveAiOpsFilter,
 } from "./platform-admin-ai-ops-model";
@@ -82,7 +83,7 @@ describe("aiOpsPathFromFilter", () => {
   });
 });
 
-describe("AI Ops paged ledger", () => {
+describe("AI 작업 paged ledger", () => {
   it("keeps page order while removing a duplicate cursor-boundary job", () => {
     const job = (jobId: string) => ({ jobId } as never);
     expect(
@@ -94,7 +95,53 @@ describe("AI Ops paged ledger", () => {
   });
 });
 
-describe("AI Ops error classification", () => {
+describe("AI 작업 elapsed labels", () => {
+  const now = new Date("2026-05-18T00:21:00Z");
+
+  it("labels an in-progress job with elapsed minutes", () => {
+    expect(
+      formatAiJobElapsedLabel(
+        {
+          status: "RUNNING",
+          createdAt: "2026-05-18T00:16:00Z",
+          lastUpdatedAt: "2026-05-18T00:20:00Z",
+          staleCandidate: false,
+        },
+        now,
+      ),
+    ).toBe("5분째 진행");
+  });
+
+  it("warns when an in-progress job has stalled past the threshold", () => {
+    expect(
+      formatAiJobElapsedLabel(
+        {
+          status: "RUNNING",
+          createdAt: "2026-05-18T00:00:00Z",
+          lastUpdatedAt: "2026-05-18T00:01:00Z",
+          staleCandidate: true,
+        },
+        now,
+      ),
+    ).toBe("멈춤 의심 · 20분");
+  });
+
+  it("omits elapsed labels for terminal jobs", () => {
+    expect(
+      formatAiJobElapsedLabel(
+        {
+          status: "FAILED",
+          createdAt: "2026-05-18T00:00:00Z",
+          lastUpdatedAt: "2026-05-18T00:01:00Z",
+          staleCandidate: false,
+        },
+        now,
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("AI 작업 error classification", () => {
   it("distinguishes disabled 404, unavailable 5xx, conflict, and transport unknown", () => {
     expect(classifyAiOpsError(Object.assign(new Error("missing"), { status: 404, code: "RESOURCE_NOT_FOUND" })))
       .toEqual({ kind: "DISABLED", status: 404, code: "RESOURCE_NOT_FOUND", message: "missing" });

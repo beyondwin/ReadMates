@@ -44,11 +44,11 @@ export const LIGHTHOUSE_ROUTE_INVENTORY: LighthouseRouteDefinition[] = [
   { id: "admin-today", group: "admin", path: "/admin/today", mode: "timespan", auth: "admin", description: "Platform admin today ledger", expectedText: "오늘" },
   { id: "admin-health", group: "admin", path: "/admin/health", mode: "snapshot", auth: "admin", description: "Platform admin health", expectedText: "헬스" },
   { id: "admin-clubs", group: "admin", path: "/admin/clubs", mode: "snapshot", auth: "admin", description: "Platform admin clubs", expectedText: "클럽" },
-  { id: "admin-support", group: "admin", path: "/admin/support", mode: "snapshot", auth: "admin", description: "Platform admin support", expectedText: "지원" },
+  { id: "admin-support", group: "admin", path: "/admin/support", mode: "snapshot", auth: "admin", description: "Platform admin support", expectedText: "접근 원장" },
   { id: "admin-notifications", group: "admin", path: "/admin/notifications", mode: "snapshot", auth: "admin", description: "Platform admin notifications", expectedText: "알림" },
   { id: "admin-ai-ops", group: "admin", path: "/admin/ai-ops", mode: "snapshot", auth: "admin", description: "Platform admin AI operations", expectedText: "AI" },
-  { id: "admin-audit", group: "admin", path: "/admin/audit", mode: "snapshot", auth: "admin", description: "Platform admin audit", expectedText: "감사" },
-  { id: "admin-analytics", group: "admin", path: "/admin/analytics", mode: "snapshot", auth: "admin", description: "Platform admin analytics", expectedText: "분석" },
+  { id: "admin-audit", group: "admin", path: "/admin/audit", mode: "snapshot", auth: "admin", description: "Platform admin audit", expectedText: "운영 기입" },
+  { id: "admin-analytics", group: "admin", path: "/admin/analytics", mode: "snapshot", auth: "admin", description: "Platform admin analytics", expectedText: "분석 부록" },
   { id: "admin-club-detail", group: "admin", path: `/admin/clubs/${READING_SAI_FIXTURES.clubId}`, mode: "snapshot", auth: "admin", description: "Platform admin club detail", expectedText: "읽는사이" },
 ];
 

@@ -212,11 +212,11 @@ test("five cold 100-case runs stay within the admin editorial ledger budgets", a
     await cdp.send("HeapProfiler.collectGarbage");
     const heapAfter = await cdp.send("Runtime.getHeapUsage");
 
-    await page.getByRole("searchbox", { name: "이미 불러온 사건 검색" }).fill("AI 작업");
+    await page.getByRole("searchbox", { name: "이미 불러온 케이스 검색" }).fill("AI 작업");
     await expect(page.locator(".admin-operations-queue__row")).toHaveCount(25);
     const filterToRafCommitMs = await measure(page, ADMIN_EDITORIAL_LEDGER_PERFORMANCE_METRICS.filterToRafCommit);
 
-    await page.getByRole("searchbox", { name: "이미 불러온 사건 검색" }).fill("");
+    await page.getByRole("searchbox", { name: "이미 불러온 케이스 검색" }).fill("");
     await expect(page.locator(".admin-operations-queue__row")).toHaveCount(CASE_COUNT);
     await page.locator(".admin-operations-queue__row").nth(1).click();
     const caseSelectionToDocketCommitMs = await measure(

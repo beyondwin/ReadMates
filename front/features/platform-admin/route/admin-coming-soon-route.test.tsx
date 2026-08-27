@@ -7,8 +7,8 @@ import { adminComingSoonLoader } from "./admin-coming-soon-data";
 const descriptor: AdminRouteDescriptor = {
   path: "audit",
   label: "감사",
-  group: "review",
-  groupLabel: "감사/분석",
+  group: "ledger",
+  groupLabel: "원장",
   slice: "S7",
   status: "coming_soon",
   requiredCapability: "VIEW_AUDIT",

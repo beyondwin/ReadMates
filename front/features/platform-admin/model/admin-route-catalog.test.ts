@@ -45,6 +45,7 @@ describe("ADMIN_ROUTES catalog", () => {
   it("uses a single Korean label per primary area", () => {
     const labelByGroup = new Map<string, string>();
     for (const route of ADMIN_ROUTES) {
+      if (route.group == null) continue;
       const existing = labelByGroup.get(route.group);
       if (existing) expect(existing).toBe(route.groupLabel);
       else labelByGroup.set(route.group, route.groupLabel);
@@ -52,8 +53,8 @@ describe("ADMIN_ROUTES catalog", () => {
     expect([...labelByGroup.entries()]).toEqual([
       ["today", "오늘"],
       ["clubs", "클럽"],
-      ["services", "서비스"],
-      ["review", "검토"],
+      ["pipeline", "파이프라인"],
+      ["ledger", "원장"],
     ]);
   });
 
@@ -82,53 +83,53 @@ describe("ADMIN_ROUTES catalog", () => {
         requiredCapability: "VIEW_CLUBS",
       },
       {
-        path: "health",
-        label: "서비스 건강",
-        group: "services",
-        groupLabel: "서비스",
-        requiredCapability: "VIEW_SERVICE_HEALTH",
-      },
-      {
         path: "notifications",
-        label: "알림",
-        group: "services",
-        groupLabel: "서비스",
+        label: "배달 원장",
+        group: "pipeline",
+        groupLabel: "파이프라인",
         requiredCapability: "VIEW_NOTIFICATION_OPERATIONS",
       },
       {
         path: "ai-ops",
         label: "AI 작업",
-        group: "services",
-        groupLabel: "서비스",
+        group: "pipeline",
+        groupLabel: "파이프라인",
         requiredCapability: "VIEW_AI_OPERATIONS",
+      },
+      {
+        path: "health",
+        label: "서비스 건강",
+        group: "pipeline",
+        groupLabel: "파이프라인",
+        requiredCapability: "VIEW_SERVICE_HEALTH",
+      },
+      {
+        path: "audit",
+        label: "운영 기입",
+        group: "ledger",
+        groupLabel: "원장",
+        requiredCapability: "VIEW_AUDIT",
+      },
+      {
+        path: "support",
+        label: "접근 원장",
+        group: "ledger",
+        groupLabel: "원장",
+        requiredCapability: "VIEW_SUPPORT",
+      },
+      {
+        path: "analytics",
+        label: "분석 부록",
+        group: "ledger",
+        groupLabel: "원장",
+        requiredCapability: "VIEW_ANALYTICS",
       },
       {
         path: "public-takedown",
         label: "긴급 공개 회수",
-        group: "services",
-        groupLabel: "서비스",
+        group: null,
+        groupLabel: "비상 레인",
         requiredCapability: "EMERGENCY_PUBLIC_TAKEDOWN",
-      },
-      {
-        path: "support",
-        label: "지원",
-        group: "review",
-        groupLabel: "검토",
-        requiredCapability: "VIEW_SUPPORT",
-      },
-      {
-        path: "audit",
-        label: "감사",
-        group: "review",
-        groupLabel: "검토",
-        requiredCapability: "VIEW_AUDIT",
-      },
-      {
-        path: "analytics",
-        label: "분석",
-        group: "review",
-        groupLabel: "검토",
-        requiredCapability: "VIEW_ANALYTICS",
       },
     ]);
   });
@@ -153,7 +154,7 @@ describe("ADMIN_ROUTES catalog", () => {
         expect(route.comingSoon?.summary).toBeTruthy();
         expect(route.comingSoon?.bullets.length).toBeGreaterThanOrEqual(3);
         expect(route.comingSoon?.docHref).toMatch(
-          /^\/docs\/superpowers\/specs\/2026-05-25-readmates-admin-vnext-roadmap-design\.md#/,
+          /^\/docs\/superpowers\/specs\/2026-05-25-readmates-admin-vnext-roadmap-design.md#/,
         );
       } else {
         expect(route.comingSoon).toBeUndefined();
@@ -187,9 +188,9 @@ describe("ADMIN_ROUTES catalog", () => {
       status: "ready",
       requiredCapability: "VIEW_CLUB_OPERATIONS",
     });
-    expect(visibleAdminNav(projection(["VIEW_CLUBS", "VIEW_CLUB_OPERATIONS"])).map((area) => area.id)).toEqual([
-      "clubs",
-    ]);
+    expect(
+      visibleAdminNav(projection(["VIEW_CLUBS", "VIEW_CLUB_OPERATIONS"])).areas.map((area) => area.id),
+    ).toEqual(["clubs"]);
   });
 
   it("every descriptor has a server enum required capability", () => {
@@ -213,8 +214,8 @@ describe("ADMIN_ROUTES catalog", () => {
 });
 
 describe("visibleAdminNav", () => {
-  it("places today and clubs as direct destinations and nests service and review children", () => {
-    const areas = visibleAdminNav(
+  it("places today and clubs as direct destinations and nests pipeline and ledger children", () => {
+    const nav = visibleAdminNav(
       projection([
         "VIEW_TODAY",
         "VIEW_CLUBS",
@@ -228,36 +229,55 @@ describe("visibleAdminNav", () => {
       ]),
     );
 
-    expect(areas.map((area) => ({ id: area.id, label: area.label, href: area.href }))).toEqual([
+    expect(nav.areas.map((area) => ({ id: area.id, label: area.label, href: area.href }))).toEqual([
       { id: "today", label: "오늘", href: "/admin/today" },
       { id: "clubs", label: "클럽", href: "/admin/clubs" },
-      { id: "services", label: "서비스", href: undefined },
-      { id: "review", label: "검토", href: undefined },
+      { id: "pipeline", label: "파이프라인", href: undefined },
+      { id: "ledger", label: "원장", href: undefined },
     ]);
-    expect(areas.find((area) => area.id === "services")?.children.map((route) => route.path)).toEqual([
-      "health",
+    expect(nav.areas.find((area) => area.id === "pipeline")?.children.map((route) => route.path)).toEqual([
       "notifications",
       "ai-ops",
-      "public-takedown",
+      "health",
     ]);
-    expect(areas.find((area) => area.id === "review")?.children.map((route) => route.path)).toEqual([
-      "support",
+    expect(nav.areas.find((area) => area.id === "ledger")?.children.map((route) => route.path)).toEqual([
       "audit",
+      "support",
       "analytics",
     ]);
-    expect(areas.flatMap((area) => area.children.map((route) => route.path))).not.toContain("clubs/:clubId");
+    expect(nav.areas.flatMap((area) => area.children.map((route) => route.path))).not.toContain(
+      "clubs/:clubId",
+    );
+    expect(nav.areas.flatMap((area) => area.children.map((route) => route.path))).not.toContain(
+      "public-takedown",
+    );
   });
 
-  it("hides routes and empty parents when the projection omits their capability", () => {
-    const areas = visibleAdminNav(projection(["VIEW_TODAY", "VIEW_SERVICE_HEALTH", "VIEW_AUDIT"]));
-    expect(areas.map((area) => area.id)).toEqual(["today", "services", "review"]);
-    expect(areas.find((area) => area.id === "services")?.children.map((route) => route.path)).toEqual(["health"]);
-    expect(areas.find((area) => area.id === "review")?.children.map((route) => route.path)).toEqual(["audit"]);
+  it("pins emergency public takedown outside primary groups", () => {
+    const nav = visibleAdminNav(
+      projection(["VIEW_TODAY", "EMERGENCY_PUBLIC_TAKEDOWN", "VIEW_AUDIT"]),
+    );
+    expect(nav.pinned.map((route) => ({ path: route.path, label: route.label, group: route.group }))).toEqual([
+      { path: "public-takedown", label: "긴급 공개 회수", group: null },
+    ]);
+    expect(nav.areas.map((area) => area.id)).toEqual(["today", "ledger"]);
+  });
+
+  it("hides routes, empty parents, and pinned emergency when the projection omits their capability", () => {
+    const nav = visibleAdminNav(projection(["VIEW_TODAY", "VIEW_SERVICE_HEALTH", "VIEW_AUDIT"]));
+    expect(nav.areas.map((area) => area.id)).toEqual(["today", "pipeline", "ledger"]);
+    expect(nav.areas.find((area) => area.id === "pipeline")?.children.map((route) => route.path)).toEqual([
+      "health",
+    ]);
+    expect(nav.areas.find((area) => area.id === "ledger")?.children.map((route) => route.path)).toEqual([
+      "audit",
+    ]);
+    expect(nav.pinned).toEqual([]);
   });
 
   it("returns empty navigation when capabilities are missing or empty", () => {
-    expect(visibleAdminNav(null)).toEqual([]);
-    expect(visibleAdminNav(undefined)).toEqual([]);
-    expect(visibleAdminNav(projection([]))).toEqual([]);
+    expect(visibleAdminNav(null)).toEqual({ areas: [], pinned: [] });
+    expect(visibleAdminNav(undefined)).toEqual({ areas: [], pinned: [] });
+    expect(visibleAdminNav(projection([]))).toEqual({ areas: [], pinned: [] });
   });
 });

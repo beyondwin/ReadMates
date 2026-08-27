@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -21,6 +21,32 @@ const grant = {
   createdByRole: "OWNER",
 };
 
+const selected = {
+  subjectId: "subject-1",
+  displayName: "지원 대상",
+  maskedEmail: "s***@example.com",
+  kind: "USER",
+  platformAdminRole: null,
+  platformAdminStatus: null,
+  clubMembershipSummary: [],
+  grantEligible: true,
+  grantBlockedReason: null,
+};
+
+const createPreview = {
+  previewId: "preview-1",
+  commandType: "CREATE" as const,
+  grantId: null,
+  clubId: "club-1",
+  scope: "HOST_SUPPORT_READ" as const,
+  grantExpiresAt: "2026-08-25T12:00:00Z",
+  reasonCategory: "MEMBER_ASSISTANCE" as const,
+  notePresent: false,
+  impactCodes: ["GRANT_SUPPORT_ACCESS"],
+  expiresAt: "2026-08-25T10:10:00Z",
+  fingerprintPrefix: "00112233",
+};
+
 function props(overrides: Partial<ComponentProps<typeof AdminSupportWorkbench>> = {}): ComponentProps<typeof AdminSupportWorkbench> {
   return {
     clubs: [{ clubId: "club-1", name: "읽는사이" }],
@@ -39,6 +65,45 @@ function props(overrides: Partial<ComponentProps<typeof AdminSupportWorkbench>> 
 }
 
 describe("AdminSupportWorkbench", () => {
+  it("renders the page-context heading 접근 원장", () => {
+    render(<AdminSupportWorkbench {...props()} />);
+    expect(screen.getByRole("heading", { level: 1, name: "접근 원장" })).toBeInTheDocument();
+    expect(screen.getByText("원장")).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  it("disables the issue button when reason or expiry is missing", () => {
+    const { rerender } = render(<AdminSupportWorkbench {...props({
+      search: { ...props().search, selected },
+      create: { ...props().create, reasonCategory: "" as "MEMBER_ASSISTANCE", expiresAt: "2026-08-25T12:00" },
+    })} />);
+    expect(screen.getByRole("button", { name: "발급 검토" })).toBeDisabled();
+
+    rerender(<AdminSupportWorkbench {...props({
+      search: { ...props().search, selected },
+      create: { ...props().create, reasonCategory: "MEMBER_ASSISTANCE", expiresAt: "" },
+    })} />);
+    expect(screen.getByRole("button", { name: "발급 검토" })).toBeDisabled();
+
+    rerender(<AdminSupportWorkbench {...props({
+      search: { ...props().search, selected },
+      create: { ...props().create, reasonCategory: "MEMBER_ASSISTANCE", expiresAt: "2026-08-25T12:00" },
+    })} />);
+    expect(screen.getByRole("button", { name: "발급 검토" })).toBeEnabled();
+  });
+
+  it("labels the L2 confirm button with the action sentence 지원 접근 발급", () => {
+    render(<AdminSupportWorkbench {...props({
+      search: { ...props().search, selected },
+      create: { ...props().create, preview: createPreview },
+    })} />);
+
+    const dock = screen.getByRole("group", { name: "작업" });
+    expect(dock.closest("[data-level]")).toHaveAttribute("data-level", "L2");
+    expect(within(dock).getByRole("button", { name: "지원 접근 발급" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "발급 확정" })).not.toBeInTheDocument();
+  });
+
   it("keeps search accessible and has no unnamed controls", () => {
     const { container } = render(<AdminSupportWorkbench {...props()} />);
     expect(screen.getByRole("searchbox", { name: "지원 대상 검색" })).toBeInTheDocument();
@@ -54,6 +119,17 @@ describe("AdminSupportWorkbench", () => {
     expect(onLoadMore).toHaveBeenCalledOnce();
   });
 
+  it("shows Korean grant status labels in a sentence ledger row", () => {
+    render(<AdminSupportWorkbench {...props()} />);
+    const ledger = document.querySelector(".admin-support-workbench__ledger")
+      ?? document.querySelector(".admin-evidence-ledger");
+    expect(ledger).not.toBeNull();
+    expect(within(ledger!).getByText(/읽는사이에서 지원 대상에게 지원 접근을 발급함/)).toBeInTheDocument();
+    expect(within(ledger!).getByText(/활성/)).toBeInTheDocument();
+    expect(within(ledger!).queryByText(/\bACTIVE\b/)).toBeNull();
+    expect(within(ledger!).queryByText(/\bMEMBER_ASSISTANCE\b/)).toBeNull();
+  });
+
   it("starts revoke review only when the current capability permits it", async () => {
     const onStart = vi.fn();
     const { rerender } = render(<AdminSupportWorkbench {...props({ revoke: { ...props().revoke, onStart } })} />);
@@ -66,29 +142,14 @@ describe("AdminSupportWorkbench", () => {
   });
 
   it("disables existing create and revoke confirmations after capability loss", () => {
-    const preview = {
-      previewId: "preview-1",
-      commandType: "CREATE" as const,
-      grantId: null,
-      clubId: "club-1",
-      scope: "HOST_SUPPORT_READ" as const,
-      grantExpiresAt: "2026-08-25T12:00:00Z",
-      reasonCategory: "MEMBER_ASSISTANCE" as const,
-      notePresent: false,
-      impactCodes: ["GRANT_SUPPORT_ACCESS"],
-      expiresAt: "2026-08-25T10:10:00Z",
-      fingerprintPrefix: "00112233",
-    };
     render(<AdminSupportWorkbench {...props({
       canManage: false,
-      search: { ...props().search, selected: {
-        subjectId: "subject-1", displayName: "지원 대상", maskedEmail: "s***@example.com", kind: "USER", platformAdminRole: null, platformAdminStatus: null, clubMembershipSummary: [], grantEligible: true, grantBlockedReason: null,
-      } },
-      create: { ...props().create, preview },
-      revoke: { ...props().revoke, target: grant, preview: { ...preview, commandType: "REVOKE", grantId: grant.grantId, impactCodes: ["REVOKE_SUPPORT_ACCESS"] } },
+      search: { ...props().search, selected },
+      create: { ...props().create, preview: createPreview },
+      revoke: { ...props().revoke, target: grant, preview: { ...createPreview, commandType: "REVOKE", grantId: grant.grantId, impactCodes: ["REVOKE_SUPPORT_ACCESS"] } },
     })} />);
 
-    expect(screen.getByRole("button", { name: "발급 확정" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "지원 접근 발급" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "취소 확정" })).toBeDisabled();
   });
 
@@ -108,9 +169,7 @@ describe("AdminSupportWorkbench", () => {
 
   it("keeps the optional reason note as review-time-only copy", () => {
     render(<AdminSupportWorkbench {...props({
-      search: { ...props().search, selected: {
-        subjectId: "subject-1", displayName: "지원 대상", maskedEmail: "s***@example.com", kind: "USER", platformAdminRole: null, platformAdminStatus: null, clubMembershipSummary: [], grantEligible: true, grantBlockedReason: null,
-      } },
+      search: { ...props().search, selected },
     })} />);
     expect(screen.getByLabelText("검토 시에만 확인하는 사유 메모 (저장되지 않음)")).toBeInTheDocument();
     expect(screen.queryByLabelText("내부 메모 (선택)")).not.toBeInTheDocument();

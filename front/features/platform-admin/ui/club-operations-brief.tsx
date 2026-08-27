@@ -1,3 +1,7 @@
+import {
+  clubLifecycleLabel,
+  clubVisibilityLabel,
+} from "@/features/platform-admin/model/admin-copy";
 import type {
   PlatformAdminPermissionView,
   PlatformAdminSelectedClubBrief,
@@ -58,7 +62,7 @@ export function ClubOperationsBrief({
           {club.name}
         </h2>
         <p className="tiny muted">
-          {club.slug} · {club.status} · {club.publicVisibility}
+          {club.slug} · {clubLifecycleLabel(club.status)} · {clubVisibilityLabel(club.publicVisibility)}
         </p>
       </div>
       <ClubPublishChecklist

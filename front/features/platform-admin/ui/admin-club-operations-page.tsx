@@ -17,6 +17,7 @@ import {
   type AdminClubClosingRiskItem,
   type AdminClubOperationsSnapshot,
 } from "@/features/platform-admin/model/platform-admin-club-operations-model";
+import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
 
 type AdminClubOperationsPageProps = {
   snapshot: AdminClubOperationsSnapshot;
@@ -41,7 +42,7 @@ export function AdminClubOperationsPage({
     >
       <header className="admin-club-operations__header">
         <div>
-          <p className="eyebrow">Operations snapshot</p>
+          <p className="eyebrow">{ADMIN_COPY.eyebrow.operationsSnapshot}</p>
           <h2 id="admin-club-operations-title" className="h3 editorial">
             {snapshot.club.name} 운영 스냅샷
           </h2>
@@ -52,20 +53,20 @@ export function AdminClubOperationsPage({
       </header>
 
       <div className="admin-club-operations__summary">
-        <Metric label="활성 멤버" value={snapshot.memberActivity.activeCount} />
-        <Metric label="호스트" value={snapshot.memberActivity.hostCount} />
+        <Metric label="활성 멤버" value={snapshot.memberActivity.activeCount} inventory />
+        <Metric label="호스트" value={snapshot.memberActivity.hostCount} inventory />
         {supportGrantCount !== undefined ? (
-          <Metric label="지원 grant" value={supportGrantCount} />
+          <Metric label={ADMIN_COPY.support.count} value={supportGrantCount} />
         ) : supportGrantUnavailable ? (
           <article className="surface admin-club-operations__metric">
-            <p className="tiny muted">지원 grant 확인 불가</p>
+            <p className="tiny muted">{ADMIN_COPY.support.unavailable}</p>
             {onRetrySupportGrants ? (
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
                 onClick={onRetrySupportGrants}
               >
-                지원 grant 다시 시도
+                {ADMIN_COPY.support.retry}
               </button>
             ) : null}
           </article>
@@ -73,6 +74,7 @@ export function AdminClubOperationsPage({
         <Metric
           label="열린 모임"
           value={snapshot.sessionProgress.currentOpenCount}
+          inventory
         />
         <Metric
           label="알림 실패 (7일)"
@@ -110,17 +112,17 @@ export function AdminClubOperationsPage({
           <Panel title="Notification health">
             <Stat
               label="최근 7일 실패"
-              value={snapshot.notificationHealth.recentFailed7d}
+              value={deviantCount(snapshot.notificationHealth.recentFailed7d)}
             />
-            <Stat label="지난 7일 대비" value={formatDelta(notifDelta)} />
-            <Stat label="Pending" value={snapshot.notificationHealth.pending} />
+            <Stat label="지난 7일 대비" value={deviantDelta(notifDelta)} />
+            <Stat label="Pending" value={deviantCount(snapshot.notificationHealth.pending)} />
             <Stat
               label="Failed (전체)"
-              value={snapshot.notificationHealth.failed}
+              value={deviantCount(snapshot.notificationHealth.failed)}
             />
             <Stat
               label="Dead (전체)"
-              value={snapshot.notificationHealth.dead}
+              value={deviantCount(snapshot.notificationHealth.dead)}
             />
             <Link
               className="btn btn-ghost btn-sm"
@@ -131,18 +133,18 @@ export function AdminClubOperationsPage({
           </Panel>
 
           <Panel title="AI usage">
-            <Stat label="Active jobs" value={snapshot.aiUsage.activeJobs} />
+            <Stat label="Active jobs" value={null} />
             <Stat
               label="최근 7일 실패"
-              value={snapshot.aiUsage.failedRecentJobs}
+              value={deviantCount(snapshot.aiUsage.failedRecentJobs)}
             />
-            <Stat label="지난 7일 대비" value={formatDelta(aiDelta)} />
-            <Stat label="Cost" value={`$${snapshot.aiUsage.costEstimateUsd}`} />
+            <Stat label="지난 7일 대비" value={deviantDelta(aiDelta)} />
+            <Stat label="Cost" value={deviantCost(snapshot.aiUsage.costEstimateUsd)} />
             <Link
               className="btn btn-ghost btn-sm"
               to={`/admin/ai-ops?clubId=${snapshot.club.clubId}`}
             >
-              AI Ops
+              AI 작업
             </Link>
           </Panel>
         </div>
@@ -155,24 +157,18 @@ export function AdminClubOperationsPage({
         <h3 className="h4 editorial">호스트 운영</h3>
         <div className="admin-club-operations__grid">
           <Panel title="Session progress">
-            <Stat label="예정" value={snapshot.sessionProgress.upcomingCount} />
-            <Stat label="닫힘" value={snapshot.sessionProgress.closedCount} />
-            <Stat
-              label="공개 기록"
-              value={snapshot.sessionProgress.publishedRecordCount}
-            />
+            <Stat label="예정" value={null} />
+            <Stat label="닫힘" value={null} />
+            <Stat label="공개 기록" value={null} />
             <Stat
               label="미완료 기록"
-              value={snapshot.sessionProgress.incompleteRecordCount}
+              value={deviantCount(snapshot.sessionProgress.incompleteRecordCount)}
             />
           </Panel>
           <Panel title="Member activity">
-            <Stat label="활성" value={snapshot.memberActivity.activeCount} />
-            <Stat label="휴면" value={snapshot.memberActivity.dormantCount} />
-            <Stat
-              label="대기"
-              value={snapshot.memberActivity.pendingViewerCount}
-            />
+            <Stat label="활성" value={null} />
+            <Stat label="휴면" value={deviantCount(snapshot.memberActivity.dormantCount)} />
+            <Stat label="대기" value={deviantCount(snapshot.memberActivity.pendingViewerCount)} />
           </Panel>
         </div>
         <ClosingRiskPanel snapshot={snapshot} />
@@ -199,20 +195,46 @@ function formatDelta(delta: number): string {
   return `→ 0 (지난 7일 대비)`;
 }
 
+function deviantCount(value: number): number | null {
+  return value > 0 ? value : null;
+}
+
+function deviantDelta(delta: number): string | null {
+  return delta === 0 ? null : formatDelta(delta);
+}
+
+function deviantCost(value: string): string | null {
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount > 0 ? `$${value}` : null;
+}
+
+function closingRiskCountsLabel(
+  closingRisks: AdminClubOperationsSnapshot["closingRisks"],
+): string | null {
+  const incomplete = closingRisks?.incompleteCount ?? 0;
+  const blocked = closingRisks?.blockedCount ?? 0;
+  const ready = closingRisks?.readyCount ?? 0;
+  if (incomplete === 0 && blocked === 0 && ready === 0) return null;
+  return `미완료 ${incomplete} · 차단 ${blocked} · 준비 ${ready}`;
+}
+
 function Metric({
   label,
   value,
   delta,
+  inventory = false,
 }: {
   label: string;
   value: number;
   delta?: number;
+  inventory?: boolean;
 }) {
+  const showValue = !inventory && value > 0;
   return (
     <article className="surface admin-club-operations__metric">
       <p className="tiny muted">{label}</p>
-      <strong className="editorial">{value}</strong>
-      {delta !== undefined ? (
+      {showValue ? <strong className="editorial">{value}</strong> : null}
+      {showValue && delta !== undefined && delta !== 0 ? (
         <p className="tiny muted">{formatDelta(delta)}</p>
       ) : null}
     </article>
@@ -236,11 +258,17 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: number | string }) {
+function Stat({
+  label,
+  value,
+}: {
+  label: string;
+  value: number | string | null;
+}) {
   return (
     <div className="admin-club-operations__stat">
       <span>{label}</span>
-      <strong>{value}</strong>
+      {value != null && value !== "" ? <strong>{value}</strong> : null}
     </div>
   );
 }
@@ -265,11 +293,9 @@ function ClosingRiskPanel({
           <h4 id="admin-club-closing-risk-title" className="h5 editorial">
             클로징 확인 필요
           </h4>
-          <p className="tiny muted">
-            미완료 {closingRisks?.incompleteCount ?? 0} · 차단{" "}
-            {closingRisks?.blockedCount ?? 0} · 준비{" "}
-            {closingRisks?.readyCount ?? 0}
-          </p>
+          {closingRiskCountsLabel(closingRisks) ? (
+            <p className="tiny muted">{closingRiskCountsLabel(closingRisks)}</p>
+          ) : null}
           {closingRisks?.trackingUnavailable ? (
             <p className="tiny muted">추적 상태 확인 불가</p>
           ) : null}

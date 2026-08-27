@@ -137,7 +137,7 @@ test("owner without EXPORT_ANALYTICS cannot start a CSV download", async ({ page
   });
 
   await page.goto("/admin/analytics");
-  await expect(page.getByRole("heading", { name: "분석" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "분석 부록" })).toBeVisible();
   await expect(page.getByRole("button", { name: "CSV 내려받기" })).toHaveCount(0);
   expect(exportRequests).toBe(0);
 });
@@ -148,7 +148,7 @@ test("owner reviews admin analytics overview and switches window", async ({ page
 
   await page.goto("/admin/analytics");
 
-  await expect(page.getByRole("heading", { name: "분석" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "분석 부록" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await expect(page.getByText("80%")).toBeVisible();
   await expect(page.getByRole("heading", { name: "KPI 추세" })).toBeVisible();
@@ -162,7 +162,7 @@ test("owner reviews admin analytics overview and switches window", async ({ page
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("readmates-admin-analytics-30d-2026-05-30.csv");
   await expect(page.getByRole("link", { name: "알림 운영 보기" })).toHaveAttribute("href", "/admin/notifications");
-  await expect(page.getByRole("link", { name: "AI Ops 보기" })).toHaveAttribute("href", "/admin/ai-ops");
+  await expect(page.getByRole("link", { name: "AI 작업 보기" })).toHaveAttribute("href", "/admin/ai-ops");
   await expect(page.getByRole("link", { name: "클럽 운영 보기" }).first()).toHaveAttribute("href", "/admin/clubs");
 
   await page.getByRole("button", { name: "최근 7일" }).click();
@@ -180,7 +180,7 @@ test("owner captures public-safe analytics visual evidence on desktop and mobile
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/admin/analytics");
-  await expect(page.getByRole("heading", { name: "분석" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "분석 부록" })).toBeVisible();
   await expect(page.getByRole("table", { name: "KPI 추세" })).toBeVisible();
   const desktopScreenshot = await page.screenshot({
     path: testInfo.outputPath("admin-analytics-desktop.png"),
@@ -190,7 +190,7 @@ test("owner captures public-safe analytics visual evidence on desktop and mobile
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/admin/analytics");
-  await expect(page.getByRole("heading", { name: "분석" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "분석 부록" })).toBeVisible();
   await expect(page.getByRole("button", { name: "CSV 내려받기" })).toBeVisible();
   const mobileScreenshot = await page.screenshot({
     path: testInfo.outputPath("admin-analytics-mobile.png"),

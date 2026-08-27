@@ -49,7 +49,10 @@ describe("AdminAnalyticsOverviewView", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "분석" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "분석 부록" })).toBeInTheDocument();
+    expect(screen.getByText("원장")).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole("region", { name: "분석 부록" })).toHaveClass("admin-page-frame");
     expect(screen.getAllByText("모임 완료율").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("80%")).toBeInTheDocument();
     expect(screen.getAllByText("0")).toHaveLength(2);
@@ -59,15 +62,58 @@ describe("AdminAnalyticsOverviewView", () => {
     expect(screen.getByText("클럽 비교에 충분한 데이터가 없습니다.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "KPI 추세" })).toBeInTheDocument();
     expect(screen.getByRole("table", { name: "KPI 추세" })).toBeInTheDocument();
+    const trendCells = [...screen.getByRole("table", { name: "KPI 추세" }).querySelectorAll("tbody td")];
+    expect(trendCells.length).toBeGreaterThan(0);
+    for (const cell of trendCells) {
+      expect(cell).toHaveClass("ledger-number");
+    }
+    expect(screen.getByRole("rowheader", { name: "모임 완료율" })).not.toHaveClass("ledger-number");
     expect(screen.getByText("2026-05-01")).toBeInTheDocument();
     expect(screen.getByText("2026-05-15")).toBeInTheDocument();
     expect(screen.getByText("75%")).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "클럽 운영 보기" }).at(0)).toHaveAttribute("href", "/admin/clubs");
-    expect(screen.getByRole("link", { name: "AI Ops 보기" })).toHaveAttribute("href", "/admin/ai-ops");
+    expect(screen.getByRole("link", { name: "AI 작업 보기" })).toHaveAttribute("href", "/admin/ai-ops");
     expect(screen.getByRole("link", { name: "알림 운영 보기" })).toHaveAttribute("href", "/admin/notifications");
-    expect(screen.getByRole("link", { name: "AI Ops 보기" })).toHaveClass("small");
+    expect(screen.getByRole("link", { name: "AI 작업 보기" })).toHaveClass("small");
     expect(screen.getByRole("link", { name: "알림 운영 보기" })).toHaveClass("small");
     expect(screen.getByRole("button", { name: "CSV 내려받기" })).toBeEnabled();
+  });
+
+  it("applies tabular numbers to club comparison cells", () => {
+    render(
+      <AdminAnalyticsOverviewView
+        overview={{
+          ...overview,
+          clubBenchmark: {
+            availability: "AVAILABLE",
+            rows: [{
+              clubId: "club-1",
+              slug: "fiction",
+              name: "Fiction Club",
+              activeMembers: 12,
+              sessionCompletionRate: 80,
+              rsvpRate: 70,
+              aiCostUsd: "1.50",
+              notificationDeliveryRate: 95,
+            }],
+          },
+        }}
+        window="30d"
+        loading={false}
+        error={null}
+        onWindowChange={vi.fn()}
+        exportStatus="idle"
+        canExport
+        onExport={vi.fn()}
+      />,
+    );
+
+    const cells = [...screen.getByRole("table", { name: "클럽 비교" }).querySelectorAll("tbody td")];
+    expect(cells.length).toBeGreaterThan(0);
+    for (const cell of cells) {
+      expect(cell).toHaveClass("ledger-number");
+    }
+    expect(screen.getByRole("rowheader", { name: "Fiction Club" })).not.toHaveClass("ledger-number");
   });
 
   it("does not offer CSV export unless the export capability is explicitly supplied", () => {
@@ -124,9 +170,45 @@ describe("AdminAnalyticsOverviewView", () => {
       />,
     );
 
-    expect(screen.getByText(/권한이 없습니다|분석 권한이 없습니다/)).toBeInTheDocument();
+    const panel = screen.getByRole("alert");
+    expect(panel).toHaveClass("admin-state-panel--forbidden");
+    expect(panel).toHaveTextContent("권한이 없습니다");
     expect(screen.queryByRole("button", { name: "CSV 내려받기" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("핵심 지표")).not.toBeInTheDocument();
+  });
+
+  it("announces loading and fetch errors through AdminStatePanel", () => {
+    const { rerender } = render(
+      <AdminAnalyticsOverviewView
+        overview={null}
+        window="30d"
+        loading
+        error={null}
+        onWindowChange={vi.fn()}
+        exportStatus="idle"
+        onExport={vi.fn()}
+      />,
+    );
+
+    const loading = screen.getByRole("status");
+    expect(loading).toHaveClass("admin-state-panel--loading");
+    expect(loading).toHaveTextContent("불러오는 중");
+
+    rerender(
+      <AdminAnalyticsOverviewView
+        overview={null}
+        window="30d"
+        loading={false}
+        error="분석 데이터를 처리하지 못했습니다. 다시 시도해 주세요."
+        onWindowChange={vi.fn()}
+        exportStatus="idle"
+        onExport={vi.fn()}
+      />,
+    );
+
+    const unavailable = screen.getByRole("alert");
+    expect(unavailable).toHaveClass("admin-state-panel--unavailable");
+    expect(unavailable).toHaveTextContent("분석 데이터를 처리하지 못했습니다. 다시 시도해 주세요.");
   });
 
   it("renders an honest empty trend state when KPI series are unavailable", () => {

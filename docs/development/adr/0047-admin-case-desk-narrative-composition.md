@@ -1,11 +1,13 @@
 # ADR-0047: 플랫폼 어드민을 케이스 데스크 + 운영 서사로 재구성
 
-- 상태: Proposed
+- 상태: Accepted
 - 결정일: 2026-08-27
 - 작성자: design/front
 - 관련: ADR-0039, ADR-0040, ADR-0045, `docs/development/2026-08-27-readmates-admin-case-desk-narrative-redesign-design.md`, `front/DESIGN.md`, `front/features/platform-admin/**`
 
 > 새 ADR은 승인됐지만 아직 미구현인 `Proposed`로 시작합니다. 코드·테스트·active architecture가 일치한 뒤에만 `Accepted`로 바꿉니다.
+>
+> 2026-08-28: 6단계 내비 4축과 케이스 데스크·운영 서사 구현, frontend lint/test/build, admin-shell e2e 내비 검증, `front/DESIGN.md`·architecture 동기화 후 `Accepted`.
 
 ## 컨텍스트
 
@@ -46,7 +48,7 @@
 
 - 스펙 §9의 6단계 각각에서 frontend lint/test/build + admin e2e.
 - `front/DESIGN.md` 갱신과 tracked CT 스크린샷 재잠금(320/390/768/900/1024/1440).
-- `Accepted` 승격 시 ADR-0045를 superseded로 정리하고 ADR-0039의 Service Spine 서술을 갱신, 인덱스 동기화.
+- `Accepted` 승격 시 ADR-0045의 **admin composition**만 ADR-0047로 대체한다. ADR-0046이 아직 Proposed이므로 ADR-0045의 host composition은 유지한다. ADR-0039의 내비 축 서술을 오늘 · 클럽 · 파이프라인 · 원장(+ 비상 레인 긴급 회수)으로 갱신한다.
 
 ## 후속 작업
 

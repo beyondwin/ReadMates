@@ -46,6 +46,21 @@ function renderPanel(
 }
 
 describe("AdminClubDomainCommandPanel request binding", () => {
+  it("renders the L2 dock and receipt timeline for domain commands", async () => {
+    const { container } = renderPanel(vi.fn().mockResolvedValue(preview));
+    expect(container.querySelector(".admin-safe-action-dock[data-level='L2']")).not.toBeNull();
+    fireEvent.change(screen.getByRole("textbox", { name: "Hostname" }), {
+      target: { value: "first.example.test" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "도메인 추가 미리보기" }));
+    await screen.findByText("DOMAIN_CREATED");
+    fireEvent.click(screen.getByRole("checkbox", { name: "도메인 영향을 확인했습니다" }));
+    fireEvent.click(screen.getByRole("button", { name: "도메인 추가 확정" }));
+    expect(await screen.findByText(/receipt-1/)).toBeInTheDocument();
+    expect(screen.getByText("영수증 — 명령 접수")).toBeInTheDocument();
+    expect(container.querySelector(".admin-receipt-timeline")).not.toBeNull();
+  });
+
   it("ignores a stale preview failure after the hostname changed", async () => {
     let rejectPreview: ((error: unknown) => void) | undefined;
     renderPanel(
@@ -54,6 +69,8 @@ describe("AdminClubDomainCommandPanel request binding", () => {
           rejectPreview = reject;
         }),
     );
+    expect(screen.getByText("도메인 준비")).toBeInTheDocument();
+    expect(screen.queryByText("Domain provisioning")).toBeNull();
     const hostname = screen.getByRole("textbox", { name: "Hostname" });
     fireEvent.change(hostname, { target: { value: "first.example.test" } });
     fireEvent.click(
@@ -107,6 +124,7 @@ describe("AdminClubDomainCommandPanel request binding", () => {
       );
       if (outcome === "resolve") {
         expect(screen.getByText(/receipt-1/)).toBeInTheDocument();
+        expect(screen.getByText("영수증 — 명령 접수")).toBeInTheDocument();
       } else {
         expect(screen.getByRole("alert")).toHaveTextContent(
           "같은 명령으로 다시 시도",
@@ -223,6 +241,7 @@ describe("AdminClubDomainCommandPanel request binding", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "도메인 추가 확정" }));
     expect(await screen.findByText(/receipt-1/)).toBeInTheDocument();
+    expect(screen.getByText("영수증 — 명령 접수")).toBeInTheDocument();
 
     rerender(
       <AdminClubDomainCommandPanel

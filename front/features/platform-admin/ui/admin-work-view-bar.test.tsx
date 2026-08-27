@@ -21,7 +21,7 @@ describe("AdminWorkViewBar", () => {
         activeView="briefing"
         onViewChange={onViewChange}
         search={{
-          label: "이미 불러온 사건 검색",
+          label: "이미 불러온 케이스 검색",
           value: "",
           placeholder: "사건 번호",
           onChange: onSearchChange,
@@ -33,7 +33,7 @@ describe("AdminWorkViewBar", () => {
     await user.click(screen.getByRole("button", { name: "내 담당 2" }));
     expect(onViewChange).toHaveBeenCalledWith("mine");
 
-    await user.type(screen.getByRole("searchbox", { name: "이미 불러온 사건 검색" }), "case-1");
+    await user.type(screen.getByRole("searchbox", { name: "이미 불러온 케이스 검색" }), "case-1");
     expect(onSearchChange).toHaveBeenCalled();
     expect(screen.getByLabelText("상태")).toBeInTheDocument();
     expect(findUnnamedInteractiveElements(container)).toEqual([]);

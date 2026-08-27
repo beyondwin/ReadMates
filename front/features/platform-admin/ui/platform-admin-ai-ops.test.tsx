@@ -83,7 +83,7 @@ describe("PlatformAdminAiOps", () => {
   it("shows safe aggregate and job metadata without raw content fields", () => {
     render(<PlatformAdminAiOps role="SUPPORT" summary={summary} jobs={[runningJob]} />);
 
-    const section = screen.getByRole("region", { name: "AI 운영" });
+    const section = screen.getByRole("region", { name: "AI 작업" });
     expect(within(section).getByText("Active")).toBeInTheDocument();
     expect(within(section).getByText("2")).toBeInTheDocument();
     expect(within(section).getByText("$0.2000")).toBeInTheDocument();
@@ -97,12 +97,23 @@ describe("PlatformAdminAiOps", () => {
   it("shows recovery revision and cleanup state without exposing generation content", () => {
     render(<PlatformAdminAiOps role="OWNER" summary={summary} jobs={[committingJob]} />);
 
-    const section = screen.getByRole("region", { name: "AI 운영" });
+    const section = screen.getByRole("region", { name: "AI 작업" });
     expect(within(section).getByText(/revision 2/)).toBeInTheDocument();
     expect(within(section).getByText(/cleanup pending/)).toBeInTheDocument();
     expect(section.textContent).not.toContain("transcript");
     expect(section.textContent).not.toContain("evidence");
     expect(section.textContent).not.toContain("result");
+  });
+
+  it("warns when an in-progress job has stalled past the threshold", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-18T00:21:00Z"));
+    try {
+      render(<PlatformAdminAiOps role="OWNER" summary={summary} jobs={[runningJob]} />);
+      expect(screen.getByText("멈춤 의심 · 20분")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("opens preview instead of executing an actionable job", async () => {
@@ -150,7 +161,7 @@ describe("PlatformAdminAiOps", () => {
     expect(within(dialog).getByText(/00112233/)).toBeInTheDocument();
     expect(dialog.contains(document.activeElement)).toBe(true);
 
-    await userEvent.click(within(dialog).getByRole("button", { name: "강제 취소 확인" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "작업 job-1 강제 취소" }));
     expect(onConfirmCommand).toHaveBeenCalledTimes(1);
     trigger.remove();
   });
@@ -213,9 +224,9 @@ describe("PlatformAdminAiOps", () => {
   });
 
   it("shows errors without hiding the ledger", () => {
-    render(<PlatformAdminAiOps role="OPERATOR" summary={summary} jobs={[runningJob]} error="AI Ops 로딩 실패" />);
+    render(<PlatformAdminAiOps role="OPERATOR" summary={summary} jobs={[runningJob]} error="AI 작업 로딩 실패" />);
 
-    expect(screen.getByRole("alert")).toHaveTextContent("AI Ops 로딩 실패");
+    expect(screen.getByRole("alert")).toHaveTextContent("AI 작업 로딩 실패");
     expect(screen.getByText(/Book/)).toBeInTheDocument();
   });
 
@@ -383,8 +394,8 @@ describe("PlatformAdminAiOps", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "AI 운영" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "AI 작업" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "AI 작업" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "작업 목록" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
     expect(screen.queryByText("공개 반영 추적")).not.toBeInTheDocument();
   });
@@ -433,13 +444,14 @@ describe("PlatformAdminAiOps", () => {
     expect(screen.queryByText("공개 반영 추적")).not.toBeInTheDocument();
   });
 
-  it("locks 44px targets and reduced motion in the scoped AI Ops stylesheet", () => {
+  it("locks 44px targets and reduced motion in the scoped AI 작업 stylesheet", () => {
     expect(LEDGER_CSS).toMatch(/\.admin-ai-ops[\s\S]*min-height:\s*44px/);
     expect(LEDGER_CSS).toContain(".admin-ai-ops");
     expect(LEDGER_CSS).toContain(":focus-visible");
     expect(LEDGER_CSS).toMatch(
       /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.admin-ai-ops[\s\S]*animation-duration:\s*0\.01ms/,
     );
+    expect(LEDGER_CSS).toContain("platform-admin-ai-ops__job-elapsed--stalled");
     expect(LEDGER_CSS).not.toMatch(/backdrop-filter|linear-gradient/);
   });
 });

@@ -5,6 +5,11 @@ import type {
   AdminNotificationReplayPreview,
   AdminNotificationReplayConfirmResult,
 } from "@/features/platform-admin/model/platform-admin-notifications-model";
+import {
+  ADMIN_COPY,
+  deliveryAttemptBadge,
+  deliveryLedgerStatusLabel,
+} from "@/features/platform-admin/model/admin-copy";
 import { AdminEvidenceLedger } from "./admin-evidence-ledger";
 import { AdminPageContext } from "./admin-page-context";
 import { AdminReceiptTimeline } from "./admin-receipt-timeline";
@@ -65,8 +70,8 @@ export function AdminNotificationsPage({
   return (
     <section className="admin-notifications">
       <AdminPageContext
-        eyebrow="S5 Operations"
-        heading="알림 / Outbox 운영"
+        eyebrow={ADMIN_COPY.eyebrow.notifications}
+        heading={ADMIN_COPY.heading.delivery}
         freshness={snapshot ? `생성 ${formatTimestamp(snapshot.generatedAt)}` : "요약을 불러오지 못함"}
         authority={canReplay ? "재처리 가능" : "재처리 권한 없음"}
       >
@@ -76,24 +81,24 @@ export function AdminNotificationsPage({
 
         {snapshot ? (
           <div className="admin-notifications__summary" aria-label="알림 운영 요약">
-            <Metric label="Outbox pending" value={snapshot.outboxSummary.pending} />
-            <Metric label="Outbox failed" value={snapshot.outboxSummary.failed + snapshot.outboxSummary.dead} />
-            <Metric label="Delivery pending" value={snapshot.deliverySummary.pending} />
-            <Metric label="Delivery failed" value={snapshot.deliverySummary.failed + snapshot.deliverySummary.dead} />
-            <Metric label="Relay stale" value={snapshot.relaySummary.stalePublishing + snapshot.relaySummary.staleSending} />
+            <Metric label={ADMIN_COPY.metric.outboxPending} value={snapshot.outboxSummary.pending} />
+            <Metric label={ADMIN_COPY.metric.outboxFailed} value={snapshot.outboxSummary.failed + snapshot.outboxSummary.dead} />
+            <Metric label={ADMIN_COPY.metric.deliveryPending} value={snapshot.deliverySummary.pending} />
+            <Metric label={ADMIN_COPY.metric.deliveryFailed} value={snapshot.deliverySummary.failed + snapshot.deliverySummary.dead} />
+            <Metric label={ADMIN_COPY.metric.relayStale} value={snapshot.relaySummary.stalePublishing + snapshot.relaySummary.staleSending} />
           </div>
         ) : null}
 
         <div className="admin-notifications__grid">
           <section className="admin-notifications__panel" aria-labelledby="admin-notifications-failures-title">
-            <h2 id="admin-notifications-failures-title" className="h3 editorial">Failure clusters</h2>
+            <h2 id="admin-notifications-failures-title" className="h3 editorial">{ADMIN_COPY.heading.failureClusters}</h2>
             {snapshot?.failureClusters.length ? (
               <ul className="admin-notifications__cluster-list">
                 {snapshot.failureClusters.map((cluster) => (
                   <li key={`${cluster.status}-${cluster.safeErrorCode}`}>
-                    <span>{cluster.safeErrorCode}</span>
+                    <span>{failureClusterSentence(cluster, events, deliveries)}</span>
                     <strong>{cluster.count}</strong>
-                    <em>{cluster.status}</em>
+                    <em>{deliveryLedgerStatusLabel(cluster.status)}</em>
                   </li>
                 ))}
               </ul>
@@ -104,8 +109,9 @@ export function AdminNotificationsPage({
 
           <section className="admin-notifications__panel" aria-labelledby="admin-notifications-replay-title">
             <div className="admin-notifications__panel-heading">
-              <h2 id="admin-notifications-replay-title" className="h3 editorial">Replay</h2>
+              <h2 id="admin-notifications-replay-title" className="h3 editorial">{ADMIN_COPY.heading.replay}</h2>
             </div>
+            <p className="admin-notifications__replay-warning">{ADMIN_COPY.replayWarning}</p>
             {replayPreview ? (
               <div className="admin-notifications__preview">
                 <p>
@@ -165,7 +171,7 @@ export function AdminNotificationsPage({
         </div>
 
         <AdminEvidenceLedger
-          label="Outbox ledger"
+          label="발송 대기 장부"
           count={events.length > 0 ? events.length : undefined}
           state={events.length > 0 ? "ready" : "empty"}
           title={events.length > 0 ? undefined : "표시할 outbox event가 없습니다."}
@@ -183,9 +189,9 @@ export function AdminNotificationsPage({
                 <article key={item.eventId} className="admin-notifications__row">
                   <div>
                     <p className="admin-notifications__row-title">{item.club.name} · {item.eventType}</p>
-                    <p className="small muted">{item.source} · attempts {item.attemptCount} · {formatTimestamp(item.updatedAt)}</p>
+                    {ledgerRowMeta(item.attemptCount, item.nextAttemptAt, item.updatedAt, item.source)}
                   </div>
-                  <span className="platform-admin-domain-status">{item.status}</span>
+                  <span className="platform-admin-domain-status">{deliveryLedgerStatusLabel(item.status)}</span>
                   {item.safeErrorCode ? <span className="admin-notifications__safe-code">{item.safeErrorCode}</span> : null}
                 </article>
               ))}
@@ -194,7 +200,7 @@ export function AdminNotificationsPage({
         </AdminEvidenceLedger>
 
         <AdminEvidenceLedger
-          label="Delivery ledger"
+          label="배달 장부"
           count={deliveries.length > 0 ? deliveries.length : undefined}
           state={deliveries.length > 0 ? "ready" : "empty"}
           title={deliveries.length > 0 ? undefined : "표시할 delivery가 없습니다."}
@@ -214,9 +220,9 @@ export function AdminNotificationsPage({
                     <p className="admin-notifications__row-title">
                       {item.club.name} · {item.channel} · {item.maskedRecipient ?? "recipient masked"}
                     </p>
-                    <p className="small muted">attempts {item.attemptCount} · {formatTimestamp(item.updatedAt)}</p>
+                    {ledgerRowMeta(item.attemptCount, null, item.updatedAt)}
                   </div>
-                  <span className="platform-admin-domain-status">{item.status}</span>
+                  <span className="platform-admin-domain-status">{deliveryLedgerStatusLabel(item.status)}</span>
                   {item.safeErrorCode ? <span className="admin-notifications__safe-code">{item.safeErrorCode}</span> : null}
                 </article>
               ))}
@@ -300,6 +306,44 @@ function FocusBanner({ focus }: { focus: string }) {
         ? "Notification dispatch 상태에서 이동했습니다. 최근 성공과 실패 분포를 함께 확인하세요."
         : "Health drill-down에서 이동했습니다.";
   return <p className="admin-notifications__focus">{copy}</p>;
+}
+
+function failureClusterSentence(
+  cluster: AdminNotificationOperationsSnapshot["failureClusters"][number],
+  events: AdminNotificationOutboxEvent[],
+  deliveries: AdminNotificationDelivery[],
+): string {
+  const matchingEvent = events.find((item) => item.safeErrorCode === cluster.safeErrorCode);
+  const matchingDelivery = deliveries.find((item) => item.safeErrorCode === cluster.safeErrorCode);
+  const club = matchingEvent?.club.name ?? matchingDelivery?.club.name;
+  const eventType = matchingEvent?.eventType;
+  return [club, eventType, cluster.safeErrorCode].filter((part): part is string => Boolean(part)).join(" · ");
+}
+
+function ledgerRowMeta(
+  attemptCount: number,
+  nextAttemptAt: string | null,
+  updatedAt: string,
+  source?: string,
+) {
+  return (
+    <p className="small muted">
+      {source ? <>{source} · </> : null}
+      {attemptCount > 0 ? (
+        <span className="admin-notifications__attempt">{deliveryAttemptBadge(attemptCount)}</span>
+      ) : null}
+      {nextAttemptAt ? (
+        <>
+          {attemptCount > 0 ? " · " : null}
+          {ADMIN_COPY.nextRetry} {formatTimestamp(nextAttemptAt)}
+        </>
+      ) : null}
+      <>
+        {attemptCount > 0 || nextAttemptAt ? " · " : null}
+        {formatTimestamp(updatedAt)}
+      </>
+    </p>
+  );
 }
 
 function formatTimestamp(value: string) {

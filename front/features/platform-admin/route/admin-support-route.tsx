@@ -173,7 +173,7 @@ export function AdminSupportRoute() {
   }
 
   async function previewCreate() {
-    if (!selectedResult || !selectedClubId || !canManage) return;
+    if (!selectedResult || !selectedClubId || !canManage || !createCategory || !expiresAt) return;
     const draft: AdminSupportGrantCreateDraft = {
       clubId: selectedClubId,
       granteeSubjectId: selectedResult.subjectId,

@@ -88,7 +88,7 @@ beforeEach(() => {
   vi.mocked(confirmRetryCommitPlatformAdminAiJob).mockReset();
 });
 
-describe("platform admin AI Ops query keys", () => {
+describe("platform admin AI 작업 query keys", () => {
   it("normalizes filters into stable query keys", () => {
     expect(platformAdminAiOpsKeys.summary()).toEqual(["platform-admin", "ai-ops", "summary", null]);
     expect(platformAdminAiOpsKeys.summary("7d")).toEqual([
@@ -111,7 +111,7 @@ describe("platform admin AI Ops query keys", () => {
     ]);
   });
 
-  it("query functions call AI Ops API wrappers", async () => {
+  it("query functions call AI 작업 API wrappers", async () => {
     vi.mocked(fetchPlatformAdminAiGenerationCapabilities).mockResolvedValue({ enabled: false });
     vi.mocked(fetchPlatformAdminAiOpsSummary).mockResolvedValue(summary);
     vi.mocked(fetchPlatformAdminAiOpsJobs).mockResolvedValue(jobs);
@@ -145,7 +145,7 @@ describe("platform admin AI Ops query keys", () => {
   });
 });
 
-describe("platform admin AI Ops mutation cache behavior", () => {
+describe("platform admin AI 작업 mutation cache behavior", () => {
   it("previews the selected safe action without invalidating the ledger", async () => {
     vi.mocked(previewForceCancelPlatformAdminAiJob).mockResolvedValue({
       previewId: "preview-1",

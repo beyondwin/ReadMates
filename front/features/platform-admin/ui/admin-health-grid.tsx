@@ -1,16 +1,15 @@
 import type { ReactNode } from "react";
-import { AdminHealthCard } from "./admin-health-card";
-import { AdminHealthDeployStrip } from "./admin-health-deploy-strip";
-import { AdminEvidenceLedger } from "./admin-evidence-ledger";
-import { AdminPageContext } from "./admin-page-context";
-import type { AdminPageState } from "./admin-state-panel";
+import { Link } from "react-router";
+import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
 import {
   DEPLOY_ATTEMPTS_CARD_ID,
+  HEALTH_OK_SIGNALS_LABEL,
   HEALTH_PAGE_DESCRIPTION,
   HEALTH_PAGE_HEADING,
   aggregateHealthPageState,
   canRetryHealthCard,
   formatGeneratedAtLabel,
+  formatHealthNarrative,
   formatHealthTimestamp,
   formatLastEvidenceLabel,
   formatLastSuccessfulLabel,
@@ -23,9 +22,15 @@ import {
   healthSourceLabel,
   isLastKnownHealthEvidence,
   missingDeployCard,
+  partitionHealthServiceCards,
   type HealthCard,
   type PlatformHealthSnapshot,
 } from "@/features/platform-admin/model/platform-admin-health-model";
+import { AdminEvidenceLedger } from "./admin-evidence-ledger";
+import { AdminHealthCard } from "./admin-health-card";
+import { AdminHealthDeployStrip } from "./admin-health-deploy-strip";
+import { AdminPageContext } from "./admin-page-context";
+import type { AdminPageState } from "./admin-state-panel";
 
 export type AdminHealthGridProps = {
   snapshot: PlatformHealthSnapshot | null;
@@ -94,7 +99,7 @@ export function AdminHealthGrid({
 
   const cards = healthCardsForPage(snapshot);
   const pageState = aggregateHealthPageState(cards);
-  const serviceCards = cards.filter((card) => card.id !== DEPLOY_ATTEMPTS_CARD_ID);
+  const { deviations, okSignals } = partitionHealthServiceCards(cards);
   const deployCard = cards.find((card) => card.id === DEPLOY_ATTEMPTS_CARD_ID) ?? missingDeployCard();
   const failedSources = healthFailedSources(cards);
   const ledgerState = ledgerStateFor(pageState);
@@ -132,6 +137,7 @@ export function AdminHealthGrid({
           </button>
         }
       >
+        <p className="admin-health-grid__narrative">{formatHealthNarrative(cards)}</p>
         <AdminEvidenceLedger
           label={EVIDENCE_LEDGER_LABEL}
           state={ledgerState}
@@ -153,16 +159,34 @@ export function AdminHealthGrid({
               <p>설정된 원천이 꺼져 있습니다. 장애가 아닙니다.</p>
             </div>
           ) : null}
-          <div className="admin-health-grid__cards">
-            {serviceCards.map((card) => (
-              <AdminHealthCard
-                key={card.id}
-                card={card}
-                refreshState={snapshot.refreshState}
-                onRetry={canRetryHealthCard(card) ? retryCard : undefined}
-              />
-            ))}
-          </div>
+          {deviations.length > 0 ? (
+            <div className="admin-health-grid__cards">
+              {deviations.map((card) => (
+                <AdminHealthCard
+                  key={card.id}
+                  card={card}
+                  refreshState={snapshot.refreshState}
+                  onRetry={canRetryHealthCard(card) ? retryCard : undefined}
+                />
+              ))}
+            </div>
+          ) : null}
+          {okSignals.length > 0 ? (
+            <details className="admin-health-grid__ok-signals">
+              <summary>{HEALTH_OK_SIGNALS_LABEL}</summary>
+              <ul>
+                {okSignals.map((card) => (
+                  <li key={card.id}>
+                    {card.drill ? (
+                      <Link to={card.drill.target}>{card.title}</Link>
+                    ) : (
+                      card.title
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
           <DeployEvidence
             card={deployCard}
             refreshState={snapshot.refreshState}
@@ -187,7 +211,7 @@ function HealthPage({
 }) {
   return (
     <AdminPageContext
-      eyebrow="서비스"
+      eyebrow={ADMIN_COPY.eyebrow.pipeline}
       heading={HEALTH_PAGE_HEADING}
       description={HEALTH_PAGE_DESCRIPTION}
       freshness={freshness}
@@ -243,7 +267,7 @@ function DeployEvidence({
     >
       <header className="admin-health-grid__strip-header">
         <div>
-          <h2 id="admin-health-deploy-heading">최근 deploy</h2>
+          <h2 id="admin-health-deploy-heading">{ADMIN_COPY.heading.recentChanges}</h2>
           <p className="admin-health-grid__strip-reading">
             {evidence === "ok" && card.deployStrip ? `${card.deployStrip.length}건` : healthEvidenceLabel(evidence)}
           </p>
@@ -274,7 +298,7 @@ function DeployEvidence({
       <AdminHealthDeployStrip entries={card.deployStrip} evidenceState={evidence} lastKnown={lastKnown} />
       {onRetry ? (
         <button type="button" className="admin-health-card__retry" onClick={() => onRetry(card.id)}>
-          최근 deploy 다시 확인
+          {`${ADMIN_COPY.heading.recentChanges} 다시 확인`}
         </button>
       ) : null}
     </section>

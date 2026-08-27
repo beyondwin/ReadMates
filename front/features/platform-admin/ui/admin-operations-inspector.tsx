@@ -1,9 +1,11 @@
 import { useLayoutEffect, type ReactNode } from "react";
 import { commitAdminEditorialLedgerCaseDocket } from "@/shared/observability/admin-editorial-ledger-performance";
 import { Link } from "react-router";
+import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
 import type { AdminOperationCaseView } from "@/features/platform-admin/model/platform-admin-operations-model";
 import { AdminSafeActionDock, type AdminSafeActionState } from "./admin-action-dock";
 import { AdminCaseDocket } from "./admin-case-docket";
+import { AdminTargetLedgerInline } from "./admin-target-ledger-inline";
 
 type SafeHistoryEvent = {
   fromState: string | null;
@@ -12,6 +14,13 @@ type SafeHistoryEvent = {
   reasonCode: string;
   occurredAt: string;
   caseVersion: number;
+};
+
+export type AdminCaseTraversal = {
+  index: number;
+  total: number;
+  onPrev: (() => void) | null;
+  onNext: (() => void) | null;
 };
 
 type Props = {
@@ -23,6 +32,7 @@ type Props = {
   permissionDenied?: boolean;
   actionState?: AdminSafeActionState;
   actionReason?: ReactNode;
+  traversal?: AdminCaseTraversal;
 };
 
 const HISTORY_LABELS: Record<string, string> = {
@@ -36,7 +46,7 @@ const HISTORY_LABELS: Record<string, string> = {
 
 const SOURCE_DETAIL_LABELS: Record<string, string> = {
   CLUB_READINESS: "클럽 운영에서 확인",
-  NOTIFICATION: "알림 운영에서 확인",
+  NOTIFICATION: "배달 원장에서 확인",
   AI_JOB: "AI 작업에서 확인",
   CLOSING_RISK: "마감 운영에서 확인",
 };
@@ -61,6 +71,15 @@ const KOREAN_TIME = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
 });
 
+const LEDGER_TIME = new Intl.DateTimeFormat("ko-KR", {
+  month: "numeric",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: "Asia/Seoul",
+});
+
 export function AdminOperationsInspector({
   selectedCase,
   history,
@@ -70,6 +89,7 @@ export function AdminOperationsInspector({
   permissionDenied = false,
   actionState = "ready",
   actionReason,
+  traversal,
 }: Props) {
   useLayoutEffect(() => {
     if (selectedCase) commitAdminEditorialLedgerCaseDocket(selectedCase.id);
@@ -95,6 +115,7 @@ export function AdminOperationsInspector({
   return (
     <AdminCaseDocket
       label="운영 케이스 상세"
+      nav={traversal ? <DocketNav traversal={traversal} /> : null}
       title={<span className="admin-operation-wrap">{selectedCase.summary.title}</span>}
       identity={<code className="admin-operation-wrap">{selectedCase.id}</code>}
       status={
@@ -113,7 +134,7 @@ export function AdminOperationsInspector({
               <dd>{selectedCase.impactLabel}</dd>
             </div>
             <div>
-              <dt>관측 source</dt>
+              <dt>관측 출처</dt>
               <dd>{selectedCase.sourceLabel}</dd>
             </div>
             <div>
@@ -138,21 +159,13 @@ export function AdminOperationsInspector({
       }
       history={
         <div className="admin-operations-inspector__history">
-          <h3 className="h3">케이스 이력</h3>
-          {history.length === 0 ? (
-            <p className="admin-operations-inspector__empty">표시할 상태 변경 이력이 없습니다.</p>
-          ) : (
-            <ol>
-              {history.map((event) => (
-                <li key={`${event.caseVersion}:${event.occurredAt}`}>
-                  <strong>{HISTORY_LABELS[event.reasonCode] ?? "상태 변경 기록"}</strong>
-                  <span>
-                    {CASE_STATE_LABELS[event.toState] ?? "상태 확인"} · {formatTime(event.occurredAt)}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          )}
+          <div className="sec-h">
+            <h3>{ADMIN_COPY.targetLedger.heading}</h3>
+          </div>
+          <AdminTargetLedgerInline
+            entries={targetLedgerEntries(history)}
+            moreHref={targetLedgerHref(selectedCase)}
+          />
         </div>
       }
       actions={
@@ -188,6 +201,62 @@ export function AdminOperationsInspector({
 function formatTime(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "시각 확인 필요" : KOREAN_TIME.format(date);
+}
+
+function formatLedgerTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "시각 확인 필요";
+  const parts = LEDGER_TIME.formatToParts(date);
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  const hour = parts.find((part) => part.type === "hour")?.value;
+  const minute = parts.find((part) => part.type === "minute")?.value;
+  if (!month || !day || !hour || !minute) return formatTime(value);
+  return `${month}.${day} ${hour}:${minute}`;
+}
+
+function targetLedgerEntries(history: readonly SafeHistoryEvent[]) {
+  return [...history]
+    .sort((left, right) => {
+      const byTime = Date.parse(right.occurredAt) - Date.parse(left.occurredAt);
+      if (byTime !== 0 && Number.isFinite(byTime)) return byTime;
+      return right.caseVersion - left.caseVersion;
+    })
+    .slice(0, 3)
+    .map((event) => ({
+      at: formatLedgerTime(event.occurredAt),
+      sentence: `${HISTORY_LABELS[event.reasonCode] ?? "상태 변경 기록"} · ${CASE_STATE_LABELS[event.toState] ?? "상태 확인"}`,
+    }));
+}
+
+function targetLedgerHref(selectedCase: AdminOperationCaseView): string {
+  return `/admin/audit?target=${encodeURIComponent(selectedCase.clubId ?? selectedCase.id)}`;
+}
+
+function DocketNav({ traversal }: { traversal: AdminCaseTraversal }) {
+  return (
+    <nav className="docket-nav" aria-label="케이스 순회">
+      <span className="count">케이스 {traversal.index + 1} / {traversal.total}</span>
+      <span className="docket-nav__actions">
+        <button
+          type="button"
+          className="btn btn-quiet btn-sm admin-operation-control--touch"
+          disabled={traversal.onPrev == null}
+          onClick={() => traversal.onPrev?.()}
+        >
+          ‹ 이전
+        </button>
+        <button
+          type="button"
+          className="btn btn-quiet btn-sm admin-operation-control--touch"
+          disabled={traversal.onNext == null}
+          onClick={() => traversal.onNext?.()}
+        >
+          다음 ›
+        </button>
+      </span>
+    </nav>
+  );
 }
 
 function sourceFreshnessLabel(

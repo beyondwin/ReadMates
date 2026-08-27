@@ -4,11 +4,15 @@ import type {
   PlatformAdminAiOpsCommandPreviewResponse,
   PlatformAdminAiOpsCommandReceiptResponse,
 } from "@/features/platform-admin/model/platform-admin-domain-types";
+import { ADMIN_COPY, aiJobConfirmAction } from "@/features/platform-admin/model/admin-copy";
+import { formatAiJobElapsedLabel } from "@/features/platform-admin/model/platform-admin-ai-ops-model";
 import { AdminSafeActionDock, type AdminSafeActionState } from "@/features/platform-admin/ui/admin-action-dock";
 import { AdminEvidenceLedger } from "@/features/platform-admin/ui/admin-evidence-ledger";
 import { AdminModalDialog } from "@/features/platform-admin/ui/admin-modal-dialog";
 import { AdminPageContext } from "@/features/platform-admin/ui/admin-page-context";
 import { AdminReceiptTimeline } from "@/features/platform-admin/ui/admin-receipt-timeline";
+
+export const ADMIN_AI_OPS_HEADING_ID = "admin-ai-ops-title";
 
 export type PlatformAdminAiOpsRole = "OWNER" | "OPERATOR" | "SUPPORT";
 
@@ -142,8 +146,9 @@ export function PlatformAdminAiOps({
   return (
     <section className="platform-admin-ai-ops admin-ai-ops">
       <AdminPageContext
-        eyebrow="S5 Operations"
-        heading="AI 운영"
+        headingId={ADMIN_AI_OPS_HEADING_ID}
+        eyebrow={ADMIN_COPY.eyebrow.aiOps}
+        heading={ADMIN_COPY.heading.aiOps}
         freshness={loading ? "동기화 중" : undefined}
         authority={canAct ? "명령 가능" : "변경 권한 없음"}
       >
@@ -213,7 +218,7 @@ export function PlatformAdminAiOps({
       ) : null}
 
       <AdminEvidenceLedger
-        label="AI 작업"
+        label="작업 목록"
         count={jobs.length > 0 ? jobs.length : undefined}
         state={jobsLedgerState}
         title={jobsLedgerTitle}
@@ -232,7 +237,9 @@ export function PlatformAdminAiOps({
       >
         {jobs.length > 0 ? (
           <div className="platform-admin-ai-ops__jobs">
-            {jobs.map((job) => (
+            {jobs.map((job) => {
+              const elapsed = formatAiJobElapsedLabel(job, new Date());
+              return (
               <article key={job.jobId} className="platform-admin-ai-ops__job">
                 <div className="platform-admin-ai-ops__job-main">
                   <div className="platform-admin-ai-ops__badges">
@@ -244,6 +251,17 @@ export function PlatformAdminAiOps({
                     {job.club.name ?? job.club.slug ?? job.club.clubId} ·{" "}
                     {job.session.bookTitle ?? job.session.sessionId}
                   </p>
+                  {elapsed ? (
+                    <p
+                      className={
+                        job.staleCandidate
+                          ? "platform-admin-ai-ops__job-elapsed platform-admin-ai-ops__job-elapsed--stalled"
+                          : "platform-admin-ai-ops__job-elapsed"
+                      }
+                    >
+                      {elapsed}
+                    </p>
+                  ) : null}
                   <p className="tiny muted">
                     {job.provider} / {job.model} · ${job.costEstimateUsd} · {formatTimestamp(job.lastUpdatedAt)}
                   </p>
@@ -291,7 +309,8 @@ export function PlatformAdminAiOps({
                   상세 보기
                 </button>
               </article>
-            ))}
+              );
+            })}
           </div>
         ) : null}
       </AdminEvidenceLedger>
@@ -410,7 +429,7 @@ function AiCommandDialog({
           level="L2"
           authority="allowed"
           state={aiCommandDockState(state, busy)}
-          primary={aiCommandPrimary({ state, label, busy, onConfirm, onRetrySame, onDismiss })}
+          primary={aiCommandPrimary({ state, busy, onConfirm, onRetrySame, onDismiss })}
           secondary={aiCommandSecondary({ state, busy, onRestart, onRetrySame, onDismiss })}
         />
       </div>
@@ -428,14 +447,12 @@ function aiCommandDockState(
 
 function aiCommandPrimary({
   state,
-  label,
   busy,
   onConfirm,
   onRetrySame,
   onDismiss,
 }: {
   state: PlatformAdminAiOpsCommandState;
-  label: string;
   busy: boolean;
   onConfirm?: () => void;
   onRetrySame?: () => void;
@@ -457,7 +474,7 @@ function aiCommandPrimary({
   }
   return (
     <button type="button" className="btn btn-primary" disabled={busy} onClick={() => onConfirm?.()}>
-      {state.phase === "CONFIRMING" ? "확인 중" : `${label} 확인`}
+      {state.phase === "CONFIRMING" ? "확인 중" : aiJobConfirmAction(state.job.jobId, state.action)}
     </button>
   );
 }

@@ -1,10 +1,12 @@
 # ADR-0045: 호스트·플랫폼 관리자 composition을 Focus Deck·Editorial Operations Ledger로 고정
 
-- 상태: Accepted (admin Editorial Operations Ledger 유지; host composition은 ADR-0046으로 대체)
+- 상태: Accepted
 - 결정일: 2026-08-26
 - 작성자: 제품·디자인·플랫폼 운영·프런트엔드
-- 관련: ADR-0003, ADR-0020, ADR-0039, ADR-0040, ADR-0043, ADR-0044, ADR-0046,
+- 관련: ADR-0003, ADR-0020, ADR-0039, ADR-0040, ADR-0043, ADR-0044, ADR-0046, ADR-0047,
   `docs/superpowers/specs/2026-08-26-readmates-host-admin-visual-authority-and-integration-design.md`
+
+> Host page-level composition은 ADR-0046이다. Admin case-desk composition은 ADR-0047이다. 이 ADR은 공유 paper/ink primitive 계약을 위해 `Accepted`로 남는다.
 
 ## 컨텍스트
 

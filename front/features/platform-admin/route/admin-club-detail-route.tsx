@@ -3,7 +3,6 @@ import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-quer
 import { Link, useParams, useSearchParams } from "react-router";
 import { parseAdminRouteReturnState } from "@/features/platform-admin/model/admin-route-state";
 import type {
-  PlatformAdminClubCommandReceipt,
   PlatformAdminClubDetail,
   PlatformAdminClubVisibilityPreviewResponse,
 } from "@/features/platform-admin/api/platform-admin-contracts";
@@ -27,10 +26,27 @@ import {
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { AdminPageContext } from "@/features/platform-admin/ui/admin-page-context";
 import { flattenSupportGrantLedgerPages } from "@/features/platform-admin/model/platform-admin-support-model";
+import {
+  ADMIN_COPY,
+  clubLifecycleLabel,
+  clubVisibilityLabel,
+} from "@/features/platform-admin/model/admin-copy";
 import { platformAdminSupportLedgerInfiniteQuery } from "@/features/platform-admin/queries/platform-admin-support-queries";
 import { platformAdminClubOperationsQuery } from "@/features/platform-admin/queries/platform-admin-club-operations-queries";
+import { platformAdminAuditLedgerInfiniteQuery } from "@/features/platform-admin/queries/platform-admin-audit-queries";
+import {
+  formatAdminAuditLedgerSentenceBody,
+  formatAdminAuditOccurredAt,
+  mergeAdminAuditLedgerPages,
+} from "@/features/platform-admin/model/platform-admin-audit-model";
 import { AdminClubOperationsPage } from "@/features/platform-admin/ui/admin-club-operations-page";
 import { AdminClubDomainCommandPanel } from "@/features/platform-admin/ui/domain-provisioning-panel";
+import {
+  AdminSafeActionDock,
+  type AdminSafeActionState,
+} from "@/features/platform-admin/ui/admin-action-dock";
+import { AdminReceiptTimeline } from "@/features/platform-admin/ui/admin-receipt-timeline";
+import { AdminTargetLedgerInline } from "@/features/platform-admin/ui/admin-target-ledger-inline";
 import { useAdminBreadcrumbExtra } from "./admin-breadcrumb-hook";
 
 const CLUBS_ALLOWED = { fallback: "/admin/clubs", allowedPath: "/admin/clubs" };
@@ -46,6 +62,8 @@ export function AdminClubDetailRoute() {
     capabilities != null && canAdmin(capabilities, "VIEW_CLUB_OPERATIONS");
   const canViewSupport =
     capabilities != null && canAdmin(capabilities, "VIEW_SUPPORT");
+  const canViewAudit =
+    capabilities != null && canAdmin(capabilities, "VIEW_AUDIT");
   const supportGrantsQuery = useInfiniteQuery({
     ...platformAdminSupportLedgerInfiniteQuery({ clubId, status: "ACTIVE" }),
     enabled: canViewOperations && canViewSupport,
@@ -53,6 +71,10 @@ export function AdminClubDetailRoute() {
   const operationsQuery = useQuery({
     ...platformAdminClubOperationsQuery(clubId),
     enabled: canViewOperations,
+  });
+  const auditQuery = useInfiniteQuery({
+    ...platformAdminAuditLedgerInfiniteQuery({ clubId }),
+    enabled: canViewAudit,
   });
   const club = detailQuery.data ?? null;
   const { setExtra } = useAdminBreadcrumbExtra();
@@ -102,9 +124,9 @@ export function AdminClubDetailRoute() {
   return (
     <section className="admin-club-detail" aria-label="클럽 상세">
       <AdminPageContext
-        eyebrow="Club control"
+        eyebrow={ADMIN_COPY.eyebrow.clubDetail}
         heading={club.name}
-        description={`revision ${club.adminRevision} · ${club.status} · ${club.publicVisibility}`}
+        description={`revision ${club.adminRevision} · ${clubLifecycleLabel(club.status)} · ${clubVisibilityLabel(club.publicVisibility)}`}
         action={<ClubsReturnLink returnState={returnState} />}
       />
       <ClubMetadataPanel
@@ -157,6 +179,20 @@ export function AdminClubDetailRoute() {
           )}
         </section>
       ) : null}
+      <section
+        className="surface admin-club-detail__panel"
+        aria-labelledby="admin-club-recent-ledger-title"
+      >
+        <div className="sec-h">
+          <h2 id="admin-club-recent-ledger-title" className="h3 editorial">
+            {ADMIN_COPY.targetLedger.clubHeading}
+          </h2>
+        </div>
+        <AdminTargetLedgerInline
+          entries={clubTargetLedgerEntries(auditQuery.data?.pages ?? [])}
+          moreHref={`/admin/audit?target=${encodeURIComponent(clubId)}`}
+        />
+      </section>
     </section>
   );
 }
@@ -231,6 +267,7 @@ function ClubMetadataPanel({
   canManage: boolean;
   onRefresh: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({
     name: club.name,
     tagline: club.tagline,
@@ -244,6 +281,13 @@ function ClubMetadataPanel({
     if (canManage) return;
     mutation.reset();
   }, [canManage, mutation]);
+
+  function cancelEdit() {
+    setEditing(false);
+    setDraft({ name: club.name, tagline: club.tagline, about: club.about });
+    mutation.reset();
+  }
+
   return (
     <section
       className="surface admin-club-detail__panel"
@@ -251,7 +295,7 @@ function ClubMetadataPanel({
     >
       <div className="admin-club-detail__panel-heading">
         <div>
-          <p className="eyebrow">Identity</p>
+          <p className="eyebrow">{ADMIN_COPY.eyebrow.identity}</p>
           <h2 id="club-metadata-title" className="h3 editorial">
             공개 정보
           </h2>
@@ -260,82 +304,121 @@ function ClubMetadataPanel({
           {mutation.isPending ? "저장 중" : "최신 revision 기준"}
         </span>
       </div>
-      <div className="admin-club-detail__form">
-        <label className="field-group">
-          <span className="label">Slug</span>
-          <input className="input" value={club.slug} readOnly />
-        </label>
-        <label className="field-group">
-          <span className="label">클럽 이름</span>
-          <input
-            className="input"
-            value={draft.name}
-            readOnly={!canManage}
-            disabled={mutation.isPending}
-            onChange={(event) =>
-              setDraft({ ...draft, name: event.target.value })
-            }
-          />
-        </label>
-        <label className="field-group">
-          <span className="label">Tagline</span>
-          <input
-            className="input"
-            value={draft.tagline}
-            readOnly={!canManage}
-            disabled={mutation.isPending}
-            onChange={(event) =>
-              setDraft({ ...draft, tagline: event.target.value })
-            }
-          />
-        </label>
-        <label className="field-group admin-club-detail__wide">
-          <span className="label">About</span>
-          <textarea
-            className="input"
-            value={draft.about}
-            readOnly={!canManage}
-            disabled={mutation.isPending}
-            onChange={(event) =>
-              setDraft({ ...draft, about: event.target.value })
-            }
-          />
-        </label>
-      </div>
-      {canManage && recovery ? (
-        <div role="alert" className="danger">
-          <p>{recovery.message}</p>
-          {recovery.kind === "REFRESH_STATE" ? (
+      {canManage && editing ? (
+        <>
+          <div className="admin-club-detail__form">
+            <label className="field-group">
+              <span className="label">Slug</span>
+              <input className="input" value={club.slug} readOnly />
+            </label>
+            <label className="field-group">
+              <span className="label">클럽 이름</span>
+              <input
+                className="input"
+                value={draft.name}
+                disabled={mutation.isPending}
+                onChange={(event) =>
+                  setDraft({ ...draft, name: event.target.value })
+                }
+              />
+            </label>
+            <label className="field-group">
+              <span className="label">Tagline</span>
+              <input
+                className="input"
+                value={draft.tagline}
+                disabled={mutation.isPending}
+                onChange={(event) =>
+                  setDraft({ ...draft, tagline: event.target.value })
+                }
+              />
+            </label>
+            <label className="field-group admin-club-detail__wide">
+              <span className="label">About</span>
+              <textarea
+                className="input"
+                value={draft.about}
+                disabled={mutation.isPending}
+                onChange={(event) =>
+                  setDraft({ ...draft, about: event.target.value })
+                }
+              />
+            </label>
+          </div>
+          {recovery ? (
+            <div role="alert" className="danger">
+              <p>{recovery.message}</p>
+              {recovery.kind === "REFRESH_STATE" ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={onRefresh}
+                >
+                  최신 상태 불러오기
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="admin-club-detail__actions">
             <button
               type="button"
               className="btn btn-ghost btn-sm"
-              onClick={onRefresh}
+              disabled={mutation.isPending}
+              onClick={cancelEdit}
             >
-              최신 상태 불러오기
+              취소
             </button>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={mutation.isPending}
+              onClick={() =>
+                mutation.mutate({
+                  clubId: club.clubId,
+                  request: {
+                    expectedAdminRevision: club.adminRevision,
+                    ...draft,
+                  },
+                })
+              }
+            >
+              공개 정보 저장
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <dl className="admin-club-detail__facts">
+            <div>
+              <dt>Slug</dt>
+              <dd>{club.slug}</dd>
+            </div>
+            <div>
+              <dt>클럽 이름</dt>
+              <dd>{club.name}</dd>
+            </div>
+            <div>
+              <dt>Tagline</dt>
+              <dd>{club.tagline}</dd>
+            </div>
+            <div>
+              <dt>About</dt>
+              <dd>{club.about}</dd>
+            </div>
+          </dl>
+          {canManage ? (
+            <div className="admin-club-detail__actions">
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setEditing(true)}
+              >
+                편집
+              </button>
+            </div>
           ) : null}
-        </div>
-      ) : null}
-      {canManage ? (
-        <div className="admin-club-detail__actions">
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            disabled={mutation.isPending}
-            onClick={() =>
-              mutation.mutate({
-                clubId: club.clubId,
-                request: {
-                  expectedAdminRevision: club.adminRevision,
-                  ...draft,
-                },
-              })
-            }
-          >
-            공개 정보 저장
-          </button>
-        </div>
-      ) : null}
+        </>
+      )}
     </section>
   );
 }
@@ -446,31 +529,21 @@ function VisibilityPanel({
     >
       <div className="admin-club-detail__panel-heading">
         <div>
-          <p className="eyebrow">Visibility</p>
+          <p className="eyebrow">{ADMIN_COPY.eyebrow.visibility}</p>
           <h2 id="visibility-title" className="h3 editorial">
             공개 상태
           </h2>
         </div>
-        <span className="admin-club-detail__state">현재 {current}</span>
+        <span className="admin-club-detail__state">현재 {clubVisibilityLabel(current)}</span>
       </div>
       <p className="body">
         공개 전환은 영향을 미리 확인한 뒤 명시적으로 확정합니다.
       </p>
-      {canManage ? (
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          onClick={() => void previewIntent()}
-          disabled={previewMutation.isPending}
-        >
-          {target === "PUBLIC" ? "공개 전환 미리보기" : "비공개 전환 미리보기"}
-        </button>
-      ) : null}
       {canManage && preview ? (
         <div className="admin-club-detail__review" aria-live="polite">
           <p>
             <strong>
-              {preview.currentVisibility} → {preview.targetVisibility}
+              {clubVisibilityLabel(preview.currentVisibility)} → {clubVisibilityLabel(preview.targetVisibility)}
             </strong>
           </p>
           <ul>
@@ -491,53 +564,115 @@ function VisibilityPanel({
             />
             <span>영향을 확인했습니다</span>
           </label>
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            disabled={
-              !confirmed || confirmMutation.isPending || receipt !== null
-            }
-            onClick={() => void confirmIntent()}
-          >
-            {target === "PUBLIC" ? "공개 전환 확정" : "비공개 전환 확정"}
-          </button>
         </div>
       ) : null}
-      {canManage && recovery ? (
-        <div role="alert" className="danger">
-          <p>{recovery.message}</p>
-          {recovery.kind === "REFRESH_STATE" ? (
+      {canManage ? (
+        <AdminSafeActionDock
+          level="L2"
+          authority="allowed"
+          state={clubCommandDockState({
+            pending: previewMutation.isPending || confirmMutation.isPending,
+            receipt: receipt !== null,
+            recovery,
+          })}
+          reason={
+            recovery ? (
+              <div role="alert" className="danger">
+                <p>{recovery.message}</p>
+                {recovery.kind === "REFRESH_STATE" ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={onRefresh}
+                  >
+                    최신 상태 불러오기
+                  </button>
+                ) : null}
+              </div>
+            ) : undefined
+          }
+          secondary={
             <button
               type="button"
               className="btn btn-ghost btn-sm"
-              onClick={onRefresh}
+              onClick={() => void previewIntent()}
+              disabled={previewMutation.isPending}
             >
-              최신 상태 불러오기
+              {target === "PUBLIC" ? "공개 전환 미리보기" : "비공개 전환 미리보기"}
             </button>
-          ) : null}
-        </div>
+          }
+          primary={
+            preview ? (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                disabled={
+                  !confirmed || confirmMutation.isPending || receipt !== null
+                }
+                onClick={() => void confirmIntent()}
+              >
+                {target === "PUBLIC" ? "공개 전환 확정" : "비공개 전환 확정"}
+              </button>
+            ) : undefined
+          }
+        />
       ) : null}
-      {canManage && receipt ? <ReceiptStatus receipt={receipt} /> : null}
+      {canManage && receipt ? (
+        <AdminReceiptTimeline
+          level="L2"
+          receiptId={`receipt ${receipt.receiptId}`}
+          entries={[
+            {
+              key: "accepted",
+              label: `${ADMIN_COPY.receipt} — 명령 접수`,
+              state:
+                receipt.convergenceState === "FAILED"
+                  ? "failed"
+                  : receipt.convergenceState === "PENDING"
+                    ? "pending"
+                    : "succeeded",
+              detail: `${receipt.resultCode}${
+                receipt.convergenceState ? ` · ${receipt.convergenceState}` : ""
+              }`,
+            },
+          ]}
+        />
+      ) : null}
     </section>
   );
 }
 
-function ReceiptStatus({
-  receipt,
-}: {
-  receipt: PlatformAdminClubCommandReceipt;
-}) {
-  return (
-    <div className="admin-club-detail__receipt" aria-live="polite">
-      <strong>명령 접수 완료</strong>
-      <span>receipt {receipt.receiptId}</span>
-      <span>
-        {receipt.resultCode}
-        {receipt.convergenceState ? ` · ${receipt.convergenceState}` : ""}
-      </span>
-    </div>
-  );
+function clubTargetLedgerEntries(
+  pages: Parameters<typeof mergeAdminAuditLedgerPages>[0],
+) {
+  const items = mergeAdminAuditLedgerPages(pages)?.items ?? [];
+  return items.slice(0, 3).map((item) => ({
+    at: formatAdminAuditOccurredAt(item.occurredAt),
+    sentence: formatAdminAuditLedgerSentenceBody(item),
+  }));
 }
+
+function clubCommandDockState({
+  pending,
+  receipt,
+  recovery,
+}: {
+  pending: boolean;
+  receipt: boolean;
+  recovery: AdminCommandRecovery | null;
+}): AdminSafeActionState {
+  if (receipt) return "complete";
+  if (pending) return "pending";
+  if (recovery?.kind === "REFRESH_STATE") return "conflict";
+  if (recovery?.kind === "RESTART_PREVIEW" || recovery?.kind === "RESTART_INTENT") {
+    return "stale";
+  }
+  if (recovery?.kind === "RETRY_SAME_INTENT" || recovery?.kind === "CORRECT_DRAFT") {
+    return "unknown-outcome";
+  }
+  return "ready";
+}
+
 function PanelError({ label, retry }: { label: string; retry: () => void }) {
   return (
     <div role="alert" className="surface admin-club-detail__panel">

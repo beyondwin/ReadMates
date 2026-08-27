@@ -3,9 +3,10 @@
 이 문서는 현재 코드·테스트·tracked screenshot이 구현한 host/admin 시각 권위다.
 승인 설계나 미구현 목표를 적지 않는다. Public, guest, member composition은 이 문서로 바꾸지 않는다.
 
-- ADR-0044: Superseded by ADR-0046(주 행동 계산 규칙은 다이어리형에 계승)
-- ADR-0045: admin Editorial Operations Ledger 유지; host composition은 ADR-0046
+- ADR-0044: Superseded by ADR-0046 (주 행동 계산 규칙은 다이어리형에 계승)
+- ADR-0045: Accepted — 공유 paper/ink; host composition은 ADR-0046, admin composition은 ADR-0047
 - ADR-0046: Accepted — 오늘 트리아지 + 모임 다이어리 + 3탭 셸
+- ADR-0047: Accepted — admin case desk + 운영 서사 + 오늘·클럽·파이프라인·원장 4축 내비
 - Token source: `design/system/src/styles/tokens.css`
 - Viewport contract: `front/tests/e2e/support/visual-authority-contract.ts`
 
@@ -147,9 +148,18 @@ Record-dependent action은 기존 record editor query를 readiness union으로 �
 
 ## Editorial Operations Ledger
 
-`/admin/**` page-level 권위는 Editorial Operations Ledger다. ADR-0039의 오늘·클럽·서비스·검토 Service Spine과 exact capability catalog는 유지한다.
+`/admin/**` page-level 권위는 Editorial Operations Ledger다. ADR-0047의 케이스 데스크·운영 서사·4축 내비를 현재 구현으로 둔다. ADR-0039의 exact capability catalog와 signal→case→docket→command→receipt 운영 문법은 유지한다.
+라벨은 `admin-copy.ts` 사전 사용.
 
-Ready routes: `/admin/today`, `/admin/clubs`, `/admin/clubs/:clubId`, `/admin/health`, `/admin/notifications`, `/admin/ai-ops`, `/admin/public-takedown`, `/admin/support`, `/admin/audit`, `/admin/analytics`.
+Ready routes: `/admin/today`, `/admin/clubs`, `/admin/clubs/:clubId`, `/admin/health`, `/admin/notifications`, `/admin/ai-ops`, `/admin/public-takedown`, `/admin/support`, `/admin/audit`, `/admin/analytics`. URL 경로는 바꾸지 않는다.
+
+1차 내비는 오늘 · 클럽 · 파이프라인 · 원장의 네 축이다. 파이프라인은 배달 원장·AI 작업·서비스 건강, 원장은 운영 기입·접근 원장·분석 부록이다. 긴급 공개 회수는 그룹 밖 비상 레인으로 사이드 하단에 고정한다. 오늘 항목 옆에는 알람 요약의 `attention.count`를 0보다 클 때만 mono 숫자로 둔다.
+
+페이지 타입은 세 종이다.
+
+- 데스크형: `/admin/today` — 좌 큐 + 우 증거 도켓, 도켓 내 이전/다음 순회, 확인·보류·무시(사유 필수)·해결
+- 원장형: 클럽 목록·배달·AI 작업·운영 기입·접근 원장 — 필터/표/도켓
+- 서사형: 서비스 건강 — 한 문장 서사, 정상은 숫자 숨김, 이탈만 펼침
 
 운영 문법: `signal → prioritized case → evidence docket → guarded command → 등급에 맞는 history/receipt/convergence`.
 모든 화면에 case/command/receipt를 꾸며내지 않는다. 해당 domain에 선택 대상·command·receipt가 있을 때만 조합한다.

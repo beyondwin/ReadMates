@@ -31,12 +31,13 @@ member, attendance, record workflow를 흡수하면 권한과 제품 소유권�
 
 `/admin/**`를 cross-club 운영 작업대인 task-centered Service Spine으로 구성한다.
 
-1차 navigation은 동등한 네 영역만 사용한다.
+1차 navigation은 동등한 네 영역과 하단 비상 레인만 사용한다.
 
 - `오늘`: platform-wide 우선순위 operation case
 - `클럽`: registry, onboarding, detail, readiness, public state, domain
-- `서비스`: health, notification, AI workbench
-- `검토`: support, audit, analytics
+- `파이프라인`: 배달 원장, AI 작업, 서비스 건강
+- `원장`: 운영 기입, 접근 원장, 분석 부록
+- 비상 레인: 긴급 공개 회수 (사이드 하단 고정, 그룹 밖)
 
 기존 URL과 deep link는 유지한다. Create, detail, preview, recovery는 해당 resource 아래 nested flow이며
 동등한 전역 tab으로 승격하지 않는다.

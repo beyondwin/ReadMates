@@ -6,6 +6,7 @@ import {
   type TakedownPreviewRequest,
   type TakedownReasonCategory,
 } from "../model/platform-admin-takedown-model";
+import { ADMIN_COPY } from "../model/admin-copy";
 import { AdminPageContext } from "./admin-page-context";
 import { AdminReceiptTimeline } from "./admin-receipt-timeline";
 import { AdminSafeActionDock, type AdminSafeActionState } from "./admin-action-dock";
@@ -42,7 +43,7 @@ export function AdminPublicTakedownWorkbench({
     return (
       <div className="admin-public-takedown">
         <AdminPageContext
-          eyebrow="Emergency public operation"
+          eyebrow={ADMIN_COPY.eyebrow.takedown}
           heading="긴급 공개 회수"
           authority="긴급 회수 권한 없음"
         >
@@ -77,7 +78,7 @@ export function AdminPublicTakedownWorkbench({
   return (
     <div className="admin-club-operations admin-public-takedown">
       <AdminPageContext
-        eyebrow="Emergency public operation"
+        eyebrow={ADMIN_COPY.eyebrow.takedown}
         heading="긴급 공개 회수"
         authority="긴급 회수 가능"
       >

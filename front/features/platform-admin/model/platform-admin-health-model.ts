@@ -8,7 +8,13 @@ export type HealthPageState = "ready" | "partial" | "unavailable" | "disabled";
 export const HEALTH_PAGE_HEADING = "서비스 건강";
 export const HEALTH_PAGE_DESCRIPTION =
   "서비스·큐·AI 가용성·outbox·배포 신호를 근거와 함께 봅니다.";
+export const HEALTH_OK_SIGNALS_LABEL = "정상 신호";
 export const DEPLOY_ATTEMPTS_CARD_ID = "deploy_attempts_strip";
+
+export type HealthLastIncident = {
+  at: string;
+  title: string;
+};
 
 export type HealthCardMetric = {
   value: number | null;
@@ -217,6 +223,38 @@ export function aggregateHealthPageState(cards: readonly HealthCard[]): HealthPa
   if (unavailableCount > 0) return "partial";
   if (disabledCount === states.length) return "disabled";
   return "ready";
+}
+
+export function partitionHealthServiceCards(cards: readonly HealthCard[]): {
+  deviations: HealthCard[];
+  okSignals: HealthCard[];
+} {
+  const serviceCards = cards.filter((card) => card.id !== DEPLOY_ATTEMPTS_CARD_ID);
+  return {
+    deviations: serviceCards.filter((card) => healthCardEvidenceState(card) !== "ok"),
+    okSignals: serviceCards.filter((card) => healthCardEvidenceState(card) === "ok"),
+  };
+}
+
+export function formatHealthNarrative(
+  cards: readonly HealthCard[],
+  lastIncident?: HealthLastIncident | null,
+): string {
+  const { deviations } = partitionHealthServiceCards(cards);
+  if (deviations.length > 0) {
+    return deviations
+      .map((card) => `${card.title} ${healthEvidenceLabel(healthCardEvidenceState(card))}.`)
+      .join(" ");
+  }
+  const resolved = formatResolvedIncident(lastIncident);
+  return resolved ? `모든 신호 정상. 마지막 이상은 ${resolved} (해소됨).` : "모든 신호 정상.";
+}
+
+function formatResolvedIncident(lastIncident?: HealthLastIncident | null): string | null {
+  if (!lastIncident) return null;
+  const when = formatHealthTimestamp(lastIncident.at);
+  if (!when) return null;
+  return `${when} · ${lastIncident.title}`;
 }
 
 export function healthFailedSources(cards: readonly HealthCard[]): HealthFailedSource[] {

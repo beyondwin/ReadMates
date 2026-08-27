@@ -1,10 +1,11 @@
 import { useEffect, useRef, type KeyboardEvent } from "react";
 import { Link } from "react-router";
+import { ADMIN_COPY, auditOutcomeLabel } from "@/features/platform-admin/model/admin-copy";
 import {
   buildAdminAuditOperationSummary,
+  formatAdminAuditOccurredAt,
+  formatAdminAuditLedgerSentenceBody,
   labelAdminAuditActorRole,
-  labelAdminAuditOutcome,
-  labelAdminAuditSourceSlice,
   shouldShowAdminAuditDetailValue,
   type AdminAuditActionCategory,
   type AdminAuditActorRole,
@@ -14,6 +15,10 @@ import {
   type AdminAuditOutcome,
   type AdminAuditSourceSlice,
 } from "@/features/platform-admin/model/platform-admin-audit-model";
+import { AdminEvidenceLedger } from "./admin-evidence-ledger";
+import { AdminPageContext } from "./admin-page-context";
+import type { AdminPageState } from "./admin-state-panel";
+import { AdminWorkViewBar } from "./admin-work-view-bar";
 
 export type AdminAuditLedgerProps = {
   page: AdminAuditLedgerPage | null;
@@ -79,6 +84,10 @@ export function AdminAuditLedger({
     if (key === "range") return value !== "7d";
     return Boolean(value);
   });
+  const ledgerState = auditLedgerState({ page, loading, error });
+  const freshness = page?.filters.from && page?.filters.to
+    ? formatDateRange(page.filters.from, page.filters.to)
+    : `범위 ${filters.range ?? "7d"}`;
 
   function handleRowKeyDown(event: KeyboardEvent<HTMLButtonElement>, item: AdminAuditLedgerItem) {
     if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
@@ -97,99 +106,165 @@ export function AdminAuditLedger({
   }
 
   return (
-    <section className="admin-audit" aria-labelledby="admin-audit-title">
-      <header className="admin-audit__header">
-        <h1 id="admin-audit-title" className="h1 editorial">감사</h1>
-        <p className="admin-audit__timestamp">
-          {page?.filters.from && page?.filters.to
-            ? `${formatDateRange(page.filters.from, page.filters.to)} · `
-            : `범위 ${filters.range ?? "7d"} · `}
-          {page?.summary.visibleCount ?? 0}건
-        </p>
-      </header>
+    <div className="admin-audit">
+      <AdminPageContext
+        eyebrow={ADMIN_COPY.eyebrow.ledger}
+        heading={ADMIN_COPY.heading.audit}
+        freshness={freshness}
+      >
+        <AdminWorkViewBar
+          filters={
+            <>
+              <fieldset className="admin-audit__filters">
+                <legend>감사 필터</legend>
+                <div className="admin-audit__ranges">
+                  {(["24h", "7d", "30d", "90d"] as const).map((range) => (
+                    <button
+                      key={range}
+                      type="button"
+                      className={filters.range === range && !filters.from && !filters.to ? "btn btn-primary btn-sm" : "btn btn-quiet btn-sm"}
+                      onClick={() => onFilterChange({ ...filters, range, from: null, to: null })}
+                    >
+                      {range}
+                    </button>
+                  ))}
+                </div>
+                <label>시작 시각<input type="datetime-local" value={toLocalDateTime(filters.from)} onChange={(event) => onFilterChange({ ...filters, from: toUtcInstant(event.currentTarget.value), range: undefined })} /></label>
+                <label>종료 시각<input type="datetime-local" value={toLocalDateTime(filters.to)} onChange={(event) => onFilterChange({ ...filters, to: toUtcInstant(event.currentTarget.value), range: undefined })} /></label>
+                <label>클럽 ID<input value={filters.clubId ?? ""} onChange={(event) => onFilterChange({ ...filters, clubId: event.currentTarget.value || null })} /></label>
+                <FilterSelect label="행위자 역할" value={filters.actorRole} values={ACTOR_ROLES} onChange={(value) => onFilterChange({ ...filters, actorRole: value as AdminAuditActorRole | null })} />
+                <FilterSelect label="소스 영역" value={filters.sourceSlice} values={SOURCE_SLICES} onChange={(value) => onFilterChange({ ...filters, sourceSlice: value as AdminAuditSourceSlice | null })} />
+                <FilterSelect label="행동 분류" value={filters.actionCategory} values={ACTION_CATEGORIES} onChange={(value) => onFilterChange({ ...filters, actionCategory: value as AdminAuditActionCategory | null })} />
+                <FilterSelect label="결과" value={filters.outcome} values={OUTCOMES} labels={OUTCOMES.map(auditOutcomeLabel)} onChange={(value) => onFilterChange({ ...filters, outcome: value as AdminAuditOutcome | null })} />
+                <button type="button" className="btn btn-quiet btn-sm admin-audit__reset" onClick={() => onFilterChange({ range: "7d" })}>필터 초기화</button>
+              </fieldset>
+              {sensitiveSearch.canSearch ? (
+                <form className="admin-audit__search" onSubmit={(event) => { event.preventDefault(); sensitiveSearch.onSubmit(); }}>
+                  <label htmlFor="admin-audit-sensitive-search">민감 대상 검색</label>
+                  <input id="admin-audit-sensitive-search" type="search" value={sensitiveSearch.value} autoComplete="off" onChange={(event) => sensitiveSearch.onChange(event.currentTarget.value)} />
+                  <button type="submit" className="btn btn-secondary btn-sm" disabled={sensitiveSearch.pending || !sensitiveSearch.value.trim()}>대상 검색</button>
+                  {sensitiveSearch.active ? <button type="button" className="btn btn-quiet btn-sm" onClick={sensitiveSearch.onClear}>민감 검색 지우기</button> : null}
+                </form>
+              ) : null}
+            </>
+          }
+        />
 
-      <fieldset className="admin-audit__filters">
-        <legend>감사 필터</legend>
-        <div className="admin-audit__ranges">
-          {(["24h", "7d", "30d", "90d"] as const).map((range) => (
-            <button
-              key={range}
-              type="button"
-              className={filters.range === range && !filters.from && !filters.to ? "btn btn-primary btn-sm" : "btn btn-quiet btn-sm"}
-              onClick={() => onFilterChange({ ...filters, range, from: null, to: null })}
-            >
-              {range}
-            </button>
-          ))}
-        </div>
-        <label>시작 시각<input type="datetime-local" value={toLocalDateTime(filters.from)} onChange={(event) => onFilterChange({ ...filters, from: toUtcInstant(event.currentTarget.value), range: undefined })} /></label>
-        <label>종료 시각<input type="datetime-local" value={toLocalDateTime(filters.to)} onChange={(event) => onFilterChange({ ...filters, to: toUtcInstant(event.currentTarget.value), range: undefined })} /></label>
-        <label>클럽 ID<input value={filters.clubId ?? ""} onChange={(event) => onFilterChange({ ...filters, clubId: event.currentTarget.value || null })} /></label>
-        <FilterSelect label="행위자 역할" value={filters.actorRole} values={ACTOR_ROLES} onChange={(value) => onFilterChange({ ...filters, actorRole: value as AdminAuditActorRole | null })} />
-        <FilterSelect label="소스 영역" value={filters.sourceSlice} values={SOURCE_SLICES} onChange={(value) => onFilterChange({ ...filters, sourceSlice: value as AdminAuditSourceSlice | null })} />
-        <FilterSelect label="행동 분류" value={filters.actionCategory} values={ACTION_CATEGORIES} onChange={(value) => onFilterChange({ ...filters, actionCategory: value as AdminAuditActionCategory | null })} />
-        <FilterSelect label="결과" value={filters.outcome} values={OUTCOMES} onChange={(value) => onFilterChange({ ...filters, outcome: value as AdminAuditOutcome | null })} />
-        <button type="button" className="btn btn-quiet btn-sm admin-audit__reset" onClick={() => onFilterChange({ range: "7d" })}>필터 초기화</button>
-      </fieldset>
+        {sensitiveSearch.error ? <p className="admin-audit__error" role="alert">{sensitiveSearch.error}</p> : null}
+        {error && page ? <p className="admin-audit__error" role="alert">{error}</p> : null}
 
-      {sensitiveSearch.canSearch ? (
-        <form className="admin-audit__search" onSubmit={(event) => { event.preventDefault(); sensitiveSearch.onSubmit(); }}>
-          <label htmlFor="admin-audit-sensitive-search">민감 대상 검색</label>
-          <input id="admin-audit-sensitive-search" type="search" value={sensitiveSearch.value} autoComplete="off" onChange={(event) => sensitiveSearch.onChange(event.currentTarget.value)} />
-          <button type="submit" className="btn btn-secondary btn-sm" disabled={sensitiveSearch.pending || !sensitiveSearch.value.trim()}>대상 검색</button>
-          {sensitiveSearch.active ? <button type="button" className="btn btn-quiet btn-sm" onClick={sensitiveSearch.onClear}>민감 검색 지우기</button> : null}
-        </form>
-      ) : null}
-
-      {sensitiveSearch.error ? <p className="admin-audit__error" role="alert">{sensitiveSearch.error}</p> : null}
-      {error ? <p className="admin-audit__error" role="alert">{error}</p> : null}
-      {page && page.summary.sourceUnavailableCount > 0 ? (
-        <p className="admin-audit__partial" role="status">
-          일부 감사 source를 불러오지 못했습니다. 이번 조회에서는 제외됨: {page.summary.unavailableSources.join(", ")}
-        </p>
-      ) : null}
-      {loading ? <p className="admin-audit__loading">감사 ledger를 불러오는 중입니다.</p> : null}
-
-      <div className="admin-audit__body" data-detail-open={detailOpen ? "true" : "false"}>
-        <div ref={rowsRef} className="admin-audit__rows" aria-label="감사 이벤트 목록" tabIndex={-1}>
-          {page && page.items.length > 0 ? page.items.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              data-audit-row={item.id}
-              aria-pressed={selected?.id === item.id}
-              className="admin-audit__row"
-              onClick={() => onSelect(item)}
-              onKeyDown={(event) => handleRowKeyDown(event, item)}
-            >
-              <span className="admin-audit__row-time">{formatTimestamp(item.occurredAt)}</span>
-              <span className="admin-audit__row-main">{item.summary}</span>
-              <span className="platform-admin-domain-status">{labelAdminAuditOutcome(item.outcome)}</span>
-              <span className="admin-audit__slice">{labelAdminAuditSourceSlice(item.sourceSlice)}</span>
-            </button>
-          )) : !loading && !error ? (
-            <p className="admin-audit__empty">{hasFilters ? "선택한 조건에 해당하는 감사 이벤트가 없습니다." : "기록된 감사 이벤트가 없습니다."}</p>
-          ) : null}
-          {nextPageError ? (
-            <div className="admin-audit__more-error" role="alert">
-              <p>이어지는 페이지를 불러오지 못했습니다. 기존 기록은 유지되었습니다.</p>
-              <button type="button" className="btn btn-quiet btn-sm" onClick={onRetryLoadMore}>이어 불러오기 재시도</button>
+        <div className="admin-audit__body" data-detail-open={detailOpen ? "true" : "false"}>
+          <AdminEvidenceLedger
+            label={ADMIN_COPY.heading.auditLedger}
+            count={page && ledgerState !== "loading" && ledgerState !== "unavailable" ? page.summary.visibleCount : undefined}
+            state={ledgerState}
+            title={
+              ledgerState === "loading"
+                ? "운영 기입을 불러오는 중입니다."
+                : ledgerState === "unavailable"
+                  ? error
+                  : ledgerState === "empty"
+                    ? (hasFilters ? "선택한 조건에 해당하는 감사 이벤트가 없습니다." : "기록된 감사 이벤트가 없습니다.")
+                    : ledgerState === "partial"
+                      ? "일부 감사 source를 불러오지 못했습니다."
+                      : undefined
+            }
+            description={
+              ledgerState === "partial" && page
+                ? `이번 조회에서는 제외됨: ${page.summary.unavailableSources.join(", ")}`
+                : ledgerState === "loading" || ledgerState === "empty" || ledgerState === "unavailable"
+                  ? ""
+                  : undefined
+            }
+            sources={
+              ledgerState === "partial" && page
+                ? page.summary.unavailableSources.map((source) => ({
+                    id: source,
+                    label: source,
+                    available: false,
+                  }))
+                : undefined
+            }
+          >
+            <div ref={rowsRef} className="admin-audit__rows" aria-label="운영 기입 목록" tabIndex={-1}>
+              {page && page.items.length > 0 ? page.items.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  data-audit-row={item.id}
+                  aria-pressed={selected?.id === item.id}
+                  className="admin-audit__row"
+                  onClick={() => onSelect(item)}
+                  onKeyDown={(event) => handleRowKeyDown(event, item)}
+                >
+                  <span className="admin-audit__row-main">
+                    <time className="admin-audit__row-time" dateTime={item.occurredAt}>
+                      {formatAdminAuditOccurredAt(item.occurredAt)}
+                    </time>
+                    {` · ${formatAdminAuditLedgerSentenceBody(item)}`}
+                  </span>
+                </button>
+              )) : null}
+              {nextPageError ? (
+                <div className="admin-audit__more-error" role="alert">
+                  <p>이어지는 페이지를 불러오지 못했습니다. 기존 기록은 유지되었습니다.</p>
+                  <button type="button" className="btn btn-quiet btn-sm" onClick={onRetryLoadMore}>이어 불러오기 재시도</button>
+                </div>
+              ) : null}
+              {page?.nextCursor && !nextPageError ? (
+                <button type="button" className="btn btn-quiet btn-sm admin-audit__more" onClick={onLoadMore} disabled={loadingMore}>
+                  {loadingMore ? "이어 불러오는 중" : "더 보기"}
+                </button>
+              ) : null}
             </div>
-          ) : null}
-          {page?.nextCursor && !nextPageError ? (
-            <button type="button" className="btn btn-quiet btn-sm admin-audit__more" onClick={onLoadMore} disabled={loadingMore}>
-              {loadingMore ? "이어 불러오는 중" : "더 보기"}
-            </button>
-          ) : null}
+          </AdminEvidenceLedger>
+          <AuditDetail item={selected} onBack={onCloseDetail} />
         </div>
-        <AuditDetail item={selected} onBack={onCloseDetail} />
-      </div>
-    </section>
+      </AdminPageContext>
+    </div>
   );
 }
 
-function FilterSelect({ label, value, values, onChange }: { label: string; value: string | null | undefined; values: string[]; onChange: (value: string | null) => void }) {
-  return <label>{label}<select value={value ?? ""} onChange={(event) => onChange(event.currentTarget.value || null)}><option value="">전체</option>{values.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>;
+function auditLedgerState({
+  page,
+  loading,
+  error,
+}: {
+  page: AdminAuditLedgerPage | null;
+  loading: boolean;
+  error: string | null;
+}): AdminPageState {
+  if (loading && !page) return "loading";
+  if (error && !page) return "unavailable";
+  if (!page || page.items.length === 0) return "empty";
+  if (page.summary.sourceUnavailableCount > 0) return "partial";
+  return "ready";
+}
+
+function FilterSelect({
+  label,
+  value,
+  values,
+  labels,
+  onChange,
+}: {
+  label: string;
+  value: string | null | undefined;
+  values: string[];
+  labels?: string[];
+  onChange: (value: string | null) => void;
+}) {
+  return (
+    <label>
+      {label}
+      <select value={value ?? ""} onChange={(event) => onChange(event.currentTarget.value || null)}>
+        <option value="">전체</option>
+        {values.map((item, index) => (
+          <option key={item} value={item}>{labels?.[index] ?? item}</option>
+        ))}
+      </select>
+    </label>
+  );
 }
 
 function AuditDetail({ item, onBack }: { item: AdminAuditLedgerItem | null; onBack: () => void }) {
@@ -236,11 +311,5 @@ function toUtcInstant(value: string) {
 }
 
 function formatDateRange(from: unknown, to: unknown) {
-  return `${formatTimestamp(String(from))}–${formatTimestamp(String(to))}`;
-}
-
-function formatTimestamp(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return `${formatAdminAuditOccurredAt(String(from))}–${formatAdminAuditOccurredAt(String(to))}`;
 }

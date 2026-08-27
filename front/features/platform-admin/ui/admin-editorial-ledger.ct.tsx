@@ -226,7 +226,7 @@ test("Clubs locks the 900 tablet editorial composition", async ({ mount, page })
     VISUAL_AUTHORITY_VIEWPORTS.tablet,
   );
   await expect(component.getByRole("heading", { name: "클럽", exact: true })).toBeVisible();
-  await expect(component.getByRole("region", { name: "클럽 레지스트리" })).toBeVisible();
+  await expect(component.getByRole("region", { name: "클럽 장부" })).toBeVisible();
   await expect(component.getByRole("link", { name: EDITORIAL_LEDGER_LONG_CLUB_NAME })).toBeVisible();
   const create = component.getByRole("link", { name: "새 클럽" });
   await expect(create).toBeVisible();
@@ -246,7 +246,7 @@ test("Service health locks the 768 read-only evidence composition", async ({ mou
   );
   await expect(component.getByRole("heading", { name: "서비스 건강" })).toBeVisible();
   await expect(component.getByRole("region", { name: "서비스 신호" })).toBeVisible();
-  await expect(component.getByText(EDITORIAL_LEDGER_LONG_HEALTH_TITLE)).toBeVisible();
+  await expect(component.getByRole("heading", { name: EDITORIAL_LEDGER_LONG_HEALTH_TITLE })).toBeVisible();
   await expect(component.locator(".admin-case-docket")).toHaveCount(0);
   await expect(component.locator(".admin-action-dock")).toHaveCount(0);
   await expect(component.locator(".admin-receipt-timeline")).toHaveCount(0);
@@ -265,7 +265,7 @@ test("Review audit locks the 390 mobile docket composition", async ({ mount, pag
     reviewNode(reviewAuditLedger),
     VISUAL_AUTHORITY_VIEWPORTS.mobile,
   );
-  await expect(component.getByRole("heading", { name: "감사", exact: true })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "운영 기입", exact: true })).toBeVisible();
   await expect(component.getByRole("heading", { name: EDITORIAL_LEDGER_LONG_AUDIT_SUMMARY })).toBeVisible();
   await expect(component.getByRole("region", { name: "감사 이벤트 상세" })).toBeVisible();
   const back = component.getByRole("button", { name: "목록으로" });
