@@ -443,13 +443,13 @@ const HEALTH_SNAPSHOT: PlatformHealthSnapshot = {
   cards: [
     healthCard({
       id: "outbox_backlog",
-      title: EDITORIAL_LEDGER_LONG_HEALTH_TITLE,
+      title: "Outbox backlog",
       metric: { value: 42, unit: "rows", label: "pending" },
       drill: { kind: "ADMIN_ROUTE", target: "/admin/notifications?focus=outbox_backlog" },
     }),
     healthCard({
       id: "kafka_consumer_lag",
-      title: "Kafka consumer lag",
+      title: EDITORIAL_LEDGER_LONG_HEALTH_TITLE,
       status: "WARN",
       metric: { value: 75, unit: "records", label: "max across partitions" },
       thresholds: { warn: 50, crit: 500 },

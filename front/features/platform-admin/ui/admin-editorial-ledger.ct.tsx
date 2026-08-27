@@ -246,7 +246,7 @@ test("Service health locks the 768 read-only evidence composition", async ({ mou
   );
   await expect(component.getByRole("heading", { name: "서비스 건강" })).toBeVisible();
   await expect(component.getByRole("region", { name: "서비스 신호" })).toBeVisible();
-  await expect(component.getByText(EDITORIAL_LEDGER_LONG_HEALTH_TITLE)).toBeVisible();
+  await expect(component.getByRole("heading", { name: EDITORIAL_LEDGER_LONG_HEALTH_TITLE })).toBeVisible();
   await expect(component.locator(".admin-case-docket")).toHaveCount(0);
   await expect(component.locator(".admin-action-dock")).toHaveCount(0);
   await expect(component.locator(".admin-receipt-timeline")).toHaveCount(0);

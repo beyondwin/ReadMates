@@ -96,7 +96,7 @@ test("Health is read-only evidence without commands", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "서비스 건강" })).toBeVisible();
   await expect(page.getByRole("region", { name: "서비스 신호" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Outbox backlog" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Kafka consumer lag" })).toBeVisible();
   await expect(page.locator(".admin-case-docket")).toHaveCount(0);
   await expect(page.locator(".admin-action-dock")).toHaveCount(0);
   await expect(page.locator(".admin-receipt-timeline")).toHaveCount(0);

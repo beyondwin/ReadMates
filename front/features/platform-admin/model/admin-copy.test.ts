@@ -23,6 +23,7 @@ describe("admin-copy", () => {
     expect(ADMIN_COPY.heading.replay).toBe("재발송");
     expect(ADMIN_COPY.heading.clubsLedger).toBe("클럽 장부");
     expect(ADMIN_COPY.heading.delivery).toBe("배달 원장");
+    expect(ADMIN_COPY.heading.recentChanges).toBe("최근에 바뀐 것");
     expect(ADMIN_COPY.metric.outboxPending).toBe("발송 대기");
     expect(ADMIN_COPY.metric.outboxFailed).toBe("발송 실패");
     expect(ADMIN_COPY.metric.deliveryPending).toBe("배달 대기");

@@ -16,6 +16,7 @@ export const ADMIN_COPY = {
     replay: "재발송",
     clubsLedger: "클럽 장부",
     delivery: "배달 원장",
+    recentChanges: "최근에 바뀐 것",
   },
   metric: {
     outboxPending: "발송 대기",
