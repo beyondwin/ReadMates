@@ -1,4 +1,4 @@
-import { type CSSProperties } from "react";
+import { type CSSProperties, type ReactElement } from "react";
 import type { HostMemberListItem } from "@/features/host/model/host-view-types";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import {
@@ -17,7 +17,7 @@ export function MemberPendingZone({
   isRowPending: (membershipId: string) => boolean;
   onActivate: (membershipId: string) => void;
   onRelease: (membershipId: string) => void;
-}): JSX.Element | null {
+}): ReactElement | null {
   if (viewers.length === 0) {
     return null;
   }

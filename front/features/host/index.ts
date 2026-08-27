@@ -53,6 +53,7 @@ export {
 export {
   createHostMembersActions,
   hostMembersLoaderFactory,
+  type HostMembersRouteData,
 } from "@/features/host/route/host-members-data";
 export {
   HostInvitationsRoute,

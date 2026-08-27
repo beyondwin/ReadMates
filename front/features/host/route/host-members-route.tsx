@@ -1,19 +1,23 @@
 import { useMemo } from "react";
 import { useLoaderData, useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import type { HostMemberListPage } from "@/features/host/api/host-contracts";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import HostMembers, { type HostMembersLinkComponent } from "@/features/host/ui/host-members";
-import { createHostMembersActions } from "./host-members-data";
+import { createHostInvitationsActions } from "./host-invitations-data";
+import { createHostMembersActions, type HostMembersRouteData } from "./host-members-data";
 import "@/features/host/ui/host-editorial-ledger.css";
 
 export function HostMembersRoute({ LinkComponent }: { LinkComponent?: HostMembersLinkComponent }) {
-  const members = useLoaderData() as HostMemberListPage;
+  const { members, invitations } = useLoaderData() as HostMembersRouteData;
   const { clubSlug = "" } = useParams<{ clubSlug: string }>();
   const queryClient = useQueryClient();
   const context = requireHostClubContext(clubSlug);
   const actions = useMemo(
     () => createHostMembersActions(queryClient, context),
+    [context, queryClient],
+  );
+  const invitationActions = useMemo(
+    () => createHostInvitationsActions(queryClient, context),
     [context, queryClient],
   );
 
@@ -31,7 +35,13 @@ export function HostMembersRoute({ LinkComponent }: { LinkComponent?: HostMember
         </div>
       </section>
       <section className="container rm-host-members-page__body">
-        <HostMembers initialMembers={members} actions={actions} LinkComponent={LinkComponent} />
+        <HostMembers
+          initialMembers={members}
+          actions={actions}
+          initialInvitations={invitations}
+          invitationActions={invitationActions}
+          LinkComponent={LinkComponent}
+        />
       </section>
     </main>
   );

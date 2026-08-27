@@ -7,10 +7,11 @@ import { RouterProvider } from "react-router/dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { HostMembersActions } from "@/features/host/model/host-member-actions";
+import type { HostInvitationsActions } from "@/features/host/model/host-invitation-actions";
 import HostMembers from "@/features/host/ui/host-members";
 import { createHostMembersActions, hostMembersLoaderFactory } from "@/features/host";
 import HostMembersPage from "@/src/pages/host-members";
-import type { HostMemberListItem } from "@/features/host/api/host-contracts";
+import type { HostInvitationListItem, HostMemberListItem } from "@/features/host/api/host-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { __resetHostClientContractCapabilityForTest } from "@/shared/api/host-client-contract";
 
@@ -143,18 +144,35 @@ const noopHostMembersActions = {
   submitProfile: vi.fn(async () => members[0]),
 } satisfies HostMembersActions;
 
+const noopHostInvitationsActions = {
+  listInvitations: vi.fn(async () => new Response(JSON.stringify({ items: [], nextCursor: null }))),
+  refreshInvitations: vi.fn(async () => ({ items: [], nextCursor: null })),
+  createInvitation: vi.fn(async () => new Response(JSON.stringify({}), { status: 201 })),
+  revokeInvitation: vi.fn(async () => new Response(JSON.stringify({}), { status: 200 })),
+  parseInvitation: vi.fn(async (response) => response.json()),
+  parseInvitationList: vi.fn(async (response) => response.json()),
+} satisfies HostInvitationsActions;
+
 type HostMembersProps = Parameters<typeof HostMembers>[0];
 
 function HostMembersForTest({
   actions,
+  invitationActions,
   initialMembers,
+  initialInvitations = [],
   ...props
-}: Omit<HostMembersProps, "actions"> & { actions?: HostMembersActions }) {
+}: Omit<HostMembersProps, "actions" | "invitationActions" | "initialInvitations"> & {
+  actions?: HostMembersActions;
+  invitationActions?: HostInvitationsActions;
+  initialInvitations?: HostMembersProps["initialInvitations"];
+}) {
   return (
     <HostMembers
       {...props}
       initialMembers={initialMembers}
+      initialInvitations={initialInvitations}
       actions={actions ?? noopHostMembersActions}
+      invitationActions={invitationActions ?? noopHostInvitationsActions}
     />
   );
 }
@@ -174,6 +192,13 @@ function memberListItemResponse(member: HostMemberListItem, status = 200) {
 }
 
 function memberListResponse(items: HostMemberListItem[]) {
+  return new Response(JSON.stringify({ items, nextCursor: null }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function invitationListResponse(items: HostInvitationListItem[] = []) {
   return new Response(JSON.stringify({ items, nextCursor: null }), {
     status: 200,
     headers: { "Content-Type": "application/json" },
@@ -216,7 +241,8 @@ function renderHostMembersPage(extraResponses: Array<Response | Promise<Response
   const fetchMock = vi
     .fn()
     .mockResolvedValueOnce(authResponse(activeHostAuth))
-    .mockResolvedValueOnce(memberListResponse(initialMembers));
+    .mockResolvedValueOnce(memberListResponse(initialMembers))
+    .mockResolvedValueOnce(invitationListResponse());
 
   for (const response of extraResponses) {
     fetchMock.mockResolvedValueOnce(response);
@@ -303,7 +329,9 @@ describe("HostMembersPage", () => {
     expect(memberLedgerRow("멤버1").getByText("이번 모임 참여")).toBeInTheDocument();
     expect(memberLedgerRow("새").getByText("이번 모임 미포함")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "가입 승인 대기" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "초대" })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/members?limit=50&clubSlug=reading-sai", expect.objectContaining({ cache: "no-store" }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/invitations?limit=50&clubSlug=reading-sai", expect.objectContaining({ cache: "no-store" }));
   });
 
   it("renders each member row with identity, status, and current-session state", async () => {
@@ -522,7 +550,7 @@ describe("HostMembersPage", () => {
     await user.type(dialog.getByLabelText("이름"), "새이름");
     await user.dblClick(dialog.getByRole("button", { name: "이름 저장" }));
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
     expect(dialog.getByRole("button", { name: "이름 저장" })).toBeDisabled();
     expect(dialog.getByRole("button", { name: "이름 저장" })).toHaveTextContent("저장 중");
 
@@ -744,10 +772,10 @@ describe("HostMembersPage", () => {
     expect(secondRow.getByRole("button", { name: "거절" })).toBeDisabled();
     expect(secondRow.getByRole("button", { name: "거절" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
     expect(secondRow.getAllByText("멤버 상태 업데이트를 처리하는 중입니다.")).toHaveLength(2);
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
 
     await user.click(firstRow.getByRole("button", { name: "거절" }));
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
 
     firstApproval.resolve(new Response(JSON.stringify({ status: "ACTIVE" }), { status: 200, headers: { "Content-Type": "application/json" } }));
     secondApproval.resolve(new Response(JSON.stringify({ status: "ACTIVE" }), { status: 200, headers: { "Content-Type": "application/json" } }));
@@ -806,12 +834,12 @@ describe("HostMembersPage", () => {
     expect(await screen.findByText("정식 멤버로 전환했습니다.")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "가입 승인 대기" })).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
+      4,
       "/api/bff/api/host/members/membership-pending/activate?clubSlug=reading-sai",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      4,
+      5,
       "/api/bff/api/host/members?limit=50&clubSlug=reading-sai",
       expect.objectContaining({ cache: "no-store" }),
     );
@@ -849,7 +877,7 @@ describe("HostMembersPage", () => {
         name: "승인",
       }),
     );
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
 
     await user.click(
       within((await findPendingZone()).getByText("두번째 둘러보기").closest("article") as HTMLElement).getByRole(
@@ -859,7 +887,7 @@ describe("HostMembersPage", () => {
         },
       ),
     );
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(7));
 
     expect(screen.queryByRole("region", { name: "가입 승인 대기" })).not.toBeInTheDocument();
 
@@ -896,12 +924,12 @@ describe("HostMembersPage", () => {
     expect(await screen.findByText("둘러보기 멤버를 해제했습니다.")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "가입 승인 대기" })).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
+      4,
       "/api/bff/api/host/members/membership-pending/deactivate-viewer?clubSlug=reading-sai",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      4,
+      5,
       "/api/bff/api/host/members?limit=50&clubSlug=reading-sai",
       expect.objectContaining({ cache: "no-store" }),
     );
@@ -926,7 +954,7 @@ describe("HostMembersPage", () => {
     expect(screen.queryByRole("region", { name: "가입 승인 대기" })).not.toBeInTheDocument();
     expect(screen.queryByText("정식 멤버 전환에 실패했습니다.")).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenNthCalledWith(
-      4,
+      5,
       "/api/bff/api/host/members?limit=50&clubSlug=reading-sai",
       expect.objectContaining({ cache: "no-store" }),
     );
@@ -1075,12 +1103,12 @@ describe("HostMembersPage", () => {
     await user.click(within(row as HTMLElement).getByRole("button", { name: "이번 모임 추가" }));
 
     expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
+      4,
       "/api/bff/api/host/members/membership-active/current-session/remove?clubSlug=reading-sai",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      4,
+      5,
       "/api/bff/api/host/members/membership-not-session/current-session/add?clubSlug=reading-sai",
       expect.objectContaining({ method: "POST" }),
     );
@@ -1112,7 +1140,7 @@ describe("HostMembersPage", () => {
     expect(activeRow.getAllByText("멤버 상태 업데이트를 처리하는 중입니다.")).toHaveLength(3);
 
     await user.click(activeRow.getByRole("button", { name: "멤버 관리 메뉴" }));
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
 
     await act(async () => {

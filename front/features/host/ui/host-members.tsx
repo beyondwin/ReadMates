@@ -2,6 +2,8 @@ import { type CSSProperties, useMemo, useRef, useState } from "react";
 import { useInRouterContext, useLocation } from "react-router";
 import type {
   CurrentSessionPolicy,
+  HostInvitationListItem,
+  HostInvitationListPage,
   HostMemberListPage,
   HostMemberListItem,
   MemberLifecycleRequest,
@@ -10,12 +12,14 @@ import {
   HostMemberProfileActionError,
   type HostMembersActions,
 } from "@/features/host/model/host-member-actions";
+import type { HostInvitationsActions } from "@/features/host/model/host-invitation-actions";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { LifecyclePolicyDialog } from "./members/member-approval-actions";
 import { actionKey, disabledProfileReason, isMembershipPending } from "./members/member-action-rules";
 import { MemberActionButton } from "./members/member-list";
 import { HostMemberProfileDialog } from "./members/member-profile-editor";
 import { hostProfileErrorMessage, profileFailureMessage } from "./members/member-profile-errors";
+import { MemberInvitationsSection } from "./members/member-invitations-section";
 import { MemberPendingZone } from "./members/member-pending-zone";
 import { MemberStatusFilter } from "./members/member-status-filter";
 import { MemberSummary } from "./members/member-summary";
@@ -34,6 +38,8 @@ export type { HostMembersLinkComponent } from "./members/types";
 type HostMembersProps = {
   initialMembers: HostMemberListPage | HostMemberListItem[];
   actions: HostMembersActions;
+  initialInvitations: HostInvitationListPage | HostInvitationListItem[];
+  invitationActions: HostInvitationsActions;
   LinkComponent?: HostMembersLinkComponent;
 };
 
@@ -70,36 +76,125 @@ type MemberRowsState = {
 };
 type MemberRowsUpdate = HostMemberListItem[] | ((current: HostMemberListItem[]) => HostMemberListItem[]);
 
+type InvitationRowsState = {
+  source: HostInvitationListItem[];
+  invitations: HostInvitationListItem[];
+};
+
 export default function HostMembers({
   initialMembers,
   actions,
+  initialInvitations,
+  invitationActions,
   LinkComponent: _LinkComponent = DefaultLinkComponent,
 }: HostMembersProps) {
   const initialPage = useMemo(() => normalizeMemberPage(initialMembers), [initialMembers]);
   const initialMembersItems = initialPage.items;
+  const initialInvitationPage = useMemo(
+    () => normalizeInvitationPage(initialInvitations),
+    [initialInvitations],
+  );
+  const initialInvitationItems = initialInvitationPage.items;
   const initialRowsState = (): MemberRowsState => ({
     source: initialMembersItems,
     members: initialMembersItems,
     nextCursor: initialPage.nextCursor,
+  });
+  const initialInvitationRowsState = (): InvitationRowsState => ({
+    source: initialInvitationItems,
+    invitations: initialInvitationItems,
   });
   const [memberRowsState, setMemberRowsState] = useState<MemberRowsState>(() => ({
     source: initialMembersItems,
     members: initialMembersItems,
     nextCursor: initialPage.nextCursor,
   }));
+  const [invitationRowsState, setInvitationRowsState] = useState<InvitationRowsState>(() => ({
+    source: initialInvitationItems,
+    invitations: initialInvitationItems,
+  }));
   const visibleRowsState = memberRowsState.source === initialMembersItems ? memberRowsState : initialRowsState();
   const members = visibleRowsState.members;
   const visibleNextCursor = visibleRowsState.nextCursor;
+  const visibleInvitationState =
+    invitationRowsState.source === initialInvitationItems ? invitationRowsState : initialInvitationRowsState();
+  const invitations = visibleInvitationState.invitations;
+  const pendingInvitationCount = invitations.filter((item) => item.effectiveStatus === "PENDING").length;
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [activeTab, setActiveTab] = useState<MemberTab>("active");
   const [dialog, setDialog] = useState<LifecycleDialog>(null);
   const [profileDialog, setProfileDialog] = useState<ProfileDialog>(null);
   const [dialogPolicy, setDialogPolicy] = useState<CurrentSessionPolicy>("APPLY_NOW");
   const [pendingActions, setPendingActions] = useState<Set<string>>(() => new Set());
+  const [invitationBusyId, setInvitationBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<null | { kind: "alert" | "status"; text: string }>(null);
   const pendingActionsRef = useRef<Set<string>>(new Set());
   const completedViewerMembershipIdsRef = useRef<Set<string>>(new Set());
   const dialogTriggerRef = useRef<HTMLElement | null>(null);
+
+  const replaceInvitationsFromPage = (page: HostInvitationListPage | HostInvitationListItem[]) => {
+    const nextPage = normalizeInvitationPage(page);
+    setInvitationRowsState({
+      source: initialInvitationItems,
+      invitations: nextPage.items,
+    });
+  };
+
+  const createInvitation = async (request: {
+    email: string;
+    name: string;
+    applyToCurrentSession: boolean;
+  }) => {
+    const response = await invitationActions.createInvitation(request);
+    if (!response.ok) {
+      const error = new Error("create-failed") as Error & { status?: number };
+      error.status = response.status;
+      throw error;
+    }
+    replaceInvitationsFromPage(await invitationActions.refreshInvitations({ limit: 50 }));
+  };
+
+  const revokeInvitation = async (invitationId: string) => {
+    if (invitationBusyId) {
+      return;
+    }
+
+    setInvitationBusyId(invitationId);
+    setMessage(null);
+    try {
+      const response = await invitationActions.revokeInvitation(invitationId);
+      if (!response.ok) {
+        throw new Error("revoke-failed");
+      }
+      replaceInvitationsFromPage(await invitationActions.refreshInvitations({ limit: 50 }));
+      setMessage({ kind: "status", text: "초대를 중지했습니다." });
+    } catch {
+      setMessage({ kind: "alert", text: "초대 중지에 실패했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요." });
+    } finally {
+      setInvitationBusyId(null);
+    }
+  };
+
+  const reissueInvitation = async (invitation: HostInvitationListItem) => {
+    if (invitationBusyId) {
+      return;
+    }
+
+    setInvitationBusyId(invitation.invitationId);
+    setMessage(null);
+    try {
+      await createInvitation({
+        email: invitation.email,
+        name: invitation.name,
+        applyToCurrentSession: invitation.applyToCurrentSession,
+      });
+      setMessage({ kind: "status", text: "초대를 재발송했습니다." });
+    } catch {
+      setMessage({ kind: "alert", text: "재발송에 실패했습니다. 대상 이메일을 확인한 뒤 다시 시도해 주세요." });
+    } finally {
+      setInvitationBusyId(null);
+    }
+  };
 
   const setMembers = (update: MemberRowsUpdate) => {
     setMemberRowsState((current) => {
@@ -357,6 +452,15 @@ export default function HostMembers({
         onLoadMore={loadMoreMembers}
       />
 
+      <MemberInvitationsSection
+        invitations={invitations}
+        pendingCount={pendingInvitationCount}
+        onCreate={createInvitation}
+        onRevoke={revokeInvitation}
+        onReissue={reissueInvitation}
+        busyId={invitationBusyId}
+      />
+
       {dialog ? (
         <LifecyclePolicyDialog
           dialog={dialog}
@@ -381,5 +485,11 @@ export default function HostMembers({
 }
 
 function normalizeMemberPage(value: HostMemberListPage | HostMemberListItem[]): HostMemberListPage {
+  return Array.isArray(value) ? { items: value, nextCursor: null } : value;
+}
+
+function normalizeInvitationPage(
+  value: HostInvitationListPage | HostInvitationListItem[],
+): HostInvitationListPage {
   return Array.isArray(value) ? { items: value, nextCursor: null } : value;
 }
