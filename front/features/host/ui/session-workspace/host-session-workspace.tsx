@@ -64,11 +64,6 @@ function panelLocation(panel: HostSessionWorkspacePanel, source: HostSessionWork
   return { panel, source };
 }
 
-function hostStatusLabel(label: HostSessionWorkspaceView["statusLabel"]): "모임 작성 중" | "멤버와 준비 중" | "기록 정리 중" | "공개 완료" {
-  if (label === "게스트·멤버 노트 게시 완료") return "공개 완료";
-  return label;
-}
-
 function namedOverlayBody(
   panel: Exclude<HostSessionWorkspacePanel, "focus">,
   bodies: {
@@ -137,7 +132,6 @@ export function HostSessionWorkspace({
   const historyOpen = location.panel === "history";
   const attendanceOpen = location.panel === "attendance";
   const recordsOpen = location.panel === "records";
-  const statusLabel = hostStatusLabel(view.statusLabel);
   const triggerRef = useRef<HTMLElement | null>(null);
 
   const changePanel = (next: HostSessionWorkspaceLocation) => {
@@ -190,7 +184,7 @@ export function HostSessionWorkspace({
       <div className="rm-host-session-workspace__frame">
         <WorkspaceHeader
           header={header}
-          statusLabel={statusLabel}
+          statusLabel={view.statusLabel}
           basicOpen={basicOpen}
           historyOpen={historyOpen}
           onOpenBasic={() => changePanel(basicOpen ? focusLocation() : panelLocation("basic"))}

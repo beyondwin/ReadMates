@@ -1,8 +1,9 @@
 import {
-  formatMeetingLifecycle,
   formatPublicationAction,
+  hostMeetingLifecycleLabel,
   MEETING_APPLY_LABEL,
   MEETING_ATTENDANCE_LABEL,
+  type HostMeetingLifecycleLabel,
 } from "@/shared/model/meeting-language";
 import {
   observedHostMeetingRecordFacts,
@@ -81,7 +82,7 @@ export type HostMeetingWorkspaceLegacyInput = {
 
 export type HostMeetingWorkspaceView = {
   lifecycle: HostMeetingLifecycle;
-  statusLabel: "모임 작성 중" | "멤버와 준비 중" | "기록 정리 중" | "공개 완료";
+  statusLabel: HostMeetingLifecycleLabel;
   primaryAction: HostMeetingPrimaryAction;
   facts: readonly HostFocusFact[];
   relatedTasks: readonly HostMeetingTaskLink[];
@@ -199,13 +200,8 @@ function taskBadge(
   return undefined;
 }
 
-function focusDeckStatusLabel(
-  state: HostMeetingLifecycle,
-): HostMeetingWorkspaceView["statusLabel"] {
-  if (state === "DRAFT") return "모임 작성 중";
-  if (state === "OPEN") return "멤버와 준비 중";
-  if (state === "CLOSED") return "기록 정리 중";
-  return "공개 완료";
+function focusDeckStatusLabel(state: HostMeetingLifecycle): HostMeetingWorkspaceView["statusLabel"] {
+  return hostMeetingLifecycleLabel(state);
 }
 
 function publicationReadyFrom(readiness: HostMeetingRecordReadiness): boolean | null {
@@ -476,7 +472,7 @@ export type HostSessionWorkspaceInput = Omit<
 
 /** @deprecated Internal Task 5→8 compatibility only. */
 export type HostSessionWorkspaceView = {
-  statusLabel: "모임 작성 중" | "멤버와 준비 중" | "기록 정리 중" | "게스트·멤버 노트 게시 완료";
+  statusLabel: HostMeetingLifecycleLabel;
   primaryAction: { kind: string; label: string; panel: HostSessionWorkspacePanel };
   progress: ReadonlyArray<{ id: string; label: string; state: "done" | "current" | "next" }>;
   publicationReady: boolean;
@@ -495,7 +491,7 @@ export function buildHostSessionWorkspace(
     recordReadiness: readyReadinessFromLegacy(input),
   });
   return {
-    statusLabel: formatMeetingLifecycle(input.state, "host") as HostSessionWorkspaceView["statusLabel"],
+    statusLabel: hostMeetingLifecycleLabel(input.state),
     primaryAction: {
       kind: primaryAction.kind,
       label: primaryAction.label,

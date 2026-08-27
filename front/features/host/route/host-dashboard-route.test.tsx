@@ -242,7 +242,7 @@ describe("HostDashboardRoute", () => {
     const root = document.querySelector(".rm-host-editorial-ledger") as HTMLElement;
     const identity = root.querySelector(".rm-host-editorial-ledger__identity");
     const attention = within(root).getByRole("region", { name: "확인 필요" });
-    expect(identity).toHaveTextContent("2026.04.15 · 멤버와 준비 중");
+    expect(identity).toHaveTextContent("2026.04.15 · 준비 중");
     expect(identity?.textContent).not.toMatch(/진행 중|공개됨|종료/);
     expect(within(root).getAllByRole("link", { name: "지금 다루는 모임 열기" })).toHaveLength(1);
     expect(within(root).getByRole("link", { name: "지금 다루는 모임 열기" })).toHaveClass(

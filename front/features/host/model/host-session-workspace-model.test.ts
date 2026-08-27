@@ -137,25 +137,25 @@ describe("buildHostMeetingWorkspace", () => {
     [
       "DRAFT",
       { recordReadiness: { status: "not-required" } },
-      "모임 작성 중",
+      "작성 중",
       { kind: "OPEN_SESSION", label: "멤버와 준비 시작", task: "overview", disabled: false },
     ],
     [
       "OPEN",
       { meetingDate: "2026-08-21", today: "2026-08-20", unknownAttendanceCount: 2 },
-      "멤버와 준비 중",
+      "준비 중",
       { kind: "REVIEW_MEMBER_INPUT", label: "멤버 응답 확인하기", task: "responses", disabled: false },
     ],
     [
       "OPEN",
       { meetingDate: "2026-08-21", today: "2026-08-21", unknownAttendanceCount: 2 },
-      "멤버와 준비 중",
+      "준비 중",
       { kind: "CHECK_ATTENDANCE", label: "실제 출석 확인", task: "attendance", disabled: false },
     ],
     [
       "OPEN",
       { meetingDate: "2026-08-21", today: "2026-08-22", unknownAttendanceCount: 0 },
-      "멤버와 준비 중",
+      "준비 중",
       { kind: "FINISH_SESSION", label: "모임 마치기", task: "overview", disabled: false },
     ],
     [
@@ -167,7 +167,7 @@ describe("buildHostMeetingWorkspace", () => {
     [
       "PUBLISHED",
       { recordReadiness: readyReadiness({ hasAppliedRecord: true, publicationReady: true }) },
-      "공개 완료",
+      "게시됨",
       { kind: "VIEW_PUBLIC_RECORD", label: "공개 기록 보기", task: "overview", disabled: false },
     ],
   ] satisfies Array<[
@@ -202,7 +202,7 @@ describe("buildHostMeetingWorkspace", () => {
 
     expect(view).toMatchObject({
       lifecycle: "OPEN",
-      statusLabel: "멤버와 준비 중",
+      statusLabel: "준비 중",
       primaryAction: {
         kind: "REVIEW_MEMBER_INPUT",
         label: "멤버 응답 확인하기",
@@ -299,7 +299,7 @@ describe("buildHostMeetingWorkspace", () => {
       recordReadiness,
     });
 
-    expect(view.statusLabel).toBe("공개 완료");
+    expect(view.statusLabel).toBe("게시됨");
     expect(view.primaryAction).toEqual({
       kind: "VIEW_PUBLIC_RECORD",
       label: "공개 기록 보기",
@@ -431,7 +431,7 @@ describe("HostSessionWorkspace view compatibility until B8", () => {
       ...compatibilityBaseInput,
       state: "DRAFT",
     })).toMatchObject({
-      statusLabel: "모임 작성 중",
+      statusLabel: "작성 중",
       primaryAction: { kind: "OPEN_SESSION", label: "멤버와 준비 시작", panel: "focus" },
     });
   });
@@ -444,7 +444,7 @@ describe("HostSessionWorkspace view compatibility until B8", () => {
       today: "2026-08-20",
       unknownAttendanceCount: 2,
     })).toMatchObject({
-      statusLabel: "멤버와 준비 중",
+      statusLabel: "준비 중",
       primaryAction: {
         kind: "REVIEW_MEMBER_INPUT",
         label: "멤버 응답 확인하기",
@@ -461,7 +461,7 @@ describe("HostSessionWorkspace view compatibility until B8", () => {
       today: "2026-08-21",
       unknownAttendanceCount: 2,
     })).toMatchObject({
-      statusLabel: "멤버와 준비 중",
+      statusLabel: "준비 중",
       primaryAction: { kind: "CHECK_ATTENDANCE", label: "실제 출석 확인", panel: "attendance" },
     });
   });
@@ -474,7 +474,7 @@ describe("HostSessionWorkspace view compatibility until B8", () => {
       today: "2026-08-22",
       unknownAttendanceCount: 0,
     })).toMatchObject({
-      statusLabel: "멤버와 준비 중",
+      statusLabel: "준비 중",
       primaryAction: { kind: "FINISH_SESSION", label: "모임 마치기", panel: "focus" },
     });
   });
@@ -487,7 +487,7 @@ describe("HostSessionWorkspace view compatibility until B8", () => {
       today: "not-a-date",
       unknownAttendanceCount: 3,
     })).toMatchObject({
-      statusLabel: "멤버와 준비 중",
+      statusLabel: "준비 중",
       primaryAction: {
         kind: "REVIEW_MEMBER_INPUT",
         label: "멤버 응답 확인하기",
@@ -562,7 +562,7 @@ describe("HostSessionWorkspace view compatibility until B8", () => {
       hasAppliedRecord: true,
       publicationReady: true,
     })).toMatchObject({
-      statusLabel: "게스트·멤버 노트 게시 완료",
+      statusLabel: "게시됨",
       primaryAction: { kind: "VIEW_PUBLIC_RECORD", label: "공개 기록 보기", panel: "focus" },
     });
   });
@@ -575,7 +575,7 @@ describe("HostSessionWorkspace view compatibility until B8", () => {
       today: "2026-08-21",
       unknownAttendanceCount: 0,
     });
-    expect(view.statusLabel).toBe("멤버와 준비 중");
+    expect(view.statusLabel).toBe("준비 중");
     expect(view.primaryAction.kind).toBe("FINISH_SESSION");
     expect(view.primaryAction.kind).not.toMatch(/CLOSE|PUBLISH|OPEN_SESSION/);
   });

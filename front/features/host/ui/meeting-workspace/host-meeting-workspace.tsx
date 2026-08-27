@@ -52,7 +52,7 @@ function sessionViewFromMeeting(view: HostMeetingWorkspaceView): HostSessionWork
       ? "records" as const
       : "focus" as const;
   return {
-    statusLabel: view.statusLabel === "공개 완료" ? "게스트·멤버 노트 게시 완료" : view.statusLabel,
+    statusLabel: view.statusLabel,
     primaryAction: {
       kind: view.primaryAction.kind,
       label: view.primaryAction.label,

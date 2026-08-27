@@ -13,6 +13,7 @@ import type {
   UpcomingBookListItem,
 } from "@/features/host/model/upcoming-book-list-model";
 import { HostSessionAttentionSummary } from "../host-session-ledger";
+import { hostMeetingLifecycleLabel } from "@/shared/model/meeting-language";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 import { readmatesReturnState } from "@/shared/routing/readmates-route-state";
 import { MeetingPhaseRail } from "./meeting-phase-rail";
@@ -40,10 +41,7 @@ function ignoreUpcomingAccessScope() {}
 function ignoreUpcomingCreate() {}
 
 function meetingStateLabel(state: MeetingListItem["state"]) {
-  if (state === "DRAFT") return "모임 작성 중";
-  if (state === "OPEN") return "멤버와 준비 중";
-  if (state === "PUBLISHED") return "공개 완료";
-  return "기록 정리 중";
+  return hostMeetingLifecycleLabel(state);
 }
 
 function HostHomeAttention({

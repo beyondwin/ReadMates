@@ -72,7 +72,7 @@ describe("HostMeetingWorkspace", () => {
     const panel = screen.getByTestId("focus-deck-panel");
 
     expect(header).toHaveTextContent("길어도 온전히 읽히는 모임 제목");
-    expect(header).toHaveTextContent("멤버와 준비 중");
+    expect(header).toHaveTextContent("준비 중");
     expect(following(header, focus)).toBe(true);
     expect(following(focus, facts)).toBe(true);
     expect(following(facts, related)).toBe(true);
@@ -224,7 +224,7 @@ describe("HostMeetingWorkspace", () => {
     expect(screen.getAllByRole("button", { name: "다음 할 일 확인 중" }).every((button) => button.hasAttribute("disabled"))).toBe(true);
   });
 
-  it("keeps PUBLISHED as 공개 완료 without upload or publish CTAs", () => {
+  it("keeps PUBLISHED as 게시됨 without upload or publish CTAs", () => {
     const recordReadiness = { status: "pending" as const };
     const published = buildHostMeetingWorkspace({
       currentUrl: "https://readmates.test/clubs/alpha/app/host/sessions/11111111-1111-1111-1111-111111111111",
@@ -246,8 +246,9 @@ describe("HostMeetingWorkspace", () => {
       />,
     );
 
-    expect(screen.getByText("공개 완료")).toBeVisible();
+    expect(screen.getByText("게시됨")).toBeVisible();
     expect(screen.queryByText("게스트·멤버 노트 게시 완료")).not.toBeInTheDocument();
+    expect(screen.queryByText("공개 완료")).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "공개 기록 보기" })).toHaveLength(2);
     expect(screen.queryByRole("button", { name: "정리본 올리기" })).not.toBeInTheDocument();
   });

@@ -115,14 +115,14 @@ async function assertFocusDeckFocus(
 
 test("Focus Deck DRAFT locks the 1440 wide editorial composition", async ({ mount, page }) => {
   const component = await mountFocusDeck(mount, page, draftFocusDeck, VISUAL_AUTHORITY_VIEWPORTS.desktopWide);
-  await assertFocusDeck(component, page, { status: "모임 작성 중", action: "멤버와 준비 시작" });
+  await assertFocusDeck(component, page, { status: "작성 중", action: "멤버와 준비 시작" });
   await lockFocusDeckScreenshot(component, "focus-deck-draft-1440.png");
   await assertFocusDeckFocus(component, { action: "멤버와 준비 시작" });
 });
 
 test("Focus Deck OPEN locks the 900 tablet editorial composition", async ({ mount, page }) => {
   const component = await mountFocusDeck(mount, page, openFocusDeck, VISUAL_AUTHORITY_VIEWPORTS.tablet);
-  await assertFocusDeck(component, page, { status: "멤버와 준비 중", action: "실제 출석 확인" });
+  await assertFocusDeck(component, page, { status: "준비 중", action: "실제 출석 확인" });
   await expect(component.getByText("오늘이 모임일입니다.")).toBeVisible();
   await lockFocusDeckScreenshot(component, "focus-deck-open-900.png");
   await assertFocusDeckFocus(component, { action: "실제 출석 확인" });
@@ -139,8 +139,9 @@ test("Focus Deck CLOSED locks the 768 tablet-narrow composition with recovery", 
 
 test("Focus Deck PUBLISHED locks the 390 mobile composition", async ({ mount, page }) => {
   const component = await mountFocusDeck(mount, page, publishedFocusDeck, VISUAL_AUTHORITY_VIEWPORTS.mobile);
-  await assertFocusDeck(component, page, { status: "공개 완료", action: "공개 기록 보기" });
+  await assertFocusDeck(component, page, { status: "게시됨", action: "공개 기록 보기" });
   await expect(component.getByText("게스트·멤버 노트 게시 완료")).toHaveCount(0);
+  await expect(component.getByText("공개 완료")).toHaveCount(0);
   await lockFocusDeckScreenshot(component, "focus-deck-published-390.png");
   await assertFocusDeckFocus(component, { action: "공개 기록 보기" });
 });
@@ -163,7 +164,7 @@ test("Focus Deck pending readiness fail-closes the 320 mobile composition", asyn
 
 test("Focus Deck stays inside the remaining viewport matrix and 200 percent zoom", async ({ mount, page }) => {
   const component = await mountFocusDeck(mount, page, openFocusDeck, VISUAL_AUTHORITY_VIEWPORTS.desktop);
-  await assertFocusDeck(component, page, { status: "멤버와 준비 중", action: "실제 출석 확인" });
+  await assertFocusDeck(component, page, { status: "준비 중", action: "실제 출석 확인" });
 
   await page.setViewportSize({ width: 512, height: 450 });
   await expect(component.getByRole("heading", { level: 1 })).toContainText(FOCUS_DECK_TITLE);

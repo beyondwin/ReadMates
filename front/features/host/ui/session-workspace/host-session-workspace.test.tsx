@@ -83,8 +83,8 @@ describe("HostSessionWorkspace", () => {
 
     expect(screen.getByRole("heading", { level: 1, name: "테스트 책" })).toBeVisible();
     expect(screen.getByText("No.7")).toBeVisible();
-    expect(screen.getByText("모임 작성 중")).toBeVisible();
-    expect(screen.queryByText("멤버와 준비 중")).not.toBeInTheDocument();
+    expect(screen.getByText("작성 중")).toBeVisible();
+    expect(screen.queryByText("준비 중")).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "멤버와 준비 시작" })).toHaveLength(2);
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "모임 정보" })).toHaveAttribute("aria-expanded", "false");
@@ -111,7 +111,7 @@ describe("HostSessionWorkspace", () => {
       />,
     );
 
-    expect(screen.getByText("멤버와 준비 중")).toBeVisible();
+    expect(screen.getByText("준비 중")).toBeVisible();
     const buttons = screen.getAllByRole("button", { name: "멤버 응답 확인하기" });
     expect(buttons).toHaveLength(2);
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
@@ -135,7 +135,7 @@ describe("HostSessionWorkspace", () => {
       />,
     );
 
-    expect(screen.getByText("멤버와 준비 중")).toBeVisible();
+    expect(screen.getByText("준비 중")).toBeVisible();
     expect(screen.getAllByRole("button", { name: "실제 출석 확인" })).toHaveLength(2);
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     await user.click(within(screen.getByRole("region", { name: "출석" })).getByRole("button", { name: "열기" }));
@@ -239,8 +239,9 @@ describe("HostSessionWorkspace", () => {
       />,
     );
 
-    expect(screen.getByText("공개 완료")).toBeVisible();
+    expect(screen.getByText("게시됨")).toBeVisible();
     expect(screen.queryByText("게스트·멤버 노트 게시 완료")).not.toBeInTheDocument();
+    expect(screen.queryByText("공개 완료")).not.toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "공개 기록 보기" })).toHaveLength(2);
     expect(screen.getByRole("button", { name: "수정본 만들기" })).toBeVisible();
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();

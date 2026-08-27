@@ -354,7 +354,7 @@ describe("HostMeetingLedger", () => {
     expect(root!.querySelectorAll("[style]")).toHaveLength(0);
     expect(findNestedLiveRegions(root!)).toEqual([]);
     expect(root!.querySelector(".rm-host-editorial-ledger__identity")).toHaveTextContent(
-      "2026.04.15 · 멤버와 준비 중",
+      "2026.04.15 · 준비 중",
     );
     expect(root!.querySelector(".rm-host-editorial-ledger__identity")?.textContent).not.toMatch(
       /진행 중|공개됨|종료/,
@@ -392,10 +392,10 @@ describe("HostMeetingLedger", () => {
   });
 
   it.each([
-    ["DRAFT", "모임 작성 중"],
-    ["OPEN", "멤버와 준비 중"],
+    ["DRAFT", "작성 중"],
+    ["OPEN", "준비 중"],
     ["CLOSED", "기록 정리 중"],
-    ["PUBLISHED", "공개 완료"],
+    ["PUBLISHED", "게시됨"],
   ] as const)("uses the exact host status label on home identity for %s", (state, label) => {
     render(
       <MemoryRouter>
