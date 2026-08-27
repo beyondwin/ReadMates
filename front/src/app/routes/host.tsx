@@ -100,14 +100,10 @@ function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
     scopedHostRoute({
       path: HOST_ROUTE_PATHS.invitations,
       errorElement: <HostRouteError />,
-      fallback: <ReadmatesRouteLoading label="초대 목록을 불러오는 중" variant="host" />,
-      load: async () => {
-        const [{ HostInvitationsRouteElement: Component }, { hostInvitationsLoaderFactory }] = await Promise.all([
-          import("@/src/app/host-routes/invitations-route-element"),
-          import("@/features/host/route/host-invitations-data"),
-        ]);
-        return { Component, loader: hostInvitationsLoaderFactory(queryClient) };
-      },
+      fallback: <ReadmatesRouteLoading label="멤버 목록을 불러오는 중" variant="host" />,
+      load: async () => ({
+        Component: (await import("@/src/app/host-routes/invitations-redirect-element")).HostInvitationsRedirectElement,
+      }),
     }),
     scopedHostRoute({
       path: HOST_ROUTE_PATHS.notifications,
@@ -124,14 +120,10 @@ function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
     scopedHostRoute({
       path: HOST_ROUTE_PATHS.operations,
       errorElement: <HostRouteError />,
-      fallback: <ReadmatesRouteLoading label="운영 허브를 불러오는 중" variant="host" />,
-      load: async () => {
-        const [{ HostOperationsRouteElement: Component }, { hostOperationsLoader }] = await Promise.all([
-          import("@/src/app/host-routes/operations-route-element"),
-          import("@/features/host/route/host-operations-data"),
-        ]);
-        return { Component, loader: hostOperationsLoader };
-      },
+      fallback: <ReadmatesRouteLoading label="모임 운영 화면을 불러오는 중" variant="host" />,
+      load: async () => ({
+        Component: (await import("@/src/app/host-routes/operations-redirect-element")).HostOperationsRedirectElement,
+      }),
     }),
     scopedHostRoute({
       path: HOST_ROUTE_PATHS.meetings,
@@ -148,14 +140,10 @@ function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
     scopedHostRoute({
       path: HOST_ROUTE_PATHS.records,
       errorElement: <HostRouteError />,
-      fallback: <ReadmatesRouteLoading label="기록 목록을 불러오는 중" variant="host" />,
-      load: async () => {
-        const [{ HostSessionLedgerRouteElement: Component }, { hostSessionLedgerLoaderFactory }] = await Promise.all([
-          import("@/src/app/host-routes/session-ledger-route-element"),
-          import("@/features/host/route/host-session-ledger-data"),
-        ]);
-        return { Component, loader: hostSessionLedgerLoaderFactory(queryClient) };
-      },
+      fallback: <ReadmatesRouteLoading label="모임 목록을 불러오는 중" variant="host" />,
+      load: async () => ({
+        Component: (await import("@/src/app/host-routes/records-redirect-element")).HostRecordsRedirectElement,
+      }),
     }),
     scopedHostRoute({
       path: HOST_ROUTE_PATHS.newSession,
@@ -248,16 +236,10 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
     {
       path: HOST_ROUTE_PATHS.invitations,
       errorElement: <HostRouteError />,
-      hydrateFallbackElement: <ReadmatesRouteLoading label="초대 목록을 불러오는 중" variant="host" />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 목록을 불러오는 중" variant="host" />,
       lazy: async () => {
-        const [{ HostInvitationsRouteElement }, { hostInvitationsLoaderFactory }] = await Promise.all([
-          import("@/src/app/host-routes/invitations-route-element"),
-          import("@/features/host/route/host-invitations-data"),
-        ]);
-        return {
-          Component: HostInvitationsRouteElement,
-          loader: hostInvitationsLoaderFactory(queryClient),
-        };
+        const { HostInvitationsRedirectElement } = await import("@/src/app/host-routes/invitations-redirect-element");
+        return { Component: HostInvitationsRedirectElement };
       },
     },
     {
@@ -278,16 +260,10 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
     {
       path: HOST_ROUTE_PATHS.operations,
       errorElement: <HostRouteError />,
-      hydrateFallbackElement: <ReadmatesRouteLoading label="운영 허브를 불러오는 중" variant="host" />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="모임 운영 화면을 불러오는 중" variant="host" />,
       lazy: async () => {
-        const [{ HostOperationsRouteElement }, { hostOperationsLoader }] = await Promise.all([
-          import("@/src/app/host-routes/operations-route-element"),
-          import("@/features/host/route/host-operations-data"),
-        ]);
-        return {
-          Component: HostOperationsRouteElement,
-          loader: hostOperationsLoader,
-        };
+        const { HostOperationsRedirectElement } = await import("@/src/app/host-routes/operations-redirect-element");
+        return { Component: HostOperationsRedirectElement };
       },
     },
     {
@@ -308,16 +284,10 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
     {
       path: HOST_ROUTE_PATHS.records,
       errorElement: <HostRouteError />,
-      hydrateFallbackElement: <ReadmatesRouteLoading label="기록 목록을 불러오는 중" variant="host" />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="모임 목록을 불러오는 중" variant="host" />,
       lazy: async () => {
-        const [{ HostSessionLedgerRouteElement }, { hostSessionLedgerLoaderFactory }] = await Promise.all([
-          import("@/src/app/host-routes/session-ledger-route-element"),
-          import("@/features/host/route/host-session-ledger-data"),
-        ]);
-        return {
-          Component: HostSessionLedgerRouteElement,
-          loader: hostSessionLedgerLoaderFactory(queryClient),
-        };
+        const { HostRecordsRedirectElement } = await import("@/src/app/host-routes/records-redirect-element");
+        return { Component: HostRecordsRedirectElement };
       },
     },
     {
