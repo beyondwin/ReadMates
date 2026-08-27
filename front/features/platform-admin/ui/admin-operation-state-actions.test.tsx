@@ -18,19 +18,18 @@ function renderActions(overrides: Partial<React.ComponentProps<typeof AdminOpera
 }
 
 describe("AdminOperationStateActions", () => {
-  it("emits exact ISO snooze targets from the injected clock", async () => {
+  it("emits the selected duration ISO and required hold reason", async () => {
     const user = userEvent.setup();
     const { props } = renderActions();
 
-    await user.click(screen.getByRole("button", { name: "1시간 보류" }));
-    await user.click(screen.getByRole("button", { name: "4시간 보류" }));
-    await user.click(screen.getByRole("button", { name: "24시간 보류" }));
-    await user.click(screen.getByRole("button", { name: "7일 보류" }));
+    await user.click(screen.getByRole("button", { name: "보류" }));
+    expect(screen.getByRole("button", { name: "보류 확정" })).toBeDisabled();
+    await user.selectOptions(screen.getByRole("combobox", { name: "보류 기간" }), "1시간");
+    await user.type(screen.getByLabelText("보류 사유"), "야간 관찰");
+    await user.click(screen.getByRole("button", { name: "보류 확정" }));
 
-    expect(props.onSnooze).toHaveBeenNthCalledWith(1, "2026-08-04T11:00:00.000Z");
-    expect(props.onSnooze).toHaveBeenNthCalledWith(2, "2026-08-04T14:00:00.000Z");
-    expect(props.onSnooze).toHaveBeenNthCalledWith(3, "2026-08-05T10:00:00.000Z");
-    expect(props.onSnooze).toHaveBeenNthCalledWith(4, "2026-08-11T10:00:00.000Z");
+    expect(props.onSnooze).toHaveBeenCalledOnce();
+    expect(props.onSnooze).toHaveBeenCalledWith("2026-08-04T11:00:00.000Z", "야간 관찰");
   });
 
   it.each([
@@ -83,10 +82,8 @@ describe("AdminOperationStateActions", () => {
     renderActions({ pending: true });
 
     expect(screen.getByRole("button", { name: "확인 처리" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "1시간 보류" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "4시간 보류" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "24시간 보류" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "7일 보류" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "보류" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "무시" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "해결 확인" })).toBeDisabled();
     expect(screen.getByRole("status")).toHaveTextContent("상태를 반영하고 있습니다.");
   });
@@ -95,7 +92,7 @@ describe("AdminOperationStateActions", () => {
     renderActions({ pending: false, disabled: true });
 
     expect(screen.getByRole("button", { name: "확인 처리" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "4시간 보류", exact: true })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "보류" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "해결 확인" })).toBeDisabled();
     expect(screen.queryByText("상태를 반영하고 있습니다.")).not.toBeInTheDocument();
   });

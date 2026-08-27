@@ -128,8 +128,10 @@ export function useAdminAlarmSummary(): { summary: AdminAlarmSummary | null; sta
 - 모바일 보류 버튼 6개 세로 나열 제거 → 보류는 단일 버튼 + 기간 선택(`<select>`: 1시간/4시간/24시간/7일).
 
 **Steps:**
-- [ ] 테스트: ① 사유 없이 무시 확정 불가 ② 기간 select 존재, 개별 보류 버튼 나열 부재 ③ 사유가 command 호출 인자에 포함.
-- [ ] 구현 → 통과 → Commit: `feat(admin): guarded queue-exit paths with reasons`
+- [x] 테스트: ① 사유 없이 무시 확정 불가 ② 기간 select 존재, 개별 보류 버튼 나열 부재 ③ 사유가 command 호출 인자에 포함.
+- [x] 구현 → 통과 → Commit: `feat(admin): guarded queue-exit paths with reasons`
+
+> 실행 노트: 서버 snooze body는 `expectedVersion`+`snoozedUntil`만 허용(unknown field 400). 무시는 SNOOZE 7일 + 사유 필수. 사유는 UI command args에만 포함하고 HTTP에는 넣지 않음. 버튼 구현은 inspector dock primary인 `AdminOperationStateActions`.
 
 ### Task 3-3: 도켓 "이 대상의 최근 기입" 인라인
 
@@ -273,3 +275,5 @@ export function AdminTargetLedgerInline({ entries, moreHref }: {
 ## 실행 중 발견
 
 (실행자가 기입: 서버 후속 / 이월 결함 / 계획 이탈 결정)
+
+- 3-2: 서버에 dismiss API 없음. 무시는 기존 `SNOOZE`(최대 7일) + 사유 필수로 구현. snooze 요청 DTO는 unknown field를 거부하므로 사유를 HTTP body에 넣지 않음 — 사유 보존은 서버 후속.

@@ -30,6 +30,13 @@ describe("admin-copy", () => {
     expect(ADMIN_COPY.metric.deliveryFailed).toBe("배달 실패");
     expect(ADMIN_COPY.metric.relayStale).toBe("중계 지연");
     expect(ADMIN_COPY.receipt).toBe("영수증");
+    expect(ADMIN_COPY.queueExit.acknowledge).toBe("확인 처리");
+    expect(ADMIN_COPY.queueExit.hold).toBe("보류");
+    expect(ADMIN_COPY.queueExit.ignore).toBe("무시");
+    expect(ADMIN_COPY.queueExit.resolve).toBe("해결 확인");
+    expect(ADMIN_COPY.queueExit.holdDuration).toBe("보류 기간");
+    expect(ADMIN_COPY.queueExit.holdConfirm).toBe("보류 확정");
+    expect(ADMIN_COPY.queueExit.ignoreConfirm).toBe("무시 확정");
     expect(ADMIN_COPY.alarm.attention).toBe("주의");
     expect(ADMIN_COPY.alarm.noUnacknowledged).toBe("미확인 신호 없음");
     expect(ADMIN_COPY.alarm.serviceOk).toBe("서비스 정상");

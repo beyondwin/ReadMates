@@ -205,6 +205,26 @@
   min-height: 44px;
 }
 
+.admin-operation-actions__duration,
+.admin-operation-actions__reason {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.admin-operation-actions__duration select,
+.admin-operation-actions__reason input,
+.admin-operation-actions__reason .btn {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.admin-operation-actions__reason p,
+.admin-operation-actions__reason label {
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
 .admin-receipt-timeline__entries {
   display: grid;
   gap: var(--space-xs);

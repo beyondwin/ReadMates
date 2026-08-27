@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import type { AdminOperationCaseView } from "@/features/platform-admin/model/platform-admin-operations-model";
 import { findNestedLiveRegions } from "@/shared/testing/accessibility-checks";
+import { AdminOperationStateActions } from "./admin-operation-state-actions";
 import { AdminOperationsInspector } from "./admin-operations-inspector";
 
 const selectedCase: AdminOperationCaseView = {
@@ -257,5 +258,105 @@ describe("AdminOperationsInspector", () => {
     expect(onNext).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "다음 ›" }));
     expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it("cannot confirm 무시 without a one-line reason", async () => {
+    const user = userEvent.setup();
+    const onSnooze = vi.fn();
+    render(
+      <MemoryRouter>
+        <AdminOperationsInspector
+          selectedCase={selectedCase}
+          history={[]}
+          lifecycleControls={
+            <AdminOperationStateActions
+              allowedActions={["ACKNOWLEDGE", "SNOOZE", "RESOLVE"]}
+              pending={false}
+              message={null}
+              now={() => new Date("2026-08-04T10:00:00.000Z")}
+              onAcknowledge={vi.fn()}
+              onSnooze={onSnooze}
+              onResolve={vi.fn()}
+            />
+          }
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "무시" }));
+    const confirm = screen.getByRole("button", { name: "무시 확정" });
+    expect(confirm).toBeDisabled();
+    await user.click(confirm);
+    expect(onSnooze).not.toHaveBeenCalled();
+
+    await user.type(screen.getByLabelText("무시 사유"), "   ");
+    expect(confirm).toBeDisabled();
+  });
+
+  it("exposes a duration select instead of stacked individual snooze buttons", () => {
+    render(
+      <MemoryRouter>
+        <AdminOperationsInspector
+          selectedCase={selectedCase}
+          history={[]}
+          lifecycleControls={
+            <AdminOperationStateActions
+              allowedActions={["ACKNOWLEDGE", "SNOOZE", "RESOLVE"]}
+              pending={false}
+              message={null}
+              now={() => new Date("2026-08-04T10:00:00.000Z")}
+              onAcknowledge={vi.fn()}
+              onSnooze={vi.fn()}
+              onResolve={vi.fn()}
+            />
+          }
+        />
+      </MemoryRouter>,
+    );
+
+    const duration = screen.getByRole("combobox", { name: "보류 기간" });
+    expect(duration).toBeInTheDocument();
+    expect(Array.from(duration.querySelectorAll("option")).map((option) => option.textContent)).toEqual([
+      "1시간",
+      "4시간",
+      "24시간",
+      "7일",
+    ]);
+    expect(screen.getByRole("button", { name: "보류" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "1시간 보류" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "4시간 보류" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "24시간 보류" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "7일 보류" })).not.toBeInTheDocument();
+  });
+
+  it("includes the ignore reason in the snooze command args", async () => {
+    const user = userEvent.setup();
+    const onSnooze = vi.fn();
+    render(
+      <MemoryRouter>
+        <AdminOperationsInspector
+          selectedCase={selectedCase}
+          history={[]}
+          lifecycleControls={
+            <AdminOperationStateActions
+              allowedActions={["ACKNOWLEDGE", "SNOOZE", "RESOLVE"]}
+              pending={false}
+              message={null}
+              now={() => new Date("2026-08-04T10:00:00.000Z")}
+              onAcknowledge={vi.fn()}
+              onSnooze={onSnooze}
+              onResolve={vi.fn()}
+            />
+          }
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "무시" }));
+    await user.type(screen.getByLabelText("무시 사유"), "중복 신호로 판단");
+    await user.click(screen.getByRole("button", { name: "무시 확정" }));
+
+    expect(onSnooze).toHaveBeenCalledOnce();
+    expect(onSnooze).toHaveBeenCalledWith("2026-08-11T10:00:00.000Z", "중복 신호로 판단");
   });
 });

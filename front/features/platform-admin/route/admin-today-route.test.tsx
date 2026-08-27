@@ -289,7 +289,7 @@ describe("AdminTodayRoute", () => {
       "data-state",
       "stale",
     );
-    expect(screen.getByRole("button", { name: "4시간 보류", exact: true })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "보류" })).toBeDisabled();
     expect(operationsApi.snooze).not.toHaveBeenCalled();
   });
 
@@ -581,9 +581,11 @@ describe("AdminTodayRoute", () => {
       );
     });
     expect(screen.queryByText("상태를 반영하고 있습니다.")).not.toBeInTheDocument();
-    const snooze = screen.getByRole("button", { name: "4시간 보류", exact: true });
-    expect(snooze).toBeEnabled();
-    await user.click(snooze);
+    const hold = screen.getByRole("button", { name: "보류" });
+    expect(hold).toBeEnabled();
+    await user.click(hold);
+    await user.type(screen.getByLabelText("보류 사유"), "후속 관찰");
+    await user.click(screen.getByRole("button", { name: "보류 확정" }));
 
     await waitFor(() => {
       expect(operationsApi.snooze).toHaveBeenCalledWith(
