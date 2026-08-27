@@ -9,11 +9,11 @@ import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { hostMeetingWorkspaceLoaderFactory } from "./host-meeting-workspace-data";
 import {
   hostPublicConvergenceQuery,
+  hostSessionClosingStatusQuery,
   hostSessionDetailQuery,
 } from "@/features/host/queries/host-session-queries";
 import { hostSensitiveStorage } from "@/features/host/storage/host-sensitive-storage";
 import type { HostMeetingRecordReadiness } from "@/features/host/model/host-meeting-record-readiness";
-import { formatDateTimeLabel } from "@/shared/ui/readmates-display";
 
 const routeMocks = vi.hoisted(() => ({
   panelStates: {} as Record<string, unknown>,
@@ -182,6 +182,55 @@ function renderRoute(search: string, extras: {
       feedbackDocument: { uploaded: false },
     },
   );
+  if (session?.state === "CLOSED") {
+    client.setQueryData(
+      hostSessionClosingStatusQuery(SESSION_ID, { clubSlug: "reading-sai" }).queryKey,
+      {
+        schema: "host.session_closing_status.v1",
+        session: {
+          sessionId: SESSION_ID,
+          sessionNumber: 7,
+          bookTitle: "책",
+          meetingDate: "2026-08-25",
+          state: "CLOSED",
+          recordVisibility: "HOST_ONLY",
+          sessionRevision: 7,
+          participantSetRevision: 3,
+          attendanceSnapshotId: "snapshot-1",
+        },
+        overall: {
+          state: "IN_PROGRESS",
+          label: "정리 중",
+          primaryAction: "IMPORT_RECORDS",
+        },
+        checklist: [
+          {
+            id: "SESSION_CLOSED",
+            state: "DONE",
+            label: "Session closed",
+            detail: "Closed",
+            href: null,
+          },
+          {
+            id: "RECORD_PACKAGE_SAVED",
+            state: "ACTION_REQUIRED",
+            label: "Record package",
+            detail: "Pending",
+            href: `/app/host/sessions/${SESSION_ID}/edit?records=json`,
+          },
+        ],
+        evidence: {
+          summaryPublished: false,
+          highlightCount: 0,
+          oneLinerCount: 0,
+          feedbackDocumentState: "MISSING",
+          latestNotificationEvent: null,
+          publicRecordHref: null,
+          memberReflectionHref: null,
+        },
+      },
+    );
+  }
   if (convergence) {
     client.setQueryData(
       hostPublicConvergenceQuery(SESSION_ID, { clubSlug: "reading-sai" }).queryKey,
@@ -397,8 +446,7 @@ describe("host meeting workspace route", () => {
   });
 
   it("keeps the meeting header and unrelated links when CLOSED record readiness is unavailable", async () => {
-    const retry = vi.fn();
-    setRecordPanel("unavailable", { retry });
+    setRecordPanel("unavailable", { retry: vi.fn() });
     renderRoute("?task=overview", { session: { state: "CLOSED", title: "마친 모임" } });
 
     expect(await screen.findByRole("heading", { name: "마친 모임" })).toBeInTheDocument();
@@ -410,18 +458,17 @@ describe("host meeting workspace route", () => {
     expect(screen.getByRole("link", { name: "변경 내역" })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "다음 할 일 확인 중" }).every((button) => button.hasAttribute("disabled"))).toBe(true);
     expectNoRecordMutationActions();
-
-    await userEvent.setup().click(screen.getByRole("button", { name: "모임 기록 다시 시도" }));
-    expect(retry).toHaveBeenCalledTimes(1);
+    // CLOSED records step keeps the closing checklist shell — not MeetingFocusFacts.
+    expect(screen.getByRole("region", { name: "장부 마감 체크리스트" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "진행 목록" })).not.toBeInTheDocument();
     expect(routeMocks.reopenSession).not.toHaveBeenCalled();
     expect(routeMocks.unpublishSession).not.toHaveBeenCalled();
     expect(routeMocks.returnSessionToDraft).not.toHaveBeenCalled();
   });
 
-  it("shows observed time and retry after a cached CLOSED record refetch fails", async () => {
-    const retry = vi.fn();
+  it("shows the closing checklist shell for CLOSED instead of focus facts while readiness is stale", async () => {
     setRecordPanel("stale", {
-      retry,
+      retry: vi.fn(),
       facts: {
         hasDraft: false,
         draftLiveBaseStale: false,
@@ -432,14 +479,11 @@ describe("host meeting workspace route", () => {
     });
     renderRoute("?task=overview", { session: { state: "CLOSED" } });
 
-    expect(await screen.findByText(new RegExp(formatDateTimeLabel(OBSERVED_AT)))).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "장부 마감 체크리스트" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "진행 목록" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "다음 할 일 확인 중" }).every((button) => button.hasAttribute("disabled"))).toBe(true);
     expectNoRecordMutationActions();
-
-    await userEvent.setup().click(screen.getByRole("button", { name: "최신 내용 확인" }));
-    expect(retry).toHaveBeenCalledTimes(1);
   });
-
   it("chooses the exact CLOSED action once record readiness is ready", async () => {
     setRecordPanel("ready", {
       facts: {

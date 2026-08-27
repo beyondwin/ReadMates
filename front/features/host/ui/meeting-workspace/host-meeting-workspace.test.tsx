@@ -512,43 +512,46 @@ describe("HostMeetingWorkspace", () => {
         diary={closedDiary}
         facts={closedWorkspace.facts}
         recordReadiness={recordReadiness}
-        closingBoard={{
-          title: "No.12 · Book",
-          subtitle: "2026-08-20 · Members",
-          statusLabel: "Ready",
-          statusTone: "accent",
-          primaryAction: {
-            label: "기록 보기 범위 확인",
-            reason: "멤버 또는 공개 표면에 기록을 열기 전 공개 범위를 점검해야 합니다.",
-            tone: "warn",
-            href: "/app/host/sessions/s1/edit",
-          },
-          checklist: [
-            {
-              id: "SESSION_CLOSED",
-              label: "출석 확정",
-              detail: "참석이 확정됐습니다.",
-              state: "DONE",
-              stateLabel: "완료",
-              tone: "ok",
-              href: null,
-              actionLabel: "상태 확인",
-              completedStamp: "2026-08-20",
-            },
-            {
-              id: "MEMBER_NOTIFICATION_SENT",
-              label: "소감 수집",
-              detail: "미제출자에게 수동 발송할 수 있습니다.",
-              state: "ACTION_REQUIRED",
-              stateLabel: "조치 필요",
+        closingChecklist={{
+          kind: "ready",
+          view: {
+            title: "No.12 · Book",
+            subtitle: "2026-08-20 · Members",
+            statusLabel: "Ready",
+            statusTone: "accent",
+            primaryAction: {
+              label: "기록 보기 범위 확인",
+              reason: "멤버 또는 공개 표면에 기록을 열기 전 공개 범위를 점검해야 합니다.",
               tone: "warn",
-              href: "/app/host/notifications",
-              actionLabel: "수동 발송",
-              completedStamp: null,
+              href: "/app/host/sessions/s1/edit",
             },
-          ],
-          surfaces: [],
-          evidence: [],
+            checklist: [
+              {
+                id: "SESSION_CLOSED",
+                label: "출석 확정",
+                detail: "참석이 확정됐습니다.",
+                state: "DONE",
+                stateLabel: "완료",
+                tone: "ok",
+                href: null,
+                actionLabel: "상태 확인",
+                completedStamp: "2026-08-20",
+              },
+              {
+                id: "MEMBER_NOTIFICATION_SENT",
+                label: "소감 수집",
+                detail: "미제출자에게 수동 발송할 수 있습니다.",
+                state: "ACTION_REQUIRED",
+                stateLabel: "조치 필요",
+                tone: "warn",
+                href: "/app/host/notifications",
+                actionLabel: "수동 발송",
+                completedStamp: null,
+              },
+            ],
+            surfaces: [],
+            evidence: [],
+          },
         }}
       />,
     );
@@ -559,5 +562,97 @@ describe("HostMeetingWorkspace", () => {
     expect(screen.getByRole("link", { name: "수동 발송" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "No.12 · Book" })).toBeNull();
     expect(screen.queryByRole("region", { name: "진행 목록" })).toBeNull();
+  });
+
+  it("keeps the closing checklist shell while status is pending", () => {
+    const recordReadiness = {
+      status: "ready" as const,
+      observedAt: "2026-08-25T01:02:03.000Z",
+      facts: {
+        hasDraft: true,
+        draftLiveBaseStale: false,
+        validationIssueCount: 0,
+        hasAppliedRecord: true,
+        publicationReady: true,
+      },
+    };
+    const closedWorkspace = buildHostMeetingWorkspace({
+      currentUrl: CURRENT_URL,
+      state: "CLOSED",
+      meetingDate: "2026-08-20",
+      today: "2026-08-26",
+      unansweredResponseCount: 0,
+      unknownAttendanceCount: 0,
+      recordReadiness,
+    });
+    const closedDiary = buildHostMeetingDiary({
+      workspace: closedWorkspace,
+      meetingDate: "2026-08-20",
+      today: "2026-08-26",
+      currentUrl: CURRENT_URL,
+    });
+
+    render(
+      <HostMeetingWorkspace
+        {...props}
+        view={closedWorkspace}
+        diary={closedDiary}
+        facts={closedWorkspace.facts}
+        recordReadiness={recordReadiness}
+        closingChecklist={{ kind: "loading" }}
+      />,
+    );
+
+    const shell = screen.getByRole("region", { name: "장부 마감 체크리스트" });
+    expect(shell).toBeVisible();
+    expect(within(shell).getByRole("status")).toHaveTextContent("장부 마감을 불러오는 중입니다.");
+    expect(screen.queryByRole("region", { name: "진행 목록" })).toBeNull();
+  });
+
+  it("keeps the closing checklist shell when status fails", async () => {
+    const onRetry = vi.fn();
+    const recordReadiness = {
+      status: "ready" as const,
+      observedAt: "2026-08-25T01:02:03.000Z",
+      facts: {
+        hasDraft: true,
+        draftLiveBaseStale: false,
+        validationIssueCount: 0,
+        hasAppliedRecord: true,
+        publicationReady: true,
+      },
+    };
+    const closedWorkspace = buildHostMeetingWorkspace({
+      currentUrl: CURRENT_URL,
+      state: "CLOSED",
+      meetingDate: "2026-08-20",
+      today: "2026-08-26",
+      unansweredResponseCount: 0,
+      unknownAttendanceCount: 0,
+      recordReadiness,
+    });
+    const closedDiary = buildHostMeetingDiary({
+      workspace: closedWorkspace,
+      meetingDate: "2026-08-20",
+      today: "2026-08-26",
+      currentUrl: CURRENT_URL,
+    });
+
+    render(
+      <HostMeetingWorkspace
+        {...props}
+        view={closedWorkspace}
+        diary={closedDiary}
+        facts={closedWorkspace.facts}
+        recordReadiness={recordReadiness}
+        closingChecklist={{ kind: "unavailable", onRetry }}
+      />,
+    );
+
+    expect(screen.getByRole("region", { name: "장부 마감 체크리스트" })).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent("장부 마감을 불러오지 못했습니다.");
+    expect(screen.queryByRole("region", { name: "진행 목록" })).toBeNull();
+    await userEvent.setup().click(screen.getByRole("button", { name: "장부 마감 다시 시도" }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 });

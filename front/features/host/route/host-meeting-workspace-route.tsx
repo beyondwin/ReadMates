@@ -533,8 +533,17 @@ export function HostMeetingWorkspaceRoute({
     today: todayIsoDate(),
     currentUrl,
   });
-  const closingBoard = closingStatusQuery.data
-    ? getSessionClosingBoardView(closingStatusQuery.data)
+  const closingChecklist = session.state === "CLOSED"
+    ? closingStatusQuery.data
+      ? { kind: "ready" as const, view: getSessionClosingBoardView(closingStatusQuery.data) }
+      : closingStatusQuery.isError
+        ? {
+          kind: "unavailable" as const,
+          onRetry: () => {
+            void closingStatusQuery.refetch();
+          },
+        }
+        : { kind: "loading" as const }
     : null;
   const baseTask = meetingLocation.task === "overview" || meetingLocation.task === "responses" || meetingLocation.task === "attendance";
   const historyAuthority = panelStates.historyAuthority;
@@ -854,7 +863,7 @@ export function HostMeetingWorkspaceRoute({
         location: session.locationLabel,
       }}
       facts={workspace.facts}
-      closingBoard={closingBoard}
+      closingChecklist={closingChecklist}
       relatedWork={(
         <MeetingRelatedWork
           tasks={workspace.relatedTasks}

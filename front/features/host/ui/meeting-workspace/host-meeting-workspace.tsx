@@ -30,6 +30,12 @@ export type MeetingDiaryAdjacentSession = {
   sessionNumber: number;
 };
 
+/** CLOSED records-step checklist slot — non-null reserves the facts region. */
+export type MeetingClosingChecklistSlot =
+  | { kind: "ready"; view: SessionClosingBoardView }
+  | { kind: "loading" }
+  | { kind: "unavailable"; onRetry?: () => void };
+
 export type HostMeetingWorkspaceProps = {
   view: HostMeetingWorkspaceView;
   diary: HostMeetingDiaryView;
@@ -39,8 +45,11 @@ export type HostMeetingWorkspaceProps = {
   relatedWork?: ReactNode;
   projections?: readonly MeetingAudienceProjection[];
   recordReadiness?: HostMeetingRecordReadiness;
-  /** CLOSED records-step content — embedded SessionClosingBoard from getSessionClosingBoardView. */
-  closingBoard?: SessionClosingBoardView | null;
+  /**
+   * CLOSED records-step checklist. When set, the facts slot stays on the closing
+   * shell (loading / ready / unavailable) and never swaps to MeetingFocusFacts.
+   */
+  closingChecklist?: MeetingClosingChecklistSlot | null;
   panel?: ReactNode;
   recovery?: ReactNode;
   publicRecordHref?: string | null;
@@ -125,6 +134,51 @@ function MeetingDiaryPager({
   );
 }
 
+function ClosingChecklistSlot({
+  slot,
+  LinkComponent,
+}: {
+  slot: MeetingClosingChecklistSlot;
+  LinkComponent: HostSessionEditorLinkComponent;
+}) {
+  if (slot.kind === "ready") {
+    return (
+      <SessionClosingBoard
+        view={slot.view}
+        embedded
+        LinkComponent={LinkComponent as SessionClosingLinkComponent}
+      />
+    );
+  }
+
+  if (slot.kind === "unavailable") {
+    return (
+      <section
+        className="rm-host-closing-board rm-host-closing-board--embedded"
+        aria-label="장부 마감 체크리스트"
+      >
+        <div role="alert" className="rm-meeting-panel-state is-error">
+          <p>장부 마감을 불러오지 못했습니다.</p>
+          {slot.onRetry ? (
+            <button type="button" className="btn btn-quiet btn-sm" onClick={slot.onRetry}>
+              장부 마감 다시 시도
+            </button>
+          ) : null}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      className="rm-host-closing-board rm-host-closing-board--embedded"
+      aria-label="장부 마감 체크리스트"
+    >
+      <p role="status" className="rm-meeting-panel-state">장부 마감을 불러오는 중입니다.</p>
+    </section>
+  );
+}
+
 export function HostMeetingWorkspace({
   view,
   diary,
@@ -134,7 +188,7 @@ export function HostMeetingWorkspace({
   relatedWork,
   projections,
   recordReadiness,
-  closingBoard = null,
+  closingChecklist = null,
   panel,
   recovery,
   publicRecordHref = null,
@@ -163,9 +217,9 @@ export function HostMeetingWorkspace({
   }, [view.primaryAction.kind, view.primaryAction.label]);
 
   const showPager = Boolean(adjacentSessions?.previous || adjacentSessions?.next);
-  const showClosingChecklist = Boolean(
-    closingBoard && (diary.currentStep === "records" || diary.currentStep === "publish"),
-  );
+  // CLOSED + records (and publish when a slot is provided): never fall back to focus facts.
+  const showClosingChecklist = closingChecklist != null
+    && (diary.currentStep === "records" || diary.currentStep === "publish");
 
   return (
     <main ref={workspaceRef} className="rm-meeting-diary">
@@ -221,12 +275,8 @@ export function HostMeetingWorkspace({
         )}
         facts={(
           <div className="rm-meeting-diary__step-content">
-            {showClosingChecklist && closingBoard ? (
-              <SessionClosingBoard
-                view={closingBoard}
-                embedded
-                LinkComponent={LinkComponent as SessionClosingLinkComponent}
-              />
+            {showClosingChecklist && closingChecklist ? (
+              <ClosingChecklistSlot slot={closingChecklist} LinkComponent={LinkComponent} />
             ) : (
               <MeetingFocusFacts
                 facts={facts}
