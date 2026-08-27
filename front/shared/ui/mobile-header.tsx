@@ -10,6 +10,7 @@ import {
   hasHostRecordsReturnState,
   readHostRecordsReturnTarget,
 } from "@/shared/routing/readmates-route-state";
+import { HOST_ROUTE_HREFS } from "@/shared/routing/host-route-destinations";
 import type { ClubShellBackTarget } from "@/shared/model/app-club-shell";
 
 export type MobileHeaderVariant = "guest" | "member" | "host";
@@ -235,7 +236,7 @@ function publicTitle(pathname: string, publicBasePath = "") {
 
 function appTitle(variant: Exclude<MobileHeaderVariant, "guest">, pathname: string) {
   if (variant === "host" && pathname === "/app/host/records") {
-    return "기록";
+    return "모임";
   }
 
   if (variant === "host" && pathname === "/app/host/sessions") {
@@ -346,8 +347,8 @@ function appBackTarget(
 
   if (variant === "host" && isHostRecordOwnedRoute(pathname, state, currentPathname)) {
     const target = readHostRecordsReturnTarget(state, currentPathname) ?? {
-      href: "/app/host/records",
-      label: "기록으로",
+      href: HOST_ROUTE_HREFS.meetings,
+      label: "모임으로",
     };
     return { href: target.href, state: target.state, label: "뒤로", icon: "brand" };
   }
@@ -562,7 +563,7 @@ function AppMobileHeader({
     <HeaderShell
       workspace={variant}
       kicker={presentation?.kicker ?? (variant === "host" ? "호스트" : null)}
-      title={presentation?.title ?? (recordOwned ? "기록" : appTitle(variant, appPath))}
+      title={presentation?.title ?? (recordOwned ? "모임" : appTitle(variant, appPath))}
       backTarget={presentation
         ? (presentation.backTarget as HeaderBackTarget | null | undefined)
         : scopeAppBackTarget(

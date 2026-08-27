@@ -36,7 +36,6 @@ export const READMATES_MOBILE_TAB_LABELS = {
   hostSessionPending: "확인 중",
   hostNotifications: "알림",
   hostMembers: "멤버",
-  hostRecords: "기록",
 } as const;
 
 export const READMATES_PRIMARY_NAV_LABELS = {
@@ -50,6 +49,5 @@ export const READMATES_PRIMARY_NAV_LABELS = {
     today: "오늘",
     session: "모임",
     members: "멤버",
-    records: "기록",
   },
 } as const;

@@ -215,6 +215,39 @@ afterEach(() => {
 });
 
 describe("AppRouteLayout host session navigation", () => {
+  it("renders the three-tab host primary navigation without a records tab", () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const path = input.toString();
+      return Promise.reject(new Error(`Unexpected fetch: ${path}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, staleTime: 0, gcTime: 0 },
+        mutations: { retry: false },
+      },
+    });
+
+    renderHostLayout({
+      queryClient,
+      child: <main>오늘</main>,
+    });
+
+    const desktopPrimary = screen.getByRole("navigation", { name: "호스트 주 메뉴" });
+    const mobilePrimary = screen.getByRole("navigation", { name: "호스트 주 메뉴 모바일" });
+    expect(within(desktopPrimary).getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "오늘",
+      "모임",
+      "멤버",
+    ]);
+    expect(within(mobilePrimary).getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "오늘",
+      "모임",
+      "멤버",
+    ]);
+    expect(screen.queryByRole("link", { name: "기록" })).not.toBeInTheDocument();
+  });
+
   it.each([
     {
       operation: "open" as const,

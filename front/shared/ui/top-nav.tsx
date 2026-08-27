@@ -126,21 +126,15 @@ function hostLinks({
       current: (pathname) =>
         pathname === "/app/host/sessions"
         || pathname === "/app/host/sessions/new"
-        || /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(pathname),
+        || pathname === "/app/host/records"
+        || /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(pathname)
+        || /^\/app\/host\/sessions\/[^/]+\/(?:closing|feedback-document)$/.test(pathname),
     },
     {
       key: "host-members",
       href: HOST_ROUTE_HREFS.members,
       label: READMATES_PRIMARY_NAV_LABELS.host.members,
       current: (pathname) => pathname === "/app/host/members" || pathname === "/app/host/invitations",
-    },
-    {
-      key: "host-records",
-      href: HOST_ROUTE_HREFS.records,
-      label: READMATES_PRIMARY_NAV_LABELS.host.records,
-      current: (pathname) =>
-        pathname === "/app/host/records" ||
-        /^\/app\/host\/sessions\/[^/]+\/(?:closing|feedback-document)$/.test(pathname),
     },
   ];
 }
@@ -405,7 +399,7 @@ function AppTopNav({
   const appPath = variant === "host"
     && /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(rawAppPath)
     && hasHostRecordsReturnState(location.state, pathname)
-    ? "/app/host/records"
+    ? HOST_ROUTE_HREFS.meetings
     : rawAppPath;
   const resolvedCurrentSessionStatus =
     currentSessionStatus ?? (currentSessionId === undefined ? "loading" : "ready");

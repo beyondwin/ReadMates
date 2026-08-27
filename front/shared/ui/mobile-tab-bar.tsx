@@ -149,7 +149,9 @@ function hostTabs({
       current: (pathname) =>
         pathname === "/app/host/sessions"
         || pathname === "/app/host/sessions/new"
-        || /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(pathname),
+        || pathname === "/app/host/records"
+        || /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(pathname)
+        || /^\/app\/host\/sessions\/[^/]+\/(?:closing|feedback-document)$/.test(pathname),
     },
     {
       key: "host-members",
@@ -157,15 +159,6 @@ function hostTabs({
       label: READMATES_MOBILE_TAB_LABELS.hostMembers,
       icon: "approve",
       current: (pathname) => pathname === "/app/host/members" || pathname === "/app/host/invitations",
-    },
-    {
-      key: "host-records",
-      href: HOST_ROUTE_HREFS.records,
-      label: READMATES_MOBILE_TAB_LABELS.hostRecords,
-      icon: "archive",
-      current: (pathname) =>
-        pathname === "/app/host/records" ||
-        /^\/app\/host\/sessions\/[^/]+\/(?:closing|feedback-document)$/.test(pathname),
     },
   ];
 }
@@ -348,7 +341,7 @@ function RouteAwareMobileTabBar({
   const appPath = variant === "host"
     && /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(rawAppPath)
     && hasHostRecordsReturnState(location.state, pathname)
-    ? "/app/host/records"
+    ? HOST_ROUTE_HREFS.meetings
     : rawAppPath;
   const resolvedCurrentSessionStatus =
     currentSessionStatus ?? (currentSessionId === undefined ? "loading" : "ready");

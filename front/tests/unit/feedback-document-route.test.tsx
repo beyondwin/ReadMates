@@ -541,9 +541,9 @@ describe("Host feedback document preview route", () => {
     );
     const desktop = screen.getByRole("navigation", { name: "앱 내비게이션" });
     const mobile = screen.getByRole("navigation", { name: "앱 탭" });
-    expect(within(desktop).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
-    expect(within(mobile).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
-    expect(document.querySelector(".m-hdr-title")).toHaveTextContent("기록");
+    expect(within(desktop).getByRole("link", { name: "모임" })).toHaveAttribute("aria-current", "page");
+    expect(within(mobile).getByRole("link", { name: "모임" })).toHaveAttribute("aria-current", "page");
+    expect(document.querySelector(".m-hdr-title")).toHaveTextContent("모임");
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute(
       "href",
       "/clubs/club-a/app/host/records",

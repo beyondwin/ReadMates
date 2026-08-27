@@ -45,7 +45,7 @@ function LocationProbe() {
 function primaryItems(workspace: ClubWorkspace): PrimaryNavigationItem[] {
   const labels = workspace === "member"
     ? ["오늘", "노트", "기록", "내 공간"]
-    : ["오늘", "모임", "멤버", "기록"];
+    : ["오늘", "모임", "멤버"];
 
   return labels.map((label, index) => ({
     id: `${workspace}-${index}`,

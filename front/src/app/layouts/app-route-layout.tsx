@@ -207,7 +207,7 @@ function primaryNavigationItems({
   basePath: string;
 }): PrimaryNavigationItem[] {
   const navigationPath = workspace === "host" && hostRecordOwnedRoute(appPath, state, pathname)
-    ? "/app/host/records"
+    ? HOST_ROUTE_HREFS.meetings
     : appPath;
 
   if (workspace === "member") {
@@ -260,7 +260,9 @@ function primaryNavigationItems({
       icon: "edit",
       current: navigationPath === "/app/host/sessions"
         || navigationPath === "/app/host/sessions/new"
-        || /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(navigationPath),
+        || navigationPath === "/app/host/records"
+        || /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(navigationPath)
+        || /^\/app\/host\/sessions\/[^/]+\/(?:closing|feedback-document)$/.test(navigationPath),
     },
     {
       id: "host-members",
@@ -269,19 +271,11 @@ function primaryNavigationItems({
       icon: "approve",
       current: navigationPath === "/app/host/members" || navigationPath === "/app/host/invitations",
     },
-    {
-      id: "host-records",
-      label: READMATES_PRIMARY_NAV_LABELS.host.records,
-      href: scopedAppPath(basePath, HOST_ROUTE_HREFS.records),
-      icon: "archive",
-      current: navigationPath === "/app/host/records"
-        || /^\/app\/host\/sessions\/[^/]+\/(?:closing|feedback-document)$/.test(navigationPath),
-    },
   ];
 }
 
 function appMobileTitle(workspace: ShellClubWorkspace, appPath: string, recordOwned: boolean) {
-  if (recordOwned || (workspace === "host" && appPath === "/app/host/records")) return "기록";
+  if (recordOwned || (workspace === "host" && appPath === "/app/host/records")) return "모임";
   if (workspace === "host" && appPath === "/app/host/sessions") return "모임";
   if (appPath.startsWith("/app/feedback/")) return "피드백 문서";
   if (appPath.startsWith("/app/host/sessions/")) return "모임";
@@ -317,8 +311,8 @@ function appMobileBackTarget({
   if (appPath === "/app/host/sessions" || appPath === "/app/host/records") return null;
   if (workspace === "host" && recordOwned) {
     const target = readHostRecordsReturnTarget(state, pathname) ?? {
-      href: scopedAppPath(basePath, "/app/host/records"),
-      label: "기록으로",
+      href: scopedAppPath(basePath, HOST_ROUTE_HREFS.meetings),
+      label: "모임으로",
     };
     return { href: scopeAppTarget(target.href, basePath), state: target.state, label: "뒤로", icon: "brand" };
   }

@@ -3,35 +3,45 @@ import { HOST_ROUTE_DESTINATION_INVENTORY } from "./route-continuity";
 import { HOST_ROUTE_HREFS, HOST_ROUTE_PATHS } from "@/shared/routing/host-route-destinations";
 
 describe("host route destination inventory", () => {
-  it("keeps the four primary host destinations distinct", () => {
+  it("keeps the three primary host destinations distinct", () => {
     const primary = HOST_ROUTE_DESTINATION_INVENTORY.filter((entry) => entry.kind === "host-primary");
     expect(primary.map((entry) => entry.href)).toEqual([
       "/app/host",
       "/app/host/sessions",
       "/app/host/members",
-      "/app/host/records",
     ]);
-    expect(new Set(primary.map((entry) => entry.href)).size).toBe(4);
+    expect(new Set(primary.map((entry) => entry.href)).size).toBe(3);
     expect(primary.map((entry) => entry.scopedHref)).toEqual([
       "/clubs/:slug/app/host",
       "/clubs/:slug/app/host/sessions",
       "/clubs/:slug/app/host/members",
-      "/clubs/:slug/app/host/records",
     ]);
-    expect(new Set(primary.map((entry) => entry.scopedHref)).size).toBe(4);
+    expect(new Set(primary.map((entry) => entry.scopedHref)).size).toBe(3);
+    expect(primary.some((entry) => entry.owner === "host-records" || entry.href === "/app/host/records")).toBe(false);
   });
 
-  it("routes meeting and record lifecycle owners without conflating their lists", () => {
+  it("routes meeting lifecycle owners on the absorbed meetings list", () => {
     for (const entry of HOST_ROUTE_DESTINATION_INVENTORY) {
-      if (entry.owner === "host-draft-list" || entry.owner === "host-open-list") {
+      if (
+        entry.owner === "host-draft-list"
+        || entry.owner === "host-open-list"
+        || entry.owner === "host-closed-list"
+        || entry.owner === "host-published-list"
+      ) {
         expect(entry.href, entry.owner).toBe("/app/host/sessions");
         expect(entry.scopedHref, entry.owner).toBe("/clubs/:slug/app/host/sessions");
       }
-      if (entry.owner === "host-closed-list" || entry.owner === "host-published-list") {
-        expect(entry.href, entry.owner).toBe("/app/host/records");
-        expect(entry.scopedHref, entry.owner).toBe("/clubs/:slug/app/host/records");
-      }
     }
+  });
+
+  it("keeps the records redirect as a non-primary compatibility destination", () => {
+    expect(HOST_ROUTE_DESTINATION_INVENTORY).toContainEqual({
+      owner: "host-records",
+      kind: "compatibility",
+      href: HOST_ROUTE_HREFS.records,
+      scopedHref: "/clubs/:slug/app/host/records",
+      lifecycle: null,
+    });
   });
 
   it("inventories scoped counterparts for every member, host, and public destination", () => {
