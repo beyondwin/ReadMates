@@ -27,6 +27,7 @@ import {
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { AdminPageContext } from "@/features/platform-admin/ui/admin-page-context";
 import { flattenSupportGrantLedgerPages } from "@/features/platform-admin/model/platform-admin-support-model";
+import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
 import { platformAdminSupportLedgerInfiniteQuery } from "@/features/platform-admin/queries/platform-admin-support-queries";
 import { platformAdminClubOperationsQuery } from "@/features/platform-admin/queries/platform-admin-club-operations-queries";
 import { AdminClubOperationsPage } from "@/features/platform-admin/ui/admin-club-operations-page";
@@ -102,7 +103,7 @@ export function AdminClubDetailRoute() {
   return (
     <section className="admin-club-detail" aria-label="클럽 상세">
       <AdminPageContext
-        eyebrow="Club control"
+        eyebrow={ADMIN_COPY.eyebrow.clubDetail}
         heading={club.name}
         description={`revision ${club.adminRevision} · ${club.status} · ${club.publicVisibility}`}
         action={<ClubsReturnLink returnState={returnState} />}
@@ -529,7 +530,7 @@ function ReceiptStatus({
 }) {
   return (
     <div className="admin-club-detail__receipt" aria-live="polite">
-      <strong>명령 접수 완료</strong>
+      <strong>{ADMIN_COPY.receipt} — 명령 접수</strong>
       <span>receipt {receipt.receiptId}</span>
       <span>
         {receipt.resultCode}

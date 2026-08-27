@@ -191,6 +191,7 @@ beforeEach(() => {
 describe("AdminClubDetailRoute", () => {
   it("renders authoritative detail with a read-only slug and independent domain panel", () => {
     const { container } = renderRoute();
+    expect(screen.getByText("운영 · 클럽 상세")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Alpha" })).toBeInTheDocument();
     expect(screen.getByText("alpha.example.test")).toBeInTheDocument();
     expect(screen.getByDisplayValue("alpha")).toHaveAttribute("readonly");
@@ -320,6 +321,7 @@ describe("AdminClubDetailRoute", () => {
       expect(confirmPlatformAdminClubVisibility).toHaveBeenCalledOnce(),
     );
     expect(await screen.findByText(/receipt-1/)).toBeInTheDocument();
+    expect(screen.getByText("영수증 — 명령 접수")).toBeInTheDocument();
     expect(confirm).toBeDisabled();
   });
 

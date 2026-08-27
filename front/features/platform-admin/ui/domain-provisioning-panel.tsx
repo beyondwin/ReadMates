@@ -3,6 +3,7 @@ import {
   adminCommandRecovery,
   type AdminCommandRecovery,
 } from "@/features/platform-admin/model/platform-admin-command-recovery";
+import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
 
 type DomainKind = "SUBDOMAIN" | "CUSTOM_DOMAIN";
 type DomainStatus =
@@ -385,7 +386,7 @@ function AdminClubDomainCommandPanelInner({
       ) : null}
       {canManageDomains && receipt ? (
         <div className="admin-club-detail__receipt" aria-live="polite">
-          <strong>명령 접수 완료</strong>
+          <strong>{ADMIN_COPY.receipt} — 명령 접수</strong>
           <span>receipt {receipt.receiptId}</span>
           <span>
             {receipt.resultCode}

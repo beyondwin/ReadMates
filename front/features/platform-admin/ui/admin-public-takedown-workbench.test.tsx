@@ -54,6 +54,7 @@ function renderWorkbench(state: AdminTakedownState, overrides = {}) {
 describe("AdminPublicTakedownWorkbench", () => {
   it("denies a capability-less actor without rendering the emergency mutation form", () => {
     renderWorkbench({ kind: "idle" }, { canOperate: false });
+    expect(screen.getByText("운영 · 긴급 공개 회수")).toBeInTheDocument();
     expect(screen.getByText("긴급 회수 권한이 없습니다.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "대상 확인" })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
@@ -61,6 +62,7 @@ describe("AdminPublicTakedownWorkbench", () => {
 
   it("shows exact target, current surfaces, generation, limitation, and one primary confirm", () => {
     const { props, container } = renderWorkbench({ kind: "preview", preview });
+    expect(screen.getByText("운영 · 긴급 공개 회수")).toBeInTheDocument();
     expect(screen.getByText(preview.clubId)).toBeInTheDocument();
     expect(screen.getByText(preview.sessionId)).toBeInTheDocument();
     expect(screen.getByText(preview.publicationId)).toBeInTheDocument();

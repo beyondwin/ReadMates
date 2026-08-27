@@ -107,6 +107,7 @@ describe("AdminClubDomainCommandPanel request binding", () => {
       );
       if (outcome === "resolve") {
         expect(screen.getByText(/receipt-1/)).toBeInTheDocument();
+        expect(screen.getByText("영수증 — 명령 접수")).toBeInTheDocument();
       } else {
         expect(screen.getByRole("alert")).toHaveTextContent(
           "같은 명령으로 다시 시도",
@@ -223,6 +224,7 @@ describe("AdminClubDomainCommandPanel request binding", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "도메인 추가 확정" }));
     expect(await screen.findByText(/receipt-1/)).toBeInTheDocument();
+    expect(screen.getByText("영수증 — 명령 접수")).toBeInTheDocument();
 
     rerender(
       <AdminClubDomainCommandPanel
