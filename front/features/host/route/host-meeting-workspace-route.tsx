@@ -48,7 +48,12 @@ import { buildMeetingAudienceProjections } from "@/features/host/ui/meeting-work
 import { MeetingRelatedWork } from "@/features/host/ui/meeting-workspace/meeting-related-work";
 import { MeetingNotificationWorkspace } from "@/features/host/ui/meeting-workspace/meeting-notification-workspace";
 import { MeetingNotificationRail } from "@/features/host/ui/meeting-workspace/meeting-notification-rail";
-import type { MeetingResponseLedgerRow } from "@/features/host/ui/meeting-workspace/meeting-response-ledger";
+import {
+  MeetingResponseLedger,
+  type MeetingAttendance,
+  type MeetingResponseLedgerRow,
+} from "@/features/host/ui/meeting-workspace/meeting-response-ledger";
+import { meetingResponseLedgerRowsFromAttendees } from "@/features/host/ui/meeting-workspace/meeting-response-ledger-rows";
 import { buildComposerSelection } from "@/features/host/model/host-notification-composer-model";
 import type { ManualNotificationOptionsResponse, ManualNotificationPreviewResponse } from "@/features/host/model/host-view-types";
 import {
@@ -227,18 +232,9 @@ function panelForTask(
 }
 
 
-function mapRsvpToLedgerResponse(
-  status: "NO_RESPONSE" | "GOING" | "MAYBE" | "DECLINED",
-): MeetingResponseLedgerRow["response"] {
-  if (status === "GOING") return "GOING";
-  if (status === "MAYBE") return "UNSURE";
-  if (status === "DECLINED") return "NOT_GOING";
-  return "NO_RESPONSE";
-}
-
 function mapAttendanceToLedger(
   status: "UNKNOWN" | "ATTENDED" | "ABSENT",
-): MeetingResponseLedgerRow["attendance"] {
+): MeetingAttendance {
   if (status === "ATTENDED") return "ATTENDED";
   if (status === "ABSENT") return "ABSENT";
   return "UNKNOWN";
@@ -247,16 +243,15 @@ function mapAttendanceToLedger(
 function responseRowsFromAttendees(
   attendees: HostSessionDetailResponse["attendees"],
 ): MeetingResponseLedgerRow[] {
-  return attendees.map((attendee) => ({
+  return meetingResponseLedgerRowsFromAttendees(attendees.map((attendee) => ({
     membershipId: attendee.membershipId,
     displayName: attendee.displayName,
-    secondaryLabel: attendee.accountName,
-    response: mapRsvpToLedgerResponse(attendee.rsvpStatus),
-    attendance: mapAttendanceToLedger(attendee.attendanceStatus),
+    accountName: attendee.accountName,
+    rsvpStatus: attendee.rsvpStatus,
+    attendanceStatus: mapAttendanceToLedger(attendee.attendanceStatus),
     attendanceRevision: attendee.attendanceRevision,
-    questionCount: null,
-    recentResponseLabel: null,
-  }));
+    participationStatus: attendee.participationStatus,
+  })));
 }
 
 export function HostMeetingWorkspaceRoute({
@@ -1008,6 +1003,41 @@ export function HostMeetingWorkspaceRoute({
     }
     : null;
 
+  const commitMeetingDayAttendance = async (
+    membershipIds: ReadonlyArray<string>,
+    attendance: MeetingAttendance,
+  ) => {
+    if (membershipIds.length === 0) return;
+    await editorActions.updateAttendance(
+      sessionId,
+      membershipIds.map((membershipId) => ({
+        membershipId,
+        attendanceStatus: attendance,
+      })),
+    );
+  };
+
+  const meetingDayAttendanceLedger = diary.currentStep === "meetingDay" ? (
+    <MeetingResponseLedger
+      presentation="meetingDay"
+      rows={responseRows}
+      onAttendanceChange={(membershipId, attendance) => {
+        void commitMeetingDayAttendance([membershipId], attendance);
+      }}
+      onBulkAttendanceChange={(membershipIds, attendance) => {
+        void commitMeetingDayAttendance(membershipIds, attendance);
+      }}
+      pendingUndo={pendingUndoView}
+    />
+  ) : null;
+
+  const focusContent = (
+    <>
+      {meetingDayAttendanceLedger}
+      {notificationRail}
+    </>
+  );
+
   return (
     <>
     <HostMeetingWorkspace
@@ -1027,7 +1057,7 @@ export function HostMeetingWorkspaceRoute({
       }}
       facts={workspace.facts}
       closingChecklist={closingChecklist}
-      focusContent={notificationRail}
+      focusContent={focusContent}
       relatedWork={(
         <MeetingRelatedWork
           tasks={workspace.relatedTasks}
@@ -1113,7 +1143,7 @@ export function HostMeetingWorkspaceRoute({
         editorPrimaryActionRef.current?.();
       }}
       onRetryReadiness={recordRetry}
-      pendingUndo={pendingUndoView}
+      pendingUndo={diary.currentStep === "meetingDay" ? null : pendingUndoView}
       undoConfirm={undoConfirmView}
       restoreNotice={restoreNoticeView}
       LinkComponent={LinkComponent}

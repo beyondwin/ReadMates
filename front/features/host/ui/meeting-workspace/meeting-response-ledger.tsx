@@ -9,6 +9,7 @@ import {
   type WorkspacePendingUndo,
 } from "@/features/host/ui/session-workspace/workspace-undo-bar";
 import "./meeting-response-ledger.css";
+
 type Response = "GOING" | "NOT_GOING" | "UNSURE" | "NO_RESPONSE";
 export type MeetingAttendance = "ATTENDED" | "ABSENT" | "UNKNOWN";
 export type MeetingResponseLedgerPresentation = "default" | "meetingDay";
@@ -24,6 +25,16 @@ export type MeetingResponseLedgerRow = {
   questionCount: number | null;
   recentResponseLabel: string | null;
   writeState?: "idle" | "saving" | "saved" | "error" | "conflict";
+};
+
+export type MeetingResponseLedgerAttendeeInput = {
+  membershipId: string;
+  displayName: string;
+  accountName?: string | null;
+  rsvpStatus: "NO_RESPONSE" | "GOING" | "MAYBE" | "DECLINED";
+  attendanceStatus: MeetingAttendance;
+  attendanceRevision: number;
+  participationStatus?: "ACTIVE" | "EXCLUDED" | string | null;
 };
 
 const responseLabel: Record<Response, string> = {

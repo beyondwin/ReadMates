@@ -1376,9 +1376,14 @@ export default function HostSessionEditor({
         LinkComponent={LinkComponent}
         focusContent={
           <>
-            {(meetingTask === "responses" || displayedWorkspaceView.primaryAction.kind === "REVIEW_MEMBER_INPUT") && session ? (
+            {(meetingTask === "responses"
+              || (meetingTask === "attendance" && sessionState === "OPEN" && date === todayIsoDate())
+              || displayedWorkspaceView.primaryAction.kind === "REVIEW_MEMBER_INPUT") && session ? (
               <div id="workspace-member-responses" tabIndex={-1}>
                 <MeetingResponseLedger
+                  presentation={
+                    sessionState === "OPEN" && date === todayIsoDate() ? "meetingDay" : "default"
+                  }
                   rows={session.attendees
                     .filter((attendee) => (attendee.participationStatus ?? "ACTIVE") === "ACTIVE")
                     .map((attendee, index) => ({
@@ -1397,6 +1402,9 @@ export default function HostSessionEditor({
                     }))}
                   onAttendanceChange={(membershipId, attendance) => void updateAttendance(membershipId, attendance)}
                   onBulkAttendanceChange={(membershipIds, attendance) => void updateBulkAttendance(membershipIds, attendance)}
+                  pendingUndo={
+                    sessionState === "OPEN" && date === todayIsoDate() ? pendingUndo : null
+                  }
                 />
               </div>
             ) : null}

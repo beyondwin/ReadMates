@@ -17,6 +17,21 @@ const routeMocks = vi.hoisted(() => ({
   refetchAttention: vi.fn(),
   refetchOperations: vi.fn(),
   refetchNotifications: vi.fn(),
+  updateAttendance: vi.fn(),
+  restoreChange: vi.fn(),
+  fetchRestorePreview: vi.fn(),
+  sessionDetail: null as null | {
+    sessionId: string;
+    attendees: Array<{
+      membershipId: string;
+      displayName: string;
+      accountName: string;
+      rsvpStatus: "GOING" | "NO_RESPONSE" | "MAYBE" | "DECLINED";
+      attendanceStatus: "UNKNOWN" | "ATTENDED" | "ABSENT";
+      attendanceRevision: number;
+      participationStatus?: "ACTIVE";
+    }>;
+  },
   recordAttention: {
     items: [] as HostSessionLedgerItem[],
     nextCursor: null as string | null,
@@ -37,7 +52,7 @@ const routeMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: (query: { testData?: unknown; source?: string }) => {
+  useQuery: (query: { testData?: unknown; source?: string; enabled?: boolean }) => {
     if (query.source === "operations") {
       return {
         data: routeMocks.operationsError ? undefined : query.testData,
@@ -54,6 +69,14 @@ vi.mock("@tanstack/react-query", () => ({
         refetch: routeMocks.refetchNotifications,
       };
     }
+    if (query.source === "session-detail") {
+      return {
+        data: query.enabled === false ? undefined : (routeMocks.sessionDetail ?? query.testData),
+        isError: false,
+        isFetching: false,
+        refetch: vi.fn(),
+      };
+    }
     return {
       data: routeMocks.attentionError ? undefined : query.testData,
       isError: routeMocks.attentionError,
@@ -61,6 +84,12 @@ vi.mock("@tanstack/react-query", () => ({
       refetch: routeMocks.refetchAttention,
     };
   },
+  useQueryClient: () => ({
+    fetchQuery: async (query: { queryFn?: () => unknown }) => {
+      if (query.queryFn) return query.queryFn();
+      return routeMocks.fetchRestorePreview();
+    },
+  }),
 }));
 
 vi.mock("react-router", async (importOriginal) => {
@@ -84,6 +113,24 @@ vi.mock("@/features/host/queries/host-session-queries", () => ({
   DEFAULT_HOST_SESSION_LIST_LIMIT: 50,
   hostCurrentSessionQuery: () => ({ testData: routeMocks.current }),
   hostSessionListQuery: () => ({ testData: routeMocks.hostSessions }),
+  hostSessionDetailQuery: (sessionId: string) => ({
+    queryKey: ["session-detail", sessionId],
+    testData: routeMocks.sessionDetail,
+    source: "session-detail",
+  }),
+  useUpdateHostSessionAttendanceMutation: () => ({
+    mutateAsync: routeMocks.updateAttendance,
+  }),
+}));
+
+vi.mock("@/features/host/queries/host-session-recovery-queries", () => ({
+  hostSessionRestorePreviewQuery: (_sessionId: string, changeId: string) => ({
+    queryKey: ["restore-preview", changeId],
+    queryFn: () => routeMocks.fetchRestorePreview(changeId),
+  }),
+  useRestoreHostSessionChangeMutation: () => ({
+    mutateAsync: routeMocks.restoreChange,
+  }),
 }));
 
 vi.mock("@/features/host/queries/host-session-record-queries", () => ({
@@ -168,6 +215,10 @@ beforeEach(() => {
   routeMocks.refetchAttention.mockReset();
   routeMocks.refetchOperations.mockReset();
   routeMocks.refetchNotifications.mockReset();
+  routeMocks.updateAttendance.mockReset();
+  routeMocks.restoreChange.mockReset();
+  routeMocks.fetchRestorePreview.mockReset();
+  routeMocks.sessionDetail = null;
   routeMocks.recordAttention = {
     items: [],
     nextCursor: null,
@@ -345,5 +396,60 @@ describe("HostDashboardRoute", () => {
     );
     expect(within(root).getByRole("link", { name: "모임 목록" })).toBeInTheDocument();
     expect(queue).toHaveTextContent("공개된 책");
+  });
+
+  it("embeds one-tap meeting-day attendance on the today home when it is meeting day", async () => {
+    const user = userEvent.setup();
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    routeMocks.hostSessions = {
+      items: [{ sessionId: "open-today", state: "OPEN", date: today }],
+      nextCursor: null,
+    };
+    routeMocks.sessionDetail = {
+      sessionId: "open-today",
+      attendees: [
+        {
+          membershipId: "m-1",
+          displayName: "지후",
+          accountName: "reader-a",
+          rsvpStatus: "GOING",
+          attendanceStatus: "UNKNOWN",
+          attendanceRevision: 1,
+          participationStatus: "ACTIVE",
+        },
+        {
+          membershipId: "m-2",
+          displayName: "서연",
+          accountName: "reader-b",
+          rsvpStatus: "GOING",
+          attendanceStatus: "ATTENDED",
+          attendanceRevision: 2,
+          participationStatus: "ACTIVE",
+        },
+      ],
+    };
+    routeMocks.updateAttendance.mockResolvedValue({
+      changeReceipt: {
+        changeId: "change-1",
+        kind: "ATTENDANCE",
+        undoAvailable: true,
+        createdAt: `${today}T12:01:00.000Z`,
+      },
+    });
+
+    renderRoute();
+
+    const hero = screen.getByRole("region", { name: "오늘 모임" });
+    expect(within(hero).getByRole("heading", { name: "출석 확인" })).toBeInTheDocument();
+    expect(within(hero).getByRole("button", { name: "아직 안 옴 1" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(hero).getByRole("button", { name: /지후/ })).toBeInTheDocument();
+
+    await user.click(within(hero).getByRole("button", { name: /지후/ }));
+    expect(routeMocks.updateAttendance).toHaveBeenCalledWith({
+      sessionId: "open-today",
+      attendance: [{ membershipId: "m-1", attendanceStatus: "ATTENDED" }],
+    });
+    expect(await screen.findByRole("button", { name: "되돌리기" })).toBeVisible();
   });
 });

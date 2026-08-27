@@ -31,6 +31,7 @@ const routeMocks = vi.hoisted(() => ({
   unpublishSession: vi.fn(),
   returnSessionToDraft: vi.fn(),
   saveSession: vi.fn(),
+  updateAttendance: vi.fn(),
 }));
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const OBSERVED_AT = "2026-08-25T01:02:03.000Z";
@@ -70,6 +71,7 @@ vi.mock("./host-meeting-workspace-actions", () => ({
     unpublishSession: routeMocks.unpublishSession,
     returnSessionToDraft: routeMocks.returnSessionToDraft,
     saveSession: routeMocks.saveSession,
+    updateAttendance: routeMocks.updateAttendance,
   }),
 }));
 
@@ -155,6 +157,16 @@ function renderRoute(search: string, extras: {
   session?: {
     state?: "DRAFT" | "OPEN" | "CLOSED" | "PUBLISHED";
     title?: string;
+    date?: string;
+    attendees?: Array<{
+      membershipId: string;
+      displayName: string;
+      accountName: string;
+      rsvpStatus: "GOING" | "NO_RESPONSE" | "MAYBE" | "DECLINED";
+      attendanceStatus: "UNKNOWN" | "ATTENDED" | "ABSENT";
+      attendanceRevision: number;
+      participationStatus?: "ACTIVE";
+    }>;
   };
 } = {}) {
   const { convergence, session } = extras;
@@ -167,7 +179,7 @@ function renderRoute(search: string, extras: {
       sessionId: SESSION_ID,
       title: session?.title ?? "모임",
       bookTitle: "책",
-      date: "2026-08-25",
+      date: session?.date ?? "2026-08-25",
       state: session?.state ?? "OPEN",
       visibility: "HOST_ONLY",
       versions: {
@@ -178,7 +190,7 @@ function renderRoute(search: string, extras: {
         liveRecordRevision: 2,
         publicationRevision: 1,
       },
-      attendees: [],
+      attendees: session?.attendees ?? [],
       feedbackDocument: { uploaded: false },
     },
   );
@@ -284,6 +296,9 @@ describe("host meeting workspace route", () => {
     routeMocks.saveSession.mockReset().mockResolvedValue(new Response(JSON.stringify({
       changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO", undoAvailable: true },
     }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    routeMocks.updateAttendance.mockReset().mockResolvedValue({
+      changeReceipt: { changeId: "change-att-1", kind: "ATTENDANCE", undoAvailable: true },
+    });
   });
 
   it("shows origin commit and pending public convergence as separate route-owned facts", async () => {
@@ -558,6 +573,37 @@ describe("host meeting workspace route", () => {
     );
     expect(screen.getAllByRole("region", { name: "지금 할 일" })).toHaveLength(1);
     expect(document.querySelector(".rm-meeting-diary")).not.toBeNull();
+  });
+
+  it("mounts meetingDay one-tap attendance ledger on OPEN meeting day", async () => {
+    const user = userEvent.setup();
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    renderRoute("?task=overview", {
+      session: {
+        state: "OPEN",
+        date: today,
+        attendees: [
+          {
+            membershipId: "m-1",
+            displayName: "지후",
+            accountName: "reader-a",
+            rsvpStatus: "GOING",
+            attendanceStatus: "UNKNOWN",
+            attendanceRevision: 1,
+            participationStatus: "ACTIVE",
+          },
+        ],
+      },
+    });
+
+    expect(await screen.findByRole("heading", { name: "출석 확인" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "아직 안 옴 1" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: /지후/ }));
+    expect(routeMocks.updateAttendance).toHaveBeenCalledWith(SESSION_ID, [
+      { membershipId: "m-1", attendanceStatus: "ATTENDED" },
+    ]);
+    expect(await screen.findByRole("button", { name: "되돌리기" })).toBeVisible();
   });
 
   it("opens 모임 정보 through the route-owned panel instead of an empty inert sheet", async () => {

@@ -1,18 +1,37 @@
-import { useMemo, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useLoaderData, useParams } from "react-router";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLoaderData, useNavigate, useParams } from "react-router";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import { readmatesReturnState as defaultReadmatesReturnState } from "@/shared/routing/readmates-route-state";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
+import type { HostSessionChangeReceipt } from "@/features/host/api/host-session-recovery-contracts";
 import { hostClubOperationsQuery } from "@/features/host/queries/host-club-operations-queries";
 import { hostNotificationHealthQuery } from "@/features/host/queries/host-notification-queries";
 import { hostSessionRecordLedgerQuery } from "@/features/host/queries/host-session-record-queries";
+import {
+  hostSessionDetailQuery,
+  useUpdateHostSessionAttendanceMutation,
+} from "@/features/host/queries/host-session-queries";
+import {
+  hostSessionRestorePreviewQuery,
+  useRestoreHostSessionChangeMutation,
+} from "@/features/host/queries/host-session-recovery-queries";
 import { meetingListItemsFromHostSources } from "@/features/host/model/host-meeting-ledger-model";
 import { buildHostTodayView } from "@/features/host/model/host-today-model";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
+import {
+  hostSessionChangeUndoDescription,
+  hostSessionRestoreBlockedExplanation,
+} from "@/features/host/model/host-session-editor-view-model";
 import type { HostLinkComponent } from "@/features/host/ui/host-link-types";
 import { HostTodayPage } from "@/features/host/ui/today/host-today-page";
+import {
+  MeetingResponseLedger,
+  type MeetingAttendance,
+} from "@/features/host/ui/meeting-workspace/meeting-response-ledger";
+import { meetingResponseLedgerRowsFromAttendees } from "@/features/host/ui/meeting-workspace/meeting-response-ledger-rows";
+import type { WorkspacePendingUndo } from "@/features/host/ui/session-workspace/workspace-undo-bar";
 import { HOST_HOME_ATTENTION_LIMIT, type HostDashboardRouteData } from "./host-dashboard-data";
 import "@/features/host/ui/today/host-today.css";
 import "@/features/host/ui/host-editorial-ledger.css";
@@ -66,6 +85,8 @@ export function HostDashboardRoute({
   const loaderData = useLoaderData() as HostDashboardRouteData;
   const { clubSlug } = useParams<{ clubSlug: string }>();
   const context = useMemo(() => requireHostClubContext(clubSlug), [clubSlug]);
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const attentionQuery = useQuery({
     ...hostSessionRecordLedgerQuery({
@@ -124,6 +145,104 @@ export function HostDashboardRoute({
     operationsQuery.data,
   ]);
 
+  const meetingDaySessionId = view.nextMeeting?.isMeetingDay ? view.nextMeeting.sessionId : null;
+  const meetingDayDetailQuery = useQuery({
+    ...hostSessionDetailQuery(meetingDaySessionId ?? "", context),
+    enabled: Boolean(meetingDaySessionId),
+    retry: false,
+  });
+  const { mutateAsync: updateAttendance } = useUpdateHostSessionAttendanceMutation(context);
+  const { mutateAsync: restoreChange } = useRestoreHostSessionChangeMutation(context);
+  const [pendingAttendanceUndo, setPendingAttendanceUndo] = useState<{
+    sessionId: string;
+    receipt: HostSessionChangeReceipt;
+    description: string;
+    error: string | null;
+  } | null>(null);
+
+  const commitMeetingDayAttendance = useCallback(async (
+    membershipIds: ReadonlyArray<string>,
+    attendance: MeetingAttendance,
+  ) => {
+    if (!meetingDaySessionId || membershipIds.length === 0) return;
+    const result = await updateAttendance({
+      sessionId: meetingDaySessionId,
+      attendance: membershipIds.map((membershipId) => ({
+        membershipId,
+        attendanceStatus: attendance,
+      })),
+    });
+    const receipt = result.changeReceipt ?? null;
+    if (receipt?.undoAvailable) {
+      setPendingAttendanceUndo({
+        sessionId: meetingDaySessionId,
+        receipt,
+        description: hostSessionChangeUndoDescription("ATTENDANCE"),
+        error: null,
+      });
+      return;
+    }
+    setPendingAttendanceUndo(null);
+  }, [meetingDaySessionId, updateAttendance]);
+
+  const meetingDayPendingUndo: WorkspacePendingUndo | null = pendingAttendanceUndo
+    && meetingDaySessionId
+    && pendingAttendanceUndo.sessionId === meetingDaySessionId
+    ? {
+      description: pendingAttendanceUndo.description,
+      error: pendingAttendanceUndo.error,
+      onUndo: () => {
+        const current = pendingAttendanceUndo;
+        void (async () => {
+          try {
+            const preview = await queryClient.fetchQuery(
+              hostSessionRestorePreviewQuery(current.sessionId, current.receipt.changeId, context),
+            );
+            if (!preview.canRestore) {
+              setPendingAttendanceUndo({
+                ...current,
+                error: hostSessionRestoreBlockedExplanation(preview.blockedReason),
+              });
+              return;
+            }
+            await restoreChange({
+              sessionId: current.sessionId,
+              changeId: preview.changeId,
+              request: { expectedCurrentHash: preview.expectedCurrentHash },
+            });
+            setPendingAttendanceUndo(null);
+          } catch {
+            setPendingAttendanceUndo({
+              ...current,
+              error: "되돌리지 못했습니다. 변경 내역에서 다시 시도해 주세요.",
+            });
+          }
+        })();
+      },
+      onOpenHistory: () => {
+        const detailHref = view.nextMeeting?.detailHref ?? SESSIONS_HREF;
+        const url = new URL(detailHref, "https://readmates.invalid");
+        url.searchParams.set("section", "history");
+        void navigate(`${url.pathname}${url.search}`);
+      },
+      onDismiss: () => setPendingAttendanceUndo(null),
+    }
+    : null;
+
+  const meetingDayAttendance = meetingDaySessionId && meetingDayDetailQuery.data ? (
+    <MeetingResponseLedger
+      presentation="meetingDay"
+      rows={meetingResponseLedgerRowsFromAttendees(meetingDayDetailQuery.data.attendees)}
+      onAttendanceChange={(membershipId, attendance) => {
+        void commitMeetingDayAttendance([membershipId], attendance);
+      }}
+      onBulkAttendanceChange={(membershipIds, attendance) => {
+        void commitMeetingDayAttendance(membershipIds, attendance);
+      }}
+      pendingUndo={meetingDayPendingUndo}
+    />
+  ) : null;
+
   const nextMeetingBlock = useMemo(() => {
     if (!view.nextMeeting) {
       return (
@@ -166,6 +285,7 @@ export function HostDashboardRoute({
     <HostTodayPage
       view={view}
       nextMeetingBlock={nextMeetingBlock}
+      meetingDayAttendance={meetingDayAttendance}
       widgetErrors={queueWidgetError ? { queue: true } : undefined}
       onRetryQueue={() => {
         if (attentionError) {
