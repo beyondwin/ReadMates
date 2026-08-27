@@ -102,7 +102,12 @@ describe("AdminNotificationsPage", () => {
   it("renders summary and failure clusters", () => {
     renderPage();
 
+    expect(screen.getByText("운영 · 배달")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "알림 / Outbox 운영" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "실패 클러스터" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "재발송" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "발송 대기 장부" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "배달 장부" })).toBeInTheDocument();
     expect(screen.getByText("Outbox pending")).toBeInTheDocument();
     expect(screen.getAllByText("mailbox_unavailable").length).toBeGreaterThan(0);
   });
@@ -158,7 +163,7 @@ describe("AdminNotificationsPage", () => {
 
   it("renders masked recipients without raw email fixture", () => {
     const { container } = renderPage();
-    const deliveryLedger = screen.getByRole("region", { name: "Delivery ledger" });
+    const deliveryLedger = screen.getByRole("region", { name: "배달 장부" });
 
     expect(within(deliveryLedger).getByText(/m\*\*\*@example.com/)).toBeInTheDocument();
     expect(container.textContent).not.toContain("member1@example.com");

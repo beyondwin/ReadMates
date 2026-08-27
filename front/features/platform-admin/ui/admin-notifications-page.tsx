@@ -5,6 +5,7 @@ import type {
   AdminNotificationReplayPreview,
   AdminNotificationReplayConfirmResult,
 } from "@/features/platform-admin/model/platform-admin-notifications-model";
+import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
 import { AdminEvidenceLedger } from "./admin-evidence-ledger";
 import { AdminPageContext } from "./admin-page-context";
 import { AdminReceiptTimeline } from "./admin-receipt-timeline";
@@ -65,7 +66,7 @@ export function AdminNotificationsPage({
   return (
     <section className="admin-notifications">
       <AdminPageContext
-        eyebrow="S5 Operations"
+        eyebrow={ADMIN_COPY.eyebrow.notifications}
         heading="알림 / Outbox 운영"
         freshness={snapshot ? `생성 ${formatTimestamp(snapshot.generatedAt)}` : "요약을 불러오지 못함"}
         authority={canReplay ? "재처리 가능" : "재처리 권한 없음"}
@@ -86,7 +87,7 @@ export function AdminNotificationsPage({
 
         <div className="admin-notifications__grid">
           <section className="admin-notifications__panel" aria-labelledby="admin-notifications-failures-title">
-            <h2 id="admin-notifications-failures-title" className="h3 editorial">Failure clusters</h2>
+            <h2 id="admin-notifications-failures-title" className="h3 editorial">{ADMIN_COPY.heading.failureClusters}</h2>
             {snapshot?.failureClusters.length ? (
               <ul className="admin-notifications__cluster-list">
                 {snapshot.failureClusters.map((cluster) => (
@@ -104,7 +105,7 @@ export function AdminNotificationsPage({
 
           <section className="admin-notifications__panel" aria-labelledby="admin-notifications-replay-title">
             <div className="admin-notifications__panel-heading">
-              <h2 id="admin-notifications-replay-title" className="h3 editorial">Replay</h2>
+              <h2 id="admin-notifications-replay-title" className="h3 editorial">{ADMIN_COPY.heading.replay}</h2>
             </div>
             {replayPreview ? (
               <div className="admin-notifications__preview">
@@ -165,7 +166,7 @@ export function AdminNotificationsPage({
         </div>
 
         <AdminEvidenceLedger
-          label="Outbox ledger"
+          label="발송 대기 장부"
           count={events.length > 0 ? events.length : undefined}
           state={events.length > 0 ? "ready" : "empty"}
           title={events.length > 0 ? undefined : "표시할 outbox event가 없습니다."}
@@ -194,7 +195,7 @@ export function AdminNotificationsPage({
         </AdminEvidenceLedger>
 
         <AdminEvidenceLedger
-          label="Delivery ledger"
+          label="배달 장부"
           count={deliveries.length > 0 ? deliveries.length : undefined}
           state={deliveries.length > 0 ? "ready" : "empty"}
           title={deliveries.length > 0 ? undefined : "표시할 delivery가 없습니다."}
