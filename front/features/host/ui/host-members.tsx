@@ -1,5 +1,4 @@
 import { type CSSProperties, useMemo, useRef, useState } from "react";
-import { useInRouterContext, useLocation } from "react-router";
 import type {
   CurrentSessionPolicy,
   HostInvitationListItem,
@@ -13,7 +12,6 @@ import {
   type HostMembersActions,
 } from "@/features/host/model/host-member-actions";
 import type { HostInvitationsActions } from "@/features/host/model/host-invitation-actions";
-import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { LifecyclePolicyDialog } from "./members/member-approval-actions";
 import { actionKey, disabledProfileReason, isMembershipPending } from "./members/member-action-rules";
 import { MemberActionButton } from "./members/member-list";
@@ -27,7 +25,6 @@ import { MemberTabPanel } from "./members/member-tab-panel";
 import type {
   HostMemberLifecyclePath,
   HostMembersLinkComponent,
-  HostMembersLinkProps,
   HostViewerAction,
   LifecycleDialog,
   MemberTab,
@@ -40,34 +37,9 @@ type HostMembersProps = {
   actions: HostMembersActions;
   initialInvitations: HostInvitationListPage | HostInvitationListItem[];
   invitationActions: HostInvitationsActions;
+  /** Kept for route API compatibility; Stage 5 absorbed invitations into this page (no outbound link). */
   LinkComponent?: HostMembersLinkComponent;
 };
-
-function RouterScopedDefaultLink({ to, children, ...props }: HostMembersLinkProps) {
-  const location = useLocation();
-
-  return (
-    <a {...props} href={scopedAppLinkTarget(location.pathname, to)}>
-      {children}
-    </a>
-  );
-}
-
-function DefaultLinkComponent(props: HostMembersLinkProps) {
-  const inRouter = useInRouterContext();
-
-  if (inRouter) {
-    return <RouterScopedDefaultLink {...props} />;
-  }
-
-  const { to, children, ...anchorProps } = props;
-
-  return (
-    <a {...anchorProps} href={scopedAppLinkTarget(globalThis.location.pathname, to)}>
-      {children}
-    </a>
-  );
-}
 
 type MemberRowsState = {
   source: HostMemberListItem[];
@@ -86,7 +58,6 @@ export default function HostMembers({
   actions,
   initialInvitations,
   invitationActions,
-  LinkComponent: _LinkComponent = DefaultLinkComponent,
 }: HostMembersProps) {
   const initialPage = useMemo(() => normalizeMemberPage(initialMembers), [initialMembers]);
   const initialMembersItems = initialPage.items;

@@ -117,20 +117,22 @@ test("host activates viewer into full member", async ({ page }) => {
 
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto("/app/host/members");
-  await page.getByRole("tab", { name: "둘러보기 멤버" }).click();
 
-  const viewerRow = page.getByRole("article").filter({ hasText: viewerEmail });
+  const pendingZone = page.getByRole("region", { name: "가입 승인 대기" });
+  const viewerRow = pendingZone.getByRole("article").filter({ hasText: viewerEmail });
   await expect(viewerRow).toContainText("둘러보기 멤버");
 
   const activateResponse = page.waitForResponse(
     (response) => response.url().includes("/api/bff/api/host/members/") && response.url().includes("/activate") && response.status() === 200,
   );
-  await viewerRow.getByRole("button", { name: "정식 멤버로 전환" }).click();
+  await viewerRow.getByRole("button", { name: "승인" }).click();
   await activateResponse;
 
   await expect(page.getByRole("status")).toContainText("정식 멤버로 전환했습니다.");
+  await expect(page.getByRole("region", { name: "가입 승인 대기" })).toHaveCount(0);
+  const displayName = viewerEmail.split("@")[0] ?? viewerEmail;
   await page.getByRole("tab", { name: "활성 멤버" }).click();
-  await expect(page.getByRole("article").filter({ hasText: viewerEmail })).toContainText("정식 멤버");
+  await expect(page.getByRole("row").filter({ hasText: displayName })).toContainText("활동");
 
   await page.evaluate(async () => {
     const response = await fetch("/api/bff/api/auth/logout", { method: "POST" });
