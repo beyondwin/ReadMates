@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/experimental-ct-react";
+import type { Locator, Page } from "@playwright/test";
+import type { ReactElement } from "react";
 import type { SessionClosingBoardView } from "@/features/host/model/session-closing-model";
+import {
+  VISUAL_AUTHORITY_VIEWPORTS,
+  expectNoHorizontalOverflow,
+  expectReducedMotion,
+} from "@/tests/e2e/support/visual-authority-contract";
 import { SessionClosingBoard } from "./session-closing-board";
 
 const blockedView: SessionClosingBoardView = {
@@ -16,7 +23,7 @@ const blockedView: SessionClosingBoardView = {
   checklist: [
     {
       id: "SESSION_CLOSED",
-      label: "세션 종료",
+      label: "출석 확정",
       detail: "세션은 닫혔습니다.",
       state: "DONE",
       stateLabel: "완료",
@@ -38,8 +45,30 @@ const blockedView: SessionClosingBoardView = {
     },
     {
       id: "FEEDBACK_DOCUMENT_READY",
-      label: "피드백 문서 준비",
+      label: "소감 수집",
       detail: "피드백 문서 parser 상태를 확인해야 합니다.",
+      state: "BLOCKED",
+      stateLabel: "차단",
+      tone: "danger",
+      href: null,
+      actionLabel: "상태 확인",
+      completedStamp: null,
+    },
+    {
+      id: "MEMBER_NOTIFICATION_SENT",
+      label: "멤버 알림",
+      detail: "멤버 알림이 아직 발송되지 않았습니다.",
+      state: "ACTION_REQUIRED",
+      stateLabel: "조치 필요",
+      tone: "warn",
+      href: "/app/host/notifications",
+      actionLabel: "수동 발송",
+      completedStamp: null,
+    },
+    {
+      id: "PUBLIC_RECORD_VISIBLE",
+      label: "공개 기록",
+      detail: "공개 표면에는 아직 발행되지 않았습니다.",
       state: "BLOCKED",
       stateLabel: "차단",
       tone: "danger",
@@ -56,7 +85,6 @@ const blockedView: SessionClosingBoardView = {
       tone: "danger",
       href: "/app/host/sessions/11111111-1111-1111-1111-111111111111/edit",
       actionLabel: "호스트 문서 확인",
-      completedStamp: null,
     },
     {
       id: "MEMBER",
@@ -65,7 +93,6 @@ const blockedView: SessionClosingBoardView = {
       tone: "muted",
       href: null,
       actionLabel: "멤버 회고 확인",
-      completedStamp: null,
     },
     {
       id: "PUBLIC",
@@ -74,7 +101,6 @@ const blockedView: SessionClosingBoardView = {
       tone: "muted",
       href: null,
       actionLabel: "공개 기록 확인",
-      completedStamp: null,
     },
   ],
   evidence: [
@@ -100,7 +126,7 @@ const publishedView: SessionClosingBoardView = {
   checklist: [
     {
       id: "SESSION_CLOSED",
-      label: "세션 종료",
+      label: "출석 확정",
       detail: "세션은 닫혔습니다.",
       state: "DONE",
       stateLabel: "완료",
@@ -122,7 +148,7 @@ const publishedView: SessionClosingBoardView = {
     },
     {
       id: "FEEDBACK_DOCUMENT_READY",
-      label: "피드백 문서 준비",
+      label: "소감 수집",
       detail: "피드백 문서를 멤버가 열람할 수 있습니다.",
       state: "DONE",
       stateLabel: "완료",
@@ -130,6 +156,28 @@ const publishedView: SessionClosingBoardView = {
       href: "/app/feedback/22222222-2222-2222-2222-222222222222",
       actionLabel: "확인하기",
       completedStamp: "열람 가능",
+    },
+    {
+      id: "MEMBER_NOTIFICATION_SENT",
+      label: "멤버 알림",
+      detail: "멤버 알림이 발송되었습니다.",
+      state: "DONE",
+      stateLabel: "완료",
+      tone: "ok",
+      href: "/app/host/notifications",
+      actionLabel: "확인하기",
+      completedStamp: "발송됨",
+    },
+    {
+      id: "PUBLIC_RECORD_VISIBLE",
+      label: "공개 기록",
+      detail: "공개 기록 표면에서 발행 상태를 확인할 수 있습니다.",
+      state: "DONE",
+      stateLabel: "완료",
+      tone: "ok",
+      href: "/sessions/22222222-2222-2222-2222-222222222222",
+      actionLabel: "확인하기",
+      completedStamp: "노출됨",
     },
   ],
   surfaces: [
@@ -140,7 +188,6 @@ const publishedView: SessionClosingBoardView = {
       tone: "ok",
       href: "/app/host/sessions/22222222-2222-2222-2222-222222222222/edit",
       actionLabel: "호스트 문서 확인",
-      completedStamp: null,
     },
     {
       id: "MEMBER",
@@ -149,7 +196,6 @@ const publishedView: SessionClosingBoardView = {
       tone: "ok",
       href: "/app/sessions/22222222-2222-2222-2222-222222222222",
       actionLabel: "멤버 회고 확인",
-      completedStamp: null,
     },
     {
       id: "PUBLIC",
@@ -158,7 +204,6 @@ const publishedView: SessionClosingBoardView = {
       tone: "ok",
       href: "/sessions/22222222-2222-2222-2222-222222222222",
       actionLabel: "공개 기록 확인",
-      completedStamp: null,
     },
   ],
   evidence: [
@@ -170,20 +215,32 @@ const publishedView: SessionClosingBoardView = {
   ],
 };
 
-test("SessionClosingBoard renders blocked host closing state", async ({ mount, page }) => {
-  await page.setViewportSize({ width: 480, height: 900 });
+async function mountEmbeddedClosing(
+  mount: (component: ReactElement) => Promise<Locator>,
+  page: Page,
+  view: SessionClosingBoardView,
+  viewport: { width: number; height: number },
+) {
+  await page.setViewportSize(viewport);
+  await page.emulateMedia({ colorScheme: "light" });
   const component = await mount(
     <div style={{ width: "100%" }}>
-      <SessionClosingBoard view={blockedView} />
+      <SessionClosingBoard view={view} embedded />
     </div>,
   );
+  await expectReducedMotion(page);
+  return component;
+}
 
-  expect(await page.evaluate(() => window.innerWidth)).toBe(480);
-  expect(await component.locator(".rm-host-closing-board__surfaces").evaluate((element) =>
-    getComputedStyle(element).gridTemplateColumns.split(" ").length,
-  )).toBe(1);
-  expect(await component.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+async function assertEmbeddedClosing(component: Locator, page: Page) {
+  await expect(component.getByRole("region", { name: "장부 마감 체크리스트" })).toBeVisible();
+  await expect(component.getByText("장부 마감")).toBeVisible();
+  await expect(component.getByRole("heading", { level: 1 })).toHaveCount(0);
+  await expect(component.getByText("이번 모임 다음 조치")).toHaveCount(0);
+  await expect(component.getByText("마감 증거")).toHaveCount(0);
+  await expect(component.getByText("호스트 문서 / 멤버 회고 / 공개 기록")).toHaveCount(0);
+  await expect(component.locator(".rm-host-closing-board__checklist-item")).toHaveCount(5);
+  await expectNoHorizontalOverflow(page);
 
   for (const copy of await component.locator(".rm-host-closing-board__checklist-item .small").all()) {
     const fontSize = await copy.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
@@ -193,39 +250,40 @@ test("SessionClosingBoard renders blocked host closing state", async ({ mount, p
     const fontSize = await action.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
     expect(fontSize).toBeGreaterThanOrEqual(14);
   }
-  for (const copy of await component.locator(".rm-host-closing-board__surface .body").all()) {
-    const fontSize = await copy.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
-    expect(fontSize).toBeGreaterThanOrEqual(16);
-  }
-  await expect(component).toHaveScreenshot("host-closing-board-blocked.png");
+}
+
+test("Embedded closing checklist locks blocked state at 1440", async ({ mount, page }) => {
+  const component = await mountEmbeddedClosing(mount, page, blockedView, VISUAL_AUTHORITY_VIEWPORTS.desktopWide);
+  await assertEmbeddedClosing(component, page);
+  await expect(component).toHaveScreenshot("host-closing-embedded-blocked-1440.png");
 });
 
-test("SessionClosingBoard renders published host closing state", async ({ mount, page }) => {
-  await page.setViewportSize({ width: 480, height: 900 });
-  const component = await mount(
-    <div style={{ width: "100%" }}>
-      <SessionClosingBoard view={publishedView} />
-    </div>,
-  );
+test("Embedded closing checklist locks published state at 900", async ({ mount, page }) => {
+  const component = await mountEmbeddedClosing(mount, page, publishedView, VISUAL_AUTHORITY_VIEWPORTS.tablet);
+  await assertEmbeddedClosing(component, page);
+  await expect(component).toHaveScreenshot("host-closing-embedded-published-900.png");
+});
 
-  expect(await page.evaluate(() => window.innerWidth)).toBe(480);
-  expect(await component.locator(".rm-host-closing-board__surfaces").evaluate((element) =>
-    getComputedStyle(element).gridTemplateColumns.split(" ").length,
-  )).toBe(1);
-  expect(await component.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+test("Embedded closing checklist locks blocked state at 768", async ({ mount, page }) => {
+  const component = await mountEmbeddedClosing(mount, page, blockedView, VISUAL_AUTHORITY_VIEWPORTS.tabletNarrow);
+  await assertEmbeddedClosing(component, page);
+  await expect(component).toHaveScreenshot("host-closing-embedded-blocked-768.png");
+});
 
-  for (const copy of await component.locator(".rm-host-closing-board__checklist-item .small").all()) {
-    const fontSize = await copy.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
-    expect(fontSize).toBeGreaterThanOrEqual(14);
-  }
-  for (const action of await component.locator(".rm-host-closing-board__checklist-item a").all()) {
-    const fontSize = await action.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
-    expect(fontSize).toBeGreaterThanOrEqual(14);
-  }
-  for (const copy of await component.locator(".rm-host-closing-board__surface .body").all()) {
-    const fontSize = await copy.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
-    expect(fontSize).toBeGreaterThanOrEqual(16);
-  }
-  await expect(component).toHaveScreenshot("host-closing-board-published.png");
+test("Embedded closing checklist locks published state at 390", async ({ mount, page }) => {
+  const component = await mountEmbeddedClosing(mount, page, publishedView, VISUAL_AUTHORITY_VIEWPORTS.mobile);
+  await assertEmbeddedClosing(component, page);
+  await expect(component).toHaveScreenshot("host-closing-embedded-published-390.png");
+});
+
+test("Embedded closing checklist locks blocked state at 320", async ({ mount, page }) => {
+  const component = await mountEmbeddedClosing(mount, page, blockedView, VISUAL_AUTHORITY_VIEWPORTS.mobileNarrow);
+  await assertEmbeddedClosing(component, page);
+  await expect(component).toHaveScreenshot("host-closing-embedded-blocked-320.png");
+});
+
+test("Embedded closing checklist stays inside the 1024 viewport matrix", async ({ mount, page }) => {
+  const component = await mountEmbeddedClosing(mount, page, publishedView, VISUAL_AUTHORITY_VIEWPORTS.desktop);
+  await assertEmbeddedClosing(component, page);
+  expect(await page.evaluate(() => window.innerWidth)).toBe(1024);
 });

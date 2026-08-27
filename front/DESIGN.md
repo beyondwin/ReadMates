@@ -3,8 +3,9 @@
 이 문서는 현재 코드·테스트·tracked screenshot이 구현한 host/admin 시각 권위다.
 승인 설계나 미구현 목표를 적지 않는다. Public, guest, member composition은 이 문서로 바꾸지 않는다.
 
-- ADR-0044: 호스트 현재 모임 Focus Deck
+- ADR-0044: 호스트 현재 모임 Focus Deck(주 행동 계산 — 다이어리형에 계승)
 - ADR-0045: host Focus Deck + admin Editorial Operations Ledger
+- ADR-0046: 오늘 트리아지 + 모임 다이어리 재구성(Proposed — Stage 6에서 Accept)
 - Token source: `design/system/src/styles/tokens.css`
 - Viewport contract: `front/tests/e2e/support/visual-authority-contract.ts`
 
@@ -43,32 +44,34 @@ Host와 platform admin은 같은 paper/ink primitive를 쓴다. Role-only palett
 3. hero — 다음 모임 / 모임 당일(`오늘 모임` + primary `출석 확인 열기` → `section=attendance`) / empty(`첫 모임 만들기`)
 4. `aside "참고"` — 다가오는 일정, 클럽 상태 definition list, `운영 기록 전체 보기` quiet link (desktop rail; mobile below)
 
-오늘형은 KPI 타일·균등 카드 그리드가 아니다. Focus Deck 레이아웃을 복제하지 않는다.
+오늘형은 KPI 타일·균등 카드 그리드가 아니다. 다이어리형 레이아웃을 복제하지 않는다.
 Lifecycle 상태 문구는 `hostMeetingLifecycleLabel`만 쓴다: `작성 중` / `준비 중` / `기록 정리 중` / `게시됨`.
 
-오늘형 CT 스크린샷 잠금 대상은 아직 없다(홈 CT 부재). Focus Deck CT 재잠금과 오늘형 baseline은 4단계(모임 다이어리)와 함께 일괄 수행한다.
+오늘형 CT 스크린샷 잠금 대상은 아직 없다(홈 CT 부재).
 
-## Host Focus Deck
+## Host Meeting Diary
 
-적용 범위는 특정 모임 canonical 경로뿐이다. 페이지 타입은 현행 Focus Deck(4단계에서 다이어리형으로 재조립 예정)이다.
+적용 범위는 특정 모임 canonical 경로뿐이다. 페이지 타입은 다이어리형이다(ADR-0044 Focus Deck을 스프레드로 재조립; ADR-0046은 아직 Proposed).
 
 `/clubs/:slug/app/host/sessions/:sessionId` (등록 host의 `/app/host/sessions/:sessionId`)
 
-`HostMeetingWorkspaceRoute`가 auth, base detail, URL, panel query, mutation, receipt, authority-loss purge를 소유한다.
-`HostMeetingWorkspace`는 `HostSessionWorkspace`를 page-level Focus Deck으로 조립한다. DOM 순서:
+`HostMeetingWorkspaceRoute`가 auth, base detail, URL, panel query, mutation, receipt, closing-status, authority-loss purge를 소유한다.
+`HostMeetingWorkspace`는 `HostSessionWorkspace`를 `.rm-meeting-diary` 스프레드로 조립한다. DOM 순서:
 
-1. meeting header — 회차, 제목, 날짜·장소, 상태 문구
-2. `region "지금 할 일"` — 한 개의 primary CTA와 이유
-3. `region "진행 목록"` — identity, 응답, 출석, 기록, 공개 사실(3~5개)
-4. `navigation "관련 작업"` — 정보·응답·출석·기록·알림·변경 내역 deep link
-5. undo/recovery — 최근 변경, 충돌, public convergence
-6. info/attendance/records/history/notification panel 또는 sheet
+1. optional `navigation "이전·다음 모임"` — 인접 모임 pager
+2. left page — 모임 identity(`WorkspaceHeader`), `멤버 시야로 보기`, `group "공개 상태"`, `navigation "모임의 걸음"`(6단계 세로 타임라인)
+3. `region "지금 할 일"` — 한 개의 primary CTA와 이유(ADR-0044 계산 규칙 유지)
+4. step content — 기본 `region "진행 목록"`; CLOSED 기록 단계에서는 embedded `region "장부 마감 체크리스트"`(`SessionClosingBoard` `embedded`)
+5. `navigation "관련 작업"` — 정보·응답·출석·기록·알림·변경 내역 deep link
+6. undo/recovery — 최근 변경, 충돌, public convergence
+7. info/attendance/records/history/notification panel 또는 sheet
 
+타임라인 단계명(§4.2 고정): `모임 만들기` → `멤버와 준비` → `응답 모으는 중` → `모임 당일(출석)` → `기록 정리` → `기록 게시`.
 Page-level local task navigation과 judgment complementary rail은 primary composition이 아니다.
-모임 header는 `WorkspaceHeader`와 `rm-host-session-workspace__*`다.
+`/closing`은 다이어리 기록 정리 단계(`section=records`)로 착지한다.
 
-List, new, members, notifications는 같은 token과 state grammar를 쓰되 Focus Deck·오늘형 레이아웃을 복제하지 않는다.
-지운 모임 URL은 Focus Deck이 아니라 `WorkspaceTrashTombstone`이다.
+List, new, members, notifications는 같은 token과 state grammar를 쓰되 다이어리·오늘형 레이아웃을 복제하지 않는다.
+지운 모임 URL은 다이어리가 아니라 `WorkspaceTrashTombstone`이다.
 
 ### Status and primary action
 
@@ -152,11 +155,12 @@ Tracked screenshots는 대표 상태만 잠근다. 1024px는 viewport contract�
 
 | Owner | File | Locks |
 | --- | --- | --- |
-| host CT | `front/__screenshots__/features/host/ui/meeting-workspace/host-focus-deck.ct.tsx/` | `focus-deck-draft-1440.png`, `focus-deck-open-900.png`, `focus-deck-closed-768.png`, `focus-deck-published-390.png`, `focus-deck-readiness-pending-320.png` |
-| host today CT | _(없음 — 오늘형 baseline 미잠금)_ | 4단계 다이어리와 함께 Focus Deck CT 재잠금·오늘형 CT를 일괄 수행 |
+| host diary CT | `front/__screenshots__/features/host/ui/meeting-workspace/host-focus-deck.ct.tsx/` | `diary-draft-1440.png`, `diary-open-900.png`, `diary-closed-768.png`, `diary-published-390.png`, `diary-readiness-pending-320.png` (1024는 매트릭스만, PNG 없음) |
+| host closing CT | `front/__screenshots__/features/host/ui/session-closing-board.ct.tsx/` | `host-closing-embedded-blocked-1440.png`, `host-closing-embedded-published-900.png`, `host-closing-embedded-blocked-768.png`, `host-closing-embedded-published-390.png`, `host-closing-embedded-blocked-320.png` (1024는 매트릭스만) |
+| host today CT | _(없음 — 오늘형 baseline 미잠금)_ | — |
 | admin CT | `front/__screenshots__/features/platform-admin/ui/admin-editorial-ledger.ct.tsx/` | `editorial-ledger-today-1440.png`, `editorial-ledger-clubs-900.png`, `editorial-ledger-service-768.png`, `editorial-ledger-review-390.png`, `editorial-ledger-case-detail-320.png` |
 
-Chromium, Firefox, mobile WebKit smoke는 host Focus Deck과 admin Today/Clubs/Service/Review 대표 흐름이다.
+Chromium, Firefox, mobile WebKit smoke는 host 다이어리 스프레드와 admin Today/Clubs/Service/Review 대표 흐름이다.
 VoiceOver/Safari와 NVDA/Chrome 수동 결과는 `docs/reports/host-admin-visual-authority-accessibility-evidence-template.md`에 따라 `not measured`다.
 
 이 시각 권위 작업은 server API·schema·auth 계약을 바꾸지 않는다.

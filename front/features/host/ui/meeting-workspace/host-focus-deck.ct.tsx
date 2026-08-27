@@ -34,7 +34,7 @@ const STICKY_IN_FLOW_STYLE = `
   }
 `;
 
-async function mountFocusDeck(
+async function mountDiarySpread(
   mount: (component: ReactElement) => Promise<Locator>,
   page: Page,
   fixture: FocusDeckFixture,
@@ -70,16 +70,20 @@ async function visiblePrimary(component: Locator) {
   return component.locator(".rm-host-session-workspace__cta--mobile");
 }
 
-async function assertFocusDeck(
+async function assertDiarySpread(
   component: Locator,
   page: Page,
   expected: { status: string; action: string },
 ) {
+  await expect(component.locator(".rm-meeting-diary")).toHaveCount(1);
   await expect(component.getByRole("heading", { level: 1 })).toContainText(FOCUS_DECK_TITLE);
   await expect(component.getByText(expected.status, { exact: true })).toBeVisible();
+  await expect(component.getByRole("navigation", { name: "모임의 걸음" })).toBeVisible();
+  await expect(component.getByRole("navigation", { name: "모임의 걸음" }).getByRole("listitem")).toHaveCount(6);
   await expect(component.getByRole("region", { name: "지금 할 일" })).toBeVisible();
   await expect(component.getByRole("region", { name: "진행 목록" })).toBeVisible();
   await expect(component.getByRole("navigation", { name: "관련 작업" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "멤버 시야로 보기" })).toBeVisible();
   await expect(component.getByRole("tablist")).toHaveCount(0);
   for (const name of FOLIO_LANDMARKS) {
     await expect(component.getByRole("navigation", { name })).toHaveCount(0);
@@ -93,7 +97,7 @@ async function assertFocusDeck(
   await expectNoHorizontalOverflow(page);
 }
 
-async function lockFocusDeckScreenshot(component: Locator, name: string) {
+async function lockDiaryScreenshot(component: Locator, name: string) {
   await component.evaluate((root) => {
     for (const element of root.querySelectorAll<HTMLElement>(
       ".rm-host-session-workspace__sticky-cta, .rm-host-session-workspace__footer-cta",
@@ -104,72 +108,78 @@ async function lockFocusDeckScreenshot(component: Locator, name: string) {
   await expect(component).toHaveScreenshot(name, { style: STICKY_IN_FLOW_STYLE });
 }
 
-async function assertFocusDeckFocus(
+async function assertDiaryFocus(
   component: Locator,
   expected: { action: string; focusPrimary?: boolean },
 ) {
   const focusTarget = expected.focusPrimary === false
-    ? component.getByRole("link", { name: "참석 응답" })
+    ? component.getByRole("navigation", { name: "관련 작업" }).getByRole("link", { name: "참석 응답", exact: true })
     : await visiblePrimary(component);
   await focusTarget.focus();
   await expectVisibleFocus(focusTarget);
 }
 
-test("Focus Deck DRAFT locks the 1440 wide editorial composition", async ({ mount, page }) => {
-  const component = await mountFocusDeck(mount, page, draftFocusDeck, VISUAL_AUTHORITY_VIEWPORTS.desktopWide);
-  await assertFocusDeck(component, page, { status: "작성 중", action: "멤버와 준비 시작" });
-  await lockFocusDeckScreenshot(component, "focus-deck-draft-1440.png");
-  await assertFocusDeckFocus(component, { action: "멤버와 준비 시작" });
+test("Diary spread DRAFT locks the 1440 wide editorial composition", async ({ mount, page }) => {
+  const component = await mountDiarySpread(mount, page, draftFocusDeck, VISUAL_AUTHORITY_VIEWPORTS.desktopWide);
+  await assertDiarySpread(component, page, { status: "작성 중", action: "멤버와 준비 시작" });
+  await lockDiaryScreenshot(component, "diary-draft-1440.png");
+  await assertDiaryFocus(component, { action: "멤버와 준비 시작" });
 });
 
-test("Focus Deck OPEN locks the 900 tablet editorial composition", async ({ mount, page }) => {
-  const component = await mountFocusDeck(mount, page, openFocusDeck, VISUAL_AUTHORITY_VIEWPORTS.tablet);
-  await assertFocusDeck(component, page, { status: "준비 중", action: "실제 출석 확인" });
-  await expect(component.getByText("오늘이 모임일입니다.")).toBeVisible();
-  await lockFocusDeckScreenshot(component, "focus-deck-open-900.png");
-  await assertFocusDeckFocus(component, { action: "실제 출석 확인" });
+test("Diary spread OPEN locks the 900 tablet editorial composition", async ({ mount, page }) => {
+  const component = await mountDiarySpread(mount, page, openFocusDeck, VISUAL_AUTHORITY_VIEWPORTS.tablet);
+  await assertDiarySpread(component, page, { status: "준비 중", action: "실제 출석 확인" });
+  await expect(component.getByRole("region", { name: "진행 목록" }).getByText("오늘이 모임일입니다.")).toBeVisible();
+  await expect(
+    component.getByRole("navigation", { name: "모임의 걸음" }).locator('[aria-current="step"]'),
+  ).toContainText("모임 당일(출석)");
+  await lockDiaryScreenshot(component, "diary-open-900.png");
+  await assertDiaryFocus(component, { action: "실제 출석 확인" });
 });
 
-test("Focus Deck CLOSED locks the 768 tablet-narrow composition with recovery", async ({ mount, page }) => {
-  const component = await mountFocusDeck(mount, page, closedFocusDeck, VISUAL_AUTHORITY_VIEWPORTS.tabletNarrow);
-  await assertFocusDeck(component, page, { status: "기록 정리 중", action: "정리본 올리기" });
+test("Diary spread CLOSED locks the 768 tablet-narrow composition with recovery", async ({ mount, page }) => {
+  const component = await mountDiarySpread(mount, page, closedFocusDeck, VISUAL_AUTHORITY_VIEWPORTS.tabletNarrow);
+  await assertDiarySpread(component, page, { status: "기록 정리 중", action: "정리본 올리기" });
   await expect(component.getByText("최근 출석 변경을 되돌릴 수 있습니다.")).toBeVisible();
   await expect(component.getByRole("button", { name: "되돌리기" })).toBeVisible();
-  await lockFocusDeckScreenshot(component, "focus-deck-closed-768.png");
-  await assertFocusDeckFocus(component, { action: "정리본 올리기" });
+  await lockDiaryScreenshot(component, "diary-closed-768.png");
+  await assertDiaryFocus(component, { action: "정리본 올리기" });
 });
 
-test("Focus Deck PUBLISHED locks the 390 mobile composition", async ({ mount, page }) => {
-  const component = await mountFocusDeck(mount, page, publishedFocusDeck, VISUAL_AUTHORITY_VIEWPORTS.mobile);
-  await assertFocusDeck(component, page, { status: "게시됨", action: "공개 기록 보기" });
+test("Diary spread PUBLISHED locks the 390 mobile composition", async ({ mount, page }) => {
+  const component = await mountDiarySpread(mount, page, publishedFocusDeck, VISUAL_AUTHORITY_VIEWPORTS.mobile);
+  await assertDiarySpread(component, page, { status: "게시됨", action: "공개 기록 보기" });
   await expect(component.getByText("게스트·멤버 노트 게시 완료")).toHaveCount(0);
   await expect(component.getByText("공개 완료")).toHaveCount(0);
-  await lockFocusDeckScreenshot(component, "focus-deck-published-390.png");
-  await assertFocusDeckFocus(component, { action: "공개 기록 보기" });
+  await lockDiaryScreenshot(component, "diary-published-390.png");
+  await assertDiaryFocus(component, { action: "공개 기록 보기" });
 });
 
-test("Focus Deck pending readiness fail-closes the 320 mobile composition", async ({ mount, page }) => {
-  const component = await mountFocusDeck(
+test("Diary spread pending readiness fail-closes the 320 mobile composition", async ({ mount, page }) => {
+  const component = await mountDiarySpread(
     mount,
     page,
     readinessPendingFocusDeck,
     VISUAL_AUTHORITY_VIEWPORTS.mobileNarrow,
   );
-  await assertFocusDeck(component, page, { status: "기록 정리 중", action: "다음 할 일 확인 중" });
+  await assertDiarySpread(component, page, { status: "기록 정리 중", action: "다음 할 일 확인 중" });
   await expect(await visiblePrimary(component)).toBeDisabled();
   await expect(component.getByRole("button", { name: "정리본 올리기" })).toHaveCount(0);
   await expect(component.getByRole("button", { name: "게스트·멤버 노트에 기록 게시" })).toHaveCount(0);
-  await expect(component.getByText("모임 기록을 확인하는 중입니다.")).toBeVisible();
-  await lockFocusDeckScreenshot(component, "focus-deck-readiness-pending-320.png");
-  await assertFocusDeckFocus(component, { action: "다음 할 일 확인 중", focusPrimary: false });
+  await expect(
+    component.getByRole("region", { name: "진행 목록" }).getByText("모임 기록을 확인하는 중입니다."),
+  ).toBeVisible();
+  await lockDiaryScreenshot(component, "diary-readiness-pending-320.png");
+  await assertDiaryFocus(component, { action: "다음 할 일 확인 중", focusPrimary: false });
 });
 
-test("Focus Deck stays inside the remaining viewport matrix and 200 percent zoom", async ({ mount, page }) => {
-  const component = await mountFocusDeck(mount, page, openFocusDeck, VISUAL_AUTHORITY_VIEWPORTS.desktop);
-  await assertFocusDeck(component, page, { status: "준비 중", action: "실제 출석 확인" });
+test("Diary spread stays inside the remaining viewport matrix and 200 percent zoom", async ({ mount, page }) => {
+  const component = await mountDiarySpread(mount, page, openFocusDeck, VISUAL_AUTHORITY_VIEWPORTS.desktop);
+  await assertDiarySpread(component, page, { status: "준비 중", action: "실제 출석 확인" });
 
   await page.setViewportSize({ width: 512, height: 450 });
   await expect(component.getByRole("heading", { level: 1 })).toContainText(FOCUS_DECK_TITLE);
+  await expect(component.getByRole("navigation", { name: "모임의 걸음" })).toBeVisible();
   await expect(component.getByRole("region", { name: "지금 할 일" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await expectMinimumTargetSize(await visiblePrimary(component));

@@ -17,9 +17,16 @@ const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const PATH = `/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}`;
 
 function meeting(): HostSessionDetailResponse {
+  const meetingDate = new Date();
+  meetingDate.setDate(meetingDate.getDate() + 1);
+  const year = meetingDate.getFullYear();
+  const month = String(meetingDate.getMonth() + 1).padStart(2, "0");
+  const day = String(meetingDate.getDate()).padStart(2, "0");
   return {
     ...hostSessionDetailResponse(SESSION_ID),
     title: "긴 한글 모임 제목과 a deliberately long English meeting title",
+    date: `${year}-${month}-${day}`,
+    state: "OPEN",
     attendees: Array.from({ length: 500 }, (_, index) => ({
       membershipId: `synthetic-member-${index + 1}`,
       avatarKey: "banana-green-book",
@@ -54,6 +61,9 @@ test("host workspace keeps its essential semantics and keyboard path across focu
 
   await expect(page.getByRole("main")).toHaveCount(1);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("긴 한글 모임 제목");
+  await expect(page.locator(".rm-meeting-diary")).toHaveCount(1);
+  await expect(page.getByRole("navigation", { name: "모임의 걸음" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "모임의 걸음" }).getByRole("listitem")).toHaveCount(6);
   await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "관련 작업" })).toBeVisible();
   await expect(page.getByRole("region", { name: "진행 목록" })).toBeVisible();
@@ -62,13 +72,13 @@ test("host workspace keeps its essential semantics and keyboard path across focu
   await expect(page.getByRole("button", { name: "모임 작업 목차" })).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 
-  const responses = page.getByRole("link", { name: /참석 응답/ });
+  const responses = page.getByRole("navigation", { name: "관련 작업" }).getByRole("link", { name: "참석 응답", exact: true });
   await responses.click();
   await expect(page).toHaveURL(/section=responses/);
   const responsesSheet = page.getByRole("dialog", { name: "참석 응답" });
   await expect(responsesSheet).toBeVisible();
   await expect(responsesSheet).toHaveAttribute("aria-modal", "true");
-  await expect(page.locator(".rm-meeting-response-ledger__row")).toHaveCount(500);
+  await expect(responsesSheet.locator(".rm-meeting-response-ledger__row")).toHaveCount(500);
   await expect(page.getByRole("searchbox", { name: "참여자 검색" })).toBeVisible();
   await expect(page.getByRole("combobox", { name: /합성 독자 1 Reader with a long name 실제 출석/ })).toBeVisible();
 
@@ -87,7 +97,7 @@ test("host workspace keeps its essential semantics and keyboard path across focu
     await expect(trigger).toBeFocused();
     await expectMinimumTargetSize(page.locator(".rm-host-session-workspace__cta--mobile"));
   } else {
-    const attendance = page.getByRole("link", { name: /실제 출석/ });
+    const attendance = page.getByRole("navigation", { name: "관련 작업" }).getByRole("link", { name: /실제 출석/ });
     await attendance.focus();
     await expectVisibleFocus(attendance);
     await page.keyboard.press("Enter");

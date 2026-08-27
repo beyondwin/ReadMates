@@ -25,7 +25,7 @@
 
 .rm-host-closing-board__stamp {
   font-variant-numeric: tabular-nums;
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-family: var(--f-mono);
   color: var(--ok, var(--text-2));
   white-space: nowrap;
 }

@@ -35,23 +35,35 @@ async function openMeeting(page: Page, sessionId: string, search = "") {
   await expect(page.getByRole("heading", { level: 1, name: new RegExp(BOOK_TITLE) })).toBeVisible();
 }
 
-test("host sees one Focus Deck with related-work links and independent publication language", async ({ page }) => {
+test("host sees one diary spread with timeline, related-work links, and independent publication language", async ({ page }) => {
+  const meetingDate = new Date();
+  meetingDate.setDate(meetingDate.getDate() + 1);
+  const meetingDateIso = [
+    meetingDate.getFullYear(),
+    String(meetingDate.getMonth() + 1).padStart(2, "0"),
+    String(meetingDate.getDate()).padStart(2, "0"),
+  ].join("-");
   const sessionId = createHostSessionFixture({
     number: 27,
     bookTitle: BOOK_TITLE,
     state: "OPEN",
-    date: "2026-08-25",
+    date: meetingDateIso,
   });
   await openMeeting(page, sessionId);
 
   await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
   await expect(page.getByRole("main")).toHaveCount(1);
+  await expect(page.locator(".rm-meeting-diary")).toHaveCount(1);
   await expect(page.locator(".rm-host-session-workspace")).toHaveCount(1);
+  await expect(page.getByRole("navigation", { name: "모임의 걸음" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "모임의 걸음" }).getByRole("listitem")).toHaveCount(6);
   await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "관련 작업" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /참석 응답/ })).toHaveAttribute("href", /section=responses/);
-  await expect(page.getByRole("region", { name: "진행 목록" })).toContainText("게스트·멤버");
-  await expect(page.getByRole("region", { name: "진행 목록" })).toContainText("공개 기록에 게시 안 됨");
+  await expect(
+    page.getByRole("navigation", { name: "관련 작업" }).getByRole("link", { name: "참석 응답", exact: true }),
+  ).toHaveAttribute("href", /section=responses/);
+  await expect(page.getByRole("group", { name: "공개 상태" })).toContainText("게스트·멤버");
+  await expect(page.getByRole("group", { name: "공개 상태" })).toContainText("공개 기록에 게시 안 됨");
   await expect(page.getByRole("tablist")).toHaveCount(0);
   await expect(page.getByText(/\d+\/\d+ 완료/)).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: "현재 모임 작업" })).toHaveCount(0);
@@ -60,7 +72,7 @@ test("host sees one Focus Deck with related-work links and independent publicati
   await expectNoHorizontalOverflow(page);
   await expectMinimumTargetSize(page.locator(".rm-host-session-workspace__cta--desktop"));
 
-  const attendance = page.getByRole("link", { name: /실제 출석/ });
+  const attendance = page.getByRole("navigation", { name: "관련 작업" }).getByRole("link", { name: /실제 출석/ });
   await attendance.focus();
   await expectVisibleFocus(attendance);
   await attendance.click();
@@ -69,16 +81,23 @@ test("host sees one Focus Deck with related-work links and independent publicati
   await expect(attendanceSheet).toBeVisible();
   await expect(attendanceSheet).toHaveAttribute("aria-modal", "true");
   await expect(attendanceSheet.getByRole("heading", { name: "출석", exact: true })).toBeVisible();
+  await expect(page.locator(".rm-meeting-diary")).toHaveCount(1);
   await expect(page.locator(".rm-host-session-workspace")).toHaveCount(1);
   await expect(page.getByRole("main")).toHaveCount(1);
 });
 
 test("mobile info sheet is modal, keyboard-dismissible, and restores its trigger", async ({ page }) => {
+  const meetingDate = new Date();
+  meetingDate.setDate(meetingDate.getDate() + 1);
   const sessionId = createHostSessionFixture({
     number: 28,
     bookTitle: BOOK_TITLE,
     state: "OPEN",
-    date: "2026-08-25",
+    date: [
+      meetingDate.getFullYear(),
+      String(meetingDate.getMonth() + 1).padStart(2, "0"),
+      String(meetingDate.getDate()).padStart(2, "0"),
+    ].join("-"),
   });
   await page.setViewportSize(VISUAL_AUTHORITY_VIEWPORTS.mobileNarrow);
   await openMeeting(page, sessionId);
@@ -111,7 +130,11 @@ test("record panel failure does not remove basic meeting work and exposes retry"
   await openMeeting(page, sessionId, "?section=records");
   await expect(page.getByText("모임 기록을 불러오지 못했습니다.")).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toContainText(BOOK_TITLE);
+  await expect(page.locator(".rm-meeting-diary")).toHaveCount(1);
+  await expect(page.getByRole("navigation", { name: "모임의 걸음" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "관련 작업" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "참석 응답" })).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "관련 작업" }).getByRole("link", { name: "참석 응답", exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("dialog", { name: "모임 기록" }).getByRole("button", { name: "모임 기록 다시 시도" })).toBeVisible();
 });

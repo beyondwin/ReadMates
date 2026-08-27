@@ -116,7 +116,7 @@ describe("HostMeetingWorkspace", () => {
 
   it("omits the session pager when adjacent ids are absent", () => {
     render(<HostMeetingWorkspace {...props} />);
-    expect(screen.queryByRole("navigation", { name: "회차" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "이전·다음 모임" })).not.toBeInTheDocument();
   });
 
   it("renders the session pager only for provided adjacent sessions", () => {
@@ -129,7 +129,7 @@ describe("HostMeetingWorkspace", () => {
         }}
       />,
     );
-    const pager = screen.getByRole("navigation", { name: "회차" });
+    const pager = screen.getByRole("navigation", { name: "이전·다음 모임" });
     expect(within(pager).getByRole("link", { name: "No.11" })).toHaveAttribute(
       "href",
       "/app/host/sessions/prev",

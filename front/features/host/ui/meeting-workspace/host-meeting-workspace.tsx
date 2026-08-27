@@ -106,7 +106,7 @@ function MeetingDiaryPager({
   if (!previous && !next) return null;
 
   return (
-    <nav className="rm-meeting-diary__pager" aria-label="회차">
+    <nav className="rm-meeting-diary__pager" aria-label="이전·다음 모임">
       <span className="rm-meeting-diary__pager-chevron" aria-hidden="true">‹</span>
       {previous ? (
         <LinkComponent to={previous.href} className="rm-meeting-diary__pager-link">

@@ -153,6 +153,46 @@ export async function routeHostEditorShell(page: Page, clubSlug: string): Promis
     });
   });
 
+  await page.route("**/api/bff/api/host/notifications/policy**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        sessionReminderEnabled: true,
+        updatedAt: "2026-08-20T10:00:00+09:00",
+      }),
+    });
+  });
+
+  await page.route("**/api/bff/api/host/notifications/manual/options**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        session: {
+          sessionId: "session-e2e",
+          sessionNumber: 1,
+          bookTitle: "E2E 책",
+          date: "2026-09-05",
+          state: "OPEN",
+          visibility: "MEMBER",
+          feedbackDocumentUploaded: false,
+        },
+        templates: [{
+          eventType: "SESSION_REMINDER_DUE",
+          contentRevision: "e".repeat(64),
+          label: "모임 리마인더",
+          enabled: true,
+          disabledReason: null,
+          defaultAudience: "SELECTED_MEMBERS",
+          allowedAudiences: ["ALL_ACTIVE_MEMBERS", "CONFIRMED_ATTENDEES", "SELECTED_MEMBERS"],
+          defaultChannels: "BOTH",
+        }],
+        members: { items: [], nextCursor: null },
+      }),
+    });
+  });
+
   await page.route("**/api/bff/api/host/sessions/*/record-apply-preview**", async (route) => {
     await route.fulfill({
       status: 200,
