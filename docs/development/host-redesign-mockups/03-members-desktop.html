@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>호스트 · 멤버 원장 — 시안 A</title>
+<link rel="stylesheet" href="./shared.css">
+<style>
+  .page { padding-bottom: 72px; }
+  .head-wrap { padding: 40px 0 0; }
+  h1 { font-size: 30px; letter-spacing: -0.02em; font-weight: 600; margin: 8px 0 0; }
+  .summary-line { margin-top: 10px; font-size: 14px; color: var(--text-2); }
+  .summary-line .mono { font-size: 13px; }
+
+  .tabs { display: flex; gap: 2px; margin-top: 30px; border-bottom: 1px solid var(--line); }
+  .tab { padding: 10px 16px 12px; font-size: 14px; color: var(--text-3); position: relative; }
+  .tab[aria-current] { color: var(--text); font-weight: 600; }
+  .tab[aria-current]::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: -1px; height: 2px; background: var(--accent); }
+  .tab .mono { font-size: 12px; color: var(--text-4); margin-left: 5px; }
+
+  .toolbar { display: flex; align-items: center; justify-content: space-between; margin: 22px 0 14px; }
+  .search { display: flex; align-items: center; gap: 8px; color: var(--text-4); font-size: 14px; padding: 6px 2px; border-bottom: 1px solid var(--line); min-width: 260px; }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase;
+    color: var(--text-4); padding: 8px 10px; border-bottom: 1px solid var(--line);
+  }
+  thead th.num { text-align: right; }
+  thead th .sort { color: var(--accent); }
+  tbody td { padding: 11px 10px; border-bottom: 1px solid var(--line-soft); font-size: 14px; vertical-align: middle; }
+  tbody tr { height: 48px; }
+  tbody tr:hover { background: var(--bg-sub); }
+  td.num { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--text-2); }
+  td.num.hot { color: var(--warn); font-weight: 600; }
+  .name-cell { display: flex; align-items: center; gap: 10px; font-weight: 500; }
+  .row-actions { visibility: hidden; display: flex; gap: 4px; justify-content: flex-end; }
+  tbody tr:hover .row-actions { visibility: visible; }
+  tr.dim td { color: var(--text-4); }
+  tr.dim .name-cell { color: var(--text-3); }
+</style>
+</head>
+<body>
+<header class="topnav">
+  <div class="container topnav-inner">
+    <div class="brand">읽는사이 <span class="host-mark">HOST</span></div>
+    <nav class="nav-links">
+      <a class="nav-link">오늘</a>
+      <a class="nav-link">모임</a>
+      <a class="nav-link" aria-current="page">멤버</a>
+      <a class="nav-link">기록</a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button class="btn btn-quiet btn-sm">멤버 공간으로</button>
+      <span class="avatar">진</span>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+  <div class="container">
+    <section class="head-wrap">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;">
+        <div>
+          <p class="eyebrow" style="margin:0;">호스트 · 멤버</p>
+          <h1 class="editorial">멤버 원장</h1>
+          <p class="summary-line">정식 멤버 <span class="mono">12</span> · 둘러보기 <span class="mono">2</span> · 응답을 기다리는 초대장 <span class="mono">2</span></p>
+        </div>
+        <button class="btn btn-primary">초대장 보내기</button>
+      </div>
+
+      <nav class="tabs">
+        <a class="tab" aria-current="page">멤버<span class="mono">14</span></a>
+        <a class="tab">초대장<span class="mono">2</span></a>
+        <a class="tab">쉬는 멤버<span class="mono">1</span></a>
+      </nav>
+    </section>
+
+    <div class="toolbar">
+      <div class="search">⌕ 이름으로 찾기</div>
+      <span class="folio">참석 수는 이 클럽 모임 기준 · 무단 불참은 미리 알리지 않은 불참</span>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>이름</th>
+          <th>상태</th>
+          <th class="num">함께한 지</th>
+          <th class="num sort">참석 ↓</th>
+          <th class="num">알린 불참</th>
+          <th class="num">무단 불참</th>
+          <th class="num">마지막 참석</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="name-cell"><span class="avatar">서</span>서연</span></td>
+          <td><span class="state-dot st-ok">정식</span></td>
+          <td class="num">22개월</td><td class="num">21회</td><td class="num">1회</td><td class="num">0회</td><td class="num">08-15</td>
+          <td><span class="row-actions"><button class="btn btn-quiet btn-sm">이력</button><button class="btn btn-quiet btn-sm">관리</button></span></td>
+        </tr>
+        <tr>
+          <td><span class="name-cell"><span class="avatar">민</span>민재</span></td>
+          <td><span class="state-dot st-ok">정식</span></td>
+          <td class="num">22개월</td><td class="num">19회</td><td class="num">3회</td><td class="num">0회</td><td class="num">08-15</td>
+          <td><span class="row-actions"><button class="btn btn-quiet btn-sm">이력</button><button class="btn btn-quiet btn-sm">관리</button></span></td>
+        </tr>
+        <tr>
+          <td><span class="name-cell"><span class="avatar">유</span>유진</span></td>
+          <td><span class="state-dot st-ok">정식</span></td>
+          <td class="num">15개월</td><td class="num">13회</td><td class="num">2회</td><td class="num">0회</td><td class="num">08-15</td>
+          <td><span class="row-actions"><button class="btn btn-quiet btn-sm">이력</button><button class="btn btn-quiet btn-sm">관리</button></span></td>
+        </tr>
+        <tr>
+          <td><span class="name-cell"><span class="avatar">하</span>하늘</span></td>
+          <td><span class="state-dot st-ok">정식</span></td>
+          <td class="num">14개월</td><td class="num">11회</td><td class="num">1회</td><td class="num">1회</td><td class="num">07-11</td>
+          <td><span class="row-actions"><button class="btn btn-quiet btn-sm">이력</button><button class="btn btn-quiet btn-sm">관리</button></span></td>
+        </tr>
+        <tr>
+          <td><span class="name-cell"><span class="avatar">도</span>도윤</span></td>
+          <td><span class="state-dot st-ok">정식</span></td>
+          <td class="num">9개월</td><td class="num">5회</td><td class="num">1회</td><td class="num hot">3회</td><td class="num">05-16</td>
+          <td><span class="row-actions"><button class="btn btn-quiet btn-sm">이력</button><button class="btn btn-quiet btn-sm">관리</button></span></td>
+        </tr>
+        <tr>
+          <td><span class="name-cell"><span class="avatar">수</span>수민</span></td>
+          <td><span class="state-dot st-ok">정식</span></td>
+          <td class="num">4개월</td><td class="num">3회</td><td class="num">0회</td><td class="num">0회</td><td class="num">08-15</td>
+          <td><span class="row-actions"><button class="btn btn-quiet btn-sm">이력</button><button class="btn btn-quiet btn-sm">관리</button></span></td>
+        </tr>
+        <tr class="dim">
+          <td><span class="name-cell"><span class="avatar">가</span>가온</span></td>
+          <td><span class="state-dot st-mut">둘러보기</span></td>
+          <td class="num">1개월</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td>
+          <td><span class="row-actions"><button class="btn btn-ghost btn-sm">정식 전환</button></span></td>
+        </tr>
+        <tr class="dim">
+          <td><span class="name-cell"><span class="avatar">라</span>라온</span></td>
+          <td><span class="state-dot st-mut">둘러보기</span></td>
+          <td class="num">2주</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td>
+          <td><span class="row-actions"><button class="btn btn-ghost btn-sm">정식 전환</button></span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="folio" style="margin-top:16px;">행을 누르면 멤버 이력이 열려요 — 초대 발송부터 회차별 응답·출석까지 시간순으로</div>
+  </div>
+</main>
+</body>
+</html>

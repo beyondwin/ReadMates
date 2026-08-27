@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>호스트 · 오늘 — 시안 B (차례식)</title>
+<link rel="stylesheet" href="./shared.css">
+<style>
+  .page { padding-bottom: 72px; }
+  .narrow { max-width: 860px; }
+  .head-wrap { padding: 48px 0 0; }
+  .kicker-row { display: flex; align-items: baseline; justify-content: space-between; }
+
+  .nm { margin-top: 34px; padding: 30px 0 34px; border-top: 2px solid var(--ink-800); }
+  .nm-state { margin-bottom: 14px; }
+  .nm-title { font-size: 44px; line-height: 1.12; letter-spacing: -0.025em; font-weight: 600; margin: 0; }
+  .nm-meta { display: flex; gap: 28px; margin-top: 18px; font-size: 14px; color: var(--text-2); flex-wrap: wrap; }
+  .nm-meta .k { display: block; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-4); font-weight: 600; margin-bottom: 2px; }
+  .nm-meta .mono { font-size: 13px; }
+  .nm-cta { display: flex; align-items: center; gap: 10px; margin-top: 26px; }
+  .nm-note { font-size: 12.5px; color: var(--text-3); margin-left: 4px; }
+
+  .sec { margin-top: 46px; }
+  .sec-head { display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .sec-head strong { font-size: 15px; font-weight: 650; }
+
+  /* table-of-contents rows with dot leaders */
+  .toc-row { display: flex; align-items: baseline; gap: 12px; min-height: 46px; padding: 10px 2px 8px; border-bottom: 1px solid var(--line-soft); }
+  .toc-row:hover { background: var(--bg-sub); }
+  .toc-no { font-family: var(--f-mono); font-size: 12px; color: var(--text-4); flex: 0 0 52px; }
+  .toc-title { font-size: 15.5px; font-weight: 500; white-space: nowrap; }
+  .toc-leader { flex: 1; border-bottom: 1px dotted var(--line-strong); transform: translateY(-4px); min-width: 24px; }
+  .toc-end { font-family: var(--f-mono); font-size: 12.5px; color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  .foot { margin-top: 60px; padding-top: 14px; border-top: 1px solid var(--line-soft); display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+<header class="topnav">
+  <div class="container topnav-inner">
+    <div class="brand">읽는사이 <span class="host-mark">HOST</span></div>
+    <nav class="nav-links">
+      <a class="nav-link" aria-current="page">오늘</a>
+      <a class="nav-link">모임</a>
+      <a class="nav-link">멤버</a>
+      <a class="nav-link">기록</a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button class="btn btn-quiet btn-sm">멤버 공간으로</button>
+      <span class="avatar">진</span>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+  <div class="container narrow">
+    <section class="head-wrap">
+      <div class="kicker-row">
+        <p class="eyebrow" style="margin:0;">호스트 · 오늘</p>
+        <span class="folio">2026-08-27 목</span>
+      </div>
+
+      <div class="nm">
+        <div class="nm-state"><span class="state-dot st-acc">멤버와 준비 중 · D-9</span></div>
+        <h1 class="nm-title editorial">『지구 끝의 온실』</h1>
+        <div class="nm-meta">
+          <div><span class="k">회차</span><span class="mono">NO.25</span></div>
+          <div><span class="k">일시</span><span class="mono">2026-09-05 SAT 19:30</span></div>
+          <div><span class="k">장소</span>합정 스튜디오</div>
+          <div><span class="k">참석 응답</span><span class="mono">8·1·2</span> · 미응답 <span class="mono" style="color:var(--warn);font-weight:600;">3</span></div>
+        </div>
+        <div class="nm-cta">
+          <button class="btn btn-primary">미응답 3명에게 리마인드 보내기</button>
+          <button class="btn btn-ghost">모임 상세 열기</button>
+          <span class="nm-note">참석 확정 멤버에게는 보내지 않아요</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec" aria-label="지금 살펴볼 일">
+      <div class="sec-head">
+        <strong>지금 살펴볼 일</strong>
+        <span class="folio">2건</span>
+      </div>
+      <div class="toc-row">
+        <span class="toc-no">초대</span>
+        <span class="toc-title">지원 님에게 보낸 초대장이 곧 만료돼요</span>
+        <span class="toc-leader"></span>
+        <span class="toc-end" style="color:var(--warn);font-weight:600;">D-3</span>
+        <button class="btn btn-ghost btn-sm">재발송</button>
+      </div>
+      <div class="toc-row">
+        <span class="toc-no">기록</span>
+        <span class="toc-title">제24회차 『소년이 온다』 기록 정리가 남았어요</span>
+        <span class="toc-leader"></span>
+        <span class="toc-end">08-15 종료</span>
+        <button class="btn btn-ghost btn-sm">마저 쓰기</button>
+      </div>
+    </section>
+
+    <section class="sec" aria-label="클럽 차례">
+      <div class="sec-head">
+        <strong>클럽 차례</strong>
+        <span class="folio">전체 26편</span>
+      </div>
+      <div class="toc-row">
+        <span class="toc-no">NO.26</span>
+        <span class="toc-title" style="color:var(--text-3);">다음 책 후보 정하기</span>
+        <span class="toc-leader"></span>
+        <span class="toc-end">후보 3권 · 투표 전</span>
+      </div>
+      <div class="toc-row">
+        <span class="toc-no">NO.25</span>
+        <span class="toc-title">『지구 끝의 온실』 — 준비 중</span>
+        <span class="toc-leader"></span>
+        <span class="toc-end">09-05 예정</span>
+      </div>
+      <div class="toc-row">
+        <span class="toc-no">NO.24</span>
+        <span class="toc-title">『소년이 온다』 — 기록 정리 중</span>
+        <span class="toc-leader"></span>
+        <span class="toc-end">참석 7/9</span>
+      </div>
+      <div class="toc-row">
+        <span class="toc-no">NO.23</span>
+        <span class="toc-title" style="color:var(--text-2);">『H마트에서 울다』 — 게시 완료</span>
+        <span class="toc-leader"></span>
+        <span class="toc-end">참석 9/11 · ★ 4.2</span>
+      </div>
+      <div class="toc-row">
+        <span class="toc-no">NO.22</span>
+        <span class="toc-title" style="color:var(--text-2);">『파친코』 — 게시 완료</span>
+        <span class="toc-leader"></span>
+        <span class="toc-end">참석 10/12 · ★ 4.6</span>
+      </div>
+    </section>
+
+    <div class="foot folio">
+      <span>정식 멤버 12 · 둘러보기 2 · 초대 대기 2</span>
+      <span>누적 24회 · 올해 평균 참석 8.2명</span>
+    </div>
+  </div>
+</main>
+</body>
+</html>

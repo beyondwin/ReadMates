@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>호스트 · 오늘 — 시안 A</title>
+<link rel="stylesheet" href="./shared.css">
+<style>
+  .page { padding-bottom: 72px; }
+  .head-wrap { padding: 40px 0 26px; border-bottom: 1px solid var(--line); }
+  .head-grid { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+  h1 { font-size: 32px; line-height: 1.18; letter-spacing: -0.02em; font-weight: 600; margin: 8px 0 0; }
+  h1 em { font-style: normal; color: var(--accent); }
+
+  .attn { margin-top: 28px; }
+  .attn-head { display: flex; align-items: baseline; gap: 10px; padding-bottom: 10px; }
+  .attn-head strong { font-size: 15px; font-weight: 650; }
+
+  .main-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); gap: 56px; margin-top: 44px; }
+
+  .next-meeting { }
+  .nm-identity { display: flex; gap: 22px; margin-top: 18px; }
+  .nm-title { font-size: 24px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.25; margin: 2px 0 0; }
+  .nm-meta { margin-top: 6px; font-size: 13.5px; color: var(--text-2); }
+  .nm-meta .mono { font-size: 12.5px; color: var(--text-3); }
+  .tally { display: flex; gap: 26px; margin: 20px 0 6px; }
+  .tally div { min-width: 52px; }
+  .tally .t-num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 500; }
+  .tally .t-label { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+  .cta-row { display: flex; align-items: center; gap: 10px; margin-top: 22px; }
+  .cta-note { font-size: 12.5px; color: var(--text-3); margin-left: 4px; }
+
+  .side { display: grid; gap: 44px; align-content: start; }
+  .side .mini-rows .lrow { min-height: 42px; }
+
+  .foot { margin-top: 64px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+</style>
+</head>
+<body>
+<header class="topnav">
+  <div class="container topnav-inner">
+    <div class="brand">읽는사이 <span class="host-mark">HOST</span></div>
+    <nav class="nav-links">
+      <a class="nav-link" aria-current="page">오늘</a>
+      <a class="nav-link">모임</a>
+      <a class="nav-link">멤버</a>
+      <a class="nav-link">기록</a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button class="btn btn-quiet btn-sm">멤버 공간으로</button>
+      <span class="avatar">진</span>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+  <div class="container">
+    <section class="head-wrap">
+      <div class="head-grid">
+        <div>
+          <p class="eyebrow" style="margin:0;">호스트 · 오늘</p>
+          <h1>다음 모임까지 <em>아흐레</em>, 응답을 기다리는 멤버가 3명 있어요.</h1>
+        </div>
+        <div class="folio" style="flex:0 0 auto;">NO.25 · 2026-08-27 목</div>
+      </div>
+
+      <section class="attn" aria-label="조치 필요">
+        <div class="attn-head">
+          <strong>지금 살펴볼 일</strong>
+          <span class="mono" style="font-size:12px;color:var(--text-4);">2건</span>
+        </div>
+        <div class="ledger-rows">
+          <div class="lrow lrow--urgent">
+            <span class="state-dot st-warn">초대</span>
+            <div class="lrow-main">
+              <div class="lrow-title">지원 님에게 보낸 초대장이 곧 만료됩니다</div>
+              <div class="lrow-sub">2026-08-30 만료 · 아직 열람하지 않음</div>
+            </div>
+            <span class="lrow-num">D-3</span>
+            <button class="btn btn-ghost btn-sm">재발송</button>
+          </div>
+          <div class="lrow lrow--urgent">
+            <span class="state-dot st-warn">기록</span>
+            <div class="lrow-main">
+              <div class="lrow-title">제24회차 『소년이 온다』 기록이 아직 정리 중입니다</div>
+              <div class="lrow-sub">모임 종료 후 12일 경과 · 요약과 출석 확정이 남았어요</div>
+            </div>
+            <span class="lrow-num">08-15 종료</span>
+            <button class="btn btn-ghost btn-sm">기록 마저 쓰기</button>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <div class="main-grid">
+      <section class="next-meeting ledger-panel" aria-label="다음 모임">
+        <div class="ledger-panel-head">
+          <span class="eyebrow">다음 모임</span>
+          <span class="folio">NO.25 · D-9</span>
+        </div>
+
+        <div class="nm-identity">
+          <div class="book-cover"><strong>지구 끝의 온실</strong><span>김초엽</span></div>
+          <div style="min-width:0;">
+            <span class="state-dot st-acc">멤버와 준비 중</span>
+            <h2 class="nm-title editorial">『지구 끝의 온실』</h2>
+            <p class="nm-meta">
+              김초엽 · 자이언트북스<br>
+              <span class="mono">2026-09-05 SAT 19:30</span> · 합정 스튜디오
+            </p>
+            <div class="tally" role="group" aria-label="참석 응답 집계">
+              <div><div class="t-num">8</div><div class="t-label">참석</div></div>
+              <div><div class="t-num">1</div><div class="t-label">미정</div></div>
+              <div><div class="t-num">2</div><div class="t-label">불참</div></div>
+              <div><div class="t-num" style="color:var(--warn);">3</div><div class="t-label">미응답</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ledger-rows" style="margin-top:18px;">
+          <div class="lrow">
+            <span class="avatar">하</span>
+            <div class="lrow-main"><div class="lrow-title">하늘</div><div class="lrow-sub">지난 모임 참석 · 초대일로부터 14개월</div></div>
+            <span class="state-dot st-mut">미응답</span>
+            <span class="lrow-num">공지 열람 08-21</span>
+          </div>
+          <div class="lrow">
+            <span class="avatar">도</span>
+            <div class="lrow-main"><div class="lrow-title">도윤</div><div class="lrow-sub">최근 두 모임 연속 불참</div></div>
+            <span class="state-dot st-mut">미응답</span>
+            <span class="lrow-num">공지 미열람</span>
+          </div>
+          <div class="lrow">
+            <span class="avatar">수</span>
+            <div class="lrow-main"><div class="lrow-title">수민</div><div class="lrow-sub">둘러보기에서 지난달 정식 전환</div></div>
+            <span class="state-dot st-mut">미응답</span>
+            <span class="lrow-num">공지 열람 08-24</span>
+          </div>
+        </div>
+
+        <div class="cta-row">
+          <button class="btn btn-primary">미응답 3명에게 리마인드 보내기</button>
+          <button class="btn btn-ghost">모임 상세 열기</button>
+          <span class="cta-note">참석 확정 멤버에게는 보내지 않아요</span>
+        </div>
+      </section>
+
+      <aside class="side">
+        <section class="ledger-panel" aria-label="최근 마감한 모임">
+          <div class="ledger-panel-head">
+            <span class="eyebrow">최근 마감</span>
+            <span class="folio">NO.24</span>
+          </div>
+          <div class="mini-rows ledger-rows">
+            <div class="lrow">
+              <div class="lrow-main">
+                <div class="lrow-title editorial">『소년이 온다』</div>
+                <div class="lrow-sub">한강 · 08-15 종료</div>
+              </div>
+              <span class="lrow-num">참석 7/9</span>
+            </div>
+            <div class="lrow">
+              <div class="lrow-main"><div class="lrow-sub" style="margin-top:0;">모임 소감 5건 수집 · 피드백 문서 초안 준비됨</div></div>
+              <span class="lrow-go">›</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="ledger-panel" aria-label="클럽 원장 요약">
+          <div class="ledger-panel-head">
+            <span class="eyebrow">클럽 원장</span>
+            <button class="btn btn-quiet btn-sm" style="font-size:12px;">숨기기</button>
+          </div>
+          <div class="mini-rows ledger-rows">
+            <div class="lrow"><div class="lrow-main"><div class="lrow-sub" style="margin-top:0;">누적 모임</div></div><span class="lrow-num" style="font-size:14px;color:var(--text);">24회</span></div>
+            <div class="lrow"><div class="lrow-main"><div class="lrow-sub" style="margin-top:0;">올해 평균 참석</div></div><span class="lrow-num" style="font-size:14px;color:var(--text);">8.2명 / 회</span></div>
+            <div class="lrow"><div class="lrow-main"><div class="lrow-sub" style="margin-top:0;">정식 멤버</div></div><span class="lrow-num" style="font-size:14px;color:var(--text);">12명</span></div>
+          </div>
+        </section>
+
+        <section class="ledger-panel" aria-label="바로 시작">
+          <div class="ledger-panel-head"><span class="eyebrow">바로 시작</span></div>
+          <div class="mini-rows ledger-rows">
+            <a class="lrow"><div class="lrow-main"><div class="lrow-title">새 모임 초안 만들기</div><div class="lrow-sub">지난 모임 형식 그대로 복제할 수 있어요</div></div><span class="lrow-go">›</span></a>
+            <a class="lrow"><div class="lrow-main"><div class="lrow-title">초대장 보내기</div></div><span class="lrow-go">›</span></a>
+            <a class="lrow"><div class="lrow-main"><div class="lrow-title">멤버 전체 공지 쓰기</div></div><span class="lrow-go">›</span></a>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+    <div class="foot folio">읽는사이 클럽 원장 · 마지막 갱신 2026-08-27 20:51</div>
+  </div>
+</main>
+</body>
+</html>
