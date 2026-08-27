@@ -62,6 +62,8 @@ export const ADMIN_COPY = {
     openToday: "오늘 열기",
     asOfSuffix: "기준",
   },
+  replayWarning: "수동 재발송은 자동 재시도를 취소하지 않습니다.",
+  nextRetry: "다음 재시도 예정",
 } as const;
 
 function fromMap(map: Record<string, string>) {
@@ -106,3 +108,17 @@ export const auditOutcomeLabel = fromMap({
   DENIED: "차단",
   PREPARED: "진행",
 });
+
+export const deliveryLedgerStatusLabel = fromMap({
+  SENT: "발송됨",
+  PUBLISHED: "발송됨",
+  PENDING: "대기",
+  PUBLISHING: "대기",
+  SENDING: "대기",
+  FAILED: "실패",
+  DEAD: "실패",
+});
+
+export function deliveryAttemptBadge(attemptCount: number): string {
+  return `${attemptCount}차 시도`;
+}

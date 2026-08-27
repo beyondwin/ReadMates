@@ -117,12 +117,66 @@ describe("AdminNotificationsPage", () => {
     expect(screen.getAllByText("mailbox_unavailable").length).toBeGreaterThan(0);
   });
 
+  it("shows the fixed replay warning under failure clusters", () => {
+    renderPage();
+
+    const warning = screen.getByText("수동 재발송은 자동 재시도를 취소하지 않습니다.");
+    const failures = screen.getByRole("heading", { name: "실패 클러스터" });
+    const replay = screen.getByRole("heading", { name: "재발송" });
+    const replayPanel = screen.getByRole("region", { name: "재발송" });
+
+    expect(warning).toBeInTheDocument();
+    expect(replayPanel).toContainElement(warning);
+    expect(failures.compareDocumentPosition(replay) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(failures.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("renders an attempt badge from the fixture attempt count", () => {
+    renderPage();
+
+    expect(screen.getAllByText("2차 시도").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/attempts 2/)).toBeNull();
+  });
+
+  it("renders the three Korean delivery status labels", () => {
+    renderPage({
+      events: [
+        { ...event, eventId: "event-sent", status: "PUBLISHED", attemptCount: 1, nextAttemptAt: null, safeErrorCode: null },
+        { ...event, eventId: "event-pending", status: "PENDING", attemptCount: 1, nextAttemptAt: "2026-05-27T00:30:00Z", safeErrorCode: null },
+        { ...event, eventId: "event-failed", status: "FAILED", attemptCount: 2 },
+      ],
+      deliveries: [
+        { ...delivery, deliveryId: "delivery-sent", status: "SENT", attemptCount: 1, safeErrorCode: null },
+        { ...delivery, deliveryId: "delivery-pending", status: "PENDING", attemptCount: 1, safeErrorCode: null },
+        { ...delivery, deliveryId: "delivery-failed", status: "FAILED", attemptCount: 3, safeErrorCode: "mailbox_unavailable" },
+      ],
+    });
+
+    const outbox = screen.getByRole("region", { name: "발송 대기 장부" });
+    const ledger = screen.getByRole("region", { name: "배달 장부" });
+
+    expect(within(outbox).getByText("발송됨", { exact: true })).toBeInTheDocument();
+    expect(within(outbox).getByText("대기", { exact: true })).toBeInTheDocument();
+    expect(within(outbox).getByText("실패", { exact: true })).toBeInTheDocument();
+    expect(within(ledger).getByText("발송됨", { exact: true })).toBeInTheDocument();
+    expect(within(ledger).getByText("대기", { exact: true })).toBeInTheDocument();
+    expect(within(ledger).getByText("실패", { exact: true })).toBeInTheDocument();
+    expect(within(outbox).queryByText("PUBLISHED")).toBeNull();
+    expect(within(ledger).queryByText("SENT")).toBeNull();
+    expect(within(outbox).getByText(/다음 재시도/)).toBeInTheDocument();
+    expect(within(ledger).queryByText(/다음 재시도/)).toBeNull();
+  });
+
+  it("labels a failure cluster as club · notification type · error class", () => {
+    renderPage();
+
+    expect(screen.getByText("읽는사이 · SESSION_REMINDER_DUE · mailbox_unavailable")).toBeInTheDocument();
+  });
+
   it("uses supporting copy for replay expiry and runtime summaries", () => {
     renderPage({ replayPreview });
 
     expect(screen.getByText(/^만료 /)).toHaveClass("small");
-    expect(screen.getByText(/^AUTOMATIC · attempts 2 ·/)).toHaveClass("small");
-    expect(screen.getByText(/^attempts 2 ·/)).toHaveClass("small");
     expect(screen.getByText("MAIL_AMBIGUOUS")).toBeInTheDocument();
     expect(screen.getByText(/DEAD 2/)).toBeInTheDocument();
   });

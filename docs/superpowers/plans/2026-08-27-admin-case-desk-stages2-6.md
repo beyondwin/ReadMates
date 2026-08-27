@@ -221,7 +221,9 @@ export function AdminTargetLedgerInline({ entries, moreHref }: {
 - 실패 클러스터 그룹 라벨에 `클럽 · 알림 유형 · 오류 분류`를 문장으로.
 
 **Steps:**
-- [ ] 테스트: ① 경고 문장 존재 ② 시도 배지 렌더(시도 수 fixture) ③ 상태 라벨 3종 한국어 → 구현 → 통과 → Commit: `feat(admin): delivery ledger row grammar`
+- [x] 테스트: ① 경고 문장 존재 ② 시도 배지 렌더(시도 수 fixture) ③ 상태 라벨 3종 한국어 → 구현 → 통과 → Commit: `feat(admin): delivery ledger row grammar`
+
+> 실행 노트: `rg "retry" platform-admin-workbench-model.ts`는 0건. Outbox `nextAttemptAt`만 조건부 표기. Delivery DTO·클러스터 DTO에 재시도 시각/클럽/알림 유형 필드 없음 — 클러스터 문장은 로드된 ledger 행에서 보강하고 없으면 해당 절 생략. SKIPPED는 fail-open 원문. 내비 그룹은 6-2까지 유지.
 
 ### Task 5-2: 작업 원장(AI) 정리
 
@@ -284,3 +286,4 @@ export function AdminTargetLedgerInline({ entries, moreHref }: {
 
 - 3-2: 서버에 dismiss API 없음. 무시는 기존 `SNOOZE`(최대 7일) + 사유 필수로 구현. snooze 요청 DTO는 unknown field를 거부하므로 사유를 HTTP body에 넣지 않음 — 사유 보존은 서버 후속.
 - 4-2: 활성 support grant를 전역 알람 바 attention 후보에 넣으려면 서버 요약(또는 2-1 훅의 support 쿼리)이 필요함. 이번 화면은 PageContext scope `활성 접근 N건`만 표기.
+- 5-1: `platform-admin-workbench-model.ts`에 retry 필드 없음. Outbox는 `nextAttemptAt`이 있을 때만 "다음 재시도 예정" 표기. Delivery 응답에는 next-retry 필드가 없어 UI 생략(가짜 시각 없음). Failure cluster 응답은 `safeErrorCode/status/count/latestAt`만 — 클럽·알림 유형은 서버 후속. 현재는 같은 오류 코드의 로드된 outbox/delivery 행으로 문장을 보강.

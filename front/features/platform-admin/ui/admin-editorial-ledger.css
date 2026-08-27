@@ -648,6 +648,10 @@
   gap: var(--space-md);
 }
 
+.admin-notifications .admin-notifications__grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .admin-notifications .admin-safe-action-dock .btn,
 .admin-notifications .admin-safe-action-dock button,
 .admin-notifications .admin-notifications__reason textarea,
@@ -660,10 +664,15 @@
 .admin-notifications .admin-notifications__row-title,
 .admin-notifications .admin-notifications__focus,
 .admin-notifications .admin-notifications__error,
+.admin-notifications .admin-notifications__replay-warning,
 .admin-notifications .admin-page-context__freshness,
 .admin-notifications .admin-page-context__authority,
 .admin-notifications .admin-safe-action-dock__reason {
   overflow-wrap: anywhere;
+}
+
+.admin-notifications .admin-notifications__attempt {
+  font-weight: 600;
 }
 
 .admin-notifications :focus-visible {

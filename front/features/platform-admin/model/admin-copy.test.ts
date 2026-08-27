@@ -4,6 +4,8 @@ import {
   auditOutcomeLabel,
   clubLifecycleLabel,
   clubVisibilityLabel,
+  deliveryAttemptBadge,
+  deliveryLedgerStatusLabel,
   hostOnboardingLabel,
   supportGrantReasonLabel,
   supportGrantStatusLabel,
@@ -53,6 +55,8 @@ describe("admin-copy", () => {
     expect(ADMIN_COPY.alarm.serviceOk).toBe("서비스 정상");
     expect(ADMIN_COPY.alarm.unavailable).toBe("신호 확인 불가");
     expect(ADMIN_COPY.alarm.openToday).toBe("오늘 열기");
+    expect(ADMIN_COPY.replayWarning).toBe("수동 재발송은 자동 재시도를 취소하지 않습니다.");
+    expect(ADMIN_COPY.nextRetry).toBe("다음 재시도 예정");
   });
 
   it("클럽 enum을 한국어 라벨로 바꾼다", () => {
@@ -93,5 +97,17 @@ describe("admin-copy", () => {
     expect(auditOutcomeLabel("DENIED")).toBe("차단");
     expect(auditOutcomeLabel("PREPARED")).toBe("진행");
     expect(auditOutcomeLabel("UNKNOWN")).toBe("UNKNOWN");
+  });
+
+  it("배달 원장 상태를 발송됨/대기/실패로 바꾼다", () => {
+    expect(deliveryLedgerStatusLabel("SENT")).toBe("발송됨");
+    expect(deliveryLedgerStatusLabel("PUBLISHED")).toBe("발송됨");
+    expect(deliveryLedgerStatusLabel("PENDING")).toBe("대기");
+    expect(deliveryLedgerStatusLabel("PUBLISHING")).toBe("대기");
+    expect(deliveryLedgerStatusLabel("SENDING")).toBe("대기");
+    expect(deliveryLedgerStatusLabel("FAILED")).toBe("실패");
+    expect(deliveryLedgerStatusLabel("DEAD")).toBe("실패");
+    expect(deliveryLedgerStatusLabel("SKIPPED")).toBe("SKIPPED");
+    expect(deliveryAttemptBadge(2)).toBe("2차 시도");
   });
 });
