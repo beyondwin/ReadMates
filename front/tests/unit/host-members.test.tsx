@@ -265,6 +265,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+function membersTabPanel(name: string) {
+  return within(screen.getByRole("tabpanel", { name }));
+}
+
 describe("HostMembersPage", () => {
   it("loads the host member hub and renders lifecycle tabs", async () => {
     const fetchMock = renderHostMembersPage();
@@ -323,13 +327,15 @@ describe("HostMembersPage", () => {
     expect(suspendedRow.getByText("이번 모임 제외")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "둘러보기 멤버" }));
-    const pendingArticle = screen.getByText("둘").closest("article") as HTMLElement;
+    const pendingArticle = membersTabPanel("둘러보기 멤버").getByText("둘").closest("article") as HTMLElement;
     expect(pendingArticle.querySelector(".rm-avatar-chip img")).toHaveAttribute(
       "src",
       "/assets/avatars/book-club/cloud-green-book.webp",
     );
     expect(pendingArticle.querySelector(".rm-avatar-chip")).toHaveAttribute("data-avatar-size-role", "member");
 
+    expect(screen.getByRole("region", { name: "가입 승인 대기" })).toBeInTheDocument();
+    expect(screen.getByText("승인·거절은 멤버에게 알림이 갑니다")).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "탈퇴/비활성" }));
     const inactiveArticle = screen.getByText("탈").closest("article") as HTMLElement;
     const inactiveRow = within(inactiveArticle);
@@ -546,11 +552,13 @@ describe("HostMembersPage", () => {
     expect(summary).not.toHaveTextContent("승인 대기");
 
     await user.click(screen.getByRole("tab", { name: "둘러보기 멤버" }));
-    const viewerRow = within(screen.getByText("둘").closest("article") as HTMLElement);
+    const viewerRow = membersTabPanel("둘러보기 멤버").getByText("둘").closest("article") as HTMLElement;
+    const viewer = within(viewerRow);
 
-    expect(viewerRow.getByText("둘러보기")).toBeInTheDocument();
-    expect(viewerRow.getByText("viewer@example.com · 둘러보기 멤버 · 요청일 2026.04.20")).toBeInTheDocument();
+    expect(viewer.getByText("둘러보기")).toBeInTheDocument();
+    expect(viewer.getByText("viewer@example.com · 둘러보기 멤버 · 요청일 2026.04.20")).toBeInTheDocument();
     expect(screen.queryByText("승인 대기")).not.toBeInTheDocument();
+    expect(screen.getByText("승인·거절은 멤버에게 알림이 갑니다")).toBeInTheDocument();
   });
 
   it("supports keyboard selection in the member management tablist", async () => {
@@ -565,7 +573,7 @@ describe("HostMembersPage", () => {
     await user.keyboard("{ArrowRight}");
     await waitFor(() => expect(viewerTab).toHaveFocus());
     expect(viewerTab).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText("둘")).toBeInTheDocument();
+    expect(membersTabPanel("둘러보기 멤버").getByText("둘")).toBeInTheDocument();
 
     await user.keyboard("{End}");
     await waitFor(() => expect(invitationsTab).toHaveFocus());
@@ -587,8 +595,9 @@ describe("HostMembersPage", () => {
 
     await user.click(await screen.findByRole("tab", { name: "둘러보기 멤버" }));
 
-    expect(screen.getByText("둘")).toBeInTheDocument();
-    expect(screen.getByText("viewer@example.com · 둘러보기 멤버 · 요청일 2026.04.20")).toBeInTheDocument();
+    const viewerPanel = membersTabPanel("둘러보기 멤버");
+    expect(viewerPanel.getByText("둘")).toBeInTheDocument();
+    expect(viewerPanel.getByText("viewer@example.com · 둘러보기 멤버 · 요청일 2026.04.20")).toBeInTheDocument();
   });
 
   it("syncs local member rows when loader data changes", () => {
@@ -708,8 +717,9 @@ describe("HostMembersPage", () => {
     );
 
     await user.click(await screen.findByRole("tab", { name: "둘러보기 멤버" }));
-    const firstRow = within(screen.getByText("둘").closest("article") as HTMLElement);
-    const secondRow = within(screen.getByText("두번째 둘러보기").closest("article") as HTMLElement);
+    const viewerPanel = membersTabPanel("둘러보기 멤버");
+    const firstRow = within(viewerPanel.getByText("둘").closest("article") as HTMLElement);
+    const secondRow = within(viewerPanel.getByText("두번째 둘러보기").closest("article") as HTMLElement);
 
     await user.click(firstRow.getByRole("button", { name: "정식 멤버로 전환" }));
 
@@ -757,7 +767,7 @@ describe("HostMembersPage", () => {
     renderHostMembersPage([], [lockedViewer, lockedSuspended]);
 
     await user.click(await screen.findByRole("tab", { name: "둘러보기 멤버" }));
-    const viewerRow = within(screen.getByText("둘").closest("article") as HTMLElement);
+    const viewerRow = within(membersTabPanel("둘러보기 멤버").getByText("둘").closest("article") as HTMLElement);
     const activateButton = viewerRow.getByRole("button", { name: "정식 멤버로 전환" });
     const deactivateButton = viewerRow.getByRole("button", { name: "둘러보기 해제" });
 
@@ -838,16 +848,19 @@ describe("HostMembersPage", () => {
 
     await user.click(await screen.findByRole("tab", { name: "둘러보기 멤버" }));
     await user.click(
-      within(screen.getByText("둘").closest("article") as HTMLElement).getByRole("button", {
+      within(membersTabPanel("둘러보기 멤버").getByText("둘").closest("article") as HTMLElement).getByRole("button", {
         name: "정식 멤버로 전환",
       }),
     );
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
 
     await user.click(
-      within(screen.getByText("두번째 둘러보기").closest("article") as HTMLElement).getByRole("button", {
-        name: "정식 멤버로 전환",
-      }),
+      within(membersTabPanel("둘러보기 멤버").getByText("두번째 둘러보기").closest("article") as HTMLElement).getByRole(
+        "button",
+        {
+          name: "정식 멤버로 전환",
+        },
+      ),
     );
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6));
 

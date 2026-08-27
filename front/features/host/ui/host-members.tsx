@@ -16,6 +16,7 @@ import { actionKey, disabledProfileReason, isMembershipPending } from "./members
 import { MemberActionButton } from "./members/member-list";
 import { HostMemberProfileDialog } from "./members/member-profile-editor";
 import { hostProfileErrorMessage, profileFailureMessage } from "./members/member-profile-errors";
+import { MemberPendingZone } from "./members/member-pending-zone";
 import { MemberStatusFilter } from "./members/member-status-filter";
 import { MemberSummary } from "./members/member-summary";
 import { MemberTabPanel } from "./members/member-tab-panel";
@@ -124,6 +125,15 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
     [members],
   );
   const viewerMembers = useMemo(() => members.filter((member) => member.status === "VIEWER"), [members]);
+  const pendingViewerSubmittingId = useMemo(() => {
+    for (const viewer of viewerMembers) {
+      if (isMembershipPending(viewer.membershipId, pendingActions)) {
+        return viewer.membershipId;
+      }
+    }
+
+    return null;
+  }, [viewerMembers, pendingActions]);
   const currentSessionParticipants = useMemo(
     () => activeMembers.filter((member) => member.currentSessionParticipationStatus === "ACTIVE"),
     [activeMembers],
@@ -318,6 +328,23 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
         currentSessionParticipantCount={currentSessionParticipants.length}
         activeOutsideCurrentSessionCount={activeMembersOutsideCurrentSession.length}
         suspendedCount={suspendedMembers.length}
+      />
+
+      <MemberPendingZone
+        viewers={viewerMembers}
+        submittingId={pendingViewerSubmittingId}
+        onActivate={(membershipId) => {
+          const member = viewerMembers.find((item) => item.membershipId === membershipId);
+          if (member) {
+            void submitViewerAction(member, "activate");
+          }
+        }}
+        onRelease={(membershipId) => {
+          const member = viewerMembers.find((item) => item.membershipId === membershipId);
+          if (member) {
+            void submitViewerAction(member, "deactivate-viewer");
+          }
+        }}
       />
 
       <MemberStatusFilter activeTab={activeTab} onTabChange={setActiveTab} />
