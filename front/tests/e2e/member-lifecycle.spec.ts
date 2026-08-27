@@ -118,10 +118,11 @@ test("host suspends member and member cannot save current session activity", asy
   await page.goto("/clubs/reading-sai/app/host/members");
   await page.getByRole("tab", { name: "활성 멤버" }).click();
 
-  const memberRow = page.getByRole("article").filter({ hasText: lifecycleMemberEmail });
+  const memberRow = page.getByRole("row").filter({ has: page.getByRole("heading", { name: "멤버5" }) });
   await expect(memberRow).toContainText("이번 모임 참여");
 
-  await memberRow.getByRole("button", { name: "정지" }).click();
+  await memberRow.getByRole("button", { name: "멤버 관리 메뉴" }).click();
+  await page.getByRole("menu", { name: "멤버5 관리" }).getByRole("menuitem", { name: "정지" }).click();
   const dialog = page.getByRole("dialog", { name: /정지할까요/ });
   await dialog.getByLabel("이번 모임부터 바로 정지").check();
 
@@ -131,8 +132,8 @@ test("host suspends member and member cannot save current session activity", asy
   await dialog.getByRole("button", { name: "정지" }).click();
   await suspendResponse;
 
-  await page.getByRole("tab", { name: "정지됨" }).click();
-  await expect(page.getByRole("article").filter({ hasText: lifecycleMemberEmail })).toContainText("정지됨");
+  await page.getByRole("tab", { name: "쉬는 중" }).click();
+  await expect(page.getByRole("row").filter({ has: page.getByRole("heading", { name: "멤버5" }) })).toContainText("쉬는 중");
 
   const memberPage = await context.newPage();
   await loginWithGoogleFixture(memberPage, lifecycleMemberEmail);

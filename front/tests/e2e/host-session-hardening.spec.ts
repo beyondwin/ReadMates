@@ -814,14 +814,14 @@ test("home shows attention queue rows and operations lists the full set includin
   await expect(page.getByRole("link", { name: "운영 기록 전체 보기" })).toBeVisible();
 
   await page.getByRole("link", { name: "운영 기록 전체 보기" }).click();
-  await expect(page).toHaveURL(/\/app\/host\/operations\/?$/);
-  await expect(page.getByRole("heading", { name: "운영 허브" })).toBeVisible();
-  await expect(page.getByText(/확인 필요 \d+건/)).toBeVisible();
-  const operationsList = page.getByRole("list", { name: "확인 필요한 모임 기록" });
-  await expect(operationsList.getByText("주의 공개 초안")).toBeVisible();
-  await expect(operationsList.getByText("주의 공개 미완")).toBeVisible();
-  await expect(operationsList.getByText("주의 마감 초안")).toBeVisible();
-  await expect(operationsList.getByText("주의 마감 미완")).toBeVisible();
+  await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/app\/host\/?$/);
+  await expect(page.getByRole("heading", { name: "운영 허브" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1, name: "오늘" })).toBeVisible();
+  const redirectedQueue = page.getByRole("region", { name: "처리할 일" });
+  await expect(redirectedQueue.getByText("주의 공개 초안")).toBeVisible();
+  await expect(redirectedQueue.getByText("주의 공개 미완")).toBeVisible();
+  await expect(redirectedQueue.getByText("주의 마감 초안")).toBeVisible();
+  await expect(redirectedQueue.getByText("주의 마감 미완")).toBeVisible();
 });
 
 test.skip("access-scope mutation failure stays on the row and retries locally", async ({ page }) => {

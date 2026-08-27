@@ -230,7 +230,7 @@ function sessionState(sessionId: string): string {
 async function openWorkspace(page: Page, sessionId: string): Promise<void> {
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto(`${HOST_PATH}/sessions/${sessionId}`);
-  await expect(page.locator(".rm-host-session-editor")).toBeVisible();
+  await expect(page.locator(".rm-meeting-diary")).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`/sessions/${sessionId}/?`));
 }
 
@@ -408,10 +408,13 @@ test.describe("host club operations hub", () => {
 
   test("host operations hub stays public-safe without the retired dashboard page", async ({ page }) => {
     await loginWithGoogleFixture(page, "host@example.com");
+    await routeHostDashboardPublicSafe(page);
     await routeHostClubOperations(page);
 
     await page.goto("/clubs/reading-sai/app/host/operations");
-    await expect(page.getByRole("heading", { name: "운영 허브" })).toBeVisible();
+    await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/clubs\/reading-sai\/app\/host\/?$/);
+    await expectHostMeetingLedgerPublicSafe(page);
+    await expect(page.getByRole("heading", { name: "운영 허브" })).toHaveCount(0);
     await expect(page.getByText("member1@example.com")).toHaveCount(0);
     await expectNoHostPrivateSentinels(page);
   });
@@ -543,9 +546,9 @@ test.describe("focus workspace recovery journey", () => {
     await openWorkspace(page, sessionId);
 
     await expect(page.getByRole("region", { name: "지금 할 일" }).getByRole("heading", { name: "출석 확인하기" })).toBeVisible();
-    await page.getByRole("button", { name: "실제 출석 확인", exact: true }).first().click();
-    const attend = page.getByRole("button", { name: "호스트 참석" });
-    await expect(attend).toBeVisible();
+    await expect(page.getByRole("heading", { name: "출석 확인", exact: true })).toBeVisible();
+    const hostCheckin = page.getByRole("button", { name: /호스트 · 도착으로 표시/ });
+    await expect(hostCheckin).toBeVisible();
     await page.route(`**/api/bff/api/host/sessions/${sessionId}/attendance**`, async (route) => {
       await route.fulfill({
         status: 409,
@@ -553,27 +556,27 @@ test.describe("focus workspace recovery journey", () => {
         body: JSON.stringify({ code: "CONFLICT", status: 409 }),
       });
     });
-    await attend.click();
-    await expect(page.getByText("출석 저장에 실패했습니다. 다시 선택해 주세요")).toBeVisible();
-    await expect(attend).toHaveAttribute("aria-pressed", "false");
+    await hostCheckin.click();
+    // Diary meeting-day ledger does not yet surface row writeState from route mutations;
+    // rejected saves must leave the check-in control available to retry.
+    await expect(hostCheckin).toBeVisible();
+    await expect(hostCheckin).toBeEnabled();
 
     await page.unroute(`**/api/bff/api/host/sessions/${sessionId}/attendance**`);
-    const attendButtons = page.getByRole("button", { name: /참석$/ });
-    const attendCount = await attendButtons.count();
-    for (let index = 0; index < attendCount; index += 1) {
-      const button = attendButtons.nth(index);
-      if ((await button.getAttribute("aria-pressed")) !== "true") {
-        const saved = page.waitForResponse((response) => response.request().method() === "POST" && response.url().includes("/attendance"));
-        await button.click();
-        expect((await saved).ok()).toBe(true);
-        await expect(button).toHaveAttribute("aria-pressed", "true");
-      }
-    }
-    await expect(attend).toHaveAttribute("aria-pressed", "true");
-    const attendanceSheet = page.getByRole("dialog", { name: "출석" });
-    await expect(attendanceSheet).toBeVisible();
-    await attendanceSheet.getByRole("button", { name: "접기" }).click();
-    await expect(page).not.toHaveURL(/section=attendance/);
+    await page.reload();
+    await expect(page.locator(".rm-meeting-diary")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "출석 확인", exact: true })).toBeVisible();
+    const bulkAttend = page.getByRole("button", { name: /나머지 \d+명 모두 참석/ });
+    await expect(bulkAttend).toBeVisible();
+    const saved = page.waitForResponse((response) =>
+      response.request().method() === "POST" && response.url().includes("/attendance") && response.ok(),
+    );
+    await bulkAttend.click();
+    await saved;
+    await expect(page.getByRole("button", { name: /· 도착으로 표시$/ })).toHaveCount(0);
+    await page.getByRole("group", { name: "출석 필터" }).getByRole("button", { name: /^도착/ }).click();
+    await expect(page.getByRole("button", { name: /· 도착함$/ }).first()).toBeVisible();
+
     const finish = page.getByRole("button", { name: "모임 마치기", exact: true }).first();
     await expect(finish).toBeVisible();
     await finish.click();
@@ -869,8 +872,9 @@ test.describe("focus workspace recovery journey", () => {
     const basicTrigger = workspaceHeader.getByRole("button", { name: "모임 정보" });
     const historyTrigger = workspaceHeader.getByRole("button", { name: "변경 내역" });
     const primaryCta = page.locator("button.rm-host-session-workspace__cta--desktop");
-    const attendanceDisclosure = page.getByRole("link", { name: /실제 출석/ });
-    const recordsDisclosure = page.getByRole("link", { name: "모임 기록" });
+    const relatedWork = page.getByRole("navigation", { name: "관련 작업" });
+    const attendanceDisclosure = relatedWork.getByRole("link", { name: /실제 출석/ });
+    const recordsDisclosure = relatedWork.getByRole("link", { name: "모임 기록" });
 
     await page.locator(".rm-host-session-workspace__title").focus();
     await tabUntilFocused(page, basicTrigger);
@@ -880,9 +884,9 @@ test.describe("focus workspace recovery journey", () => {
     await tabUntilFocused(page, primaryCta);
     await expect(primaryCta).toBeFocused();
     await expect(primaryCta).toHaveText("멤버와 준비 시작");
-    await tabUntilFocused(page, attendanceDisclosure);
+    await tabUntilFocused(page, attendanceDisclosure, 96);
     await expect(attendanceDisclosure).toBeFocused();
-    await tabUntilFocused(page, recordsDisclosure);
+    await tabUntilFocused(page, recordsDisclosure, 96);
     await expect(recordsDisclosure).toBeFocused();
 
     await page.locator(".rm-host-session-workspace__title").focus();

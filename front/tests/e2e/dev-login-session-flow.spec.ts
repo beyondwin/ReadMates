@@ -229,7 +229,7 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
   await page.goto("/app/host");
   await openCurrentMeetingFromDashboard(page);
   await confirmLifecycle(page, "모임 마치기", "/close");
-  await expect(page.getByRole("region", { name: "진행 목록" }).getByText("모임을 마쳤습니다.")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "모임의 걸음" }).getByText("모임을 마쳤습니다.").first()).toBeVisible();
   await expect(page.getByText("기록 정리 중")).toBeVisible();
   await expect(page.getByRole("region", { name: "지금 할 일" }).getByRole("button", { name: "정리본 올리기" })).toBeVisible();
 });
@@ -277,10 +277,21 @@ test("host invites a new member and invite page uses Google acceptance", async (
   });
 
   await page.goto("/app/host/invitations");
+  await expect(page).toHaveURL(/\/app\/host\/members\/?$/);
+  await expect(page.getByRole("region", { name: "초대" })).toBeVisible();
   await page.getByLabel("이름").fill("초대테스트");
   await page.getByLabel("초대 이메일").fill(invitedEmail);
-  await page.getByRole("button", { name: "초대 링크 만들기" }).click();
-  const inviteUrl = await page.getByLabel("생성된 초대 링크").inputValue();
+  const createResponsePromise = page.waitForResponse((response) =>
+    response.request().method() === "POST"
+    && /\/api\/bff\/api\/host\/invitations\/?$/.test(new URL(response.url()).pathname),
+  );
+  await page.getByRole("button", { name: "초대 보내기" }).click();
+  const createResponse = await createResponsePromise;
+  expect(createResponse.ok()).toBe(true);
+  const created = await createResponse.json() as { acceptUrl?: string | null };
+  expect(created.acceptUrl).toBeTruthy();
+  const inviteUrl = created.acceptUrl!;
+  await expect(page.getByRole("status")).toContainText("초대를 보냈습니다.");
 
   await page.evaluate(async () => {
     const response = await fetch("/api/bff/api/auth/logout", { method: "POST" });
@@ -302,7 +313,11 @@ test("host invites a new member and invite page uses Google acceptance", async (
 
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto("/app/host/invitations");
-  await expect(page.getByText("초대테스트")).toBeVisible();
-  await expect(page.getByText(invitedEmail)).toBeVisible();
-  await expect(page.getByText(`${invitedEmail} · 만료`)).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/host\/members\/?$/);
+  const inviteSection = page.getByRole("region", { name: "초대" });
+  await expect(inviteSection.getByText("초대테스트")).toBeVisible();
+  await inviteSection.getByRole("button", { name: /전체 보기/ }).click();
+  await expect(inviteSection.getByText(invitedEmail, { exact: true })).toBeVisible();
+  await expect(inviteSection.getByText("대기", { exact: true })).toBeVisible();
+  await expect(inviteSection.getByText(/만료 /)).toBeVisible();
 });

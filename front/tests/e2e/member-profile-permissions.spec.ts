@@ -561,7 +561,7 @@ test("host edits a same-club member display name and sees the row update", async
   await expect(page.getByRole("heading", { name: "멤버 관리", level: 1 })).toBeVisible();
   await page.getByRole("tab", { name: "활성 멤버" }).click();
 
-  const memberRow = page.getByRole("article").filter({ hasText: hostTargetMemberEmail });
+  const memberRow = page.getByRole("row").filter({ has: page.getByRole("heading", { name: "멤버4" }) });
   await expect(memberRow).toContainText("멤버4");
   await expect(memberRow).not.toContainText("@멤버4");
 
@@ -580,8 +580,9 @@ test("host edits a same-club member display name and sees the row update", async
   await profileResponse;
 
   await expect(page.getByRole("status")).toContainText("이름을 저장했습니다.");
-  await expect(memberRow).toContainText(updatedDisplayName);
-  await expect(memberRow).not.toContainText(`@${updatedDisplayName}`);
+  const updatedRow = page.getByRole("row").filter({ has: page.getByRole("heading", { name: updatedDisplayName }) });
+  await expect(updatedRow).toBeVisible();
+  await expect(updatedRow).not.toContainText(`@${updatedDisplayName}`);
 });
 
 test("viewer can read member routes but cannot use current-session write actions or host routes", async ({

@@ -44,16 +44,22 @@ test("host creates invite and member is directed to Google acceptance", async ({
   await loginWithGoogleFixture(page, "host@example.com");
 
   await page.goto("/app/host/invitations");
+  await expect(page).toHaveURL(/\/app\/host\/members\/?$/);
+  await expect(page.getByRole("region", { name: "초대" })).toBeVisible();
   await expect(page.getByLabel("수락하면 이번 모임에도 추가")).toBeChecked();
   await page.getByLabel("이름").fill("테스트멤버");
   await page.getByLabel("초대 이메일").fill(invitedEmail);
-  await page.getByRole("button", { name: "초대 링크 만들기" }).click();
-
-  const displayedInviteUrl = await page.getByLabel("생성된 초대 링크").inputValue();
-  await page.getByRole("button", { name: "초대 링크 복사" }).click();
-  await expect(page.getByRole("status")).toContainText("초대 링크를 복사했습니다.");
-  const inviteUrl = await page.evaluate(() => navigator.clipboard.readText());
-  expect(inviteUrl).toBe(displayedInviteUrl);
+  const createResponsePromise = page.waitForResponse((response) =>
+    response.request().method() === "POST"
+    && /\/api\/bff\/api\/host\/invitations\/?$/.test(new URL(response.url()).pathname),
+  );
+  await page.getByRole("button", { name: "초대 보내기" }).click();
+  const createResponse = await createResponsePromise;
+  expect(createResponse.ok()).toBe(true);
+  const created = await createResponse.json() as { acceptUrl?: string | null };
+  expect(created.acceptUrl).toBeTruthy();
+  const inviteUrl = created.acceptUrl!;
+  await expect(page.getByRole("status")).toContainText("초대를 보냈습니다.");
 
   await page.evaluate(async () => {
     const response = await fetch("/api/bff/api/auth/logout", { method: "POST" });

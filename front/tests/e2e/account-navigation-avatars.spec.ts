@@ -841,7 +841,7 @@ test("member roster and host attendance/member artwork stay frame-free at mobile
     await page.goto(`${APP_BASE}/host/members`);
     await expect(page.getByRole("tablist", { name: "멤버 관리" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "김책가방" })).toBeVisible();
-    const memberCard = page.locator(".rm-host-members-page__body article", {
+    const memberCard = page.getByRole("row").filter({
       has: page.getByRole("heading", { name: "김책가방" }),
     });
     await expectAvatarRoleSize(
