@@ -16,6 +16,7 @@ const ALLOWED_KINDS: ReadonlySet<MeetingLanguageAllowlistKind> = new Set([
   "technical-login-session",
   "wire-storage-compatibility",
   "historical-fixture",
+  "canonical-host-status-label",
 ]);
 
 type CopyHit = {
@@ -69,7 +70,7 @@ function scanLegacyCopy(): CopyHit[] {
 }
 
 describe("canonical meeting language inventory", () => {
-  it("allowlists only login-session, wire/storage, or historical fixtures", () => {
+  it("allowlists only login-session, wire/storage, historical fixtures, or canonical host status labels", () => {
     for (const entry of MEETING_LANGUAGE_ALLOWLIST) {
       expect(ALLOWED_KINDS.has(entry.kind)).toBe(true);
       expect(entry.owner.trim().length).toBeGreaterThan(0);

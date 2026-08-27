@@ -1,7 +1,8 @@
 export type MeetingLanguageAllowlistKind =
   | "technical-login-session"
   | "wire-storage-compatibility"
-  | "historical-fixture";
+  | "historical-fixture"
+  | "canonical-host-status-label";
 
 export type MeetingLanguageAllowlistEntry = {
   kind: MeetingLanguageAllowlistKind;
@@ -88,5 +89,47 @@ export const MEETING_LANGUAGE_ALLOWLIST: readonly MeetingLanguageAllowlistEntry[
     needle: "RSVP_RATE",
     owner: "platform-admin.analytics",
     removalCondition: "Remove when the analytics KPI contract key is renamed away from RSVP",
+  },
+  {
+    kind: "canonical-host-status-label",
+    relativePath: "features/host/model/host-session-workspace-model.ts",
+    needle: "공개 완료",
+    owner: "host",
+    removalCondition: "Remove only if the mandated host status labels no longer include 공개 완료",
+  },
+  {
+    kind: "canonical-host-status-label",
+    relativePath: "features/host/ui/host-session-editor.tsx",
+    needle: "공개 완료",
+    owner: "host",
+    removalCondition: "Remove only if the mandated host status labels no longer include 공개 완료",
+  },
+  {
+    kind: "canonical-host-status-label",
+    relativePath: "features/host/ui/meeting-ledger/host-meeting-ledger.tsx",
+    needle: "공개 완료",
+    owner: "host",
+    removalCondition: "Remove only if the mandated host status labels no longer include 공개 완료",
+  },
+  {
+    kind: "canonical-host-status-label",
+    relativePath: "features/host/ui/meeting-workspace/host-meeting-workspace.tsx",
+    needle: "공개 완료",
+    owner: "host",
+    removalCondition: "Remove only if the mandated host status labels no longer include 공개 완료",
+  },
+  {
+    kind: "canonical-host-status-label",
+    relativePath: "features/host/ui/session-workspace/host-session-workspace.tsx",
+    needle: "공개 완료",
+    owner: "host",
+    removalCondition: "Remove only if the mandated host status labels no longer include 공개 완료",
+  },
+  {
+    kind: "canonical-host-status-label",
+    relativePath: "features/host/ui/session-workspace/workspace-header.tsx",
+    needle: "공개 완료",
+    owner: "host",
+    removalCondition: "Remove only if the mandated host status labels no longer include 공개 완료",
   },
 ];
