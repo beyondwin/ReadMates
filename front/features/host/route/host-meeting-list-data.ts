@@ -1,8 +1,13 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { LoaderFunctionArgs } from "react-router";
-import type { HostSessionListPage, HostSessionTrashPage } from "@/features/host/api/host-contracts";
+import type {
+  HostSessionListPage,
+  HostSessionRecordLedgerPage,
+  HostSessionTrashPage,
+} from "@/features/host/api/host-contracts";
 import { normalizeHostSessionLedgerFilters, type HostSessionLedgerFilters } from "@/features/host/model/host-session-ledger-model";
 import { hostMeetingSessionListQuery, hostSessionTrashListQuery } from "@/features/host/queries/host-session-queries";
+import { hostSessionRecordLedgerQuery } from "@/features/host/queries/host-session-record-queries";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
@@ -17,7 +22,7 @@ export function hostMeetingListPageQuery(page: PageRequest, context: ExplicitRea
 }
 
 export type HostMeetingListRouteData =
-  | { view: "meeting"; page: HostSessionListPage | null }
+  | { view: "meeting"; page: HostSessionListPage | null; pastPage: HostSessionRecordLedgerPage | null }
   | {
       view: "trash";
       filters: HostSessionLedgerFilters;
@@ -41,11 +46,18 @@ export function hostMeetingListLoaderFactory(client: QueryClient) {
         ).catch(recoverableHostListLoaderFailure),
       };
     }
-    return {
-      view: "meeting",
-      page: await client.fetchQuery(
+    const [page, pastPage] = await Promise.all([
+      client.fetchQuery(
         hostMeetingListPageQuery({ limit: HOST_MEETING_LIST_PAGE_LIMIT }, context),
       ).catch(recoverableHostListLoaderFailure),
+      client.fetchQuery(
+        hostSessionRecordLedgerQuery({ page: { limit: HOST_MEETING_LIST_PAGE_LIMIT } }, context),
+      ).catch(recoverableHostListLoaderFailure),
+    ]);
+    return {
+      view: "meeting",
+      page,
+      pastPage,
     };
   };
 }

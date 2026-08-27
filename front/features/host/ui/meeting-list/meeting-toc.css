@@ -103,6 +103,23 @@
   color: var(--text-3);
 }
 
+.rm-meeting-toc__section-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  border: 1px solid var(--warning-line);
+  background: var(--warning-soft);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.rm-meeting-toc__section-state .small {
+  margin: 0;
+}
+
 .rm-meeting-toc__list {
   margin: 0;
   padding: 0;

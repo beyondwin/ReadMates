@@ -19,10 +19,13 @@ import {
   hostMeetingListPageQuery,
   type HostMeetingListRouteData,
 } from "./host-meeting-list-data";
+import { hostSessionRecordLedgerQuery } from "@/features/host/queries/host-session-record-queries";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
 import { HOST_ROUTE_HREFS } from "@/shared/routing/host-route-destinations";
 import "@/features/host/ui/host-editorial-ledger.css";
+
+const PAST_FIRST_REQUEST = { page: { limit: HOST_MEETING_LIST_PAGE_LIMIT } } as const;
 
 export function HostMeetingListRoute({
   LinkComponent,
@@ -72,6 +75,11 @@ function MeetingListBody({
     ...hostMeetingListPageQuery(firstRequest, context),
     initialData: loaderData.page ?? undefined,
   });
+  const pastQuery = useQuery({
+    ...hostSessionRecordLedgerQuery(PAST_FIRST_REQUEST, context),
+    initialData: loaderData.pastPage ?? undefined,
+    retry: false,
+  });
   const [state, setState] = useState<HostMeetingListState>({
     baseUpdatedAt: query.dataUpdatedAt,
     appendedItems: [],
@@ -81,16 +89,41 @@ function MeetingListBody({
     focusHeadingRevision: 0,
     replaceHref: null,
   });
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [pastState, setPastState] = useState<HostMeetingListState>({
+    baseUpdatedAt: pastQuery.dataUpdatedAt,
+    appendedItems: [],
+    nextCursor: loaderData.pastPage?.nextCursor ?? null,
+    paginationStarted: false,
+    announcement: null,
+    focusHeadingRevision: 0,
+    replaceHref: null,
+  });
+  const [loadingMoreUpcoming, setLoadingMoreUpcoming] = useState(false);
+  const [loadingMorePast, setLoadingMorePast] = useState(false);
+
   const basePage = query.data ?? loaderData.page;
   const visibleState = state.baseUpdatedAt === query.dataUpdatedAt || !basePage
     ? state
     : hostMeetingListBaseRefresh(state, query.dataUpdatedAt, basePage.nextCursor);
   const nextCursor = hostMeetingListNextCursor(visibleState, basePage?.nextCursor ?? null);
 
-  const loadMore = async () => {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
+  const basePastPage = pastQuery.data ?? loaderData.pastPage;
+  const visiblePastState = pastState.baseUpdatedAt === pastQuery.dataUpdatedAt || !basePastPage
+    ? pastState
+    : hostMeetingListBaseRefresh(pastState, pastQuery.dataUpdatedAt, basePastPage.nextCursor);
+  const pastNextCursor = hostMeetingListNextCursor(
+    visiblePastState,
+    basePastPage?.nextCursor ?? null,
+  );
+
+  const pastUnavailable = !basePastPage && (
+    pastQuery.isError
+    || (loaderData.pastPage === null && !pastQuery.isPending && !pastQuery.isFetching)
+  );
+
+  const loadMoreUpcoming = async () => {
+    if (!nextCursor || loadingMoreUpcoming) return;
+    setLoadingMoreUpcoming(true);
     try {
       const nextPage = await queryClient.fetchQuery(
         hostMeetingListPageQuery({ limit: HOST_MEETING_LIST_PAGE_LIMIT, cursor: nextCursor }, context),
@@ -117,34 +150,78 @@ function MeetingListBody({
         setState((current) => ({ ...current, announcement: "다음 모임을 불러오지 못했습니다." }));
       }
     } finally {
-      setLoadingMore(false);
+      setLoadingMoreUpcoming(false);
     }
   };
 
-  // Task 2 temporary prop bridge — Task 3 wires past pages + dual load-more properly.
+  const loadMorePast = async () => {
+    if (!pastNextCursor || loadingMorePast || !basePastPage) return;
+    setLoadingMorePast(true);
+    try {
+      const nextPage = await queryClient.fetchQuery(
+        hostSessionRecordLedgerQuery({
+          page: { limit: HOST_MEETING_LIST_PAGE_LIMIT, cursor: pastNextCursor },
+        }, context),
+      );
+      setPastState((current) => {
+        const currentBase = current.baseUpdatedAt === pastQuery.dataUpdatedAt
+          ? current
+          : hostMeetingListBaseRefresh(current, pastQuery.dataUpdatedAt, basePastPage.nextCursor);
+        return {
+          ...currentBase,
+          appendedItems: [...currentBase.appendedItems, ...nextPage.items],
+          nextCursor: nextPage.nextCursor,
+          paginationStarted: true,
+          announcement: null,
+          replaceHref: null,
+        };
+      });
+    } catch (error) {
+      if (isReadmatesApiError(error) && error.code === "LIST_CURSOR_STALE") {
+        setPastState((current) => hostListCursorRecovery(current, canonicalHref));
+        await navigate(canonicalHref, { replace: true });
+        await pastQuery.refetch();
+      } else {
+        setPastState((current) => ({ ...current, announcement: "지난 모임을 더 불러오지 못했습니다." }));
+      }
+    } finally {
+      setLoadingMorePast(false);
+    }
+  };
+
+  const announcement = visibleState.announcement ?? visiblePastState.announcement;
+  const focusHeadingRevision = Math.max(
+    visibleState.focusHeadingRevision,
+    visiblePastState.focusHeadingRevision,
+  );
+
   const sections = buildHostMeetingTocSections({
     basePath: "/app/host",
     upcomingItems: [...(basePage?.items ?? []), ...visibleState.appendedItems],
     upcomingCursor: nextCursor,
-    pastItems: [],
-    pastCursor: null,
+    pastItems: pastUnavailable
+      ? []
+      : [...(basePastPage?.items ?? []), ...visiblePastState.appendedItems],
+    pastCursor: pastUnavailable ? null : pastNextCursor,
   });
 
   return (
     <HostMeetingList
       sections={sections}
-      onLoadMoreUpcoming={() => void loadMore()}
-      onLoadMorePast={() => {}}
-      loadingMoreUpcoming={loadingMore}
-      loadingMorePast={false}
+      onLoadMoreUpcoming={() => void loadMoreUpcoming()}
+      onLoadMorePast={() => void loadMorePast()}
+      loadingMoreUpcoming={loadingMoreUpcoming}
+      loadingMorePast={loadingMorePast}
       trashHref={HOST_ROUTE_HREFS.trashCompatibility}
       newMeetingHref={HOST_ROUTE_HREFS.newSession}
       LinkComponent={LinkComponent}
-      announcement={visibleState.announcement}
-      focusHeadingRevision={visibleState.focusHeadingRevision}
+      announcement={announcement}
+      focusHeadingRevision={focusHeadingRevision}
       loading={query.isPending && !basePage}
       errorMessage={query.isError && !basePage ? "모임을 불러오지 못했습니다." : null}
       onRetry={() => void query.refetch()}
+      pastErrorMessage={pastUnavailable ? "지난 모임을 불러오지 못했습니다." : null}
+      onRetryPast={() => void pastQuery.refetch()}
     />
   );
 }

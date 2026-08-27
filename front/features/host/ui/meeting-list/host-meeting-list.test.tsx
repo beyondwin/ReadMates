@@ -140,6 +140,24 @@ describe("HostMeetingList", () => {
     expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*\.rm-meeting-toc__row[\s\S]*min-height:\s*44px/);
   });
 
+  it("shows a past-section retry row without collapsing into the first-meeting empty state", async () => {
+    const onRetryPast = vi.fn();
+    renderList({
+      sections: {
+        upcoming: { rows: [upcomingRow], nextCursor: null },
+        past: { rows: [], nextCursor: null },
+      },
+      pastErrorMessage: "지난 모임을 불러오지 못했습니다.",
+      onRetryPast,
+    });
+
+    const past = screen.getByRole("region", { name: "지난 모임" });
+    expect(within(past).getByText("지난 모임을 불러오지 못했습니다.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "첫 모임 만들기" })).not.toBeInTheDocument();
+    await userEvent.click(within(past).getByRole("button", { name: "다시 시도" }));
+    expect(onRetryPast).toHaveBeenCalledOnce();
+  });
+
   it("loads more within each section independently", async () => {
     const onLoadMoreUpcoming = vi.fn();
     const onLoadMorePast = vi.fn();

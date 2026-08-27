@@ -22,6 +22,8 @@ function TocSection({
   loadingMore,
   onLoadMore,
   emptyCopy,
+  errorMessage = null,
+  onRetry,
   LinkComponent,
 }: {
   title: string;
@@ -30,6 +32,8 @@ function TocSection({
   loadingMore: boolean;
   onLoadMore: () => void;
   emptyCopy: string;
+  errorMessage?: string | null;
+  onRetry?: () => void;
   LinkComponent: HostLinkComponent;
 }) {
   return (
@@ -37,7 +41,16 @@ function TocSection({
       <div className="rm-meeting-toc__section-head">
         <h2 className="rm-meeting-toc__section-title">{title}</h2>
       </div>
-      {rows.length === 0 ? (
+      {errorMessage ? (
+        <div className="rm-meeting-toc__section-state" role="alert">
+          <p className="small">{errorMessage}</p>
+          {onRetry ? (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={onRetry}>
+              다시 시도
+            </button>
+          ) : null}
+        </div>
+      ) : rows.length === 0 ? (
         <p className="small rm-meeting-toc__section-empty">{emptyCopy}</p>
       ) : (
         <ol className="rm-meeting-toc__list" aria-label={title}>
@@ -46,7 +59,7 @@ function TocSection({
           ))}
         </ol>
       )}
-      {nextCursor ? (
+      {!errorMessage && nextCursor ? (
         <button
           type="button"
           className="btn btn-ghost rm-meeting-toc__more"
@@ -74,6 +87,8 @@ export function HostMeetingList({
   loading = false,
   errorMessage = null,
   onRetry,
+  pastErrorMessage = null,
+  onRetryPast,
 }: {
   sections: HostMeetingTocSections;
   onLoadMoreUpcoming: () => void;
@@ -88,10 +103,14 @@ export function HostMeetingList({
   loading?: boolean;
   errorMessage?: string | null;
   onRetry?: () => void;
+  pastErrorMessage?: string | null;
+  onRetryPast?: () => void;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const previousFocusRevision = useRef(focusHeadingRevision);
-  const isEmpty = sections.upcoming.rows.length === 0 && sections.past.rows.length === 0;
+  const isEmpty = !pastErrorMessage
+    && sections.upcoming.rows.length === 0
+    && sections.past.rows.length === 0;
   const showCreate = !loading && !errorMessage && !isEmpty;
 
   useEffect(() => {
@@ -169,6 +188,8 @@ export function HostMeetingList({
               loadingMore={loadingMorePast}
               onLoadMore={onLoadMorePast}
               emptyCopy="지난 모임이 없습니다."
+              errorMessage={pastErrorMessage}
+              onRetry={onRetryPast}
               LinkComponent={LinkComponent}
             />
             <div className="rm-meeting-toc__foot">
