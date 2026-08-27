@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/experimental-ct-react";
 import { AdminSupportWorkbench, type AdminSupportWorkbenchProps } from "./admin-support-workbench";
+import "./admin-editorial-ledger.css";
 
 test.use({ timezoneId: "UTC" });
 
@@ -96,6 +97,8 @@ const selectedSupportProps: AdminSupportWorkbenchProps = {
 
 test("AdminSupportWorkbench remains operable at a narrow width", async ({ mount }) => {
   const component = await mount(<div style={{ width: 320 }}><AdminSupportWorkbench {...selectedSupportProps} /></div>);
+  await expect(component.getByRole("heading", { name: "접근 원장" })).toBeVisible();
   await expect(component.getByRole("button", { name: "발급 검토" })).toBeVisible();
   await expect(component.getByRole("button", { name: "권한 취소 검토" })).toBeVisible();
+  await expect(component).toHaveScreenshot("admin-support-workbench-selected.png");
 });
