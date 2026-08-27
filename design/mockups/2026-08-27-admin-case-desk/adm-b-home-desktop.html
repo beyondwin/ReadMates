@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>어드민 B안 · 운영 서사 — 홈 (데스크톱)</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="mock.css">
+<style>
+  .narr-top {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 0; border-bottom: 1px solid var(--line);
+  }
+  .narr-top .brand { display: flex; align-items: baseline; gap: 10px; }
+  .narr-top .brand strong { font-size: 17px; }
+  .narr-top nav { display: flex; gap: 4px; }
+  .narr-top nav a { padding: 8px 14px; font-size: 14px; color: var(--text-2); border-radius: var(--r-2); }
+  .narr-top nav a[aria-current] { color: var(--text); font-weight: 600; }
+
+  .narrative {
+    font-size: 30px; line-height: 1.5; letter-spacing: -0.018em; font-weight: 500;
+    max-width: 30ch; word-break: keep-all;
+  }
+  .narrative .warn-word { color: var(--warn); font-weight: 600; border-bottom: 2px solid var(--warn-soft); }
+  .narrative .ok-word { color: var(--text); font-weight: 600; }
+
+  .attn-card {
+    border: 1px solid color-mix(in oklch, var(--warn), transparent 60%);
+    background: var(--warn-soft); border-radius: var(--r-3);
+    padding: 20px 24px; margin-top: 36px;
+  }
+  .idx-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 1px solid var(--line); margin-top: 56px; }
+  .idx-cell { padding: 22px 20px 26px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line-soft); }
+  .idx-cell:nth-child(3n) { border-right: 0; }
+  .idx-cell .t { font-size: 15px; font-weight: 600; }
+  .idx-cell .d { font-size: 12px; color: var(--text-3); margin-top: 5px; line-height: 1.6; }
+  .idx-cell a { color: var(--accent); font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
+  .change-line { display: grid; grid-template-columns: 110px 1fr; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); font-size: 15px; }
+  .change-line time { font-family: var(--f-mono); font-size: 12px; color: var(--text-4); padding-top: 3px; }
+</style>
+</head>
+<body>
+
+<div class="mock-container mock-container--sm">
+
+  <header class="narr-top">
+    <div class="brand">
+      <strong>읽는사이</strong>
+      <span class="mock-mode">플랫폼 운영</span>
+    </div>
+    <nav>
+      <a href="#" aria-current="page">오늘</a>
+      <a href="#">클럽</a>
+      <a href="#">파이프라인</a>
+      <a href="#">원장</a>
+    </nav>
+    <span class="tiny" style="font-family:var(--f-mono); color:var(--text-4);">21:36 기준</span>
+  </header>
+
+  <main style="padding: 72px 0 90px;">
+
+    <p class="eyebrow" style="margin:0 0 20px;">2026년 8월 27일 수요일 저녁</p>
+
+    <h1 class="narrative" style="margin:0;">
+      세 클럽 모두 살아 있고, 서비스는 <span class="ok-word">정상</span>입니다.
+      다만 <span class="warn-word">밤의 독서회의 알림 스물네 건</span>이
+      배달에 실패해 손길을 기다립니다.
+    </h1>
+
+    <section class="attn-card" aria-label="주의">
+      <div class="row-between" style="align-items:baseline;">
+        <strong style="font-size:15px; color:var(--warn);">알림 배달 실패 · 재시도 소진 8건</strong>
+        <span class="tiny" style="font-family:var(--f-mono); color:var(--text-3);">첫 실패 15:12</span>
+      </div>
+      <p class="small" style="margin:8px 0 0; color:var(--text-2);">
+        자동 재시도 16건이 22:10에 다시 시도됩니다. 소진된 8건만 결정이 필요합니다.
+      </p>
+      <div class="row" style="gap:8px; margin-top:14px;">
+        <button class="btn btn-primary btn-sm">케이스 열기</button>
+        <button class="btn btn-quiet btn-sm">잦아들 때까지 보류</button>
+      </div>
+    </section>
+
+    <section aria-label="최근 변경" style="margin-top:56px;">
+      <div class="hairline-title"><h2 class="h4" style="margin:0;">최근에 바뀐 것</h2></div>
+      <div style="margin-top:8px;">
+        <div class="change-line"><time>19:40</time><span>프런트엔드 배포 v2.6.3 — 이상 없음</span></div>
+        <div class="change-line"><time>14:02</time><span>새벽 서가, 커스텀 도메인 재검증 시작 (진행 중)</span></div>
+        <div class="change-line"><time>어제</time><span>AI 정리본 제안 정책을 '검토 후 반영'으로 변경</span></div>
+      </div>
+    </section>
+
+    <section class="idx-grid" aria-label="색인">
+      <div class="idx-cell">
+        <div class="t">클럽 3</div>
+        <div class="d">모두 활동 중 · 공개 전환 검토 1건 대기</div>
+        <a href="#">클럽 장부</a>
+      </div>
+      <div class="idx-cell">
+        <div class="t">알림 배달</div>
+        <div class="d">오늘 132건 중 108건 도달 · 실패 24건은 위 케이스</div>
+        <a href="#">배달 원장</a>
+      </div>
+      <div class="idx-cell">
+        <div class="t">AI 작업</div>
+        <div class="d">진행 1 · 멈춤 1 (40분) · 결정론 경로 정상</div>
+        <a href="#">작업 목록</a>
+      </div>
+      <div class="idx-cell">
+        <div class="t">지원 접근</div>
+        <div class="d">활성 세션 없음 · 이번 달 발급 1건 (만료됨)</div>
+        <a href="#">접근 원장</a>
+      </div>
+      <div class="idx-cell">
+        <div class="t">운영 기입</div>
+        <div class="d">오늘 6건 기입 · 차단된 시도 없음</div>
+        <a href="#">전체 원장</a>
+      </div>
+      <div class="idx-cell">
+        <div class="t">긴급 공개 회수</div>
+        <div class="d">진행 중인 회수 없음 · 파기 예정 0건</div>
+        <a href="#">회수 레인</a>
+      </div>
+    </section>
+
+    <p class="tiny" style="margin-top:28px; color:var(--text-4);">
+      정상인 항목은 숫자를 펼치지 않습니다 · 이탈이 생기면 해당 구역이 위로 올라옵니다
+    </p>
+
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>어드민 A안 · 케이스 데스크 — 오늘 (데스크톱)</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="mock.css">
+<style>
+  .adm-shell { display: grid; grid-template-columns: 210px minmax(0, 1fr); min-height: 100vh; }
+  .adm-nav { border-right: 1px solid var(--line); background: var(--bg-sub); padding: 24px 18px; display: flex; flex-direction: column; }
+  .adm-nav .brand strong { display: block; font-size: 24px; letter-spacing: -0.015em; }
+  .adm-nav .brand span { font-size: 12px; color: var(--text-3); }
+  .adm-nav a {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 8px 10px; margin-top: 2px; border-radius: var(--r-2); font-size: 15px; color: var(--text-2);
+  }
+  .adm-nav a[aria-current] { background: var(--bg); color: var(--text); font-weight: 600; box-shadow: inset 2px 0 0 var(--accent); }
+  .adm-nav a .n { font-family: var(--f-mono); font-size: 12px; color: var(--accent); }
+  .adm-nav .grp { font-size: 12px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-4); font-weight: 600; margin: 20px 0 4px; }
+  .adm-nav .foot { margin-top: auto; font-size: 12px; color: var(--text-4); line-height: 1.6; }
+
+  .alarm-bar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 28px; border-bottom: 1px solid var(--line);
+    background: var(--bg); font-size: 12px; color: var(--text-3);
+  }
+  .alarm-bar .live { display: inline-flex; align-items: center; gap: 6px; color: var(--warn); font-weight: 600; }
+  .alarm-bar .live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
+  .alarm-bar .asof { margin-left: auto; font-family: var(--f-mono); }
+
+  .desk { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 0; }
+  .queue-pane { border-right: 1px solid var(--line); padding: 24px 0 60px; }
+  .queue-pane .pane-head { padding: 0 24px 12px; }
+  .case-row {
+    display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px;
+    padding: 14px 24px; border-top: 1px solid var(--line-soft); cursor: pointer;
+  }
+  .case-row[aria-selected="true"] { background: var(--bg-sub); box-shadow: inset 3px 0 0 var(--accent); }
+  .case-row .head { font-size: 15px; font-weight: 600; }
+  .case-row .sub { font-size: 12px; color: var(--text-3); margin-top: 3px; }
+  .case-row .age { font-family: var(--f-mono); font-size: 12px; color: var(--text-4); white-space: nowrap; }
+  .case-row.quietened { opacity: 0.55; }
+
+  .docket { padding: 24px 32px 60px; }
+  .docket-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .docket-nav .count { font-family: var(--f-mono); font-size: 12px; color: var(--text-4); }
+  .verdict { font-size: 24px; line-height: 1.35; letter-spacing: -0.015em; font-weight: 600; margin: 0; }
+  .sig-row { display: grid; grid-template-columns: 150px 1fr; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--line-soft); font-size: 15px; }
+  .sig-row .k { font-size: 12px; color: var(--text-3); padding-top: 3px; letter-spacing: 0.04em; }
+  .sig-row .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+  .cmd-dock { display: flex; gap: 8px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+  .ledger-inline { margin-top: 10px; }
+  .ledger-inline .li { display: grid; grid-template-columns: 104px 1fr; gap: 14px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); font-size: 12px; color: var(--text-3); }
+  .ledger-inline .li time { font-family: var(--f-mono); color: var(--text-4); }
+  .sec-h { display: flex; align-items: baseline; gap: 12px; margin: 30px 0 8px; }
+  .sec-h h2 { margin: 0; font-size: 15px; font-weight: 600; }
+  .sec-h::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+</style>
+</head>
+<body>
+
+<div class="adm-shell">
+
+  <nav class="adm-nav" aria-label="운영 콘솔">
+    <div class="brand" style="margin-bottom:22px;">
+      <strong>읽는사이</strong>
+      <span>플랫폼 운영</span>
+    </div>
+    <a href="#" aria-current="page">오늘 <span class="n">4</span></a>
+    <a href="#">클럽</a>
+    <div class="grp">파이프라인</div>
+    <a href="#">알림 배달</a>
+    <a href="#">AI 작업</a>
+    <div class="grp">원장</div>
+    <a href="#">운영 기입</a>
+    <a href="#">지원 접근</a>
+    <a href="#">분석</a>
+    <div class="foot">모든 명령은 기입으로 남습니다<br>긴급 공개 회수 ↗</div>
+  </nav>
+
+  <div>
+    <div class="alarm-bar" role="status">
+      <span class="live">주의 1건 — 밤의 독서회 알림 실패</span>
+      <span>미확인 신호 없음 · 서비스 정상</span>
+      <span class="asof">21:36 기준</span>
+    </div>
+
+    <main class="desk">
+
+      <section class="queue-pane" aria-label="오늘 케이스 큐">
+        <div class="pane-head row-between" style="align-items:baseline;">
+          <div>
+            <p class="eyebrow" style="margin:0;">운영 · 오늘</p>
+            <h1 class="h2 editorial" style="margin:6px 0 0;">케이스 4건</h1>
+          </div>
+          <span class="tiny" style="color:var(--text-4);">보류 2건 숨김 · 보기</span>
+        </div>
+
+        <div class="case-row" aria-selected="true">
+          <div>
+            <div class="head">밤의 독서회 · 알림 발송 실패 24건</div>
+            <div class="sub">파이프라인 · 재시도 소진 8건 포함 · 신호 2개</div>
+          </div>
+          <span class="age">2시간</span>
+        </div>
+        <div class="case-row">
+          <div>
+            <div class="head">새벽 서가 · 커스텀 도메인 검증 실패</div>
+            <div class="sub">클럽 · DNS 레코드 불일치 · 신호 1개</div>
+          </div>
+          <span class="age">5시간</span>
+        </div>
+        <div class="case-row">
+          <div>
+            <div class="head">AI 정리본 작업 1건 멈춤</div>
+            <div class="sub">AI 작업 · 40분째 진행 없음 · 결정론 경로 정상</div>
+          </div>
+          <span class="age">40분</span>
+        </div>
+        <div class="case-row">
+          <div>
+            <div class="head">목요일 밤 · 공개 전환 검토 요청</div>
+            <div class="sub">클럽 · 호스트 요청 · 공개 전 점검 4항목</div>
+          </div>
+          <span class="age">1일</span>
+        </div>
+        <div class="case-row quietened">
+          <div>
+            <div class="head">지난 주 처리 12건</div>
+            <div class="sub">처리한 케이스는 운영 기입에서 열람</div>
+          </div>
+          <span class="age">→</span>
+        </div>
+      </section>
+
+      <section class="docket" aria-label="증거 도켓">
+        <div class="docket-nav">
+          <span class="count">케이스 1 / 4</span>
+          <span class="row" style="gap:6px;">
+            <button class="btn btn-quiet btn-sm">‹ 이전</button>
+            <button class="btn btn-quiet btn-sm">다음 ›</button>
+          </span>
+        </div>
+
+        <p class="eyebrow" style="margin:0 0 8px;">파이프라인 · 알림 배달</p>
+        <h2 class="verdict">밤의 독서회의 알림 발송이 지난 6시간 동안 24건 실패했습니다.</h2>
+        <p class="small" style="margin:10px 0 0; color:var(--text-2);">
+          자동 재시도가 16건에 남아 있습니다 — 다음 재시도 22:10. 재시도가 소진된 8건만 지금 결정이 필요합니다.
+        </p>
+
+        <div class="sec-h"><h2>발화한 신호</h2></div>
+        <div class="sig-row"><span class="k">실패율</span><span class="num">지난 6시간 24 / 132건 (18%) — 임계 5% 초과</span></div>
+        <div class="sig-row"><span class="k">오류 분류</span><span>수신 서버 일시 거부 (4xx 아님) · 같은 원인 클러스터 1개</span></div>
+
+        <div class="sec-h"><h2>증거</h2></div>
+        <div class="sig-row"><span class="k">재시도 소진</span><span class="num">8건 · 참석 확인 알림 · 첫 실패 15:12</span></div>
+        <div class="sig-row"><span class="k">멱등키</span><span class="num">disp-9f2···a1 외 7건 — 중복 발송 없음 확인됨</span></div>
+        <div class="sig-row"><span class="k">원문</span><span><a href="#" style="text-decoration:underline; text-underline-offset:3px;">실패 8건 원시 기록 열기</a> · 집계 → 클러스터 → 원문 순으로 확대</span></div>
+
+        <div class="sec-h"><h2>명령</h2></div>
+        <p class="tiny" style="margin:0 0 4px; color:var(--text-4);">수동 재발송은 남은 자동 재시도를 취소하지 않습니다.</p>
+        <div class="cmd-dock">
+          <button class="btn btn-primary">소진된 8건 재발송</button>
+          <button class="btn btn-secondary">신호 잦아들 때까지 보류</button>
+          <button class="btn btn-quiet">무시 (사유 필요)</button>
+        </div>
+
+        <div class="sec-h"><h2>이 클럽의 최근 기입</h2></div>
+        <div class="ledger-inline">
+          <div class="li"><time>어제 19:40</time><span>참석 확인 알림 발송 — 12명 중 12명 도달 · 성공</span></div>
+          <div class="li"><time>8.24 11:02</time><span>운영자가 공개 기록 1건 내림 · 사유: 호스트 요청 · 성공</span></div>
+          <div class="li"><time>8.21 09:15</time><span>커스텀 도메인 재검증 — 통과</span></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+</body>
+</html>
