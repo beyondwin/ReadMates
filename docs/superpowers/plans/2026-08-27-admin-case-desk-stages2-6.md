@@ -284,6 +284,6 @@ export function AdminTargetLedgerInline({ entries, moreHref }: {
 
 (실행자가 기입: 서버 후속 / 이월 결함 / 계획 이탈 결정)
 
-- 3-2: 서버에 dismiss API 없음. 무시는 기존 `SNOOZE`(최대 7일) + 사유 필수로 구현. snooze 요청 DTO는 unknown field를 거부하므로 사유를 HTTP body에 넣지 않음 — 사유 보존은 서버 후속.
+- 3-2: 서버에 dismiss API 없음. 무시는 기존 `SNOOZE`(최대 7일) + 화면 사유 필수로 구현. snooze 요청 DTO는 unknown field를 거부하므로 사유를 HTTP body에 넣지 않음 — **무시 사유는 UI-gated이며 persist되지 않음.** 사유 보존은 서버 후속.
 - 4-2: 활성 support grant를 전역 알람 바 attention 후보에 넣으려면 서버 요약(또는 2-1 훅의 support 쿼리)이 필요함. 이번 화면은 PageContext scope `활성 접근 N건`만 표기.
 - 5-1: `platform-admin-workbench-model.ts`에 retry 필드 없음. Outbox는 `nextAttemptAt`이 있을 때만 "다음 재시도 예정" 표기. Delivery 응답에는 next-retry 필드가 없어 UI 생략(가짜 시각 없음). Failure cluster 응답은 `safeErrorCode/status/count/latestAt`만 — 클럽·알림 유형은 서버 후속. 현재는 같은 오류 코드의 로드된 outbox/delivery 행으로 문장을 보강.

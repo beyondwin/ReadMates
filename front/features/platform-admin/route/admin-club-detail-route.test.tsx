@@ -300,7 +300,7 @@ describe("AdminClubDetailRoute", () => {
   it("hides the support grant metric without VIEW_SUPPORT", () => {
     renderRoute(detail, ["VIEW_CLUBS", "VIEW_CLUB_OPERATIONS"]);
     expect(screen.getByText("Alpha 운영 스냅샷")).toBeInTheDocument();
-    expect(screen.queryByText("지원 grant")).not.toBeInTheDocument();
+    expect(screen.queryByText("접근 발급")).not.toBeInTheDocument();
   });
 
   it("shows support grant unavailability and retries a permitted failed query", async () => {
@@ -313,10 +313,10 @@ describe("AdminClubDetailRoute", () => {
       false,
     );
     await waitFor(() =>
-      expect(screen.getByText("지원 grant 확인 불가")).toBeInTheDocument(),
+      expect(screen.getByText("접근 발급 확인 불가")).toBeInTheDocument(),
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "지원 grant 다시 시도" }),
+      screen.getByRole("button", { name: "접근 발급 다시 시도" }),
     );
     await waitFor(() =>
       expect(fetchAdminSupportGrantLedger).toHaveBeenCalledTimes(2),

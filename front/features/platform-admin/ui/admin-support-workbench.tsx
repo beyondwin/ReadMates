@@ -104,7 +104,7 @@ export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
   return (
     <div className="admin-support-workbench">
       <AdminPageContext
-        eyebrow="검토"
+        eyebrow={ADMIN_COPY.eyebrow.ledger}
         heading={ADMIN_COPY.heading.access}
         description="민감한 대상 정보는 이 화면을 떠나면 즉시 폐기됩니다."
         scope={activeGrants > 0 ? `활성 접근 ${activeGrants}건` : undefined}

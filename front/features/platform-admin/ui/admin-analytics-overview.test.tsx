@@ -50,6 +50,7 @@ describe("AdminAnalyticsOverviewView", () => {
     );
 
     expect(screen.getByRole("heading", { level: 1, name: "분석 부록" })).toBeInTheDocument();
+    expect(screen.getByText("원장")).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByRole("region", { name: "분석 부록" })).toHaveClass("admin-page-frame");
     expect(screen.getAllByText("모임 완료율").length).toBeGreaterThanOrEqual(1);

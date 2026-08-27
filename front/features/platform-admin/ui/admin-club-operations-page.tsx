@@ -56,17 +56,17 @@ export function AdminClubOperationsPage({
         <Metric label="활성 멤버" value={snapshot.memberActivity.activeCount} inventory />
         <Metric label="호스트" value={snapshot.memberActivity.hostCount} inventory />
         {supportGrantCount !== undefined ? (
-          <Metric label="지원 grant" value={supportGrantCount} />
+          <Metric label={ADMIN_COPY.support.count} value={supportGrantCount} />
         ) : supportGrantUnavailable ? (
           <article className="surface admin-club-operations__metric">
-            <p className="tiny muted">지원 grant 확인 불가</p>
+            <p className="tiny muted">{ADMIN_COPY.support.unavailable}</p>
             {onRetrySupportGrants ? (
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
                 onClick={onRetrySupportGrants}
               >
-                지원 grant 다시 시도
+                {ADMIN_COPY.support.retry}
               </button>
             ) : null}
           </article>

@@ -108,7 +108,7 @@ export function AdminAuditLedger({
   return (
     <div className="admin-audit">
       <AdminPageContext
-        eyebrow="검토"
+        eyebrow={ADMIN_COPY.eyebrow.ledger}
         heading={ADMIN_COPY.heading.audit}
         freshness={freshness}
       >

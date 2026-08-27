@@ -76,6 +76,7 @@ describe("AdminAuditLedger", () => {
     );
 
     expect(screen.getByRole("heading", { name: "운영 기입" })).toBeInTheDocument();
+    expect(screen.getByText("원장")).toBeInTheDocument();
     const notificationRow = screen.getByRole("button", { name: /알림 재처리가 확정되었습니다/ });
     expect(notificationRow).toBeInTheDocument();
     await user.click(notificationRow);

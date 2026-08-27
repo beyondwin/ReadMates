@@ -454,6 +454,16 @@ export function AdminTodayRoute() {
   }
 
   const permissionDenied = mutationPermissionDenied || hasHttpStatus(detailQuery.error, 403);
+  function advanceAfterQueueExit(nextId: string | null) {
+    return (ok: boolean) => {
+      if (!ok) return;
+      if (nextId) {
+        writeSearch({ caseId: nextId, mode: searchState.mode });
+        return;
+      }
+      document.querySelector<HTMLElement>('[aria-label="운영 케이스 요약"]')?.focus();
+    };
+  }
   const lifecycleControls = !permissionDenied && currentCase && currentCase.allowedActions.length > 0 ? (
     <AdminOperationStateActions
       allowedActions={currentCase.allowedActions}
@@ -468,14 +478,17 @@ export function AdminTodayRoute() {
           expectedVersion: currentCase.version,
         }),
       )}
-      onSnooze={(snoozedUntil) => void runMutation(
-        { caseId: currentCase.id, version: currentCase.version, confirmationKey: confirmationKey ?? "" },
-        () => snoozeMutation.mutateAsync({
-          caseId: currentCase.id,
-          expectedVersion: currentCase.version,
-          snoozedUntil,
-        }),
-      )}
+      onSnooze={(snoozedUntil) => {
+        const nextId = nextDocketCaseId(view.items, currentCase.id);
+        void runMutation(
+          { caseId: currentCase.id, version: currentCase.version, confirmationKey: confirmationKey ?? "" },
+          () => snoozeMutation.mutateAsync({
+            caseId: currentCase.id,
+            expectedVersion: currentCase.version,
+            snoozedUntil,
+          }),
+        ).then(advanceAfterQueueExit(nextId));
+      }}
       onResolve={() => {
         const nextId = nextDocketCaseId(view.items, currentCase.id);
         void runMutation(
@@ -484,14 +497,7 @@ export function AdminTodayRoute() {
             caseId: currentCase.id,
             expectedVersion: currentCase.version,
           }),
-        ).then((ok) => {
-          if (!ok) return;
-          if (nextId) {
-            writeSearch({ caseId: nextId, mode: searchState.mode });
-            return;
-          }
-          document.querySelector<HTMLElement>('[aria-label="운영 케이스 요약"]')?.focus();
-        });
+        ).then(advanceAfterQueueExit(nextId));
       }}
     />
   ) : null;

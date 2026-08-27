@@ -37,11 +37,13 @@ describe("AdminTodayControls", () => {
     await user.click(screen.getByRole("button", { name: "내 담당 2" }));
     expect(onViewChange).toHaveBeenCalledWith("mine");
 
-    await user.type(screen.getByRole("searchbox", { name: "이미 불러온 사건 검색" }), "알림");
+    await user.type(screen.getByRole("searchbox", { name: "이미 불러온 케이스 검색" }), "알림");
     expect(onQueryChange).toHaveBeenCalled();
 
     await user.selectOptions(screen.getByRole("combobox", { name: "상태 필터" }), "open");
     expect(onFilterChange).toHaveBeenCalledWith("state", "open");
+    expect(screen.getByRole("combobox", { name: "관측 출처 필터" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "모든 출처" })).toBeInTheDocument();
 
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
     expect(findNestedLiveRegions(container)).toEqual([]);

@@ -68,6 +68,7 @@ describe("AdminSupportWorkbench", () => {
   it("renders the page-context heading 접근 원장", () => {
     render(<AdminSupportWorkbench {...props()} />);
     expect(screen.getByRole("heading", { level: 1, name: "접근 원장" })).toBeInTheDocument();
+    expect(screen.getByText("원장")).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 

@@ -239,7 +239,7 @@ test("owner views aggregate club operations without host-owned commands", async 
     "href",
     "/clubs/reading-sai/app/host/sessions/session-7/closing",
   );
-  await expect(page.getByText("지원 grant")).toBeVisible();
+  await expect(page.getByText("접근 발급")).toBeVisible();
   await expect(page.getByRole("link", { name: "알림 ledger" })).toHaveAttribute(
     "href",
     `/admin/notifications?clubId=${CLUB_ID}`,

@@ -58,7 +58,7 @@ export function AdminAnalyticsOverviewView({
   return (
     <div className="admin-analytics">
       <AdminPageContext
-        eyebrow="검토"
+        eyebrow={ADMIN_COPY.eyebrow.ledger}
         heading={ADMIN_COPY.heading.analytics}
         action={
           <div className="admin-analytics__windows" role="group" aria-label="분석 기간 선택">

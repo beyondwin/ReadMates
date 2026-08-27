@@ -984,6 +984,69 @@ describe("AdminTodayRoute", () => {
     expect(operationsApi.resolve).toHaveBeenCalledWith("case-b", 3);
   });
 
+  it("advances to the next case after a mocked snooze success", async () => {
+    const user = userEvent.setup();
+    const cases = [
+      operationCase({
+        id: "case-a",
+        summaryCode: "NOTIFICATION_DELIVERY_FAILURE",
+        firstObservedAt: "2026-08-04T06:00:00Z",
+      }),
+      operationCase({
+        id: "case-b",
+        sourceType: "AI_JOB",
+        summaryCode: "AI_JOB_STALE",
+        firstObservedAt: "2026-08-04T07:00:00Z",
+        detailHref: "/admin/ai-ops",
+      }),
+      operationCase({
+        id: "case-c",
+        sourceType: "CLUB_READINESS",
+        summaryCode: "CLUB_SETUP_REQUIRED",
+        firstObservedAt: "2026-08-04T08:00:00Z",
+        detailHref: "/admin/clubs/club-1",
+      }),
+      operationCase({
+        id: "case-d",
+        sourceType: "CLOSING_RISK",
+        summaryCode: "SESSION_CLOSING_BLOCKED",
+        firstObservedAt: "2026-08-04T09:00:00Z",
+        detailHref: "/admin/clubs/club-1",
+      }),
+    ];
+    const snoozed = operationCase({
+      ...cases[1]!,
+      state: "SNOOZED",
+      snoozedUntil: "2026-08-04T14:00:00Z",
+      version: 4,
+      allowedActions: ["ACKNOWLEDGE", "RESOLVE"],
+    });
+    operationsApi.snooze.mockResolvedValue({
+      schema: "admin.operation_cases.v1",
+      ...snoozed,
+    });
+    operationsApi.fetchList.mockResolvedValue(listResponse([cases[0]!, snoozed, cases[2]!, cases[3]!]));
+    operationsApi.fetchDetail.mockImplementation(async (caseId: string) => {
+      const item = caseId === "case-b" ? snoozed : cases.find((entry) => entry.id === caseId) ?? snoozed;
+      return detailResponse(item);
+    });
+    renderRoute(seededClient(cases), "/admin/today?case=case-b");
+
+    expect(await screen.findByText("케이스 2 / 4")).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "보류" }));
+    await user.type(screen.getByLabelText("보류 사유"), "후속 관찰");
+    await user.click(screen.getByRole("button", { name: "보류 확정" }));
+
+    expect(await screen.findByText("케이스 3 / 4")).toBeInTheDocument();
+    expect(screen.getByLabelText("current location")).toHaveTextContent("case=case-c");
+    expect(screen.getByRole("button", { name: /클럽 설정이 필요합니다/ })).toHaveAttribute("aria-pressed", "true");
+    expect(operationsApi.snooze).toHaveBeenCalledWith(
+      "case-b",
+      3,
+      expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+    );
+  });
+
   it("returns focus to the queue summary after resolving the last case", async () => {
     const user = userEvent.setup();
     const last = operationCase({ id: "case-last" });
@@ -1012,5 +1075,39 @@ describe("AdminTodayRoute", () => {
     expect(screen.getByLabelText("current location")).toHaveTextContent("case=case-last");
     expect(screen.getByRole("button", { name: "다음 ›" })).toBeDisabled();
     expect(operationsApi.resolve).toHaveBeenCalledWith("case-last", 3);
+  });
+
+  it("returns focus to the queue summary after ignoring the last case", async () => {
+    const user = userEvent.setup();
+    const last = operationCase({ id: "case-last" });
+    const snoozed = operationCase({
+      id: "case-last",
+      state: "SNOOZED",
+      snoozedUntil: "2026-08-11T10:00:00Z",
+      version: 4,
+      allowedActions: ["ACKNOWLEDGE", "RESOLVE"],
+    });
+    operationsApi.snooze.mockResolvedValue({
+      schema: "admin.operation_cases.v1",
+      ...snoozed,
+    });
+    operationsApi.fetchList.mockResolvedValue(listResponse([snoozed]));
+    operationsApi.fetchDetail.mockResolvedValue(detailResponse(snoozed));
+    renderRoute(seededClient([last]), "/admin/today?case=case-last");
+
+    expect(await screen.findByText("케이스 1 / 1")).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "무시" }));
+    await user.type(screen.getByLabelText("무시 사유"), "중복 신호로 판단");
+    await user.click(screen.getByRole("button", { name: "무시 확정" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("운영 케이스 요약")).toHaveFocus();
+    });
+    expect(screen.getByLabelText("current location")).toHaveTextContent("case=case-last");
+    expect(operationsApi.snooze).toHaveBeenCalledWith(
+      "case-last",
+      3,
+      expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+    );
   });
 });

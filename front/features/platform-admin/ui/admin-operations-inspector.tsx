@@ -46,7 +46,7 @@ const HISTORY_LABELS: Record<string, string> = {
 
 const SOURCE_DETAIL_LABELS: Record<string, string> = {
   CLUB_READINESS: "클럽 운영에서 확인",
-  NOTIFICATION: "알림 운영에서 확인",
+  NOTIFICATION: "배달 원장에서 확인",
   AI_JOB: "AI 작업에서 확인",
   CLOSING_RISK: "마감 운영에서 확인",
 };
@@ -134,7 +134,7 @@ export function AdminOperationsInspector({
               <dd>{selectedCase.impactLabel}</dd>
             </div>
             <div>
-              <dt>관측 source</dt>
+              <dt>관측 출처</dt>
               <dd>{selectedCase.sourceLabel}</dd>
             </div>
             <div>

@@ -25,6 +25,9 @@ describe("admin-copy", () => {
     expect(ADMIN_COPY.eyebrow.visibility).toBe("공개 설정");
     expect(ADMIN_COPY.eyebrow.domainProvisioning).toBe("도메인 준비");
     expect(ADMIN_COPY.eyebrow.operationsSnapshot).toBe("운영 스냅샷");
+    expect(ADMIN_COPY.eyebrow.pipeline).toBe("파이프라인");
+    expect(ADMIN_COPY.eyebrow.ledger).toBe("원장");
+    expect(ADMIN_COPY.search.loadedCases).toBe("이미 불러온 케이스 검색");
     expect(ADMIN_COPY.heading.aiOps).toBe("AI 작업");
     expect(ADMIN_COPY.heading.failureClusters).toBe("실패 클러스터");
     expect(ADMIN_COPY.heading.replay).toBe("재발송");
@@ -37,6 +40,9 @@ describe("admin-copy", () => {
     expect(ADMIN_COPY.heading.accessLedger).toBe("발급 목록");
     expect(ADMIN_COPY.heading.analytics).toBe("분석 부록");
     expect(ADMIN_COPY.support.issue).toBe("지원 접근 발급");
+    expect(ADMIN_COPY.support.count).toBe("접근 발급");
+    expect(ADMIN_COPY.support.unavailable).toBe("접근 발급 확인 불가");
+    expect(ADMIN_COPY.support.retry).toBe("접근 발급 다시 시도");
     expect(ADMIN_COPY.targetLedger.heading).toBe("이 대상의 최근 기입");
     expect(ADMIN_COPY.targetLedger.clubHeading).toBe("이 클럽의 최근 기입");
     expect(ADMIN_COPY.targetLedger.more).toBe("전체 기입 보기");
@@ -75,7 +81,7 @@ describe("admin-copy", () => {
     expect(hostOnboardingLabel("ASSIGNED")).toBe("배정됨");
   });
 
-  it("지원 grant 상태를 한국어 라벨로 바꾼다", () => {
+  it("지원 발급 상태를 한국어 라벨로 바꾼다", () => {
     expect(supportGrantStatusLabel("ACTIVE")).toBe("활성");
     expect(supportGrantStatusLabel("EXPIRING")).toBe("만료 임박");
     expect(supportGrantStatusLabel("EXPIRED")).toBe("만료됨");

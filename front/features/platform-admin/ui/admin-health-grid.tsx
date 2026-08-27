@@ -211,7 +211,7 @@ function HealthPage({
 }) {
   return (
     <AdminPageContext
-      eyebrow="서비스"
+      eyebrow={ADMIN_COPY.eyebrow.pipeline}
       heading={HEALTH_PAGE_HEADING}
       description={HEALTH_PAGE_DESCRIPTION}
       freshness={freshness}

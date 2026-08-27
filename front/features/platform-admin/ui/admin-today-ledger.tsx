@@ -6,6 +6,7 @@ import {
   commitAdminEditorialLedgerFirstUsable,
   commitAdminEditorialLedgerPollMergeRaf,
 } from "@/shared/observability/admin-editorial-ledger-performance";
+import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
 import { ADMIN_SHELL_LAYOUT_MEDIA_QUERY } from "@/features/platform-admin/model/admin-route-catalog";
 import type {
   AdminOperationsSearchMode,
@@ -108,7 +109,7 @@ export function AdminTodayLedger({
 
   useLayoutEffect(() => {
     const control = ledgerRef.current?.querySelector<HTMLElement>(
-      "input[type='search'][aria-label='이미 불러온 사건 검색']",
+      `input[type='search'][aria-label='${ADMIN_COPY.search.loadedCases}']`,
     );
     if (control) commitAdminEditorialLedgerFirstUsable();
   }, [view.items.length, view.generatedAt]);

@@ -9,6 +9,11 @@ export const ADMIN_COPY = {
     visibility: "공개 설정",
     domainProvisioning: "도메인 준비",
     operationsSnapshot: "운영 스냅샷",
+    pipeline: "파이프라인",
+    ledger: "원장",
+  },
+  search: {
+    loadedCases: "이미 불러온 케이스 검색",
   },
   heading: {
     aiOps: "AI 작업",
@@ -25,6 +30,9 @@ export const ADMIN_COPY = {
   },
   support: {
     issue: "지원 접근 발급",
+    count: "접근 발급",
+    unavailable: "접근 발급 확인 불가",
+    retry: "접근 발급 다시 시도",
   },
   targetLedger: {
     heading: "이 대상의 최근 기입",

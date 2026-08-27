@@ -73,7 +73,8 @@ describe("AdminOperationsInspector", () => {
 
     expect(screen.getByText("영향 2건")).toBeInTheDocument();
     expect(screen.getByText(/일부 확인 불가/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "알림 운영에서 확인" })).toHaveAttribute(
+    expect(screen.getByText("관측 출처")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "배달 원장에서 확인" })).toHaveAttribute(
       "href",
       "/admin/notifications?focus=delivery",
     );
