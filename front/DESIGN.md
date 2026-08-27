@@ -47,14 +47,56 @@ Host와 platform admin은 같은 paper/ink primitive를 쓴다. Role-only palett
 `HostTodayPage`는 오늘형 page shell이다. DOM 순서:
 
 1. page header — eyebrow `호스트 · 오늘`, h1 `오늘`, headline lede
-2. `region "처리할 일"` — resolve queue(상한 7 + 전체 보기) 또는 zero-as-data 한 줄(`오늘 처리할 일이 없습니다 · 마지막 확인 HH:MM`)
+2. `region "처리할 일"` — resolve queue(기본 상한 7, **전체 보기**는 같은 페이지에서 나머지 항목을 펼침) 또는 zero-as-data 한 줄(`오늘 처리할 일이 없습니다 · 마지막 확인 HH:MM`)
 3. hero — 다음 모임 / 모임 당일(`오늘 모임` + primary `출석 확인 열기` → `section=attendance`) / empty(`첫 모임 만들기`)
-4. `aside "참고"` — 다가오는 일정, 클럽 상태 definition list, `운영 기록 전체 보기` quiet link (desktop rail; mobile below)
+4. `aside "참고"` — 다가오는 일정, 클럽 상태 definition list, `운영 기록 전체 보기` quiet link → `/sessions` (desktop rail; mobile below)
 
 오늘형은 KPI 타일·균등 카드 그리드가 아니다. 다이어리형 레이아웃을 복제하지 않는다.
 Lifecycle 상태 문구는 `hostMeetingLifecycleLabel`만 쓴다: `작성 중` / `준비 중` / `기록 정리 중` / `게시됨`.
 
 오늘형 CT 스크린샷 잠금 대상은 아직 없다(홈 CT 부재).
+
+## Host list pages (목록형)
+
+적용 범위는 호스트 1차 탭 중 모임 목록과 멤버 원장이다. 페이지 타입은 목록형이다. 오늘형 큐나 다이어리 스프레드를 복제하지 않는다.
+
+### Meeting TOC
+
+`/app/host/sessions` · `/clubs/:slug/app/host/sessions`
+
+`HostMeetingListRoute`가 upcoming·past query와 cursor pagination을 소유한다.
+`HostMeetingList`는 목록형 page shell이다. DOM 순서:
+
+1. page header — eyebrow `호스트 · 예정과 기록`, h1 `모임`, lede
+2. `region "다가오는 모임"` — TOC rows 또는 section-scoped error+retry
+3. `region "지난 모임"` — TOC rows 또는 section-scoped error+retry
+4. quiet `휴지통`
+
+Row grammar: folio ordinal · title · optional attention text · lifecycle chip · dotted leader · mono summary.
+Upcoming summary는 `MM-DD 예정일`. Past summary는 `MM-DD`만 두고 lifecycle은 chip이 담당한다.
+Lifecycle chip은 desktop·mobile 모두 보인다. 다가오는 목록 fetch 실패가 지난 모임 구간을 가리지 않는다.
+
+`max-width: 640px`에서 행은 `핵심 사실 1줄 + 상태 + 시각` 그리드로 재구성되고 title이 행 전체 tap target이다. 가로 스크롤 표가 아니다.
+
+목록형 CT 스크린샷 잠금 대상은 아직 없다.
+
+### Members ledger
+
+`/app/host/members` · `/clubs/:slug/app/host/members`
+
+`HostMembersRoute`가 member·invitation loader와 mutation을 소유한다.
+멤버 화면 DOM 순서:
+
+1. page header — eyebrow `운영 · 멤버 관리`, h1 `멤버 관리`
+2. summary counts
+3. pending viewer zone(있을 때만)
+4. roster table
+5. invitation ledger
+
+Roster row grammar: 이름(핵심 사실) · 상태 · 함께한 기간(시각) · 이번 모임 · 관리.
+Invitation row grammar: 이름(핵심 사실) · 이메일 · 상태 · 만료·수락(시각) · 액션.
+
+`max-width: 640px`에서 두 표 모두 CSS로 `핵심 사실 1줄 + 상태 + 시각` 리스트로 재구성한다. 가로 스크롤 표 금지. 레이아웃은 `member-ledger.css`가 소유한다.
 
 ## Host Meeting Diary
 
