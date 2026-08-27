@@ -74,24 +74,24 @@ describe("AdminLayoutNav", () => {
   it("nests service and review destinations and keeps club detail out of the primary list", () => {
     renderNav();
     expect(screen.getByRole("link", { name: "서비스 건강" })).toHaveAttribute("href", "/admin/health");
-    expect(screen.getByRole("link", { name: "알림" })).toHaveAttribute("href", "/admin/notifications");
+    expect(screen.getByRole("link", { name: "배달 원장" })).toHaveAttribute("href", "/admin/notifications");
     expect(screen.getByRole("link", { name: "AI 작업" })).toHaveAttribute("href", "/admin/ai-ops");
     expect(screen.getByRole("link", { name: "긴급 공개 회수" })).toHaveAttribute(
       "href",
       "/admin/public-takedown",
     );
-    expect(screen.getByRole("link", { name: "지원" })).toHaveAttribute("href", "/admin/support");
-    expect(screen.getByRole("link", { name: "감사" })).toHaveAttribute("href", "/admin/audit");
-    expect(screen.getByRole("link", { name: "분석" })).toHaveAttribute("href", "/admin/analytics");
+    expect(screen.getByRole("link", { name: "접근 원장" })).toHaveAttribute("href", "/admin/support");
+    expect(screen.getByRole("link", { name: "운영 기입" })).toHaveAttribute("href", "/admin/audit");
+    expect(screen.getByRole("link", { name: "분석 부록" })).toHaveAttribute("href", "/admin/analytics");
     expect(screen.queryByRole("link", { name: "사건" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "클럽 상세" })).not.toBeInTheDocument();
   });
 
   it("does not show 준비 중 pill on ready routes", () => {
     renderNav();
-    expect(screen.getByRole("link", { name: "알림" }).textContent).not.toContain("준비 중");
+    expect(screen.getByRole("link", { name: "배달 원장" }).textContent).not.toContain("준비 중");
     expect(screen.getByRole("link", { name: "오늘" }).textContent).not.toContain("준비 중");
-    expect(screen.getByRole("link", { name: "감사" }).textContent).not.toContain("준비 중");
+    expect(screen.getByRole("link", { name: "운영 기입" }).textContent).not.toContain("준비 중");
   });
 
   it("marks the active route with aria-current=page", () => {
@@ -118,7 +118,7 @@ describe("AdminLayoutNav", () => {
   it("marks the 검토 parent current when a nested child is active", () => {
     renderNav({ activePath: "/admin/analytics" });
     expect(screen.getByText("검토")).toHaveAttribute("aria-current", "true");
-    expect(screen.getByRole("link", { name: "분석" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "분석 부록" })).toHaveAttribute("aria-current", "page");
   });
 
   it("hides items the capability projection does not allow", () => {
@@ -127,9 +127,9 @@ describe("AdminLayoutNav", () => {
     });
     expect(screen.getByRole("link", { name: "오늘" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "서비스 건강" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "감사" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "운영 기입" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "클럽" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "알림" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "배달 원장" })).not.toBeInTheDocument();
     expect(screen.queryByText("클럽")).not.toBeInTheDocument();
   });
 
@@ -138,7 +138,7 @@ describe("AdminLayoutNav", () => {
     const emptyNav = screen.getByRole("navigation", { name: "플랫폼 관리 메뉴" });
     expect(within(emptyNav).queryAllByRole("link")).toEqual([]);
     expect(within(emptyNav).queryByText("오늘")).not.toBeInTheDocument();
-    expect(within(emptyNav).queryByText("지원")).not.toBeInTheDocument();
+    expect(within(emptyNav).queryByText("접근 원장")).not.toBeInTheDocument();
     unmount();
 
     renderNav({ capabilities: projection([]) });
@@ -158,7 +158,7 @@ describe("AdminLayoutNav", () => {
         generatedAt: "2026-08-22T00:00:00Z",
       },
     });
-    expect(screen.queryByRole("link", { name: "지원" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "접근 원장" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "오늘" })).not.toBeInTheDocument();
   });
 

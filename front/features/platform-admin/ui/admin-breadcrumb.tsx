@@ -33,7 +33,7 @@ function buildParts(descriptor: AdminRouteDescriptor, extra?: string | null): st
   if (!isPrimaryLeaf) {
     parts.push(descriptor.groupLabel);
   }
-  parts.push(descriptor.label === "오늘" ? "오늘 할 일" : descriptor.label);
+  parts.push(descriptor.label);
   if (extra) parts.push(extra);
   if (descriptor.status === "coming_soon") parts.push("준비 중");
   return parts;

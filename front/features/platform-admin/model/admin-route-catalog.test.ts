@@ -90,7 +90,7 @@ describe("ADMIN_ROUTES catalog", () => {
       },
       {
         path: "notifications",
-        label: "알림",
+        label: "배달 원장",
         group: "services",
         groupLabel: "서비스",
         requiredCapability: "VIEW_NOTIFICATION_OPERATIONS",
@@ -111,21 +111,21 @@ describe("ADMIN_ROUTES catalog", () => {
       },
       {
         path: "support",
-        label: "지원",
+        label: "접근 원장",
         group: "review",
         groupLabel: "검토",
         requiredCapability: "VIEW_SUPPORT",
       },
       {
         path: "audit",
-        label: "감사",
+        label: "운영 기입",
         group: "review",
         groupLabel: "검토",
         requiredCapability: "VIEW_AUDIT",
       },
       {
         path: "analytics",
-        label: "분석",
+        label: "분석 부록",
         group: "review",
         groupLabel: "검토",
         requiredCapability: "VIEW_ANALYTICS",

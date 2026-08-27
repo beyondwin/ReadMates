@@ -480,7 +480,7 @@ describe("AdminShellLayout", () => {
     const nav = screen.getByRole("navigation", { name: "Admin 콘솔" });
     expect(within(nav).queryAllByRole("link")).toEqual([]);
     expect(within(nav).queryByText("오늘")).not.toBeInTheDocument();
-    expect(within(nav).queryByText("지원")).not.toBeInTheDocument();
+    expect(within(nav).queryByText("접근 원장")).not.toBeInTheDocument();
   });
 
   it("purges platform-admin state and closes onboarding and workspace menus on 401", async () => {
@@ -547,7 +547,7 @@ describe("AdminShellLayout", () => {
     });
     const nav = screen.getByRole("navigation", { name: "Admin 콘솔" });
     expect(within(nav).queryAllByRole("link")).toEqual([]);
-    expect(within(nav).queryByText("지원")).not.toBeInTheDocument();
+    expect(within(nav).queryByText("접근 원장")).not.toBeInTheDocument();
     expect(queryClient.getQueryData(platformAdminKeys.clubs())).toBeUndefined();
     expect(queryClient.getQueryData(memberQueryKey)).toEqual(memberSnapshot);
   });

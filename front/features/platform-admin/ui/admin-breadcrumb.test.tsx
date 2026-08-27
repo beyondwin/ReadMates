@@ -3,9 +3,15 @@ import { describe, expect, it } from "vitest";
 import { AdminBreadcrumb } from "./admin-breadcrumb";
 
 describe("AdminBreadcrumb", () => {
+  it("오늘 브레드크럼은 내비 라벨과 같은 단어를 쓴다", () => {
+    render(<AdminBreadcrumb routePath="today" />);
+    expect(screen.getByLabelText("현재 위치")).toHaveTextContent("오늘");
+    expect(screen.queryByText("오늘 할 일")).toBeNull();
+  });
+
   it("renders 'today' breadcrumb as a single label", () => {
     render(<AdminBreadcrumb routePath="today" />);
-    expect(screen.getByText("오늘 할 일")).toBeInTheDocument();
+    expect(screen.getByText("오늘")).toBeInTheDocument();
     expect(screen.queryByText("Command")).not.toBeInTheDocument();
   });
 
@@ -34,7 +40,7 @@ describe("AdminBreadcrumb", () => {
   it("nests analytics under 검토", () => {
     render(<AdminBreadcrumb routePath="analytics" />);
     expect(screen.getByText("검토")).toBeInTheDocument();
-    expect(screen.getByText("분석")).toBeInTheDocument();
+    expect(screen.getByText("분석 부록")).toBeInTheDocument();
     expect(screen.queryByText("Review")).not.toBeInTheDocument();
     expect(screen.queryByText(/준비 중/)).not.toBeInTheDocument();
   });
