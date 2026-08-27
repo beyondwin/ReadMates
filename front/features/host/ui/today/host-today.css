@@ -16,7 +16,11 @@
 }
 
 .rm-host-today__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 4fr);
+  gap: 56px;
   align-items: start;
+  min-width: 0;
 }
 
 .rm-host-today__main {
@@ -275,6 +279,13 @@
   outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
   box-shadow: 0 0 0 4px var(--focus-ring-soft);
+}
+
+@media (max-width: 767px) {
+  .rm-host-today__grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-xl);
+  }
 }
 
 @media (max-width: 640px) {

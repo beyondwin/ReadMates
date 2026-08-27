@@ -1,7 +1,11 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { HostTodayView } from "@/features/host/model/host-today-model";
 import { HostTodayPage } from "./host-today-page";
+
+const TODAY_CSS = readFileSync(path.resolve("features/host/ui/today/host-today.css"), "utf8");
 
 const viewWithTwoQueueItems: HostTodayView = {
   headline: "다음 모임까지 9일 · 처리할 일 2건",
@@ -68,5 +72,14 @@ describe("HostTodayPage", () => {
 
     render(<HostTodayPage view={emptyQueueView} />);
     expect(screen.getByText(/오늘 처리할 일이 없습니다 · 마지막 확인/)).toBeInTheDocument();
+  });
+
+  it("styles the hero/rail body as an asymmetric grid that collapses with mobile-only", () => {
+    expect(TODAY_CSS).toMatch(
+      /\.rm-host-today__grid\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*minmax\(0,\s*7fr\)\s+minmax\(0,\s*4fr\)/,
+    );
+    expect(TODAY_CSS).toMatch(
+      /@media \(max-width: 767px\)[\s\S]*?\.rm-host-today__grid[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)/,
+    );
   });
 });
