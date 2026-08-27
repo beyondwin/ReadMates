@@ -82,4 +82,34 @@ describe("HostTodayPage", () => {
       /@media \(max-width: 767px\)[\s\S]*?\.rm-host-today__grid[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)/,
     );
   });
+
+  it("promotes the hero to attendance entry when it is meeting day", () => {
+    const meetingDayView: HostTodayView = {
+      ...viewWithTwoQueueItems,
+      headline: "오늘 모임 · 처리할 일 2건",
+      nextMeeting: {
+        sessionId: "session-open-1",
+        statusLabel: "준비 중",
+        isMeetingDay: true,
+        detailHref: "/app/host/sessions/session-open-1",
+      },
+    };
+
+    render(
+      <HostTodayPage
+        view={meetingDayView}
+        nextMeetingBlock={<section aria-label="다음 모임">override should not win</section>}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { level: 1, name: "오늘" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "오늘 모임" })).toBeInTheDocument();
+    const attendanceCta = screen.getByRole("link", { name: /출석 확인/ });
+    expect(attendanceCta).toHaveClass("btn-primary");
+    expect(attendanceCta).toHaveAttribute(
+      "href",
+      "/app/host/sessions/session-open-1?section=attendance",
+    );
+    expect(screen.queryByText("override should not win")).not.toBeInTheDocument();
+  });
 });

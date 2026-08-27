@@ -13,6 +13,34 @@ function DefaultLink({ to, children, ...props }: HostLinkProps) {
   );
 }
 
+function attendanceSectionHref(detailHref: string): string {
+  const separator = detailHref.includes("?") ? "&" : "?";
+  return `${detailHref}${separator}section=attendance`;
+}
+
+function MeetingDayHero({
+  nextMeeting,
+  LinkComponent,
+}: {
+  nextMeeting: NonNullable<HostTodayView["nextMeeting"]>;
+  LinkComponent: HostLinkComponent;
+}) {
+  return (
+    <section className="rm-host-today__hero" aria-label="오늘 모임">
+      <h2 className="h3 editorial rm-host-today__hero-title">오늘 모임</h2>
+      <p className="rm-host-editorial-ledger__identity">{nextMeeting.statusLabel}</p>
+      <div className="rm-host-today__hero-actions">
+        <LinkComponent
+          to={attendanceSectionHref(nextMeeting.detailHref)}
+          className="btn btn-primary rm-host-today__action rm-host-today__action--block"
+        >
+          출석 확인 열기
+        </LinkComponent>
+      </div>
+    </section>
+  );
+}
+
 function NextMeetingFallback({
   nextMeeting,
   LinkComponent,
@@ -29,6 +57,10 @@ function NextMeetingFallback({
         </LinkComponent>
       </section>
     );
+  }
+
+  if (nextMeeting.isMeetingDay) {
+    return <MeetingDayHero nextMeeting={nextMeeting} LinkComponent={LinkComponent} />;
   }
 
   return (
@@ -112,9 +144,15 @@ export function HostTodayPage({
   onRetryQueue?: () => void;
   LinkComponent?: HostLinkComponent;
 }) {
-  const hero = nextMeetingBlock ?? (
-    <NextMeetingFallback nextMeeting={view.nextMeeting} LinkComponent={LinkComponent} />
-  );
+  // Meeting-day hero owns the home primary CTA; route nextMeetingBlock must not override it.
+  const hero = view.nextMeeting?.isMeetingDay
+    ? (
+      <MeetingDayHero nextMeeting={view.nextMeeting} LinkComponent={LinkComponent} />
+    )
+    : (nextMeetingBlock ?? (
+      <NextMeetingFallback nextMeeting={view.nextMeeting} LinkComponent={LinkComponent} />
+    ));
+
 
   return (
     <main className="rm-host-today rm-host-editorial-ledger">
