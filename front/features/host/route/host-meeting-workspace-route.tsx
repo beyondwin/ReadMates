@@ -47,6 +47,19 @@ import { HostMeetingWorkspace } from "@/features/host/ui/meeting-workspace/host-
 import { buildMeetingAudienceProjections } from "@/features/host/ui/meeting-workspace/meeting-audience-projections";
 import { MeetingRelatedWork } from "@/features/host/ui/meeting-workspace/meeting-related-work";
 import { MeetingNotificationWorkspace } from "@/features/host/ui/meeting-workspace/meeting-notification-workspace";
+import { MeetingNotificationRail } from "@/features/host/ui/meeting-workspace/meeting-notification-rail";
+import type { MeetingResponseLedgerRow } from "@/features/host/ui/meeting-workspace/meeting-response-ledger";
+import { buildComposerSelection } from "@/features/host/model/host-notification-composer-model";
+import type { ManualNotificationOptionsResponse, ManualNotificationPreviewResponse } from "@/features/host/model/host-view-types";
+import {
+  hostNotificationManualDispatchesQuery,
+  hostNotificationManualOptionsQuery,
+  hostNotificationPolicyQuery,
+  hostNotificationSummaryQuery,
+  useConfirmManualNotificationMutation,
+  usePreviewManualNotificationMutation,
+  useUpdateHostNotificationPolicyMutation,
+} from "@/features/host/queries/host-notification-queries";
 import type { HostSessionRecordsChangedEvent } from "./host-session-editor-route";
 import { useHostMeetingWorkspaceActions } from "./host-meeting-workspace-actions";
 import type { HostMeetingWorkspaceRouteData } from "./host-meeting-workspace-data";
@@ -214,6 +227,39 @@ function panelForTask(
   return null;
 }
 
+
+function mapRsvpToLedgerResponse(
+  status: "NO_RESPONSE" | "GOING" | "MAYBE" | "DECLINED",
+): MeetingResponseLedgerRow["response"] {
+  if (status === "GOING") return "GOING";
+  if (status === "MAYBE") return "UNSURE";
+  if (status === "DECLINED") return "NOT_GOING";
+  return "NO_RESPONSE";
+}
+
+function mapAttendanceToLedger(
+  status: "UNKNOWN" | "ATTENDED" | "ABSENT",
+): MeetingResponseLedgerRow["attendance"] {
+  if (status === "ATTENDED") return "ATTENDED";
+  if (status === "ABSENT") return "ABSENT";
+  return "UNKNOWN";
+}
+
+function responseRowsFromAttendees(
+  attendees: HostSessionDetailResponse["attendees"],
+): MeetingResponseLedgerRow[] {
+  return attendees.map((attendee) => ({
+    membershipId: attendee.membershipId,
+    displayName: attendee.displayName,
+    secondaryLabel: attendee.accountName,
+    response: mapRsvpToLedgerResponse(attendee.rsvpStatus),
+    attendance: mapAttendanceToLedger(attendee.attendanceStatus),
+    attendanceRevision: attendee.attendanceRevision,
+    questionCount: null,
+    recentResponseLabel: null,
+  }));
+}
+
 export function HostMeetingWorkspaceRoute({
   returnTarget,
   LinkComponent,
@@ -368,6 +414,40 @@ export function HostMeetingWorkspaceRoute({
     ...hostSessionClosingStatusQuery(sessionId, context),
     enabled: loaderData.mode === "active" && baseQuery.data?.state === "CLOSED",
   });
+  const notificationSessionId = loaderData.mode === "active" ? sessionId : "";
+  const notificationQueriesEnabled = loaderData.mode === "active" && Boolean(baseQuery.data);
+  const [notificationPreview, setNotificationPreview] = useState<ManualNotificationPreviewResponse | null>(null);
+  const [notificationError, setNotificationError] = useState<string | null>(null);
+  const [notificationOptions, setNotificationOptions] = useState<ManualNotificationOptionsResponse | null>(null);
+  const [notificationMemberSearch, setNotificationMemberSearch] = useState("");
+  const policyQuery = useQuery({
+    ...hostNotificationPolicyQuery(context),
+    enabled: notificationQueriesEnabled,
+  });
+  const summaryQuery = useQuery({
+    ...hostNotificationSummaryQuery(context),
+    enabled: notificationQueriesEnabled,
+  });
+  const reminderDispatchesQuery = useQuery({
+    ...hostNotificationManualDispatchesQuery({
+      sessionId: notificationSessionId,
+      eventType: "SESSION_REMINDER_DUE",
+      page: { limit: 20 },
+    }, context),
+    enabled: notificationQueriesEnabled && Boolean(notificationSessionId),
+  });
+  const manualOptionsQuery = useQuery({
+    ...hostNotificationManualOptionsQuery({
+      sessionId: notificationSessionId,
+      search: notificationMemberSearch || null,
+      page: { limit: 50 },
+    }, context),
+    enabled: notificationQueriesEnabled && Boolean(notificationSessionId),
+  });
+  const updatePolicyMutation = useUpdateHostNotificationPolicyMutation(context);
+  const previewManualMutation = usePreviewManualNotificationMutation(context);
+  const confirmManualMutation = useConfirmManualNotificationMutation(context);
+
   const retryConvergence = useRetryHostPublicConvergenceMutation(context);
   const recordPrerequisite = baseQuery.data?.state === "CLOSED" || baseQuery.data?.state === "PUBLISHED";
   const panelStates = useHostMeetingPanelQueries({
@@ -545,6 +625,95 @@ export function HostMeetingWorkspaceRoute({
         }
         : { kind: "loading" as const }
     : null;
+
+  const responseRows = responseRowsFromAttendees(activeAttendees);
+  const showNotificationRail = diary.currentStep === "prepare" || diary.currentStep === "responses";
+  const notificationWorkbenchHref = `/app/host/notifications?${new URLSearchParams({
+    sessionId,
+    eventType: "SESSION_REMINDER_DUE",
+  }).toString()}`;
+  void summaryQuery.data;
+  const notificationRail = showNotificationRail ? (
+    <MeetingNotificationRail
+      policy={policyQuery.data}
+      policyPending={updatePolicyMutation.isPending}
+      policyLoading={policyQuery.isFetching && !policyQuery.data}
+      policyError={
+        policyQuery.isError && !policyQuery.data
+          ? "자동 리마인더 정책을 불러오지 못했습니다."
+          : null
+      }
+      onPolicyChange={async (enabled) => {
+        await updatePolicyMutation.mutateAsync({ sessionReminderEnabled: enabled });
+      }}
+      dispatches={reminderDispatchesQuery.data?.items ?? []}
+      responseRows={responseRows}
+      options={notificationOptions ?? manualOptionsQuery.data ?? null}
+      workbenchHref={notificationWorkbenchHref}
+      busy={
+        previewManualMutation.isPending
+        || confirmManualMutation.isPending
+        || manualOptionsQuery.isFetching
+      }
+      error={notificationError}
+      preview={notificationPreview}
+      onSearch={async (search) => {
+        setNotificationMemberSearch(search);
+        const next = await queryClient.fetchQuery(hostNotificationManualOptionsQuery({
+          sessionId,
+          search: search || null,
+          page: { limit: 50 },
+        }, context));
+        setNotificationOptions(next);
+      }}
+      onLoadMore={async () => {
+        const cursor = notificationOptions?.members.nextCursor;
+        if (!cursor) return;
+        const next = await queryClient.fetchQuery(hostNotificationManualOptionsQuery({
+          sessionId,
+          search: notificationMemberSearch || null,
+          page: { limit: 50, cursor },
+        }, context));
+        setNotificationOptions((current) => {
+          if (!current) return next;
+          const byId = new Map(current.members.items.map((item) => [item.membershipId, item]));
+          next.members.items.forEach((item) => byId.set(item.membershipId, item));
+          return {
+            ...next,
+            members: {
+              items: Array.from(byId.values()),
+              nextCursor: next.members.nextCursor,
+            },
+          };
+        });
+      }}
+      onPreview={async (draft) => {
+        setNotificationError(null);
+        try {
+          setNotificationPreview(await previewManualMutation.mutateAsync(buildComposerSelection(draft)));
+        } catch {
+          setNotificationPreview(null);
+          setNotificationError("미리보기를 만들지 못했습니다. 대상과 채널을 확인해 주세요.");
+        }
+      }}
+      onConfirm={async (draft, resendConfirmed) => {
+        if (!notificationPreview) return;
+        setNotificationError(null);
+        try {
+          await confirmManualMutation.mutateAsync({
+            ...buildComposerSelection(draft),
+            previewId: notificationPreview.previewId,
+            resendConfirmed,
+          });
+          setNotificationPreview(null);
+          await reminderDispatchesQuery.refetch();
+        } catch {
+          setNotificationError("발송을 요청하지 못했습니다. 미리보기 만료 또는 재발송 여부를 확인해 주세요.");
+        }
+      }}
+    />
+  ) : null;
+
   const baseTask = meetingLocation.task === "overview" || meetingLocation.task === "responses" || meetingLocation.task === "attendance";
   const historyAuthority = panelStates.historyAuthority;
   const historyAuthorityData = historyAuthority.kind === "ready" || historyAuthority.kind === "stale-cached"
@@ -864,6 +1033,7 @@ export function HostMeetingWorkspaceRoute({
       }}
       facts={workspace.facts}
       closingChecklist={closingChecklist}
+      focusContent={notificationRail}
       relatedWork={(
         <MeetingRelatedWork
           tasks={workspace.relatedTasks}

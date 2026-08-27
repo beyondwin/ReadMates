@@ -39,6 +39,7 @@ export type HostNotificationComposerProps = {
   previewButtonLabel?: string;
   recommendedRecipientLabel?: string;
   recipientModes?: readonly HostNotificationRecipientMode[];
+  recipientModeLabels?: Partial<Record<HostNotificationRecipientMode, string>>;
 };
 
 const channelOptions: Array<[ManualNotificationRequestedChannels, string]> = [
@@ -77,18 +78,24 @@ export function HostNotificationComposer({
   previewButtonLabel = "알림 미리보기",
   recommendedRecipientLabel = recommendedLabel(eventType),
   recipientModes = publicationRecipientModes,
+  recipientModeLabels,
 }: HostNotificationComposerProps) {
   const isWorkbench = presentation === "workbench";
   const template = options.templates.find((item) => item.eventType === eventType);
   const visibleRecipientModes = [...new Set(recipientModes)];
-  const recipientLabel = (mode: HostNotificationRecipientMode) => mode === "RECOMMENDED"
-    ? recommendedRecipientLabel
-    : manualAudienceLabels[mode];
+  const recipientLabel = (mode: HostNotificationRecipientMode) => {
+    const override = recipientModeLabels?.[mode];
+    if (override) return override;
+    return mode === "RECOMMENDED"
+      ? recommendedRecipientLabel
+      : manualAudienceLabels[mode];
+  };
   const recipientDescription = (mode: HostNotificationRecipientMode) => mode === "RECOMMENDED"
     ? `현재 알림에 맞는 추천 대상 · ${recommendedRecipientLabel}`
     : manualAudienceDescriptions[mode];
   const selectedRecipientLabel = draft.recipientMode === "SELECTED_MEMBERS"
-    ? `직접 선택 ${draft.selectedMembershipIds.length}명`
+    ? (recipientModeLabels?.SELECTED_MEMBERS
+      ?? `직접 선택 ${draft.selectedMembershipIds.length}명`)
     : recipientLabel(draft.recipientMode);
   const selectedChannelLabel = manualChannelLabels[draft.requestedChannels];
   const directSelectionEmpty = draft.recipientMode === "SELECTED_MEMBERS"
@@ -183,7 +190,7 @@ export function HostNotificationComposer({
             {visibleRecipientModes.map((mode) => {
               const label = mode === "RECOMMENDED"
                 ? "추천 대상"
-                : manualAudienceLabels[mode];
+                : recipientLabel(mode);
               const ariaLabel = mode === "RECOMMENDED"
                 ? `${label} · ${recommendedRecipientLabel}`
                 : label;
