@@ -417,10 +417,11 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await page.setViewportSize({ width: 320, height: 720 });
   await page.goto(`${baselineClubHostPath}/sessions`);
   await expect(page.getByRole("heading", { name: "모임", level: 1 })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "첫 모임을 준비해 보세요", level: 2 })).toBeVisible();
-  const firstMeetingAction = page.getByRole("link", { name: "첫 모임 만들기" });
-  await expect(firstMeetingAction).toHaveAttribute("href", `${baselineClubHostPath}/sessions/new`);
-  await expectPracticalTapTarget(firstMeetingAction);
+  await expect(page.getByRole("heading", { name: "다가오는 모임", level: 2 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "지난 모임", level: 2 })).toBeVisible();
+  const newMeetingAction = page.getByRole("link", { name: "새 모임 만들기" });
+  await expect(newMeetingAction).toHaveAttribute("href", `${baselineClubHostPath}/sessions/new`);
+  await expectPracticalTapTarget(newMeetingAction);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.goto(`${baselineClubHostPath}/sessions/${seededHostSessionId}`);
   await expect(page).toHaveURL(/\/app\/host\/sessions\/[^/]+\/?$/);

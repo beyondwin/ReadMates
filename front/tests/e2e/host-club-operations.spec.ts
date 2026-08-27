@@ -792,6 +792,7 @@ test.describe("focus workspace recovery journey", () => {
     await page.getByRole("dialog", { name: "이 모임을 휴지통으로 옮길까요?" })
       .getByRole("button", { name: "휴지통으로 이동" })
       .click();
+    await expect(page.getByRole("heading", { name: "휴지통에서 복원" })).toBeVisible();
     expireHostSessionTrash(sessionId);
     await page.reload();
     const expiredRestore = page.getByRole("button", { name: "방금 삭제한 모임 복구", exact: true }).first();
