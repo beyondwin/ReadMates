@@ -44,6 +44,7 @@ describe("AdminAnalyticsOverviewView", () => {
         error={null}
         onWindowChange={vi.fn()}
         exportStatus="idle"
+        canExport
         onExport={vi.fn()}
       />,
     );
@@ -67,6 +68,25 @@ describe("AdminAnalyticsOverviewView", () => {
     expect(screen.getByRole("link", { name: "AI Ops 보기" })).toHaveClass("small");
     expect(screen.getByRole("link", { name: "알림 운영 보기" })).toHaveClass("small");
     expect(screen.getByRole("button", { name: "CSV 내려받기" })).toBeEnabled();
+  });
+
+  it("does not offer CSV export unless the export capability is explicitly supplied", () => {
+    const onExport = vi.fn();
+    render(
+      <AdminAnalyticsOverviewView
+        overview={overview}
+        window="30d"
+        loading={false}
+        error={null}
+        onWindowChange={vi.fn()}
+        exportStatus="idle"
+        onExport={onExport}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "CSV 내려받기" })).not.toBeInTheDocument();
+    expect(screen.getByText("현재 권한으로는 CSV를 내려받을 수 없습니다.")).toBeInTheDocument();
+    expect(onExport).not.toHaveBeenCalled();
   });
 
   it("hides export when the export capability is absent and does not invoke the handler", () => {
@@ -118,6 +138,7 @@ describe("AdminAnalyticsOverviewView", () => {
         error={null}
         onWindowChange={vi.fn()}
         exportStatus="pending"
+        canExport
         onExport={vi.fn()}
       />,
     );
@@ -137,6 +158,7 @@ describe("AdminAnalyticsOverviewView", () => {
         error={null}
         onWindowChange={onWindowChange}
         exportStatus="error"
+        canExport
         onExport={vi.fn()}
       />,
     );

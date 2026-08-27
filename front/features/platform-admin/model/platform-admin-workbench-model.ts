@@ -64,6 +64,7 @@ export type PlatformAdminAiOpsJobInput = {
 
 export type PlatformAdminWorkbenchInput = {
   role: PlatformAdminRole;
+  permissions?: PlatformAdminPermissionView;
   activeClubCount: number;
   domainActionRequiredCount: number;
   selectedClubId: string | null;
@@ -174,8 +175,17 @@ export type PlatformAdminSelectedClubBrief = PlatformAdminWorkbenchClub & {
   queueItem: WorkbenchQueueItem;
 };
 
+const DENIED_PERMISSIONS: PlatformAdminPermissionView = {
+  canCreateClub: false,
+  canUpdateClub: false,
+  canManageDomains: false,
+  canCreateSupportGrant: false,
+  canRevokeSupportGrant: false,
+  canForceCancelAiJob: false,
+};
+
 export function buildPlatformAdminWorkbench(input: PlatformAdminWorkbenchInput): PlatformAdminWorkbenchView {
-  const permissions = permissionsForRole(input.role);
+  const permissions = input.permissions ?? DENIED_PERMISSIONS;
   const domainsByClub = groupDomainsByClub(input.domains);
   const clubItems = input.clubs
     .map((club) => buildClubQueueItem(club, domainsByClub.get(club.clubId) ?? []))
@@ -557,18 +567,6 @@ function closingRiskSortRank(state: string): number {
   if (state === "BLOCKED") return 25;
   if (state === "IN_PROGRESS") return 35;
   return 45;
-}
-
-function permissionsForRole(role: PlatformAdminRole): PlatformAdminPermissionView {
-  const canOperate = role === "OWNER" || role === "OPERATOR";
-  return {
-    canCreateClub: canOperate,
-    canUpdateClub: canOperate,
-    canManageDomains: canOperate,
-    canCreateSupportGrant: role === "OWNER",
-    canRevokeSupportGrant: role === "OWNER",
-    canForceCancelAiJob: canOperate,
-  };
 }
 
 function buildSelectedBrief(

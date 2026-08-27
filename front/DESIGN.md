@@ -46,7 +46,7 @@ Host와 platform admin은 같은 paper/ink primitive를 쓴다. Role-only palett
 6. info/attendance/records/history/notification panel 또는 sheet
 
 Page-level local task navigation과 judgment complementary rail은 primary composition이 아니다.
-`MeetingMasthead`와 `rm-meeting-folio__*` 클래스 이름은 남은 leftover이며 화면 권위가 아니다.
+모임 header는 `WorkspaceHeader`와 `rm-host-session-workspace__*`다.
 
 Home, list, new, members, notifications는 같은 token과 state grammar를 쓰되 Focus Deck 레이아웃을 복제하지 않는다.
 지운 모임 URL은 Focus Deck이 아니라 `WorkspaceTrashTombstone`이다.
@@ -127,7 +127,7 @@ Live region은 의미 있는 전이에만 쓰고 polling마다 반복하지 않�
 
 ## Responsive and accessibility matrix
 
-Contract widths: 320, 390, 768, 900, 1024, 1440px. 200% zoom, keyboard, visible focus, 44px target, reduced motion, long Korean wrapping은 automated helper로 검증한다.
+Contract widths: 320, 390, 768, 900, 1024, 1440px. keyboard, visible focus, 44px target, reduced motion, long Korean wrapping은 automated helper로 검증한다. 200% zoom은 CSS `zoom`이 아니라 레이아웃 viewport를 절반으로 줄인 proxy(예: 640×700 → 320×350)로 확인한다.
 
 Tracked screenshots는 대표 상태만 잠근다. 1024px는 viewport contract와 browser smoke에 있고 PNG baseline은 없다.
 

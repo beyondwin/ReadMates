@@ -36,7 +36,7 @@ export function AdminAnalyticsOverviewView({
   onWindowChange,
   exportStatus,
   canView = true,
-  canExport = true,
+  canExport = false,
   onExport,
 }: AdminAnalyticsOverviewViewProps) {
   function handleWindowKeyDown(event: KeyboardEvent<HTMLButtonElement>, value: AnalyticsWindow) {

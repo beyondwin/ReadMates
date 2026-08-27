@@ -108,6 +108,7 @@ function NotificationReplaySession({
   const [replayReason, setReplayReason] = useState("");
   const [replayIntentKey, setReplayIntentKey] = useState<string | null>(null);
   const [commandSubmitted, setCommandSubmitted] = useState(false);
+  const [unknownOutcome, setUnknownOutcome] = useState(false);
   const [replayResult, setReplayResult] = useState<AdminNotificationReplayConfirmResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const previewMutation = usePreviewAdminNotificationReplayMutation();
@@ -121,6 +122,7 @@ function NotificationReplaySession({
     setReplayReason("");
     setReplayIntentKey(null);
     setCommandSubmitted(false);
+    setUnknownOutcome(false);
     setReplayResult(null);
     setError(null);
   }
@@ -135,6 +137,7 @@ function NotificationReplaySession({
     setReplayResult(null);
     setReplayIntentKey(null);
     setCommandSubmitted(false);
+    setUnknownOutcome(false);
     try {
       const preview = await previewMutation.mutateAsync({ clubId });
       setReplayPreview(preview);
@@ -160,11 +163,13 @@ function NotificationReplaySession({
         idempotencyKey: replayIntentKey,
       });
       setReplayResult(result);
+      setUnknownOutcome(false);
     } catch (caught) {
       if (isPlatformAdminAuthorityLossError(caught)) {
         purgeReplayState();
         return;
       }
+      setUnknownOutcome(true);
       setError("재처리 결과를 확인하지 못했습니다. 같은 요청으로 다시 확인해 주세요.");
     }
   }
@@ -181,6 +186,7 @@ function NotificationReplaySession({
       canReplay={canReplay}
       busy={busy}
       reasonLocked={commandSubmitted}
+      unknownOutcome={unknownOutcome}
       error={error ?? queryError}
       onPreviewReplay={previewReplay}
       onConfirmReplay={confirmReplay}

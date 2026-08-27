@@ -377,6 +377,10 @@ describe("AdminNotificationsRoute", () => {
     fireEvent.change(screen.getByLabelText("처리 사유"), { target: { value: "retry delivery" } });
     fireEvent.click(screen.getByRole("button", { name: "재처리 확정" }));
     await screen.findByText(/같은 요청으로 다시 확인/);
+    expect(screen.getByRole("group", { name: "작업" }).closest("[data-state]")).toHaveAttribute(
+      "data-state",
+      "unknown-outcome",
+    );
     const previewAgain = screen.getByRole("button", { name: "대상 확인" });
     expect(previewAgain).toBeDisabled();
     fireEvent.click(previewAgain);

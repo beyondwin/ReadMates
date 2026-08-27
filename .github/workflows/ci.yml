@@ -323,7 +323,7 @@ jobs:
           if-no-files-found: ignore
 
   frontend-host-workspace-quality:
-    name: Host workspace browser and performance budgets
+    name: Host and admin visual-authority browser and performance budgets
     runs-on: ubuntu-latest
     defaults:
       run:

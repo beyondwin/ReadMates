@@ -181,6 +181,22 @@ describe("AdminNotificationsPage", () => {
     expect(onReasonChange).toHaveBeenCalled();
   });
 
+  it("marks the L2 dock unknown-outcome without treating the command as ready", () => {
+    renderPage({
+      replayPreview,
+      replayReason: "retry delivery",
+      unknownOutcome: true,
+      error: "재처리 결과를 확인하지 못했습니다. 같은 요청으로 다시 확인해 주세요.",
+    });
+
+    expect(screen.getByRole("group", { name: "작업" }).closest("[data-state]")).toHaveAttribute(
+      "data-state",
+      "unknown-outcome",
+    );
+    expect(screen.getByRole("button", { name: "대상 확인" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "재처리 확정" })).toBeEnabled();
+  });
+
   it("shows a capability denial instead of a role-derived replay control", () => {
     renderPage({ canReplay: false });
 

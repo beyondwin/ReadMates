@@ -379,6 +379,22 @@ describe("buildHostMeetingWorkspace", () => {
     expect(view.publicationReady).toBe(true);
   });
 
+  it("does not claim notes publication is available while the meeting is still OPEN", () => {
+    const view = buildHostMeetingWorkspace({
+      ...baseInput,
+      state: "OPEN",
+      recordReadiness: readyReadiness({
+        hasAppliedRecord: true,
+        publicationReady: true,
+      }),
+    });
+
+    expect(view.facts.find((fact) => fact.id === "publication")?.label).toBe(
+      "게스트·멤버 노트에는 아직 게시되지 않았습니다.",
+    );
+    expect(view.facts.find((fact) => fact.id === "publication")?.label).not.toMatch(/게시할 수/);
+  });
+
   it("does not treat unknown record readiness as publicationReady false", () => {
     const pending = buildHostMeetingWorkspace({
       ...baseInput,

@@ -747,7 +747,7 @@ export default function HostSessionEditor({
       flash("모임을 복원했습니다.");
       queueMicrotask(() => {
         document.querySelector<HTMLElement>(
-          ".rm-meeting-folio__title, .rm-host-session-workspace__title",
+          ".rm-host-session-workspace__title",
         )?.focus();
       });
     } catch (error) {

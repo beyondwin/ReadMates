@@ -413,7 +413,7 @@ function publicationFact(input: HostMeetingWorkspaceInput): HostFocusFact | null
       relatedTask: "records",
     };
   }
-  if (facts.publicationReady) {
+  if (input.state === "CLOSED" && facts.publicationReady) {
     return {
       id: "publication",
       label: "게스트·멤버 노트에 게시할 수 있습니다.",

@@ -21,6 +21,7 @@ export type AdminNotificationsPageProps = {
   canReplay: boolean;
   busy: boolean;
   reasonLocked?: boolean;
+  unknownOutcome?: boolean;
   error: string | null;
   success?: string | null;
   onPreviewReplay: () => Promise<void>;
@@ -45,6 +46,7 @@ export function AdminNotificationsPage({
   canReplay,
   busy,
   reasonLocked = false,
+  unknownOutcome = false,
   error,
   success,
   onPreviewReplay,
@@ -58,7 +60,7 @@ export function AdminNotificationsPage({
   onLoadMoreDeliveries,
 }: AdminNotificationsPageProps) {
   const confirmDisabled = !replayPreview || !replayReason.trim() || !canReplay || busy;
-  const dockState = replayDockState({ canReplay, busy, replayResult });
+  const dockState = replayDockState({ canReplay, busy, replayResult, unknownOutcome });
 
   return (
     <section className="admin-notifications">
@@ -124,7 +126,7 @@ export function AdminNotificationsPage({
               <span>처리 사유</span>
               <textarea
                 value={replayReason}
-                disabled={!canReplay || busy || reasonLocked}
+                disabled={!canReplay || busy || reasonLocked || unknownOutcome}
                 onChange={(event) => onReplayReasonChange(event.currentTarget.value)}
                 rows={3}
                 placeholder="예: 공급자 복구 후 실패 delivery 재처리"
@@ -134,13 +136,19 @@ export function AdminNotificationsPage({
               level="L2"
               authority={canReplay ? "allowed" : "denied"}
               state={dockState}
-              reason={!canReplay ? "현재 권한으로는 재처리를 실행할 수 없습니다." : undefined}
+              reason={
+                !canReplay
+                  ? "현재 권한으로는 재처리를 실행할 수 없습니다."
+                  : unknownOutcome
+                    ? "명령 응답을 확인하지 못했습니다. 같은 명령으로 다시 시도할 수 있습니다."
+                    : undefined
+              }
               status={busy ? <span className="platform-admin-domain-status">처리 중</span> : undefined}
               secondary={
                 <button
                   type="button"
                   className="btn btn-quiet btn-sm"
-                  disabled={!canReplay || busy || reasonLocked}
+                  disabled={!canReplay || busy || reasonLocked || unknownOutcome}
                   onClick={() => void onPreviewReplay()}
                 >
                   대상 확인
@@ -255,13 +263,16 @@ function replayDockState({
   canReplay,
   busy,
   replayResult,
+  unknownOutcome,
 }: {
   canReplay: boolean;
   busy: boolean;
   replayResult: AdminNotificationReplayConfirmResult | null;
+  unknownOutcome: boolean;
 }): AdminSafeActionState {
   if (!canReplay) return "forbidden";
   if (busy) return "pending";
+  if (unknownOutcome && !replayResult) return "unknown-outcome";
   if (replayResult && replayResult.effectStatus !== "PENDING") return "complete";
   return "ready";
 }

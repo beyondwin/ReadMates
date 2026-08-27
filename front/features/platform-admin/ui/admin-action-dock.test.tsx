@@ -89,6 +89,31 @@ describe("AdminSafeActionDock", () => {
     expect(onPrimary).toHaveBeenCalledOnce();
   });
 
+  it("keeps an L2 unknown-outcome same-intent primary clickable", async () => {
+    const onPrimary = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <AdminSafeActionDock
+        level="L2"
+        authority="allowed"
+        state="unknown-outcome"
+        reason="명령 응답을 확인하지 못했습니다. 같은 명령으로 다시 시도할 수 있습니다."
+        primary={
+          <button type="button" onClick={onPrimary}>
+            재처리 확정
+          </button>
+        }
+      />,
+    );
+
+    expect(screen.getByRole("group", { name: "작업" }).closest("[data-state]")).toHaveAttribute(
+      "data-state",
+      "unknown-outcome",
+    );
+    await user.click(screen.getByRole("button", { name: "재처리 확정" }));
+    expect(onPrimary).toHaveBeenCalledOnce();
+  });
+
   it("does not activate a wrapped button or link primary when locked", () => {
     const onButton = vi.fn();
     const onLink = vi.fn();

@@ -5,8 +5,18 @@ import {
   type PlatformAdminWorkbenchInput,
 } from "@/features/platform-admin/model/platform-admin-workbench-model";
 
+const OWNER_PERMISSIONS = {
+  canCreateClub: true,
+  canUpdateClub: true,
+  canManageDomains: true,
+  canCreateSupportGrant: true,
+  canRevokeSupportGrant: true,
+  canForceCancelAiJob: true,
+} as const;
+
 const baseInput: PlatformAdminWorkbenchInput = {
   role: "OWNER",
+  permissions: OWNER_PERMISSIONS,
   activeClubCount: 3,
   domainActionRequiredCount: 1,
   selectedClubId: null,
@@ -108,13 +118,45 @@ describe("platform admin workbench model", () => {
     expect(workbench.selectedBrief?.primaryAction.disabled).toBe(true);
   });
 
-  it("exposes role capabilities separately from queue state", () => {
-    const owner = buildPlatformAdminWorkbench(baseInput);
-    const support = buildPlatformAdminWorkbench({ ...baseInput, role: "SUPPORT" });
+  it("does not grant mutations from the platform role name", () => {
+    const owner = buildPlatformAdminWorkbench({
+      ...baseInput,
+      role: "OWNER",
+      permissions: undefined,
+      selectedClubId: "club-ready",
+    });
+    const support = buildPlatformAdminWorkbench({
+      ...baseInput,
+      role: "SUPPORT",
+      permissions: undefined,
+      selectedClubId: "club-ready",
+    });
 
-    expect(owner.permissions.canCreateSupportGrant).toBe(true);
+    expect(owner.permissions.canCreateSupportGrant).toBe(false);
+    expect(owner.permissions.canUpdateClub).toBe(false);
+    expect(owner.selectedBrief?.primaryAction.disabled).toBe(true);
     expect(support.permissions.canCreateSupportGrant).toBe(false);
     expect(support.permissions.canUpdateClub).toBe(false);
+  });
+
+  it("uses caller-supplied permissions instead of the role name", () => {
+    const workbench = buildPlatformAdminWorkbench({
+      ...baseInput,
+      role: "SUPPORT",
+      selectedClubId: "club-ready",
+      permissions: {
+        canCreateClub: true,
+        canUpdateClub: true,
+        canManageDomains: true,
+        canCreateSupportGrant: true,
+        canRevokeSupportGrant: true,
+        canForceCancelAiJob: true,
+      },
+    });
+
+    expect(workbench.permissions.canUpdateClub).toBe(true);
+    expect(workbench.permissions.canCreateSupportGrant).toBe(true);
+    expect(workbench.selectedBrief?.primaryAction.disabled).toBe(false);
   });
 
   it("returns the 'none' primary action for ARCHIVED and SUSPENDED clubs", () => {
@@ -290,6 +332,7 @@ describe("buildPlatformAdminWorkbench — operations ledger queue", () => {
     const result = buildPlatformAdminWorkbench({
       ...baseInput,
       role: "SUPPORT",
+      permissions: undefined,
       selectedItemId: "club-club-ready",
       selectedClubId: "club-ready",
     });
