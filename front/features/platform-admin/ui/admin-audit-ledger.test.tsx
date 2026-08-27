@@ -75,7 +75,7 @@ describe("AdminAuditLedger", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "감사" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "운영 기입" })).toBeInTheDocument();
     const notificationRow = screen.getByRole("button", { name: /알림 재처리가 확정되었습니다/ });
     expect(notificationRow).toBeInTheDocument();
     await user.click(notificationRow);
@@ -285,5 +285,93 @@ describe("AdminAuditLedger", () => {
     expect(screen.getByLabelText("행동 분류")).toBeInTheDocument();
     expect(screen.getByLabelText("결과")).toBeInTheDocument();
     expect(screen.queryByLabelText(/cursor/i)).not.toBeInTheDocument();
+  });
+
+  it("renders a sentence row that names 사유 없음", () => {
+    render(
+      <AdminAuditLedger
+        page={page}
+        filters={{ range: "7d" }}
+        loading={false}
+        error={null}
+        nextPageError={false}
+        loadingMore={false}
+        sensitiveSearch={defaultSearch}
+        selectedId={null}
+        detailOpen={false}
+        onSelect={vi.fn()}
+        onCloseDetail={vi.fn()}
+        onFilterChange={vi.fn()}
+        onLoadMore={vi.fn()}
+        onRetryLoadMore={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "운영 기입" })).toBeInTheDocument();
+    const row = screen.getByRole("button", { name: /OWNER가 Replay preview에 알림 재처리가 확정되었습니다/ });
+    expect(row).toHaveTextContent("사유: 사유 없음");
+    expect(row).toHaveTextContent("성공");
+    expect(row.querySelector("time")).toHaveAttribute("datetime", "2026-05-27T00:01:00Z");
+    expect(row).not.toHaveTextContent("preview-1");
+    expect(row).not.toHaveTextContent("ADMIN_NOTIFICATION_REPLAY_CONFIRMED");
+    expect(row).not.toHaveTextContent("platform_audit_events:event-1");
+  });
+
+  it("labels a DENIED row as 차단", () => {
+    render(
+      <AdminAuditLedger
+        page={{
+          ...page,
+          items: [{ ...page.items[0], outcome: "DENIED" }],
+        }}
+        filters={{ range: "7d" }}
+        loading={false}
+        error={null}
+        nextPageError={false}
+        loadingMore={false}
+        sensitiveSearch={defaultSearch}
+        selectedId={null}
+        detailOpen={false}
+        onSelect={vi.fn()}
+        onCloseDetail={vi.fn()}
+        onFilterChange={vi.fn()}
+        onLoadMore={vi.fn()}
+        onRetryLoadMore={vi.fn()}
+      />,
+    );
+
+    const row = screen.getByRole("button", { name: /OWNER가 Replay preview에/ });
+    expect(row).toHaveTextContent("차단");
+    expect(row).not.toHaveTextContent("거부");
+  });
+
+  it("keeps the event id in the drawer and out of the sentence row", async () => {
+    const user = userEvent.setup();
+    render(
+      <AdminAuditLedger
+        page={page}
+        filters={{ range: "7d" }}
+        loading={false}
+        error={null}
+        nextPageError={false}
+        loadingMore={false}
+        sensitiveSearch={defaultSearch}
+        selectedId={null}
+        detailOpen={false}
+        onSelect={vi.fn()}
+        onCloseDetail={vi.fn()}
+        onFilterChange={vi.fn()}
+        onLoadMore={vi.fn()}
+        onRetryLoadMore={vi.fn()}
+      />,
+    );
+
+    const row = screen.getByRole("button", { name: /OWNER가 Replay preview에 알림 재처리가 확정되었습니다/ });
+    expect(row).not.toHaveTextContent("preview-1");
+    await user.click(row);
+
+    const detail = screen.getByRole("region", { name: "감사 이벤트 상세" });
+    expect(within(detail).getByText("preview-1")).toBeInTheDocument();
+    expect(detail).toHaveTextContent("ADMIN_NOTIFICATION_REPLAY_CONFIRMED");
   });
 });

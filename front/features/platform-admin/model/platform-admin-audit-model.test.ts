@@ -4,6 +4,7 @@ import {
   adminAuditSearchFromFilters,
   aiOpsDrilldownForAuditItem,
   buildAdminAuditOperationSummary,
+  formatAdminAuditLedgerSentence,
   mergeAdminAuditLedgerPages,
   labelAdminAuditOutcome,
   shouldShowAdminAuditDetailValue,
@@ -53,6 +54,23 @@ describe("platform-admin-audit-model", () => {
     expect(labelAdminAuditOutcome("PREPARED")).toBe("준비됨");
   });
 
+  it("reads a target query as the initial clubId filter without serializing target", () => {
+    expect(adminAuditFiltersFromSearchParams(new URLSearchParams("target=club-reading-sai"))).toEqual({
+      range: "7d",
+      clubId: "club-reading-sai",
+    });
+    expect(
+      adminAuditFiltersFromSearchParams(new URLSearchParams("target=case-notification&clubId=club-1")),
+    ).toEqual({
+      range: "7d",
+      clubId: "club-1",
+    });
+    expect(adminAuditSearchFromFilters({ range: "7d", clubId: "club-reading-sai" }).toString()).toBe(
+      "range=7d&clubId=club-reading-sai",
+    );
+    expect(adminAuditSearchFromFilters({ range: "7d", clubId: "club-reading-sai" }).has("target")).toBe(false);
+  });
+
   it("suppresses unsafe metadata values in defensive UI helpers", () => {
     expect(shouldShowAdminAuditDetailValue("rawJson", "{\"secret\":\"value\"}")).toBe(false);
     expect(shouldShowAdminAuditDetailValue("scope", "METADATA_READ")).toBe(true);
@@ -76,6 +94,28 @@ function auditItem(overrides: Partial<AdminAuditLedgerItem> = {}): AdminAuditLed
     ...overrides,
   };
 }
+
+describe("formatAdminAuditLedgerSentence", () => {
+  it("renders one sentence with 사유 없음 when reason metadata is absent", () => {
+    const sentence = formatAdminAuditLedgerSentence(auditItem({
+      actor: { userId: "admin-1", role: "OWNER", displayLabel: "OWNER" },
+      target: { clubId: "club-1", userId: null, jobId: null, eventId: "preview-1", label: "Replay preview" },
+      summary: "알림 재처리가 확정되었습니다.",
+      outcome: "SUCCESS",
+      safeMetadata: [{ label: "selectionHashPrefix", value: "aaaaaaaa", kind: "fingerprint" }],
+    }));
+
+    expect(sentence).toContain("OWNER가 Replay preview에 알림 재처리가 확정되었습니다.");
+    expect(sentence).toContain("사유: 사유 없음");
+    expect(sentence).toContain("성공");
+    expect(sentence).not.toContain("preview-1");
+    expect(sentence).not.toContain("ADMIN_AI_OPS_RETRY_COMMIT");
+  });
+
+  it("labels a DENIED outcome as 차단", () => {
+    expect(formatAdminAuditLedgerSentence(auditItem({ outcome: "DENIED" }))).toContain("차단");
+  });
+});
 
 describe("aiOpsDrilldownForAuditItem", () => {
   it("returns an ai-ops club and job path for an AI_OPS item", () => {

@@ -133,10 +133,10 @@ test("owner reviews admin audit ledger without raw private fields", async ({ pag
 
   await page.goto("/admin/audit");
 
-  await expect(page.getByRole("heading", { name: "감사" })).toBeVisible();
-  await expect(page.getByLabel("감사 이벤트 목록").getByText("알림 재처리가 확정되었습니다.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "운영 기입" })).toBeVisible();
+  await expect(page.getByLabel("운영 기입 목록").getByText("알림 재처리가 확정되었습니다.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "알림 재처리가 확정되었습니다." })).toBeVisible();
-  await expect(page.getByLabel("감사 이벤트 목록").getByText("support grant가 생성되었습니다.")).toBeVisible();
+  await expect(page.getByLabel("운영 기입 목록").getByText("support grant가 생성되었습니다.")).toBeVisible();
   await page.getByRole("button", { name: /support grant가 생성되었습니다/ }).click();
   await expect(page).toHaveURL(/event=platform_audit_events%3Aevent-2|event=platform_audit_events:event-2/);
   await expect(page).toHaveURL(/mode=detail/);
@@ -178,7 +178,7 @@ test("owner captures audit operation summary visual evidence on desktop and mobi
 
   await page.setViewportSize(VISUAL_AUTHORITY_VIEWPORTS.desktopWide);
   await page.goto("/admin/audit");
-  await expect(page.getByRole("heading", { name: "감사" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "운영 기입" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await expect(page.getByText("운영 판단")).toBeVisible();
   await expectNoAuditPrivateSentinels(page);
@@ -190,7 +190,7 @@ test("owner captures audit operation summary visual evidence on desktop and mobi
 
   await page.setViewportSize(VISUAL_AUTHORITY_VIEWPORTS.mobile);
   await page.goto("/admin/audit");
-  await expect(page.getByRole("heading", { name: "감사" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "운영 기입" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await page.getByRole("button", { name: /support grant가 생성되었습니다/ }).click();
   await expect(page).toHaveURL(/mode=detail/);

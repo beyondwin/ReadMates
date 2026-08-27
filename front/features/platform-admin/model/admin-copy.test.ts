@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ADMIN_COPY,
+  auditOutcomeLabel,
   clubLifecycleLabel,
   clubVisibilityLabel,
   hostOnboardingLabel,
@@ -24,6 +25,8 @@ describe("admin-copy", () => {
     expect(ADMIN_COPY.heading.clubsLedger).toBe("클럽 장부");
     expect(ADMIN_COPY.heading.delivery).toBe("배달 원장");
     expect(ADMIN_COPY.heading.recentChanges).toBe("최근에 바뀐 것");
+    expect(ADMIN_COPY.heading.audit).toBe("운영 기입");
+    expect(ADMIN_COPY.heading.auditLedger).toBe("기입 목록");
     expect(ADMIN_COPY.targetLedger.heading).toBe("이 대상의 최근 기입");
     expect(ADMIN_COPY.targetLedger.more).toBe("전체 기입 보기");
     expect(ADMIN_COPY.targetLedger.empty).toBe("표시할 기입이 없습니다.");
@@ -69,5 +72,14 @@ describe("admin-copy", () => {
   it("모르는 값은 원문을 그대로 반환한다 (fail-open 라벨, 숨기지 않음)", () => {
     expect(clubLifecycleLabel("UNKNOWN_X")).toBe("UNKNOWN_X");
     expect(supportGrantStatusLabel("")).toBe("");
+    expect(auditOutcomeLabel("WEIRD")).toBe("WEIRD");
+  });
+
+  it("감사 결과를 성공/실패/차단/진행으로 바꾼다", () => {
+    expect(auditOutcomeLabel("SUCCESS")).toBe("성공");
+    expect(auditOutcomeLabel("FAILED")).toBe("실패");
+    expect(auditOutcomeLabel("DENIED")).toBe("차단");
+    expect(auditOutcomeLabel("PREPARED")).toBe("진행");
+    expect(auditOutcomeLabel("UNKNOWN")).toBe("UNKNOWN");
   });
 });

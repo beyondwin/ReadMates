@@ -115,7 +115,7 @@ test("Audit URL owns the review docket", async ({ page }) => {
   await page.goto("/admin/audit");
   await expectReducedMotion(page);
 
-  await expect(page.getByRole("heading", { name: "감사" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "운영 기입" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await page.getByRole("button", { name: /support grant가 생성되었습니다/ }).click();
   await expect(page).toHaveURL(/event=platform_audit_events%3Aevent-2|event=platform_audit_events:event-2/);

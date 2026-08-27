@@ -17,6 +17,8 @@ export const ADMIN_COPY = {
     clubsLedger: "클럽 장부",
     delivery: "배달 원장",
     recentChanges: "최근에 바뀐 것",
+    audit: "운영 기입",
+    auditLedger: "기입 목록",
   },
   targetLedger: {
     heading: "이 대상의 최근 기입",
@@ -83,4 +85,11 @@ export const supportGrantStatusLabel = fromMap({
   EXPIRING: "만료 임박",
   EXPIRED: "만료됨",
   REVOKED: "취소됨",
+});
+
+export const auditOutcomeLabel = fromMap({
+  SUCCESS: "성공",
+  FAILED: "실패",
+  DENIED: "차단",
+  PREPARED: "진행",
 });

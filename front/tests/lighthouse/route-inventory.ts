@@ -47,7 +47,7 @@ export const LIGHTHOUSE_ROUTE_INVENTORY: LighthouseRouteDefinition[] = [
   { id: "admin-support", group: "admin", path: "/admin/support", mode: "snapshot", auth: "admin", description: "Platform admin support", expectedText: "지원" },
   { id: "admin-notifications", group: "admin", path: "/admin/notifications", mode: "snapshot", auth: "admin", description: "Platform admin notifications", expectedText: "알림" },
   { id: "admin-ai-ops", group: "admin", path: "/admin/ai-ops", mode: "snapshot", auth: "admin", description: "Platform admin AI operations", expectedText: "AI" },
-  { id: "admin-audit", group: "admin", path: "/admin/audit", mode: "snapshot", auth: "admin", description: "Platform admin audit", expectedText: "감사" },
+  { id: "admin-audit", group: "admin", path: "/admin/audit", mode: "snapshot", auth: "admin", description: "Platform admin audit", expectedText: "운영 기입" },
   { id: "admin-analytics", group: "admin", path: "/admin/analytics", mode: "snapshot", auth: "admin", description: "Platform admin analytics", expectedText: "분석" },
   { id: "admin-club-detail", group: "admin", path: `/admin/clubs/${READING_SAI_FIXTURES.clubId}`, mode: "snapshot", auth: "admin", description: "Platform admin club detail", expectedText: "읽는사이" },
 ];

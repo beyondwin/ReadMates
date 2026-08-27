@@ -838,6 +838,8 @@
 .admin-support-workbench .admin-receipt-timeline,
 .admin-audit,
 .admin-audit .admin-page-context,
+.admin-audit .admin-work-view-bar,
+.admin-audit .admin-evidence-ledger,
 .admin-analytics,
 .admin-analytics .admin-state-panel {
   min-width: 0;
@@ -856,6 +858,22 @@
 .admin-analytics .admin-analytics__window {
   min-width: 44px;
   min-height: 44px;
+}
+
+.admin-audit .admin-work-view-bar {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.admin-audit .admin-audit__row {
+  display: flex;
+  align-items: baseline;
+  grid-template-columns: none;
+}
+
+.admin-audit .admin-audit__row-time {
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .admin-support-workbench .admin-support-workbench__notice,
@@ -880,10 +898,15 @@
   .admin-support-workbench .admin-support-workbench__command-actions,
   .admin-audit,
   .admin-audit .admin-audit__filters,
+  .admin-audit .admin-work-view-bar,
   .admin-analytics,
   .admin-analytics .admin-analytics__actions {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-audit__body[data-detail-open="true"] .admin-evidence-ledger {
+    display: none;
   }
 
   .admin-support-workbench .btn,

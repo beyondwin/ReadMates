@@ -265,7 +265,7 @@ test("Review audit locks the 390 mobile docket composition", async ({ mount, pag
     reviewNode(reviewAuditLedger),
     VISUAL_AUTHORITY_VIEWPORTS.mobile,
   );
-  await expect(component.getByRole("heading", { name: "감사", exact: true })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "운영 기입", exact: true })).toBeVisible();
   await expect(component.getByRole("heading", { name: EDITORIAL_LEDGER_LONG_AUDIT_SUMMARY })).toBeVisible();
   await expect(component.getByRole("region", { name: "감사 이벤트 상세" })).toBeVisible();
   const back = component.getByRole("button", { name: "목록으로" });

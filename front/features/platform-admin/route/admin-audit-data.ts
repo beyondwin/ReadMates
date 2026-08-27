@@ -1,9 +1,9 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { replace, type LoaderFunctionArgs } from "react-router";
-import { adminAuditFiltersFromSearchParams, adminAuditSearchFromFilters } from "@/features/platform-admin/model/platform-admin-audit-model";
+import { adminAuditFiltersFromSearchParams, adminAuditSearchFromFilters, adminAuditShareSafeIdentifier } from "@/features/platform-admin/model/platform-admin-audit-model";
 import { platformAdminAuditLedgerInfiniteQuery } from "@/features/platform-admin/queries/platform-admin-audit-queries";
 
-const SAFE_AUDIT_PARAMS = new Set(["range", "from", "to", "clubId", "actorRole", "sourceSlice", "actionCategory", "outcome", "event", "mode"]);
+const SAFE_AUDIT_PARAMS = new Set(["range", "from", "to", "clubId", "actorRole", "sourceSlice", "actionCategory", "outcome", "event", "mode", "target"]);
 const SAFE_EVENT_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 export function adminAuditEventFromSearchParams(params: URLSearchParams): string | null {
@@ -32,6 +32,7 @@ export function adminAuditLoaderFactory(queryClient: QueryClient) {
       invalidInstant(url.searchParams.get("from")) ||
       invalidInstant(url.searchParams.get("to")) ||
       invalidIdentifier(url.searchParams, "clubId", filters.clubId) ||
+      invalidIdentifier(url.searchParams, "target", adminAuditShareSafeIdentifier(url.searchParams.get("target"))) ||
       invalidEnum(url.searchParams, "actorRole", filters.actorRole) ||
       invalidEnum(url.searchParams, "sourceSlice", filters.sourceSlice) ||
       invalidEnum(url.searchParams, "actionCategory", filters.actionCategory) ||

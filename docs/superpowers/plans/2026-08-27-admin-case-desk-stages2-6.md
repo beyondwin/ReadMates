@@ -172,7 +172,9 @@ export function AdminTargetLedgerInline({ entries, moreHref }: {
 - **프리필터 진입 지원**: `/admin/audit?target={id}` 쿼리를 읽어 초기 필터로 적용 (Task 3-3의 moreHref가 사용).
 
 **Steps:**
-- [ ] 테스트: ① 문장형 행 렌더(사유 없음 명시 포함) ② 차단 결과 라벨 ③ target 쿼리 프리필터 ④ 드로어에 이벤트 ID 존재·행에는 부재 → 구현 → 통과 → Commit: `feat(admin): audit as sentence ledger with shared shell`
+- [x] 테스트: ① 문장형 행 렌더(사유 없음 명시 포함) ② 차단 결과 라벨 ③ target 쿼리 프리필터 ④ 드로어에 이벤트 ID 존재·행에는 부재 → 구현 → 통과 → Commit: `feat(admin): audit as sentence ledger with shared shell`
+
+> 실행 노트: `?target=`은 SAFE 쿼리로 유지하고 parse 시 `clubId`에 매핑(서버 계약 불변). 라우트 파일은 searchParams 파싱이 이미 model에 있어 변경 없음. `auditOutcomeLabel`: SUCCESS→성공, FAILED→실패, DENIED→차단, PREPARED→진행, 그 외 원문.
 
 ### Task 4-2: 지원 → "접근 원장" 재조립
 

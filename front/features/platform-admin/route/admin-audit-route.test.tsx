@@ -180,6 +180,16 @@ describe("AdminAuditRoute", () => {
     );
   });
 
+  it("applies a target query as the initial club filter", async () => {
+    renderRoute("/admin/audit?target=club-reading-sai");
+
+    expect(await screen.findByLabelText("클럽 ID")).toHaveValue("club-reading-sai");
+    expect(fetchAdminAuditLedger).toHaveBeenCalledWith(
+      expect.objectContaining({ range: "7d", clubId: "club-reading-sai" }),
+      undefined,
+    );
+  });
+
   it("retains prior rows and offers a focused retry when load more fails", async () => {
     vi.mocked(fetchAdminAuditLedger)
       .mockResolvedValueOnce(page([item("event-1", "보존 이벤트")], "cursor-1"))
