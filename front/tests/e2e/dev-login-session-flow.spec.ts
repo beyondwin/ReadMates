@@ -229,7 +229,7 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
   await page.goto("/app/host");
   await openCurrentMeetingFromDashboard(page);
   await confirmLifecycle(page, "모임 마치기", "/close");
-  await expect(page.locator(".m-toast")).toContainText("모임을 마쳤습니다");
+  await expect(page.getByRole("region", { name: "진행 목록" }).getByText("모임을 마쳤습니다.")).toBeVisible();
   await expect(page.getByText("기록 정리 중")).toBeVisible();
   await expect(page.getByRole("region", { name: "지금 할 일" }).getByRole("button", { name: "정리본 올리기" })).toBeVisible();
 });
