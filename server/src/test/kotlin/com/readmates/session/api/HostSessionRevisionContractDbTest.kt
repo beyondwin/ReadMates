@@ -292,6 +292,50 @@ class HostSessionRevisionContractDbTest(
     }
 
     @Test
+    fun `non-schedule mutation families leave schedule revision unchanged`() {
+        val sessionId = createDraft("일정 불변 mutation")
+        val scheduleRevisionBefore = scheduleRevision(sessionId)
+
+        open(sessionId, expectedRevision = 0)
+        assertThat(scheduleRevision(sessionId)).isEqualTo(scheduleRevisionBefore)
+
+        mockMvc
+            .patch("/api/host/sessions/$sessionId/visibility") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"visibility":"MEMBER"}"""
+            }.andExpect { status { isOk() } }
+        assertThat(scheduleRevision(sessionId)).isEqualTo(scheduleRevisionBefore)
+
+        confirmAttendance(sessionId, HOST_MEMBERSHIP_ID, "ABSENT")
+        assertThat(scheduleRevision(sessionId)).isEqualTo(scheduleRevisionBefore)
+
+        mockMvc
+            .patch("/api/sessions/current/rsvp") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"status":"GOING"}"""
+            }.andExpect { status { isOk() } }
+        assertThat(scheduleRevision(sessionId)).isEqualTo(scheduleRevisionBefore)
+
+        mockMvc
+            .post("/api/sessions/current/questions") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"priority":1,"text":"일정 변경이 아닌 질문","draftThought":null}"""
+            }.andExpect { status { isCreated() } }
+        assertThat(scheduleRevision(sessionId)).isEqualTo(scheduleRevisionBefore)
+
+        mockMvc
+            .patch("/api/host/sessions/$sessionId/record-draft") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = recordDraftJson()
+            }.andExpect { status { isOk() } }
+        assertThat(scheduleRevision(sessionId)).isEqualTo(scheduleRevisionBefore)
+    }
+
+    @Test
     fun `trashed sessions stay not found instead of revision conflict`() {
         val sessionId = createDraft("휴지통 개정 404")
         mockMvc
@@ -469,6 +513,36 @@ class HostSessionRevisionContractDbTest(
             """.trimIndent()
     }
 
+    private fun recordDraftJson() =
+        """
+        {
+          "expectedDraftRevision": null,
+          "snapshot": {
+            "visibility": "HOST_ONLY",
+            "publicationSummary": "일정 불변 기록",
+            "highlights": [
+              {
+                "membershipId": "$HOST_MEMBERSHIP_ID",
+                "authorDisplayName": "호스트",
+                "text": "일정 불변 하이라이트"
+              }
+            ],
+            "oneLineReviews": [
+              {
+                "membershipId": "$HOST_MEMBERSHIP_ID",
+                "authorDisplayName": "호스트",
+                "text": "일정 불변 한 줄"
+              }
+            ],
+            "feedbackDocument": {
+              "fileName": "schedule-unchanged.md",
+              "title": "일정 불변 기록",
+              "markdown": "일정과 무관한 기록 변경"
+            }
+          }
+        }
+        """.trimIndent()
+
     private fun revisionJson(expectedRevision: Long) = """{"expectedSessionRevision":$expectedRevision}"""
 
     private fun sessionRevision(sessionId: String): Long =
@@ -561,6 +635,18 @@ class HostSessionRevisionContractDbTest(
 }
 
 private const val CLEANUP_REVISION_CONTRACT_SQL = """
+    delete from session_record_drafts
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number > 7
+      );
+    delete from questions
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number > 7
+      );
     delete from host_session_change_audit
     where club_id = '00000000-0000-0000-0000-000000000001'
       and session_id in (
