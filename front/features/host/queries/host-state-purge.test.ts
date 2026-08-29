@@ -5,7 +5,6 @@ import {
   hostMutationKey,
   purgeClubHostState,
 } from "./host-state-purge";
-import { currentSessionKeys } from "@/features/current-session/queries/current-session-queries";
 import { aiClubKeys, aiJobKeys } from "@/features/host/aigen/queries/aigen-job-queries";
 import { hostClubOperationsKeys } from "./host-club-operations-queries";
 import { hostInvitationKeys } from "./host-invitation-queries";
@@ -59,7 +58,7 @@ describe("purgeClubHostState", () => {
       aiClubKeys.capabilities(exactContext),
     ];
     const otherHostKey = hostSessionKeys.detail("session-7", otherContext);
-    const safeMemberKey = currentSessionKeys.current(exactContext);
+    const safeMemberKey = ["current-session", "scope", exactContext.clubSlug, "current"] as const;
 
     for (const key of exactHostKeys) client.setQueryData(key, { sensitive: true });
     client.setQueryData(otherHostKey, { otherClub: true });
