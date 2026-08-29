@@ -18,8 +18,8 @@ create index session_participants_schedule_seen_idx
   on session_participants (club_id, session_id, participation_status, seen_schedule_revision);
 
 create table membership_club_access (
-  membership_id char(36) not null,
-  club_id char(36) not null,
+  membership_id char(36) character set utf8mb4 collate utf8mb4_0900_ai_ci not null,
+  club_id char(36) character set utf8mb4 collate utf8mb4_0900_ai_ci not null,
   last_access_at datetime(6) not null,
   primary key (membership_id, club_id),
   constraint membership_club_access_membership_fk

@@ -3256,6 +3256,17 @@ class MySqlFlywayMigrationTest(
             )
             insertV52RevisionSession(upgradeJdbc, fixture.sessionId, fixture.clubId, number = 1, state = "OPEN")
             insertV52RevisionParticipant(upgradeJdbc, fixture)
+            upgradeJdbc.update(
+                """
+                insert into auth_sessions (
+                  id, user_id, session_token_hash, created_at, last_seen_at, expires_at
+                ) values (?, ?, ?, '2026-08-01 09:00:00.000000', '2026-08-20 09:00:00.000000',
+                          '2026-09-01 09:00:00.000000')
+                """.trimIndent(),
+                UUID.randomUUID().toString(),
+                fixture.memberUserId,
+                "a".repeat(64),
+            )
             val receiptId = UUID.randomUUID().toString()
             upgradeJdbc.update(
                 """
@@ -3312,11 +3323,70 @@ class MySqlFlywayMigrationTest(
             assertEquals(
                 0,
                 upgradeJdbc.queryForObject(
-                    "select count(*) from membership_club_access where membership_id = ?",
+                    "select count(*) from membership_club_access",
                     Int::class.java,
-                    fixture.memberMembershipId,
                 ),
             )
+        }
+    }
+
+    @Test
+    fun `mysql upgrades v60 schedule state when schema default drifts from membership key collation`() {
+        FlywayUpgradeMySqlContainer().use { database ->
+            database.start()
+            val dataSource = DriverManagerDataSource(database.jdbcUrl, database.username, database.password)
+            val v60Flyway =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .target("60")
+                    .load()
+            assertThat(v60Flyway.migrate().targetSchemaVersion.toString()).isEqualTo("60")
+            val upgradeJdbc = JdbcTemplate(dataSource)
+            val membershipId = columnMetadata(upgradeJdbc, "memberships", "id")
+            val clubId = columnMetadata(upgradeJdbc, "memberships", "club_id")
+            val originalSchemaDefault =
+                upgradeJdbc.queryForObject(
+                    """
+                    select default_collation_name
+                    from information_schema.schemata
+                    where schema_name = database()
+                    """.trimIndent(),
+                    String::class.java,
+                ) ?: error("schema default collation must be present")
+            val mismatchedDefault =
+                if (membershipId["COLLATION_NAME"] == "utf8mb4_0900_ai_ci") {
+                    "utf8mb4_unicode_ci"
+                } else {
+                    "utf8mb4_0900_ai_ci"
+                }
+
+            try {
+                upgradeJdbc.execute(
+                    "alter database default character set utf8mb4 collate $mismatchedDefault",
+                )
+
+                val upgradeResult =
+                    Flyway
+                        .configure()
+                        .dataSource(dataSource)
+                        .locations("classpath:db/mysql/migration")
+                        .load()
+                        .migrate()
+
+                assertThat(upgradeResult.migrationsExecuted).isEqualTo(1)
+                assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("61")
+                listOf("membership_id" to membershipId, "club_id" to clubId).forEach { (column, parent) ->
+                    val child = columnMetadata(upgradeJdbc, "membership_club_access", column)
+                    assertThat(child["CHARACTER_SET_NAME"]).isEqualTo(parent["CHARACTER_SET_NAME"])
+                    assertThat(child["COLLATION_NAME"]).isEqualTo(parent["COLLATION_NAME"])
+                }
+            } finally {
+                upgradeJdbc.execute(
+                    "alter database default character set utf8mb4 collate $originalSchemaDefault",
+                )
+            }
         }
     }
 
