@@ -65,8 +65,17 @@ function hostSessionDetail() {
     meetingPasscode: null,
     publication: null,
     state: "OPEN" as const,
+    scheduleRevision: 7,
+    scheduleSeenAvailability: "AVAILABLE" as const,
+    scheduleSeenSummary: {
+      currentCount: 1,
+      staleCount: 0,
+      unseenCount: 0,
+      eligibleCount: 1,
+    },
     versions: {
       sessionRevision: 3,
+      scheduleRevision: 7,
       exposureRevision: 2,
       participantSetRevision: 1,
       recordDraftRevision: null,
@@ -74,7 +83,21 @@ function hostSessionDetail() {
       publicationRevision: 0,
     },
     attendanceSnapshotId: "attendance-snapshot-1",
-    attendees: [],
+    attendees: [
+      {
+        membershipId: "membership-1",
+        avatarKey: "banana-green-book",
+        displayName: "멤버1",
+        accountName: "안멤버1",
+        rsvpStatus: "GOING" as const,
+        attendanceStatus: "UNKNOWN" as const,
+        participationStatus: "ACTIVE" as const,
+        attendanceRevision: 2,
+        seenScheduleRevision: 7,
+        scheduleSeenAt: "2026-07-22T12:00:00Z",
+        scheduleSeenState: "CURRENT" as const,
+      },
+    ],
     feedbackDocument: {
       uploaded: false,
       fileName: null,
@@ -240,6 +263,7 @@ describe("host api wrappers", () => {
       resourceId: "session-7",
       resultingVersions: {
         sessionRevision: 4,
+        scheduleRevision: 7,
         exposureRevision: 1,
         participantSetRevision: 2,
         recordDraftRevision: null,
@@ -261,6 +285,7 @@ describe("host api wrappers", () => {
         state: "OPEN",
         versions: {
           sessionRevision: 4,
+          scheduleRevision: 7,
           exposureRevision: 1,
           participantSetRevision: 2,
           recordDraftRevision: null,

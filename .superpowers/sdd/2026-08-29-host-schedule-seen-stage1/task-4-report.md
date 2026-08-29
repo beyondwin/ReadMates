@@ -90,3 +90,15 @@ All hashes below are SHA-256 values of the closing source state. The round start
 | Future seen-revision corruption | `565fac5c980e9bba4ba4ef65fb816525e51380560823fdce14a9a2628a5a7c04` — host row mapper | RED: the same 18-test run failed because seen revision `4` against schedule revision `3` was returned as STALE. GREEN: the fresh `--rerun-tasks` selector passed 18/18. | STALE is now only `seenRevision < scheduleRevision`; equality is CURRENT, null is UNSEEN, and a future value fails fast with an explicit invariant message. |
 
 Fixture determinism was sealed by staging only the two generated schedule-contract fixtures, rerunning the pinned exporter, and running `git diff --exit-code -- front/tests/unit/__fixtures__/zod-schemas/`; result: exit `0`. `git diff --check` also exited `0`. Stage-wide gates remained intentionally excluded.
+
+## Review fix round 2 — legacy wire fixtures
+
+- Source state: clean commit `d07f995cf3e6940ed86c06591c9feb1d661d9f24`.
+- Closing SHA-256:
+  - `252f0a4e3dea48de4401f8c60089a558139a481a354cfce7a8ee69b88c747eba` — `front/features/host/api/host-session-recovery-contracts.test.ts`
+  - `16197d415c27f4c9c8784b0d8f17f744f2711a093107eb7d2dd900a8bbbe44a9` — `front/features/host/api/host-api.test.ts`
+- Focused RED command: `PATH=/opt/homebrew/opt/node@24/bin:$PATH npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/api/host-session-recovery-contracts.test.ts features/host/api/host-api.test.ts`.
+  - Result: 30 tests, 6 failures. Every failure was strict-schema rejection of omitted schedule fields in the two legacy wire fixtures: detail revision/availability/summary, version-vector schedule revision, or reconciliation receipt/projection/current vectors.
+- Focused GREEN command: the same pinned command.
+  - Result: 2 files passed, 30 tests passed.
+- Closure: both legacy detail fixtures now use non-baseline `scheduleRevision: 7`, AVAILABLE summary counts for one ACTIVE current attendee, and explicit seen revision/time/state. Reconciliation resulting/projection/current vectors carry the same non-baseline schedule revision. No production file changed.
