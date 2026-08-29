@@ -78,9 +78,20 @@ private const val RESTORE_MANUAL_DISPATCH_SQL = """
     where club_id = '00000000-0000-0000-0000-000000000001'
       and (dedupe_key like 'manual:%' or dedupe_key like 'manual-dispatch-test-%');
     update sessions
-    set state = 'PUBLISHED'
+    set state = 'PUBLISHED', visibility = 'PUBLIC', access_scope = 'GUEST_READABLE'
     where club_id = '00000000-0000-0000-0000-000000000001'
-      and id = '00000000-0000-0000-0000-000000000301';
+      and id in (
+        '00000000-0000-0000-0000-000000000301',
+        '00000000-0000-0000-0000-000000000302'
+      );
+    update public_projection_current
+    set origin_readable = true
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        '00000000-0000-0000-0000-000000000301',
+        '00000000-0000-0000-0000-000000000302'
+      )
+      and emergency_denied = false;
 """
 
 @SpringBootTest(properties = ["spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev"])

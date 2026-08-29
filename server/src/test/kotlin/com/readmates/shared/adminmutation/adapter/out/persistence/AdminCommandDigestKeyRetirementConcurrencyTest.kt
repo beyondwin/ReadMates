@@ -823,10 +823,7 @@ private fun Instant.toDbTime4(): LocalDateTime = atOffset(ZoneOffset.UTC).toLoca
 
 private const val CLEANUP_TASK4_SQL = """
 delete from platform_audit_events where event_type = 'ADMIN_COMMAND_TASK4_TEST';
-delete from platform_admin_command_idempotency_keys
-where platform_admin_user_id = 'bbbbbbbb-0000-4000-8000-000000058001';
-delete from platform_admin_command_idempotency
-where platform_admin_user_id = 'bbbbbbbb-0000-4000-8000-000000058001';
-delete from platform_admin_command_digest_key_state
-where digest_key_version in (5801, 5802);
+delete from platform_admin_command_idempotency_keys;
+delete from platform_admin_command_idempotency;
+delete from platform_admin_command_digest_key_state;
 """

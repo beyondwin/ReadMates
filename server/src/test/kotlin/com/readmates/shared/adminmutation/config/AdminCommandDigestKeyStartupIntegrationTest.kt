@@ -37,6 +37,12 @@ class AdminCommandDigestKeyStartupIntegrationTest(
     @AfterEach
     fun cleanup() {
         jdbcTemplate.update(
+            """
+            delete from platform_admin_club_command_convergence
+            where effect_type = 'HOST_INVITATION' and state = 'PENDING'
+            """.trimIndent(),
+        )
+        jdbcTemplate.update(
             "delete from platform_admin_club_command_convergence where receipt_id_snapshot = ?",
             PENDING_RECEIPT_ID.toString(),
         )
@@ -45,20 +51,9 @@ class AdminCommandDigestKeyStartupIntegrationTest(
             PENDING_RECEIPT_ID.toString(),
         )
         jdbcTemplate.update("delete from platform_audit_events where id = ?", PENDING_AUDIT_ID.toString())
-        jdbcTemplate.update(
-            "delete from platform_admin_command_idempotency_keys where digest_key_version between ? and ?",
-            VERSION_MIN,
-            VERSION_MAX,
-        )
-        jdbcTemplate.update(
-            "delete from platform_admin_command_idempotency where platform_admin_user_id = ?",
-            ADMIN_ID.toString(),
-        )
-        jdbcTemplate.update(
-            "delete from platform_admin_command_digest_key_state where digest_key_version between ? and ?",
-            VERSION_MIN,
-            VERSION_MAX,
-        )
+        jdbcTemplate.update("delete from platform_admin_command_idempotency_keys")
+        jdbcTemplate.update("delete from platform_admin_command_idempotency")
+        jdbcTemplate.update("delete from platform_admin_command_digest_key_state")
     }
 
     @Test
@@ -83,7 +78,7 @@ class AdminCommandDigestKeyStartupIntegrationTest(
                 val migratedJdbc = JdbcTemplate(context.getBean(DataSource::class.java))
                 assertThat(context.getBean(AdminCommandDigestKeyStartupValidator::class.java)).isNotNull
                 assertThat(tableExists(migratedJdbc, "platform_admin_command_idempotency_keys")).isTrue()
-                assertThat(latestFlywayVersion(migratedJdbc)).isEqualTo("60")
+                assertThat(latestFlywayVersion(migratedJdbc)).isEqualTo("61")
             }
         }
     }
@@ -190,7 +185,7 @@ class AdminCommandDigestKeyStartupIntegrationTest(
                     """.trimIndent(),
                     String::class.java,
                 ),
-            ).isEqualTo("60")
+            ).isEqualTo("61")
         } else {
             assertThat(generateSequence(failure) { it.cause }.mapNotNull { it.message }.toList())
                 .contains("Admin command digest keys cannot safely replay or retire persisted command references")
@@ -376,8 +371,6 @@ class AdminCommandDigestKeyStartupIntegrationTest(
         const val CURRENT_VERSION = 5902
         const val PREVIOUS_VERSION = 5901
         const val UNKNOWN_VERSION = 5909
-        const val VERSION_MIN = 5900
-        const val VERSION_MAX = 5910
 
         fun key(version: Int) = "test-admin-command-startup-key-$version"
     }

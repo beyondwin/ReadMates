@@ -351,25 +351,39 @@ class JdbcMutationIdempotencyAdapterDbTest(
         jdbcTemplate.update(
             """
             insert into admin_public_takedown_receipts (
-              id, actor_admin_id, actor_role_snapshot, capability_snapshot,
-              club_id_snapshot, session_id_snapshot, publication_id_snapshot, preview_id_snapshot,
-              idempotency_key_hmac, canonical_schema_version, digest_key_version, request_hmac,
-              reason_category, reason_summary, origin_result, committed_generation,
-              committed_club_generation, convergence_id, created_at
+              id, convergence_id, actor_user_id_snapshot, actor_platform_role_snapshot,
+              reason_category, reason_redacted, club_id_snapshot, session_id_snapshot,
+              publication_id_snapshot, committed_generation, origin_result, current_surfaces_json,
+              remote_copy_limitation_code, created_at
             ) values (
-              ?, ?, 'OWNER', 'EMERGENCY_PUBLIC_TAKEDOWN', ?, ?, ?, ?,
-              unhex(repeat('01', 32)), 1, ?, unhex(repeat('02', 32)),
-              'PRIVACY', 'REDACTED_NON_EMPTY', 'DENIED', 2, 2, ?, utc_timestamp(6)
+              ?, ?, ?, 'OWNER', 'PRIVATE_DATA', true, ?, ?, ?, 2, 'DENIED',
+              json_array('ORIGIN'), 'REMOTE_COPY_UNCONTROLLED', utc_timestamp(6)
             )
             """.trimIndent(),
             TAKEDOWN_RECEIPT_ID,
+            TAKEDOWN_CONVERGENCE_ID,
             ACTOR_ID.toString(),
             CLUB_ID.toString(),
             TAKEDOWN_SESSION_ID,
             TAKEDOWN_PUBLICATION_ID,
-            TAKEDOWN_PREVIEW_ID,
+        )
+        jdbcTemplate.update(
+            """
+            insert into admin_public_takedown_idempotency (
+              actor_user_id, operation, club_id, publication_id, idempotency_key,
+              request_hmac, canonical_schema_version, digest_key_version, receipt_id,
+              created_at, completed_at, expires_at
+            ) values (
+              ?, 'EMERGENCY_PUBLIC_TAKEDOWN', ?, ?, 'immutable-takedown-fixture',
+              unhex(repeat('02', 32)), 1, ?, ?, utc_timestamp(6), utc_timestamp(6),
+              timestampadd(day, 7, utc_timestamp(6))
+            )
+            """.trimIndent(),
+            ACTOR_ID.toString(),
+            CLUB_ID.toString(),
+            TAKEDOWN_PUBLICATION_ID,
             digestKeyVersion,
-            TAKEDOWN_CONVERGENCE_ID,
+            TAKEDOWN_RECEIPT_ID,
         )
     }
 
@@ -433,7 +447,6 @@ class JdbcMutationIdempotencyAdapterDbTest(
         const val TAKEDOWN_RECEIPT_ID = "aaaaaaaa-0000-4000-8000-000000053091"
         const val TAKEDOWN_SESSION_ID = "aaaaaaaa-0000-4000-8000-000000053092"
         const val TAKEDOWN_PUBLICATION_ID = "aaaaaaaa-0000-4000-8000-000000053093"
-        const val TAKEDOWN_PREVIEW_ID = "aaaaaaaa-0000-4000-8000-000000053094"
         const val TAKEDOWN_CONVERGENCE_ID = "aaaaaaaa-0000-4000-8000-000000053095"
 
         fun keyPair(
@@ -454,6 +467,9 @@ class JdbcMutationIdempotencyAdapterDbTest(
 }
 
 private const val CLEANUP_MUTATION_IDEMPOTENCY_SQL = """
+delete from admin_public_takedown_idempotency
+where actor_user_id = 'aaaaaaaa-0000-4000-8000-000000053002'
+  and publication_id = 'aaaaaaaa-0000-4000-8000-000000053093';
 delete from admin_public_takedown_receipts
 where id = 'aaaaaaaa-0000-4000-8000-000000053091';
 delete from mutation_idempotency_keys
