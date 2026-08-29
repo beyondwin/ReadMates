@@ -76,6 +76,9 @@ function currentSessionResponse() {
       meetingPasscode: null,
       questionDeadlineAt: "2026-08-01T10:00:00Z",
       myRsvpStatus: "GOING",
+      scheduleRevision: 1,
+      mySeenScheduleRevision: 1,
+      myScheduleSeenAt: "2026-08-01T00:00:00Z",
       myCheckin: { readingProgress: 60 },
       myQuestions: [],
       myOneLineReview: null,
@@ -174,6 +177,7 @@ function hostMembersResponse() {
       status: "ACTIVE",
       joinedAt: "2026-01-01T00:00:00Z",
       createdAt: "2026-01-01T00:00:00Z",
+      lastClubAccessAt: null,
       currentSessionParticipationStatus: "ACTIVE",
       canSuspend: member.role !== "HOST",
       canRestore: false,
@@ -204,8 +208,17 @@ function hostSessionDetailResponse() {
     visibility: "HOST_ONLY",
     publication: null,
     state: "OPEN",
+    scheduleRevision: 1,
+    scheduleSeenAvailability: "AVAILABLE",
+    scheduleSeenSummary: {
+      currentCount: 3,
+      staleCount: 0,
+      unseenCount: 0,
+      eligibleCount: 3,
+    },
     versions: {
       sessionRevision: 1,
+      scheduleRevision: 1,
       exposureRevision: 0,
       participantSetRevision: 1,
       recordDraftRevision: null,
@@ -217,6 +230,9 @@ function hostSessionDetailResponse() {
       ...member,
       participationStatus: "ACTIVE",
       attendanceRevision: 0,
+      seenScheduleRevision: 1,
+      scheduleSeenAt: "2026-08-01T00:00:00Z",
+      scheduleSeenState: "CURRENT",
     })),
     feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null },
   };
@@ -265,6 +281,9 @@ async function routeSyntheticApp(
       });
     }
     if (path.endsWith("/api/auth/me")) return json(route, authResponse(role, savedAvatarKey));
+    if (path.endsWith("/api/me/club-access") && route.request().method() === "PUT") {
+      return json(route, { lastClubAccessAt: "2026-08-29T01:02:03Z" });
+    }
     if (path.endsWith("/api/me/notifications")) {
       return json(route, { items: [], unreadCount: 0, nextCursor: null });
     }
