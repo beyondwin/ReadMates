@@ -30,10 +30,14 @@ ADR impact: `Accepted` only if every named gate is green; otherwise Proposed wit
 ```bash
 git status --short --branch
 git diff --stat origin/main..HEAD
-python3 scripts/agent-preflight.py --intent release --base origin/main --paths front,server,docs,CHANGELOG.md --isolation-note "Stage 5 host operating room closeout"
+python3 scripts/agent-preflight.py --intent release --base origin/main \
+  --paths front --paths server --paths docs --paths CHANGELOG.md \
+  --isolation-note "Stage 5 host operating room closeout"
 ```
 
 - [ ] **Step 2:** For every program requirement, point to code + test + runtime evidence. Missing evidence is a failing item.
+- [ ] **Step 3:** Review `origin/main..HEAD` with `docs/development/release-readiness-review.md`; include CHANGELOG/Unreleased, migrations, CI/deploy scripts, operator-visible changes, security hygiene, architecture baselines/exceptions and public-release safety.
+- [ ] **Step 4:** Run `command -v corepack || true`; use and record `npx --yes corepack@0.35.0 pnpm` when it is absent, as in the reviewed checkout.
 
 ### Task 1: Lock responsive layout and interaction contracts
 
@@ -44,7 +48,7 @@ python3 scripts/agent-preflight.py --intent release --base origin/main --paths f
 - [ ] **Step 1:** RED CT at 390, 767, 768, 1024, 1199, 1200, 1440; assert DOM order, no overflow, safe area, 44px targets and one visible primary CTA.
 - [ ] **Step 2:** Add long Korean/English, missing image, 0/large counts, partial rows and 200% zoom.
 - [ ] **Step 3:** Verify reduced motion, focus-visible, keyboard order, menu escape/return focus and color-independent status.
-- [ ] **Step 4:** Update baselines only after semantics pass. Compare hierarchy with 07–17; do not pixel-copy.
+- [ ] **Step 4:** After semantics pass, use `npx --yes corepack@0.35.0 pnpm --dir front test:ct:update` only for intentional reviewed baseline changes. Inspect the image diff/provenance, then require `npx --yes corepack@0.35.0 pnpm --dir front test:ct` green; update mode is never verification. Compare hierarchy with 07–17; do not pixel-copy.
 - [ ] **Step 5:** Commit CT and baselines together.
 
 ### Task 2: Prove recovery state machines
@@ -57,7 +61,12 @@ python3 scripts/agent-preflight.py --intent release --base origin/main --paths f
 - [ ] **Step 3:** Unknown mutation: abort after server commit, reconcile by idempotency key, keep action until COMMITTED/NOT_EXECUTED.
 - [ ] **Step 4:** Partial source: fail workbox/notification while current meeting remains usable; retry only failed source.
 - [ ] **Step 5:** Deferred: clock advance returns NOW; source resolution derives COMPLETED without a completion write.
-- [ ] **Step 6:** Commit.
+- [ ] **Step 6:** Schedule lifecycle: DRAFT is explicitly unavailable, OPEN creates UNSEEN, only a successful MEMBER current-session render records the exact revision as CURRENT, schedule edit becomes STALE, and the next successful member render becomes CURRENT again. Host operating-room entry and any GET/loader never write seen state. Assert RSVP/attendance state is unchanged by seen writes.
+- [ ] **Step 7:** Access lifecycle: ACTIVE membership coarse club access is independent from seen state. HOST authority loss immediately purges client host cache/drafts/workbox but a HOST→MEMBER downgrade with ACTIVE membership preserves legitimate access/participant seen facts. Server rows are deleted only when membership becomes INACTIVE/deleted or the owning participant/session row is deleted/anonymized, exactly as ADR-0049 declares.
+- [ ] **Step 8:** Work lifecycle: preparation → live → closing preserves the authoritative next-action/work-item key. NOW → DEFERRED → expiry → NOW and source resolution → COMPLETED are derived without a completion write.
+- [ ] **Step 9:** Notification lifecycle: edited subject/body preview records exact copy, schedule revision and target snapshot; a schedule or target change before confirm returns a conflict with explicit re-preview. Abort-after-commit reconciles partial/unknown delivery state without sending a second delivery.
+- [ ] **Step 10:** People/settings lifecycle: person detail rejects cross-club membership ids and excludes unrelated/private account fields; named invitation-link changes keep history; settings changes enforce revision/authority; club-end preview/confirm is exercised only with a local safe fixture.
+- [ ] **Step 11:** Commit.
 
 ### Task 3: Switch legacy host routes
 
@@ -87,15 +96,19 @@ python3 scripts/agent-preflight.py --intent release --base origin/main --paths f
 ```bash
 ./scripts/server-ci-check.sh
 ./server/gradlew -p server integrationTest
+./server/gradlew -p server architectureTest
 ```
 
 - [ ] **Step 2:** Frontend gates.
 
 ```bash
-corepack pnpm --dir front lint
-corepack pnpm --dir front test
-corepack pnpm --dir front build
-corepack pnpm --dir front test:e2e
+npx --yes corepack@0.35.0 pnpm --dir front lint
+npx --yes corepack@0.35.0 pnpm --dir front test
+npx --yes corepack@0.35.0 pnpm --dir front build
+npx --yes corepack@0.35.0 pnpm --dir front test:ct
+npx --yes corepack@0.35.0 pnpm --dir front test:e2e
+npx --yes corepack@0.35.0 pnpm --dir front zod:export-fixtures
+git diff --exit-code -- front/tests/unit/__fixtures__
 ```
 
 - [ ] **Step 3:** Public release safety.
@@ -106,6 +119,8 @@ corepack pnpm --dir front test:e2e
 ```
 
 - [ ] **Step 4:** Run `git diff --check` and safety scans. Record exact results; skipped is never passed.
+- [ ] **Step 5:** Run migration-policy and concurrency evidence for V61–V65: clean migrate, upgrade from the previous migration, duplicate idempotency, stale revision, parallel seen-upsert, cursor misuse/expiry/key rotation and cleanup-on-role-loss. Record the exact Gradle test selectors or suite output.
+- [ ] **Step 6:** Re-run trusted-BFF and authorization contract tests for every new mutation path. Browser-supplied internal headers must remain untrusted.
 
 ### Task 5: Synchronize active docs
 
@@ -129,9 +144,27 @@ corepack pnpm --dir front test:e2e
 - [ ] **Step 3:** Otherwise keep Proposed and add dated missing-evidence bullets with commands/scenarios.
 - [ ] **Step 4:** Commit docs/ADR closeout separately.
 
-### Task 7: Final handoff
+### Task 7: Capture the mandatory browser evidence set
 
-- [ ] **Step 1:** Report surfaces, migrations, API contracts, routes and visible behavior.
-- [ ] **Step 2:** List every command run and every skipped validation with reason.
-- [ ] **Step 3:** List residual risks: production migration duration, external provider delivery, manual VoiceOver/NVDA if not run.
-- [ ] **Step 4:** Use `superpowers:requesting-code-review`, then `superpowers:finishing-a-development-branch`. Do not push/merge/deploy without authorization.
+**Files:**
+- Modify: the Stage 1–4 host E2E specs and public-safe fixtures.
+- Create/update: code-native screenshot baselines produced by the existing CT/E2E commands.
+
+- [ ] **Step 1:** Capture scoped and unscoped entry, legacy redirects, deep-link retention, combined club+role switching and authority loss.
+- [ ] **Step 2:** Capture DRAFT unavailable → OPEN UNSEEN → CURRENT → STALE → CURRENT plus unchanged RSVP/attendance.
+- [ ] **Step 3:** Capture preparation → live → closing, schedule comparison after 409, person detail/privacy, invitation links, club settings and guarded club-end preview.
+- [ ] **Step 4:** Capture notification preview/confirm, schedule/target snapshot conflict, partial failure and unknown-outcome reconciliation. Use the local safe provider; do not send real email.
+- [ ] **Step 5:** Capture workbox NOW → DEFERRED → expired NOW and source resolution → COMPLETED, including an invalid/expired cursor recovery.
+- [ ] **Step 6:** Capture 403, 409, partial and unknown states at 390, 768, 1024, 1200 and 1440 widths; retain public-safe screenshots and traces only.
+- [ ] **Step 7:** Record automated accessibility output and explicitly mark manual VoiceOver/NVDA as `not measured` unless actually run.
+- [ ] **Step 8:** Commit evidence and its fixture provenance.
+
+### Task 8: Independent whole-branch review and final handoff
+
+- [ ] **Step 1:** Build a review package for `origin/main..HEAD` and use `superpowers:requesting-code-review` with a fresh strongest-capable reviewer. Review requirements, architecture, security/privacy, migrations, generated contracts, responsive behavior, release readiness and public-repo safety.
+- [ ] **Step 2:** Classify findings by severity and task. Run a bounded correction wave with fresh verification; do not exceed the program's five-round fix limit.
+- [ ] **Step 3:** Re-run the complete validation matrix after the last code or docs change. Evidence produced before a later change is not final unless the touched-surface hash proves it is reusable.
+- [ ] **Step 4:** Report surfaces, migrations, API contracts, routes and visible behavior.
+- [ ] **Step 5:** List every command run and every skipped validation with reason.
+- [ ] **Step 6:** List residual risks: production migration duration, external provider delivery, manual VoiceOver/NVDA if not run. Use truthful `not measured` labels.
+- [ ] **Step 7:** Use `superpowers:verification-before-completion`, then `superpowers:finishing-a-development-branch`. The authorized integration boundary is a safe local merge to `main`; do not push, open a PR, tag, deploy or send real email.

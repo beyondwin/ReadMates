@@ -20,6 +20,9 @@ ADR impact: **implement ADR-0049**; 상태는 Stage 5까지 Proposed.
 - 동일 revision 재확인은 `seen_schedule_at`을 다시 쓰지 않는 no-op이다. 요청 revision이 현재보다 작거나 크면 `409 SESSION_SCHEDULE_REVISION_STALE`로 실패한다.
 - host 응답에는 membershipId, displayName, avatarKey, 상태, seen revision/time만 넣는다. userId, email, auth session, page history는 넣지 않는다.
 - 최근 클럽 접속은 `membership_club_access.last_access_at`만 저장한다. page path, action, duration, IP, user agent를 저장하지 않고 일정 확인으로 승격하지 않는다.
+- `seen_schedule_revision/at`은 participant/session lifecycle과 함께 삭제·익명화한다. `membership_club_access`는 membership가 INACTIVE 또는 삭제되면 제거하고 ACTIVE가 아닌 actor의 write를 거절한다.
+- future DRAFT는 host selection에는 참여할 수 있지만 member-visible OPEN/current schedule과 participant snapshot이 없으면 `scheduleSeenAvailability=UNAVAILABLE`, count 없음, write 없음이다.
+- 새 PUT route는 `auth/infrastructure/security/SecurityConfig.kt` exact CSRF ignore와 trusted-BFF security test를 함께 추가한다.
 
 ---
 
@@ -35,7 +38,13 @@ ADR impact: **implement ADR-0049**; 상태는 Stage 5까지 Proposed.
 - [ ] **Step 1:** Run path classification.
 
 ```bash
-python3 scripts/agent-preflight.py --intent change --paths server/src/main/kotlin/com/readmates/session,server/src/main/resources/db/mysql/migration,front/features/current-session,front/features/host,front/functions/api/bff --isolation-note "Stage 1 schedule seen vertical slice"
+python3 scripts/agent-preflight.py --intent change \
+  --paths server/src/main/kotlin/com/readmates/session \
+  --paths server/src/main/resources/db/mysql/migration \
+  --paths front/features/current-session \
+  --paths front/features/host \
+  --paths front/functions/api/bff \
+  --isolation-note "Stage 1 schedule seen vertical slice"
 ```
 
 - [ ] **Step 2:** Reconfirm the next migration remains V61.
@@ -46,12 +55,15 @@ find server/src/main/resources/db/mysql/migration -maxdepth 1 -type f -name 'V*.
 
 Expected: V60 is latest. If a newer migration exists, renumber this plan's V61 file before editing.
 
+- [ ] **Step 3:** Run `command -v corepack || true`. In the reviewed checkout it is absent, so use the repo-approved `npx --yes corepack@0.35.0 pnpm` launcher below and record the exact launcher in the Stage ledger.
+
 ### Task 1: Add schedule revision persistence
 
 **Files:**
 - Create: `server/src/main/resources/db/mysql/migration/V61__session_schedule_seen_state.sql`
 - Modify: `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/session/domain/SessionInvariantConstraintTest.kt`
+- Modify: `server/src/test/kotlin/com/readmates/auth/api/HostMemberLifecycleControllerTest.kt`
 
 **Schema:**
 
@@ -89,10 +101,11 @@ alter table host_session_mutation_receipts
 - [ ] **Step 2:** Run RED.
 
 ```bash
-./server/gradlew -p server test --tests 'com.readmates.support.MySqlFlywayMigrationTest' --tests 'com.readmates.session.domain.SessionInvariantConstraintTest'
+./server/gradlew -p server integrationTest --tests 'com.readmates.support.MySqlFlywayMigrationTest'
+./server/gradlew -p server unitTest --tests 'com.readmates.session.domain.SessionInvariantConstraintTest'
 ```
 
-- [ ] **Step 3:** Add V61 exactly as above; do not fabricate historical seen values.
+- [ ] **Step 3:** Add V61 exactly as above; do not fabricate historical seen values. The composite FK cascades on membership delete, participant/session FK lifecycle owns seen columns, and INACTIVE row cleanup is implemented by the membership lifecycle owner rather than a fabricated login timestamp backfill.
 - [ ] **Step 4:** Run GREEN with the same command.
 - [ ] **Step 5:** Commit.
 
@@ -141,7 +154,8 @@ object SessionScheduleRevisionPolicy {
 - [ ] **Step 5:** Run focused tests and commit.
 
 ```bash
-./server/gradlew -p server test --tests 'com.readmates.session.domain.SessionScheduleRevisionPolicyTest' --tests '*HostSession*DbTest'
+./server/gradlew -p server unitTest --tests 'com.readmates.session.domain.SessionScheduleRevisionPolicyTest'
+./server/gradlew -p server integrationTest --tests '*HostSession*DbTest'
 git add server/src/main/kotlin/com/readmates/session server/src/test/kotlin/com/readmates/session
 git commit -m "feat(session): version member-visible schedule changes"
 ```
@@ -156,7 +170,9 @@ git commit -m "feat(session): version member-visible schedule changes"
 - Modify: `server/src/main/kotlin/com/readmates/session/adapter/out/persistence/JdbcSessionParticipationWriteAdapter.kt`
 - Create: `server/src/main/kotlin/com/readmates/session/adapter/in/web/SessionScheduleSeenController.kt`
 - Modify: `server/src/main/kotlin/com/readmates/session/adapter/in/web/SessionApplicationErrorHandler.kt`
+- Modify: `server/src/main/kotlin/com/readmates/auth/infrastructure/security/SecurityConfig.kt`
 - Create: `server/src/test/kotlin/com/readmates/session/api/SessionScheduleSeenDbTest.kt`
+- Modify: `server/src/test/kotlin/com/readmates/session/api/HostSessionBffSecurityTest.kt`
 
 **Interfaces:**
 
@@ -178,13 +194,15 @@ PUT /api/sessions/current/schedule-seen
 409 {"code":"SESSION_SCHEDULE_REVISION_STALE", ...}
 ```
 
-- [ ] **Step 1:** Add RED API/DB tests for first seen, same-revision no-op preserving timestamp, stale/future revision 409, inactive participant, no open session, and cross-club denial.
+- [ ] **Step 1:** Add RED API/DB tests for first seen, same-revision no-op preserving timestamp, stale/future revision 409, inactive participant/membership, DRAFT unavailable, no open session, and cross-club denial.
 - [ ] **Step 2:** Implement one transaction: lock the URL-authoritative open session, compare exact revision, require ACTIVE participant, update only NULL/older seen revision, return stored timestamp.
-- [ ] **Step 3:** Do not bump meeting/record epochs or notification state for this read fact.
-- [ ] **Step 4:** Run focused tests and commit.
+- [ ] **Step 3:** Add exact `PUT /api/sessions/current/schedule-seen` CSRF ignore registration and security tests proving valid BFF secret + allowed Origin reaches the controller, while missing/invalid secret or origin is rejected.
+- [ ] **Step 4:** Do not bump meeting/record epochs or notification state for this read fact.
+- [ ] **Step 5:** Run focused tests and commit.
 
 ```bash
-./server/gradlew -p server test --tests 'com.readmates.session.api.SessionScheduleSeenDbTest'
+./server/gradlew -p server integrationTest --tests 'com.readmates.session.api.SessionScheduleSeenDbTest'
+./server/gradlew -p server integrationTest --tests 'com.readmates.session.api.HostSessionBffSecurityTest'
 git add server/src/main/kotlin/com/readmates/session server/src/test/kotlin/com/readmates/session/api/SessionScheduleSeenDbTest.kt
 git commit -m "feat(session): record exact current schedule views"
 ```
@@ -199,8 +217,11 @@ git commit -m "feat(session): record exact current schedule views"
 - Modify: `server/src/main/kotlin/com/readmates/session/adapter/out/persistence/HostSessionRowMappers.kt`
 - Modify: `server/src/main/kotlin/com/readmates/session/adapter/out/persistence/HostSessionProjectionQueries.kt`
 - Modify: `server/src/main/kotlin/com/readmates/session/adapter/out/persistence/JdbcHostMutationReceiptAdapter.kt`
-- Modify: `server/src/test/kotlin/com/readmates/architecture/FrontendFixtureContractTest.kt`
-- Modify: `server/src/test/kotlin/com/readmates/architecture/FrontendZodSchemaContractTest.kt`
+- Modify: `server/src/test/kotlin/com/readmates/contract/FrontendFixtureContractTest.kt`
+- Modify: `server/src/test/kotlin/com/readmates/contract/FrontendZodSchemaContractTest.kt`
+- Modify: `front/tests/unit/__fixtures__/host-session-detail.json`, `current-session-empty.json`
+- Modify: `front/tests/unit/__fixtures__/zod-schemas/host-session-detail.json`, `current-session.json`, `host-session-change-receipt.json`, `host-session-history-recovery.json`, and `host-session-record-editor.json`
+- Modify: `front/scripts/export-zod-fixtures.ts`
 
 **Wire additions:**
 
@@ -214,6 +235,7 @@ val myScheduleSeenAt: String?
 
 // HostSessionDetailResponse
 val scheduleRevision: Long
+val scheduleSeenAvailability: ScheduleSeenAvailability // AVAILABLE | UNAVAILABLE
 val scheduleSeenSummary: ScheduleSeenSummary
 
 // SessionVersionVector and every host mutation receipt/projection
@@ -227,9 +249,9 @@ val scheduleSeenState: ScheduleSeenState
 
 - [ ] **Step 1:** Add RED contract tests and a forbidden-key assertion against `email`, `userId`, auth session fields, page paths and raw history.
 - [ ] **Step 2:** Add `scheduleRevision` to Kotlin/TypeScript version vectors, projection snapshot identity, immutable host mutation receipt persistence and reconciliation mapping. Historical receipt rows stay at migration baseline 1.
-- [ ] **Step 3:** Calculate CURRENT only for exact equality, STALE for non-null older, UNSEEN for null. Exclude REMOVED participants from summary denominator but keep detail row if existing host detail already exposes it.
+- [ ] **Step 3:** Calculate CURRENT only for exact equality, STALE for non-null older, UNSEEN for null. Exclude REMOVED participants from summary denominator but keep detail row if existing host detail already exposes it. A DRAFT without a member-visible participant snapshot returns `scheduleSeenAvailability=UNAVAILABLE`, no zero/UNSEEN count, and no review destination.
 - [ ] **Step 4:** Return self seen fields only in member current-session response.
-- [ ] **Step 5:** Run focused server contract, receipt replay and reconciliation tests and commit.
+- [ ] **Step 5:** Run `npx --yes corepack@0.35.0 pnpm --dir front zod:export-fixtures`, verify `git diff --exit-code -- front/tests/unit/__fixtures__/zod-schemas/` after staging generated contract changes, then run the two `com.readmates.contract` classes through `integrationTest` plus focused receipt replay/reconciliation tests and commit.
 
 ### Task 5: Prove the generic BFF contract
 
@@ -250,7 +272,10 @@ val scheduleSeenState: ScheduleSeenState
 - Modify: `front/features/current-session/queries/current-session-queries.ts`
 - Modify: `front/features/current-session/route/current-session-route.tsx`
 - Modify: `front/features/current-session/ui/current-session-page.tsx`
-- Test: corresponding contract/query/route tests.
+- Modify: `front/features/current-session/api/current-session-contracts.test.ts`
+- Modify: `front/features/current-session/queries/current-session-queries.test.tsx`
+- Create: `front/features/current-session/route/current-session-route.test.tsx`
+- Modify: `front/features/current-session/ui/current-session-review-visibility.test.tsx`
 
 **Interfaces:**
 
@@ -266,7 +291,7 @@ markCurrentScheduleSeen(scheduleRevision: number, context?: ReadmatesApiContext)
 - [ ] **Step 5:** Run focused tests and commit.
 
 ```bash
-corepack pnpm --dir front test -- features/current-session shared/model/current-session-contracts
+npx --yes corepack@0.35.0 pnpm --dir front test -- features/current-session shared/model/current-session-contracts
 git add front/shared/model/current-session-contracts.ts front/features/current-session
 git commit -m "feat(member): acknowledge rendered schedule revisions"
 ```
@@ -309,6 +334,12 @@ type HostScheduleSeenRow = {
 - Create: `server/src/main/kotlin/com/readmates/auth/application/service/ClubAccessService.kt`
 - Create: `server/src/main/kotlin/com/readmates/auth/adapter/out/persistence/JdbcClubAccessAdapter.kt`
 - Create: `server/src/main/kotlin/com/readmates/auth/adapter/in/web/ClubAccessController.kt`
+- Modify: `server/src/main/kotlin/com/readmates/auth/application/port/out/MemberLifecycleStorePort.kt`
+- Modify: `server/src/main/kotlin/com/readmates/auth/application/service/MemberLifecycleService.kt`
+- Modify: `server/src/main/kotlin/com/readmates/auth/adapter/out/persistence/JdbcMemberLifecycleStoreAdapter.kt`
+- Modify: `server/src/main/kotlin/com/readmates/auth/infrastructure/security/SecurityConfig.kt`
+- Modify: `server/src/test/kotlin/com/readmates/auth/api/HostMemberLifecycleControllerTest.kt`
+- Create/modify: `server/src/test/kotlin/com/readmates/auth/api/ClubAccessBffSecurityTest.kt`
 - Modify: host member list row/model/mapper/persistence files located by `rg -n "HostMemberListItem|HostMemberListRow" server/src/main/kotlin/com/readmates/auth`.
 - Create: `front/shared/auth/club-access-api.ts`
 - Create: `front/shared/auth/club-access-query.ts`
@@ -325,11 +356,13 @@ PUT /api/me/club-access
 
 Host member rows add `lastClubAccessAt: string | null`; this value never affects `scheduleSeenState`.
 
-- [ ] **Step 1:** RED tests: authenticated ACTIVE member/host success, viewer policy follows current member-app access rule, cross-club denial, support-synthesized host excluded, 15-minute write throttle, and no route/action/auth metadata columns.
+- [ ] **Step 1:** RED tests: authenticated ACTIVE member/host success, viewer policy follows current member-app access rule, cross-club denial, support-synthesized host excluded, 15-minute write throttle, INACTIVE write rejection/removal, membership delete cascade, and no route/action/auth metadata columns.
 - [ ] **Step 2:** Implement a SQL upsert that advances `last_access_at` only when absent or older than 15 minutes, then returns the stored time. Do not update `memberships.updated_at`.
-- [ ] **Step 3:** After an authenticated club app shell mounts, issue the idempotent touch once per club-scoped client episode. Failure is non-blocking and must not mark schedule seen.
-- [ ] **Step 4:** Left join the fact into existing host member list/detail contracts; add a pure presentation test for `최근 접속 …` versus `접속 기록 없음`.
-- [ ] **Step 5:** Add BFF and privacy forbidden-key tests and commit.
+- [ ] **Step 3:** Wire membership lifecycle deactivation/deletion to remove `membership_club_access` in the same transaction. Prove participant/session hard-delete/anonymize removes or anonymizes seen facts while legally retained participant history keeps them.
+- [ ] **Step 4:** Add exact `PUT /api/me/club-access` CSRF ignore registration and trusted-BFF/origin security tests.
+- [ ] **Step 5:** After an authenticated club app shell mounts, issue the idempotent touch once per club-scoped client episode. Failure is non-blocking and must not mark schedule seen.
+- [ ] **Step 6:** Left join the fact into existing host member list/detail contracts; add a pure presentation test for `최근 접속 …` versus `접속 기록 없음`.
+- [ ] **Step 7:** Add BFF and privacy forbidden-key tests and commit.
 
 ### Task 9: Stage verification
 
@@ -343,10 +376,11 @@ Host member rows add `lastClubAccessAt: string | null`; this value never affects
 - [ ] **Step 2:** Run frontend gates.
 
 ```bash
-corepack pnpm --dir front lint
-corepack pnpm --dir front test
-corepack pnpm --dir front build
+npx --yes corepack@0.35.0 pnpm --dir front lint
+npx --yes corepack@0.35.0 pnpm --dir front test
+npx --yes corepack@0.35.0 pnpm --dir front build
 ```
 
 - [ ] **Step 3:** Run the member current-session E2E scenario with two clubs and a host edit between two member views. Assert UNSEEN → CURRENT → STALE → CURRENT, unchanged RSVP/attendance, and independently advanced `lastClubAccessAt`.
-- [ ] **Step 4:** Record any browser test not run as `not measured`; do not accept ADR-0049 yet.
+- [ ] **Step 4:** Add DRAFT unavailable → OPEN UNSEEN before the same scenario, plus INACTIVE cleanup/erase integration evidence.
+- [ ] **Step 5:** Run affected `architectureTest` and `com.readmates.contract` integration tests. Record any browser test not run as `not measured`; do not accept ADR-0049 yet.

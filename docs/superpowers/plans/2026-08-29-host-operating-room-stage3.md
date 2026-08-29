@@ -4,7 +4,7 @@
 
 **Goal:** `/host`를 현재 모임 중심의 준비실·현장·마감실 운영실로 바꾸고, 다음 행동 하나와 준비 현황을 실제 계약으로 렌더링한다.
 
-**Architecture:** server의 host-only current-selection read model이 운영실 기준 모임을 결정한다. loader는 그 session의 detail과 closing/record/operations 독립 query를 prefetch하고 partial failure를 보존한다. pure model이 lifecycle phase, next action, preparation rows를 계산한다. route가 URL `phase`, query/mutation, 403/409 recovery를 소유하고 UI는 props/callback만 받는다. 일정 확인 row는 Stage 1 source of truth만 사용한다.
+**Architecture:** 새 composition feature `hostworkspace`의 host-only current-selection service가 운영실 기준 모임을 결정한다. `hostworkspace.application`은 자기 outbound port만 본다. `adapter/out/source/SessionOperatingRoomCandidateSourceAdapter`와 `SessionClosingRequirementSourceAdapter`가 각각 `session` candidate input port와 기존 `sessionclosing` status input port를 번역한다. 따라서 application feature edge/debt baseline을 늘리지 않고 closing predicate 복제나 `session → sessionclosing` 역의존도 만들지 않는다. loader는 선택된 session의 detail과 closing/record/operations 독립 query를 prefetch하고 partial failure를 보존한다. pure model이 lifecycle phase, next action, preparation rows를 계산한다. route가 URL `phase`, query/mutation, 403/409 recovery를 소유하고 UI는 props/callback만 받는다. 일정 확인 row는 Stage 1 source of truth만 사용한다.
 
 **Tech Stack:** React Router loaders, TanStack Query, TypeScript pure models, React/CSS, Vitest, Playwright CT/E2E.
 
@@ -19,7 +19,9 @@ ADR impact: none beyond implementing Proposed ADR-0048/0049.
 - no current meeting shows `첫 모임 만들기`; partial widget failures do not blank the full page.
 - one filled primary action only. Action reason and blocked/unknown state remain visible.
 - preparation facts are independent rows: schedule seen, RSVP, questions, place readiness. Never derive one from another.
+- a selected future DRAFT without a member-visible participant snapshot renders `아직 멤버에게 공개되지 않음`; it does not render UNSEEN zero/count, schedule review, or a schedule-seen work item.
 - existing attendance, closing, edit/history, manual notification, receipt/reconciliation logic is reused.
+- `hostworkspace` is registered before its first inbound class. Its application/domain packages import no other ReadMates feature, including `shared`, so the approved application feature-dependency debt baselines remain byte-for-byte unchanged. Outbound source adapters may depend on foreign application input ports but never foreign adapters.
 
 ---
 
@@ -28,11 +30,16 @@ ADR impact: none beyond implementing Proposed ADR-0048/0049.
 - [ ] **Step 1:** Run preflight and locate exact queries.
 
 ```bash
-python3 scripts/agent-preflight.py --intent change --paths front/features/host,front/src/app/host-routes/dashboard-route-element.tsx,front/src/app/routes/host.tsx --isolation-note "Stage 3 operating room composition"
+python3 scripts/agent-preflight.py --intent change \
+  --paths front/features/host \
+  --paths front/src/app/host-routes/dashboard-route-element.tsx \
+  --paths front/src/app/routes/host.tsx \
+  --isolation-note "Stage 3 operating room composition"
 rg -n "hostCurrentSessionQuery|hostSessionDetailQuery|closing|recordAttention|clubOperations|notificationHealth" front/features/host
 ```
 
 - [ ] **Step 2:** Record required current read versus optional widget sources. Required failure uses route error; optional failures become partial rows/work items.
+- [ ] **Step 3:** Run `command -v corepack || true`; use and record `npx --yes corepack@0.35.0 pnpm` when it is absent, as in the reviewed checkout.
 
 ### Task 1: Define lifecycle operating-room view models
 
@@ -56,37 +63,57 @@ type HostOperatingRoomView = {
   preparation: readonly PreparationLedgerRowView[];
   partialFailures: readonly OperatingRoomFailure[];
 };
+
+type HostNextActionView = {
+  state: HostNextActionState;
+  workItemKey: string | null;
+  // presentation fields omitted
+};
 ```
 
 - [ ] **Step 1:** RED matrix for no current meeting, DRAFT/OPEN/CLOSED/PUBLISHED, before/day-of/after date, closing blocked/ready/published, and partial sources.
 - [ ] **Step 2:** Fix phase availability: prep for active current, live for OPEN/day-of or lifecycle allowance, closing after attendance/close path; completed phases remain readable.
 - [ ] **Step 3:** Fix next-action priority: conflict/unknown receipt → live attendance → schedule unseen review → RSVP → questions → place → closing → none.
-- [ ] **Step 4:** Produce denominator-aware rows and `집계 준비 중` only when contract is absent/error; never invent counts.
+- [ ] **Step 4:** Produce denominator-aware rows and `집계 준비 중` only when an expected contract is absent/error; never invent counts. Use the distinct DRAFT unavailable copy when the server says no member-visible snapshot exists.
 - [ ] **Step 5:** Run tests and commit.
 
 ### Task 2: Add the server-owned host current-meeting selector
 
 **Files:**
-- Create: `server/src/main/kotlin/com/readmates/session/application/model/HostOperatingRoomModels.kt`
-- Modify: `server/src/main/kotlin/com/readmates/session/application/port/in/HostSessionUseCases.kt`
-- Modify: `server/src/main/kotlin/com/readmates/session/application/port/out/HostSessionQueryPort.kt`
+- Create: `server/src/main/kotlin/com/readmates/session/application/model/HostOperatingRoomCandidateModels.kt`
+- Create: `server/src/main/kotlin/com/readmates/session/application/port/in/ListHostOperatingRoomCandidatesUseCase.kt`
+- Create: `server/src/main/kotlin/com/readmates/session/application/port/out/HostOperatingRoomCandidateQueryPort.kt`
 - Modify: `server/src/main/kotlin/com/readmates/session/application/service/HostSessionQueryService.kt`
-- Modify: `server/src/main/kotlin/com/readmates/session/adapter/out/persistence/HostSessionQueries.kt`
-- Create: `server/src/main/kotlin/com/readmates/session/adapter/in/web/HostOperatingRoomController.kt`
-- Create: focused service/API/MySQL tests.
+- Create: `server/src/main/kotlin/com/readmates/session/adapter/out/persistence/HostOperatingRoomCandidateQueries.kt`
+- Create: `server/src/main/kotlin/com/readmates/hostworkspace/application/model/HostOperatingRoomModels.kt`
+- Create: `server/src/main/kotlin/com/readmates/hostworkspace/application/port/in/GetHostOperatingRoomCurrentUseCase.kt`
+- Create: `server/src/main/kotlin/com/readmates/hostworkspace/application/port/out/HostOperatingRoomSourcePorts.kt`
+- Create: `server/src/main/kotlin/com/readmates/hostworkspace/application/service/HostOperatingRoomCurrentService.kt`
+- Create: `server/src/main/kotlin/com/readmates/hostworkspace/adapter/out/source/SessionOperatingRoomCandidateSourceAdapter.kt`
+- Create: `server/src/main/kotlin/com/readmates/hostworkspace/adapter/out/source/SessionClosingRequirementSourceAdapter.kt`
+- Create: `server/src/main/kotlin/com/readmates/hostworkspace/adapter/in/web/HostOperatingRoomController.kt`
+- Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt`
+- Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureInventory.kt`
+- Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureInventoryTest.kt`
+- Create: `server/src/test/kotlin/com/readmates/session/application/service/HostSessionQueryServiceTest.kt`
+- Create: `server/src/test/kotlin/com/readmates/session/api/HostOperatingRoomCandidateDbTest.kt`
+- Create: `server/src/test/kotlin/com/readmates/hostworkspace/application/service/HostOperatingRoomCurrentServiceTest.kt`
+- Create: `server/src/test/kotlin/com/readmates/hostworkspace/api/HostOperatingRoomControllerTest.kt`
 
 **Contract:**
 
 ```text
 GET /api/host/operating-room/current
-200 {"currentMeeting": {"sessionId":"...","selection":"OPEN|UPCOMING_DRAFT|CLOSING_REQUIRED"}|null}
+200 {"currentMeeting": {"sessionId":"...","selection":"OPEN|UPCOMING_DRAFT|CLOSING_REQUIRED","scheduleSeenAvailability":"AVAILABLE|UNAVAILABLE"}|null}
 ```
 
-Selection order is fixed: the single OPEN session; otherwise the earliest future DRAFT by date/start/number; otherwise the newest CLOSED session whose closing status still needs action; otherwise null. Deleted sessions are excluded. PUBLISHED is never selected as current.
+Selection order is fixed: the single OPEN session; otherwise the earliest future DRAFT by date/start/number; otherwise the newest CLOSED session whose canonical `GetHostSessionClosingStatusUseCase` result still needs action; otherwise null. Deleted sessions are excluded. PUBLISHED is never selected as current.
 
-- [ ] **Step 1:** RED tests for every selection class, tie-breaks, no candidate, cross-club isolation and active HOST requirement.
-- [ ] **Step 2:** Implement the selector in the server query adapter and expose only sessionId + reason; host detail remains the canonical detail contract.
-- [ ] **Step 3:** Add the generic GET proxy proof to `front/tests/unit/cloudflare-bff.test.ts` and commit server/BFF tests.
+- [ ] **Step 1:** RED session candidate tests for every class, deterministic tie-breaks, deleted exclusion, cross-club isolation and active HOST requirement. The session query returns ordered raw CLOSED candidate IDs but does not decide closing readiness.
+- [ ] **Step 2:** RED hostworkspace service tests proving OPEN then DRAFT short-circuit; CLOSED candidates are evaluated newest-first through its own two outbound ports; published/resolved candidates are skipped; partial closing lookup fails closed with an explicit availability error; no closing predicate is copied into `session` or `hostworkspace`.
+- [ ] **Step 3:** Register `hostworkspace` in all three architecture inventory/boundary files before adding the controller. Add adapters that translate the existing foreign input ports outside `hostworkspace.application`. Assert application feature edges do not grow, both dependency baseline files remain unchanged, and no foreign adapter is imported.
+- [ ] **Step 4:** Expose sessionId + selection reason + server-owned schedule-seen availability. A future DRAFT is `AVAILABLE` only when it is member-visible and has the legal active participant snapshot; frontend never infers this from date, RSVP, visibility, or notification eligibility. Host detail remains the canonical detail contract.
+- [ ] **Step 5:** Add the generic GET proxy proof to `front/tests/unit/cloudflare-bff.test.ts`; run the four named tests plus `./server/gradlew -p server architectureTest` and `git diff --exit-code -- server/config/architecture/feature-dependency-baseline.txt server/config/architecture/phase-0-approved-feature-dependencies.txt`, then commit server/BFF tests.
 
 ### Task 3: Replace the dashboard loader with an operating-room loader
 
@@ -121,7 +148,7 @@ Selection order is fixed: the single OPEN session; otherwise the earliest future
 - Create: `front/features/host/ui/operating-room/preparation-ledger-row.tsx`
 - Create: tests and CT.
 
-- [ ] **Step 1:** RED semantics: one primary CTA, visible reason, secondary defer, row label/value/detail/action, color-independent state, retryable unavailable row.
+- [ ] **Step 1:** RED semantics: one primary CTA, visible reason, secondary defer, authoritative `workItemKey` required before deferral mutation, row label/value/detail/action, color-independent state, retryable unavailable row.
 - [ ] **Step 2:** Implement continuous hairline ledger, not a card grid. Desktop first viewport shows at least 3 rows; mobile uses two-line rows without horizontal scroll.
 - [ ] **Step 3:** Wire drill-down hrefs for schedule review, RSVP, questions and place editor.
 - [ ] **Step 4:** Commit.
@@ -145,9 +172,9 @@ Selection order is fixed: the single OPEN session; otherwise the earliest future
 **Files:**
 - Modify/reuse: `front/features/host/ui/meeting-workspace/meeting-response-ledger.tsx`
 - Modify/reuse: `front/features/host/ui/session-closing-board.tsx`
-- Modify: corresponding route/model/tests.
+- Modify: `front/features/host/ui/meeting-workspace/meeting-response-ledger.test.tsx`, `front/features/host/ui/session-closing-board.test.tsx`, `front/features/host/route/host-dashboard-route.test.tsx`, and `front/tests/e2e/host-lifecycle-operating-room.spec.ts`.
 
-- [ ] **Step 1:** Prep: schedule review CTA opens Stage 4 review; other rows link to owned detail.
+- [ ] **Step 1:** Prep: schedule review CTA opens Stage 4 review only when availability is `AVAILABLE`; DRAFT unavailable keeps explanatory copy and no mutation. Other rows link to owned detail.
 - [ ] **Step 2:** Live: reuse attendance editor with attended/absent/unknown, bulk action and undo receipt; no RSVP→attendance copy.
 - [ ] **Step 3:** Closing: reuse readiness/checklist/record apply/publish with blocked reasons and receipts.
 - [ ] **Step 4:** Add E2E for prep→live→closing without losing current meeting context.

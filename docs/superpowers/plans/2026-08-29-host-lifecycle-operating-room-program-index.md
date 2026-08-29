@@ -19,8 +19,14 @@ ADR impact: **update + accept after proof** — Proposed ADR-0048에 작업함 �
 - 글꼴은 bundled Pretendard Variable만 사용한다. serif/handwriting/외부 font를 추가하지 않는다.
 - 사람·계정 identity는 `front/shared/ui/book-club-avatar.ts`와 `AvatarChip`의 실제 WebP artwork만 사용한다. 이니셜 avatar나 새 동물 이미지를 만들지 않는다.
 - 최신 일정 확인, 최근 클럽 접속, 참석 응답, 실제 출석, 알림 전달은 독립 사실이다. 서로 추정하거나 대리하지 않는다.
+- future DRAFT는 운영실에서 선택할 수 있지만 member-visible participant snapshot이 없으면 schedule-seen은 unavailable이다. 프런트가 DRAFT를 UNSEEN으로 추정하지 않는다.
 - URL의 club slug가 권위다. query key와 mutation invalidation은 club scope를 포함한다.
 - mutation은 기존 revision guard/idempotency/receipt/reconciliation 규칙을 약화하지 않는다.
+- 새 PUT/DELETE는 `SecurityConfig.kt`의 exact CSRF ignore와 trusted-BFF security test를 함께 갱신한다.
+- 새 `com.readmates.hostworkspace` inbound/application 경계는 `ServerArchitectureBoundaryTest.kt`, `ServerArchitectureInventory.kt`, `ServerArchitectureInventoryTest.kt`에 등록한다.
+- 서버 focused command는 disabled `test`가 아니라 `unitTest`, `integrationTest`, `architectureTest` 중 실제 test suite owner를 사용한다.
+- 이 checkout에는 `corepack` binary가 없으므로 frontend launcher는 `npx --yes corepack@0.35.0 pnpm`으로 고정한다. 각 Stage Task 0에서 다시 확인하고, 환경이 달라져 native Corepack을 썼다면 ledger에 실제 명령을 기록한다.
+- Zod 변경은 `npx --yes corepack@0.35.0 pnpm --dir front zod:export-fixtures` 뒤 `front/tests/unit/__fixtures__/zod-schemas/` clean diff와 `com/readmates/contract` integration tests로 검증한다.
 - filled primary CTA는 viewport composition당 하나다. 모바일 터치 영역은 최소 44px이며 safe-area를 포함한다.
 - 실제 멤버 데이터, 이메일, 토큰, 도메인, 로컬 절대 경로를 fixture·docs·screenshot에 넣지 않는다.
 - 구현 단계마다 TDD RED → GREEN → focused regression → commit 순서를 지킨다.
@@ -41,10 +47,15 @@ Stage 1은 Stage 3의 일정 확인 숫자보다 먼저 완료한다. Stage 2는
 | --- | --- | --- |
 | 최신 일정 확인 CURRENT/STALE/UNSEEN | 1 | migration, concurrency/API/BFF/front tests, member E2E |
 | coarse 최근 접속과 확인·응답·출석 분리 | 1, 4 | throttled club access fact, forbidden inference tests, 사람 상세 semantics |
+| seen/access retention과 erase lifecycle | 1 | INACTIVE/delete/hard-delete/anonymize migration·integration tests |
 | 운영실·일정과 모임·사람·기록 4영역 | 2 | desktop/mobile nav tests, route inventory |
+| club + member/host combined switcher | 2 | same-club role switch, cross-club fallback, authority-loss route tests |
 | 초대와 설정·멤버 시야·알림·계정·새 모임 | 2, 4 | semantic destination inventory test |
 | 현재 모임 header·3단계·다음 행동·준비 원장 | 3 | pure-model matrices, route/UI tests, CT |
 | 작업함 지금·보류·완료·receipt | 4 | MySQL/API/query/UI tests, state transition E2E |
+| editable schedule 안내 preview/confirm | 4 | copy/target/schedule snapshot conflict, duplicate/resend/unknown reconciliation tests |
+| 전용 사람 상세 API와 attendance cursor | 4 | cross-club/privacy/no-gap/no-duplicate server+BFF+front tests |
+| named invitation links와 club settings | 4 | persistence/API/BFF/front, revision/history, local-safe close preview/confirm |
 | 07–14 desktop, 15–17 mobile 톤 | 2–5 | tracked CT at 390/768/1024/1440 |
 | 기존 동물 artwork avatar·Pretendard | 2–5 | component/font tests and screenshot review |
 | 403/409/partial/unknown recovery | 1, 3–5 | focused route and E2E scenarios |
@@ -65,9 +76,9 @@ Stage 1은 Stage 3의 일정 확인 숫자보다 먼저 완료한다. Stage 2는
 각 단계 말에 해당 plan의 focused 명령을 먼저 실행한다. frontend를 건드린 단계는 최소 다음을 실행한다.
 
 ```bash
-corepack pnpm --dir front lint
-corepack pnpm --dir front test
-corepack pnpm --dir front build
+npx --yes corepack@0.35.0 pnpm --dir front lint
+npx --yes corepack@0.35.0 pnpm --dir front test
+npx --yes corepack@0.35.0 pnpm --dir front build
 ```
 
 server 또는 migration을 건드린 단계는 다음을 추가한다.
@@ -80,7 +91,8 @@ server 또는 migration을 건드린 단계는 다음을 추가한다.
 라우팅·BFF·권한·실제 완료 흐름을 건드린 단계는 영향 spec을 먼저 돌린 뒤 마지막에 전체 E2E를 실행한다.
 
 ```bash
-corepack pnpm --dir front test:e2e
+npx --yes corepack@0.35.0 pnpm --dir front test:ct
+npx --yes corepack@0.35.0 pnpm --dir front test:e2e
 ```
 
 명령을 실행하지 못하면 통과로 기록하지 않는다. 최종 closeout은 `not measured` 항목과 이유를 남기고 ADR을 Proposed로 유지한다.
@@ -92,6 +104,10 @@ corepack pnpm --dir front test:e2e
 - [ ] 전역 기능 완전성 semantic test가 승인 목록 100%를 찾는다.
 - [ ] member 확인 write와 host 조회가 다른 club/session을 섞지 않는다.
 - [ ] 작업함 source item 해결·보류 만료·부분 실패가 상태를 잃지 않는다.
+- [ ] 작업함 cursor가 club/host/filter/snapshot/evaluatedAt/sort/expiry/key-version에 결속되고 tamper·rotation·concurrent mutation에서 gap/duplicate 없이 fail closed한다.
+- [ ] 일정 안내 preview 이후 schedule revision 또는 target eligibility가 바뀌면 outbox 없이 conflict이고 새 preview를 요구한다.
+- [ ] 사람 상세가 목록 scan이 아닌 전용 allowlist API와 server attendance cursor를 사용한다.
+- [ ] named invitation link와 club settings/host management/audit/close preview-confirm가 실제 vertical slice로 구현됐다.
 - [ ] authority loss가 host query/draft/workbox cache를 폐기한다.
 - [ ] tracked CT와 E2E가 390/768/1024/1440 및 긴 문자열을 포함한다.
 - [ ] `front/DESIGN.md`, `docs/development/architecture.md`, CHANGELOG가 실제 코드와 일치한다.

@@ -63,6 +63,10 @@ ReadMates의 warm paper, ink hierarchy, restrained navy, Pretendard-only 원칙�
 
 현재 모임이 없으면 빈 운영실에서 `첫 모임 만들기`를 주 행동으로 제공한다. 후보가 여러 개면 서버가 정한 current/active 규칙을 따르며 프런트가 임의로 최근 날짜를 선택하지 않는다.
 
+미래 `DRAFT`도 운영실의 선택 후보가 될 수 있다. 다만 멤버에게 공개된 현재 일정과 합법적인 participant snapshot이 아직 없으면 일정 확인 분모를 만들지 않고 `아직 멤버에게 공개되지 않음`으로 표시한다. 이 상태에서는 `SCHEDULE_UNSEEN` 작업, 일정 확인 write, 대상 선택을 만들지 않는다. `OPEN`이 되어 current member schedule과 participant snapshot이 생긴 뒤에만 `UNSEEN` 집계를 시작한다.
+
+작업함 v1 source는 `SCHEDULE_UNSEEN`, `MEMBER_APPROVAL`, `RECORD_CLOSING`, `INVITATION_EXPIRY`, `NOTIFICATION_FAILURE`로 고정한다. identity는 source type, club-scoped resource identity, source generation/revision을 결합한 stable key다. 완료는 source 사실이나 allowlist receipt에서 파생하고 별도 mutable completed flag로 복제하지 않는다. 보류는 `(club, host membership, work-item key)`에 귀속하며 만료 시 자동으로 `지금`으로 돌아온다. 완료 탭은 allowlist된 결과·receipt summary만 30일 노출한다.
+
 ## 4. 화면 구성 계약
 
 ### 4.1 데스크톱
@@ -120,10 +124,16 @@ ADR-0049의 네 사실을 UI에서도 합치지 않는다.
 
 현재 계약만으로 최신 revision 확인을 증명할 수 없다면 숫자를 추정해 렌더링하지 않는다. 해당 행은 `집계 준비 중`으로 실패 닫힘 처리하고 ADR-0049의 서버·영속성 slice를 먼저 구현한다.
 
+`seenScheduleRevision`과 `seenScheduleAt`은 해당 `session_participants` row와 같은 생애주기를 가진다. participant 또는 session이 hard-delete/anonymize되면 함께 삭제·익명화하며, 합법적으로 보존되는 participant history가 있는 동안에만 역사적 확인을 유지한다. membership가 `INACTIVE`가 된 뒤에는 새 seen/access 사실을 기록하지 않는다.
+
+`lastClubAccessAt`은 ACTIVE membership의 coarse club access만 나타낸다. membership가 `INACTIVE` 또는 삭제되면 별도 access row를 제거한다. page path, action, duration, IP, user agent, auth-session timestamp는 저장하거나 access fact로 추론하지 않는다.
+
 ## 7. 상호작용과 복구
 
 - `대상과 문구 검토`는 발송 전 대상·제외 대상·문구를 확인하는 review step으로 이동한다. 자동 전송하지 않는다.
+- 일정 안내의 제목·본문 편집은 실제 manual notification preview/confirm 계약에 포함한다. preview receipt는 exact subject/body, 선택 대상 snapshot summary, `scheduleRevision`, 대상 snapshot revision/hash에 결속한다. confirm은 current schedule revision과 ACTIVE/eligible selected membership을 다시 잠그고 검증하며, 어느 쪽이든 달라지면 outbox를 만들지 않고 conflict로 닫아 새 preview를 요구한다. 기존 expiry, duplicate/resend, idempotency, unknown-outcome, reconciliation 계약은 유지한다.
 - `내일 09:00까지 보류`는 작업을 삭제하지 않고 작업함 `보류`로 이동시키며, 만료 시 `지금`으로 돌아온다.
+- `HostNextAction`의 보류는 화면 로컬 상태가 아니라 서버가 발급한 authoritative work-item key를 그대로 deferral mutation에 전달한다.
 - 일정 편집 후에는 변경 요약과 revision을 만들고, 기존 확인 상태를 `변경 전 확인`으로 재분류한다.
 - mutation은 기존 revision guard와 idempotency receipt를 유지한다. 409는 최신 상태를 다시 읽고 사용자 입력을 보존한다.
 - 발송 성공은 toast만으로 끝내지 않고 `OperationReceipt`와 변경 이력에 남긴다. 부분 실패와 unknown outcome은 작업함에서 사라지지 않는다.
@@ -153,6 +163,12 @@ ADR-0049의 네 사실을 UI에서도 합치지 않는다.
 - 다음 행동: 대상과 문구 검토, 보류, 행동 근거
 - 준비 현황: 현재 일정 확인, 참석 응답, 발제 질문, 장소 준비, 각 상세 보기
 - 작업함: 지금, 보류, 완료, 일정 미열람 확인, 가입 승인 검토, 지난 모임 기록 마감, 초대 링크 만료 확인, 처리 receipt
+- 초대 링크: 이름, 사용 한도·사용 수, 만료, 연장, 중지·재개, 이력
+- 클럽 설정: 클럽 이름, 가입 승인 정책, 기본 시간대, 일정 reminder, 기록 공개 기본값, 공동 호스트, 변경 이력, 클럽 운영 종료 preview/confirm
+
+사람 상세는 목록 page를 client-side scan해 만들지 않는다. active HOST와 URL-authoritative club scope를 요구하는 전용 allowlist API를 사용하고, 일정 확인·coarse 최근 접속·RSVP·실제 출석·membership 상태를 서로 다른 필드로 반환한다. 실제 출석 이력은 server cursor를 사용한다. DTO에는 `userId`, email, 인증 세션, page history를 넣지 않는다.
+
+`초대와 설정`은 기존 이름·이메일 기반 1회 초대를 그대로 이름 있는 invitation link로 위장하지 않는다. 기존 이메일 초대는 호환 기능으로 유지하고, named link와 club settings는 persistence/server/BFF/front/test가 있는 별도 vertical slice로 구현한다. named link의 raw token은 저장하지 않고 생성 응답에서 share path를 한 번만 제공하며, 수락은 기존 signed OAuth invitation flow에서 ACTIVE MEMBER로만 처리한다. 사용 한도는 link row lock 안에서 membership 생성과 함께 원자적으로 소비하고 legacy password accept나 HOST 부여는 열지 않는다. 클럽 운영 종료는 active HOST 권한, club revision, idempotency와 preview/confirm을 요구하며 fixture/local-safe 경로에서만 검증한다.
 
 기능이 현재 API로 지원되지 않으면 삭제하거나 가짜 데이터로 채우지 않고 구현 계획에서 dependency로 분리한다.
 
@@ -165,7 +181,7 @@ ADR-0049의 네 사실을 UI에서도 합치지 않는다.
 1. **데이터 의미 선행**: ADR-0049에 필요한 schedule revision/seen fact, read model, privacy-safe 조회 계약.
 2. **셸 전환**: 4개 업무 영역, combined context switcher, utility actions, 구 경로 redirect.
 3. **운영실 composition**: current meeting header, phase tabs, next action, preparation ledger.
-4. **작업함 통합**: existing attention/notification/approval/closing signal을 상태 기반 workbox view model로 조합.
+4. **작업함 통합**: five-source projection, purpose-signed snapshot cursor, host-owned deferral, notification copy preview/confirm, person detail, named invitation link와 club settings vertical slice를 구현.
 5. **복구·반응형·시각 계약**: loading/empty/partial/stale/403/409/unknown outcome, 390/768/1024/1440 CT, E2E.
 6. **결정 closeout**: 구현·테스트·`front/DESIGN.md`·architecture가 일치한 뒤 ADR-0048/0049를 Accepted로 승격.
 
@@ -181,8 +197,10 @@ Acceptance matrix에서 다음 row를 선택한다.
 - `모임 lifecycle`: 준비실·현장·마감실의 허용 단계와 blocked action.
 - `Cursor collection`: 작업함·사람·기록의 continuation이 포함될 때만 적용.
 - `Persistence or migration`: schedule revision/seen 저장이 추가될 때 적용.
+- `BFF or OAuth` 중 BFF security 하위 범위: 새 PUT/DELETE가 trusted BFF와 same-origin 정책을 통과하고 browser-supplied internal header를 신뢰하지 않음을 검증한다. OAuth 의미는 바꾸지 않는다.
+- `Async, cache, or provider`: 일정 안내 preview/confirm의 duplicate, target/revision drift, partial/unknown reconciliation을 local-safe provider와 fixture로 검증한다.
 
-인접한 public exposure, OAuth, provider, emergency takedown row는 이 설계 자체가 해당 계약을 바꾸지 않으므로 제외한다.
+인접한 public exposure, OAuth, emergency takedown row는 이 설계 자체가 해당 계약을 바꾸지 않으므로 제외한다. 실제 외부 이메일 발송도 이 구현의 증거 범위에서 제외한다.
 
 구현 단계의 최소 명령:
 
@@ -201,6 +219,7 @@ pnpm --dir front test:e2e
 - 멤버·게스트·퍼블릭 화면의 정보 구조 변경.
 - 세부 행동을 추적하는 감시형 analytics 또는 페이지 방문 이력 노출.
 - 호스트 검토 없는 자동 재촉 발송.
+- 실제 외부 이메일 발송, push, deploy, 실제 클럽 운영 종료.
 - 승인 PNG를 그대로 배경 이미지로 사용하는 구현.
 
 ## 13. 승인 자산의 사용 규칙

@@ -23,6 +23,12 @@ UI 라벨은 각각 `현재 일정 확인`, `변경 전 확인`, `미열람`이�
 
 일정의 호스트·멤버 노출 필드가 바뀌는 mutation만 revision을 증가시킨다. 메모, 내부 처리 상태처럼 멤버가 볼 수 없는 변경은 일정 확인 상태를 무효화하지 않는다. 어떤 필드가 revision을 올리는지는 server domain policy와 테스트가 소유한다.
 
+`seenScheduleRevision`과 `seenScheduleAt`은 해당 session-participant 기록과 같은 생애주기를 가진다. participant 또는 session이 hard delete/anonymize되면 일정 확인 사실도 함께 삭제하거나 익명화하고, 합법적으로 유지되는 participant 기록이 있는 동안에만 역사적 확인을 유지한다. membership가 `INACTIVE`가 된 뒤에는 seen/access 사실을 새로 기록하지 않는다.
+
+`lastClubAccessAt`은 ACTIVE membership의 coarse club access에만 사용한다. membership가 `INACTIVE` 또는 삭제되면 club-access row를 제거한다. page path, action, duration, IP, user agent, auth-session timestamp는 저장하거나 추론하지 않는다.
+
+미래 `DRAFT`는 host operating room의 선택 후보가 될 수 있지만, 멤버에게 공개된 current schedule과 participant snapshot이 없으면 확인 분모가 없다. 이때 host API는 unavailable 상태를 반환하고 `UNSEEN` 숫자, 일정 확인 write, `SCHEDULE_UNSEEN` work item을 만들지 않는다. 확인 write와 집계는 멤버에게 공개된 `OPEN` current schedule에서만 활성화한다.
+
 ## 근거
 
 - 일정 변경 후 잘못된 장소·시간을 보는 위험을 직접 측정한다.
@@ -64,6 +70,8 @@ UI 라벨은 각각 `현재 일정 확인`, `변경 전 확인`, `미열람`이�
 - 멤버 노출 일정 필드 변경만 revision을 증가시키는 allowlist/denylist 테스트를 둔다.
 - 다른 클럽·다른 모임의 revision이 섞이지 않는 authorization/club-context 테스트를 둔다.
 - 동시 일정 변경과 확인 write에서 revision guard와 idempotency가 잘못된 `CURRENT`를 만들지 않음을 검증한다.
+- DRAFT unavailable → OPEN UNSEEN → CURRENT → 일정 변경 STALE → CURRENT 전이를 검증한다.
+- membership INACTIVE/delete와 participant/session hard-delete/anonymize에서 access/seen lifecycle과 erase behavior를 migration/integration test로 검증한다.
 - API/BFF 응답에 이메일, 계정 ID, 상세 page history 같은 불필요한 개인정보가 포함되지 않는 forbidden-key 테스트를 둔다.
 - server focused test, migration integration, frontend model/route test, 영향 E2E와 active docs가 일치할 때만 `Accepted`로 승격한다.
 

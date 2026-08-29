@@ -18,6 +18,7 @@ ADR impact: implement ADR-0048 shell portion; remains Proposed.
 - Desktop primary label is `일정과 모임`; mobile label is `모임`, same href.
 - `초대와 설정`, `멤버 시야`, notification, account are utilities and never consume a fifth bottom tab.
 - Existing `AppClubShell`, `TopNav`, `MobileHeader`, `MobileTabBar`, account/security controllers remain shared; do not fork an entire host shell.
+- `HostWorkspaceSwitcher` combines the existing `ClubSelector` and `WorkspaceSelector` responsibilities: club change and member/host workspace change are one trigger, while URL-authoritative scope and safe fallback remain owned by `workspace-route-model.ts`.
 - Preserve `/clubs/:slug/app/host/**` as canonical and `/app/host/**` compatibility canonicalization.
 - Use Pretendard and existing tokens; use `AvatarChip` with current `avatarKey` and role sizes.
 
@@ -28,11 +29,19 @@ ADR impact: implement ADR-0048 shell portion; remains Proposed.
 - [ ] **Step 1:** Run preflight and inventory.
 
 ```bash
-python3 scripts/agent-preflight.py --intent change --paths front/src/app/routes,front/src/app/layouts,front/src/app/host-routes,front/shared/routing,front/shared/ui,front/shared/styles --isolation-note "Stage 2 host shell navigation"
+python3 scripts/agent-preflight.py --intent change \
+  --paths front/src/app/routes \
+  --paths front/src/app/layouts \
+  --paths front/src/app/host-routes \
+  --paths front/shared/routing \
+  --paths front/shared/ui \
+  --paths front/shared/styles \
+  --isolation-note "Stage 2 host shell navigation"
 rg -n "HOST_ROUTE_PATHS|primaryNavigationItems|hostLinks|MobileTabBar|AppClubShell" front/src front/shared
 ```
 
 - [ ] **Step 2:** Capture the current redirect and route-continuity tests before edits.
+- [ ] **Step 3:** Run `command -v corepack || true`; use and record `npx --yes corepack@0.35.0 pnpm` when it is absent, as in the reviewed checkout.
 
 ### Task 1: Define canonical host destination ownership
 
@@ -85,8 +94,11 @@ Compatibility aliases remain exported for `today`, `members`, `invitations`, and
 type HostWorkspaceSwitcherProps = {
   club: { name: string; slug: string; avatarKey: string };
   clubs: readonly ClubNavigationItem[];
+  currentWorkspace: "member" | "host";
+  workspaceItems: readonly WorkspaceNavigationItem[];
   disabledReason?: string | null;
-  onSelectClub: (slug: string) => void;
+  buildClubTarget: (slug: string, workspace: "member" | "host") => string;
+  onSelectTarget: (href: string) => void;
 };
 
 type HostUtilityActionsProps = {
@@ -99,8 +111,8 @@ type HostUtilityActionsProps = {
 };
 ```
 
-- [ ] **Step 1:** RED tests: exact approved labels, one combined trigger, `aria-current`, notification accessible count, permission-limited reason, keyboard menu dismissal, no initial avatar fallback.
-- [ ] **Step 2:** Implement with semantic navigation/menu primitives and `AvatarChip`; no new global theme.
+- [ ] **Step 1:** RED tests: exact approved labels, one combined trigger, same-club member↔host workspace targets, club change while staying in member/host workspace, unavailable host reason, deep-link safe fallback, `aria-current`, notification accessible count, keyboard menu dismissal, no initial avatar fallback.
+- [ ] **Step 2:** Implement as one adapter over `AppClubShell`'s club/workspace inputs and `workspace-route-model.ts`; replace the two visible controls for host composition rather than adding a disconnected third widget. Use semantic navigation/menu primitives and `AvatarChip`; no new global theme.
 - [ ] **Step 3:** CT at 390 and 1440: long club name, 44px targets, focus ring, reduced motion.
 - [ ] **Step 4:** Commit.
 
@@ -112,7 +124,7 @@ type HostUtilityActionsProps = {
 - Modify: `front/shared/ui/mobile-tab-bar.tsx`
 - Modify: `front/shared/ui/readmates-copy.ts`
 - Modify: `front/shared/styles/mobile.css`
-- Modify: corresponding layout/top-nav/mobile tests and CT.
+- Modify: `front/src/app/layouts/app-route-layout.test.tsx`, `front/shared/ui/app-club-shell.test.tsx`, `workspace-selector.test.tsx`, `app-club-shell.ct.tsx`, `top-nav.ct.tsx`, `mobile-header.ct.tsx`, and `mobile-tab-bar.ct.tsx`.
 
 - [ ] **Step 1:** RED tests assert desktop order `운영실, 일정과 모임, 사람, 기록`; mobile order `운영실, 모임, 사람, 기록`; utilities remain reachable but absent from primary tabs.
 - [ ] **Step 2:** Make host layout inject the new composition while member/guest/admin snapshots remain unchanged.
@@ -130,7 +142,7 @@ type HostUtilityActionsProps = {
 - Create: route element tests.
 
 - [ ] **Step 1:** Add RED lazy-route tests for canonical scoped routes and loader auth.
-- [ ] **Step 2:** Initially adapt existing members, meeting list, invitation and notification/settings UI behind the new route elements. Do not duplicate their queries.
+- [ ] **Step 2:** Initially adapt existing members and meeting-list UI behind the new route elements. `/settings` may provide a permission-aware loading/route boundary for Stage 4, but must not present the existing email invitation screen as the approved named-link and club-settings functionality. Do not duplicate queries.
 - [ ] **Step 3:** Keep old `/members`, `/invitations`, `/operations` routes operational until replacement flows pass Stage 4/5.
 - [ ] **Step 4:** Verify lazy module boundaries and commit.
 
@@ -144,7 +156,7 @@ type HostUtilityActionsProps = {
 - Modify: relevant E2E specs.
 
 - [ ] **Step 1:** RED tests: club A→B changes all host query scopes; authority loss clears schedule/workbox/member/record keys and sensitive drafts; member-view action lands in same club.
-- [ ] **Step 2:** Extend purge inventory with every query introduced in Stage 1 and planned Stage 4.
+- [ ] **Step 2:** Extend purge inventory with every query introduced in Stage 1 and planned Stage 4. Same-club workspace change and cross-club change both purge host-sensitive state before navigation when host authority is lost.
 - [ ] **Step 3:** Preserve safe navigation state but never carry membershipId/sessionId into a different club.
 - [ ] **Step 4:** Run focused tests and commit.
 
