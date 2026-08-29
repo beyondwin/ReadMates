@@ -11,6 +11,7 @@
   - `admin-ai-ops-drilldown.spec.ts`: `86ab4ff56570030e37ca803f1aa1233721d535eb933e8b2346f4b90e4185cd2a`.
   - `admin-analytics.spec.ts`: `eb84eb9afc0d6956384964fd05a7e1502ddb7fb64b254551c00a9405c8010027`.
   - `admin-audit-ai-ops-drilldown.spec.ts`: `83248e10c60e3e860992b84e02777c2d43947329c53713af5965e21e92e22dcf`.
+- The fresh isolated review recomputed these three hashes from exact base `9285266b` and matched all values above.
 
 Commands ran with Node `v24`, Corepack `0.35.0`, repository-pinned pnpm `11.13.1`, one Playwright worker, and isolated loopback ports and synthetic databases. Machine-specific launcher and temporary-checkout paths are intentionally omitted.
 
@@ -37,13 +38,13 @@ npx --yes corepack@0.35.0 pnpm --dir front test:e2e \
   --project=chromium
 ```
 
-Result: `2 passed`, `4 failed` in `1.5m`.
+Fresh isolated review result: `0 passed`, `6 failed`. All six tests reached the login return page before their expected admin assertion or interaction.
 
 - `admin-ai-ops-drilldown.spec.ts`: its only test failed after navigation moved to the login return URL before the expected `AI 작업` heading appeared.
-- `admin-analytics.spec.ts`: the export-denial and public-safe visual tests passed; the overview test failed after navigation moved to the login return URL before the expected `80%` value appeared.
+- `admin-analytics.spec.ts`: all three tests reached the login return URL and failed before their expected analytics assertion or interaction.
 - `admin-audit-ai-ops-drilldown.spec.ts`: both tests timed out waiting for the audit-row button after the same login-return navigation.
 
-All three files therefore reproduce their full-gate failure class at the unchanged authority base. Stage 1 has no diff in these specs, so the admin failures are sealed as pre-existing and out of scope. No admin source or test was modified.
+All three files therefore fail unchanged at the exact authority base. Stage 1 has no diff in these specs, so the admin failures remain sealed as pre-existing and out of scope. No admin source or test was modified. This fresh result supersedes the earlier local count recorded in this report.
 
 ## Validation boundary
 
