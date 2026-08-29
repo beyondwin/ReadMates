@@ -2,6 +2,7 @@ package com.readmates.session.domain
 
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -27,6 +28,10 @@ class SessionInvariantConstraintTest(
     fun cleanupCreatedSessions() {
         if (createdSessionIds.isNotEmpty()) {
             val placeholders = createdSessionIds.joinToString(", ") { "?" }
+            jdbcTemplate.update(
+                "delete from session_participants where session_id in ($placeholders)",
+                *createdSessionIds.toTypedArray(),
+            )
             jdbcTemplate.update(
                 "delete from sessions where id in ($placeholders)",
                 *createdSessionIds.toTypedArray(),
@@ -99,13 +104,101 @@ class SessionInvariantConstraintTest(
         }
     }
 
+    @Test
+    fun `new sessions start at schedule revision one`() {
+        val id = "00000000-0000-0000-0000-000000099007"
+        insertSession(
+            id = id,
+            state = "OPEN",
+            visibility = "MEMBER",
+        )
+        createdSessionIds += id
+
+        val scheduleRevision = jdbcTemplate.queryForObject(
+            "select schedule_revision from sessions where id = ?",
+            Long::class.java,
+            id,
+        )
+
+        assertEquals(1L, scheduleRevision)
+    }
+
+    @Test
+    fun `schedule revision below one violates constraint`() {
+        assertThrows(UncategorizedSQLException::class.java) {
+            insertSession(
+                id = "00000000-0000-0000-0000-000000099008",
+                state = "OPEN",
+                visibility = "MEMBER",
+                scheduleRevision = 0,
+            )
+        }
+    }
+
+    @Test
+    fun `seen schedule revision without timestamp violates constraint`() {
+        val participantId = insertParticipantForScheduleSeenInvariant("00000000-0000-0000-0000-000000099009")
+
+        assertThrows(UncategorizedSQLException::class.java) {
+            jdbcTemplate.update(
+                """
+                update session_participants
+                set seen_schedule_revision = 1, seen_schedule_at = null
+                where id = ?
+                """.trimIndent(),
+                participantId,
+            )
+        }
+    }
+
+    @Test
+    fun `seen schedule timestamp without revision violates constraint`() {
+        val participantId = insertParticipantForScheduleSeenInvariant("00000000-0000-0000-0000-000000099010")
+
+        assertThrows(UncategorizedSQLException::class.java) {
+            jdbcTemplate.update(
+                """
+                update session_participants
+                set seen_schedule_revision = null, seen_schedule_at = utc_timestamp(6)
+                where id = ?
+                """.trimIndent(),
+                participantId,
+            )
+        }
+    }
+
+    private fun insertParticipantForScheduleSeenInvariant(sessionId: String): String {
+        insertSession(
+            id = sessionId,
+            state = "OPEN",
+            visibility = "MEMBER",
+        )
+        createdSessionIds += sessionId
+        val participantId = sessionId.dropLast(1) + "1"
+        jdbcTemplate.update(
+            """
+            insert into session_participants (
+              id, club_id, session_id, membership_id, rsvp_status, attendance_status, participation_status
+            ) values (
+              ?, '00000000-0000-0000-0000-000000000001', ?,
+              '00000000-0000-0000-0000-000000000202', 'NO_RESPONSE', 'UNKNOWN', 'ACTIVE'
+            )
+            """.trimIndent(),
+            participantId,
+            sessionId,
+        )
+        return participantId
+    }
+
     private fun insertSession(
         id: String,
         state: String,
         visibility: String,
         accessScope: String? = null,
+        scheduleRevision: Long? = null,
     ) {
         val accessScopeValue = if (accessScope == null) "default" else "?"
+        val scheduleRevisionValue = if (scheduleRevision == null) "default" else "?"
         jdbcTemplate.update(
             """
             insert into sessions (
@@ -113,7 +206,7 @@ class SessionInvariantConstraintTest(
               book_translator, book_link, book_image_url,
               session_date, start_time, end_time, location_label,
               meeting_url, meeting_passcode, question_deadline_at,
-              state, visibility, access_scope
+              state, visibility, access_scope, schedule_revision
             )
             values (
               ?, '00000000-0000-0000-0000-000000000001',
@@ -121,14 +214,14 @@ class SessionInvariantConstraintTest(
               null, null, null,
               '2099-01-01', '20:00:00', '22:00:00', '온라인',
               null, null, '2098-12-31 14:59:00.000000',
-              ?, ?, $accessScopeValue
+              ?, ?, $accessScopeValue, $scheduleRevisionValue
             )
             """.trimIndent(),
             id,
             idSuffix(id),
             state,
             visibility,
-            *listOfNotNull(accessScope).toTypedArray(),
+            *listOfNotNull<Any>(accessScope, scheduleRevision).toTypedArray(),
         )
     }
 
