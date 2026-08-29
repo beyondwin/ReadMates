@@ -18,7 +18,7 @@ Status: complete in the isolated `codex/host-lifecycle-operating-room` worktree.
 - Browser-forged `X-Readmates-Club-Slug` is present in the input and is not trusted; the query-selected normalized slug is forwarded instead.
 - Characterization result: existing generic proxy behavior passed without production changes.
 - GREEN command (Node 24 and pinned launcher):
-  - `PATH=/opt/homebrew/opt/node@24/bin:$PATH npx --yes corepack@0.35.0 pnpm --dir front exec vitest run tests/unit/cloudflare-bff.test.ts`
+  - `PATH=<node24-bin>:$PATH npx --yes corepack@0.35.0 pnpm --dir front exec vitest run tests/unit/cloudflare-bff.test.ts`
   - `1` test file passed; `77` tests passed; `0` failed.
 - `git diff --check` passed.
 

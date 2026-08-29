@@ -15,7 +15,7 @@
 Command:
 
 ```bash
-PATH="/opt/homebrew/opt/node@24/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/current-session/route/current-session-route.test.tsx
+PATH="<node24-bin>:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/current-session/route/current-session-route.test.tsx
 ```
 
 Result: exit `1`; 1 test file, 4 tests, 3 failed and 1 passed. The production route rendered the schedule, but `markCurrentScheduleSeen` was called 0 times, the conflict path never acknowledged a fresh revision, and the inline `일정 확인 다시 기록` action did not exist.
@@ -23,7 +23,7 @@ Result: exit `1`; 1 test file, 4 tests, 3 failed and 1 passed. The production ro
 Expanded focused RED command:
 
 ```bash
-PATH="/opt/homebrew/opt/node@24/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/current-session/api/current-session-contracts.test.ts features/current-session/queries/current-session-queries.test.tsx features/current-session/route/current-session-route.test.tsx features/current-session/ui/current-session-review-visibility.test.tsx
+PATH="<node24-bin>:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/current-session/api/current-session-contracts.test.ts features/current-session/queries/current-session-queries.test.tsx features/current-session/route/current-session-route.test.tsx features/current-session/ui/current-session-review-visibility.test.tsx
 ```
 
 Result: exit `1`; 4 test files, 29 tests, 7 failed and 22 passed. Failures were the missing receipt parser/write API, mutation hook/cache behavior, route acknowledgement behavior, and recovery notice.
@@ -33,7 +33,7 @@ Result: exit `1`; 4 test files, 29 tests, 7 failed and 22 passed. Failures were 
 Command:
 
 ```bash
-PATH="/opt/homebrew/opt/node@24/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/current-session/api/current-session-contracts.test.ts features/current-session/queries/current-session-queries.test.tsx features/current-session/route/current-session-route.test.tsx features/current-session/ui/current-session-review-visibility.test.tsx
+PATH="<node24-bin>:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/current-session/api/current-session-contracts.test.ts features/current-session/queries/current-session-queries.test.tsx features/current-session/route/current-session-route.test.tsx features/current-session/ui/current-session-review-visibility.test.tsx
 ```
 
 Result: exit `0`; 4 test files passed, 29 tests passed.
@@ -41,7 +41,7 @@ Result: exit `0`; 4 test files passed, 29 tests passed.
 Focused lint command:
 
 ```bash
-PATH="/opt/homebrew/opt/node@24/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec eslint shared/model/current-session-contracts.ts features/current-session/api/current-session-contracts.ts features/current-session/api/current-session-api.ts features/current-session/queries/current-session-queries.ts features/current-session/route/current-session-route.tsx features/current-session/ui/current-session-page.tsx features/current-session/api/current-session-contracts.test.ts features/current-session/queries/current-session-queries.test.tsx features/current-session/route/current-session-route.test.tsx features/current-session/ui/current-session-review-visibility.test.tsx
+PATH="<node24-bin>:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec eslint shared/model/current-session-contracts.ts features/current-session/api/current-session-contracts.ts features/current-session/api/current-session-api.ts features/current-session/queries/current-session-queries.ts features/current-session/route/current-session-route.tsx features/current-session/ui/current-session-page.tsx features/current-session/api/current-session-contracts.test.ts features/current-session/queries/current-session-queries.test.tsx features/current-session/route/current-session-route.test.tsx features/current-session/ui/current-session-review-visibility.test.tsx
 ```
 
 Result: exit `0`; no errors or warnings.
@@ -92,7 +92,7 @@ Additional checks:
 ### RED command and result
 
 ```bash
-PATH="/opt/homebrew/opt/node@24/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/current-session/route/current-session-route.test.tsx
+PATH="<node24-bin>:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/current-session/route/current-session-route.test.tsx
 ```
 
 Result: exit `1`; 1 test file, 5 tests, 1 failed and 4 passed. A write rejected with an offline error after route unmount, then the same `QueryClient`/club/revision remounted, but `markCurrentScheduleSeen` remained at 1 call instead of retrying.
@@ -100,19 +100,19 @@ Result: exit `1`; 1 test file, 5 tests, 1 failed and 4 passed. A write rejected 
 ### GREEN commands and results
 
 ```bash
-PATH="/opt/homebrew/opt/node@24/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/current-session/route/current-session-route.test.tsx
+PATH="<node24-bin>:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/current-session/route/current-session-route.test.tsx
 ```
 
 Result: exit `0`; 1 test file passed, 5 tests passed.
 
 ```bash
-PATH="/opt/homebrew/opt/node@24/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/current-session/api/current-session-contracts.test.ts features/current-session/queries/current-session-queries.test.tsx features/current-session/route/current-session-route.test.tsx features/current-session/ui/current-session-review-visibility.test.tsx
+PATH="<node24-bin>:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/current-session/api/current-session-contracts.test.ts features/current-session/queries/current-session-queries.test.tsx features/current-session/route/current-session-route.test.tsx features/current-session/ui/current-session-review-visibility.test.tsx
 ```
 
 Result: exit `0`; 4 test files passed, 30 tests passed.
 
 ```bash
-PATH="/opt/homebrew/opt/node@24/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec eslint features/current-session/route/current-session-route.tsx features/current-session/route/current-session-route.test.tsx
+PATH="<node24-bin>:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec eslint features/current-session/route/current-session-route.tsx features/current-session/route/current-session-route.test.tsx
 ```
 
 Result: exit `0`; no errors or warnings. `git diff --check` also exited `0`.
@@ -122,3 +122,8 @@ Result: exit `0`; no errors or warnings. `git diff --check` also exited `0`.
 - Root cause: the per-call `mutate(..., { onError })` callback is observer-bound and may not execute after its component unmounts, leaving the non-conflict idempotence key retained.
 - Fix: route acknowledgement now uses the `mutateAsync` promise and performs non-conflict key release in its rejection handler, which remains attached after unmount.
 - Preserved behavior: `409` still retains the rejected revision key and the mutation hook still invalidates the club-scoped current-session query. Mounted non-conflict failures still expose the same inline retry, and session expiry still uses the existing write-recovery policy.
+
+## Public-safety closure
+
+- The recorded Node 24 commands retain their exact launcher and arguments while expressing the machine-specific runtime directory as the portable `<node24-bin>` placeholder.
+- A single Stage 1 changed-file scan closed local absolute path and credential-pattern exposure without altering source hashes, command results, or finding closures.
