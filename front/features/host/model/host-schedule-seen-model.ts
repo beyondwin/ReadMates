@@ -51,7 +51,13 @@ export function hostScheduleSeenRows(detail: HostSessionDetailResponse): HostSch
       seenScheduleRevision: attendee.seenScheduleRevision,
       scheduleSeenAt: attendee.scheduleSeenAt,
     }))
-    .sort((left, right) => stateOrder[left.state] - stateOrder[right.state]);
+    .sort((left, right) => {
+      const stateDifference = stateOrder[left.state] - stateOrder[right.state];
+      if (stateDifference !== 0) {
+        return stateDifference;
+      }
+      return left.membershipId < right.membershipId ? -1 : left.membershipId > right.membershipId ? 1 : 0;
+    });
 }
 
 export function hostScheduleSeenSummary(detail: HostSessionDetailResponse): HostScheduleSeenSummary {

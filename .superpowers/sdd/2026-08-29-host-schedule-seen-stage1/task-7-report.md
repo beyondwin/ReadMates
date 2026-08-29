@@ -6,8 +6,10 @@
 - ADR impact: `update` — continues the approved semantics in Proposed ADR-0049; ADR-0049 remains Proposed until the later frontend/runtime and documentation stages agree.
 - Task brief SHA-256: `d3345d121af5d1dac77f5560e6898f461d9d2a30da094277a861d41d0032425c`.
 - Closing source SHA-256:
-  - `front/features/host/model/host-schedule-seen-model.ts`: `78d7b1e3d8883e518198b9d10121cfcbff83e2497de35ecc44cbbc03e420860f`
-  - `front/features/host/model/host-schedule-seen-model.test.ts`: `11c9bd17dc06ca8f830057ebcda83c740c9af9ae922f0592d7af978d58fec5fa`
+  - `front/features/host/model/host-schedule-seen-model.ts`: `68df0959becd850c350faa231e7954bfd3c8a972a41ac410419b4dc2e783b542`
+  - `front/features/host/model/host-schedule-seen-model.test.ts`: `835abdb593d0019b57763dfbdba252c7d429ad7a90595c050bf8845aa1d4a029`
+
+All frontend commands in this report ran with Node 24 and the pinned Corepack launcher. Local launcher paths are intentionally omitted.
 
 Task 4 already owns the strict host detail, version-vector, projection, receipt, and reconciliation schemas. Task 7 therefore adds no duplicate endpoint or client query and changes no server classification. It adds the pure, UI-ready projection of that server state only.
 
@@ -16,7 +18,7 @@ Task 4 already owns the strict host detail, version-vector, projection, receipt,
 - RED command:
 
   ```bash
-  PATH=/opt/homebrew/opt/node@24/bin:$PATH npx --yes corepack@0.35.0 pnpm --dir front test -- features/host/model/host-schedule-seen-model.test.ts
+  npx --yes corepack@0.35.0 pnpm --dir front test -- features/host/model/host-schedule-seen-model.test.ts
   ```
 
   Result: the new suite failed at collection with `Cannot find module './host-schedule-seen-model'`; `1` failed suite with `0` tests collected. Vitest completed the existing configured suites as well (`397` passed files, `3580` passed tests). The expected missing production module was the failure cause.
@@ -24,7 +26,7 @@ Task 4 already owns the strict host detail, version-vector, projection, receipt,
 - GREEN model command:
 
   ```bash
-  PATH=/opt/homebrew/opt/node@24/bin:$PATH npx --yes corepack@0.35.0 pnpm --dir front exec vitest run --project node features/host/model/host-schedule-seen-model.test.ts
+  npx --yes corepack@0.35.0 pnpm --dir front exec vitest run --project node features/host/model/host-schedule-seen-model.test.ts
   ```
 
   Result: `1` file, `5` tests passed.
@@ -32,7 +34,7 @@ Task 4 already owns the strict host detail, version-vector, projection, receipt,
 - Focused host API/query/model and receipt/reconciliation regression command:
 
   ```bash
-  PATH=/opt/homebrew/opt/node@24/bin:$PATH npx --yes corepack@0.35.0 pnpm --dir front exec vitest run --project node tests/unit/host-contract-zod.test.ts features/host/api/host-api.test.ts features/host/api/host-session-recovery-contracts.test.ts features/host/queries/host-session-queries.test.ts features/host/model/host-schedule-seen-model.test.ts
+  npx --yes corepack@0.35.0 pnpm --dir front exec vitest run --project node tests/unit/host-contract-zod.test.ts features/host/api/host-api.test.ts features/host/api/host-session-recovery-contracts.test.ts features/host/queries/host-session-queries.test.ts features/host/model/host-schedule-seen-model.test.ts
   ```
 
   Result: `5` files, `78` tests passed. The existing non-baseline `scheduleRevision` contract test covers host detail, version vector, projection, immutable receipt, and reconciliation; the host API test covers the exact reconciliation response.
@@ -57,3 +59,17 @@ Task 4 already owns the strict host detail, version-vector, projection, receipt,
 - Selected acceptance row: UI or runtime state, limited to pure loading/available/unavailable presentation state and its deterministic sort/empty-denominator behavior.
 - Excluded rows: actor/authorization, club context, BFF/OAuth, persistence/migration, cursor, provider/cache, and browser runtime. This task adds no route, fetch, mutation, server state, or UI surface.
 - Evidence is local repository-only. Stage-wide lint/test/build/E2E gates and browser/runtime validation were intentionally not run by the Task 7 controller constraint.
+
+## Fix round 1 — deterministic ordering and report safety
+
+- Base: clean `6aab62779e834ead07bb2bec5f59ab4096b01add`.
+- Root cause: rows with equal state compared as `0`, preserving upstream input order rather than providing a deterministic review order.
+- RED command (Node 24, pinned Corepack):
+
+  ```bash
+  npx --yes corepack@0.35.0 pnpm --dir front exec vitest run --project node features/host/model/host-schedule-seen-model.test.ts
+  ```
+
+  Result: `1` file with `6` tests, `1` failed and `5` passed. Shuffled same-state rows returned `unseen-z` before `unseen-a`.
+- GREEN command: the same command passed `1` file and `6` tests after adding `membershipId` as the state-tie breaker.
+- The report command examples now keep the exact pinned Corepack invocation without machine-specific launcher paths.

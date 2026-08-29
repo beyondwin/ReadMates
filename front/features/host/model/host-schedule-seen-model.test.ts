@@ -119,6 +119,28 @@ describe("host schedule seen state", () => {
     ]);
   });
 
+  it("breaks same-state ties by membership id after state priority", () => {
+    const source = detail();
+    const unseen = source.attendees.find((attendee) => attendee.membershipId === "unseen");
+    if (!unseen) {
+      throw new Error("Expected unseen fixture row");
+    }
+
+    expect(hostScheduleSeenRows(detail({
+      attendees: [
+        { ...unseen, membershipId: "unseen-z", displayName: "미열람 Z" },
+        source.attendees[0],
+        { ...unseen, membershipId: "unseen-a", displayName: "미열람 A" },
+        source.attendees[1],
+      ],
+    })).map((row) => row.membershipId)).toEqual([
+      "unseen-a",
+      "unseen-z",
+      "stale",
+      "current",
+    ]);
+  });
+
   it("uses the server state without inferring schedule review from RSVP or attendance", () => {
     const rows = hostScheduleSeenRows(detail());
 
