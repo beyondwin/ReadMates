@@ -9,6 +9,9 @@ export type SafeRouteFamily =
   | "profile"
   | "meetings-list"
   | "meeting-detail"
+  | "people-list"
+  | "person-detail"
+  | "settings"
   | "notification-list"
   | "account";
 
@@ -76,7 +79,13 @@ function routeFamily(appPath: string, workspace: ClubWorkspace): SafeRouteFamily
   if (workspace === "member" && localPath === "/notes") return "notes-list";
   if (workspace === "member" && /^\/notes\/[^/]+$/.test(localPath)) return "note-detail";
   if (localPath === "/archive" || localPath === "/me/records") return "records-list";
-  if (workspace === "host" && (localPath === "/sessions" || localPath === "/records")) return "meetings-list";
+  if (workspace === "host" && localPath === "/sessions") return "meetings-list";
+  if (workspace === "host" && localPath === "/records") return "records-list";
+  if (workspace === "host" && /^\/records\/[^/]+$/.test(localPath)) return "record-detail";
+  if (workspace === "host" && (localPath === "/people" || localPath === "/members")) return "people-list";
+  if (workspace === "host" && /^\/people\/[^/]+$/.test(localPath)) return "person-detail";
+  if (workspace === "host" && (localPath === "/settings" || localPath === "/invitations")) return "settings";
+  if (workspace === "host" && localPath === "/operations") return "today";
   if (workspace === "member" && /^\/sessions\/[^/]+$/.test(localPath)) return "record-detail";
   if (workspace === "member" && /^\/feedback\/[^/]+(?:\/print)?$/.test(localPath)) return "record-detail";
   if (workspace === "host" && /^\/sessions\/(?!new$)[^/]+$/.test(localPath)) return "meeting-detail";
@@ -88,7 +97,10 @@ function routeFamily(appPath: string, workspace: ClubWorkspace): SafeRouteFamily
 
 function safeFallback(clubSlug: string, workspace: ClubWorkspace, family: SafeRouteFamily | null) {
   if (workspace === "host") {
-    if (family === "meetings-list" || family === "records-list") return pathForWorkspace(clubSlug, "host", "/sessions");
+    if (family === "meetings-list" || family === "meeting-detail") return pathForWorkspace(clubSlug, "host", "/sessions");
+    if (family === "people-list" || family === "person-detail") return pathForWorkspace(clubSlug, "host", "/people");
+    if (family === "records-list" || family === "record-detail") return pathForWorkspace(clubSlug, "host", "/records");
+    if (family === "settings") return pathForWorkspace(clubSlug, "host", "/settings");
     if (family === "notification-list") return pathForWorkspace(clubSlug, "host", "/notifications");
     return pathForWorkspace(clubSlug, "host");
   }
