@@ -4,6 +4,10 @@ export type RsvpStatus = "NO_RESPONSE" | "GOING" | "MAYBE" | "DECLINED";
 export type AttendanceStatus = "UNKNOWN" | "ATTENDED" | "ABSENT";
 export type SessionParticipationStatus = "ACTIVE" | "REMOVED";
 export type CurrentSessionMemberRole = "HOST" | "MEMBER";
+export type ScheduleSeenReceipt = {
+  scheduleRevision: number;
+  seenAt: string;
+};
 
 export type CurrentSessionResponse = {
   currentSession: null | {
@@ -157,10 +161,21 @@ export const CurrentSessionResponseSchema = z.object({
         .nullable(),
     });
 
+export const ScheduleSeenReceiptSchema = z
+  .object({
+    scheduleRevision: z.number().int().positive(),
+    seenAt: z.string().datetime({ offset: true }),
+  })
+  .strict();
+
 export function parseCurrentSessionResponse(value: unknown): CurrentSessionResponse {
   if (import.meta.env.DEV) {
     return CurrentSessionResponseSchema.parse(value);
   }
 
   return value as CurrentSessionResponse;
+}
+
+export function parseScheduleSeenReceipt(value: unknown): ScheduleSeenReceipt {
+  return ScheduleSeenReceiptSchema.parse(value);
 }

@@ -1,8 +1,10 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo } from "react";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useLoaderData, useParams } from "react-router";
 import {
   currentSessionQuery,
+  isCurrentScheduleSeenConflict,
+  useMarkCurrentScheduleSeenMutation,
   useSaveCurrentSessionCheckinMutation,
   useSaveCurrentSessionLongReviewMutation,
   useSaveCurrentSessionOneLineReviewMutation,
@@ -19,6 +21,17 @@ import {
 } from "@/shared/api/client";
 import { readSurfaceCapabilitiesForAuth } from "@/shared/model/read-surface-capabilities";
 export { CurrentSessionRouteError } from "./current-session-route-error";
+
+const renderedScheduleAcknowledgements = new WeakMap<QueryClient, Set<string>>();
+
+function acknowledgementSet(client: QueryClient) {
+  const current = renderedScheduleAcknowledgements.get(client);
+  if (current) return current;
+
+  const created = new Set<string>();
+  renderedScheduleAcknowledgements.set(client, created);
+  return created;
+}
 
 function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext | undefined {
   return clubSlug ? { clubSlug } : undefined;
@@ -39,8 +52,15 @@ export function CurrentSessionRoute({
 }) {
   const loaderData = useLoaderData() as CurrentSessionRouteData;
   const params = useParams();
+  const queryClient = useQueryClient();
   const context = useMemo(() => contextFromClubSlug(params.clubSlug), [params.clubSlug]);
   const currentQuery = useQuery(currentSessionQuery(context, RECOVER_READ_SESSION_EXPIRY));
+  const {
+    error: scheduleSeenError,
+    isError: scheduleSeenIsError,
+    isPending: scheduleSeenIsPending,
+    mutate: markScheduleSeen,
+  } = useMarkCurrentScheduleSeenMutation(context);
   const updateRsvpMutation = useUpdateCurrentSessionRsvpMutation(context);
   const saveCheckinMutation = useSaveCurrentSessionCheckinMutation(context);
   const saveQuestionsMutation = useSaveCurrentSessionQuestionsMutation(context);
@@ -51,6 +71,35 @@ export function CurrentSessionRoute({
     currentData,
     readSurfaceCapabilitiesForAuth(loaderData.auth),
   );
+  const renderedSession = currentData.currentSession;
+  const renderedRevision = renderedSession?.scheduleRevision ?? null;
+  const renderedRevisionKey = renderedRevision === null
+    ? null
+    : `${context?.clubSlug ?? "unscoped"}:${renderedRevision}`;
+  const acknowledgeRenderedRevision = useCallback(() => {
+    if (renderedRevision === null || renderedRevisionKey === null) return;
+
+    const acknowledgements = acknowledgementSet(queryClient);
+    if (acknowledgements.has(renderedRevisionKey)) return;
+
+    acknowledgements.add(renderedRevisionKey);
+    markScheduleSeen(renderedRevision, {
+      onError: (error) => {
+        if (!isCurrentScheduleSeenConflict(error)) {
+          acknowledgements.delete(renderedRevisionKey);
+        }
+      },
+    });
+  }, [markScheduleSeen, queryClient, renderedRevision, renderedRevisionKey]);
+
+  useEffect(() => {
+    if (
+      renderedSession
+      && renderedSession.mySeenScheduleRevision !== renderedSession.scheduleRevision
+    ) {
+      acknowledgeRenderedRevision();
+    }
+  }, [acknowledgeRenderedRevision, renderedSession]);
 
   const currentSessionSaveActions = useMemo<CurrentSessionSaveActions>(
     () => ({
@@ -75,6 +124,14 @@ export function CurrentSessionRoute({
       data={currentSessionPage}
       actions={currentSessionSaveActions}
       internalLinkComponent={internalLinkComponent}
+      scheduleSeenRecovery={
+        scheduleSeenIsError && !isCurrentScheduleSeenConflict(scheduleSeenError)
+          ? {
+              isRetrying: scheduleSeenIsPending,
+              onRetry: acknowledgeRenderedRevision,
+            }
+          : undefined
+      }
     />
   );
 }

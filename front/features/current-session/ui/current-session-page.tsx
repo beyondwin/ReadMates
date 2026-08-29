@@ -76,25 +76,69 @@ type CurrentSessionPageProps = {
   actions?: CurrentSessionSaveActions;
   internalLinkComponent: InternalLinkComponent;
   onSaveSuccess?: () => void;
+  scheduleSeenRecovery?: {
+    isRetrying: boolean;
+    onRetry: () => void;
+  };
 };
 
-export function CurrentSessionPage({ auth, data, actions, internalLinkComponent, onSaveSuccess }: CurrentSessionPageProps) {
+export function CurrentSessionPage({
+  auth,
+  data,
+  actions,
+  internalLinkComponent,
+  onSaveSuccess,
+  scheduleSeenRecovery,
+}: CurrentSessionPageProps) {
   if (data.currentSession === null) {
     return <CurrentSessionEmpty auth={auth} internalLinkComponent={internalLinkComponent} />;
   }
 
   return (
-    <CurrentSessionBoard
-      key={data.currentSession.sessionId}
-      session={data.currentSession}
-      auth={auth}
-      actions={actions}
-      onSaveSuccess={onSaveSuccess}
-    />
+    <>
+      {scheduleSeenRecovery ? <ScheduleSeenRecoveryNotice {...scheduleSeenRecovery} /> : null}
+      <CurrentSessionBoard
+        key={data.currentSession.sessionId}
+        session={data.currentSession}
+        auth={auth}
+        actions={actions}
+        onSaveSuccess={onSaveSuccess}
+      />
+    </>
   );
 }
 
 export default CurrentSessionPage;
+
+export function ScheduleSeenRecoveryNotice({
+  isRetrying,
+  onRetry,
+}: {
+  isRetrying: boolean;
+  onRetry: () => void;
+}) {
+  return (
+    <section className="container" aria-live="polite" aria-busy={isRetrying} style={{ paddingTop: "12px" }}>
+      <div
+        className="surface-quiet row-between"
+        role="status"
+        style={{ gap: "12px", padding: "12px 14px", flexWrap: "wrap" }}
+      >
+        <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
+          최신 일정 확인 기록을 남기지 못했습니다. 일정은 계속 확인하고 준비할 수 있습니다.
+        </p>
+        <button
+          type="button"
+          className="btn btn-quiet btn-sm"
+          disabled={isRetrying}
+          onClick={onRetry}
+        >
+          {isRetrying ? "다시 기록하는 중" : "일정 확인 다시 기록"}
+        </button>
+      </div>
+    </section>
+  );
+}
 
 export function CurrentSessionEmpty({
   auth,
