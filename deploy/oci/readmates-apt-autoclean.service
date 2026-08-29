@@ -1,0 +1,7 @@
+[Unit]
+Description=Clean obsolete APT package cache entries
+Documentation=https://github.com/readmates/web/blob/main/docs/operations/runbooks/capacity-guardrails.md
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/apt-get autoclean --yes

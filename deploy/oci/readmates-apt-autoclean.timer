@@ -1,0 +1,12 @@
+[Unit]
+Description=Weekly ReadMates APT cache cleanup
+Documentation=https://github.com/readmates/web/blob/main/docs/operations/runbooks/capacity-guardrails.md
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+RandomizedDelaySec=2h
+Unit=readmates-apt-autoclean.service
+
+[Install]
+WantedBy=timers.target

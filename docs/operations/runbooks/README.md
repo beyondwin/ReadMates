@@ -20,6 +20,7 @@ ReadMates 운영자가 반복적으로 수행하는 배포, 진단, 장애 대�
 - [Deploy observability check](deploy-observability-check.md) — 배포 전후 Prometheus rule, Grafana dashboard, local provisioning, request correlation 증거와 한계를 분리해 확인.
 - [AI session generation](ai-session-generation.md) — grounded-only Spring AI provider, atomic cost reservation, crash/redelivery recovery, provider key/retention, trace/Tempo, kill switch, alert/PII 진단 절차.
 - [DB backup & restore](db-backup.md) — 일일 자동 백업 systemd timer, 릴리스 전 수동 백업, OCI Object Storage 객체 검증, 복구 절차.
+- [Capacity guardrails](capacity-guardrails.md) — Docker image, Prometheus, system journal, APT cache 보관 한도와 MySQL storage 알림 점검.
 - [Secrets management](secrets-management.md) — GitHub Repository Secrets와 sync-config 워크플로 기반 SSH-less 시크릿 추가·회전.
 - [SLO monthly report](slo-monthly-report.md) — 매월 첫 주에 6개 SLO를 Prometheus에서 측정해 `docs/operations/slo-reports/`로 기록하는 절차.
 - [VM deploy key bootstrap](vm-deploy-key-bootstrap.md) — 신규 OCI VM에 GitHub Actions deploy 키를 1회 연결하는 초기 설정.
