@@ -39,7 +39,7 @@ describe("host compatibility routes", () => {
         request: new Request("https://readmates.local/app/host/sessions?cursor=old#draft"),
         params: {},
         context: undefined,
-      }),
+      } as unknown as LoaderFunctionArgs),
     ).rejects.toMatchObject({
       status: 302,
       headers: expect.objectContaining({ get: expect.any(Function) }),
@@ -50,7 +50,7 @@ describe("host compatibility routes", () => {
         request: new Request("https://readmates.local/app/host/sessions?cursor=old#draft"),
         params: {},
         context: undefined,
-      });
+      } as unknown as LoaderFunctionArgs);
     } catch (response) {
       expect((response as Response).headers.get("Location")).toBe(
         "/clubs/reading-sai/app/host/sessions?cursor=old#draft",
@@ -80,9 +80,63 @@ describe("hostRoutes", () => {
       expect(childPaths(route)).toEqual(expect.arrayContaining([
         "index",
         "sessions",
-        "members",
+        "people",
         "records",
       ]));
     }
   });
+
+  it("registers canonical people, records, and settings without removing compatibility routes", () => {
+    const routes = hostRoutes(new QueryClient());
+
+    for (const routeId of ["app-host", "club-app-host"]) {
+      const route = routes.find((candidate) => candidate.id === routeId);
+      expect(childPaths(route)).toEqual(expect.arrayContaining([
+        "people",
+        "records",
+        "settings",
+        "members",
+        "invitations",
+        "operations",
+      ]));
+    }
+  });
+
+  it.each(["people", "records", "settings"])(
+    "keeps the unscoped %s destination behind a lazy route module",
+    (path) => {
+      const route = hostRoutes(new QueryClient())
+        .find((candidate) => candidate.id === "app-host")
+        ?.children?.find((candidate) => candidate.path === path);
+
+      expect(route?.lazy).toEqual(expect.any(Function));
+      expect(route?.Component).toBeUndefined();
+      expect(route?.element).toBeUndefined();
+    },
+  );
+
+  it.each(["people", "records", "settings"])(
+    "guards the scoped %s destination with host loader authorization",
+    async (path) => {
+      const fetchMock = vi.fn(() => Promise.resolve(new Response(JSON.stringify({
+        authenticated: true,
+        role: "MEMBER",
+        membershipStatus: "ACTIVE",
+        approvalState: "ACTIVE",
+      }), { headers: { "Content-Type": "application/json" } })));
+      vi.stubGlobal("fetch", fetchMock);
+      const route = hostRoutes(new QueryClient())
+        .find((candidate) => candidate.id === "club-app-host")
+        ?.children?.find((candidate) => candidate.path === path);
+      const loader = route?.loader as ((args: LoaderFunctionArgs) => Promise<unknown>) | undefined;
+
+      expect(loader).toEqual(expect.any(Function));
+      await expect(loader!({
+        request: new Request(`https://readmates.local/clubs/reading-sai/app/host/${path}`),
+        params: { clubSlug: "reading-sai" },
+        context: undefined,
+      } as unknown as LoaderFunctionArgs)).rejects.toMatchObject({ status: 302 });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    },
+  );
 });
