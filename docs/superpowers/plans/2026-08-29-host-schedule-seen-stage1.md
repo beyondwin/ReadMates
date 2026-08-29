@@ -259,7 +259,7 @@ val scheduleSeenState: ScheduleSeenState
 - Modify: `front/tests/unit/cloudflare-bff.test.ts`.
 - Modify: BFF route allowlist only if the current generic proxy explicitly limits methods/paths.
 
-- [ ] **Step 1:** Add a failing proxy test for `PUT /api/bff/sessions/current/schedule-seen`, club context forwarding, body preservation, and upstream 409 preservation.
+- [ ] **Step 1:** Add a failing proxy test for the browser path `PUT /api/bff/api/sessions/current/schedule-seen`, which the generic proxy forwards to upstream `PUT /api/sessions/current/schedule-seen`; prove club context forwarding, body preservation, and upstream 409 preservation.
 - [ ] **Step 2:** If it already passes, keep the test and make no production BFF change. If it fails, make the smallest generic correction; do not add a parallel endpoint-specific function.
 - [ ] **Step 3:** Run the focused Functions test and commit.
 

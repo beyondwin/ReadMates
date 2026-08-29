@@ -8,6 +8,8 @@ Status: complete in the isolated `codex/host-lifecycle-operating-room` worktree.
 - ADR impact: `none` — this is characterization coverage for the existing generic BFF contract; ADR-0049 remains Proposed.
 - Changed surface: `front/tests/unit/cloudflare-bff.test.ts` and this report only.
 - Source SHA-256 at verification: `88cca22f82b5eeb5e4ecd8d4212f1ce8a641247bc67ce678ab517ace0d0b95bf`.
+- Path clarification: browser `PUT /api/bff/api/sessions/current/schedule-seen` is forwarded by the catch-all to upstream `PUT /api/sessions/current/schedule-seen`.
+- Plan SHA-256 correction: old `5bcd10023d831664eba2fb76dae3b6014ea7825c8f4b1a1e53c0e86163ba39bb` → new `0da45b5726c5e2ec68623136ee8ad78eab5b662c321ef721b286fd38497a544f`; the old value contained the missing catch-all `api` segment in the Task 5 literal. This is a typo correction only and does not reopen any other authority finding or change the approved generic-proxy decision.
 
 ## Characterization and GREEN evidence
 
