@@ -462,10 +462,24 @@ internal class HostSessionQueries(
         jdbcTemplate
             .query(
                 """
-                select start_time, end_time, question_deadline_at
-                from active_sessions sessions
+                select
+                  title,
+                  book_title,
+                  book_author,
+                  book_link,
+                  book_image_url,
+                  session_date,
+                  start_time,
+                  end_time,
+                  location_label,
+                  meeting_url,
+                  meeting_passcode,
+                  question_deadline_at,
+                  schedule_revision
+                from sessions
                 where id = ?
                   and club_id = ?
+                  and deleted_at is null
                 for update
                 """.trimIndent(),
                 { resultSet, _ -> resultSet.toExistingHostSessionSchedule() },

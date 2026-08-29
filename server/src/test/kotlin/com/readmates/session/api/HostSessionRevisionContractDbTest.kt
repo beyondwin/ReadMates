@@ -224,6 +224,74 @@ class HostSessionRevisionContractDbTest(
     }
 
     @Test
+    fun `each member-visible basic field bumps schedule revision exactly once`() {
+        val changes =
+            listOf<Pair<String, (Long) -> String>>(
+                "title" to { revision -> sessionJson("바뀐 제목", revision) },
+                "book title" to { revision -> sessionJson("일정 기준", revision, bookTitle = "바뀐 책") },
+                "book author" to { revision -> sessionJson("일정 기준", revision, bookAuthor = "바뀐 저자") },
+                "book link" to { revision ->
+                    sessionJson("일정 기준", revision, bookLink = "https://example.com/changed-book")
+                },
+                "book image" to { revision ->
+                    sessionJson("일정 기준", revision, bookImageUrl = "https://example.com/changed-book.png")
+                },
+                "date" to { revision -> sessionJson("일정 기준", revision, date = "2026-09-03") },
+                "start time" to { revision -> sessionJson("일정 기준", revision, startTime = "19:00") },
+                "end time" to { revision -> sessionJson("일정 기준", revision, endTime = "23:00") },
+                "location label" to { revision -> sessionJson("일정 기준", revision, locationLabel = "오프라인") },
+                "meeting URL" to { revision ->
+                    sessionJson("일정 기준", revision, meetingUrl = "https://example.com/changed-meeting")
+                },
+                "meeting passcode" to { revision ->
+                    sessionJson("일정 기준", revision, meetingPasscode = "changed-passcode")
+                },
+                "question deadline" to { revision ->
+                    sessionJson("일정 기준", revision, questionDeadlineAt = "2026-09-01T15:00:00Z")
+                },
+            )
+
+        changes.forEach { (field, update) ->
+            val sessionId = createDraft("일정 기준")
+
+            mockMvc
+                .patch("/api/host/sessions/$sessionId") {
+                    withHost()
+                    contentType = MediaType.APPLICATION_JSON
+                    content = update(0)
+                }.andExpect { status { isOk() } }
+
+            assertThat(scheduleRevision(sessionId))
+                .describedAs("expected $field to bump the schedule revision")
+                .isEqualTo(2)
+        }
+    }
+
+    @Test
+    fun `identical basic save and stale session revision do not bump schedule revision`() {
+        val sessionId = createDraft("일정 변경 없음")
+
+        mockMvc
+            .patch("/api/host/sessions/$sessionId") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = sessionJson("일정 변경 없음", expectedRevision = 0)
+            }.andExpect { status { isOk() } }
+        assertThat(scheduleRevision(sessionId)).isEqualTo(1)
+
+        mockMvc
+            .patch("/api/host/sessions/$sessionId") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = sessionJson("stale schedule", expectedRevision = 0)
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("REVISION_CONFLICT") }
+            }
+        assertThat(scheduleRevision(sessionId)).isEqualTo(1)
+    }
+
+    @Test
     fun `trashed sessions stay not found instead of revision conflict`() {
         val sessionId = createDraft("휴지통 개정 404")
         mockMvc
@@ -363,16 +431,39 @@ class HostSessionRevisionContractDbTest(
     private fun sessionJson(
         title: String,
         expectedRevision: Long? = null,
+        bookTitle: String = "개정 책",
+        bookAuthor: String = "개정 저자",
+        date: String = "2026-09-02",
+        bookLink: String? = null,
+        bookImageUrl: String? = null,
+        startTime: String? = null,
+        endTime: String? = null,
+        locationLabel: String = "온라인",
+        meetingUrl: String? = null,
+        meetingPasscode: String? = null,
+        questionDeadlineAt: String? = null,
     ): String {
         val revisionField =
             expectedRevision?.let { ",\"expectedSessionRevision\":$it" }.orEmpty()
+        val optionalFields =
+            listOfNotNull(
+                bookLink?.let { "\"bookLink\": \"$it\"" },
+                bookImageUrl?.let { "\"bookImageUrl\": \"$it\"" },
+                startTime?.let { "\"startTime\": \"$it\"" },
+                endTime?.let { "\"endTime\": \"$it\"" },
+                meetingUrl?.let { "\"meetingUrl\": \"$it\"" },
+                meetingPasscode?.let { "\"meetingPasscode\": \"$it\"" },
+                questionDeadlineAt?.let { "\"questionDeadlineAt\": \"$it\"" },
+            ).takeIf(List<String>::isNotEmpty)
+            ?.joinToString(prefix = ",", separator = ",")
+            .orEmpty()
         return """
             {
               "title": "$title",
-              "bookTitle": "개정 책",
-              "bookAuthor": "개정 저자",
-              "date": "2026-09-02",
-              "locationLabel": "온라인"
+              "bookTitle": "$bookTitle",
+              "bookAuthor": "$bookAuthor",
+              "date": "$date",
+              "locationLabel": "$locationLabel"$optionalFields
               $revisionField
             }
             """.trimIndent()
@@ -386,6 +477,13 @@ class HostSessionRevisionContractDbTest(
             Long::class.java,
             sessionId,
         ) ?: error("missing session revision")
+
+    private fun scheduleRevision(sessionId: String): Long =
+        jdbcTemplate.queryForObject(
+            "select schedule_revision from sessions where id = ?",
+            Long::class.java,
+            sessionId,
+        ) ?: error("missing schedule revision")
 
     private fun attendanceRevision(
         sessionId: String,
