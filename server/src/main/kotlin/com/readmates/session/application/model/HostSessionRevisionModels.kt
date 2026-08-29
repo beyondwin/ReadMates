@@ -134,7 +134,8 @@ data class ProjectionSnapshotIdentity(
             val liveToken = versions.liveRecordRevision?.toString() ?: "-"
             return ProjectionSnapshotIdentity(
                 snapshotId =
-                    "$resourceId:${versions.sessionRevision}:${versions.scheduleRevision}:${versions.exposureRevision}:" +
+                    "$resourceId:${versions.sessionRevision}:${versions.scheduleRevision}:" +
+                        "${versions.exposureRevision}:" +
                         "${versions.participantSetRevision}:$draftToken:$liveToken:${versions.publicationRevision}",
             )
         }

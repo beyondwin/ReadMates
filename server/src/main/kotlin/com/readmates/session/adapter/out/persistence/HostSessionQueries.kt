@@ -563,7 +563,10 @@ internal class HostSessionQueries(
         state: String,
         attendees: List<HostSessionAttendee>,
     ): ScheduleSeenSummary {
-        val eligible = attendees.filter { attendee -> attendee.participationStatus == SessionParticipationStatus.ACTIVE }
+        val eligible =
+            attendees.filter { attendee ->
+                attendee.participationStatus == SessionParticipationStatus.ACTIVE
+            }
         if (state != "OPEN" || eligible.isEmpty()) return ScheduleSeenSummary.UNAVAILABLE
         return ScheduleSeenSummary(
             currentCount = eligible.count { attendee -> attendee.scheduleSeenState == ScheduleSeenState.CURRENT },

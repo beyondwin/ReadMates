@@ -432,7 +432,10 @@ class JdbcCurrentSessionAdapter(
                     { resultSet, _ ->
                         CurrentSessionParticipation(
                             rsvpStatus = resultSet.getString("rsvp_status"),
-                            seenScheduleRevision = resultSet.getLong("seen_schedule_revision").takeUnless { resultSet.wasNull() },
+                            seenScheduleRevision =
+                                resultSet
+                                    .getLong("seen_schedule_revision")
+                                    .takeUnless { resultSet.wasNull() },
                             scheduleSeenAt = resultSet.utcOffsetDateTimeOrNull("seen_schedule_at")?.toString(),
                         )
                     },

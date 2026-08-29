@@ -178,7 +178,8 @@ describe("host-contract zod validators (DEV mode)", () => {
     expect(HostMutationReceiptSchema.parse(receipt).resultingVersions.scheduleRevision).toBe(7);
     expect(HostMutationReconciliationSchema.parse(reconciliation).current?.versions.scheduleRevision).toBe(7);
     expect(HostVersionVectorSchema.safeParse({ ...versions, scheduleRevision: 0 }).success).toBe(false);
-    const { scheduleRevision: _scheduleRevision, ...withoutScheduleRevision } = versions;
+    const withoutScheduleRevision: Partial<typeof versions> = { ...versions };
+    delete withoutScheduleRevision.scheduleRevision;
     expect(HostVersionVectorSchema.safeParse(withoutScheduleRevision).success).toBe(false);
   });
 

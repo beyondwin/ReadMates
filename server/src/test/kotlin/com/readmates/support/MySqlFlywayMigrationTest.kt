@@ -3305,7 +3305,9 @@ class MySqlFlywayMigrationTest(
         }
     }
 
-    private fun prepareV60ScheduleSeenUpgradeFixture(dataSource: DriverManagerDataSource): V61ScheduleSeenUpgradeFixture {
+    private fun prepareV60ScheduleSeenUpgradeFixture(
+        dataSource: DriverManagerDataSource,
+    ): V61ScheduleSeenUpgradeFixture {
         val v60Flyway =
             Flyway
                 .configure()

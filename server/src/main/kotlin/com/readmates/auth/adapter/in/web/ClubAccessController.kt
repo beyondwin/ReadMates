@@ -16,5 +16,6 @@ class ClubAccessController(
     private val touchClubAccess: TouchClubAccessUseCase,
 ) {
     @PutMapping
-    fun touch(currentMember: CurrentMember): ClubAccessResult = touchClubAccess.touch(TouchClubAccessCommand(currentMember))
+    fun touch(currentMember: CurrentMember): ClubAccessResult =
+        touchClubAccess.touch(TouchClubAccessCommand(currentMember))
 }

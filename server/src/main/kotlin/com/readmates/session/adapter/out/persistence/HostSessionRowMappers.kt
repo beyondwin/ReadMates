@@ -145,18 +145,8 @@ internal fun ResultSet.toHostSessionAttendee(scheduleRevision: Long) =
         attendanceRevision = getLong("attendance_revision"),
         seenScheduleRevision = getLong("seen_schedule_revision").takeUnless { wasNull() },
         scheduleSeenAt = utcOffsetDateTimeOrNull("seen_schedule_at")?.toString(),
-        scheduleSeenState = scheduleSeenState(scheduleRevision),
+        scheduleSeenState = toScheduleSeenState(scheduleRevision),
     )
-
-private fun ResultSet.scheduleSeenState(scheduleRevision: Long): ScheduleSeenState {
-    val seenRevision = getLong("seen_schedule_revision").takeUnless { wasNull() }
-    return when {
-        seenRevision == null -> ScheduleSeenState.UNSEEN
-        seenRevision == scheduleRevision -> ScheduleSeenState.CURRENT
-        seenRevision < scheduleRevision -> ScheduleSeenState.STALE
-        else -> error("seen schedule revision $seenRevision cannot exceed session schedule revision $scheduleRevision")
-    }
-}
 
 internal fun ResultSet.toHostSessionFeedbackDocument() =
     HostSessionFeedbackDocument(
