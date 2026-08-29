@@ -1,6 +1,7 @@
 package com.readmates.auth.api
 
 import com.readmates.auth.application.port.out.ClubAccessPort
+import com.readmates.shared.security.CurrentUser
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -13,9 +14,13 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.authority.SimpleGrantedAuthority
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.put
 import java.sql.Timestamp
 import java.util.UUID
@@ -131,20 +136,32 @@ class ClubAccessDbTest(
     }
 
     @Test
-    fun `support synthesized host identity cannot create a membership access fact`() {
+    fun `real support principal resolves synthetic host but cannot create a membership access fact`() {
         val grantId = insertSupportGrant()
+        val accessRowsBefore = clubAccessRowCount()
+
+        mockMvc
+            .get("/api/host/members") {
+                with(supportAuthentication())
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("X-Readmates-Club-Slug", "reading-sai")
+                param("limit", "1")
+            }.andExpect {
+                status { isOk() }
+            }
 
         mockMvc
             .put("/api/me/club-access") {
-                with(user("admin-support@example.com"))
+                with(supportAuthentication())
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
                 header("X-Readmates-Club-Slug", "reading-sai")
                 header("Origin", "http://localhost:3000")
             }.andExpect {
-                status { is4xxClientError() }
+                status { isForbidden() }
             }
 
         assertEquals(0, accessRowCount(grantId))
+        assertEquals(accessRowsBefore, clubAccessRowCount())
     }
 
     @Test
@@ -280,6 +297,26 @@ class ClubAccessDbTest(
                 "select count(*) from membership_club_access where membership_id = ?",
                 Int::class.java,
                 membershipId,
+            ),
+        )
+
+    private fun clubAccessRowCount(): Int =
+        requireNotNull(
+            jdbcTemplate.queryForObject(
+                "select count(*) from membership_club_access where club_id = '00000000-0000-0000-0000-000000000001'",
+                Int::class.java,
+            ),
+        )
+
+    private fun supportAuthentication() =
+        authentication(
+            UsernamePasswordAuthenticationToken(
+                CurrentUser(
+                    userId = UUID.fromString("00000000-0000-0000-0000-000000000903"),
+                    email = "admin-support@example.com",
+                ),
+                null,
+                listOf(SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN")),
             ),
         )
 

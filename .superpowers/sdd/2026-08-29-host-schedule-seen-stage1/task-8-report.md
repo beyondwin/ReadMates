@@ -101,3 +101,39 @@ Task 6 already owns the `membership_club_access` table. Task 8 adds no migration
 - Selected acceptance rows: actor/authorization, club context, BFF/OAuth boundary, persistence/concurrency, lifecycle cleanup, API contract, app-shell runtime state, privacy, and compact responsive presentation.
 - Concurrency and throttle evidence uses controlled database timestamps and concurrent callers rather than a 15-minute wall-clock wait.
 - Validation is repository-local and focused. Stage-wide server CI, full frontend lint/test/build, E2E, live browser/responsive inspection, deployment, and stage gates were intentionally not run under the Task 8 controller boundary.
+
+## Fix round 1 — support synthesis and schedule-seen lifecycle evidence
+
+- Base: clean `daac49f57a9f61063b88c1c12d54a496b3ec3921`.
+- Closing test-source SHA-256:
+  - `server/src/test/kotlin/com/readmates/auth/api/ClubAccessDbTest.kt`: `3583f72e17b417f387258aeaac36324d44761bf5bbc184cb93514c739af29638`
+  - `server/src/test/kotlin/com/readmates/auth/api/HostMemberLifecycleControllerTest.kt`: `c88294bf68240e3ee2da867473b0f8995a2822fbc95e3537d76232670f59f791`
+  - `server/src/test/kotlin/com/readmates/session/api/HostSessionTrashControllerDbTest.kt`: `d1c21b12197287f09e9b69d0e555278641df46c3c42eaebe6d405ba76cfa7501`
+
+The original support exclusion test used Spring Security's string `User` principal. It therefore provided no `CurrentUser.userId` to `MemberAuthoritiesFilter`, never entered active-grant synthesis, and could pass without proving the intended boundary. The replacement uses the real seeded `CurrentUser`, platform-admin authority, and an active database grant. A host member-list read first returns `200`, proving synthetic-host resolution; the exact access PUT then returns `403`, the grant/proxy ID has no access row, and the club's total access-row count is unchanged.
+
+The existing host-member lifecycle owner now seeds revision `1` and a literal UTC seen timestamp before host deactivation. The membership becomes `LEFT`, current participation becomes `REMOVED`, coarse access is deleted, and both legally retained schedule-seen fields remain unchanged. The existing session-trash owner proves the same pair survives the soft-delete retention period, then proves the participant and its seen fact are physically removed by expired-trash purge.
+
+- Initial focused characterization command:
+
+  ```bash
+  ./server/gradlew -p server integrationTest \
+    --tests 'com.readmates.auth.api.ClubAccessDbTest.real support principal resolves synthetic host but cannot create a membership access fact' \
+    --tests 'com.readmates.auth.api.HostMemberLifecycleControllerTest.host deactivates member to left and removes from current session when apply now' \
+    --tests 'com.readmates.session.api.HostSessionTrashControllerDbTest.purge removes children after expiry and restore then returns gone'
+  ```
+
+  Result: the real-support boundary passed immediately. Both seen-owner tests reached the retained rows and revision assertions, then RED on the timestamp fixture: a raw MySQL datetime literal read through the Asia/Seoul JVM `Timestamp` view as `10:02` rather than the fixture's local `01:02`. This was a test-fixture timezone mismatch, not a lifecycle mutation.
+
+- GREEN command: the same three exact selectors after binding `Timestamp.from(Instant)` for the UTC fixture.
+
+  Result: `3` tests passed. No production code changed in this fix round.
+
+- `./server/gradlew -p server ktlintTestSourceSetCheck`: GREEN.
+- `git diff --check`: GREEN.
+
+- Fix-round changed files:
+  - `server/src/test/kotlin/com/readmates/auth/api/ClubAccessDbTest.kt`
+  - `server/src/test/kotlin/com/readmates/auth/api/HostMemberLifecycleControllerTest.kt`
+  - `server/src/test/kotlin/com/readmates/session/api/HostSessionTrashControllerDbTest.kt`
+  - `.superpowers/sdd/2026-08-29-host-schedule-seen-stage1/task-8-report.md`
