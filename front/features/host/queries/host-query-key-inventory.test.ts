@@ -43,6 +43,48 @@ describe("host query-key inventory", () => {
     }
   });
 
+  it("changes every current host query family when the URL-owned club changes", () => {
+    const scopes = (clubSlug: string) => ({
+      sessions: hostSessionKeys.scope({ clubSlug }),
+      sessionRecords: hostSessionRecordKeys.scope({ clubSlug }),
+      sessionRecovery: hostSessionRecoveryKeys.scope({ clubSlug }),
+      members: hostMemberKeys.scope({ clubSlug }),
+      invitations: hostInvitationKeys.scope({ clubSlug }),
+      notifications: hostNotificationKeys.scope({ clubSlug }),
+      clubOperations: hostClubOperationsKeys.scope({ clubSlug }),
+      aiJobs: aiJobKeys.scope({ clubSlug }),
+      aiClub: aiClubKeys.scope({ clubSlug }),
+    });
+    const clubA = scopes("club-a");
+    const clubB = scopes("club-b");
+
+    expect(Object.keys(clubA)).toEqual(Object.keys(clubB));
+    for (const family of Object.keys(clubA) as Array<keyof typeof clubA>) {
+      expect(clubA[family].slice(0, 2)).toEqual(["host", "club-a"]);
+      expect(clubB[family].slice(0, 2)).toEqual(["host", "club-b"]);
+      expect(clubA[family]).not.toEqual(clubB[family]);
+      expect(clubA[family]).not.toContain("club-b");
+      expect(clubB[family]).not.toContain("club-a");
+    }
+  });
+
+  it("keeps Stage 1 schedule-seen and access projections inside the session club scope", () => {
+    const clubA = { clubSlug: "club-a" };
+    const clubB = { clubSlug: "club-b" };
+    const sessionId = "session-7";
+    const stageOneKeys = [
+      [hostSessionKeys.current(clubA), hostSessionKeys.current(clubB)],
+      [hostSessionKeys.detail(sessionId, clubA), hostSessionKeys.detail(sessionId, clubB)],
+      [hostSessionKeys.scheduleDefaults(clubA), hostSessionKeys.scheduleDefaults(clubB)],
+    ];
+
+    for (const [keyA, keyB] of stageOneKeys) {
+      expect(keyA.slice(0, 2)).toEqual(["host", "club-a"]);
+      expect(keyB.slice(0, 2)).toEqual(["host", "club-b"]);
+      expect(keyA).not.toEqual(keyB);
+    }
+  });
+
   it("rejects manual host keys and generic error parser usage in host production code", () => {
     const hostRoot = join(process.cwd(), "features", "host");
     const violations = sourceFiles(hostRoot).flatMap((path) => {
