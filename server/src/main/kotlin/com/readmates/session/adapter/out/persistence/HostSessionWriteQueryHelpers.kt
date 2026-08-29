@@ -127,13 +127,14 @@ select sessions.id,
        sessions.visibility,
        sessions.access_scope,
        sessions.session_revision,
+       sessions.schedule_revision,
        sessions.exposure_revision,
        sessions.participant_set_revision,
        draft.draft_revision,
        coalesce(revision.live_revision, 0) as live_revision,
        coalesce(publication.publication_revision, 0) as publication_revision,
        coalesce(public_session_publications.site_visibility, 'HIDDEN') as site_visibility
-from active_sessions sessions
+from sessions
 left join session_record_drafts draft
   on draft.session_id = sessions.id and draft.club_id = sessions.club_id
 left join (
@@ -150,6 +151,7 @@ left join public_session_publications
  and public_session_publications.club_id = sessions.club_id
 where sessions.id = ?
   and sessions.club_id = ?
+  and sessions.deleted_at is null
 """
 
 private const val HOST_ALL_PROJECTION_SQL = """
@@ -166,6 +168,7 @@ select sessions.id,
        sessions.visibility,
        sessions.access_scope,
        sessions.session_revision,
+       sessions.schedule_revision,
        sessions.exposure_revision,
        sessions.participant_set_revision,
        draft.draft_revision,

@@ -127,11 +127,13 @@ internal fun ResultSet.toVersionVector(): SessionVersionVector {
         recordDraftRevision = draft,
         liveRecordRevision = live.takeIf { value -> value > 0 },
         publicationRevision = getLong("publication_revision"),
+        scheduleRevision = getLong("schedule_revision"),
     )
 }
 
 private const val VERSION_VECTOR_SQL = """
 select sessions.session_revision,
+       sessions.schedule_revision,
        sessions.exposure_revision,
        sessions.participant_set_revision,
        draft.draft_revision,
@@ -156,6 +158,7 @@ where sessions.id = ?
 
 private const val REVISION_CONFLICT_SQL = """
 select sessions.session_revision,
+       sessions.schedule_revision,
        sessions.exposure_revision,
        sessions.participant_set_revision,
        sessions.updated_at,

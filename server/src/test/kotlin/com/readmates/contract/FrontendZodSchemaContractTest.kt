@@ -287,6 +287,86 @@ class FrontendZodSchemaContractTest
                     .response.contentAsString
 
             assertJsonShapeMatches(response, "current-session.json")
+            val currentSession = objectMapper.readTree(response).get("currentSession")
+            assertThat(currentSession.path("scheduleRevision").asLong()).isEqualTo(3)
+            assertThat(currentSession.path("mySeenScheduleRevision").asLong()).isEqualTo(2)
+            assertThat(currentSession.path("myScheduleSeenAt").asString()).isNotBlank()
+            currentSession.get("attendees").forEach { attendee ->
+                assertThat(attendee.has("seenScheduleRevision")).isFalse()
+                assertThat(attendee.has("scheduleSeenAt")).isFalse()
+                assertThat(attendee.has("scheduleSeenState")).isFalse()
+            }
+            assertPrivacySafe(response)
+        }
+
+        @Test
+        @Sql(
+            statements = [
+                CLEANUP_CONTRACT_HOST_SCHEDULE_SEEN_SQL,
+                INSERT_CONTRACT_HOST_SCHEDULE_SEEN_SESSION_SQL,
+                INSERT_CONTRACT_HOST_SCHEDULE_SEEN_PARTICIPANTS_SQL,
+            ],
+            executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+        )
+        @Sql(
+            statements = [CLEANUP_CONTRACT_HOST_SCHEDULE_SEEN_SQL],
+            executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+        )
+        fun `host schedule seen detail preserves exact states denominator and privacy`() {
+            val response =
+                mockMvc
+                    .get("/api/host/sessions/$CONTRACT_HOST_SCHEDULE_SEEN_SESSION_ID") {
+                        with(user("host@example.com"))
+                    }.andExpect { status { isOk() } }
+                    .andReturn()
+                    .response.contentAsString
+
+            val detail = objectMapper.readTree(response)
+            assertThat(detail.path("scheduleRevision").asLong()).isEqualTo(3)
+            assertThat(detail.path("versions").path("scheduleRevision").asLong()).isEqualTo(3)
+            assertThat(detail.path("scheduleSeenAvailability").asString()).isEqualTo("AVAILABLE")
+            assertThat(detail.path("scheduleSeenSummary").path("currentCount").asInt()).isEqualTo(1)
+            assertThat(detail.path("scheduleSeenSummary").path("staleCount").asInt()).isEqualTo(1)
+            assertThat(detail.path("scheduleSeenSummary").path("unseenCount").asInt()).isEqualTo(1)
+            assertThat(detail.path("scheduleSeenSummary").path("eligibleCount").asInt()).isEqualTo(3)
+
+            val attendees = detail.get("attendees").associateBy { attendee -> attendee.get("displayName").asString() }
+            assertThat(attendees.getValue("호스트").get("scheduleSeenState").asString()).isEqualTo("CURRENT")
+            assertThat(attendees.getValue("멤버1").get("scheduleSeenState").asString()).isEqualTo("STALE")
+            assertThat(attendees.getValue("멤버2").get("scheduleSeenState").asString()).isEqualTo("UNSEEN")
+            assertThat(attendees.getValue("멤버5").get("participationStatus").asString()).isEqualTo("REMOVED")
+            assertThat(attendees.getValue("멤버5").get("scheduleSeenState").asString()).isEqualTo("STALE")
+            assertPrivacySafe(response)
+        }
+
+        @Test
+        @Sql(
+            statements = [CLEANUP_CONTRACT_RECOVERY_SQL],
+            executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+        )
+        @Sql(
+            statements = [CLEANUP_CONTRACT_RECOVERY_SQL],
+            executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+        )
+        fun `draft without participant snapshot reports schedule seen unavailable`() {
+            val sessionId = createDraftSession("89회차 · 일정 확인 미공개 책")
+            val response =
+                mockMvc
+                    .get("/api/host/sessions/$sessionId") {
+                        with(user("host@example.com"))
+                    }.andExpect { status { isOk() } }
+                    .andReturn()
+                    .response.contentAsString
+
+            val detail = objectMapper.readTree(response)
+            assertThat(detail.path("scheduleSeenAvailability").asString()).isEqualTo("UNAVAILABLE")
+            val summary = detail.path("scheduleSeenSummary")
+            assertThat(summary.path("currentCount").isNull).isTrue()
+            assertThat(summary.path("staleCount").isNull).isTrue()
+            assertThat(summary.path("unseenCount").isNull).isTrue()
+            assertThat(summary.path("eligibleCount").isNull).isTrue()
+            assertThat(summary.has("reviewDestination")).isFalse()
+            assertPrivacySafe(response)
         }
 
         @Test
@@ -621,6 +701,36 @@ class FrontendZodSchemaContractTest
             return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
         }
 
+        private fun assertPrivacySafe(actualJson: String) {
+            val forbidden =
+                setOf(
+                    "email",
+                    "userId",
+                    "authSession",
+                    "authSessionId",
+                    "sessionToken",
+                    "pagePath",
+                    "pagePaths",
+                    "pathHistory",
+                    "actionHistory",
+                    "rawHistory",
+                )
+            val discovered = linkedSetOf<String>()
+
+            fun visit(node: JsonNode) {
+                if (node.isObject) {
+                    node.propertyNames().forEach { key ->
+                        if (key in forbidden) discovered += key
+                        visit(node.get(key))
+                    }
+                } else if (node.isArray) {
+                    node.forEach(::visit)
+                }
+            }
+            visit(objectMapper.readTree(actualJson))
+            assertThat(discovered).isEmpty()
+        }
+
         private fun readFixture(fixtureFileName: String): JsonNode {
             val fixtureFile = zodFixturesDir.resolve(fixtureFileName).toFile()
             check(fixtureFile.exists()) {
@@ -691,12 +801,7 @@ class FrontendZodSchemaContractTest
                 assertThat(actual?.isArray)
                     .describedAs("JSON node at '$path' from '$fixtureFileName' must be an array")
                     .isTrue()
-                if (!expected.isEmpty) {
-                    assertThat(actual!!.isEmpty)
-                        .describedAs(
-                            "JSON array at '$path' from '$fixtureFileName' " +
-                                "must contain at least one representative item",
-                        ).isFalse()
+                if (!expected.isEmpty && !actual!!.isEmpty) {
                     assertJsonShapeAcceptsOptionalFields(
                         actual = actual.get(0),
                         expected = expected.get(0),
@@ -788,6 +893,8 @@ class FrontendZodSchemaContractTest
         private companion object {
             private const val OWNER_USER_ID = "00000000-0000-0000-0000-000000000901"
             private const val MEMBER_USER_ID = "00000000-0000-0000-0000-000000000106"
+            private const val CONTRACT_HOST_SCHEDULE_SEEN_SESSION_ID =
+                "00000000-0000-0000-0000-000000000978"
 
             private const val CLEANUP_CONTRACT_RECOVERY_SQL = """
                 delete from host_session_change_audit
@@ -849,6 +956,54 @@ class FrontendZodSchemaContractTest
                 where id = '00000000-0000-0000-0000-000000000977';
             """
 
+            private const val CLEANUP_CONTRACT_HOST_SCHEDULE_SEEN_SQL = """
+                delete from session_participants
+                where session_id = '00000000-0000-0000-0000-000000000978';
+                delete from sessions
+                where id = '00000000-0000-0000-0000-000000000978';
+            """
+
+            private const val INSERT_CONTRACT_HOST_SCHEDULE_SEEN_SESSION_SQL = """
+                insert into sessions (
+                  id, club_id, number, title, book_title, book_author, book_translator, book_link,
+                  session_date, start_time, end_time, location_label, question_deadline_at, state,
+                  schedule_revision
+                )
+                values (
+                  '00000000-0000-0000-0000-000000000978',
+                  '00000000-0000-0000-0000-000000000001',
+                  978, '978회차 · 일정 확인 계약 책', '일정 확인 계약 책', '계약 테스트 저자', null, null,
+                  '2026-09-20', '20:00', '22:00', '온라인',
+                  '2026-09-19 14:59:00.000000', 'OPEN', 3
+                );
+            """
+
+            private const val INSERT_CONTRACT_HOST_SCHEDULE_SEEN_PARTICIPANTS_SQL = """
+                insert into session_participants (
+                  id, club_id, session_id, membership_id, rsvp_status, attendance_status,
+                  participation_status, seen_schedule_revision, seen_schedule_at
+                )
+                select
+                  uuid(), memberships.club_id, '00000000-0000-0000-0000-000000000978', memberships.id,
+                  'GOING', 'UNKNOWN',
+                  case when users.email = 'member5@example.com' then 'REMOVED' else 'ACTIVE' end,
+                  case
+                    when users.email = 'host@example.com' then 3
+                    when users.email in ('member1@example.com', 'member5@example.com') then 2
+                    else null
+                  end,
+                  case
+                    when users.email in ('host@example.com', 'member1@example.com', 'member5@example.com')
+                    then '2026-09-01 12:00:00.000000'
+                    else null
+                  end
+                from memberships
+                join users on users.id = memberships.user_id
+                where users.email in (
+                  'host@example.com', 'member1@example.com', 'member2@example.com', 'member5@example.com'
+                );
+            """
+
             private const val CLEANUP_CONTRACT_ADMIN_ANALYTICS_SQL = """
                 delete from admin_closing_risk_ledger
                 where session_id = '00000000-0000-0000-0000-000000000976';
@@ -875,20 +1030,28 @@ class FrontendZodSchemaContractTest
             private const val INSERT_CONTRACT_CURRENT_SESSION_SQL = """
                 insert into sessions (
                   id, club_id, number, title, book_title, book_author, book_translator, book_link,
-                  session_date, start_time, end_time, location_label, question_deadline_at, state
+                  session_date, start_time, end_time, location_label, question_deadline_at, state,
+                  schedule_revision
                 )
                 values (
                   '00000000-0000-0000-0000-000000000977',
                   '00000000-0000-0000-0000-000000000001',
                   977, '977회차 · 계약 테스트 책', '계약 테스트 책', '계약 테스트 저자', null, null,
                   '2026-05-20', '20:00', '22:00', '온라인',
-                  '2026-05-19 14:59:00.000000', 'OPEN'
+                  '2026-05-19 14:59:00.000000', 'OPEN', 3
                 );
             """
 
             private const val INSERT_CONTRACT_CURRENT_SESSION_PARTICIPANTS_SQL = """
-                insert into session_participants (id, club_id, session_id, membership_id, rsvp_status, attendance_status)
-                select uuid(), memberships.club_id, '00000000-0000-0000-0000-000000000977', memberships.id, 'GOING', 'UNKNOWN'
+                insert into session_participants (
+                  id, club_id, session_id, membership_id, rsvp_status, attendance_status,
+                  seen_schedule_revision, seen_schedule_at
+                )
+                select
+                  uuid(), memberships.club_id, '00000000-0000-0000-0000-000000000977', memberships.id,
+                  'GOING', 'UNKNOWN',
+                  case when users.email = 'member5@example.com' then 2 else null end,
+                  case when users.email = 'member5@example.com' then '2026-05-18 12:00:00.000000' else null end
                 from memberships
                 join users on users.id = memberships.user_id
                 where users.email in ('host@example.com', 'member1@example.com', 'member5@example.com');

@@ -102,6 +102,14 @@ const hostSessionDetail = {
   siteVisibility: "PUBLIC_RECORD",
   publication: null,
   state: "PUBLISHED",
+  scheduleRevision: 1,
+  scheduleSeenAvailability: "UNAVAILABLE",
+  scheduleSeenSummary: {
+    currentCount: null,
+    staleCount: null,
+    unseenCount: null,
+    eligibleCount: null,
+  },
   versions: {
     sessionRevision: 3,
     exposureRevision: 2,
@@ -111,7 +119,21 @@ const hostSessionDetail = {
     publicationRevision: 1,
   },
   attendanceSnapshotId: "att:membership-host:6",
-  attendees: [],
+  attendees: [
+    {
+      membershipId: "00000000-0000-0000-0000-000000000201",
+      displayName: "호스트",
+      accountName: "김호스트",
+      avatarKey: "banana-green-book",
+      rsvpStatus: "GOING",
+      attendanceStatus: "ATTENDED",
+      participationStatus: "ACTIVE",
+      attendanceRevision: 0,
+      seenScheduleRevision: 1,
+      scheduleSeenAt: "2026-08-29T00:00:00Z",
+      scheduleSeenState: "CURRENT",
+    },
+  ],
   feedbackDocument: {
     uploaded: false,
     fileName: null,
@@ -120,6 +142,7 @@ const hostSessionDetail = {
   changeReceipt: null,
   versions: {
     sessionRevision: 0,
+    scheduleRevision: 1,
     exposureRevision: 0,
     participantSetRevision: 0,
     recordDraftRevision: null,
@@ -235,6 +258,9 @@ const currentSession = {
     meetingPasscode: null,
     questionDeadlineAt: "2025-11-25T14:59:00Z",
     myRsvpStatus: "GOING",
+    scheduleRevision: 3,
+    mySeenScheduleRevision: 2,
+    myScheduleSeenAt: "2026-05-18T12:00:00Z",
     myCheckin: { readingProgress: 100 },
     myQuestions: [
       {

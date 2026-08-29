@@ -6,6 +6,7 @@ import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionFeedbackDocument
 import com.readmates.session.application.HostSessionListItem
 import com.readmates.session.application.HostSessionPublication
+import com.readmates.session.application.ScheduleSeenState
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.HostDashboardMissingMemberResult
 import com.readmates.session.application.model.SessionVersionVector
@@ -17,6 +18,7 @@ import com.readmates.sessionclosing.application.model.SessionRecordReadinessPoli
 import com.readmates.sessionrecord.application.model.SessionRecordStatus
 import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.db.utcOffsetDateTime
+import com.readmates.shared.db.utcOffsetDateTimeOrNull
 import com.readmates.shared.db.uuid
 import java.sql.ResultSet
 import java.time.LocalDate
@@ -108,6 +110,7 @@ internal fun ResultSet.toHostSessionDetailBase() =
         meetingPasscode = getString("meeting_passcode"),
         publication = null,
         state = getString("state"),
+        scheduleRevision = getLong("schedule_revision"),
         visibility = SessionRecordVisibility.valueOf(getString("visibility")),
         accessScope = SessionAccessScope.valueOf(getString("access_scope")),
         siteVisibility = PublicSiteVisibility.valueOf(getString("site_visibility")),
@@ -126,10 +129,11 @@ internal fun ResultSet.toHostSessionDetailBase() =
                 recordDraftRevision = getLong("draft_revision").takeUnless { wasNull() },
                 liveRecordRevision = getLong("live_revision").takeIf { it > 0 },
                 publicationRevision = getLong("publication_revision"),
+                scheduleRevision = getLong("schedule_revision"),
             ),
     )
 
-internal fun ResultSet.toHostSessionAttendee() =
+internal fun ResultSet.toHostSessionAttendee(scheduleRevision: Long) =
     HostSessionAttendee(
         membershipId = uuid("membership_id").toString(),
         displayName = getString("display_name"),
@@ -139,7 +143,19 @@ internal fun ResultSet.toHostSessionAttendee() =
         attendanceStatus = getString("attendance_status"),
         participationStatus = SessionParticipationStatus.valueOf(getString("participation_status")),
         attendanceRevision = getLong("attendance_revision"),
+        seenScheduleRevision = getLong("seen_schedule_revision").takeUnless { wasNull() },
+        scheduleSeenAt = utcOffsetDateTimeOrNull("seen_schedule_at")?.toString(),
+        scheduleSeenState = scheduleSeenState(scheduleRevision),
     )
+
+private fun ResultSet.scheduleSeenState(scheduleRevision: Long): ScheduleSeenState {
+    val seenRevision = getLong("seen_schedule_revision").takeUnless { wasNull() }
+    return when {
+        seenRevision == null -> ScheduleSeenState.UNSEEN
+        seenRevision == scheduleRevision -> ScheduleSeenState.CURRENT
+        else -> ScheduleSeenState.STALE
+    }
+}
 
 internal fun ResultSet.toHostSessionFeedbackDocument() =
     HostSessionFeedbackDocument(

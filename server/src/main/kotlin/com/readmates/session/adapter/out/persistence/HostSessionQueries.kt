@@ -2,6 +2,7 @@
 
 package com.readmates.session.adapter.out.persistence
 
+import com.readmates.session.application.HostSessionAttendee
 import com.readmates.session.application.HostSessionFeedbackDocument
 import com.readmates.session.application.HostSessionListItem
 import com.readmates.session.application.HostSessionListPage
@@ -9,6 +10,9 @@ import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.HostSessionListSummary
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.HostSessionPublication
+import com.readmates.session.application.ScheduleSeenAvailability
+import com.readmates.session.application.ScheduleSeenState
+import com.readmates.session.application.ScheduleSeenSummary
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.CanonicalHostSessionListQuery
 import com.readmates.session.application.model.HostDashboardResult
@@ -381,6 +385,7 @@ internal class HostSessionQueries(
               visibility,
               access_scope,
               session_revision,
+              schedule_revision,
               exposure_revision,
               participant_set_revision,
               draft.draft_revision,
@@ -393,7 +398,7 @@ internal class HostSessionQueries(
                   and public_session_publications.session_id = sessions.id
                 limit 1
               ), 'HIDDEN') as site_visibility
-            from active_sessions sessions
+            from sessions
             left join session_record_drafts draft
               on draft.club_id = sessions.club_id
              and draft.session_id = sessions.id
@@ -408,13 +413,20 @@ internal class HostSessionQueries(
               on publication_version.session_id = sessions.id
             where sessions.id = ?
               and sessions.club_id = ?
+              and sessions.deleted_at is null
             """.trimIndent(),
             { resultSet, _ -> resultSet.toHostSessionDetailBase() },
             sessionId.dbString(),
             member.clubId.dbString(),
         ).firstOrNull()
         ?.let { detail ->
-            val attendees = findHostSessionAttendees(jdbcTemplate, sessionId, member.clubId)
+            val attendees =
+                findHostSessionAttendees(
+                    jdbcTemplate,
+                    sessionId,
+                    member.clubId,
+                    detail.scheduleRevision,
+                )
             val attendanceRows =
                 attendees
                     .filter { attendee -> attendee.participationStatus == SessionParticipationStatus.ACTIVE }
@@ -422,11 +434,19 @@ internal class HostSessionQueries(
                     .joinToString(",") { attendee ->
                         "${attendee.membershipId}:${attendee.attendanceRevision}"
                     }
+            val scheduleSeenSummary = scheduleSeenSummary(detail.state, attendees)
             detail.copy(
                 attendees = attendees,
                 feedbackDocument = findHostSessionFeedbackDocument(jdbcTemplate, sessionId, member.clubId),
                 publication = findHostSessionPublication(jdbcTemplate, sessionId, member.clubId),
                 attendanceSnapshotId = "att:$attendanceRows",
+                scheduleSeenAvailability =
+                    if (scheduleSeenSummary.eligibleCount != null) {
+                        ScheduleSeenAvailability.AVAILABLE
+                    } else {
+                        ScheduleSeenAvailability.UNAVAILABLE
+                    },
+                scheduleSeenSummary = scheduleSeenSummary,
             )
         } ?: throw HostSessionNotFoundException()
 
@@ -509,6 +529,7 @@ internal class HostSessionQueries(
         jdbcTemplate: JdbcTemplate,
         sessionId: UUID,
         clubId: UUID,
+        scheduleRevision: Long,
     ) = jdbcTemplate.query(
         """
         select
@@ -520,7 +541,9 @@ internal class HostSessionQueries(
           session_participants.rsvp_status,
           session_participants.attendance_status,
           session_participants.participation_status,
-          session_participants.attendance_revision
+          session_participants.attendance_revision,
+          session_participants.seen_schedule_revision,
+          session_participants.seen_schedule_at
         from session_participants
         join memberships on memberships.id = session_participants.membership_id
           and memberships.club_id = session_participants.club_id
@@ -531,10 +554,24 @@ internal class HostSessionQueries(
           case when memberships.role = 'HOST' then 0 else 1 end,
           users.name
         """.trimIndent(),
-        { resultSet, _ -> resultSet.toHostSessionAttendee() },
+        { resultSet, _ -> resultSet.toHostSessionAttendee(scheduleRevision) },
         sessionId.dbString(),
         clubId.dbString(),
     )
+
+    private fun scheduleSeenSummary(
+        state: String,
+        attendees: List<HostSessionAttendee>,
+    ): ScheduleSeenSummary {
+        val eligible = attendees.filter { attendee -> attendee.participationStatus == SessionParticipationStatus.ACTIVE }
+        if (state != "OPEN" || eligible.isEmpty()) return ScheduleSeenSummary.UNAVAILABLE
+        return ScheduleSeenSummary(
+            currentCount = eligible.count { attendee -> attendee.scheduleSeenState == ScheduleSeenState.CURRENT },
+            staleCount = eligible.count { attendee -> attendee.scheduleSeenState == ScheduleSeenState.STALE },
+            unseenCount = eligible.count { attendee -> attendee.scheduleSeenState == ScheduleSeenState.UNSEEN },
+            eligibleCount = eligible.size,
+        )
+    }
 
     private fun findHostSessionFeedbackDocument(
         jdbcTemplate: JdbcTemplate,

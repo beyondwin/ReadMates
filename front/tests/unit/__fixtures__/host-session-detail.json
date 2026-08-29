@@ -15,6 +15,14 @@
   "meetingPasscode": null,
   "publication": null,
   "state": "PUBLISHED",
+  "scheduleRevision": 1,
+  "scheduleSeenAvailability": "UNAVAILABLE",
+  "scheduleSeenSummary": {
+    "currentCount": null,
+    "staleCount": null,
+    "unseenCount": null,
+    "eligibleCount": null
+  },
   "versions": {
     "sessionRevision": 3,
     "exposureRevision": 2,
@@ -36,6 +44,7 @@
   "changeReceipt": null,
   "versions": {
     "sessionRevision": 0,
+    "scheduleRevision": 1,
     "exposureRevision": 0,
     "participantSetRevision": 0,
     "recordDraftRevision": null,

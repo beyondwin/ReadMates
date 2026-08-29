@@ -34,6 +34,7 @@ class HostSessionRevisionModelsTest {
 
         assertThat(node.propertyNames().toSet()).containsExactlyInAnyOrder(
             "sessionRevision",
+            "scheduleRevision",
             "exposureRevision",
             "participantSetRevision",
             "recordDraftRevision",
@@ -41,6 +42,7 @@ class HostSessionRevisionModelsTest {
             "publicationRevision",
         )
         assertThat(node.get("sessionRevision").asLong()).isEqualTo(3)
+        assertThat(node.get("scheduleRevision").asLong()).isEqualTo(1)
         assertThat(node.get("exposureRevision").asLong()).isEqualTo(1)
         assertThat(node.get("participantSetRevision").asLong()).isEqualTo(4)
         assertThat(node.get("recordDraftRevision").asLong()).isEqualTo(2)
@@ -75,6 +77,7 @@ class HostSessionRevisionModelsTest {
 
         assertThat(vectorNode.propertyNames().toSet()).containsExactlyInAnyOrder(
             "sessionRevision",
+            "scheduleRevision",
             "exposureRevision",
             "participantSetRevision",
             "recordDraftRevision",
@@ -108,11 +111,13 @@ class HostSessionRevisionModelsTest {
 
         assertThat(json.propertyNames().toSet()).containsExactly("snapshotId")
         assertThat(identity.snapshotId).isEqualTo(
-            "$resourceId:3:1:4:2:5:6",
+            "$resourceId:3:1:1:4:2:5:6",
         )
         assertThat(ProjectionSnapshotIdentity.from(resourceId, sampleVector())).isEqualTo(identity)
         assertThat(sampleVector().snapshotIdentity(resourceId)).isEqualTo(identity)
         assertThat(sampleVector().copy(sessionRevision = 4).snapshotIdentity(resourceId).snapshotId)
+            .isNotEqualTo(identity.snapshotId)
+        assertThat(sampleVector().copy(scheduleRevision = 2).snapshotIdentity(resourceId).snapshotId)
             .isNotEqualTo(identity.snapshotId)
         assertThat(
             sampleVector()
@@ -126,7 +131,7 @@ class HostSessionRevisionModelsTest {
     fun `null record revisions use a stable snapshot sentinel`() {
         val identity = SessionVersionVector.INITIAL.snapshotIdentity(resourceId)
 
-        assertThat(identity.snapshotId).isEqualTo("$resourceId:0:0:0:-:-:0")
+        assertThat(identity.snapshotId).isEqualTo("$resourceId:0:1:0:0:-:-:0")
         assertThat(
             SessionVersionVector.INITIAL
                 .copy(recordDraftRevision = 1)
