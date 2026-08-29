@@ -55,3 +55,17 @@ Source hashes after correction:
 | --- | --- |
 | `node --version` with Node 24 selected | `v24.18.0` |
 | Node v24.18.0: `corepack pnpm --dir front lint` | Exit 0; the same two pre-existing Fast Refresh warnings remain. |
+
+## Rounds 2–4: controller formatting correction
+
+- Source before correction: `ClubAccessController.kt` SHA-256 `2dbd579a3ff4d56750ceffea07faec6a387a0bf82f52588b835c4481dfe7e00b`.
+- Hypothesis 1: wrap the expression body after `=`. Detekt accepted the shorter lines, but ktlint `function-signature` rejected the wrap because the signature and expression body fit on one line.
+- Hypothesis 2: use an explicit-return block body. Detekt accepted the shorter lines, but ktlint rejected the body with `Function body should be replaced with body expression`.
+- Hypothesis 3: use a multiline parameter signature. Ktlint rejected the inner-parenthesis whitespace and still required the expression body on the signature line.
+- Hypothesis 4: keep the required one-line expression body and shorten only the collaborator from `touchClubAccess` to `accessUseCase`. `./server/gradlew -p server ktlintMainSourceSetCheck detekt` passed ktlint but failed detekt `MaxLineLength`; the resulting line was still 122 characters.
+- Closure: restored the descriptive `touchClubAccess` collaborator and renamed only the controller argument from `currentMember` to the repository-standard `member`. The required expression body is now 110 characters with identical command construction and use-case invocation.
+- Source after correction: `ClubAccessController.kt` SHA-256 `05084852449c1e9d6bab9085f9d4a78a88065b58cc13a512e893a5c794e2ba41`.
+
+| Source | Command | Result |
+| --- | --- | --- |
+| `05084852449c1e9d6bab9085f9d4a78a88065b58cc13a512e893a5c794e2ba41` | `./server/gradlew -p server ktlintMainSourceSetCheck detekt` | Exit 0; both ktlint and detekt passed. |
