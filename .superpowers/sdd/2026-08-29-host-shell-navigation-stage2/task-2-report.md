@@ -3,6 +3,7 @@
 ## Status and scope
 
 - BASE verified clean at `2d46fd18e030ea2866cacf35faf71ac806564893`.
+- Gate-finding round 2 BASE verified clean at `c064c285a3209e8764d22fd0acd92e04001d56c8`.
 - Task brief SHA-256: `040b1038bb95ff4289ad503a548f41db17a16f53107b319128b91bfb12511e6e`.
 - ADR impact: `update` — implements only the shell-composition portion of Proposed ADR-0048. No new ADR; ADR-0048 remains Proposed.
 - Evidence is local repository/browser-component evidence. No layout wiring, route registration or redirect, server code, E2E, deployment, or production state changed.
@@ -24,6 +25,12 @@ Review fix round 1 added a dual-instance regression before changing production c
 PATH="$(brew --prefix node@24)/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/ui/shell/host-utility-actions.test.tsx
 ```
 
+Gate-finding round 2 reproduced the repository typography contract failure before changing CSS: the active notification badge `font-size: 0.6875rem` resolved to `11px`, so the suite failed `1/13`. Raising that existing compact type value to `0.75rem` closed the contract at exactly `12px`; the same command then passed `13/13`.
+
+```text
+PATH="$(brew --prefix node@24)/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run tests/unit/typography-contract.test.ts
+```
+
 ## Source hash → command → result → closure
 
 | Closing source SHA-256 | Command | Result | Finding closure |
@@ -32,7 +39,7 @@ PATH="$(brew --prefix node@24)/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir f
 | `472780a7f054ce964c37e4a6c552bce82566470b9fb3b37232797479cd34eba5` (`host-primary-navigation.tsx`) | focused Vitest above | GREEN, `18/18` | Desktop renders `운영실 · 일정과 모임 · 사람 · 기록`; mobile shortens only the meeting label; current and denied states remain semantic and discoverable. |
 | `17e0321f5e9390bf870c7b97fd2314726f16c150705f6e17fe62a16b22ff8813`, `e9ca5e94b9ae65eac23f8493cbe305ee1a472fafff6a8c022e92cf365ce6a73e` (`host-utility-actions.tsx` and test) | review-fix focused Vitest above | RED `1/4`, then GREEN `4/4` | `초대와 설정`, `멤버 시야`, notification, and `새 모임` remain separate from primary navigation; unread count is announced, and simultaneous desktop/mobile copies use unique permission-reason IDs whose `aria-describedby` resolves to each instance's own reason. |
 | `6722c66cbe6afe1cd8de9099570ada7f7a0ae8782abdcafb64d4afafcacbfc5c`, `48b82ff4577af55355611e8f64661e2e436fe570c7b1effe5e142f956f2828ad` (`app-club-shell` model/UI) | focused Vitest above | GREEN, `18/18` | One generic responsive context slot can replace the two legacy selectors; the default member/host selector pair and shared shell regions remain unchanged when no slot is supplied. |
-| `e4c799411de911e2bc3ae39883d893a5511ebb8f50b2d41acf3434cd6ceaa1d4` (`host-shell.css`) | `PATH="$(brew --prefix node@24)/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec playwright test --config=playwright-ct.config.ts features/host/ui/shell/host-shell.ct.tsx` | GREEN, `2/2` at `390×844` and `1440×900` | Long Korean/English identity does not cause horizontal overflow; visible controls are at least 44px; keyboard focus is visible; reduced-motion transition duration stays below the 20ms contract; requested avatar artwork is present. |
+| `c28788d31f91a96a5fca2cf21637e727280fef491135084381af9b0a80e065a4` (`host-shell.css`) | typography-contract Vitest above; `PATH="$(brew --prefix node@24)/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec playwright test --config=playwright-ct.config.ts features/host/ui/shell/host-shell.ct.tsx` | typography RED `1/13`, then GREEN `13/13`; CT GREEN `2/2` at `390×844` and `1440×900` | The active unread-count badge now meets the repository's 12px visual-text floor while preserving the compact hierarchy, 44px targets, responsive no-overflow geometry, keyboard focus, reduced motion, and requested avatar artwork. |
 | focused TypeScript/TSX source and tests | focused ESLint over the 11 changed TS/TSX files | exit `0`, no findings | New feature UI remains prop/callback driven and shared shell boundaries keep their repository lint contract. |
 
 ## Operate/harden closure
@@ -45,7 +52,8 @@ PATH="$(brew --prefix node@24)/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir f
 ## Verification notes and residual risk
 
 - Fresh focused Task 2 Vitest after review fix: passed, `19/19`; the utility-only TDD cycle passed `4/4` after its expected RED.
-- Focused Chromium CT from the Task 2 implementation: passed, `2/2` across 390 and 1440 widths. It was not rerun for review fix round 1 because no CSS or visual surface changed.
-- Focused ESLint: passed for the two TypeScript/TSX files changed in review fix round 1; the original Task 2 lint set also passed.
+- Typography contract after gate-finding round 2: passed, `13/13`, after reproducing the expected `11px` RED.
+- Focused Chromium CT after the CSS fix: passed, `2/2` across 390 and 1440 widths.
+- Focused ESLint: passed for the 11 Task 2 TypeScript/TSX files; CSS has no separate repository lint command.
 - Final staged `git diff --check` and targeted public-safety scan: passed with no findings.
 - Full frontend lint/test/build, E2E, and route wiring were intentionally not run under the Task 2 stop conditions. Layout injection remains Task 3; canonical route elements and legacy redirect work remain later Stage 2 tasks.

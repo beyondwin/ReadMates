@@ -226,7 +226,7 @@ button.rm-host-workspace-switcher__choice {
   border-radius: 999px;
   color: var(--bg);
   background: var(--accent);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
