@@ -410,6 +410,14 @@ export type HostSessionDetailResponse = {
   siteVisibility?: PublicSiteVisibility;
   publication: HostSessionPublication | null;
   state: SessionState;
+  scheduleRevision: number;
+  scheduleSeenAvailability: "AVAILABLE" | "UNAVAILABLE";
+  scheduleSeenSummary: {
+    currentCount: number | null;
+    staleCount: number | null;
+    unseenCount: number | null;
+    eligibleCount: number | null;
+  };
   attendees: Array<{
     membershipId: string;
     avatarKey: string;
@@ -418,6 +426,9 @@ export type HostSessionDetailResponse = {
     rsvpStatus: RsvpStatus;
     attendanceStatus: AttendanceStatus;
     participationStatus?: SessionParticipationStatus;
+    seenScheduleRevision: number | null;
+    scheduleSeenAt: string | null;
+    scheduleSeenState: "CURRENT" | "STALE" | "UNSEEN";
   }>;
   feedbackDocument: FeedbackDocumentStatus;
   changeReceipt?: HostSessionChangeReceipt | null;

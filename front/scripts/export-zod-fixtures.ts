@@ -12,6 +12,8 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { HostSessionDetailResponseSchema } from "../features/host/api/host-contracts";
+import { CurrentSessionResponseSchema } from "../shared/model/current-session-contracts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, "../tests/unit/__fixtures__/zod-schemas");
@@ -82,7 +84,7 @@ const hostSessionTrashPage = {
   nextCursor: null,
 };
 
-const hostSessionDetail = {
+const hostSessionDetail = HostSessionDetailResponseSchema.parse({
   sessionId: "00000000-0000-0000-0000-000000000301",
   sessionNumber: 1,
   title: "1회차 · 팩트풀니스",
@@ -102,7 +104,7 @@ const hostSessionDetail = {
   siteVisibility: "PUBLIC_RECORD",
   publication: null,
   state: "PUBLISHED",
-  scheduleRevision: 1,
+  scheduleRevision: 7,
   scheduleSeenAvailability: "UNAVAILABLE",
   scheduleSeenSummary: {
     currentCount: null,
@@ -112,6 +114,7 @@ const hostSessionDetail = {
   },
   versions: {
     sessionRevision: 3,
+    scheduleRevision: 7,
     exposureRevision: 2,
     participantSetRevision: 4,
     recordDraftRevision: null,
@@ -129,7 +132,7 @@ const hostSessionDetail = {
       attendanceStatus: "ATTENDED",
       participationStatus: "ACTIVE",
       attendanceRevision: 0,
-      seenScheduleRevision: 1,
+      seenScheduleRevision: 7,
       scheduleSeenAt: "2026-08-29T00:00:00Z",
       scheduleSeenState: "CURRENT",
     },
@@ -140,17 +143,7 @@ const hostSessionDetail = {
     uploadedAt: null,
   },
   changeReceipt: null,
-  versions: {
-    sessionRevision: 0,
-    scheduleRevision: 1,
-    exposureRevision: 0,
-    participantSetRevision: 0,
-    recordDraftRevision: null,
-    liveRecordRevision: null,
-    publicationRevision: 0,
-  },
-  attendanceSnapshotId: "att:",
-};
+});
 
 const hostSessionRecordEditor = {
   sessionId: "00000000-0000-0000-0000-000000000301",
@@ -241,7 +234,7 @@ const adminAnalyticsOverview = {
 // ---------------------------------------------------------------------------
 // CurrentSessionResponseSchema top-level keys
 // ---------------------------------------------------------------------------
-const currentSession = {
+const currentSession = CurrentSessionResponseSchema.parse({
   currentSession: {
     sessionId: "00000000-0000-0000-0000-000000000301",
     sessionNumber: 1,
@@ -313,7 +306,7 @@ const currentSession = {
       },
     ],
   },
-};
+});
 
 const aigenJob = {
   jobId: "00000000-0000-0000-0000-000000000401",

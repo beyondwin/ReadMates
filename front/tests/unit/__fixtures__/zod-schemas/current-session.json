@@ -62,13 +62,13 @@
     "attendees": [
       {
         "membershipId": "00000000-0000-0000-0000-000000000201",
+        "avatarKey": "banana-green-book",
         "displayName": "호스트",
         "accountName": "김호스트",
         "role": "HOST",
         "rsvpStatus": "GOING",
         "attendanceStatus": "UNKNOWN",
-        "participationStatus": "ACTIVE",
-        "avatarKey": "banana-green-book"
+        "participationStatus": "ACTIVE"
       }
     ]
   }

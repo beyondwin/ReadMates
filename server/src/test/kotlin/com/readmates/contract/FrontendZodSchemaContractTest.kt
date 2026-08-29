@@ -147,6 +147,7 @@ class FrontendZodSchemaContractTest
             assertJsonShapeAcceptsOptionalFields(
                 actualJson = patched,
                 fixtureFileName = "host-session-detail.json",
+                allowedEmptyArrayPaths = setOf("$.attendees"),
             )
             assertJsonShapeAcceptsOptionalFields(
                 actual = patchedNode.get("changeReceipt"),
@@ -337,6 +338,43 @@ class FrontendZodSchemaContractTest
             assertThat(attendees.getValue("멤버5").get("participationStatus").asString()).isEqualTo("REMOVED")
             assertThat(attendees.getValue("멤버5").get("scheduleSeenState").asString()).isEqualTo("STALE")
             assertPrivacySafe(response)
+        }
+
+        @Test
+        @Sql(
+            statements = [
+                CLEANUP_CONTRACT_HOST_SCHEDULE_SEEN_SQL,
+                INSERT_CONTRACT_HOST_SCHEDULE_SEEN_SESSION_SQL,
+                INSERT_CONTRACT_HOST_SCHEDULE_SEEN_PARTICIPANTS_SQL,
+            ],
+            executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+        )
+        @Sql(
+            statements = [CLEANUP_CONTRACT_HOST_SCHEDULE_SEEN_SQL],
+            executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+        )
+        fun `host schedule seen detail fails fast on a future seen revision`() {
+            jdbcTemplate.update(
+                """
+                update session_participants
+                set seen_schedule_revision = 4
+                where session_id = ?
+                  and membership_id = (
+                    select memberships.id
+                    from memberships
+                    join users on users.id = memberships.user_id
+                    where users.email = 'member1@example.com'
+                  )
+                """.trimIndent(),
+                CONTRACT_HOST_SCHEDULE_SEEN_SESSION_ID,
+            )
+
+            assertThatThrownBy {
+                mockMvc
+                    .get("/api/host/sessions/$CONTRACT_HOST_SCHEDULE_SEEN_SESSION_ID") {
+                        with(user("host@example.com"))
+                    }.andReturn()
+            }.hasRootCauseMessage("seen schedule revision 4 cannot exceed session schedule revision 3")
         }
 
         @Test
@@ -626,6 +664,23 @@ class FrontendZodSchemaContractTest
         }
 
         @Test
+        fun `recursive optional shape helper detects missing representative array elements`() {
+            val actual = objectMapper.readTree("""{"items":[]}""")
+            val expected = objectMapper.readTree("""{"items":[{"field":true}]}""")
+
+            assertThatThrownBy {
+                assertJsonShapeAcceptsOptionalFields(
+                    actual = actual,
+                    expected = expected,
+                    path = "$",
+                    fixtureFileName = "inline-fixture.json",
+                )
+            }.isInstanceOf(AssertionError::class.java)
+                .hasMessageContaining("JSON array at '$.items'")
+                .hasMessageContaining("must contain at least one representative item")
+        }
+
+        @Test
         fun `recursive shape helper checks every actual array element`() {
             val actual = objectMapper.readTree("""{"items":[{"field":true},{"extra":true}]}""")
             val expected = objectMapper.readTree("""{"items":[{"field":true}]}""")
@@ -760,12 +815,14 @@ class FrontendZodSchemaContractTest
         private fun assertJsonShapeAcceptsOptionalFields(
             actualJson: String,
             fixtureFileName: String,
+            allowedEmptyArrayPaths: Set<String> = emptySet(),
         ) {
             assertJsonShapeAcceptsOptionalFields(
                 actual = objectMapper.readTree(actualJson),
                 expected = readFixture(fixtureFileName),
                 path = "$",
                 fixtureFileName = fixtureFileName,
+                allowedEmptyArrayPaths = allowedEmptyArrayPaths,
             )
         }
 
@@ -775,6 +832,7 @@ class FrontendZodSchemaContractTest
             expected: JsonNode,
             path: String,
             fixtureFileName: String,
+            allowedEmptyArrayPaths: Set<String> = emptySet(),
         ) {
             if (expected.isNull) {
                 return
@@ -793,6 +851,7 @@ class FrontendZodSchemaContractTest
                         expected = expectedChild,
                         path = "$path.$key",
                         fixtureFileName = fixtureFileName,
+                        allowedEmptyArrayPaths = allowedEmptyArrayPaths,
                     )
                 }
                 return
@@ -807,7 +866,14 @@ class FrontendZodSchemaContractTest
                         expected = expected.get(0),
                         path = "$path[0]",
                         fixtureFileName = fixtureFileName,
+                        allowedEmptyArrayPaths = allowedEmptyArrayPaths,
                     )
+                } else if (!expected.isEmpty && path !in allowedEmptyArrayPaths) {
+                    assertThat(actual!!.isEmpty)
+                        .describedAs(
+                            "JSON array at '$path' from '$fixtureFileName' " +
+                                "must contain at least one representative item",
+                        ).isFalse()
                 }
                 return
             }

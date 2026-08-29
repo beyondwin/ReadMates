@@ -26,8 +26,17 @@ const validHostSessionDetail = {
   visibility: "MEMBER" as const,
   publication: null,
   state: "OPEN" as const,
+  scheduleRevision: 7,
+  scheduleSeenAvailability: "AVAILABLE" as const,
+  scheduleSeenSummary: {
+    currentCount: 1,
+    staleCount: 0,
+    unseenCount: 0,
+    eligibleCount: 1,
+  },
   versions: {
     sessionRevision: 3,
+    scheduleRevision: 7,
     exposureRevision: 2,
     participantSetRevision: 4,
     recordDraftRevision: null,
@@ -44,6 +53,9 @@ const validHostSessionDetail = {
       rsvpStatus: "GOING" as const,
       attendanceStatus: "ATTENDED" as const,
       attendanceRevision: 6,
+      seenScheduleRevision: 7,
+      scheduleSeenAt: "2026-08-29T00:00:00Z",
+      scheduleSeenState: "CURRENT" as const,
     },
   ],
   feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null },
@@ -110,6 +122,66 @@ const validHostSessionListItem = {
 // ---- DEV mode tests -----------------------------------------------------------
 
 describe("host-contract zod validators (DEV mode)", () => {
+  it("parses a non-baseline schedule revision across host detail projection receipt and reconciliation", async () => {
+    const {
+      HostMutationReceiptSchema,
+      HostMutationReconciliationSchema,
+      HostProjectionSnapshotSchema,
+      HostSessionDetailResponseSchema,
+      HostVersionVectorSchema,
+    } = await import("@/features/host/api/host-contracts");
+    const versions = {
+      sessionRevision: 3,
+      scheduleRevision: 7,
+      exposureRevision: 2,
+      participantSetRevision: 4,
+      recordDraftRevision: null,
+      liveRecordRevision: null,
+      publicationRevision: 1,
+    };
+    const projection = {
+      snapshotId: "session-1:3:7:2:4:none:none:1",
+      sessionId: "session-1",
+      sessionNumber: 1,
+      title: "Session 1",
+      bookTitle: "The Book",
+      bookAuthor: "Author",
+      date: "2024-01-01",
+      startTime: "19:00",
+      endTime: "21:00",
+      locationLabel: "Seoul",
+      state: "OPEN" as const,
+      versions,
+      accessScope: "HOST_ONLY" as const,
+      siteVisibility: "HIDDEN" as const,
+      visibility: "HOST_ONLY" as const,
+    };
+    const receipt = {
+      receiptId: "receipt-1",
+      operation: "SESSION_BASIC_SAVE" as const,
+      resourceId: "session-1",
+      resultingVersions: versions,
+      notificationDecision: "NOT_SENT" as const,
+      projection,
+    };
+    const reconciliation = {
+      status: "COMMITTED" as const,
+      receipt,
+      current: projection,
+      attendanceVersions: null,
+      attendanceSnapshotId: null,
+    };
+
+    expect(HostVersionVectorSchema.parse(versions).scheduleRevision).toBe(7);
+    expect(HostSessionDetailResponseSchema.parse(validHostSessionDetail).scheduleRevision).toBe(7);
+    expect(HostProjectionSnapshotSchema.parse(projection).versions.scheduleRevision).toBe(7);
+    expect(HostMutationReceiptSchema.parse(receipt).resultingVersions.scheduleRevision).toBe(7);
+    expect(HostMutationReconciliationSchema.parse(reconciliation).current?.versions.scheduleRevision).toBe(7);
+    expect(HostVersionVectorSchema.safeParse({ ...versions, scheduleRevision: 0 }).success).toBe(false);
+    const { scheduleRevision: _scheduleRevision, ...withoutScheduleRevision } = versions;
+    expect(HostVersionVectorSchema.safeParse(withoutScheduleRevision).success).toBe(false);
+  });
+
   it("enforces strict action-specific v3 expected revision schemas", async () => {
     const {
       CorrectionPublicationVersionVectorSchema,
@@ -227,6 +299,7 @@ describe("host-contract zod validators (DEV mode)", () => {
     const { HostMutationReceiptSchema } = await import("@/features/host/api/host-contracts");
     const versions = {
       sessionRevision: 3,
+      scheduleRevision: 9,
       exposureRevision: 4,
       participantSetRevision: 5,
       recordDraftRevision: 6,

@@ -27,6 +27,7 @@ export type CurrentSessionPolicyResult = "APPLIED" | "NOT_APPLICABLE" | "DEFERRE
 
 export type HostVersionVector = {
   sessionRevision: number;
+  scheduleRevision: number;
   exposureRevision: number;
   participantSetRevision: number;
   recordDraftRevision: number | null;
@@ -138,6 +139,7 @@ const positiveRevision = z.number().int().positive();
 
 export const HostVersionVectorSchema = z.object({
   sessionRevision: nonNegativeRevision,
+  scheduleRevision: positiveRevision,
   exposureRevision: nonNegativeRevision,
   participantSetRevision: nonNegativeRevision,
   recordDraftRevision: positiveRevision.nullable(),
@@ -975,6 +977,14 @@ export type HostSessionDetailResponse = {
   siteVisibility?: PublicSiteVisibility;
   publication: HostSessionPublication | null;
   state: SessionState;
+  scheduleRevision: number;
+  scheduleSeenAvailability: "AVAILABLE" | "UNAVAILABLE";
+  scheduleSeenSummary: {
+    currentCount: number | null;
+    staleCount: number | null;
+    unseenCount: number | null;
+    eligibleCount: number | null;
+  };
   versions: HostVersionVector;
   attendanceSnapshotId: string;
   attendees: Array<{
@@ -986,6 +996,9 @@ export type HostSessionDetailResponse = {
     attendanceStatus: AttendanceStatus;
     participationStatus?: SessionParticipationStatus;
     attendanceRevision: number;
+    seenScheduleRevision: number | null;
+    scheduleSeenAt: string | null;
+    scheduleSeenState: "CURRENT" | "STALE" | "UNSEEN";
   }>;
   feedbackDocument: FeedbackDocumentStatus;
   changeReceipt?: HostSessionChangeReceipt | null;
@@ -1128,6 +1141,14 @@ export const HostSessionDetailResponseSchema = z.object({
         })
         .nullable(),
       state: z.enum(["DRAFT", "OPEN", "PUBLISHED", "CLOSED"]),
+      scheduleRevision: positiveRevision,
+      scheduleSeenAvailability: z.enum(["AVAILABLE", "UNAVAILABLE"]),
+      scheduleSeenSummary: z.object({
+        currentCount: nonNegativeRevision.nullable(),
+        staleCount: nonNegativeRevision.nullable(),
+        unseenCount: nonNegativeRevision.nullable(),
+        eligibleCount: nonNegativeRevision.nullable(),
+      }).strict(),
       versions: HostVersionVectorSchema,
       attendanceSnapshotId: z.string().min(1),
       attendees: z.array(
@@ -1140,6 +1161,9 @@ export const HostSessionDetailResponseSchema = z.object({
           attendanceStatus: z.enum(["UNKNOWN", "ATTENDED", "ABSENT"]),
           participationStatus: z.enum(["ACTIVE", "REMOVED"]).optional(),
           attendanceRevision: nonNegativeRevision,
+          seenScheduleRevision: positiveRevision.nullable(),
+          scheduleSeenAt: z.string().datetime({ offset: true }).nullable(),
+          scheduleSeenState: z.enum(["CURRENT", "STALE", "UNSEEN"]),
         }),
       ),
       feedbackDocument: z.object({
@@ -1170,7 +1194,7 @@ export const HostMemberListItemSchema = z.object({
   canRemoveFromCurrentSession: z.boolean(),
 });
 
-export const HostMemberListPageSchema = import.meta.env.DEV
+export const HostMemberListPageSchema = import.meta.env?.DEV
   ? z.object({
       items: z.array(HostMemberListItemSchema),
       nextCursor: z.string().nullable(),
@@ -1190,7 +1214,7 @@ export const HostSessionVisibilityUpdateResponseSchema = z.object({
       }).strict().nullable(),
     }).strict();
 
-export const HostNotificationDeliveryListResponseSchema = import.meta.env.DEV
+export const HostNotificationDeliveryListResponseSchema = import.meta.env?.DEV
   ? z.object({
       items: z.array(
         z.object({
@@ -1208,7 +1232,7 @@ export const HostNotificationDeliveryListResponseSchema = import.meta.env.DEV
     })
   : (null as never);
 
-export const SessionImportPreviewResponseSchema = import.meta.env.DEV
+export const SessionImportPreviewResponseSchema = import.meta.env?.DEV
   ? z.object({
       valid: z.boolean(),
       session: z.object({
@@ -1249,7 +1273,7 @@ export const SessionImportPreviewResponseSchema = import.meta.env.DEV
     })
   : (null as never);
 
-export const HostInvitationListPageSchema = import.meta.env.DEV
+export const HostInvitationListPageSchema = import.meta.env?.DEV
   ? z.object({
       items: z.array(
         z.object({

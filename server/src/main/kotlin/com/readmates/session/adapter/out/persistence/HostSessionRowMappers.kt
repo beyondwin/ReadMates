@@ -153,7 +153,8 @@ private fun ResultSet.scheduleSeenState(scheduleRevision: Long): ScheduleSeenSta
     return when {
         seenRevision == null -> ScheduleSeenState.UNSEEN
         seenRevision == scheduleRevision -> ScheduleSeenState.CURRENT
-        else -> ScheduleSeenState.STALE
+        seenRevision < scheduleRevision -> ScheduleSeenState.STALE
+        else -> error("seen schedule revision $seenRevision cannot exceed session schedule revision $scheduleRevision")
     }
 }
 

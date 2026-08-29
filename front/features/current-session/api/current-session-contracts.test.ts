@@ -30,6 +30,23 @@ describe("/api/sessions/current response contract ownership", () => {
 });
 
 describe("parseCurrentSessionResponse", () => {
+  it("parses authoritative schedule revision and requester-only seen facts", () => {
+    const payload = structuredClone(currentSessionContractFixture) as typeof currentSessionContractFixture & {
+      currentSession: NonNullable<typeof currentSessionContractFixture.currentSession> & {
+        scheduleRevision: number;
+        mySeenScheduleRevision: number | null;
+        myScheduleSeenAt: string | null;
+      };
+    };
+    Object.assign(payload.currentSession, {
+      scheduleRevision: 7,
+      mySeenScheduleRevision: 6,
+      myScheduleSeenAt: "2026-08-29T00:00:00Z",
+    });
+
+    expect(parseCurrentSessionResponse(payload)).toEqual(payload);
+  });
+
   it("accepts a valid current-session payload", () => {
     expect(parseCurrentSessionResponse(currentSessionContractFixture)).toEqual(currentSessionContractFixture);
   });
