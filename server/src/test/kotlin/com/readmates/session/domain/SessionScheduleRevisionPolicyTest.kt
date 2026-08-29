@@ -1,10 +1,10 @@
 package com.readmates.session.domain
 
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
-import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Test
 
 class SessionScheduleRevisionPolicyTest {
     private val schedule =

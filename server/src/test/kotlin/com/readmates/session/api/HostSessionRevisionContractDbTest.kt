@@ -499,8 +499,8 @@ class HostSessionRevisionContractDbTest(
                 meetingPasscode?.let { "\"meetingPasscode\": \"$it\"" },
                 questionDeadlineAt?.let { "\"questionDeadlineAt\": \"$it\"" },
             ).takeIf(List<String>::isNotEmpty)
-            ?.joinToString(prefix = ",", separator = ",")
-            .orEmpty()
+                ?.joinToString(prefix = ",", separator = ",")
+                .orEmpty()
         return """
             {
               "title": "$title",

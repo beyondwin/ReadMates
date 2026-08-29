@@ -8,8 +8,8 @@ import com.readmates.session.application.model.UpdateHostSessionVisibilityComman
 import com.readmates.session.application.port.out.HostSessionDraftUpdateResult
 import com.readmates.session.application.port.out.HostSessionVisibilityUpdateResult
 import com.readmates.session.application.requireHost
-import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.MemberVisibleSchedule
+import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.session.domain.SessionExposure
 import com.readmates.session.domain.SessionScheduleRevisionPolicy
@@ -309,7 +309,7 @@ internal class HostSessionDraftWriteOperations(
         request: HostSessionCommand,
         values: NormalizedHostSessionWrite,
         existing: ExistingHostSessionSchedule,
-    ) =
+    ): MemberVisibleSchedule =
         MemberVisibleSchedule(
             title = request.title,
             bookTitle = request.bookTitle,

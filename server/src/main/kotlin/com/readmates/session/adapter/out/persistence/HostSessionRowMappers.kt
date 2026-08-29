@@ -9,8 +9,8 @@ import com.readmates.session.application.HostSessionPublication
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.HostDashboardMissingMemberResult
 import com.readmates.session.application.model.SessionVersionVector
-import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.MemberVisibleSchedule
+import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.session.domain.SessionParticipationStatus
 import com.readmates.sessionclosing.application.model.SessionRecordReadinessPolicy

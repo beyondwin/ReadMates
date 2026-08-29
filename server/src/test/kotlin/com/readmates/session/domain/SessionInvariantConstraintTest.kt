@@ -114,11 +114,12 @@ class SessionInvariantConstraintTest(
         )
         createdSessionIds += id
 
-        val scheduleRevision = jdbcTemplate.queryForObject(
-            "select schedule_revision from sessions where id = ?",
-            Long::class.java,
-            id,
-        )
+        val scheduleRevision =
+            jdbcTemplate.queryForObject(
+                "select schedule_revision from sessions where id = ?",
+                Long::class.java,
+                id,
+            )
 
         assertEquals(1L, scheduleRevision)
     }
