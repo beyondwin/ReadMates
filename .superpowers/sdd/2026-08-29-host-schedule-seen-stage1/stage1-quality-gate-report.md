@@ -48,3 +48,10 @@ Source hashes after correction:
 | `./server/gradlew -p server detekt` | Exit 0. |
 | `corepack pnpm --dir front lint` | Exit 0; the same two pre-existing Fast Refresh warnings remain. |
 | `git diff --check` | Exit 0. |
+
+## Node runtime confirmation
+
+| Runtime and command | Result |
+| --- | --- |
+| `node --version` with Node 24 selected | `v24.18.0` |
+| Node v24.18.0: `corepack pnpm --dir front lint` | Exit 0; the same two pre-existing Fast Refresh warnings remain. |
