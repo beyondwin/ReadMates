@@ -54,7 +54,8 @@ class JdbcMemberLifecycleStoreAdapter(
                   joined_at,
                   created_at,
                   current_session_id,
-                  participation_status
+                  participation_status,
+                  last_club_access_at
                 from (
                   select
                     memberships.id as membership_id,
@@ -70,6 +71,7 @@ class JdbcMemberLifecycleStoreAdapter(
                     memberships.created_at,
                     current_session.id as current_session_id,
                     session_participants.participation_status,
+                    membership_club_access.last_access_at as last_club_access_at,
                     case memberships.role when 'HOST' then 0 else 1 end as role_rank,
                     case memberships.status
                       when 'ACTIVE' then 0
@@ -94,6 +96,8 @@ class JdbcMemberLifecycleStoreAdapter(
                   left join session_participants on session_participants.session_id = current_session.id
                     and session_participants.club_id = memberships.club_id
                     and session_participants.membership_id = memberships.id
+                  left join membership_club_access on membership_club_access.membership_id = memberships.id
+                    and membership_club_access.club_id = memberships.club_id
                   where memberships.club_id = ?
                 ) ordered_members
                 where (
@@ -212,6 +216,17 @@ class JdbcMemberLifecycleStoreAdapter(
             membershipId.dbString(),
             clubId.dbString(),
         ) == 1
+
+    override fun deleteClubAccess(
+        clubId: UUID,
+        membershipId: UUID,
+    ) {
+        jdbcTemplate.update(
+            "delete from membership_club_access where membership_id = ? and club_id = ?",
+            membershipId.dbString(),
+            clubId.dbString(),
+        )
+    }
 
     override fun findCurrentOpenSessionId(clubId: UUID): UUID? =
         jdbcTemplate
@@ -432,7 +447,8 @@ class JdbcMemberLifecycleStoreAdapter(
                   memberships.joined_at,
                   memberships.created_at,
                   current_session.id as current_session_id,
-                  session_participants.participation_status
+                  session_participants.participation_status,
+                  membership_club_access.last_access_at as last_club_access_at
                 from memberships
                 join users on users.id = memberships.user_id
                 left join active_sessions current_session on current_session.club_id = memberships.club_id
@@ -448,6 +464,8 @@ class JdbcMemberLifecycleStoreAdapter(
                 left join session_participants on session_participants.session_id = current_session.id
                   and session_participants.club_id = memberships.club_id
                   and session_participants.membership_id = memberships.id
+                left join membership_club_access on membership_club_access.membership_id = memberships.id
+                  and membership_club_access.club_id = memberships.club_id
                 where memberships.id = ?
                   and memberships.club_id = ?
                 """.trimIndent(),
@@ -512,6 +530,7 @@ class JdbcMemberLifecycleStoreAdapter(
             createdAt = utcOffsetDateTime("created_at"),
             currentSessionId = currentSessionId,
             participationStatus = participationStatus,
+            lastClubAccessAt = utcOffsetDateTimeOrNull("last_club_access_at"),
         )
     }
 }

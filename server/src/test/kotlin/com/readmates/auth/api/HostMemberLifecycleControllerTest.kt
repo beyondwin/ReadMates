@@ -71,6 +71,7 @@ class HostMemberLifecycleControllerTest(
         val sessionId = createOpenSession()
         val activeMembershipId = insertLifecycleMember("active.list", "ACTIVE")
         addParticipant(sessionId, activeMembershipId, "ACTIVE")
+        insertClubAccess(activeMembershipId)
 
         mockMvc
             .get("/api/host/members") {
@@ -88,6 +89,7 @@ class HostMemberLifecycleControllerTest(
                 }
                 jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].canSuspend") { value(true) }
                 jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].canRemoveFromCurrentSession") { value(true) }
+                jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].lastClubAccessAt") { isNotEmpty() }
             }
     }
 
@@ -193,6 +195,7 @@ class HostMemberLifecycleControllerTest(
         val sessionId = createOpenSession()
         val membershipId = insertLifecycleMember("deactivate.now", "ACTIVE")
         addParticipant(sessionId, membershipId, "ACTIVE")
+        insertClubAccess(membershipId)
 
         mockMvc
             .post("/api/host/members/$membershipId/deactivate") {
@@ -210,6 +213,7 @@ class HostMemberLifecycleControllerTest(
 
         assertEquals("LEFT", membershipStatus(membershipId))
         assertEquals("REMOVED", participationStatus(sessionId, membershipId))
+        assertEquals(0, clubAccessCount(membershipId))
     }
 
     @Suppress("LongMethod")
@@ -794,6 +798,23 @@ class HostMemberLifecycleControllerTest(
             String::class.java,
             membershipId,
         ) ?: error("Expected membership status for $membershipId")
+
+    private fun insertClubAccess(membershipId: String) {
+        jdbcTemplate.update(
+            """
+            insert into membership_club_access (membership_id, club_id, last_access_at)
+            values (?, '00000000-0000-0000-0000-000000000001', utc_timestamp(6))
+            """.trimIndent(),
+            membershipId,
+        )
+    }
+
+    private fun clubAccessCount(membershipId: String): Int =
+        jdbcTemplate.queryForObject(
+            "select count(*) from membership_club_access where membership_id = ?",
+            Int::class.java,
+            membershipId,
+        ) ?: 0
 
     private fun suspendSeedHost() {
         jdbcTemplate.update(

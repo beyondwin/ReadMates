@@ -1,5 +1,5 @@
 import type { HostMemberListItem, MembershipStatus } from "@/features/host/model/host-view-types";
-import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
+import { formatDateOnlyLabel, formatDateTimeLabel } from "@/shared/ui/readmates-display";
 
 const statusLabels: Record<MembershipStatus, string> = {
   INVITED: "초대됨",
@@ -35,6 +35,11 @@ export function joinedMeta(member: HostMemberListItem) {
 export function inactiveMeta(member: HostMemberListItem) {
   const joined = member.joinedAt ? `참여 ${formatDateOnlyLabel(member.joinedAt)}` : `요청 ${formatDateOnlyLabel(member.createdAt)}`;
   return `${member.email} · ${joined}`;
+}
+
+export function clubAccessMeta(member: HostMemberListItem) {
+  const formatted = formatDateTimeLabel(member.lastClubAccessAt, "");
+  return formatted ? `최근 접속 ${formatted}` : "접속 기록 없음";
 }
 
 export function preservedRecordBadge() {

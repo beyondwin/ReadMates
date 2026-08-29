@@ -83,7 +83,7 @@ class MemberLifecycleServiceTest {
 
         assertEquals(CurrentSessionPolicyResult.NOT_APPLICABLE, response.currentSessionPolicyResult)
         assertEquals(
-            listOf("lock-club", "lock-active-hosts", "find-membership", "mark-left"),
+            listOf("lock-club", "lock-active-hosts", "find-membership", "mark-left", "delete-club-access"),
             store.mutationCalls,
         )
     }
@@ -128,7 +128,14 @@ class MemberLifecycleServiceTest {
 
         assertEquals(CurrentSessionPolicyResult.NOT_APPLICABLE, response.currentSessionPolicyResult)
         assertEquals(
-            listOf("lock-club", "lock-active-hosts", "find-membership", "active-host-count", "mark-left"),
+            listOf(
+                "lock-club",
+                "lock-active-hosts",
+                "find-membership",
+                "active-host-count",
+                "mark-left",
+                "delete-club-access",
+            ),
             store.mutationCalls,
         )
     }
@@ -219,6 +226,13 @@ class MemberLifecycleServiceTest {
             mutationCalls += "mark-left"
             targetStatus = MembershipStatus.LEFT
             return true
+        }
+
+        override fun deleteClubAccess(
+            clubId: UUID,
+            membershipId: UUID,
+        ) {
+            mutationCalls += "delete-club-access"
         }
 
         override fun findCurrentOpenSessionId(clubId: UUID): UUID? = null

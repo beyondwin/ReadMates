@@ -61,6 +61,16 @@
   font-size: 12.5px;
 }
 
+.rm-host-member-ledger__time > span {
+  display: block;
+}
+
+.rm-host-member-ledger__time .tiny {
+  margin-top: 2px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
 .rm-host-member-ledger__actions {
   display: flex;
   align-items: center;

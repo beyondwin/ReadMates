@@ -457,6 +457,7 @@ export type HostMemberListItem = {
   status: MembershipStatus;
   joinedAt: string | null;
   createdAt: string;
+  lastClubAccessAt: string | null;
   currentSessionParticipationStatus: SessionParticipationStatus | null;
   canSuspend: boolean;
   canRestore: boolean;
@@ -1186,13 +1187,14 @@ export const HostMemberListItemSchema = z.object({
   status: z.enum(["INVITED", "VIEWER", "ACTIVE", "SUSPENDED", "LEFT", "INACTIVE"]),
   joinedAt: z.string().nullable(),
   createdAt: z.string(),
+  lastClubAccessAt: z.string().datetime({ offset: true }).nullable(),
   currentSessionParticipationStatus: z.enum(["ACTIVE", "REMOVED"]).nullable(),
   canSuspend: z.boolean(),
   canRestore: z.boolean(),
   canDeactivate: z.boolean(),
   canAddToCurrentSession: z.boolean(),
   canRemoveFromCurrentSession: z.boolean(),
-});
+}).strict();
 
 export const HostMemberListPageSchema = import.meta.env?.DEV
   ? z.object({

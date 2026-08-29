@@ -39,6 +39,7 @@ const members: HostMemberListItem[] = [
     status: "ACTIVE",
     joinedAt: "2026-04-18T12:00:00Z",
     createdAt: "2026-04-17T12:00:00Z",
+    lastClubAccessAt: "2026-08-29T01:02:03Z",
     currentSessionParticipationStatus: "ACTIVE",
     canSuspend: true,
     canRestore: false,
@@ -57,6 +58,7 @@ const members: HostMemberListItem[] = [
     status: "VIEWER",
     joinedAt: null,
     createdAt: "2026-04-20T12:00:00Z",
+    lastClubAccessAt: null,
     currentSessionParticipationStatus: null,
     canSuspend: false,
     canRestore: false,
@@ -76,6 +78,7 @@ const members: HostMemberListItem[] = [
     status: "SUSPENDED",
     joinedAt: "2026-04-14T12:00:00Z",
     createdAt: "2026-04-13T12:00:00Z",
+    lastClubAccessAt: null,
     currentSessionParticipationStatus: "REMOVED",
     canSuspend: false,
     canRestore: true,
@@ -95,6 +98,7 @@ const members: HostMemberListItem[] = [
     status: "LEFT",
     joinedAt: "2026-04-10T12:00:00Z",
     createdAt: "2026-04-09T12:00:00Z",
+    lastClubAccessAt: null,
     currentSessionParticipationStatus: "REMOVED",
     canSuspend: false,
     canRestore: false,
@@ -114,6 +118,7 @@ const members: HostMemberListItem[] = [
     status: "ACTIVE",
     joinedAt: "2026-04-21T12:00:00Z",
     createdAt: "2026-04-21T12:00:00Z",
+    lastClubAccessAt: null,
     currentSessionParticipationStatus: null,
     canSuspend: true,
     canRestore: false,
@@ -353,6 +358,7 @@ describe("HostMembersPage", () => {
     expect(activeRow.queryByText(/active@example.com/)).not.toBeInTheDocument();
     expect(activeRow.getByText("활동")).toBeInTheDocument();
     expect(activeRow.getByText("4개월")).toHaveClass("mono");
+    expect(activeRow.getByText("최근 접속 2026.08.29 10:02")).toBeInTheDocument();
     expect(activeRow.getByText("이번 모임 참여")).toBeInTheDocument();
     expect(activeRowElement).toHaveClass("rm-host-member-ledger__row");
     const ledgerCss = readFileSync(path.resolve("features/host/ui/members/member-ledger.css"), "utf8");
@@ -367,6 +373,7 @@ describe("HostMembersPage", () => {
     expect(outsideRowElement.querySelector(".rm-avatar-chip")).toHaveAttribute("data-avatar-size-role", "member");
     expect(outsideRow.queryByText("@새")).not.toBeInTheDocument();
     expect(outsideRow.getByText("이번 모임 미포함")).toBeInTheDocument();
+    expect(outsideRow.getByText("접속 기록 없음")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "쉬는 중" }));
     const suspendedRowElement = screen.getByText("정").closest("tr") as HTMLElement;

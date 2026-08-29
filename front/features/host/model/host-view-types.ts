@@ -104,6 +104,7 @@ export type HostMemberListItem = {
   status: MembershipStatus;
   joinedAt: string | null;
   createdAt: string;
+  lastClubAccessAt: string | null;
   currentSessionParticipationStatus: SessionParticipationStatus | null;
   canSuspend: boolean;
   canRestore: boolean;

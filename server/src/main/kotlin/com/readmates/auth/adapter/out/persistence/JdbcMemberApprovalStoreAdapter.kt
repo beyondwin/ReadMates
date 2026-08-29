@@ -104,6 +104,17 @@ class JdbcMemberApprovalStoreAdapter(
         ) == 1
     }
 
+    override fun deleteClubAccess(
+        clubId: UUID,
+        membershipId: UUID,
+    ) {
+        jdbcTemplate.update(
+            "delete from membership_club_access where membership_id = ? and club_id = ?",
+            membershipId.dbString(),
+            clubId.dbString(),
+        )
+    }
+
     override fun addToCurrentOpenSession(
         clubId: UUID,
         membershipId: UUID,

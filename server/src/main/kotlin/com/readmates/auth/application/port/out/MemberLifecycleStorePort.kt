@@ -44,6 +44,7 @@ data class HostMemberListRow(
     val createdAt: OffsetDateTime,
     val currentSessionId: UUID?,
     val participationStatus: SessionParticipationStatus?,
+    val lastClubAccessAt: OffsetDateTime? = null,
 )
 
 interface MemberLifecycleStorePort {
@@ -73,6 +74,11 @@ interface MemberLifecycleStorePort {
         clubId: UUID,
         membershipId: UUID,
     ): Boolean
+
+    fun deleteClubAccess(
+        clubId: UUID,
+        membershipId: UUID,
+    )
 
     fun findCurrentOpenSessionId(clubId: UUID): UUID?
 

@@ -33,6 +33,11 @@ interface MemberApprovalStorePort {
         membershipId: UUID,
     ): Boolean
 
+    fun deleteClubAccess(
+        clubId: UUID,
+        membershipId: UUID,
+    )
+
     fun addToCurrentOpenSession(
         clubId: UUID,
         membershipId: UUID,

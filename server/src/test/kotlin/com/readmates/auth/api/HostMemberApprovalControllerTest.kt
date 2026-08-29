@@ -192,6 +192,13 @@ class HostMemberApprovalControllerTest(
     fun `host deactivates viewer member`() {
         val hostCookie = sessionCookieForEmail("host@example.com")
         val membershipId = insertViewerMember(uniqueEmail("viewer.deactivate"), "Viewer Deactivate")
+        jdbcTemplate.update(
+            """
+            insert into membership_club_access (membership_id, club_id, last_access_at)
+            values (?, '00000000-0000-0000-0000-000000000001', utc_timestamp(6))
+            """.trimIndent(),
+            membershipId,
+        )
 
         mockMvc
             .post("/api/host/members/$membershipId/deactivate-viewer") {
@@ -212,6 +219,14 @@ class HostMemberApprovalControllerTest(
             )
         assertEquals("INACTIVE", membership["status"])
         assertEquals(null, membership["joined_at"])
+        assertEquals(
+            0,
+            jdbcTemplate.queryForObject(
+                "select count(*) from membership_club_access where membership_id = ?",
+                Int::class.java,
+                membershipId,
+            ),
+        )
     }
 
     @Test

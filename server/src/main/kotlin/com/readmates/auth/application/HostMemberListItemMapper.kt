@@ -37,5 +37,6 @@ fun HostMemberListRow.toHostMemberListItem(currentMembershipId: UUID): HostMembe
                 currentSessionId != null &&
                 status == MembershipStatus.ACTIVE &&
                 participationStatus == SessionParticipationStatus.ACTIVE,
+        lastClubAccessAt = lastClubAccessAt?.toString(),
     )
 }

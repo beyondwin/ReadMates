@@ -10,7 +10,7 @@ import {
 import type { HostMemberListItem, MembershipStatus } from "@/features/host/model/host-view-types";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { isMembershipPending, memberActionPendingReason } from "./member-action-rules";
-import { formatMembershipTenure, rosterStatusLabels } from "./member-list-helpers";
+import { clubAccessMeta, formatMembershipTenure, rosterStatusLabels } from "./member-list-helpers";
 import type { HostMemberLifecyclePath } from "./types";
 import "./member-ledger.css";
 
@@ -298,6 +298,7 @@ export function MemberList({
                 </td>
                 <td className="rm-host-member-ledger__num rm-host-member-ledger__time">
                   <span className="mono">{formatMembershipTenure(member.joinedAt)}</span>
+                  <span className="tiny">{clubAccessMeta(member)}</span>
                 </td>
                 <td className="rm-host-member-ledger__meta">
                   <span className={sessionBadge.className}>{sessionBadge.label}</span>

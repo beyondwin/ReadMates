@@ -42,6 +42,7 @@ import {
 } from "@/src/app/workspace-route-continuity";
 import { Link } from "@/src/app/router-link";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import { touchClubAccessOnce } from "@/shared/auth/club-access-query";
 import { canUseHostApp, canUseJoinedClubHostApp, canUseMemberApp } from "@/shared/auth/member-app-access";
 import { loginPathForReturnTo } from "@/shared/auth/login-return";
 import type {
@@ -434,6 +435,15 @@ export function AppRouteLayout({
     status: "not-applicable" | "pending" | "available" | "unavailable";
   }>({ key: null, status: "not-applicable" });
   const latestGuestContinuationKey = useRef<string | null>(null);
+  const touchedClubSlugs = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (isGuestAudience || !auth || !clubSlug || !canUseMemberApp(auth)) {
+      return;
+    }
+
+    touchClubAccessOnce(touchedClubSlugs.current, clubSlug);
+  }, [auth, clubSlug, isGuestAudience]);
 
   useEffect(() => {
     const workspace = workspaceFromCanonicalPath(pathname);

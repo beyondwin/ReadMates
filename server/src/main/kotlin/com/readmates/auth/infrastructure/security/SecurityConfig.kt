@@ -65,6 +65,7 @@ class SecurityConfig(
                     "/api/host/invitations",
                 )
                 it.ignoringRequestMatchers(
+                    methodAndPath("PUT", Regex("^/api/me/club-access$")),
                     methodAndPath("PUT", Regex("^/api/sessions/current/schedule-seen$")),
                     methodAndPath("PATCH", Regex("^/api/host/sessions/[^/]+$")),
                     methodAndPath("PATCH", Regex("^/api/host/sessions/[^/]+/visibility$")),
@@ -213,6 +214,8 @@ class SecurityConfig(
                     .hasRole("VIEWER")
                     .requestMatchers(HttpMethod.GET, "/api/app/pending", "/api/app/viewer")
                     .hasAuthority("ROLE_VIEWER")
+                    .requestMatchers(methodAndPath("PUT", Regex("^/api/me/club-access$")))
+                    .hasRole("VIEWER")
                     .requestMatchers(methodAndPath("PATCH", Regex("^/api/me/profile$")))
                     .authenticated()
                     .requestMatchers(methodAndPath("PUT", Regex("^/api/me/profile$")))

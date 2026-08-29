@@ -120,6 +120,7 @@ function hostMemberListItem(avatarKey: unknown = "banana-green-book") {
     status: "ACTIVE",
     joinedAt: "2026-04-18T12:00:00Z",
     createdAt: "2026-04-17T12:00:00Z",
+    lastClubAccessAt: "2026-08-29T01:02:03Z",
     currentSessionParticipationStatus: "ACTIVE",
     canSuspend: true,
     canRestore: false,
@@ -702,6 +703,21 @@ describe("host api wrappers", () => {
 
     await expect(fetchHostMembers({ clubSlug: "reading-sai" })).resolves.toMatchObject({
       items: [{ avatarKey: "future-avatar" }],
+    });
+    await expect(fetchHostMembers({ clubSlug: "reading-sai" })).rejects.toThrow();
+  });
+
+  it("accepts only the coarse member access timestamp in the host contract", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ items: [hostMemberListItem()], nextCursor: null }))
+      .mockResolvedValueOnce(jsonResponse({
+        items: [{ ...hostMemberListItem(), lastVisitedPath: "/app/notes" }],
+        nextCursor: null,
+      }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchHostMembers({ clubSlug: "reading-sai" })).resolves.toMatchObject({
+      items: [{ lastClubAccessAt: "2026-08-29T01:02:03Z" }],
     });
     await expect(fetchHostMembers({ clubSlug: "reading-sai" })).rejects.toThrow();
   });

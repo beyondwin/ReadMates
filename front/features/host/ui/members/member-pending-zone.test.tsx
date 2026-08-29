@@ -17,6 +17,7 @@ function viewer(overrides: Partial<HostMemberListItem> = {}): HostMemberListItem
     status: "VIEWER",
     joinedAt: null,
     createdAt: "2026-04-20T12:00:00Z",
+    lastClubAccessAt: null,
     currentSessionParticipationStatus: null,
     canSuspend: false,
     canRestore: false,
