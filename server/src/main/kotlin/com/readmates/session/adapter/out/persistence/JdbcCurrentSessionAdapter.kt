@@ -51,10 +51,9 @@ class JdbcCurrentSessionAdapter(
                       meeting_passcode,
                       question_deadline_at,
                       schedule_revision
-                    from sessions
+                    from active_sessions
                     where club_id = ?
                       and state = 'OPEN'
-                      and deleted_at is null
                     order by number desc
                     limit 1
                     """.trimIndent(),

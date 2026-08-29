@@ -113,10 +113,9 @@ class JdbcSessionParticipationWriteAdapter(
             .query(
                 """
                 select schedule_revision
-                from sessions
+                from active_sessions
                 where id = ?
                   and club_id = ?
-                  and deleted_at is null
                   and state = 'OPEN'
                 """.trimIndent(),
                 { resultSet, _ -> resultSet.getLong("schedule_revision") },

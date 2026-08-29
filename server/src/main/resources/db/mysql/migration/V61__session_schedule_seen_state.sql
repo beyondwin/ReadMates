@@ -2,6 +2,9 @@ alter table sessions
   add column schedule_revision bigint not null default 1,
   add constraint sessions_schedule_revision_check check (schedule_revision >= 1);
 
+create or replace view active_sessions as
+  select * from sessions where deleted_at is null;
+
 alter table session_participants
   add column seen_schedule_revision bigint null,
   add column seen_schedule_at datetime(6) null,

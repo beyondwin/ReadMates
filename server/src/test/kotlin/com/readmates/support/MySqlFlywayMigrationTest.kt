@@ -3242,6 +3242,7 @@ class MySqlFlywayMigrationTest(
             assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("61")
             assertV61ScheduleRevisionSeenStateSchema(fixture.jdbcTemplate)
             assertV61ScheduleSeenBackfill(fixture)
+            assertV61ActiveSessionScheduleRevisionProjection(fixture)
         }
     }
 
@@ -3411,6 +3412,39 @@ class MySqlFlywayMigrationTest(
             fixture.jdbcTemplate.queryForObject(
                 "select count(*) from membership_club_access",
                 Int::class.java,
+            ),
+        )
+    }
+
+    private fun assertV61ActiveSessionScheduleRevisionProjection(fixture: V61ScheduleSeenUpgradeFixture) {
+        assertThat(
+            fixture.jdbcTemplate.queryForObject(
+                "select schedule_revision from active_sessions where id = ?",
+                Long::class.java,
+                fixture.revisionFixture.sessionId,
+            ),
+        ).isPositive()
+
+        assertEquals(
+            1,
+            fixture.jdbcTemplate.update(
+                """
+                update sessions
+                set deleted_at = utc_timestamp(6),
+                    deleted_by_membership_id = ?,
+                    purge_after = utc_timestamp(6) + interval 7 day
+                where id = ?
+                """.trimIndent(),
+                fixture.revisionFixture.hostMembershipId,
+                fixture.revisionFixture.sessionId,
+            ),
+        )
+        assertEquals(
+            0,
+            fixture.jdbcTemplate.queryForObject(
+                "select count(*) from active_sessions where id = ?",
+                Int::class.java,
+                fixture.revisionFixture.sessionId,
             ),
         )
     }

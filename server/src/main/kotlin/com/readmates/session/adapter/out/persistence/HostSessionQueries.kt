@@ -398,7 +398,7 @@ internal class HostSessionQueries(
                   and public_session_publications.session_id = sessions.id
                 limit 1
               ), 'HIDDEN') as site_visibility
-            from sessions
+            from active_sessions sessions
             left join session_record_drafts draft
               on draft.club_id = sessions.club_id
              and draft.session_id = sessions.id
@@ -413,7 +413,6 @@ internal class HostSessionQueries(
               on publication_version.session_id = sessions.id
             where sessions.id = ?
               and sessions.club_id = ?
-              and sessions.deleted_at is null
             """.trimIndent(),
             { resultSet, _ -> resultSet.toHostSessionDetailBase() },
             sessionId.dbString(),
@@ -496,10 +495,9 @@ internal class HostSessionQueries(
                   meeting_passcode,
                   question_deadline_at,
                   schedule_revision
-                from sessions
+                from active_sessions
                 where id = ?
                   and club_id = ?
-                  and deleted_at is null
                 for update
                 """.trimIndent(),
                 { resultSet, _ -> resultSet.toExistingHostSessionSchedule() },
