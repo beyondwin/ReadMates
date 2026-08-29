@@ -59,7 +59,7 @@ export function CurrentSessionRoute({
     error: scheduleSeenError,
     isError: scheduleSeenIsError,
     isPending: scheduleSeenIsPending,
-    mutate: markScheduleSeen,
+    mutateAsync: markScheduleSeen,
   } = useMarkCurrentScheduleSeenMutation(context);
   const updateRsvpMutation = useUpdateCurrentSessionRsvpMutation(context);
   const saveCheckinMutation = useSaveCurrentSessionCheckinMutation(context);
@@ -83,12 +83,10 @@ export function CurrentSessionRoute({
     if (acknowledgements.has(renderedRevisionKey)) return;
 
     acknowledgements.add(renderedRevisionKey);
-    markScheduleSeen(renderedRevision, {
-      onError: (error) => {
-        if (!isCurrentScheduleSeenConflict(error)) {
-          acknowledgements.delete(renderedRevisionKey);
-        }
-      },
+    void markScheduleSeen(renderedRevision).catch((error: unknown) => {
+      if (!isCurrentScheduleSeenConflict(error)) {
+        acknowledgements.delete(renderedRevisionKey);
+      }
     });
   }, [markScheduleSeen, queryClient, renderedRevision, renderedRevisionKey]);
 

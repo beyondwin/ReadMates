@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter } from "react-router";
 import { RouterProvider } from "react-router/dom";
@@ -59,6 +59,17 @@ function createClient() {
       mutations: { retry: false },
     },
   });
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+
+  return { promise, reject, resolve };
 }
 
 function renderRoute(client: QueryClient, current = sessionAtRevision(7)) {
@@ -153,5 +164,27 @@ describe("current schedule rendered acknowledgement", () => {
     await user.keyboard("{Enter}");
 
     await waitFor(() => expect(markCurrentScheduleSeen).toHaveBeenCalledTimes(2));
+  });
+
+  it("releases a non-conflict acknowledgement that rejects after unmount", async () => {
+    const client = createClient();
+    const pendingWrite = deferred<{ scheduleRevision: number; seenAt: string }>();
+    vi.mocked(markCurrentScheduleSeen)
+      .mockReturnValueOnce(pendingWrite.promise)
+      .mockResolvedValueOnce({ scheduleRevision: 7, seenAt: "2026-08-29T00:03:00Z" });
+
+    const first = renderRoute(client);
+    await waitFor(() => expect(markCurrentScheduleSeen).toHaveBeenCalledTimes(1));
+    first.unmount();
+
+    await act(async () => {
+      pendingWrite.reject(new TypeError("offline after unmount"));
+      await Promise.resolve();
+    });
+
+    renderRoute(client);
+
+    await waitFor(() => expect(markCurrentScheduleSeen).toHaveBeenCalledTimes(2));
+    expect(markCurrentScheduleSeen).toHaveBeenLastCalledWith(7, context);
   });
 });

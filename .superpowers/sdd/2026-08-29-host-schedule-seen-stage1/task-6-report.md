@@ -80,3 +80,45 @@ Additional checks:
 - Evidence is repository-local unit/JSDOM evidence, not browser, deployed, or production evidence.
 - Stage-wide frontend gates and browser E2E were intentionally not run because the Task 6 controller requires focused tests only.
 - Server concurrency, persistence, BFF forwarding, and privacy projection evidence belong to the other Stage 1 tasks and are not re-proven here.
+
+## Fix round 1 — post-unmount failure cleanup
+
+### Source hash
+
+- Review base: `9212e915fddbeff23b159e75d9c8880496e11568`
+- `front/features/current-session/route/current-session-route.tsx` SHA-256 before the fix: `bd3d9094f649522690d8218d46efcbffc60136e418cdb30af6d3cca654df254d`
+- `front/features/current-session/route/current-session-route.test.tsx` SHA-256 before the fix: `e27297c1cabda3f5fbede00c3d562e7199f2b26172a40dcf64ec583f561a57bb`
+
+### RED command and result
+
+```bash
+PATH="/opt/homebrew/opt/node@24/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/current-session/route/current-session-route.test.tsx
+```
+
+Result: exit `1`; 1 test file, 5 tests, 1 failed and 4 passed. A write rejected with an offline error after route unmount, then the same `QueryClient`/club/revision remounted, but `markCurrentScheduleSeen` remained at 1 call instead of retrying.
+
+### GREEN commands and results
+
+```bash
+PATH="/opt/homebrew/opt/node@24/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/current-session/route/current-session-route.test.tsx
+```
+
+Result: exit `0`; 1 test file passed, 5 tests passed.
+
+```bash
+PATH="/opt/homebrew/opt/node@24/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/current-session/api/current-session-contracts.test.ts features/current-session/queries/current-session-queries.test.tsx features/current-session/route/current-session-route.test.tsx features/current-session/ui/current-session-review-visibility.test.tsx
+```
+
+Result: exit `0`; 4 test files passed, 30 tests passed.
+
+```bash
+PATH="/opt/homebrew/opt/node@24/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec eslint features/current-session/route/current-session-route.tsx features/current-session/route/current-session-route.test.tsx
+```
+
+Result: exit `0`; no errors or warnings. `git diff --check` also exited `0`.
+
+### Closure
+
+- Root cause: the per-call `mutate(..., { onError })` callback is observer-bound and may not execute after its component unmounts, leaving the non-conflict idempotence key retained.
+- Fix: route acknowledgement now uses the `mutateAsync` promise and performs non-conflict key release in its rejection handler, which remains attached after unmount.
+- Preserved behavior: `409` still retains the rejected revision key and the mutation hook still invalidates the club-scoped current-session query. Mounted non-conflict failures still expose the same inline retry, and session expiry still uses the existing write-recovery policy.
