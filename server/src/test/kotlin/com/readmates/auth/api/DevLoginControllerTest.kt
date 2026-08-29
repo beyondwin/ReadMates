@@ -317,7 +317,7 @@ class DevLoginDisabledControllerTest(
 @SpringBootTest(
     properties = [
         "readmates.dev.login-enabled=true",
-        "spring.flyway.locations=classpath:db/mysql/migration",
+        "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
     ],
 )
 @AutoConfigureMockMvc
