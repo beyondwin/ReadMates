@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { ClubShellLinkComponent } from "@/shared/model/app-club-shell";
 import "./host-shell.css";
 
@@ -31,6 +32,7 @@ export function HostUtilityActions({
   permissionLimits,
   LinkComponent = DefaultLink,
 }: HostUtilityActionsProps) {
+  const instanceId = useId();
   const unreadCount = Math.max(0, Math.trunc(unreadNotifications));
   const limitations = new Map(permissionLimits.map((limit) => [limit.id, limit.reason]));
   const actions = [
@@ -45,7 +47,7 @@ export function HostUtilityActions({
       <ul>
         {actions.map((action) => {
           const disabledReason = limitations.get(action.id);
-          const reasonId = `host-utility-${action.id}-reason`;
+          const reasonId = `${instanceId}-host-utility-${action.id}-reason`;
           const notificationLabel = action.id === "notifications" && unreadCount > 0
             ? `${action.label}, 읽지 않은 알림 ${unreadCount}개`
             : action.label;

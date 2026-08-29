@@ -62,4 +62,33 @@ describe("HostUtilityActions", () => {
       expect(screen.getByText(reason)).toBeVisible();
     }
   });
+
+  it("keeps permission reasons unique to each responsive instance", () => {
+    render(
+      <>
+        <HostUtilityActions
+          {...hrefs}
+          unreadNotifications={0}
+          permissionLimits={[{ id: "settings", reason: "데스크톱 설정 권한이 필요합니다." }]}
+        />
+        <HostUtilityActions
+          {...hrefs}
+          unreadNotifications={0}
+          permissionLimits={[{ id: "settings", reason: "모바일 설정 권한이 필요합니다." }]}
+        />
+      </>,
+    );
+
+    const navigations = screen.getAllByRole("navigation", { name: "호스트 유틸리티" });
+    const desktopAction = within(navigations[0]).getByText("초대와 설정");
+    const mobileAction = within(navigations[1]).getByText("초대와 설정");
+    const desktopReasonId = desktopAction.getAttribute("aria-describedby");
+    const mobileReasonId = mobileAction.getAttribute("aria-describedby");
+
+    expect(desktopReasonId).not.toBe(mobileReasonId);
+    expect(document.getElementById(desktopReasonId!)).toHaveTextContent("데스크톱 설정 권한이 필요합니다.");
+    expect(document.getElementById(mobileReasonId!)).toHaveTextContent("모바일 설정 권한이 필요합니다.");
+    expect(desktopAction).toHaveAccessibleDescription("데스크톱 설정 권한이 필요합니다.");
+    expect(mobileAction).toHaveAccessibleDescription("모바일 설정 권한이 필요합니다.");
+  });
 });
