@@ -349,7 +349,7 @@ function RouteAwareMobileTabBar({
   const appPath = variant === "host"
     && /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(rawAppPath)
     && hasHostRecordsReturnState(location.state, pathname)
-    ? HOST_ROUTE_HREFS.meetings
+    ? HOST_ROUTE_HREFS.records
     : rawAppPath;
   const resolvedCurrentSessionStatus =
     currentSessionStatus ?? (currentSessionId === undefined ? "loading" : "ready");
