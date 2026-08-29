@@ -4,6 +4,7 @@ import type {
   ClubNavigationItem,
   ClubShellBackTarget,
   ClubShellLinkComponent,
+  ClubShellResponsiveSlot,
   ClubWorkspace,
   PrimaryNavigationItem,
   WorkspaceNavigationItem,
@@ -25,6 +26,7 @@ export type AppClubShellProps = {
   mobileKicker?: string | null;
   mobileBackTarget?: ClubShellBackTarget | null;
   LinkComponent: ClubShellLinkComponent;
+  contextSlot?: ClubShellResponsiveSlot;
   beforeContent?: ReactNode;
   securityController?: ReactNode;
   desktopFooter?: ReactNode;
@@ -101,6 +103,7 @@ export function AppClubShell({
   mobileKicker,
   mobileBackTarget,
   LinkComponent,
+  contextSlot,
   beforeContent,
   securityController,
   desktopFooter,
@@ -115,6 +118,9 @@ export function AppClubShell({
     workspaceItems,
     LinkComponent,
   };
+  const defaultContextControl = <ContextSelectors {...selectors} />;
+  const desktopContextControl = contextSlot?.desktop ?? defaultContextControl;
+  const mobileContextControl = contextSlot?.mobile ?? contextSlot?.desktop ?? defaultContextControl;
 
   return (
     <div className="app-shell rm-app-club-shell" data-workspace={workspace}>
@@ -124,7 +130,7 @@ export function AppClubShell({
           primaryItems={primaryItems}
           navLabel={desktopNavLabel}
           brandHref={brandHref}
-          contextControl={<ContextSelectors {...selectors} />}
+          contextControl={desktopContextControl}
           LinkComponent={LinkComponent}
           accountControl={account.control}
         />
@@ -143,7 +149,7 @@ export function AppClubShell({
         />
       </div>
       <div className="mobile-only rm-club-shell-mobile-context" data-club-shell-region="mobile-context">
-        <ContextSelectors {...selectors} />
+        {mobileContextControl}
       </div>
       <div className="app-content" data-club-shell-region="content">
         {securityController}

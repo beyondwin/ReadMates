@@ -41,6 +41,11 @@ export type AccountMenuModel = {
   control: ReactNode;
 };
 
+export type ClubShellResponsiveSlot = {
+  desktop: ReactNode;
+  mobile?: ReactNode;
+};
+
 export type ClubShellBackTarget = {
   href: string;
   label: string;
