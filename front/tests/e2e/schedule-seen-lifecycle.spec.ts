@@ -53,6 +53,7 @@ type ParticipantFact = {
 };
 
 let lifecycleEpochsBefore = "";
+const trackedAuthSessionIds: string[] = [];
 
 function sqlString(value: string) {
   return `'${value.replaceAll("'", "''")}'`;
@@ -92,6 +93,39 @@ where membership_id = ${sqlString(MEMBER_MEMBERSHIP_ID)}
 `);
   const value = lastDataRow(output);
   return value === "NULL" || value === "last_access_at" ? null : value;
+}
+
+function sqlStringList(values: string[]) {
+  return values.map(sqlString).join(", ");
+}
+
+function cleanupTrackedAuthSessions(sessionIds: string[]) {
+  if (sessionIds.length === 0) return;
+  runMysql(`
+delete from auth_sessions
+where id in (${sqlStringList(sessionIds)});
+`);
+}
+
+function lifecycleFixtureCounts(sessionIds: string[]) {
+  const authFilter = sessionIds.length === 0
+    ? "0"
+    : `(select count(*) from auth_sessions where id in (${sqlStringList(sessionIds)}))`;
+  const output = runMysql(`
+select concat_ws('|',
+  (select count(*) from sessions where id in (${sqlString(LIFECYCLE_SESSION_ID)}, ${sqlString(CONTROL_SESSION_ID)})),
+  (select count(*) from session_participants where id in (${sqlString(LIFECYCLE_PARTICIPANT_ID)}, ${sqlString(CONTROL_PARTICIPANT_ID)})),
+  (select count(*) from memberships where id in (${sqlString(HOST_MEMBERSHIP_ID)}, ${sqlString(MEMBER_MEMBERSHIP_ID)})),
+  (select count(*) from membership_club_access where membership_id in (${sqlString(HOST_MEMBERSHIP_ID)}, ${sqlString(MEMBER_MEMBERSHIP_ID)})),
+  (select count(*) from host_session_change_audit where session_id = ${sqlString(LIFECYCLE_SESSION_ID)}),
+  (select count(*) from host_session_lifecycle_audit where session_id = ${sqlString(LIFECYCLE_SESSION_ID)}),
+  (select count(*) from session_participant_change_audit where session_id = ${sqlString(LIFECYCLE_SESSION_ID)}),
+  (select count(*) from host_session_mutation_receipts where resource_id = ${sqlString(LIFECYCLE_SESSION_ID)}),
+  (select count(*) from mutation_idempotency_keys where club_id = ${sqlString(LIFECYCLE_CLUB_ID)} and actor_membership_id in (${sqlString(HOST_MEMBERSHIP_ID)}, ${sqlString(MEMBER_MEMBERSHIP_ID)})),
+  ${authFilter}
+) as fixture_counts;
+`);
+  return lastDataRow(output).split("|").map(Number);
 }
 
 function cleanupLifecycleFixture() {
@@ -334,17 +368,25 @@ async function editMemberVisibleSchedule(hostPage: Page) {
 async function newAuthenticatedPage(browser: Browser, email: string) {
   const context = await browser.newContext();
   const page = await context.newPage();
-  await loginWithGoogleFixture(page, email);
+  const { sessionId } = await loginWithGoogleFixture(page, email);
+  trackedAuthSessionIds.push(sessionId);
   return { context, page };
 }
 
 test.beforeEach(() => {
+  trackedAuthSessionIds.length = 0;
   setupLifecycleFixture();
 });
 
 test.afterEach(() => {
+  const createdAuthSessionIds = [...trackedAuthSessionIds];
   cleanupLifecycleFixture();
+  cleanupTrackedAuthSessions(createdAuthSessionIds);
   resetSeedGoogleLogins(["host@example.com", "member5@example.com"]);
+  expect(lifecycleFixtureCounts(createdAuthSessionIds)).toEqual([
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  ]);
+  trackedAuthSessionIds.length = 0;
 });
 
 test("schedule seen follows rendered revisions without crossing club, response, attendance, or access facts", async ({ browser }) => {

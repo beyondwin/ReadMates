@@ -529,6 +529,7 @@ select row_count();
       expires: Math.floor(Date.now() / 1000) + 14 * 24 * 60 * 60,
     },
   ]);
+  return { sessionId };
 }
 
 export function cleanupInvitedMembers(emails: string[]) {
