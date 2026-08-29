@@ -26,6 +26,7 @@ import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.put
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -103,6 +104,80 @@ class HostSessionBffSecurityTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {
+    @Test
+    fun `trusted member bff reaches exact schedule seen controller without csrf`() {
+        createOpenSession()
+
+        mockMvc
+            .put("/api/sessions/current/schedule-seen") {
+                with(user("member5@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("X-Readmates-Club-Slug", "reading-sai")
+                header("Origin", "http://localhost:3000")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"scheduleRevision":1}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.scheduleRevision") { value(1) }
+                jsonPath("$.seenAt") { isNotEmpty() }
+            }
+
+        assertEquals(
+            1L,
+            jdbcTemplate.queryForObject(
+                """
+                select seen_schedule_revision
+                from session_participants
+                where session_id = ? and membership_id = '00000000-0000-0000-0000-000000000206'
+                """.trimIndent(),
+                Long::class.java,
+                SESSION_ID,
+            ),
+        )
+    }
+
+    @Test
+    fun `schedule seen rejects missing invalid trust signals and browser forged club context`() {
+        createOpenSession()
+
+        fun scheduleSeenRequest(
+            secret: String?,
+            origin: String?,
+            clubSlug: String = "reading-sai",
+        ) = request(HttpMethod.PUT, "/api/sessions/current/schedule-seen")
+            .with(user("member5@example.com"))
+            .header("X-Readmates-Club-Slug", clubSlug)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""{"scheduleRevision":1}""")
+            .also { builder -> secret?.let { builder.header("X-Readmates-Bff-Secret", it) } }
+            .also { builder -> origin?.let { builder.header("Origin", it) } }
+
+        mockMvc.perform(scheduleSeenRequest(null, "http://localhost:3000")).andExpect(status().isUnauthorized)
+        mockMvc
+            .perform(scheduleSeenRequest("invalid-secret", "http://localhost:3000"))
+            .andExpect(status().isUnauthorized)
+        mockMvc.perform(scheduleSeenRequest("test-bff-secret", null)).andExpect(status().isForbidden)
+        mockMvc
+            .perform(scheduleSeenRequest("test-bff-secret", "https://evil.example.com"))
+            .andExpect(status().isForbidden)
+        mockMvc
+            .perform(scheduleSeenRequest(null, "http://localhost:3000", clubSlug = "sample-book-club"))
+            .andExpect(status().isUnauthorized)
+
+        assertEquals(
+            null,
+            jdbcTemplate.queryForObject(
+                """
+                select seen_schedule_revision
+                from session_participants
+                where session_id = ? and membership_id = '00000000-0000-0000-0000-000000000206'
+                """.trimIndent(),
+                Long::class.javaObjectType,
+                SESSION_ID,
+            ),
+        )
+    }
+
     @ParameterizedTest
     @MethodSource("backendPolicyCases")
     fun `spring dispatch applies every backend policy before controller side effects`(case: BackendPolicyCase) {

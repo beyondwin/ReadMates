@@ -2,6 +2,7 @@ package com.readmates.session.application.port.`in`
 
 import com.readmates.session.application.model.CheckinResult
 import com.readmates.session.application.model.LongReviewResult
+import com.readmates.session.application.model.MarkScheduleSeenCommand
 import com.readmates.session.application.model.OneLineReviewResult
 import com.readmates.session.application.model.QuestionResult
 import com.readmates.session.application.model.ReplaceQuestionsCommand
@@ -11,10 +12,15 @@ import com.readmates.session.application.model.SaveCheckinCommand
 import com.readmates.session.application.model.SaveLongReviewCommand
 import com.readmates.session.application.model.SaveOneLineReviewCommand
 import com.readmates.session.application.model.SaveQuestionCommand
+import com.readmates.session.application.model.ScheduleSeenResult
 import com.readmates.session.application.model.UpdateRsvpCommand
 
 interface UpdateRsvpUseCase {
     fun updateRsvp(command: UpdateRsvpCommand): RsvpResult
+}
+
+interface MarkCurrentScheduleSeenUseCase {
+    fun markSeen(command: MarkScheduleSeenCommand): ScheduleSeenResult
 }
 
 interface SaveCheckinUseCase {

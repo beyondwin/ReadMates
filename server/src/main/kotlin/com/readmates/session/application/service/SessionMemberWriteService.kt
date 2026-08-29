@@ -1,11 +1,13 @@
 package com.readmates.session.application.service
 
+import com.readmates.session.application.model.MarkScheduleSeenCommand
 import com.readmates.session.application.model.ReplaceQuestionsCommand
 import com.readmates.session.application.model.SaveCheckinCommand
 import com.readmates.session.application.model.SaveLongReviewCommand
 import com.readmates.session.application.model.SaveOneLineReviewCommand
 import com.readmates.session.application.model.SaveQuestionCommand
 import com.readmates.session.application.model.UpdateRsvpCommand
+import com.readmates.session.application.port.`in`.MarkCurrentScheduleSeenUseCase
 import com.readmates.session.application.port.`in`.ReplaceQuestionsUseCase
 import com.readmates.session.application.port.`in`.SaveCheckinUseCase
 import com.readmates.session.application.port.`in`.SaveQuestionUseCase
@@ -26,10 +28,18 @@ class SessionMemberWriteService(
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
     private val epochPort: HostListEpochPort = HostListEpochPort.Noop(),
 ) : UpdateRsvpUseCase,
+    MarkCurrentScheduleSeenUseCase,
     SaveCheckinUseCase,
     SaveQuestionUseCase,
     ReplaceQuestionsUseCase,
     SaveReviewUseCase {
+    @Transactional
+    override fun markSeen(command: MarkScheduleSeenCommand) =
+        writePort.markScheduleSeen(
+            command = command,
+            sessionId = writePort.lockOpenSession(command.member),
+        )
+
     @Transactional
     override fun updateRsvp(command: UpdateRsvpCommand) =
         writeAfterLock(command.member) {

@@ -65,6 +65,7 @@ class SecurityConfig(
                     "/api/host/invitations",
                 )
                 it.ignoringRequestMatchers(
+                    methodAndPath("PUT", Regex("^/api/sessions/current/schedule-seen$")),
                     methodAndPath("PATCH", Regex("^/api/host/sessions/[^/]+$")),
                     methodAndPath("PATCH", Regex("^/api/host/sessions/[^/]+/visibility$")),
                     methodAndPath("PATCH", Regex("^/api/host/sessions/[^/]+/access-scope$")),

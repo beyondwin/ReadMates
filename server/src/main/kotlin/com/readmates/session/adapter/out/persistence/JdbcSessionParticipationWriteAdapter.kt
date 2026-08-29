@@ -4,6 +4,7 @@ import com.readmates.session.application.CurrentSessionNotOpenException
 import com.readmates.session.application.InvalidQuestionSetException
 import com.readmates.session.application.model.CheckinResult
 import com.readmates.session.application.model.LongReviewResult
+import com.readmates.session.application.model.MarkScheduleSeenCommand
 import com.readmates.session.application.model.OneLineReviewResult
 import com.readmates.session.application.model.QuestionResult
 import com.readmates.session.application.model.ReplaceQuestionCommandItem
@@ -14,6 +15,8 @@ import com.readmates.session.application.model.SaveCheckinCommand
 import com.readmates.session.application.model.SaveLongReviewCommand
 import com.readmates.session.application.model.SaveOneLineReviewCommand
 import com.readmates.session.application.model.SaveQuestionCommand
+import com.readmates.session.application.model.ScheduleSeenResult
+import com.readmates.session.application.model.SessionScheduleRevisionStaleException
 import com.readmates.session.application.model.UpdateRsvpCommand
 import com.readmates.session.application.port.out.SessionParticipationWritePort
 import com.readmates.shared.db.dbString
@@ -23,12 +26,19 @@ import com.readmates.shared.security.CurrentMember
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 import java.util.UUID
 
 private data class CurrentQuestionTarget(
     val sessionId: String,
     val clubId: String,
     val membershipId: String,
+)
+
+private data class StoredScheduleSeen(
+    val scheduleRevision: Long,
+    val seenAt: LocalDateTime,
 )
 
 @Repository
@@ -79,6 +89,91 @@ class JdbcSessionParticipationWriteAdapter(
     override fun updateRsvp(command: UpdateRsvpCommand): RsvpResult {
         val result = updateMemberRsvp(command.member, command.status)
         return RsvpResult(status = result.getValue("status"))
+    }
+
+    override fun markScheduleSeen(
+        command: MarkScheduleSeenCommand,
+        sessionId: UUID,
+    ): ScheduleSeenResult {
+        currentScheduleRevision(command.member, sessionId).requireExact(command.scheduleRevision)
+        updateScheduleSeen(command, sessionId)
+        val stored = storedScheduleSeen(command.member, sessionId)
+        stored.scheduleRevision.requireExact(command.scheduleRevision)
+        return ScheduleSeenResult(
+            scheduleRevision = stored.scheduleRevision,
+            seenAt = stored.seenAt.atOffset(ZoneOffset.UTC),
+        )
+    }
+
+    private fun currentScheduleRevision(
+        member: CurrentMember,
+        sessionId: UUID,
+    ): Long =
+        jdbcTemplate
+            .query(
+                """
+                select schedule_revision
+                from sessions
+                where id = ?
+                  and club_id = ?
+                  and deleted_at is null
+                  and state = 'OPEN'
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.getLong("schedule_revision") },
+                sessionId.dbString(),
+                member.clubId.dbString(),
+            ).firstOrNull() ?: throw CurrentSessionNotOpenException()
+
+    private fun updateScheduleSeen(
+        command: MarkScheduleSeenCommand,
+        sessionId: UUID,
+    ) {
+        jdbcTemplate.update(
+            """
+            update session_participants
+            set seen_schedule_revision = ?,
+                seen_schedule_at = utc_timestamp(6)
+            where session_id = ?
+              and club_id = ?
+              and membership_id = ?
+              and participation_status = 'ACTIVE'
+              and (seen_schedule_revision is null or seen_schedule_revision < ?)
+            """.trimIndent(),
+            command.scheduleRevision,
+            sessionId.dbString(),
+            command.member.clubId.dbString(),
+            command.member.membershipId.dbString(),
+            command.scheduleRevision,
+        )
+    }
+
+    private fun storedScheduleSeen(
+        member: CurrentMember,
+        sessionId: UUID,
+    ): StoredScheduleSeen =
+        jdbcTemplate
+            .query(
+                """
+                select seen_schedule_revision, seen_schedule_at
+                from session_participants
+                where session_id = ?
+                  and club_id = ?
+                  and membership_id = ?
+                  and participation_status = 'ACTIVE'
+                """.trimIndent(),
+                { resultSet, _ ->
+                    StoredScheduleSeen(
+                        scheduleRevision = resultSet.getLong("seen_schedule_revision"),
+                        seenAt = resultSet.getObject("seen_schedule_at", LocalDateTime::class.java),
+                    )
+                },
+                sessionId.dbString(),
+                member.clubId.dbString(),
+                member.membershipId.dbString(),
+            ).firstOrNull() ?: throwCurrentSessionWriteException(member, sessionId)
+
+    private fun Long.requireExact(requestedRevision: Long) {
+        if (this != requestedRevision) throw SessionScheduleRevisionStaleException()
     }
 
     override fun saveCheckin(command: SaveCheckinCommand): CheckinResult {
