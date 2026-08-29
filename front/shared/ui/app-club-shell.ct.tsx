@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/experimental-ct-react";
 import { AppClubShellStory } from "./app-club-shell.story";
 
 test("AppClubShell uses only mobile chrome at the exact 767px boundary", async ({ mount, page }) => {
+  await page.evaluate(() => document.documentElement.style.setProperty("--m-safe-bottom", "20px"));
   await page.setViewportSize({ width: 767, height: 720 });
   const shell = await mount(<AppClubShellStory />);
 
@@ -19,7 +20,9 @@ test("AppClubShell uses only mobile chrome at the exact 767px boundary", async (
   await expect(shell.locator('.rm-club-shell-mobile-context nav[aria-label="공간 선택"]').getByRole("link", { name: "멤버 공간" })).toHaveCount(0);
   expect((await currentWorkspace.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(767);
-  await expect(shell.locator(".m-tabbar")).toHaveCSS("padding-bottom", "0px");
+  await expect(shell.locator(".m-tabbar")).toHaveCSS("padding-bottom", "20px");
+  await expect(shell.locator('[data-club-shell-region="content"]')).toHaveCSS("padding-bottom", "124px");
+  await page.evaluate(() => document.documentElement.style.removeProperty("--m-safe-bottom"));
 });
 
 test("AppClubShell uses only horizontal desktop chrome at the exact 768px boundary", async ({ mount, page }) => {

@@ -24,6 +24,18 @@
   backdrop-filter: saturate(1.25) blur(12px);
 }
 
+.rm-club-shell-mobile-context__inner {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rm-club-shell-mobile-context__inner > :first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .rm-club-shell-mobile-context .rm-club-shell-context {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

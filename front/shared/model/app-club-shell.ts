@@ -31,6 +31,7 @@ export type PrimaryNavigationIcon =
 export type PrimaryNavigationItem = {
   id: string;
   label: string;
+  mobileLabel?: string;
   href: string;
   icon: PrimaryNavigationIcon;
   current: boolean;

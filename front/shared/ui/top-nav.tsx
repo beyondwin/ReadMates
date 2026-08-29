@@ -68,6 +68,8 @@ type TopNavProps = {
   navLabel?: string;
   brandHref?: string;
   contextControl?: ReactNode;
+  primaryControl?: ReactNode;
+  utilityControl?: ReactNode;
 };
 
 const memberLinks: NavLink[] = [
@@ -114,27 +116,34 @@ function hostLinks({
 
   return [
     {
-      key: "host-operations",
-      href: HOST_ROUTE_HREFS.today,
-      label: READMATES_PRIMARY_NAV_LABELS.host.today,
-      current: (pathname) => pathname === "/app/host" || pathname === "/app/host/notifications",
+      key: "host-operating-room",
+      href: HOST_ROUTE_HREFS.operatingRoom,
+      label: READMATES_PRIMARY_NAV_LABELS.host.operatingRoom,
+      current: (pathname) => pathname === "/app/host" || pathname === "/app/host/operations",
     },
     {
-      key: "host-session",
+      key: "host-meetings",
       href: HOST_ROUTE_HREFS.meetings,
-      label: READMATES_PRIMARY_NAV_LABELS.host.session,
+      label: READMATES_PRIMARY_NAV_LABELS.host.meetings,
       current: (pathname) =>
         pathname === "/app/host/sessions"
         || pathname === "/app/host/sessions/new"
-        || pathname === "/app/host/records"
         || /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(pathname)
-        || /^\/app\/host\/sessions\/[^/]+\/(?:closing|feedback-document)$/.test(pathname),
     },
     {
-      key: "host-members",
-      href: HOST_ROUTE_HREFS.members,
-      label: READMATES_PRIMARY_NAV_LABELS.host.members,
-      current: (pathname) => pathname === "/app/host/members" || pathname === "/app/host/invitations",
+      key: "host-people",
+      href: HOST_ROUTE_HREFS.people,
+      label: READMATES_PRIMARY_NAV_LABELS.host.people,
+      current: (pathname) => pathname === "/app/host/people"
+        || pathname.startsWith("/app/host/people/")
+        || pathname === "/app/host/members",
+    },
+    {
+      key: "host-records",
+      href: HOST_ROUTE_HREFS.records,
+      label: READMATES_PRIMARY_NAV_LABELS.host.records,
+      current: (pathname) => pathname === "/app/host/records"
+        || /^\/app\/host\/sessions\/[^/]+\/(?:closing|feedback-document)$/.test(pathname),
     },
   ];
 }
@@ -244,6 +253,8 @@ function TopNavFrame({
   workspaceAction,
   accountControl,
   contextControl,
+  primaryControl,
+  utilityControl,
   LinkComponent,
 }: {
   brandHref: string;
@@ -255,6 +266,8 @@ function TopNavFrame({
   workspaceAction?: NavLink | null;
   accountControl?: ReactNode;
   contextControl?: ReactNode;
+  primaryControl?: ReactNode;
+  utilityControl?: ReactNode;
   LinkComponent: AppLinkComponent;
 }) {
   return (
@@ -266,7 +279,7 @@ function TopNavFrame({
         </div>
 
         <div className="row" style={{ gap: "12px" }}>
-          <nav className="nav-links" aria-label={navLabel}>
+          {primaryControl ?? <nav className="nav-links" aria-label={navLabel}>
             {links.map((link) =>
               link.href ? (
                 <LinkComponent
@@ -302,9 +315,10 @@ function TopNavFrame({
                 </span>
               ),
             )}
-          </nav>
-          {workspaceAction || accountControl || memberName ? (
+          </nav>}
+          {utilityControl || workspaceAction || accountControl || memberName ? (
             <div className="topnav-account-actions">
+              {utilityControl}
               {workspaceAction ? (
                 <LinkComponent
                   to={workspaceAction.href!}
@@ -377,6 +391,8 @@ function AppTopNav({
   navLabel,
   brandHref,
   contextControl,
+  primaryControl,
+  utilityControl,
 }: {
   variant: Exclude<TopNavVariant, "guest">;
   memberName?: string | null;
@@ -392,6 +408,8 @@ function AppTopNav({
   navLabel?: string;
   brandHref?: string;
   contextControl?: ReactNode;
+  primaryControl?: ReactNode;
+  utilityControl?: ReactNode;
 }) {
   const location = useLocation();
   const pathname = location.pathname;
@@ -433,6 +451,8 @@ function AppTopNav({
       workspaceAction={resolvedWorkspaceAction}
       accountControl={accountControl}
       contextControl={contextControl}
+      primaryControl={primaryControl}
+      utilityControl={utilityControl}
       LinkComponent={LinkComponent}
     />
   );
@@ -455,6 +475,8 @@ export function TopNav({
   navLabel,
   brandHref,
   contextControl,
+  primaryControl,
+  utilityControl,
 }: TopNavProps) {
   if (variant === "guest") {
     return <GuestTopNav authenticated={authenticated} publicBasePath={publicBasePath} LinkComponent={LinkComponent} />;
@@ -483,6 +505,8 @@ export function TopNav({
         workspaceAction={resolvedWorkspaceAction}
         accountControl={accountControl}
         contextControl={contextControl}
+        primaryControl={primaryControl}
+        utilityControl={utilityControl}
         LinkComponent={LinkComponent}
       />
     );
@@ -504,6 +528,8 @@ export function TopNav({
       navLabel={navLabel}
       brandHref={brandHref}
       contextControl={contextControl}
+      primaryControl={primaryControl}
+      utilityControl={utilityControl}
     />
   );
 }

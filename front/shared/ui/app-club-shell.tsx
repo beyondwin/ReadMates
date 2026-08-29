@@ -27,6 +27,8 @@ export type AppClubShellProps = {
   mobileBackTarget?: ClubShellBackTarget | null;
   LinkComponent: ClubShellLinkComponent;
   contextSlot?: ClubShellResponsiveSlot;
+  primarySlot?: ClubShellResponsiveSlot;
+  utilitySlot?: ClubShellResponsiveSlot;
   beforeContent?: ReactNode;
   securityController?: ReactNode;
   desktopFooter?: ReactNode;
@@ -104,6 +106,8 @@ export function AppClubShell({
   mobileBackTarget,
   LinkComponent,
   contextSlot,
+  primarySlot,
+  utilitySlot,
   beforeContent,
   securityController,
   desktopFooter,
@@ -131,6 +135,8 @@ export function AppClubShell({
           navLabel={desktopNavLabel}
           brandHref={brandHref}
           contextControl={desktopContextControl}
+          primaryControl={primarySlot?.desktop}
+          utilityControl={utilitySlot?.desktop}
           LinkComponent={LinkComponent}
           accountControl={account.control}
         />
@@ -149,7 +155,10 @@ export function AppClubShell({
         />
       </div>
       <div className="mobile-only rm-club-shell-mobile-context" data-club-shell-region="mobile-context">
-        {mobileContextControl}
+        <div className="rm-club-shell-mobile-context__inner">
+          {mobileContextControl}
+          {utilitySlot?.mobile}
+        </div>
       </div>
       <div className="app-content" data-club-shell-region="content">
         {securityController}
@@ -158,12 +167,14 @@ export function AppClubShell({
       </div>
       {desktopFooter ? <div className="desktop-only">{desktopFooter}</div> : null}
       <div className="mobile-only" data-club-shell-region="mobile-primary">
-        <MobileTabBar
-          variant={workspace}
-          items={primaryItems}
-          navLabel={mobileNavLabel}
-          LinkComponent={LinkComponent}
-        />
+        {primarySlot?.mobile ?? (
+          <MobileTabBar
+            variant={workspace}
+            items={primaryItems}
+            navLabel={mobileNavLabel}
+            LinkComponent={LinkComponent}
+          />
+        )}
       </div>
     </div>
   );

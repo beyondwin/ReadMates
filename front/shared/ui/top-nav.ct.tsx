@@ -15,7 +15,7 @@ const fontMetrics = async (locator: Locator) =>
     };
   });
 
-test("TopNav keeps the stable host meeting destination typographically aligned with sibling links", async ({
+test("TopNav keeps the four host areas in approved desktop order and aligned typography", async ({
   mount,
 }) => {
   const navigation = await mount(
@@ -26,8 +26,10 @@ test("TopNav keeps the stable host meeting destination typographically aligned w
     </MemoryRouter>,
   );
 
-  const destinationLink = navigation.getByRole("link", { name: "멤버", exact: true });
-  const meetingLink = navigation.getByRole("link", { name: "모임", exact: true });
+  const links = navigation.getByRole("navigation", { name: "앱 내비게이션" }).getByRole("link");
+  await expect(links).toHaveText(["운영실", "일정과 모임", "사람", "기록"]);
+  const destinationLink = navigation.getByRole("link", { name: "사람", exact: true });
+  const meetingLink = navigation.getByRole("link", { name: "일정과 모임", exact: true });
   const [linkTypography, meetingTypography] = await Promise.all(
     [destinationLink, meetingLink].map((locator) =>
       locator.evaluate((element) => {

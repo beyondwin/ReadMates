@@ -135,30 +135,38 @@ function hostTabs({
 
   return [
     {
-      key: "host",
-      href: HOST_ROUTE_HREFS.today,
-      label: READMATES_MOBILE_TAB_LABELS.hostToday,
+      key: "host-operating-room",
+      href: HOST_ROUTE_HREFS.operatingRoom,
+      label: READMATES_MOBILE_TAB_LABELS.hostOperatingRoom,
       icon: "host",
-      current: (pathname) => pathname === "/app/host" || pathname === "/app/host/notifications",
+      current: (pathname) => pathname === "/app/host" || pathname === "/app/host/operations",
     },
     {
-      key: "host-edit",
+      key: "host-meetings",
       href: HOST_ROUTE_HREFS.meetings,
-      label: READMATES_MOBILE_TAB_LABELS.hostSession,
-      icon: "edit",
+      label: READMATES_MOBILE_TAB_LABELS.hostMeetings,
+      icon: "session",
       current: (pathname) =>
         pathname === "/app/host/sessions"
         || pathname === "/app/host/sessions/new"
-        || pathname === "/app/host/records"
         || /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(pathname)
-        || /^\/app\/host\/sessions\/[^/]+\/(?:closing|feedback-document)$/.test(pathname),
     },
     {
-      key: "host-members",
-      href: HOST_ROUTE_HREFS.members,
-      label: READMATES_MOBILE_TAB_LABELS.hostMembers,
+      key: "host-people",
+      href: HOST_ROUTE_HREFS.people,
+      label: READMATES_MOBILE_TAB_LABELS.hostPeople,
       icon: "approve",
-      current: (pathname) => pathname === "/app/host/members" || pathname === "/app/host/invitations",
+      current: (pathname) => pathname === "/app/host/people"
+        || pathname.startsWith("/app/host/people/")
+        || pathname === "/app/host/members",
+    },
+    {
+      key: "host-records",
+      href: HOST_ROUTE_HREFS.records,
+      label: READMATES_MOBILE_TAB_LABELS.hostRecords,
+      icon: "archive",
+      current: (pathname) => pathname === "/app/host/records"
+        || /^\/app\/host\/sessions\/[^/]+\/(?:closing|feedback-document)$/.test(pathname),
     },
   ];
 }
@@ -381,7 +389,7 @@ export function MobileTabBar({
     const tabs: TabLink[] = items.map((item) => ({
       key: item.id,
       href: item.href,
-      label: item.label,
+      label: item.mobileLabel ?? item.label,
       icon: item.icon,
       replace: item.navigation === "replace",
       current: () => item.current,

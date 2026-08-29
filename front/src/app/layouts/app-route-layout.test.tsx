@@ -32,6 +32,29 @@ const hostAuth: AuthMeResponse = {
   role: "HOST",
   membershipStatus: "ACTIVE",
   approvalState: "ACTIVE",
+  avatarKey: "cloud-green-book",
+  currentMembership: {
+    membershipId: "membership-host",
+    clubId: "club-1",
+    clubSlug: "reading-sai",
+    displayName: "김호스트",
+    role: "HOST",
+    membershipStatus: "ACTIVE",
+    approvalState: "ACTIVE",
+    avatarKey: "cloud-green-book",
+  },
+  joinedClubs: [
+    {
+      clubId: "club-1",
+      clubSlug: "reading-sai",
+      clubName: "읽는사이",
+      membershipId: "membership-host",
+      role: "HOST",
+      status: "ACTIVE",
+      approvalState: "ACTIVE",
+      primaryHost: "김호스트",
+    },
+  ],
 };
 
 const memberAuth: AuthMeResponse = {
@@ -111,8 +134,32 @@ function renderHostLayout({
   );
 }
 
+function renderHostShellAt(initialEntry: string, initialState?: unknown) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, staleTime: 0, gcTime: 0 },
+      mutations: { retry: false },
+    },
+  });
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <AuthActionsContext.Provider value={{ markLoggedOut: vi.fn(), refreshAuth: vi.fn() }}>
+        <AuthContext.Provider value={{ status: "ready", auth: hostAuth }}>
+          <MemoryRouter initialEntries={[initialState === undefined ? initialEntry : { pathname: initialEntry, state: initialState }]}>
+            <Routes>
+              <Route path="*" element={<AppRouteLayout scopedAuth={hostAuth} audience="MEMBER" />} />
+            </Routes>
+          </MemoryRouter>
+        </AuthContext.Provider>
+      </AuthActionsContext.Provider>
+    </QueryClientProvider>,
+  );
+}
+
 function expectSessionLinks(href: string) {
-  const links = screen.getAllByRole("link", { name: "모임" });
+  const links = screen.getAllByRole("link", { name: /^(?:일정과 )?모임$/ });
   expect(links).toHaveLength(2);
   for (const link of links) {
     expect(link).toHaveAttribute("href", href);
@@ -215,7 +262,7 @@ afterEach(() => {
 });
 
 describe("AppRouteLayout host session navigation", () => {
-  it("renders the three-tab host primary navigation without a records tab", () => {
+  it("renders the four host areas in approved desktop and mobile order while utilities stay outside primary navigation", () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const path = input.toString();
       return Promise.reject(new Error(`Unexpected fetch: ${path}`));
@@ -236,16 +283,80 @@ describe("AppRouteLayout host session navigation", () => {
     const desktopPrimary = screen.getByRole("navigation", { name: "호스트 주 메뉴" });
     const mobilePrimary = screen.getByRole("navigation", { name: "호스트 주 메뉴 모바일" });
     expect(within(desktopPrimary).getAllByRole("link").map((link) => link.textContent)).toEqual([
-      "오늘",
-      "모임",
-      "멤버",
+      "운영실",
+      "일정과 모임",
+      "사람",
+      "기록",
     ]);
     expect(within(mobilePrimary).getAllByRole("link").map((link) => link.textContent)).toEqual([
-      "오늘",
+      "운영실",
       "모임",
-      "멤버",
+      "사람",
+      "기록",
     ]);
-    expect(screen.queryByRole("link", { name: "기록" })).not.toBeInTheDocument();
+
+    const expectedHrefs = [
+      "/app/host",
+      "/app/host/sessions",
+      "/app/host/people",
+      "/app/host/records",
+    ];
+    expect(within(desktopPrimary).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(expectedHrefs);
+    expect(within(mobilePrimary).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(expectedHrefs);
+
+    for (const utilityLabel of ["초대와 설정", "멤버 시야", "알림", "새 모임"]) {
+      expect(within(desktopPrimary).queryByRole("link", { name: utilityLabel })).not.toBeInTheDocument();
+      expect(within(mobilePrimary).queryByRole("link", { name: utilityLabel })).not.toBeInTheDocument();
+      expect(screen.getAllByRole("link", { name: utilityLabel }).length).toBeGreaterThan(0);
+    }
+
+    expect(screen.getAllByRole("button", { name: "읽는사이 · 호스트 운영실" })).toHaveLength(2);
+    expect(screen.queryByRole("navigation", { name: "클럽 선택" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "공간 선택" })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["scoped canonical operating room", "/clubs/reading-sai/app/host", "운영실", "운영실", "운영실"],
+    ["unscoped operating-room compatibility", "/app/host/operations", "운영실", "운영실", "운영실"],
+    ["scoped meetings", "/clubs/reading-sai/app/host/sessions", "일정과 모임", "모임", "모임"],
+    ["unscoped people compatibility", "/app/host/members", "사람", "사람", "사람"],
+    ["scoped person detail", "/clubs/reading-sai/app/host/people/member-7", "사람", "사람", "사람"],
+    ["unscoped records", "/app/host/records", "기록", "기록", "기록"],
+    ["scoped record closing", "/clubs/reading-sai/app/host/sessions/session-7/closing", "기록", "기록", "기록"],
+    ["utility compatibility", "/app/host/invitations", null, null, "초대와 설정"],
+    ["scoped utility", "/clubs/reading-sai/app/host/notifications", null, null, "알림"],
+  ])("matches %s through the normalized app pathname", (_name, initialEntry, desktopLabel, mobileLabel, mobileTitle) => {
+    renderHostShellAt(initialEntry);
+
+    const desktopPrimary = screen.getByRole("navigation", { name: "호스트 주 메뉴" });
+    const mobilePrimary = screen.getByRole("navigation", { name: "호스트 주 메뉴 모바일" });
+    const desktopCurrent = within(desktopPrimary).queryByRole("link", { current: "page" });
+    const mobileCurrent = within(mobilePrimary).queryByRole("link", { current: "page" });
+    expect(document.querySelector(".m-hdr-title")).toHaveTextContent(mobileTitle);
+
+    if (desktopLabel === null || mobileLabel === null) {
+      expect(desktopCurrent).not.toBeInTheDocument();
+      expect(mobileCurrent).not.toBeInTheDocument();
+      return;
+    }
+
+    expect(desktopCurrent).toHaveTextContent(desktopLabel);
+    expect(mobileCurrent).toHaveTextContent(mobileLabel);
+  });
+
+  it("assigns a host session detail to records only when record return state owns it", () => {
+    renderHostShellAt("/clubs/reading-sai/app/host/sessions/session-7", {
+      recordOwnership: "host-records",
+      readmatesReturnTo: "/clubs/reading-sai/app/host/records",
+      readmatesReturnLabel: "기록으로",
+    });
+
+    for (const navigation of [
+      screen.getByRole("navigation", { name: "호스트 주 메뉴" }),
+      screen.getByRole("navigation", { name: "호스트 주 메뉴 모바일" }),
+    ]) {
+      expect(within(navigation).getByRole("link", { current: "page" })).toHaveTextContent("기록");
+    }
   });
 
   it.each([
