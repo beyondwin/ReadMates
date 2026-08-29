@@ -127,3 +127,47 @@ Result: exit `0`; no errors or warnings. `git diff --check` also exited `0`.
 
 - The recorded Node 24 commands retain their exact launcher and arguments while expressing the machine-specific runtime directory as the portable `<node24-bin>` placeholder.
 - A single Stage 1 changed-file scan closed local absolute path and credential-pattern exposure without altering source hashes, command results, or finding closures.
+
+## Fix round 2 — session identity and write eligibility
+
+### Source hashes
+
+- Review base: `4febbb0ecf4145de32b3b65a378b1ae3cf42b17e`
+- `front/features/current-session/route/current-session-route.tsx` SHA-256 before the fix: `d36351d7b84e0dff733a5f792ae7d94cbb92ee3b9769d00eb785cd582a08f26e`
+- `front/features/current-session/route/current-session-route.test.tsx` SHA-256 before the fix: `58be2f4c3eb50f7564c899845e919f298287dd4906ea68afc6acf2d71a2c22f2`
+- `front/features/current-session/route/current-session-route.tsx` SHA-256 after the fix: `2757381a27476ea81f683d65ff445385850e2fe8aa3ca2ff1a9dd66a54b40ca4`
+- `front/features/current-session/route/current-session-route.test.tsx` SHA-256 after the fix: `a3aa72ee5286a6c4301ae769f7562cc985f073482e9d0c2875ce6d7ed2d44462`
+
+### RED command and result
+
+```bash
+PATH="<node24-bin>:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/current-session/route/current-session-route.test.tsx
+```
+
+Result: exit `1`; 1 test file, 9 tests, 4 failed and 5 passed. A second session in the same club with the same schedule revision remained deduplicated at one PUT, while VIEWER, SUSPENDED, and REMOVED-participant renders each issued one PUT.
+
+### GREEN commands and results
+
+```bash
+PATH="<node24-bin>:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/current-session/route/current-session-route.test.tsx
+```
+
+Result: exit `0`; 1 test file passed, 9 tests passed.
+
+```bash
+PATH="<node24-bin>:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/current-session/api/current-session-contracts.test.ts features/current-session/queries/current-session-queries.test.tsx features/current-session/route/current-session-route.test.tsx features/current-session/ui/current-session-review-visibility.test.tsx
+```
+
+Result: exit `0`; 4 test files passed, 34 tests passed.
+
+```bash
+PATH="<node24-bin>:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec eslint features/current-session/route/current-session-route.tsx features/current-session/route/current-session-route.test.tsx
+```
+
+Result: exit `0`; no errors or warnings. `git diff --check` also exited `0`.
+
+### Closure
+
+- Session transition: the per-`QueryClient` acknowledgement key is now `<clubSlug-or-unscoped>:<sessionId>:<scheduleRevision>`, so a cached remount of one session remains idempotent while a newly rendered session with the same numeric revision sends its own PUT.
+- Write eligibility: automatic acknowledgement and inline recovery require the existing read-surface `canWrite` authority plus an attendee row matching the authenticated `membershipId` whose `participationStatus` is ACTIVE (including the contract's omitted-as-ACTIVE compatibility default).
+- Ineligible recovery: VIEWER, SUSPENDED, missing-participant, and REMOVED-participant renders neither start the write nor expose a retry action they cannot complete. Existing conflict, offline, and authority-loss behavior remains unchanged for eligible active participants.

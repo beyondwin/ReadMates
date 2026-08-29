@@ -67,17 +67,26 @@ export function CurrentSessionRoute({
   const saveLongReviewMutation = useSaveCurrentSessionLongReviewMutation(context);
   const saveOneLineReviewMutation = useSaveCurrentSessionOneLineReviewMutation(context);
   const currentData = currentQuery.data ?? loaderData.current;
+  const readSurfaceCapabilities = readSurfaceCapabilitiesForAuth(loaderData.auth);
   const currentSessionPage = memberCurrentSessionReadPage(
     currentData,
-    readSurfaceCapabilitiesForAuth(loaderData.auth),
+    readSurfaceCapabilities,
   );
   const renderedSession = currentData.currentSession;
   const renderedRevision = renderedSession?.scheduleRevision ?? null;
-  const renderedRevisionKey = renderedRevision === null
+  const scheduleSeenWriteEligible = Boolean(
+    readSurfaceCapabilities.canWrite
+    && loaderData.auth.membershipId
+    && renderedSession?.attendees.some((attendee) => (
+      attendee.membershipId === loaderData.auth.membershipId
+      && (attendee.participationStatus ?? "ACTIVE") === "ACTIVE"
+    )),
+  );
+  const renderedRevisionKey = renderedSession === null || renderedRevision === null
     ? null
-    : `${context?.clubSlug ?? "unscoped"}:${renderedRevision}`;
+    : `${context?.clubSlug ?? "unscoped"}:${renderedSession.sessionId}:${renderedRevision}`;
   const acknowledgeRenderedRevision = useCallback(() => {
-    if (renderedRevision === null || renderedRevisionKey === null) return;
+    if (!scheduleSeenWriteEligible || renderedRevision === null || renderedRevisionKey === null) return;
 
     const acknowledgements = acknowledgementSet(queryClient);
     if (acknowledgements.has(renderedRevisionKey)) return;
@@ -88,16 +97,17 @@ export function CurrentSessionRoute({
         acknowledgements.delete(renderedRevisionKey);
       }
     });
-  }, [markScheduleSeen, queryClient, renderedRevision, renderedRevisionKey]);
+  }, [markScheduleSeen, queryClient, renderedRevision, renderedRevisionKey, scheduleSeenWriteEligible]);
 
   useEffect(() => {
     if (
-      renderedSession
+      scheduleSeenWriteEligible
+      && renderedSession
       && renderedSession.mySeenScheduleRevision !== renderedSession.scheduleRevision
     ) {
       acknowledgeRenderedRevision();
     }
-  }, [acknowledgeRenderedRevision, renderedSession]);
+  }, [acknowledgeRenderedRevision, renderedSession, scheduleSeenWriteEligible]);
 
   const currentSessionSaveActions = useMemo<CurrentSessionSaveActions>(
     () => ({
@@ -123,7 +133,9 @@ export function CurrentSessionRoute({
       actions={currentSessionSaveActions}
       internalLinkComponent={internalLinkComponent}
       scheduleSeenRecovery={
-        scheduleSeenIsError && !isCurrentScheduleSeenConflict(scheduleSeenError)
+        scheduleSeenWriteEligible
+        && scheduleSeenIsError
+        && !isCurrentScheduleSeenConflict(scheduleSeenError)
           ? {
               isRetrying: scheduleSeenIsPending,
               onRetry: acknowledgeRenderedRevision,

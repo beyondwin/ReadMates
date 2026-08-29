@@ -6,6 +6,7 @@ import { RouterProvider } from "react-router/dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { currentSessionContractFixture } from "@/tests/unit/api-contract-fixtures";
 import { ReadmatesApiError } from "@/shared/api/errors";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 
 vi.mock("@/features/current-session/api/current-session-api", () => ({
   getCurrentSession: vi.fn(),
@@ -28,7 +29,7 @@ const context = { clubSlug: "reading-sai" };
 const auth = {
   authenticated: true,
   userId: "user-active-member",
-  membershipId: "membership-active-member",
+  membershipId: "member-guest",
   clubId: "club-id",
   email: "member@example.com",
   displayName: "멤버",
@@ -36,15 +37,16 @@ const auth = {
   role: "MEMBER",
   membershipStatus: "ACTIVE",
   approvalState: "ACTIVE",
-} as const;
+} as const satisfies AuthMeResponse;
 
-function sessionAtRevision(scheduleRevision: number) {
+function sessionAtRevision(scheduleRevision: number, sessionId?: string) {
   const currentSession = currentSessionContractFixture.currentSession;
   if (!currentSession) throw new Error("fixture must include a current session");
 
   return {
     currentSession: {
       ...currentSession,
+      sessionId: sessionId ?? currentSession.sessionId,
       scheduleRevision,
       mySeenScheduleRevision: scheduleRevision - 1,
       myScheduleSeenAt: null,
@@ -72,13 +74,17 @@ function deferred<T>() {
   return { promise, reject, resolve };
 }
 
-function renderRoute(client: QueryClient, current = sessionAtRevision(7)) {
+function renderRoute(
+  client: QueryClient,
+  current = sessionAtRevision(7),
+  routeAuth: AuthMeResponse = auth,
+) {
   client.setQueryData(currentSessionKeys.current(context), current);
   const router = createMemoryRouter(
     [{
       path: "/clubs/:clubSlug/app/session/current",
       element: <CurrentSessionRoute />,
-      loader: () => ({ auth, current }),
+      loader: () => ({ auth: routeAuth, current }),
       hydrateFallbackElement: <div>모임을 불러오는 중</div>,
     }],
     { initialEntries: ["/clubs/reading-sai/app/session/current"] },
@@ -125,6 +131,63 @@ describe("current schedule rendered acknowledgement", () => {
     renderRoute(client, client.getQueryData(currentSessionKeys.current(context)) ?? sessionAtRevision(7));
     await waitFor(() => expect(screen.getAllByRole("heading", { name: "테스트 책" }).length).toBeGreaterThan(0));
     expect(markCurrentScheduleSeen).toHaveBeenCalledTimes(1);
+  });
+
+  it("acknowledges the same revision again when the rendered session changes", async () => {
+    const client = createClient();
+    vi.mocked(markCurrentScheduleSeen)
+      .mockResolvedValueOnce({ scheduleRevision: 7, seenAt: "2026-08-29T00:00:00Z" })
+      .mockResolvedValueOnce({ scheduleRevision: 7, seenAt: "2026-08-29T00:01:00Z" });
+
+    const first = renderRoute(client, sessionAtRevision(7, "session-first"));
+    await waitFor(() => expect(markCurrentScheduleSeen).toHaveBeenCalledTimes(1));
+    first.unmount();
+
+    renderRoute(client, sessionAtRevision(7, "session-next"));
+
+    await waitFor(() => expect(markCurrentScheduleSeen).toHaveBeenCalledTimes(2));
+    expect(markCurrentScheduleSeen).toHaveBeenNthCalledWith(2, 7, context);
+  });
+
+  it.each([
+    ["VIEWER", { ...auth, membershipStatus: "VIEWER", approvalState: "VIEWER" }],
+    ["SUSPENDED", { ...auth, membershipStatus: "SUSPENDED", approvalState: "SUSPENDED" }],
+  ] satisfies Array<[string, AuthMeResponse]>) (
+    "does not acknowledge or offer an impossible retry to a %s membership",
+    async (_status, routeAuth) => {
+      const client = createClient();
+      vi.mocked(markCurrentScheduleSeen).mockRejectedValue(new TypeError("offline"));
+
+      renderRoute(client, sessionAtRevision(7), routeAuth);
+      expect((await screen.findAllByRole("heading", { name: "테스트 책" })).length).toBeGreaterThan(0);
+      await act(async () => Promise.resolve());
+
+      expect(markCurrentScheduleSeen).not.toHaveBeenCalled();
+      expect(screen.queryByRole("button", { name: "일정 확인 다시 기록" })).not.toBeInTheDocument();
+    },
+  );
+
+  it("does not acknowledge or offer an impossible retry when the member is excluded from the session", async () => {
+    const client = createClient();
+    const current = sessionAtRevision(7);
+    const excludedCurrent = {
+      currentSession: {
+        ...current.currentSession,
+        attendees: current.currentSession.attendees.map((attendee) => (
+          attendee.membershipId === auth.membershipId
+            ? { ...attendee, participationStatus: "REMOVED" as const }
+            : attendee
+        )),
+      },
+    };
+    vi.mocked(markCurrentScheduleSeen).mockRejectedValue(new TypeError("offline"));
+
+    renderRoute(client, excludedCurrent);
+    expect((await screen.findAllByRole("heading", { name: "테스트 책" })).length).toBeGreaterThan(0);
+    await act(async () => Promise.resolve());
+
+    expect(markCurrentScheduleSeen).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "일정 확인 다시 기록" })).not.toBeInTheDocument();
   });
 
   it("invalidates a conflicted revision and acknowledges only the newly rendered revision", async () => {
