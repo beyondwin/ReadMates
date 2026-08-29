@@ -30,6 +30,16 @@ Review fix round 1 reproduced the stale direct responsive suite at BASE with `22
 PATH="$(brew --prefix node@24)/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run tests/unit/responsive-navigation.test.tsx src/app/layouts/app-route-layout.test.tsx
 ```
 
+Stage 2 gate review round 2 reproduced the remaining contract debt at BASE `9c0eb3ffce852b608c4bf21e7eca61bdb82b7ef3`: the feedback-document and SPA layout suites failed exactly `4/27`. Production already returned canonical record-owned targets, so only the two stale suites changed. The exact command then passed `27/27`, and the closing set with responsive/layout coverage passed `4` files and `126` tests:
+
+```text
+PATH="$(brew --prefix node@24)/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run tests/unit/feedback-document-route.test.tsx tests/unit/spa-layout.test.tsx
+```
+
+```text
+PATH="$(brew --prefix node@24)/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run tests/unit/feedback-document-route.test.tsx tests/unit/spa-layout.test.tsx tests/unit/responsive-navigation.test.tsx src/app/layouts/app-route-layout.test.tsx
+```
+
 ## Source hash → command → result → closure
 
 | Closing source SHA-256 | Command | Result | Finding closure |
@@ -37,6 +47,7 @@ PATH="$(brew --prefix node@24)/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir f
 | `eba6fb931448f339a32ee08152bdf17114fa5bada7016186788926276f86a429`, `32c89b1bb5d37c25d0fd2c8a24c72f56c65a73621602af48da0536c712fc9807` (`app-route-layout` source/test) | closing focused Vitest above | GREEN, `45/45` | Host layout renders one combined club/workspace control per responsive spine; desktop and mobile expose the exact four approved primary labels in the same href order; settings, member view, notifications, and new meeting remain outside primary navigation but reachable. Member/guest/admin default shell contracts remain covered by the same focused layout/shared-shell suites. |
 | `3c918bf448b38a35e43d902b53b682ab73174dfbd4b1f8649bef7f692a08f92c`, `7744778753b62515afcfb0b2186c63234c06bee9eb4660164113e6ee20c06c43`, `5a43e66f58d401a781e3bc7d50670232ed8def8449dd60f70a35b4008218beae`, `85c2aa559aa78b794ba577279b45706a304491855c2ff3b15dad488c2fa5f2da`, `1085c2c1e010d1ca408247a5bca88d18fd4ef7ab8a7e535a4f54f8788d3bbede` (shared shell/model/copy) | closing focused Vitest above and review closing Vitest | GREEN, `45/45` and `99/99` | The shared shell accepts generic responsive primary and utility composition without changing the default path. Desktop labels are `운영실 · 일정과 모임 · 사람 · 기록`; mobile labels are `운영실 · 모임 · 사람 · 기록`, while their scoped destination hrefs remain identical. Route-aware shared fallbacks now assign validated record-origin session detail to records exactly like the host layout. |
 | `37905f964ed1fe0038e810c076922318b5a2ff5b01223668ced44b86a2d73d24` (`responsive-navigation.test.tsx`) | review closing Vitest above | RED `22/73`, narrowed RED `3/73`, then GREEN `73/73`; combined GREEN `99/99` | Direct TopNav and MobileTabBar coverage now asserts exact four-area order, canonical/scoped hrefs, compatibility behavior, utility exclusion, direct record routes, validated record-origin ownership, and rejection of external or cross-club ownership without weakening the member/guest assertions. |
+| `852fc891b329174238ddcf988b06aa2a1540bdfa0311dec90740cd921349d3ea`, `d019ca4a87ef4074af8ff68a74966fb603087806845864128d6bdf5b2654c487` (`feedback-document-route.test.tsx`, `spa-layout.test.tsx`) | Stage 2 gate review commands above | RED `4/27`, then GREEN `27/27`; combined GREEN `126/126` | Scoped feedback return preserves desktop `일정과 모임` and mobile `모임` canonical links while assigning current state only to canonical `기록`. Safe club switching registers and reaches the canonical host-records family, and member/archive chrome retains its member navigation while both host-space targets preserve record ownership. |
 | `e139656ef1a721cbb06f8b02d47bf20504597cace78611ae60307c950d9a108d`, `6cb60d6ad97fc838b1caae0358a5261031b66350636f308b79361b2babcd011f` (`host-shell.css`, `mobile.css`) | focused CT command below | GREEN, `8/8` relevant CT | Mobile host utilities remain separate from the bottom primary navigation and use a 44px disclosure target with visible focus. The bottom navigation keeps safe-area padding, and the content reserve prevents overlap. |
 | `ec71e3bf235e9d938c2561b7404dfad5206596afd776998761578bef8cb201f6`, `a91c01a7a0ea962ec93431a99065ff4fe7a8fc99a895a635cdac6f478ee882d1`, `a331e72fad4ec27be8ca05f86bd7deb63912750c695f8ecf8f4dd561031edb27` (focused CT sources) | focused CT command below | GREEN, `8/8` relevant CT | At 390px, scoped host tabs retain exact labels/hrefs, 44px targets, safe-area and no horizontal overflow; desktop retains approved order and typography. Task 2 host primitives remain operable at 390 and 1440. |
 | focused TypeScript/TSX source and tests | focused ESLint command below | exit `0`, no findings | The wiring remains within existing component, routing, and lint boundaries. |
@@ -55,6 +66,12 @@ Review fix round 1 linted the exact changed TypeScript/TSX surface:
 PATH="$(brew --prefix node@24)/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec eslint shared/ui/top-nav.tsx shared/ui/mobile-tab-bar.tsx tests/unit/responsive-navigation.test.tsx
 ```
 
+Stage 2 gate review round 2 linted only its two changed suites:
+
+```text
+PATH="$(brew --prefix node@24)/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec eslint tests/unit/feedback-document-route.test.tsx tests/unit/spa-layout.test.tsx
+```
+
 ## Operate/harden closure
 
 - Current-route ownership is computed from the normalized `appPathname()` result. Scoped and unscoped canonical/compatibility paths select the same area, while utility paths do not create a fifth current primary item.
@@ -64,7 +81,7 @@ PATH="$(brew --prefix node@24)/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir f
 
 ## Verification notes and residual risk
 
-- Original focused Vitest: passed, `45/45`; review closing responsive plus layout Vitest passed, `99/99`.
+- Original focused Vitest: passed, `45/45`; review round 1 responsive plus layout Vitest passed, `99/99`; Stage 2 gate review round 2 exact suites passed `27/27` and the closing four-file set passed `126/126`.
 - Relevant focused Chromium CT: passed, `8/8`, including 390px and 1440px Task 2 primitives, 390px scoped host navigation, the 767px safe-area/content-reserve boundary, and the 768px desktop boundary.
 - Non-blocking CT residual: the original unfiltered focused CT run passed `8/9`; the only failure was the existing member `desktop avatar` screenshot comparison, with `690` pixels (about `1%`) of text anti-aliasing difference in `top-nav-long-account-name-1280.png`. Its DOM and geometry assertions passed. The screenshot artifact is byte-identical between BASE and closing HEAD: both resolve to Git blob `ba40480c43c4d41e16459d1109c37813d6ab5d42`, with SHA-256 `bdea7003385214bbe8956d2387e6552f251d502c72a41ce7cd028c3fe0b9a43a`. This review fix changes only route-aware current selection and unit expectations, so the known avatar CT was not rerun or rewritten.
 - Focused ESLint: passed with no findings.

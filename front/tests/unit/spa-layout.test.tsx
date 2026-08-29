@@ -374,7 +374,7 @@ describe("SPA AppRouteLayout", () => {
                 }
               />
               <Route
-                path="host/sessions"
+                path="host/records"
                 element={
                   <main>
                     host records child <CurrentLocationText />
@@ -390,7 +390,7 @@ describe("SPA AppRouteLayout", () => {
     expect(await screen.findByText(/archive child/)).toBeInTheDocument();
     await user.click((await screen.findAllByRole("link", { name: "샘플 북클럽" }))[0]);
 
-    expect(await screen.findByText("/clubs/sample-book-club/app/host/sessions")).toBeInTheDocument();
+    expect(await screen.findByText("/clubs/sample-book-club/app/host/records")).toBeInTheDocument();
   });
 
   it("keeps host users on member mobile chrome after opening archive from the member workspace", async () => {
@@ -433,8 +433,8 @@ describe("SPA AppRouteLayout", () => {
     ]);
     expect(within(tabs).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
     expect(screen.getAllByRole("link", { name: "호스트 공간" }).map((link) => link.getAttribute("href"))).toEqual([
-      "/app/host/sessions",
-      "/app/host/sessions",
+      "/app/host/records",
+      "/app/host/records",
     ]);
     expect(screen.queryByRole("link", { name: "멤버 공간" })).not.toBeInTheDocument();
     for (const navigation of screen.getAllByRole("navigation", { name: "공간 선택" })) {
@@ -481,8 +481,10 @@ describe("SPA AppRouteLayout", () => {
 
     const desktopNav = screen.getByRole("navigation", { name: "멤버 주 메뉴" });
     expect(within(desktopNav).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getAllByRole("link", { name: "호스트 공간" })).toHaveLength(2);
-    expect(screen.getAllByRole("link", { name: "호스트 공간" })[0]).toHaveAttribute("href", "/app/host/sessions");
+    expect(screen.getAllByRole("link", { name: "호스트 공간" }).map((link) => link.getAttribute("href"))).toEqual([
+      "/app/host/records",
+      "/app/host/records",
+    ]);
 
     expect(screen.getAllByText("기록")).toHaveLength(2);
     expect(screen.queryByRole("link", { name: "멤버 공간" })).not.toBeInTheDocument();
