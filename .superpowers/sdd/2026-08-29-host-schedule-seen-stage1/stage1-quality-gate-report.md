@@ -69,3 +69,13 @@ Source hashes after correction:
 | Source | Command | Result |
 | --- | --- | --- |
 | `05084852449c1e9d6bab9085f9d4a78a88065b58cc13a512e893a5c794e2ba41` | `./server/gradlew -p server ktlintMainSourceSetCheck detekt` | Exit 0; both ktlint and detekt passed. |
+
+## Round 5: migration fixture formatting correction
+
+- Root cause: ktlint requires the one-parameter private helper signature on one line, while the original `prepareV60ScheduleSeenUpgradeFixture` name exceeded detekt's maximum line length.
+- Closure: renamed only the private helper and its call site to `prepareV60ScheduleSeenFixture`, then restored the one-line signature. The fixture body and assertions are unchanged.
+- Source after correction: `MySqlFlywayMigrationTest.kt` SHA-256 `966992c5f6ebd23de8633c0ee33ba8dfce332a1c53eea35d3ed9dd412d1fb2eb`.
+
+| Source | Command | Result |
+| --- | --- | --- |
+| `966992c5f6ebd23de8633c0ee33ba8dfce332a1c53eea35d3ed9dd412d1fb2eb` | `./server/gradlew -p server ktlintTestSourceSetCheck detekt` | Exit 0; both ktlint test source and detekt passed. |

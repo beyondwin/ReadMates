@@ -3235,7 +3235,7 @@ class MySqlFlywayMigrationTest(
         FlywayUpgradeMySqlContainer().use { database ->
             database.start()
             val dataSource = DriverManagerDataSource(database.jdbcUrl, database.username, database.password)
-            val fixture = prepareV60ScheduleSeenUpgradeFixture(dataSource)
+            val fixture = prepareV60ScheduleSeenFixture(dataSource)
             val upgradeResult = migrateToV61(dataSource)
 
             assertThat(upgradeResult.migrationsExecuted).isEqualTo(1)
@@ -3305,9 +3305,7 @@ class MySqlFlywayMigrationTest(
         }
     }
 
-    private fun prepareV60ScheduleSeenUpgradeFixture(
-        dataSource: DriverManagerDataSource,
-    ): V61ScheduleSeenUpgradeFixture {
+    private fun prepareV60ScheduleSeenFixture(dataSource: DriverManagerDataSource): V61ScheduleSeenUpgradeFixture {
         val v60Flyway =
             Flyway
                 .configure()
