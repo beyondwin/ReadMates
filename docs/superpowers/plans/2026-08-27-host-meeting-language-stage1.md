@@ -1,5 +1,7 @@
 # 호스트 용어·상태 사전 통일 (리디자인 1단계) Implementation Plan
 
+> **Superseded — 실행 금지:** ADR-0048/0049 기반 `2026-08-29-host-lifecycle-operating-room-program-index.md`가 최신 승인 구현 권위다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 호스트 화면의 모임 lifecycle 라벨을 스펙 §5 사전(작성 중 / 준비 중 / 기록 정리 중 / 게시됨)으로 단일화하고, 화면별 하드코딩·번역 심(shim)을 제거한다.

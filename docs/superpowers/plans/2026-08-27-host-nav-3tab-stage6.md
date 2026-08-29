@@ -1,5 +1,7 @@
 # 호스트 내비 3탭 전환 + 구 라우트 리다이렉트 (리디자인 6단계) Implementation Plan
 
+> **Superseded — 실행 금지:** ADR-0048/0049 기반 `2026-08-29-host-lifecycle-operating-room-program-index.md`가 최신 승인 구현 권위다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 호스트 1차 내비게이션을 3탭(오늘·모임·멤버)으로 전환하고, 흡수된 화면(`/records`, `/operations`, `/invitations`)을 새 목적지로 리다이렉트한다(스펙 §3). 2~5단계가 모두 릴리스된 뒤 마지막에 스위치한다.

@@ -1,5 +1,7 @@
 # 호스트 모임 목록 통합 (리디자인 3단계) Implementation Plan
 
+> **Superseded — 실행 금지:** ADR-0048/0049 기반 `2026-08-29-host-lifecycle-operating-room-program-index.md`가 최신 승인 구현 권위다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** `/sessions`를 "다가오는 모임 + 지난 모임" 두 구역의 차례(목차)식 단일 목록으로 재구성해 기록 장부의 내용을 흡수하고, 휴지통 진입을 목록 하단 링크 하나로 통일한다(스펙 §4.2 목록).

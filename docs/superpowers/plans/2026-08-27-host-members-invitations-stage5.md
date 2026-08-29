@@ -1,5 +1,7 @@
 # 호스트 멤버+초대 통합 (리디자인 5단계) Implementation Plan
 
+> **Superseded — 실행 금지:** ADR-0048/0049 기반 `2026-08-29-host-lifecycle-operating-room-program-index.md`가 최신 승인 구현 권위다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 멤버 화면에 초대를 흡수해 "승인 대기 구역(조건부) + 명단 원장 + 초대 구역"의 단일 목적지로 재구성한다(스펙 §4.3).

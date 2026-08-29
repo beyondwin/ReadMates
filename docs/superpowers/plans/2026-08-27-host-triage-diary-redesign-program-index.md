@@ -1,4 +1,6 @@
-# 호스트 트리아지·다이어리 리디자인 — 프로그램 인덱스
+# 호스트 트리아지·다이어리 리디자인 — 프로그램 인덱스 (역사 기록)
+
+> **Superseded — 실행 금지:** 이 ADR-0046 기반 계획은 `2026-08-29-host-lifecycle-operating-room-program-index.md`로 대체됐다. 최신 승인 구현에는 이 문서와 연결된 stage 계획을 사용하지 않는다.
 
 스펙 `docs/development/2026-08-27-readmates-host-triage-diary-redesign-design.md`(§9 단계적 구현)의 실행 계획 묶음. 순서대로 실행하며, 각 단계는 독립 릴리스 가능하다. 각 계획의 Task 0(앵커 재확인)을 건너뛰지 않는다 — 앞 단계가 코드를 바꾼 뒤 문서의 파일·행 참조가 낡았을 수 있다.
 

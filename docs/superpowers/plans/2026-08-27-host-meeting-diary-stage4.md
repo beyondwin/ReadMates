@@ -1,5 +1,7 @@
 # 호스트 모임 다이어리 상세 (리디자인 4단계) Implementation Plan
 
+> **Superseded — 실행 금지:** ADR-0048/0049 기반 `2026-08-29-host-lifecycle-operating-room-program-index.md`가 최신 승인 구현 권위다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Focus Deck을 "모임의 걸음" 세로 타임라인 다이어리 스프레드로 재조립하고, 장부 마감 체크리스트·자동 알림 가시성·미응답 타깃 인라인 컴포저를 다이어리에 통합한다(스펙 §4.2 다이어리).

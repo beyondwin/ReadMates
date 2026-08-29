@@ -1,6 +1,6 @@
 # ADR-0046: 호스트 워크스페이스를 오늘 트리아지 + 모임 다이어리로 재구성
 
-- 상태: Accepted
+- 상태: Superseded by ADR-0048
 - 결정일: 2026-08-27
 - 작성자: design/front
 - 관련: ADR-0044, ADR-0045, ADR-0026, ADR-0038, `docs/development/2026-08-27-readmates-host-triage-diary-redesign-design.md`, `front/DESIGN.md`

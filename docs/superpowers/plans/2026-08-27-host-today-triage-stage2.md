@@ -1,5 +1,7 @@
 # 호스트 오늘(홈) 트리아지 (리디자인 2단계) Implementation Plan
 
+> **Superseded — 실행 금지:** ADR-0048/0049 기반 `2026-08-29-host-lifecycle-operating-room-program-index.md`가 최신 승인 구현 권위다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 호스트 홈을 "처리할 일 단일 큐 + 다음 모임 히어로"의 트리아지 화면(스펙 §4.1)으로 재구성하고, 운영 허브의 신호를 홈 큐로 흡수한다.
