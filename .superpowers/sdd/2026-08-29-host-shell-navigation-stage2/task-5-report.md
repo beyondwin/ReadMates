@@ -56,9 +56,25 @@ The targeted private-path, cloud identifier, private-key, credential-prefix, and
 - GREEN command: `PATH="$(brew --prefix node@24)/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run tests/unit/frontend-boundaries.test.ts features/host/model/host-authority-navigation.test.ts features/host/queries/host-query-key-inventory.test.ts features/host/queries/host-state-purge.test.ts src/app/layouts/club-app-route-layout-authority-loss.test.tsx`.
 - GREEN result: `5` files and `25` tests passed, `0` failures. The exact Task 5 purge assertion still proves same-club member cache retention.
 
+## Gate correction round 3
+
+- BASE verified clean at `75dfcd2f500fe95160cd253a7119eae17d184357`.
+- Controller-owned full frontend RED: `1` failure and `3651` passes. The suspension handoff assertion sampled the earlier `호스트 공간으로 전환했습니다` live-region instead of the final `멤버십이 중지` authority status. Per the gate instruction, this task did not rerun the full suite.
+- Focused diagnosis first established that the victim file passed alone and in `10` consecutive isolated runs. A storage-mirror hypothesis produced a pure-store RED but was falsified by the router integration: removing that proposed production change while explicitly creating the prior member→host announcement still converged to the correct authority status. No production change from that hypothesis was retained.
+- Root cause: the module-level workspace receipt legitimately persists for the page session, so an earlier host-transition status can already exist. Router pathname state may update before React commits the guest route remount; `findByRole("status")` therefore returned that already-present status immediately and treated an intermediate DOM as final. This was a test synchronization error, not a production authority-loss lifecycle error.
+- The regression now creates the polluter deterministically by preparing a prior member receipt and waiting for the host-transition status before signaling suspension. It then waits for the final authority status and retains the load-bearing assertions that exactly one status remains and the guest-safe heading owns focus.
+
+| Closing source SHA-256 | Command | Result | Finding closure |
+| --- | --- | --- | --- |
+| `bdd9ef4c374970b3e82ae5c1513a681ddf7986c6ac62a5e3a3c73eceedeb7e33` (`club-app-route-layout-authority-loss.test.tsx`) | `PATH="$(brew --prefix node@24)/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run src/app/app-route-security-transition.test.ts src/app/app-route-security-controller.test.tsx src/app/layouts/club-app-route-layout-authority-loss.test.tsx` | GREEN: `3` files, `17` tests | Explicit polluter→victim coverage proves the final suspension status replaces the earlier workspace announcement, remains unique, and focuses the remounted guest-safe heading. |
+| same hash | Task 5 closing focused Vitest command above | GREEN: `9` files, `122` tests | Authority purge, cache isolation, sanitized navigation state, editor handoff, route model, and shell switching remain closed without a production or assertion-scope change. |
+| same hash | `PATH="$(brew --prefix node@24)/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run tests/unit/frontend-boundaries.test.ts` | GREEN: `1` file, `11` tests | The test-only synchronization correction adds no architecture exception or cross-feature production dependency. |
+| same hash | `PATH="$(brew --prefix node@24)/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec eslint src/app/layouts/club-app-route-layout-authority-loss.test.tsx` | exit `0`, no findings | The changed frontend test is lint-clean. |
+
 ## Verification notes and residual risk
 
 - No focused E2E was required: the production change is a pure pending-handoff target guard, and the real router/controller/layout integration test proves purge-before-navigation and navigation-state sanitization. Existing route-model and switcher tests cover the relevant context-switch/user-action boundary.
 - Full frontend lint/test/build and full E2E were intentionally not run under the Task 5 stop conditions. Stage-wide responsive/browser verification remains Task 6.
+- The controller owns the one final full-suite rerun for the round 3 gate; this task deliberately stopped at the focused polluter/victim, Task 5, boundary, lint, diff, and public-safety evidence.
 - Multi-tab, offline/service-worker, and live authority revocation were not exercised here. They remain ADR-0035 browser-hardening evidence, not a Task 5 repository claim.
 - Stage 4 workbox code does not exist at this BASE. This task did not invent a future key; any future host workbox query must join the same canonical host club prefix and executable inventory.
