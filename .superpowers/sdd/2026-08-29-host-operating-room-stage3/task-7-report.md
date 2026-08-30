@@ -41,3 +41,24 @@ The new browser flow initially reached the canonical session with its informatio
 - Impeccable Operate and craft-floor guidance was applied. Its context check ran once before UI editing and its detector ran once after the UI was final.
 - The externally supplied untracked design directory was preserved untouched and unstaged.
 - Full frontend lint/test/build, full CT, full E2E, server, and public-release gates were intentionally not run under Task 7 stop conditions. They remain Stage 3 Task 8 evidence. Existing record-apply/publish E2E was not repeated because this task did not change that canonical mutation surface; this task proves the operating room delegates to it.
+
+## Stage 3 Docker CT gate closure
+
+The Stage 3 full Docker CT gate found one changed-surface evidence mismatch: the embedded closing CT still asserted that Task 7's canonical `마감 증거` and host/member/public destinations were absent, and the CLOSED 768 baseline predated the intentionally taller embedded evidence. The production render and the generated actual/diff were reviewed once. The added hierarchy was intentional, readable, and unclipped, so no production source changed.
+
+| Source SHA-256 | Command | Result | Finding closure |
+| --- | --- | --- | --- |
+| `7200c40607183dcc9da025a2130b9b10cd36079c3413e9b340cf03217e3ff53b` (`session-closing-board.ct.tsx`) | focused Docker CT update, then the same focused Docker CT without `--update-snapshots` | GREEN, `7/7` on both final update and fresh verification | All six embedded cases now require the canonical evidence region, five evidence facts, three destination surfaces, owned link hrefs when available, unavailable destination detail when blocked, and no horizontal overflow at 320/390/768/900/1024/1440. |
+| `8ab3ed4f852bc724445cbcc8e11ae6d8e381665e2fa029f8d42ffb755322d632` (`host-focus-deck.ct.tsx`) | the same focused Docker CT | GREEN, CLOSED 768 included in `7/7` | The CLOSED focus deck retains its approved information → close ledger → evidence/destinations → related work → receipt/recovery → primary action hierarchy with no clipping. |
+| `9812f601a665a25bc314525066c45140dc190d26dce7a1228472be3c4163d7bc` (`diary-closed-768.png`) | focused Docker snapshot update plus one visual inspection | updated intentionally; visual inspection clean | Only the CLOSED 768 focus-deck baseline changed on that CT surface. |
+| `342d5ec7cc32b083bf41649741494ff02b99c938041f3a9ba1b9f80007b9c220`, `eabd4384fb286440fafe519e83e027d742dbf9e4c62c993f5d407b9e7e24ed19`, `c76262dabe0c0ab89339184c3a3ccecd2fb15c0fed857fae5793d22cba659a64`, `9e50297c805499534fd02df74178db49fde7d0b4589f79253ab3da48377799ed`, `475dfb46a84d3cb0950906e49af85ae7b41b7a55a03a3ca84277442c84ec627b` (five embedded closing PNGs) | focused Docker snapshot update plus one visual inspection of each baseline | updated intentionally; all five visual inspections clean | The blocked 1440/768/320 and published 900/390 baselines alone now seal the canonical evidence and destination layout. No unrelated snapshot changed. |
+
+The repository Docker flow used image `mcr.microsoft.com/playwright:v1.61.1-jammy`, pinned `pnpm@11.13.1`, the three repository CT cache volumes, and this focused Playwright command after install:
+
+```text
+pnpm exec playwright test --config=playwright-ct.config.ts features/host/ui/session-closing-board.ct.tsx features/host/ui/meeting-workspace/host-focus-deck.ct.tsx --grep "Embedded closing|Diary spread CLOSED"
+```
+
+Snapshot generation used the exact same command with `--update-snapshots`; fresh verification omitted it and passed `7/7` in `3.3s`. The external untracked design directory remained untouched and unstaged.
+
+Exact changed-file lint ran in the same Docker image with Node `v24.17.0` and pinned pnpm `11.13.1`: `pnpm exec eslint features/host/ui/session-closing-board.ct.tsx` → exit `0`. The final targeted public-safety scan covered the changed CT source and this report; the staged diff check covered the CT source, six PNGs, and this forced-added report.
