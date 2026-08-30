@@ -139,8 +139,9 @@ private fun candidate(
     scheduleSeenAvailable: Boolean,
 ) = HostOperatingRoomCandidate(uuid(id), state, scheduleSeenAvailable)
 
-private fun available(requirement: HostOperatingRoomClosingRequirement) =
-    HostOperatingRoomClosingRequirementResult.Available(requirement)
+private typealias AvailableClosingRequirement = HostOperatingRoomClosingRequirementResult.Available
 
-private fun uuid(suffix: String): UUID =
-    UUID.fromString("00000000-0000-0000-0000-${suffix.padStart(12, '0')}")
+private fun available(requirement: HostOperatingRoomClosingRequirement): AvailableClosingRequirement =
+    AvailableClosingRequirement(requirement)
+
+private fun uuid(suffix: String): UUID = UUID.fromString("00000000-0000-0000-0000-${suffix.padStart(12, '0')}")

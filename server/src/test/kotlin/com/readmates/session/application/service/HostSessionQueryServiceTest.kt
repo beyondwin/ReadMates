@@ -102,5 +102,4 @@ private fun candidate(
     scheduleSeenAvailable = state == HostOperatingRoomCandidateState.OPEN,
 )
 
-private fun uuid(suffix: String): UUID =
-    UUID.fromString("00000000-0000-0000-0000-${suffix.padStart(12, '0')}")
+private fun uuid(suffix: String): UUID = UUID.fromString("00000000-0000-0000-0000-${suffix.padStart(12, '0')}")

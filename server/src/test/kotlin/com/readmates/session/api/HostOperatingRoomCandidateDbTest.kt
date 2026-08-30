@@ -109,6 +109,28 @@ class HostOperatingRoomCandidateDbTest(
 
     @Test
     fun `draft schedule availability requires member visibility and an active participant snapshot`() {
+        insertScheduleAvailabilityCandidates()
+
+        val candidates =
+            queries.loadHostOperatingRoomCandidates(
+                clubId = UUID.fromString(CLUB_ID),
+                evaluatedAt = LocalDateTime.parse("2026-08-30T12:00:00"),
+            )
+
+        assertEquals(
+            mapOf(
+                "316" to true,
+                "311" to true,
+                "312" to false,
+                "313" to false,
+                "314" to false,
+                "315" to false,
+            ),
+            candidates.associate { it.sessionId.toString().takeLast(3) to it.scheduleSeenAvailable },
+        )
+    }
+
+    private fun insertScheduleAvailabilityCandidates() {
         insertSession(
             "311",
             101,
@@ -153,24 +175,6 @@ class HostOperatingRoomCandidateDbTest(
         insertParticipant("314", "ACTIVE")
         insertParticipant("315", "ACTIVE")
         insertParticipant("316", "ACTIVE")
-
-        val candidates =
-            queries.loadHostOperatingRoomCandidates(
-                clubId = UUID.fromString(CLUB_ID),
-                evaluatedAt = LocalDateTime.parse("2026-08-30T12:00:00"),
-            )
-
-        assertEquals(
-            mapOf(
-                "316" to true,
-                "311" to true,
-                "312" to false,
-                "313" to false,
-                "314" to false,
-                "315" to false,
-            ),
-            candidates.associate { it.sessionId.toString().takeLast(3) to it.scheduleSeenAvailable },
-        )
     }
 
     private fun insertSession(

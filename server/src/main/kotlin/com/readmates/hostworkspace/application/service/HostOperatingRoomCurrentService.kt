@@ -25,29 +25,36 @@ class HostOperatingRoomCurrentService(
         if (!actor.activeHost) throw HostOperatingRoomAccessDeniedException()
 
         val candidates = candidateSource.loadCandidates(actor)
-        candidates.firstOrNull { candidate -> candidate.state == HostOperatingRoomCandidateState.OPEN }?.let {
-            return HostOperatingRoomCurrent(it.toCurrentMeeting(HostOperatingRoomSelection.OPEN))
-        }
-        candidates.firstOrNull { candidate -> candidate.state == HostOperatingRoomCandidateState.DRAFT }?.let {
-            return HostOperatingRoomCurrent(it.toCurrentMeeting(HostOperatingRoomSelection.UPCOMING_DRAFT))
-        }
+        val currentMeeting =
+            candidates
+                .firstOrNull { candidate -> candidate.state == HostOperatingRoomCandidateState.OPEN }
+                ?.toCurrentMeeting(HostOperatingRoomSelection.OPEN)
+                ?: candidates
+                    .firstOrNull { candidate -> candidate.state == HostOperatingRoomCandidateState.DRAFT }
+                    ?.toCurrentMeeting(HostOperatingRoomSelection.UPCOMING_DRAFT)
+                ?: findClosingRequiredMeeting(actor, candidates)
+        return HostOperatingRoomCurrent(currentMeeting)
+    }
+
+    private fun findClosingRequiredMeeting(
+        actor: HostOperatingRoomActor,
+        candidates: List<HostOperatingRoomCandidate>,
+    ): HostOperatingRoomCurrentMeeting? =
         candidates
             .asSequence()
             .filter { candidate -> candidate.state == HostOperatingRoomCandidateState.CLOSED }
-            .forEach { candidate ->
+            .mapNotNull { candidate ->
                 when (val result = closingRequirementSource.loadClosingRequirement(actor, candidate.sessionId)) {
                     is HostOperatingRoomClosingRequirementResult.Available ->
                         if (result.requirement == HostOperatingRoomClosingRequirement.REQUIRED) {
-                            return HostOperatingRoomCurrent(
-                                candidate.toCurrentMeeting(HostOperatingRoomSelection.CLOSING_REQUIRED),
-                            )
+                            candidate.toCurrentMeeting(HostOperatingRoomSelection.CLOSING_REQUIRED)
+                        } else {
+                            null
                         }
                     HostOperatingRoomClosingRequirementResult.Unavailable ->
                         throw HostOperatingRoomAvailabilityException()
                 }
-            }
-        return HostOperatingRoomCurrent(null)
-    }
+            }.firstOrNull()
 }
 
 private fun HostOperatingRoomCandidate.toCurrentMeeting(selection: HostOperatingRoomSelection) =
