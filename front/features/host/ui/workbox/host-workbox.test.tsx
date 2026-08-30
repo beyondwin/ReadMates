@@ -68,6 +68,22 @@ describe("HostWorkbox", () => {
     expect(props.onStateChange).toHaveBeenCalledWith("DEFERRED");
   });
 
+  it("uses Home and End to move across the complete workbox tab set", async () => {
+    const props = renderWorkbox();
+    const user = userEvent.setup();
+    const deferred = screen.getByRole("tab", { name: "보류" });
+    const completed = screen.getByRole("tab", { name: "완료" });
+
+    deferred.focus();
+    await user.keyboard("{End}");
+    expect(completed).toHaveFocus();
+    expect(props.onStateChange).toHaveBeenLastCalledWith("COMPLETED");
+
+    await user.keyboard("{Home}");
+    expect(screen.getByRole("tab", { name: /지금/ })).toHaveFocus();
+    expect(props.onStateChange).toHaveBeenLastCalledWith("NOW");
+  });
+
   it("keeps a partial source warning retryable without hiding successful rows", async () => {
     const props = renderWorkbox();
 

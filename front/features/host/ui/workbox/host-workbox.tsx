@@ -51,10 +51,14 @@ export function HostWorkbox({
   const hasContinuation = loadedView?.nextCursor !== null && loadedView !== null;
 
   const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+    if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = tabs.length - 1;
+    if (nextIndex === null) return;
+
     event.preventDefault();
-    const direction = event.key === "ArrowRight" ? 1 : -1;
-    const nextIndex = (index + direction + tabs.length) % tabs.length;
     onStateChange(tabs[nextIndex][0]);
     const tablist = event.currentTarget.closest('[role="tablist"]');
     (tablist?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[nextIndex])?.focus();
