@@ -32,6 +32,12 @@ class HostOperatingRoomCandidateDbTest(
             "Operating room candidates",
         )
         jdbcTemplate.update(
+            "insert into clubs (id, slug, name, tagline, about, status) values (?, ?, ?, '', '', 'ACTIVE')",
+            OTHER_CLUB_ID,
+            "other-operating-room-candidates",
+            "Other operating room candidates",
+        )
+        jdbcTemplate.update(
             "insert into users (id, email, name, short_name) values (?, ?, ?, ?)",
             USER_ID,
             "operating-room-host@example.com",
@@ -55,7 +61,7 @@ class HostOperatingRoomCandidateDbTest(
         jdbcTemplate.update("delete from sessions where id like '30000000-0000-0000-0000-%'")
         jdbcTemplate.update("delete from memberships where id = ?", HOST_MEMBERSHIP_ID)
         jdbcTemplate.update("delete from users where id = ?", USER_ID)
-        jdbcTemplate.update("delete from clubs where id = ?", CLUB_ID)
+        jdbcTemplate.update("delete from clubs where id in (?, ?)", CLUB_ID, OTHER_CLUB_ID)
     }
 
     @Test
@@ -70,6 +76,9 @@ class HostOperatingRoomCandidateDbTest(
         insertSession("308", 98, "CLOSED", "2026-08-31", "20:00:00", deleted = true)
         insertSession("309", 90, "DRAFT", "2026-08-30", "13:00:00")
         insertSession("310", 99, "CLOSED", "2026-08-29", "20:00:00")
+        insertSession("401", 999, "OPEN", "2026-08-30", "17:00:00", clubId = OTHER_CLUB_ID)
+        insertSession("402", 998, "DRAFT", "2026-08-30", "12:30:00", clubId = OTHER_CLUB_ID)
+        insertSession("403", 997, "CLOSED", "2026-08-30", "23:00:00", clubId = OTHER_CLUB_ID)
 
         val candidates =
             queries.loadHostOperatingRoomCandidates(
@@ -77,10 +86,13 @@ class HostOperatingRoomCandidateDbTest(
                 evaluatedAt = LocalDateTime.parse("2026-08-30T12:00:00"),
             )
 
+        val candidateSuffixes = candidates.map { it.sessionId.toString().takeLast(3) }
+
         assertEquals(
             listOf("301", "309", "303", "302", "310", "304", "305"),
-            candidates.map { it.sessionId.toString().takeLast(3) },
+            candidateSuffixes,
         )
+        assertEquals(emptySet<String>(), candidateSuffixes.toSet().intersect(setOf("401", "402", "403")))
         assertEquals(
             listOf(
                 HostOperatingRoomCandidateState.OPEN,
@@ -170,6 +182,7 @@ class HostOperatingRoomCandidateDbTest(
         accessScope: String = "HOST_ONLY",
         participantSetRevision: Long = 0,
         deleted: Boolean = false,
+        clubId: String = CLUB_ID,
     ) {
         jdbcTemplate.update(
             """
@@ -182,7 +195,7 @@ class HostOperatingRoomCandidateDbTest(
                       ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
             sessionId(suffix),
-            CLUB_ID,
+            clubId,
             number,
             "Session $number",
             "Book $number",
@@ -224,6 +237,7 @@ class HostOperatingRoomCandidateDbTest(
 
     companion object {
         private const val CLUB_ID = "30000000-0000-0000-0000-000000000001"
+        private const val OTHER_CLUB_ID = "30000000-0000-0000-0000-000000000002"
         private const val USER_ID = "30000000-0000-0000-0000-000000000101"
         private const val HOST_MEMBERSHIP_ID = "30000000-0000-0000-0000-000000000201"
     }
