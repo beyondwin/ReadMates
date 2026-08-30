@@ -33,6 +33,12 @@ interface MemberApprovalStorePort {
         membershipId: UUID,
     ): Boolean
 
+    fun recordViewerRejection(
+        clubId: UUID,
+        actorMembershipId: UUID,
+        membershipId: UUID,
+    )
+
     fun deleteClubAccess(
         clubId: UUID,
         membershipId: UUID,

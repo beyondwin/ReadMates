@@ -1,5 +1,6 @@
 package com.readmates.sessionclosing.application.service
 
+import com.readmates.sessionclosing.application.model.ClosingPrimaryAction
 import com.readmates.sessionclosing.application.port.`in`.GetHostRecordClosingWorkSourceUseCase
 import com.readmates.sessionclosing.application.port.`in`.HostRecordClosingWorkSourceItem
 import com.readmates.sessionclosing.application.port.`in`.HostRecordClosingWorkSourceResult
@@ -28,13 +29,13 @@ class HostRecordClosingWorkSourceService(
                 HostRecordClosingWorkSourceResult(
                     result.rows
                         .filter {
-                            it.actionable ||
+                            it.primaryAction.isWorkboxAction() ||
                                 (it.resolvedAt != null && !it.resolvedAt.isBefore(completedSince))
                         }.map {
                             HostRecordClosingWorkSourceItem(
                                 it.sessionId,
                                 it.sourceGeneration,
-                                it.actionable,
+                                it.primaryAction.isWorkboxAction(),
                                 it.dueAt,
                                 it.resolvedAt,
                                 it.receiptId,
@@ -45,3 +46,12 @@ class HostRecordClosingWorkSourceService(
                 )
         }
 }
+
+private fun ClosingPrimaryAction.isWorkboxAction(): Boolean =
+    this in
+        setOf(
+            ClosingPrimaryAction.CLOSE_SESSION,
+            ClosingPrimaryAction.IMPORT_RECORDS,
+            ClosingPrimaryAction.SEND_NOTIFICATION,
+            ClosingPrimaryAction.PUBLISH_RECORDS,
+        )

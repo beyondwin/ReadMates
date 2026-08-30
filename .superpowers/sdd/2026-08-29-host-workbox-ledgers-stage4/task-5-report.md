@@ -58,3 +58,31 @@ The per-file implementation manifest is sealed in `task-5-manifest.sha256`; it i
 - Full server CI/Testcontainers suite, frontend lint/test/build, CT, E2E, public-release, full Stage 4 gates and Task 6+ were not run; those belong to stage closeout or later tasks.
 - Whole-server detekt remains a skipped gate because it reports pre-existing Task 2/4 findings outside Task 5. The focused report contains zero Task 5 findings after cleanup. Whole-class architecture execution similarly retains the pre-existing `ManualNotificationAudienceQueries.kt -> Sha256` allowlist failure; both Task-5-specific architecture tests pass.
 - No live OAuth, email/provider call, deployment, push, PR or tag was performed.
+
+## Review round 1 — source-authority closure
+
+- Review base: `59b9af7c4421c6cf823d08da89cbdde959570db0`.
+- Scope stayed within the three reviewed source owners and their source-local approval/closing authority. Aggregate, snapshot, cursor, controller, security, frontend, migrations, architecture ledgers and Task 6+ were unchanged.
+
+| Finding | RED evidence | Closure |
+|---|---|---|
+| `SCHEDULE_UNSEEN` admitted unavailable drafts | Real MySQL source test returned three `DRAFT` sessions that fail the authoritative host-session availability predicate | The source now applies the same `OPEN`, or `DRAFT + GUEST_READABLE + participant_set_revision > 0 + meeting >= evaluatedAt in Asia/Seoul`, predicate and still requires an ACTIVE participant. Unavailable sessions expose no work item or deferral key. |
+| `MEMBER_APPROVAL` inferred completion from mutable membership state | Repository inspection found immutable `VIEWER_ACTIVATED` receipts, but no rejection audit/receipt anywhere in the schema or rejection transaction | The existing append-only auth mutation receipt is now written as `VIEWER_REJECTED` inside the approval transaction. The source selects the first immutable activation/rejection transition and its time; later membership status, joined-at or updated-at mutations cannot shift or relabel `APPROVED/ACTIVE` or `REJECTED/INACTIVE`. No migration or mutable fallback was introduced. |
+| `RECORD_CLOSING` treated every closed session as actionable and mutable publication state as completion | Real MySQL source test admitted `READY/NONE` and failed the same-generation publish transition | `SessionClosingStatusService` and the work source now share one closing-decision function. NOW contains only `CLOSE_SESSION`, `IMPORT_RECORDS`, `SEND_NOTIFICATION` or `PUBLISH_RECORDS`; `READY/NONE` is absent. Completion comes only from immutable `SESSION_PUBLISH` mutation receipts. The receipt's canonical resulting vector is converted to the pre-publish vector by reversing the publish transaction's single session-revision increment, so actionable and completed keys match. |
+
+### Fresh focused evidence
+
+| Source hash / command | Result | Finding closure |
+|---|---|---|
+| Review-round source hashes in `task-5-review-1-manifest.sha256` | 12/12 files verified | Exact changed authority surface sealed; report and manifest exclude themselves from recursive hashing. |
+| `./server/gradlew -p server unitTest --tests '*HostScheduleSeenWorkSourceServiceTest' --tests '*MemberApprovalServiceTest' --tests '*HostMemberApprovalWorkSourceServiceTest' --tests '*HostRecordClosingWorkSourceServiceTest' --tests '*SessionClosingStatusServiceTest'` | GREEN, 13/13: 2 + 2 + 2 + 2 + 5 | Schedule projection, rejection receipt transaction, immutable member result mapping, BLOCKED/action filtering and the complete canonical closing policy are closed. |
+| `./server/gradlew -p server integrationTest --tests '*JdbcHostWorkSourceAuthorityTest'` | GREEN, 3/3 against MySQL | DRAFT available/unavailable evaluation and no key leakage; approval/rejection immutability under later lifecycle updates; IMPORT/SEND/PUBLISH/NONE plus same-generation publish completion are closed. |
+| `./server/gradlew -p server ktlintMainSourceSetCheck ktlintTestSourceSetCheck detekt`, reports filtered to the 12 manifest files | Focused findings 0 | Whole tasks remain non-green only for pre-existing findings outside the review diff. |
+| `git diff --check` plus targeted production privacy scan | clean / no matches | Patch hygiene and public-repository privacy closed. |
+
+Review-round manifest SHA-256: `d0a0843dda1938e3f0852ab7b64418d7c74778d79d001bec2233cfbcf8b5907f`.
+
+### Review-round skipped evidence
+
+- Aggregate, snapshot, cursor, controller, security/BFF, frontend/contracts, full server CI/Testcontainers, CT/E2E, public-release and Stage 4 gates were not rerun because this round did not touch those sealed surfaces.
+- No V66 migration, architecture baseline/exception change, deployment, provider call, push, PR or tag was performed.

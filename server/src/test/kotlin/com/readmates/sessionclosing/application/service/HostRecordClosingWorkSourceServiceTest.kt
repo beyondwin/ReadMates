@@ -1,5 +1,7 @@
 package com.readmates.sessionclosing.application.service
 
+import com.readmates.sessionclosing.application.model.ClosingOverallState
+import com.readmates.sessionclosing.application.model.ClosingPrimaryAction
 import com.readmates.sessionclosing.application.port.out.HostRecordClosingWorkSourceQuery
 import com.readmates.sessionclosing.application.port.out.HostRecordClosingWorkSourceQueryPort
 import com.readmates.sessionclosing.application.port.out.HostRecordClosingWorkSourceQueryResult
@@ -15,10 +17,30 @@ class HostRecordClosingWorkSourceServiceTest {
 
     @Test
     fun `canonical vector generation distinguishes actionable and same generation resolved rows`() {
-        val actionable = row("00000000-0000-0000-0000-000000003001", "a".repeat(64), true, null)
+        val actionable =
+            row(
+                "00000000-0000-0000-0000-000000003001",
+                "a".repeat(64),
+                ClosingOverallState.BLOCKED,
+                ClosingPrimaryAction.IMPORT_RECORDS,
+                null,
+            )
         val resolved =
-            row("00000000-0000-0000-0000-000000003002", "b".repeat(64), false, now.minusHours(3))
-        val irrelevant = row("00000000-0000-0000-0000-000000003003", "c".repeat(64), false, null)
+            row(
+                "00000000-0000-0000-0000-000000003002",
+                "b".repeat(64),
+                ClosingOverallState.PUBLISHED,
+                ClosingPrimaryAction.REVIEW_PUBLIC_PAGE,
+                now.minusHours(3),
+            )
+        val irrelevant =
+            row(
+                "00000000-0000-0000-0000-000000003003",
+                "c".repeat(64),
+                ClosingOverallState.READY,
+                ClosingPrimaryAction.NONE,
+                null,
+            )
         val service =
             HostRecordClosingWorkSourceService(
                 FakePort(
@@ -51,12 +73,14 @@ class HostRecordClosingWorkSourceServiceTest {
     private fun row(
         id: String,
         generation: String,
-        actionable: Boolean,
+        overallState: ClosingOverallState,
+        primaryAction: ClosingPrimaryAction,
         resolvedAt: OffsetDateTime?,
     ) = HostRecordClosingWorkSourceRow(
         sessionId = UUID.fromString(id),
         sourceGeneration = generation,
-        actionable = actionable,
+        overallState = overallState,
+        primaryAction = primaryAction,
         dueAt = now.minusDays(1),
         resolvedAt = resolvedAt,
         receiptId = resolvedAt?.let { UUID.fromString("00000000-0000-0000-0000-000000003999") },

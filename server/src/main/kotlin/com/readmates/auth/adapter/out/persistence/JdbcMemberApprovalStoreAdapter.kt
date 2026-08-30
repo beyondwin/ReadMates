@@ -104,6 +104,24 @@ class JdbcMemberApprovalStoreAdapter(
         ) == 1
     }
 
+    override fun recordViewerRejection(
+        clubId: UUID,
+        actorMembershipId: UUID,
+        membershipId: UUID,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into auth_public_projection_mutation_receipts (
+              id, mutation_group_id, club_id_snapshot, actor_membership_id_snapshot,
+              subject_membership_id_snapshot, session_id_snapshot, operation, created_at
+            ) values (uuid(), uuid(), ?, ?, ?, null, 'VIEWER_REJECTED', utc_timestamp(6))
+            """.trimIndent(),
+            clubId.dbString(),
+            actorMembershipId.dbString(),
+            membershipId.dbString(),
+        )
+    }
+
     override fun deleteClubAccess(
         clubId: UUID,
         membershipId: UUID,

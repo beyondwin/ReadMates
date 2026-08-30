@@ -9,6 +9,7 @@ import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import java.time.ZoneId
 
 @Repository
 class JdbcHostScheduleSeenWorkSourceAdapter(
@@ -29,7 +30,16 @@ class JdbcHostScheduleSeenWorkSourceAdapter(
                 from active_sessions s
                 join session_participants sp on sp.club_id = s.club_id and sp.session_id = s.id
                   and sp.participation_status = 'ACTIVE'
-                where s.club_id = ? and s.state in ('DRAFT', 'OPEN')
+                where s.club_id = ?
+                  and (
+                    s.state = 'OPEN'
+                    or (
+                      s.state = 'DRAFT'
+                      and s.access_scope = 'GUEST_READABLE'
+                      and s.participant_set_revision > 0
+                      and timestamp(s.session_date, s.start_time) >= ?
+                    )
+                  )
                 group by s.id, s.schedule_revision, s.session_date, s.start_time
                 """.trimIndent(),
                 { rs, _ ->
@@ -51,6 +61,9 @@ class JdbcHostScheduleSeenWorkSourceAdapter(
                     )
                 },
                 query.clubId.dbString(),
+                query.evaluatedAt.atZoneSameInstant(HOST_MEETING_ZONE).toLocalDateTime(),
             ),
         )
 }
+
+private val HOST_MEETING_ZONE: ZoneId = ZoneId.of("Asia/Seoul")

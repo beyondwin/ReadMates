@@ -60,7 +60,7 @@ private fun SessionClosingSnapshot.toClosingStatus(): HostSessionClosingStatus {
                 participantSetRevision,
                 attendanceSnapshotId,
             ),
-        overall = overall(signals),
+        overall = closingDecision(signals),
         checklist = checklistItems(signals),
         evidence = evidence(),
     )
@@ -87,7 +87,9 @@ private fun SessionClosingSnapshot.closingSignals() =
         publicReady = recordVisibility == SessionRecordVisibility.PUBLIC && publicVisible && publicRecordHref != null,
     )
 
-private fun overall(signals: ClosingSignals): ClosingOverall =
+internal fun SessionClosingSnapshot.closingDecision(): ClosingOverall = closingDecision(closingSignals())
+
+private fun closingDecision(signals: ClosingSignals): ClosingOverall =
     when {
         signals.feedbackBlocked -> overall(ClosingOverallState.BLOCKED, ClosingPrimaryAction.IMPORT_RECORDS)
         !signals.sessionClosed -> overall(ClosingOverallState.IN_PROGRESS, ClosingPrimaryAction.CLOSE_SESSION)

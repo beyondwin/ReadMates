@@ -1,5 +1,8 @@
 package com.readmates.sessionclosing.application.port.out
 
+import com.readmates.sessionclosing.application.model.ClosingOverallState
+import com.readmates.sessionclosing.application.model.ClosingPrimaryAction
+import com.readmates.shared.security.Sha256
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -8,10 +11,36 @@ data class HostRecordClosingWorkSourceQuery(
     val completedSince: OffsetDateTime,
 )
 
+data class HostRecordClosingVersionVector(
+    val sessionRevision: Long,
+    val exposureRevision: Long,
+    val participantSetRevision: Long,
+    val recordDraftRevision: Long?,
+    val liveRecordRevision: Long?,
+    val publicationRevision: Long,
+    val scheduleRevision: Long,
+) {
+    fun sourceGeneration(sessionId: UUID): String =
+        Sha256.hex(
+            listOf(
+                "host-record-closing-v1",
+                sessionId,
+                sessionRevision,
+                exposureRevision,
+                participantSetRevision,
+                recordDraftRevision ?: "-",
+                liveRecordRevision ?: "-",
+                publicationRevision,
+                scheduleRevision,
+            ).joinToString("|"),
+        )
+}
+
 data class HostRecordClosingWorkSourceRow(
     val sessionId: UUID,
     val sourceGeneration: String,
-    val actionable: Boolean,
+    val overallState: ClosingOverallState,
+    val primaryAction: ClosingPrimaryAction,
     val dueAt: OffsetDateTime,
     val resolvedAt: OffsetDateTime?,
     val receiptId: UUID?,
