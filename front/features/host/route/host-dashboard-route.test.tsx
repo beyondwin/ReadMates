@@ -1,125 +1,51 @@
-import { existsSync, readFileSync } from "node:fs";
-import path from "node:path";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router";
-import type { HostSessionLedgerItem } from "@/features/host/model/host-session-ledger-model";
-import type { HostClubOperationsSnapshot } from "@/shared/model/club-operations";
-import { findNestedLiveRegions } from "@/shared/testing/accessibility-checks";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createMemoryRouter, RouterProvider, useLocation, type RouteObject } from "react-router";
+import type {
+  HostSessionClosingStatusResponse,
+  HostSessionDetailResponse,
+} from "@/features/host/api/host-contracts";
 
 const routeMocks = vi.hoisted(() => ({
-  hostSessions: { items: [] as Array<Record<string, unknown>>, nextCursor: null as string | null },
-  current: { currentSession: null as null | Record<string, unknown> },
-  attentionError: false,
-  operationsError: false,
-  notificationsError: false,
-  refetchAttention: vi.fn(),
-  refetchOperations: vi.fn(),
-  refetchNotifications: vi.fn(),
+  loaderData: null as unknown,
+  detailRefetchData: null as HostSessionDetailResponse | null,
+  refetchDetail: vi.fn(),
   updateAttendance: vi.fn(),
+  resetAttendance: vi.fn(),
   restoreChange: vi.fn(),
+  resetRestore: vi.fn(),
   fetchRestorePreview: vi.fn(),
-  sessionDetail: null as null | {
-    sessionId: string;
-    attendees: Array<{
-      membershipId: string;
-      displayName: string;
-      accountName: string;
-      rsvpStatus: "GOING" | "NO_RESPONSE" | "MAYBE" | "DECLINED";
-      attendanceStatus: "UNKNOWN" | "ATTENDED" | "ABSENT";
-      attendanceRevision: number;
-      participationStatus?: "ACTIVE";
-    }>;
-  },
-  recordAttention: {
-    items: [] as HostSessionLedgerItem[],
-    nextCursor: null as string | null,
-    summary: {
-      needsAttentionCount: 0,
-      incompletePublishedCount: 0,
-      draftCount: 0,
-    },
-  },
-  operations: null as HostClubOperationsSnapshot | null,
-  notifications: {
-    pending: 0,
-    failed: 0,
-    dead: 0,
-    sentLast24h: 0,
-    latestFailures: [] as Array<Record<string, unknown>>,
-  },
+  reconciliationState: "idle" as "idle" | "checking" | "pending",
 }));
 
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: (query: { testData?: unknown; source?: string; enabled?: boolean }) => {
-    if (query.source === "operations") {
-      return {
-        data: routeMocks.operationsError ? undefined : query.testData,
-        isError: routeMocks.operationsError,
-        isFetching: false,
-        refetch: routeMocks.refetchOperations,
-      };
-    }
-    if (query.source === "notifications") {
-      return {
-        data: routeMocks.notificationsError ? undefined : query.testData,
-        isError: routeMocks.notificationsError,
-        isFetching: false,
-        refetch: routeMocks.refetchNotifications,
-      };
-    }
-    if (query.source === "session-detail") {
-      return {
-        data: query.enabled === false ? undefined : (routeMocks.sessionDetail ?? query.testData),
-        isError: false,
-        isFetching: false,
-        refetch: vi.fn(),
-      };
-    }
-    return {
-      data: routeMocks.attentionError ? undefined : query.testData,
-      isError: routeMocks.attentionError,
-      isFetching: false,
-      refetch: routeMocks.refetchAttention,
-    };
-  },
-  useQueryClient: () => ({
-    fetchQuery: async (query: { queryFn?: () => unknown }) => {
-      if (query.queryFn) return query.queryFn();
-      return routeMocks.fetchRestorePreview();
+  queryOptions: <T,>(options: T) => options,
+  useQuery: (query: { testData?: HostSessionDetailResponse; enabled?: boolean }) => ({
+    data: query.enabled === false ? undefined : query.testData,
+    isError: false,
+    isFetching: false,
+    refetch: async () => {
+      routeMocks.refetchDetail();
+      return { data: routeMocks.detailRefetchData ?? query.testData };
     },
+  }),
+  useQueryClient: () => ({
+    fetchQuery: (query: { queryFn?: () => unknown }) => query.queryFn?.(),
   }),
 }));
 
-vi.mock("react-router", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("react-router")>();
-  return {
-    ...actual,
-    useLoaderData: () => ({
-      current: routeMocks.current,
-      hostSessions: routeMocks.hostSessions,
-      recordAttention: routeMocks.attentionError ? null : routeMocks.recordAttention,
-      attentionError: routeMocks.attentionError,
-    }),
-    useParams: () => ({ clubSlug: "reading-sai" }),
-    Navigate: ({ to }: { to: string }) => (
-      <div data-testid="host-meeting-redirect">{typeof to === "string" ? to : ""}</div>
-    ),
-  };
-});
-
-vi.mock("@/features/host/queries/host-session-queries", () => ({
-  DEFAULT_HOST_SESSION_LIST_LIMIT: 50,
-  hostCurrentSessionQuery: () => ({ testData: routeMocks.current }),
-  hostSessionListQuery: () => ({ testData: routeMocks.hostSessions }),
-  hostSessionDetailQuery: (sessionId: string) => ({
-    queryKey: ["session-detail", sessionId],
-    testData: routeMocks.sessionDetail,
-    source: "session-detail",
+vi.mock("@/features/host/queries/host-session-queries", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/host/queries/host-session-queries")>()),
+  hostSessionDetailQuery: (_sessionId: string) => ({
+    queryKey: ["session-detail", _sessionId],
+    testData: (routeMocks.loaderData as { currentMeeting?: HostSessionDetailResponse | null } | null)
+      ?.currentMeeting ?? undefined,
   }),
   useUpdateHostSessionAttendanceMutation: () => ({
     mutateAsync: routeMocks.updateAttendance,
+    reset: routeMocks.resetAttendance,
+    reconciliationState: routeMocks.reconciliationState,
   }),
 }));
 
@@ -130,363 +56,462 @@ vi.mock("@/features/host/queries/host-session-recovery-queries", () => ({
   }),
   useRestoreHostSessionChangeMutation: () => ({
     mutateAsync: routeMocks.restoreChange,
+    reset: routeMocks.resetRestore,
   }),
 }));
 
-vi.mock("@/features/host/queries/host-session-record-queries", () => ({
-  hostSessionRecordLedgerQuery: () => ({ testData: routeMocks.recordAttention, source: "attention" }),
-}));
-
-vi.mock("@/features/host/queries/host-club-operations-queries", () => ({
-  hostClubOperationsQuery: () => ({ testData: routeMocks.operations, source: "operations" }),
-}));
-
-vi.mock("@/features/host/queries/host-notification-queries", () => ({
-  hostNotificationHealthQuery: () => ({ testData: routeMocks.notifications, source: "notifications" }),
-}));
-
+import { hostSensitiveStorage } from "@/features/host/storage/host-sensitive-storage";
+import { signalHostAuthorityLoss, subscribeHostAuthorityLoss } from "@/shared/api/host-authority-event";
+import { HostMutationPendingError } from "@/features/host/queries/host-session-queries";
+import type { HostDashboardRouteData } from "./host-dashboard-data";
 import { HostDashboardRoute } from "./host-dashboard-route";
 
-function attentionItem(overrides: Partial<HostSessionLedgerItem> = {}): HostSessionLedgerItem {
-  return {
-    sessionId: "closed-1",
-    sessionNumber: 12,
-    title: "No.12",
-    bookTitle: "닫힌 책",
-    bookAuthor: "저자",
-    bookImageUrl: null,
-    date: "2026-04-15",
-    startTime: "20:00",
-    endTime: "22:00",
-    locationLabel: "온라인",
+const meetingDetail: HostSessionDetailResponse = {
+  sessionId: "session-7",
+  sessionNumber: 7,
+  title: "일곱 번째 독서모임",
+  bookTitle: "파도와 바람의 기록",
+  bookAuthor: "작가 이름",
+  bookLink: null,
+  bookImageUrl: null,
+  locationLabel: "책방 안쪽",
+  meetingUrl: null,
+  meetingPasscode: null,
+  date: "2000-01-01",
+  startTime: "19:30",
+  endTime: "21:30",
+  questionDeadlineAt: "1999-12-31T14:59:00Z",
+  visibility: "MEMBER",
+  accessScope: "GUEST_READABLE",
+  siteVisibility: "HIDDEN",
+  publication: null,
+  state: "OPEN",
+  scheduleRevision: 3,
+  scheduleSeenAvailability: "AVAILABLE",
+  scheduleSeenSummary: { currentCount: 1, staleCount: 0, unseenCount: 1, eligibleCount: 2 },
+  versions: {
+    sessionRevision: 4,
+    scheduleRevision: 3,
+    exposureRevision: 2,
+    participantSetRevision: 2,
+    recordDraftRevision: null,
+    liveRecordRevision: null,
+    publicationRevision: 0,
+  },
+  attendanceSnapshotId: "attendance-snapshot-7",
+  attendees: [
+    {
+      membershipId: "member-1",
+      avatarKey: "reader-a",
+      displayName: "지후",
+      accountName: "reader-a",
+      rsvpStatus: "GOING",
+      attendanceStatus: "UNKNOWN",
+      participationStatus: "ACTIVE",
+      attendanceRevision: 1,
+      seenScheduleRevision: null,
+      scheduleSeenAt: null,
+      scheduleSeenState: "UNSEEN",
+    },
+    {
+      membershipId: "member-2",
+      avatarKey: "reader-b",
+      displayName: "서연",
+      accountName: "reader-b",
+      rsvpStatus: "GOING",
+      attendanceStatus: "ATTENDED",
+      participationStatus: "ACTIVE",
+      attendanceRevision: 2,
+      seenScheduleRevision: 3,
+      scheduleSeenAt: "2026-08-29T11:00:00Z",
+      scheduleSeenState: "CURRENT",
+    },
+  ],
+  feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null },
+};
+
+const closingStatus: HostSessionClosingStatusResponse = {
+  schema: "host.session_closing_status.v1",
+  session: {
+    sessionId: "session-7",
+    sessionNumber: 7,
+    bookTitle: "파도와 바람의 기록",
+    meetingDate: "2000-01-01",
     state: "CLOSED",
-    visibility: "MEMBER",
-    recordStatus: "INCOMPLETE",
-    needsAttention: true,
-    hasDraft: false,
-    liveRevision: 1,
-    draftRevision: null,
-    lastModifiedAt: "2026-04-16T00:00:00Z",
-    ...overrides,
-  };
-}
+    recordVisibility: "MEMBER",
+    sessionRevision: 5,
+    participantSetRevision: 2,
+    attendanceSnapshotId: "attendance-snapshot-7",
+  },
+  overall: { state: "IN_PROGRESS", label: "기록 정리 중", primaryAction: "IMPORT_RECORDS" },
+  checklist: [
+    { id: "SESSION_CLOSED", state: "DONE", label: "모임 종료", detail: "출석이 확정되었습니다.", href: null },
+    {
+      id: "RECORD_PACKAGE_SAVED",
+      state: "ACTION_REQUIRED",
+      label: "기록 패키지",
+      detail: "정리본을 검토하세요.",
+      href: "/app/host/sessions/session-7?section=records",
+    },
+  ],
+  evidence: {
+    summaryPublished: false,
+    highlightCount: 1,
+    oneLinerCount: 1,
+    feedbackDocumentState: "MISSING",
+    latestNotificationEvent: null,
+    publicRecordHref: null,
+    memberReflectionHref: null,
+  },
+};
 
-function operationsSnapshot(
-  overrides: Partial<HostClubOperationsSnapshot> = {},
-): HostClubOperationsSnapshot {
+function dashboardData(overrides: Partial<HostDashboardRouteData> = {}): HostDashboardRouteData {
   return {
-    schema: "host.club_operations_snapshot.v1",
-    generatedAt: "2026-05-31T00:00:00Z",
-    club: { clubId: "club-1", slug: "reading-sai", name: "읽는사이" },
-    readiness: { state: "READY", blockingReasons: [], nextAction: null },
-    sessionProgress: {
-      upcomingCount: 1,
-      currentOpenCount: 0,
-      closedCount: 4,
-      publishedRecordCount: 3,
-      incompleteRecordCount: 0,
+    operatingRoom: {
+      currentMeeting: {
+        sessionId: meetingDetail.sessionId,
+        selection: "OPEN",
+        scheduleSeenAvailability: "AVAILABLE",
+      },
     },
-    aiUsage: {
-      activeJobs: 0,
-      failedRecentJobs: 0,
-      staleCandidates: 0,
-      costEstimateUsd: "0.5000",
-      state: "READY",
-      priorFailedJobs7d: 0,
-    },
+    currentMeeting: meetingDetail,
+    closingStatus: { state: "ready", data: { ...closingStatus, session: { ...closingStatus.session, state: "OPEN" } } },
+    recordAttention: { state: "ready", data: {
+      items: [],
+      nextCursor: null,
+      summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+    } },
+    clubOperations: { state: "absent" },
+    notificationHealth: { state: "absent" },
     ...overrides,
   };
 }
 
-function renderRoute() {
-  return render(
-    <MemoryRouter initialEntries={["/app/host"]}>
-      <HostDashboardRoute />
-    </MemoryRouter>,
-  );
+function LocationProbe() {
+  const location = useLocation();
+  return <output aria-label="현재 URL">{`${location.pathname}${location.search}`}</output>;
+}
+
+function renderRoute(initialEntry = "/clubs/reading-sai/app/host", data = dashboardData()) {
+  routeMocks.loaderData = data;
+  const routes: RouteObject[] = [{
+    path: "/clubs/:clubSlug/app/host",
+    loader: () => routeMocks.loaderData,
+    element: <><HostDashboardRoute /><LocationProbe /></>,
+    hydrateFallbackElement: <p role="status">운영실을 불러오는 중</p>,
+  }];
+  const router = createMemoryRouter(routes, { initialEntries: [initialEntry] });
+  const view = render(<RouterProvider router={router} />);
+  return { ...view, router };
 }
 
 beforeEach(() => {
-  routeMocks.hostSessions = { items: [], nextCursor: null };
-  routeMocks.current = { currentSession: null };
-  routeMocks.attentionError = false;
-  routeMocks.operationsError = false;
-  routeMocks.notificationsError = false;
-  routeMocks.refetchAttention.mockReset();
-  routeMocks.refetchOperations.mockReset();
-  routeMocks.refetchNotifications.mockReset();
+  routeMocks.loaderData = dashboardData();
+  routeMocks.detailRefetchData = null;
+  routeMocks.refetchDetail.mockReset();
   routeMocks.updateAttendance.mockReset();
+  routeMocks.resetAttendance.mockReset();
   routeMocks.restoreChange.mockReset();
+  routeMocks.resetRestore.mockReset();
   routeMocks.fetchRestorePreview.mockReset();
-  routeMocks.sessionDetail = null;
-  routeMocks.recordAttention = {
-    items: [],
-    nextCursor: null,
-    summary: {
-      needsAttentionCount: 0,
-      incompletePublishedCount: 0,
-      draftCount: 0,
+  routeMocks.reconciliationState = "idle";
+  routeMocks.updateAttendance.mockResolvedValue({
+    changeReceipt: {
+      changeId: "change-1",
+      kind: "ATTENDANCE",
+      undoAvailable: true,
+      createdAt: "2026-08-30T12:01:00Z",
     },
-  };
-  routeMocks.operations = null;
-  routeMocks.notifications = {
-    pending: 0,
-    failed: 0,
-    dead: 0,
-    sentLast24h: 0,
-    latestFailures: [],
-  };
+  });
+  routeMocks.fetchRestorePreview.mockResolvedValue({
+    sessionId: "session-7",
+    changeId: "change-1",
+    kind: "ATTENDANCE",
+    items: [],
+    expectedCurrentHash: "current-hash",
+    canRestore: true,
+    blockedReason: null,
+  });
+  routeMocks.restoreChange.mockResolvedValue({ restored: true });
+});
+
+afterEach(async () => {
+  await act(() => hostSensitiveStorage.clearClub("reading-sai"));
 });
 
 describe("HostDashboardRoute", () => {
-  it("asks the host to create the first meeting on the today triage empty hero", () => {
-    renderRoute();
+  it("normalizes an unavailable URL phase with replace navigation and a visible reason", async () => {
+    const futureDraft = { ...meetingDetail, state: "DRAFT" as const, date: "2999-01-01" };
+    const { router } = renderRoute(
+      "/clubs/reading-sai/app/host?phase=closing&from=notice",
+      dashboardData({
+        operatingRoom: { currentMeeting: {
+          sessionId: futureDraft.sessionId,
+          selection: "UPCOMING_DRAFT",
+          scheduleSeenAvailability: "UNAVAILABLE",
+        } },
+        currentMeeting: futureDraft,
+        closingStatus: { state: "absent" },
+      }),
+    );
 
-    expect(screen.getByRole("heading", { level: 1, name: "오늘" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "아직 열린 모임이 없습니다" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "첫 모임 만들기" })).toHaveAttribute(
+    expect(await screen.findByRole("status", { name: "운영 단계 이동 안내" })).toHaveTextContent(
+      "마감실은 모임을 마친 뒤 사용할 수 있어 준비실로 이동했습니다.",
+    );
+    await waitFor(() => expect(router.state.location.search).toBe("?phase=prep&from=notice"));
+    expect(router.state.historyAction).toBe("REPLACE");
+    expect(screen.getByRole("tab", { name: /준비실/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("renders one empty-current action without date or list selection", async () => {
+    renderRoute("/clubs/reading-sai/app/host?phase=live", dashboardData({
+      operatingRoom: { currentMeeting: null },
+      currentMeeting: null,
+      closingStatus: { state: "absent" },
+      recordAttention: { state: "absent" },
+      clubOperations: { state: "absent" },
+      notificationHealth: { state: "absent" },
+    }));
+
+    expect(await screen.findByRole("heading", { level: 1, name: "모임 운영실" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "현재 운영할 모임이 없습니다" })).toBeVisible();
+    const createLinks = screen.getAllByRole("link", { name: "첫 모임 만들기" });
+    expect(createLinks).toHaveLength(1);
+    expect(createLinks[0]).toHaveAttribute(
       "href",
-      "/app/host/sessions/new",
+      "/clubs/reading-sai/app/host/sessions/new",
     );
-    expect(screen.getByText(/오늘 처리할 일이 없습니다 · 마지막 확인/)).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "모임 운영" })).not.toBeInTheDocument();
-    expect(screen.queryByTestId("host-meeting-redirect")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/날짜 선택|모임 선택/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 
-  it("shows attention records in the resolve queue and quiet overflow when capped", () => {
-    routeMocks.recordAttention = {
-      items: [
-        attentionItem({
-          sessionId: "published-1",
-          sessionNumber: 11,
-          bookTitle: "공개된 책",
-          state: "PUBLISHED",
-        }),
-        attentionItem({
-          sessionId: "closed-2",
-          sessionNumber: 10,
-          bookTitle: "두 번째 책",
-        }),
-      ],
-      nextCursor: "more",
-      summary: {
-        needsAttentionCount: 4,
-        incompletePublishedCount: 1,
-        draftCount: 0,
-      },
-    };
-    renderRoute();
+  it("composes the prep room from the current meeting, next action, and independent ledger rows", async () => {
+    renderRoute("/clubs/reading-sai/app/host?phase=prep");
 
-    const queue = screen.getByRole("region", { name: "처리할 일" });
-    expect(within(queue).getByText("공개된 책")).toBeInTheDocument();
-    expect(within(queue).getByText("두 번째 책")).toBeInTheDocument();
-    expect(within(queue).getAllByRole("link", { name: "기록 마저 쓰기" })).toHaveLength(2);
-    expect(screen.getByText(/처리할 일 2건/)).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "모두 보기" })).not.toBeInTheDocument();
-  });
-
-  it("omits notification and readiness rows when those widgets fail, keeps attention siblings, and retries", async () => {
-    const user = userEvent.setup();
-    routeMocks.recordAttention = {
-      items: [attentionItem({ bookTitle: "공개된 책", state: "PUBLISHED" })],
-      nextCursor: null,
-      summary: {
-        needsAttentionCount: 1,
-        incompletePublishedCount: 1,
-        draftCount: 0,
-      },
-    };
-    routeMocks.notifications = {
-      pending: 0,
-      failed: 3,
-      dead: 1,
-      sentLast24h: 0,
-      latestFailures: [],
-    };
-    routeMocks.operations = operationsSnapshot({
-      readiness: {
-        state: "BLOCKED",
-        blockingReasons: ["다음 모임 없음"],
-        nextAction: "CREATE_SESSION",
-      },
-    });
-    routeMocks.notificationsError = true;
-    routeMocks.operationsError = true;
-    renderRoute();
-
-    const queue = screen.getByRole("region", { name: "처리할 일" });
-    expect(within(queue).getByText("공개된 책")).toBeInTheDocument();
-    expect(within(queue).queryByText("알림 발송")).not.toBeInTheDocument();
-    expect(within(queue).queryByText("클럽 준비")).not.toBeInTheDocument();
-    expect(within(queue).getByRole("alert")).toHaveTextContent("처리할 일 목록을 불러오지 못했습니다.");
-
-    await user.click(within(queue).getByRole("button", { name: "다시 시도" }));
-    expect(routeMocks.refetchOperations).toHaveBeenCalled();
-    expect(routeMocks.refetchNotifications).toHaveBeenCalled();
-  });
-
-  it("shows a retryable queue error when attention fails on empty home", async () => {
-    const user = userEvent.setup();
-    routeMocks.attentionError = true;
-    renderRoute();
-
-    expect(screen.getByRole("heading", { name: "아직 열린 모임이 없습니다" })).toBeInTheDocument();
-    expect(screen.getByRole("alert")).toHaveTextContent("처리할 일 목록을 불러오지 못했습니다.");
-    expect(screen.queryByText(/오늘 처리할 일이 없습니다/)).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "다시 시도" }));
-    expect(routeMocks.refetchAttention).toHaveBeenCalled();
-  });
-
-  it("imports today and editorial ledger stylesheets from the host route entry", () => {
-    const routeSource = readFileSync(path.resolve("features/host/route/host-dashboard-route.tsx"), "utf8");
-    const todayCss = path.resolve("features/host/ui/today/host-today.css");
-    const ledgerCss = path.resolve("features/host/ui/host-editorial-ledger.css");
-
-    expect(routeSource).toContain("host-today.css");
-    expect(routeSource).toContain("host-editorial-ledger.css");
-    expect(existsSync(todayCss)).toBe(true);
-    expect(existsSync(ledgerCss)).toBe(true);
-    const css = readFileSync(ledgerCss, "utf8");
-    expect(css).toMatch(/\.rm-host-editorial-ledger__action[\s\S]*min-height:\s*44px/);
-    expect(css).toContain("var(--paper");
-    expect(css).toContain("var(--ink");
-    expect(css).toContain("prefers-reduced-motion");
-  });
-
-  it("keeps empty home on one heading, one create action, and editorial state grammar", () => {
-    renderRoute();
-
-    const root = document.querySelector(".rm-host-today") as HTMLElement | null;
-    expect(root).not.toBeNull();
-    expect(within(root!).getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(within(root!).getByRole("heading", { level: 1, name: "오늘" })).toBeInTheDocument();
-    expect(root!.querySelector("[role='tablist']")).toBeNull();
-    expect(root!.querySelectorAll("[style]")).toHaveLength(0);
-    expect(findNestedLiveRegions(root!)).toEqual([]);
-
-    const create = within(root!).getByRole("link", { name: "첫 모임 만들기" });
-    expect(create).toHaveClass("rm-host-editorial-ledger__action");
-    expect(within(root!).getAllByRole("link", { name: "첫 모임 만들기" })).toHaveLength(1);
-  });
-
-  it("reuses ledger next-meeting identity and primary open action before the queue", () => {
-    routeMocks.hostSessions = {
-      items: [{ sessionId: "open-1", state: "OPEN", date: "2026-04-15" }],
-      nextCursor: null,
-    };
-    routeMocks.recordAttention = {
-      items: [attentionItem({ bookTitle: "공개된 책", state: "PUBLISHED" })],
-      nextCursor: null,
-      summary: {
-        needsAttentionCount: 1,
-        incompletePublishedCount: 1,
-        draftCount: 0,
-      },
-    };
-    renderRoute();
-
-    const root = document.querySelector(".rm-host-today") as HTMLElement;
-    const identity = root.querySelector(".rm-host-editorial-ledger__identity");
-    const queue = within(root).getByRole("region", { name: "처리할 일" });
-    expect(identity).toHaveTextContent("2026.04.15 · 준비 중");
-    expect(identity?.textContent).not.toMatch(/진행 중|공개됨|종료/);
-    expect(within(root).getAllByRole("link", { name: "지금 다루는 모임 열기" })).toHaveLength(1);
-    expect(within(root).getByRole("link", { name: "지금 다루는 모임 열기" })).toHaveClass(
-      "rm-host-editorial-ledger__action",
+    expect(await screen.findByRole("group", { name: "현재 모임" })).toHaveTextContent("일곱 번째 독서모임");
+    expect(screen.getByRole("tab", { name: /준비실/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("region", { name: "다음에 할 일" })).toHaveTextContent("실제 출석 확인");
+    const ledger = screen.getByRole("region", { name: "준비 현황" });
+    expect(within(ledger).getAllByRole("listitem")).toHaveLength(4);
+    expect(within(ledger).getByText("현재 일정 확인 1/2")).toBeVisible();
+    expect(screen.getByRole("link", { name: "모임 정보" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-7?section=basic",
     );
-    expect(within(root).getByRole("link", { name: "모임 목록" })).toBeInTheDocument();
-    expect(queue).toHaveTextContent("공개된 책");
+    expect(screen.getByRole("link", { name: "일정 편집" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-7?section=basic&edit=1",
+    );
+    expect(screen.getByRole("link", { name: "멤버 시야" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/sessions/session-7",
+    );
+    expect(screen.getByRole("link", { name: "실제 출석 확인" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-7?section=attendance",
+    );
+    expect(within(ledger).getByRole("link", { name: "일정 확인 자세히 보기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-7?section=responses&scheduleSeen=unseen",
+    );
   });
 
-  it("embeds one-tap meeting-day attendance on the today home when it is meeting day", async () => {
+  it("changes phase through SPA navigation while preserving unrelated query and recovery state", async () => {
     const user = userEvent.setup();
-    const now = new Date();
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    routeMocks.hostSessions = {
-      items: [{ sessionId: "open-today", state: "OPEN", date: today }],
-      nextCursor: null,
-    };
-    routeMocks.sessionDetail = {
-      sessionId: "open-today",
-      attendees: [
-        {
-          membershipId: "m-1",
-          displayName: "지후",
-          accountName: "reader-a",
-          rsvpStatus: "GOING",
-          attendanceStatus: "UNKNOWN",
-          attendanceRevision: 1,
-          participationStatus: "ACTIVE",
-        },
-        {
-          membershipId: "m-2",
-          displayName: "서연",
-          accountName: "reader-b",
-          rsvpStatus: "GOING",
-          attendanceStatus: "ATTENDED",
-          attendanceRevision: 2,
-          participationStatus: "ACTIVE",
-        },
-      ],
-    };
-    routeMocks.updateAttendance.mockResolvedValue({
-      changeReceipt: {
-        changeId: "change-1",
-        kind: "ATTENDANCE",
-        undoAvailable: true,
-        createdAt: `${today}T12:01:00.000Z`,
-      },
+    routeMocks.updateAttendance.mockRejectedValueOnce({ status: 409, code: "REVISION_CONFLICT" });
+    routeMocks.detailRefetchData = meetingDetail;
+    const { router } = renderRoute("/clubs/reading-sai/app/host?phase=live&from=notice");
+
+    await user.click(await screen.findByRole("button", { name: /지후/ }));
+    expect(await screen.findByRole("alert", { name: "출석 변경 충돌" })).toBeVisible();
+    await user.click(screen.getByRole("tab", { name: /준비실/ }));
+
+    await waitFor(() => {
+      expect(router.state.location.search).toBe("?phase=prep&from=notice");
     });
+    expect(router.state.historyAction).toBe("PUSH");
+    expect(screen.getByRole("alert", { name: "출석 변경 충돌" })).toBeVisible();
+  });
 
-    renderRoute();
+  it("keeps live attendance writes and the existing restore receipt flow in the operating room", async () => {
+    const user = userEvent.setup();
+    renderRoute("/clubs/reading-sai/app/host?phase=live");
 
-    const hero = screen.getByRole("region", { name: "오늘 모임" });
-    expect(within(hero).getByRole("heading", { name: "출석 확인" })).toBeInTheDocument();
-    expect(within(hero).getByRole("button", { name: "아직 안 옴 1" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(hero).getByRole("button", { name: /지후/ })).toBeInTheDocument();
-
-    await user.click(within(hero).getByRole("button", { name: /지후/ }));
+    const attendance = await screen.findByRole("region", { name: "출석 확인" });
+    await user.click(within(attendance).getByRole("button", { name: /지후/ }));
     expect(routeMocks.updateAttendance).toHaveBeenCalledWith({
-      sessionId: "open-today",
-      attendance: [{ membershipId: "m-1", attendanceStatus: "ATTENDED" }],
+      sessionId: "session-7",
+      attendance: [{ membershipId: "member-1", attendanceStatus: "ATTENDED" }],
     });
-    expect(await screen.findByRole("button", { name: "되돌리기" })).toBeVisible();
+
+    await user.click(await screen.findByRole("button", { name: "되돌리기" }));
+    await waitFor(() => expect(routeMocks.restoreChange).toHaveBeenCalledWith({
+      sessionId: "session-7",
+      changeId: "change-1",
+      request: { expectedCurrentHash: "current-hash" },
+    }));
   });
 
-  it("surfaces a retryable conflict when meeting-day attendance write is rejected", async () => {
+  it("renders the existing closing checklist for a completed readable phase", async () => {
+    const closed = { ...meetingDetail, state: "CLOSED" as const };
+    renderRoute("/clubs/reading-sai/app/host?phase=closing", dashboardData({
+      operatingRoom: { currentMeeting: {
+        sessionId: closed.sessionId,
+        selection: "CLOSING_REQUIRED",
+        scheduleSeenAvailability: "AVAILABLE",
+      } },
+      currentMeeting: closed,
+      closingStatus: { state: "ready", data: closingStatus },
+    }));
+
+    expect(await screen.findByRole("tab", { name: /마감실/ })).toHaveAttribute("aria-selected", "true");
+    const checklist = screen.getByRole("region", { name: "장부 마감 체크리스트" });
+    expect(checklist).toHaveTextContent("출석 확정");
+    expect(checklist).toHaveTextContent("기록 초안");
+    expect(screen.getByRole("link", { name: "기록 패키지 검토" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-7/edit?records=json",
+    );
+    expect(within(checklist).getByRole("link", { name: "확인하기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-7?section=records",
+    );
+  });
+
+  it("keeps successful meeting content when optional sources fail and exposes scoped retry", async () => {
+    const { router } = renderRoute("/clubs/reading-sai/app/host?phase=prep", dashboardData({
+      recordAttention: { state: "failed", error: { message: "기록 확인 항목을 불러오지 못했습니다.", retryable: true } },
+      clubOperations: { state: "failed", error: { message: "클럽 운영 상태를 불러오지 못했습니다.", retryable: true } },
+      notificationHealth: { state: "failed", error: { message: "알림 상태를 불러오지 못했습니다.", retryable: true } },
+    }));
+    const revalidate = vi.spyOn(router, "revalidate");
+
+    expect(await screen.findByRole("group", { name: "현재 모임" })).toBeVisible();
+    const partial = screen.getByRole("region", { name: "일부 운영 정보 불러오기 실패" });
+    expect(partial).toHaveTextContent("기록 확인 항목을 불러오지 못했습니다.");
+    expect(partial).toHaveTextContent("클럽 운영 상태를 불러오지 못했습니다.");
+    expect(partial).toHaveTextContent("알림 상태를 불러오지 못했습니다.");
+    await userEvent.click(within(partial).getByRole("button", { name: "일부 운영 정보 다시 불러오기" }));
+    expect(revalidate).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves the intended attendance on 409, refetches exact detail, and offers comparison retry", async () => {
     const user = userEvent.setup();
-    const now = new Date();
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    routeMocks.hostSessions = {
-      items: [{ sessionId: "open-today", state: "OPEN", date: today }],
-      nextCursor: null,
+    routeMocks.updateAttendance
+      .mockRejectedValueOnce({ status: 409, code: "REVISION_CONFLICT" })
+      .mockResolvedValueOnce({ changeReceipt: null });
+    routeMocks.detailRefetchData = {
+      ...meetingDetail,
+      attendees: meetingDetail.attendees.map((attendee) => attendee.membershipId === "member-1"
+        ? { ...attendee, attendanceStatus: "ABSENT" as const, attendanceRevision: 2 }
+        : attendee),
     };
-    routeMocks.sessionDetail = {
-      sessionId: "open-today",
-      attendees: [
-        {
-          membershipId: "m-1",
-          displayName: "지후",
-          accountName: "reader-a",
-          rsvpStatus: "GOING",
-          attendanceStatus: "UNKNOWN",
-          attendanceRevision: 1,
-          participationStatus: "ACTIVE",
-        },
-      ],
-    };
-    routeMocks.updateAttendance.mockRejectedValueOnce({
-      status: 409,
-      code: "CONFLICT",
-      message: "요청한 작업이 현재 상태와 충돌합니다.",
+    renderRoute("/clubs/reading-sai/app/host?phase=live");
+
+    await user.click(await screen.findByRole("button", { name: /지후/ }));
+
+    const comparison = await screen.findByRole("alert", { name: "출석 변경 충돌" });
+    expect(routeMocks.refetchDetail).toHaveBeenCalledTimes(1);
+    expect(within(comparison).getByText("내가 선택한 값").nextElementSibling).toHaveTextContent("출석");
+    expect(within(comparison).getByText("최신 값").nextElementSibling).toHaveTextContent("불참");
+
+    await user.click(within(comparison).getByRole("button", { name: "내 선택으로 다시 저장" }));
+    expect(routeMocks.updateAttendance).toHaveBeenLastCalledWith({
+      sessionId: "session-7",
+      attendance: [{ membershipId: "member-1", attendanceStatus: "ATTENDED" }],
     });
+  });
 
-    renderRoute();
+  it("keeps an unknown attendance result reconcilable without blind retry", async () => {
+    const user = userEvent.setup();
+    routeMocks.updateAttendance.mockRejectedValueOnce(new HostMutationPendingError());
+    routeMocks.detailRefetchData = meetingDetail;
+    renderRoute("/clubs/reading-sai/app/host?phase=live");
 
-    const hero = screen.getByRole("region", { name: "오늘 모임" });
-    const hostCheckin = within(hero).getByRole("button", { name: /지후/ });
-    await user.click(hostCheckin);
-    expect(await screen.findByRole("alert")).toHaveTextContent("최신 출석 상태와 충돌했습니다. 새로 확인해 주세요.");
-    expect(hostCheckin).toBeEnabled();
+    await user.click(await screen.findByRole("button", { name: /지후/ }));
+
+    const unknown = await screen.findByRole("status", { name: "출석 변경 결과 확인" });
+    expect(unknown).toHaveTextContent("같은 변경을 다시 보내지 않습니다");
+    expect(within(unknown).getByRole("link", { name: "변경 내역 열기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-7?section=history",
+    );
+    expect(within(unknown).queryByRole("button", { name: /다시 저장|재시도/ })).not.toBeInTheDocument();
+    await user.click(within(unknown).getByRole("button", { name: "최신 출석 확인" }));
+    expect(routeMocks.refetchDetail).toHaveBeenCalledTimes(1);
+    expect(routeMocks.updateAttendance).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears conflict drafts and receipts through the club-scoped authority-loss purge path", async () => {
+    const user = userEvent.setup();
+    routeMocks.updateAttendance.mockRejectedValueOnce({ status: 409, code: "REVISION_CONFLICT" });
+    routeMocks.detailRefetchData = meetingDetail;
+    renderRoute("/clubs/reading-sai/app/host?phase=live");
+    await user.click(await screen.findByRole("button", { name: /지후/ }));
+    expect(await screen.findByRole("alert", { name: "출석 변경 충돌" })).toBeVisible();
+
+    const unsubscribe = subscribeHostAuthorityLoss((event) => {
+      void hostSensitiveStorage.clearClub(event.clubSlug);
+    });
+    await act(async () => {
+      signalHostAuthorityLoss({
+        code: "HOST_AUTHORITY_REVOKED",
+        clubSlug: "reading-sai",
+        requestKind: "SESSION_ATTENDANCE_SINGLE",
+      });
+      await Promise.resolve();
+    });
+    unsubscribe();
+
+    await waitFor(() => expect(screen.queryByRole("alert", { name: "출석 변경 충돌" })).not.toBeInTheDocument());
+    expect(routeMocks.resetAttendance).toHaveBeenCalled();
+    expect(routeMocks.resetRestore).toHaveBeenCalled();
+  });
+
+  it("drops stale attendance recovery when revalidation selects a different current session", async () => {
+    const user = userEvent.setup();
+    routeMocks.updateAttendance.mockRejectedValueOnce({ status: 409, code: "REVISION_CONFLICT" });
+    routeMocks.detailRefetchData = meetingDetail;
+    const { router } = renderRoute("/clubs/reading-sai/app/host?phase=live");
+
+    await user.click(await screen.findByRole("button", { name: /지후/ }));
+    expect(await screen.findByRole("alert", { name: "출석 변경 충돌" })).toBeVisible();
+
+    const nextMeeting: HostSessionDetailResponse = {
+      ...meetingDetail,
+      sessionId: "session-8",
+      sessionNumber: 8,
+      title: "여덟 번째 독서모임",
+      attendees: [{
+        ...meetingDetail.attendees[0],
+        membershipId: "member-8",
+        displayName: "민수",
+        accountName: "reader-c",
+      }],
+    };
+    routeMocks.loaderData = dashboardData({
+      operatingRoom: { currentMeeting: {
+        sessionId: nextMeeting.sessionId,
+        selection: "OPEN",
+        scheduleSeenAvailability: "AVAILABLE",
+      } },
+      currentMeeting: nextMeeting,
+    });
+    routeMocks.detailRefetchData = null;
+    routeMocks.updateAttendance.mockReset();
+    routeMocks.updateAttendance.mockResolvedValue({ changeReceipt: null });
+    await act(async () => router.revalidate());
+
+    await screen.findByRole("heading", { name: "여덟 번째 독서모임" });
+    expect(screen.queryByRole("alert", { name: "출석 변경 충돌" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "내 선택으로 다시 저장" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /지후/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /민수/ }));
+    expect(routeMocks.updateAttendance).toHaveBeenCalledTimes(1);
+    expect(routeMocks.updateAttendance).toHaveBeenCalledWith({
+      sessionId: "session-8",
+      attendance: [{ membershipId: "member-8", attendanceStatus: "ATTENDED" }],
+    });
   });
 });

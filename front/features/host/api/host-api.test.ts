@@ -16,6 +16,7 @@ import {
   fetchHostNotificationPolicy,
   fetchHostNotificationSummary,
   fetchHostNotificationTestMailAudit,
+  fetchHostOperatingRoomCurrent,
   fetchHostPublicConvergence,
   fetchHostSessions,
   fetchHostSessionList,
@@ -138,7 +139,9 @@ function stubFetch() {
           supportedHostClientContracts: ["v2", "v3"],
         }), { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } })
       : jsonResponse(
-      url.includes("/visibility") || url.includes("/access-scope")
+      url.includes("/operating-room/current")
+        ? { currentMeeting: null }
+        : url.includes("/visibility") || url.includes("/access-scope")
         ? { session: hostSessionDetail(), composer: null }
         : url.includes("/attendance")
           ? { sessionId: "session-7", count: 0 }
@@ -579,6 +582,7 @@ describe("host api wrappers", () => {
     const context = { clubSlug: "reading-sai" };
 
     await fetchHostCurrentSession(context);
+    await fetchHostOperatingRoomCurrent(context);
     await fetchHostClubOperations(context);
     await fetchHostNotificationSummary(context);
     await fetchHostNotificationPolicy(context);
@@ -602,6 +606,7 @@ describe("host api wrappers", () => {
     const urls = fetchMock.mock.calls.map(([url]) => url);
     expect(urls).toEqual([
       "/api/bff/api/sessions/current?clubSlug=reading-sai",
+      "/api/bff/api/host/operating-room/current?clubSlug=reading-sai",
       "/api/bff/api/host/club-operations?clubSlug=reading-sai",
       "/api/bff/api/host/notifications/summary?clubSlug=reading-sai",
       "/api/bff/api/host/notifications/policy?clubSlug=reading-sai",
@@ -614,6 +619,18 @@ describe("host api wrappers", () => {
       "/api/bff/api/host/sessions/schedule-defaults?clubSlug=reading-sai",
       "/api/bff/api/host/members?limit=25&cursor=m2&clubSlug=reading-sai",
     ]);
+  });
+
+  it("rejects a malformed operating-room selector at the API boundary", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
+      currentMeeting: {
+        sessionId: "session-7",
+        selection: "CLIENT_GUESSED",
+        scheduleSeenAvailability: "AVAILABLE",
+      },
+    })));
+
+    await expect(fetchHostOperatingRoomCurrent({ clubSlug: "reading-sai" })).rejects.toThrow();
   });
 
   it("parses the bounded convergence view and treats no linked work as absent", async () => {
