@@ -2,6 +2,7 @@ import { act } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   ReceiptRecoveryCapsule,
+  RecoveryObservation,
   ReturnTarget,
   SpaceIdentity,
   TransitionPublicationPort,
@@ -57,7 +58,7 @@ describe("global space destination resolution", () => {
       availableIdentities: [platform, member],
       correspondence: "unknown",
       reason: "user",
-    }).target).toEqual(lastSafeTarget);
+    })?.target).toEqual(lastSafeTarget);
   });
 
   it("falls back from an unknown route and replaces on authority loss", () => {
@@ -74,6 +75,35 @@ describe("global space destination resolution", () => {
       target: target("/clubs/reading-sai/app"),
       navigation: "replace",
     });
+  });
+
+  it.each(["user", "authority-loss"] as const)(
+    "returns no %s destination when the available-space projection is empty",
+    (reason) => {
+      expect(resolveGlobalSpaceDestination({
+        currentIdentity: member,
+        targetIdentity: host,
+        currentTarget: target("/clubs/reading-sai/app"),
+        lastSafeTarget: target("/clubs/reading-sai/app/host"),
+        availableIdentities: [],
+        correspondence: "unknown",
+        reason,
+      })).toBeNull();
+    },
+  );
+
+  it("returns no destination when every projected identity is malformed", () => {
+    expect(resolveGlobalSpaceDestination({
+      currentIdentity: member,
+      targetIdentity: host,
+      currentTarget: target("/clubs/reading-sai/app"),
+      lastSafeTarget: null,
+      availableIdentities: [
+        { productSpace: "clubs", clubId: "", clubSlug: "", perspective: "host" },
+      ],
+      correspondence: "unknown",
+      reason: "user",
+    })).toBeNull();
   });
 });
 
@@ -94,31 +124,10 @@ describe("transition timeout contract", () => {
   );
 });
 
-function publicationSpies() {
+function publicationPort() {
   return {
-    ui: vi.fn(),
-    cache: vi.fn(),
-    receipt: vi.fn(),
-    successCopy: vi.fn(),
-    errorCopy: vi.fn(),
-    navigation: vi.fn(),
-    returnTarget: vi.fn(),
-    sessionStorage: vi.fn(),
-  };
-}
-
-function expectNoPublication(publication: ReturnType<typeof publicationSpies>) {
-  for (const publish of Object.values(publication)) {
-    expect(publish).not.toHaveBeenCalled();
-  }
-}
-
-function publicationPort(publication: ReturnType<typeof publicationSpies>): TransitionPublicationPort {
-  return {
-    currentOwnerRefetch: (observation) => {
-      for (const publish of Object.values(publication)) publish(observation);
-    },
-  };
+    currentOwnerRefetch: vi.fn((observation: RecoveryObservation) => observation),
+  } satisfies TransitionPublicationPort;
 }
 
 describe("global space transition coordinator", () => {
@@ -162,9 +171,9 @@ describe("global space transition coordinator", () => {
 
   it("publishes only a current-generation unknown-outcome observation through the refetch sink", async () => {
     vi.useFakeTimers();
-    const publication = publicationSpies();
+    const publication = publicationPort();
     const reconcile = vi.fn(async () => ({ operationId: "history-1", outcome: "succeeded" as const }));
-    const coordinator = createGlobalSpaceTransitionCoordinator({ publication: publicationPort(publication) });
+    const coordinator = createGlobalSpaceTransitionCoordinator({ publication });
     const handle = coordinator.beginPending({
       ownerId: "owner-1",
       operationId: "history-1",
@@ -176,7 +185,7 @@ describe("global space transition coordinator", () => {
     await expect(handle.reconcile()).resolves.toEqual({ operationId: "history-1", outcome: "succeeded" });
 
     expect(reconcile).toHaveBeenCalledTimes(1);
-    for (const publish of Object.values(publication)) expect(publish).toHaveBeenCalledTimes(1);
+    expect(publication.currentOwnerRefetch).toHaveBeenCalledTimes(1);
     expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
   });
 
@@ -192,7 +201,7 @@ describe("global space transition coordinator", () => {
 
   it("normal unmount performs at most one same-identity receipt lookup and always clears in finally", async () => {
     const registry = createRetiredReceiptCapsuleRegistry();
-    const publication = publicationSpies();
+    const publication = publicationPort();
     const request = {
       previewId: "preview-1" as string | null,
       reasonCategory: "SECURITY_REVIEW" as string | null,
@@ -216,7 +225,7 @@ describe("global space transition coordinator", () => {
         request.idempotencyKey = null;
       }),
     };
-    const coordinator = createGlobalSpaceTransitionCoordinator({ registry, publication: publicationPort(publication) });
+    const coordinator = createGlobalSpaceTransitionCoordinator({ registry, publication });
     const handle = coordinator.beginPending({
       ownerId: "owner-1",
       operationId: "operation-1",
@@ -235,8 +244,157 @@ describe("global space transition coordinator", () => {
     expect(request).toEqual({ previewId: null, reasonCategory: null, reason: null, idempotencyKey: null });
     expect(registry.size()).toBe(0);
     await expect(handle.settle("succeeded")).resolves.toBe("obsolete");
-    expectNoPublication(publication);
+    expect(publication.currentOwnerRefetch).not.toHaveBeenCalled();
   });
+
+  it("atomically retires an overlapping registration for the same owner without resurrecting it", async () => {
+    const registry = createRetiredReceiptCapsuleRegistry();
+    const publication = publicationPort();
+    const firstCapsule: ReceiptRecoveryCapsule = {
+      operationId: "operation-1",
+      reconcileOriginal: vi.fn(async () => ({ operationId: "operation-1", outcome: "succeeded" as const })),
+      invalidateForAuthorityLoss: vi.fn(),
+      clear: vi.fn(),
+    };
+    const coordinator = createGlobalSpaceTransitionCoordinator({ registry, publication });
+    const first = coordinator.beginPending({
+      ownerId: "owner-1",
+      operationId: "operation-1",
+      recovery: { kind: "receipt", capsule: firstCapsule },
+    });
+    const second = coordinator.beginPending({
+      ownerId: "owner-1",
+      operationId: "operation-2",
+      recovery: {
+        kind: "authoritative-history",
+        operationId: "operation-2",
+        reconcile: vi.fn(async () => ({ operationId: "operation-2", outcome: "succeeded" as const })),
+      },
+    });
+
+    expect(coordinator.getSnapshot()).toMatchObject({ kind: "pending", operationId: "operation-2" });
+    expect(registry.size()).toBe(1);
+    await expect(first.settle("succeeded")).resolves.toBe("obsolete");
+    await expect(first.reconcile()).resolves.toEqual({ operationId: "operation-1", outcome: "succeeded" });
+    expect(firstCapsule.reconcileOriginal).toHaveBeenCalledTimes(1);
+    expect(firstCapsule.clear).toHaveBeenCalledTimes(1);
+    expect(registry.size()).toBe(0);
+    expect(publication.currentOwnerRefetch).not.toHaveBeenCalled();
+
+    await expect(second.settle("succeeded")).resolves.toBe("accepted");
+    expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
+  });
+
+  it("does not obsolete a current pending registration when a dirty token unregisters", async () => {
+    const coordinator = createGlobalSpaceTransitionCoordinator();
+    const pending = coordinator.beginPending({
+      ownerId: "owner-1",
+      operationId: "operation-1",
+      recovery: {
+        kind: "authoritative-history",
+        operationId: "operation-1",
+        reconcile: vi.fn(async () => ({ operationId: "operation-1", outcome: "succeeded" as const })),
+      },
+    });
+    const unregisterDirty = coordinator.registerDirty("owner-1", "unsaved");
+
+    unregisterDirty();
+
+    expect(coordinator.getSnapshot()).toMatchObject({ kind: "pending", operationId: "operation-1" });
+    await expect(pending.settle("succeeded")).resolves.toBe("accepted");
+  });
+
+  it("keeps every different-owner registration blocking until that owner settles", async () => {
+    const coordinator = createGlobalSpaceTransitionCoordinator();
+    const first = coordinator.beginPending({
+      ownerId: "owner-1",
+      operationId: "operation-1",
+      recovery: {
+        kind: "authoritative-history",
+        operationId: "operation-1",
+        reconcile: vi.fn(async () => ({ operationId: "operation-1", outcome: "succeeded" as const })),
+      },
+    });
+    const second = coordinator.beginPending({
+      ownerId: "owner-2",
+      operationId: "operation-2",
+      recovery: {
+        kind: "authoritative-history",
+        operationId: "operation-2",
+        reconcile: vi.fn(async () => ({ operationId: "operation-2", outcome: "succeeded" as const })),
+      },
+    });
+
+    expect(coordinator.getSnapshot()).toMatchObject({ kind: "pending", operationId: "operation-2" });
+    await expect(second.settle("succeeded")).resolves.toBe("accepted");
+    expect(coordinator.getSnapshot()).toMatchObject({ kind: "pending", operationId: "operation-1" });
+    await expect(first.settle("failed")).resolves.toBe("accepted");
+    expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
+  });
+
+  it("allows each still-current owner to publish its own recovery observation", async () => {
+    vi.useFakeTimers();
+    const publication = publicationPort();
+    const coordinator = createGlobalSpaceTransitionCoordinator({ publication });
+    const first = coordinator.beginPending({
+      ownerId: "owner-1",
+      operationId: "operation-1",
+      timeoutMs: 10,
+      recovery: {
+        kind: "authoritative-history",
+        operationId: "operation-1",
+        reconcile: vi.fn(async () => ({ operationId: "operation-1", outcome: "succeeded" as const })),
+      },
+    });
+    const second = coordinator.beginPending({
+      ownerId: "owner-2",
+      operationId: "operation-2",
+      timeoutMs: 10,
+      recovery: {
+        kind: "authoritative-history",
+        operationId: "operation-2",
+        reconcile: vi.fn(async () => ({ operationId: "operation-2", outcome: "failed" as const })),
+      },
+    });
+    act(() => vi.advanceTimersByTime(10));
+
+    await expect(first.reconcile()).resolves.toEqual({ operationId: "operation-1", outcome: "succeeded" });
+    expect(coordinator.getSnapshot()).toMatchObject({ kind: "unknown-outcome", operationId: "operation-2" });
+    await expect(second.reconcile()).resolves.toEqual({ operationId: "operation-2", outcome: "failed" });
+
+    expect(publication.currentOwnerRefetch.mock.calls.map(([observation]) => observation)).toEqual([
+      { operationId: "operation-1", outcome: "succeeded" },
+      { operationId: "operation-2", outcome: "failed" },
+    ]);
+    expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
+  });
+
+  it.each(["receipt", "authoritative-history"] as const)(
+    "rejects a mismatched %s recovery identity synchronously without I/O",
+    (kind) => {
+      const reconcile = vi.fn(async () => ({ operationId: "recovery-operation", outcome: "succeeded" as const }));
+      const capsule: ReceiptRecoveryCapsule = {
+        operationId: "recovery-operation",
+        reconcileOriginal: reconcile,
+        invalidateForAuthorityLoss: vi.fn(),
+        clear: vi.fn(),
+      };
+      const coordinator = createGlobalSpaceTransitionCoordinator();
+
+      expect(() => coordinator.beginPending({
+        ownerId: "owner-1",
+        operationId: "registration-operation",
+        recovery: kind === "receipt"
+          ? { kind, capsule }
+          : { kind, operationId: "recovery-operation", reconcile },
+      })).toThrow("RECOVERY_OPERATION_ID_MISMATCH");
+
+      expect(reconcile).not.toHaveBeenCalled();
+      expect(capsule.invalidateForAuthorityLoss).not.toHaveBeenCalled();
+      expect(capsule.clear).not.toHaveBeenCalled();
+      expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
+    },
+  );
 
   it("accepts settlement only for the active owner generation", async () => {
     const coordinator = createGlobalSpaceTransitionCoordinator();
@@ -282,15 +440,19 @@ describe("global space transition coordinator", () => {
 
   it("invalidates active and retired receipts before purge and permits zero authority-loss replay", async () => {
     const registry = createRetiredReceiptCapsuleRegistry();
-    const publication = publicationSpies();
+    const publication = publicationPort();
     const order: string[] = [];
-    const request = {
-      previewId: "preview-1" as string | null,
-      reasonCategory: "SECURITY_REVIEW" as string | null,
-      reason: "safe reason" as string | null,
-      idempotencyKey: "intent-1" as string | null,
+    let originalRequestCount = 0;
+    const issueOriginalRequest = () => {
+      originalRequestCount += 1;
+      return {
+        previewId: "preview-1" as string | null,
+        reasonCategory: "SECURITY_REVIEW" as string | null,
+        reason: "safe reason" as string | null,
+        idempotencyKey: "intent-1" as string | null,
+      };
     };
-    const originalRequestCount = 1;
+    const request = issueOriginalRequest();
     let replayCount = 0;
     const capsule: ReceiptRecoveryCapsule = {
       operationId: "operation-1",
@@ -309,7 +471,7 @@ describe("global space transition coordinator", () => {
     };
     const coordinator = createGlobalSpaceTransitionCoordinator({
       registry,
-      publication: publicationPort(publication),
+      publication,
       onAuthorityLossPurge: () => {
         order.push("purge");
         expect(request).toEqual({ previewId: null, reasonCategory: null, reason: null, idempotencyKey: null });
@@ -334,13 +496,100 @@ describe("global space transition coordinator", () => {
     expect(order.slice(0, 3)).toEqual(["invalidate", "clear", "purge"]);
     expect(request).toEqual({ previewId: null, reasonCategory: null, reason: null, idempotencyKey: null });
     expect(registry.size()).toBe(0);
-    expectNoPublication(publication);
+    expect(publication.currentOwnerRefetch).not.toHaveBeenCalled();
+  });
+
+  it("returns authority-lost and publishes nothing when authority changes while recovery awaits", async () => {
+    let resolveRecovery!: (observation: RecoveryObservation) => void;
+    const recoveryResult = new Promise<RecoveryObservation>((resolve) => {
+      resolveRecovery = resolve;
+    });
+    const publication = publicationPort();
+    const capsule: ReceiptRecoveryCapsule = {
+      operationId: "operation-1",
+      reconcileOriginal: vi.fn(() => recoveryResult),
+      invalidateForAuthorityLoss: vi.fn(),
+      clear: vi.fn(),
+    };
+    const coordinator = createGlobalSpaceTransitionCoordinator({ publication });
+    const handle = coordinator.beginPending({
+      ownerId: "owner-1",
+      operationId: "operation-1",
+      recovery: { kind: "receipt", capsule },
+    });
+    handle.unregister();
+    await Promise.resolve();
+    expect(capsule.reconcileOriginal).toHaveBeenCalledTimes(1);
+
+    coordinator.invalidateForAuthorityLoss();
+    resolveRecovery({ operationId: "operation-1", outcome: "succeeded" });
+
+    await expect(handle.reconcile()).resolves.toEqual({ operationId: "operation-1", outcome: "authority-lost" });
+    expect(publication.currentOwnerRefetch).not.toHaveBeenCalled();
+    expect(capsule.invalidateForAuthorityLoss).toHaveBeenCalledTimes(1);
+    expect(capsule.clear).toHaveBeenCalledTimes(1);
+  });
+
+  it("isolates capsule and purge exceptions until every authority-loss cleanup has run", async () => {
+    const cleanupErrors = vi.fn();
+    const order: string[] = [];
+    const firstCapsule: ReceiptRecoveryCapsule = {
+      operationId: "operation-1",
+      reconcileOriginal: vi.fn(async () => ({ operationId: "operation-1", outcome: "still-unknown" as const })),
+      invalidateForAuthorityLoss: vi.fn(() => {
+        order.push("first-invalidate");
+        throw new Error("first invalidate failed");
+      }),
+      clear: vi.fn(() => {
+        order.push("first-clear");
+        throw new Error("first clear failed");
+      }),
+    };
+    const secondCapsule: ReceiptRecoveryCapsule = {
+      operationId: "operation-2",
+      reconcileOriginal: vi.fn(async () => ({ operationId: "operation-2", outcome: "still-unknown" as const })),
+      invalidateForAuthorityLoss: vi.fn(() => order.push("second-invalidate")),
+      clear: vi.fn(() => order.push("second-clear")),
+    };
+    const coordinator = createGlobalSpaceTransitionCoordinator({
+      onAuthorityLossPurge: () => {
+        order.push("purge");
+        throw new Error("purge failed");
+      },
+      onSafetyCleanupError: cleanupErrors,
+    });
+    const first = coordinator.beginPending({
+      ownerId: "owner-1",
+      operationId: "operation-1",
+      recovery: { kind: "receipt", capsule: firstCapsule },
+    });
+    const second = coordinator.beginPending({
+      ownerId: "owner-2",
+      operationId: "operation-2",
+      recovery: { kind: "receipt", capsule: secondCapsule },
+    });
+
+    expect(() => coordinator.invalidateForAuthorityLoss()).not.toThrow();
+
+    expect(order).toEqual([
+      "first-invalidate",
+      "first-clear",
+      "second-invalidate",
+      "second-clear",
+      "purge",
+    ]);
+    expect(cleanupErrors).toHaveBeenCalledTimes(1);
+    expect(cleanupErrors.mock.calls[0]?.[0]).toBeInstanceOf(AggregateError);
+    expect(cleanupErrors.mock.calls[0]?.[0].errors).toHaveLength(3);
+    await expect(first.settle("succeeded")).resolves.toBe("obsolete");
+    await expect(second.settle("failed")).resolves.toBe("obsolete");
+    expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
   });
 
   it("skips authoritative-history I/O when latest authority is absent", async () => {
-    const publication = publicationSpies();
+    const publication = publicationPort();
     const reconcile = vi.fn(async () => ({ operationId: "history-1", outcome: "succeeded" as const }));
-    const coordinator = createGlobalSpaceTransitionCoordinator({ publication: publicationPort(publication) });
+    const coordinator = createGlobalSpaceTransitionCoordinator({ publication });
     const handle = coordinator.beginPending({
       ownerId: "owner-1",
       operationId: "history-1",
@@ -351,6 +600,6 @@ describe("global space transition coordinator", () => {
 
     await expect(handle.reconcile()).resolves.toEqual({ operationId: "history-1", outcome: "authority-lost" });
     expect(reconcile).not.toHaveBeenCalled();
-    expectNoPublication(publication);
+    expect(publication.currentOwnerRefetch).not.toHaveBeenCalled();
   });
 });

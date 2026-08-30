@@ -30,7 +30,9 @@ export function normalizePendingTimeout(timeoutMs: number | undefined): number {
   return Math.min(timeoutMs, DEFAULT_TRANSITION_PENDING_TIMEOUT_MS);
 }
 
-export function createRetiredReceiptCapsuleRegistry(): RetiredReceiptCapsuleRegistry {
+export function createRetiredReceiptCapsuleRegistry(
+  recordCleanupError: (error: unknown) => void = () => undefined,
+): RetiredReceiptCapsuleRegistry {
   const entries = new Map<string, ReceiptRecoveryCapsule>();
 
   return {
@@ -45,8 +47,16 @@ export function createRetiredReceiptCapsuleRegistry(): RetiredReceiptCapsuleRegi
       const capsules = [...entries.values()];
       entries.clear();
       for (const capsule of capsules) {
-        capsule.invalidateForAuthorityLoss();
-        capsule.clear();
+        try {
+          capsule.invalidateForAuthorityLoss();
+        } catch (error) {
+          recordCleanupError(error);
+        }
+        try {
+          capsule.clear();
+        } catch (error) {
+          recordCleanupError(error);
+        }
       }
     },
     size() {
@@ -64,6 +74,7 @@ type CoordinatorOptions = {
   setTimer?: (callback: () => void, timeoutMs: number) => TimerHandle;
   clearTimer?: (timer: TimerHandle) => void;
   onAuthorityLossPurge?: () => void;
+  onSafetyCleanupError?: (error: AggregateError) => void;
 };
 
 type ActiveRegistration = {
@@ -74,6 +85,7 @@ type ActiveRegistration = {
   recovery: RecoveryStrategy;
   safety: Extract<TransitionSafety, { kind: "pending" | "unknown-outcome" }>;
   timer: TimerHandle | null;
+  retire: (advanceGeneration: boolean, notify: boolean) => void;
 };
 
 export type GlobalSpaceTransitionCoordinator = TransitionSafetyRegistrationPort & {
@@ -85,7 +97,9 @@ export type GlobalSpaceTransitionCoordinator = TransitionSafetyRegistrationPort 
 export function createGlobalSpaceTransitionCoordinator(
   options: CoordinatorOptions = {},
 ): GlobalSpaceTransitionCoordinator {
-  const registry = options.registry ?? createRetiredReceiptCapsuleRegistry();
+  const cleanupErrors: unknown[] = [];
+  const recordCleanupError = (error: unknown) => cleanupErrors.push(error);
+  const registry = options.registry ?? createRetiredReceiptCapsuleRegistry(recordCleanupError);
   const publication = options.publication;
   const now = options.now ?? Date.now;
   const setTimer = options.setTimer ?? ((callback, timeoutMs) => globalThis.setTimeout(callback, timeoutMs));
@@ -96,11 +110,26 @@ export function createGlobalSpaceTransitionCoordinator(
   const listeners = new Set<() => void>();
   let authorityAvailable = true;
 
+  function reportCleanupErrorsSince(startIndex: number) {
+    const currentErrors = cleanupErrors.slice(startIndex);
+    if (currentErrors.length === 0) return;
+    try {
+      options.onSafetyCleanupError?.(
+        new AggregateError(currentErrors, "GLOBAL_SPACE_TRANSITION_CLEANUP_FAILED"),
+      );
+    } catch {
+      // Reporting is observational and must never interrupt safety cleanup.
+    }
+  }
+
   function emit() {
     for (const listener of listeners) listener();
   }
 
   function getSnapshot(): TransitionSafety {
+    // This is the aggregate blocking projection: any current pending owner wins
+    // over dirty state, and settling the newest visible owner reveals the next.
+    // Recovery publication remains independently generation-checked per owner.
     const pending = [...active.values()].at(-1);
     if (pending) return pending.safety;
     const dirtyRegistration = [...dirty.values()].at(-1);
@@ -122,10 +151,36 @@ export function createGlobalSpaceTransitionCoordinator(
     active.delete(entry.token);
   }
 
-  function clearReceipt(capsule: ReceiptRecoveryCapsule | null, state: { cleared: boolean }) {
-    if (!capsule || state.cleared) return;
-    state.cleared = true;
-    capsule.clear();
+  function managedReceiptCapsule(capsule: ReceiptRecoveryCapsule): ReceiptRecoveryCapsule {
+    let invalidated = false;
+    let cleared = false;
+    return {
+      operationId: capsule.operationId,
+      reconcileOriginal() {
+        if (invalidated || cleared) {
+          return Promise.resolve({ operationId: capsule.operationId, outcome: "authority-lost" });
+        }
+        return capsule.reconcileOriginal();
+      },
+      invalidateForAuthorityLoss() {
+        if (invalidated) return;
+        invalidated = true;
+        try {
+          capsule.invalidateForAuthorityLoss();
+        } catch (error) {
+          recordCleanupError(error);
+        }
+      },
+      clear() {
+        if (cleared) return;
+        cleared = true;
+        try {
+          capsule.clear();
+        } catch (error) {
+          recordCleanupError(error);
+        }
+      },
+    };
   }
 
   function publish(observation: RecoveryObservation) {
@@ -138,23 +193,37 @@ export function createGlobalSpaceTransitionCoordinator(
     emit();
     return () => {
       if (!dirty.delete(token)) return;
-      ownerGenerations.set(ownerId, (ownerGenerations.get(ownerId) ?? 0) + 1);
       emit();
     };
   }
 
   function beginPending(registration: PendingRegistration): PendingHandle {
+    const recoveryOperationId = registration.recovery.kind === "receipt"
+      ? registration.recovery.capsule.operationId
+      : registration.recovery.operationId;
+    if (registration.operationId !== recoveryOperationId) {
+      throw new Error("RECOVERY_OPERATION_ID_MISMATCH");
+    }
+    const timeoutMs = normalizePendingTimeout(registration.timeoutMs);
     const generation = (ownerGenerations.get(registration.ownerId) ?? 0) + 1;
     ownerGenerations.set(registration.ownerId, generation);
+    for (const previous of [...active.values()]) {
+      if (previous.ownerId === registration.ownerId) previous.retire(false, false);
+    }
     const token = Symbol(`${registration.ownerId}:${generation}`);
     const startedAt = now();
-    const timeoutMs = normalizePendingTimeout(registration.timeoutMs);
+    const capsule = registration.recovery.kind === "receipt"
+      ? managedReceiptCapsule(registration.recovery.capsule)
+      : null;
+    const recovery: RecoveryStrategy = capsule
+      ? { kind: "receipt", capsule }
+      : registration.recovery;
     const entry: ActiveRegistration = {
       token,
       ownerId: registration.ownerId,
       operationId: registration.operationId,
       generation,
-      recovery: registration.recovery,
+      recovery,
       safety: {
         kind: "pending",
         ownerId: registration.ownerId,
@@ -162,15 +231,12 @@ export function createGlobalSpaceTransitionCoordinator(
         generation,
         startedAt,
         timeoutAt: startedAt + timeoutMs,
-        recovery: registration.recovery,
+        recovery,
       },
       timer: null,
+      retire: () => undefined,
     };
     active.set(token, entry);
-    const capsule = registration.recovery.kind === "receipt"
-      ? registration.recovery.capsule
-      : null;
-    const capsuleState = { cleared: false };
     let retiredRemoval: (() => void) | null = null;
     let unregistered = false;
     let reconciliation: Promise<RecoveryObservation> | null = null;
@@ -190,32 +256,40 @@ export function createGlobalSpaceTransitionCoordinator(
 
     async function settle(): Promise<"accepted" | "obsolete"> {
       if (!current(entry)) return "obsolete";
+      const cleanupErrorStart = cleanupErrors.length;
       removeActive(entry);
-      clearReceipt(capsule, capsuleState);
+      capsule?.clear();
       retiredRemoval?.();
       retiredRemoval = null;
       emit();
+      reportCleanupErrorsSince(cleanupErrorStart);
       return "accepted";
     }
 
-    function unregister() {
+    function retire(advanceGeneration: boolean, notify: boolean) {
       if (unregistered) return;
       unregistered = true;
-      if (current(entry)) {
+      if (active.get(entry.token) === entry) {
         removeActive(entry);
+      }
+      if (advanceGeneration && ownerGenerations.get(entry.ownerId) === entry.generation) {
         ownerGenerations.set(entry.ownerId, entry.generation + 1);
       }
-      if (capsule && !capsuleState.cleared) {
-        if (authorityAvailable) {
-          retiredRemoval = registry.retain(entry.ownerId, entry.generation, capsule);
-        }
+      if (capsule && authorityAvailable) {
+        retiredRemoval = registry.retain(entry.ownerId, entry.generation, capsule);
       }
-      emit();
+      if (notify) emit();
       queueMicrotask(() => {
         void reconcile().catch(() => {
           // Detached reconciliation failure remains unknown and is never published.
         });
       });
+    }
+
+    entry.retire = retire;
+
+    function unregister() {
+      retire(true, true);
     }
 
     function reconcile(): Promise<RecoveryObservation> {
@@ -228,10 +302,22 @@ export function createGlobalSpaceTransitionCoordinator(
       }
 
       reconciliation = (async () => {
+        const cleanupErrorStart = cleanupErrors.length;
         try {
-          const observation = entry.recovery.kind === "receipt"
-            ? await entry.recovery.capsule.reconcileOriginal()
-            : await entry.recovery.reconcile();
+          let observation: RecoveryObservation;
+          try {
+            observation = entry.recovery.kind === "receipt"
+              ? await entry.recovery.capsule.reconcileOriginal()
+              : await entry.recovery.reconcile();
+          } catch (error) {
+            if (!authorityAvailable) {
+              return { operationId: entry.operationId, outcome: "authority-lost" };
+            }
+            throw error;
+          }
+          if (!authorityAvailable) {
+            return { operationId: entry.operationId, outcome: "authority-lost" };
+          }
           const normalized = observation.operationId === entry.operationId
             ? observation
             : { operationId: entry.operationId, outcome: "still-unknown" as const };
@@ -243,9 +329,10 @@ export function createGlobalSpaceTransitionCoordinator(
           }
           return normalized;
         } finally {
-          clearReceipt(capsule, capsuleState);
+          capsule?.clear();
           retiredRemoval?.();
           retiredRemoval = null;
+          reportCleanupErrorsSince(cleanupErrorStart);
         }
       })();
       return reconciliation;
@@ -257,6 +344,7 @@ export function createGlobalSpaceTransitionCoordinator(
   function invalidateForAuthorityLoss() {
     if (!authorityAvailable) return;
     authorityAvailable = false;
+    const cleanupErrorStart = cleanupErrors.length;
 
     for (const entry of active.values()) {
       if (entry.recovery.kind === "receipt") {
@@ -264,7 +352,11 @@ export function createGlobalSpaceTransitionCoordinator(
         entry.recovery.capsule.clear();
       }
     }
-    registry.invalidateAndClearAll();
+    try {
+      registry.invalidateAndClearAll();
+    } catch (error) {
+      recordCleanupError(error);
+    }
 
     const affectedOwners = new Set<string>();
     for (const entry of active.values()) {
@@ -274,11 +366,16 @@ export function createGlobalSpaceTransitionCoordinator(
     for (const entry of dirty.values()) affectedOwners.add(entry.ownerId);
     active.clear();
     dirty.clear();
-    options.onAuthorityLossPurge?.();
+    try {
+      options.onAuthorityLossPurge?.();
+    } catch (error) {
+      recordCleanupError(error);
+    }
     for (const ownerId of affectedOwners) {
       ownerGenerations.set(ownerId, (ownerGenerations.get(ownerId) ?? 0) + 1);
     }
     emit();
+    reportCleanupErrorsSince(cleanupErrorStart);
   }
 
   return {
@@ -311,10 +408,12 @@ export type GlobalSpaceDestination = {
 
 export function resolveGlobalSpaceDestination(
   input: GlobalSpaceDestinationInput,
-): GlobalSpaceDestination {
-  const targetIdentity = input.availableIdentities.find((identity) =>
+): GlobalSpaceDestination | null {
+  const availableIdentities = input.availableIdentities.filter(isValidProjectedIdentity);
+  const targetIdentity = availableIdentities.find((identity) =>
     sameSpaceIdentity(identity, input.targetIdentity)
-  ) ?? input.availableIdentities[0] ?? input.targetIdentity;
+  ) ?? availableIdentities[0];
+  if (!targetIdentity) return null;
   const navigation = input.reason === "authority-loss" ? "replace" : "push";
   const lastSafe = input.lastSafeTarget && targetBelongsToIdentity(input.lastSafeTarget, targetIdentity)
     ? input.lastSafeTarget
@@ -331,7 +430,7 @@ export function resolveGlobalSpaceDestination(
       targetWorkspace: targetIdentity.perspective,
       transition: input.reason === "authority-loss" ? "authority-loss" : "role-switch",
     });
-    const authorizedWorkspaces = input.availableIdentities.flatMap((identity) =>
+    const authorizedWorkspaces = availableIdentities.flatMap((identity) =>
       identity.productSpace === "clubs"
       && identity.clubId === targetIdentity.clubId
       && identity.clubSlug === targetIdentity.clubSlug
@@ -356,6 +455,18 @@ export function resolveGlobalSpaceDestination(
     target: lastSafe ?? representativeSpaceReturnTarget(targetIdentity),
     navigation,
   };
+}
+
+function isValidProjectedIdentity(identity: unknown): identity is SpaceIdentity {
+  if (!identity || typeof identity !== "object") return false;
+  const candidate = identity as Record<string, unknown>;
+  if (candidate.productSpace === "platform") return true;
+  return candidate.productSpace === "clubs"
+    && typeof candidate.clubId === "string"
+    && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(candidate.clubId)
+    && typeof candidate.clubSlug === "string"
+    && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(candidate.clubSlug)
+    && (candidate.perspective === "member" || candidate.perspective === "host");
 }
 
 function returnTargetFromHref(href: string): ReturnTarget {

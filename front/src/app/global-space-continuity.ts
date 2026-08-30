@@ -43,6 +43,15 @@ export type ReturnTargetValidationContext = {
   hostSessionIds: readonly string[];
 };
 
+const CONTEXT_FREE_VALIDATION: ReturnTargetValidationContext = {
+  projectionCurrent: true,
+  loadedCaseIds: new Set(),
+  authorizedClubIds: new Set(),
+  availableFocusIds: new Set(),
+  noteSessionIds: new Set(),
+  hostSessionIds: [],
+};
+
 type RouteRule = {
   family: ReturnTargetRouteFamily;
   matches: (identity: SpaceIdentity, pathname: string) => boolean;
@@ -181,7 +190,10 @@ export function sanitizeGlobalSpaceReturnTarget(
   const rule = routeRules.find((candidate) => candidate.matches(identity, target.pathname));
   if (!rule) return representativeSpaceReturnTarget(identity);
   if (!isStructurallySafeTarget(target)) return rule.fallback(identity, target.pathname, context);
-  if (!context.projectionCurrent || hasDuplicateParams(target.search)) {
+  if (!context.projectionCurrent) {
+    return rule.fallback(identity, target.pathname, CONTEXT_FREE_VALIDATION);
+  }
+  if (hasDuplicateParams(target.search)) {
     return rule.fallback(identity, target.pathname, context);
   }
   return rule.sanitize(identity, { ...target, hash: "" }, context);
@@ -567,9 +579,14 @@ export type GlobalSpaceContinuityStore = {
 
 export function createGlobalSpaceContinuityStore(storage: Storage): GlobalSpaceContinuityStore {
   function remember(identity: SpaceIdentity, target: ReturnTarget, context: ReturnTargetValidationContext) {
-    const sanitized = sanitizeGlobalSpaceReturnTarget(identity, target, context);
+    const key = globalSpaceReturnTargetStorageKey(identity);
     try {
-      storage.setItem(globalSpaceReturnTargetStorageKey(identity), JSON.stringify(sanitized));
+      if (!context.projectionCurrent) {
+        storage.removeItem(key);
+        return;
+      }
+      const sanitized = sanitizeGlobalSpaceReturnTarget(identity, target, context);
+      storage.setItem(key, JSON.stringify(sanitized));
     } catch {
       // Continuity is optional; the current URL remains render authority.
     }

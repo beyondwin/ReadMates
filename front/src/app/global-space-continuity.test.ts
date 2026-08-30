@@ -221,6 +221,20 @@ describe("global space route-owned return-target registry", () => {
     ).toEqual(target("/admin/clubs", "?scrollTop=10", { scrollTop: 10 }));
   });
 
+  it("uses a context-free host notifications root when the projection is stale", () => {
+    expect(
+      sanitizeGlobalSpaceReturnTarget(
+        host,
+        target("/clubs/reading-sai/app/host/notifications", `?sessionId=${MEETING_ID}&eventType=SESSION_REMINDER_DUE`, {
+          hash: "#stale",
+          focusId: "club-1",
+          scrollTop: 240,
+        }),
+        { ...freshContext, projectionCurrent: false },
+      ),
+    ).toEqual(target("/clubs/reading-sai/app/host/notifications"));
+  });
+
   it.each([
     ["?task=attendance", "?task=attendance"],
     ["?records=json", "?section=records&source=json"],
@@ -315,5 +329,20 @@ describe("versioned global space continuity storage", () => {
 
     expect(continuity.read(member, { ...freshContext, projectionCurrent: false })).toBeNull();
     expect(storage.getItem(globalSpaceReturnTargetStorageKey(member))).toBeNull();
+  });
+
+  it("refuses and purges a stale-projection remember instead of persisting its route root", () => {
+    const storage = new MemoryStorage();
+    const continuity = createGlobalSpaceContinuityStore(storage);
+    continuity.remember(host, target("/clubs/reading-sai/app/host/notifications", `?sessionId=${MEETING_ID}`), freshContext);
+
+    continuity.remember(
+      host,
+      target("/clubs/reading-sai/app/host/notifications", `?sessionId=${OTHER_MEETING_ID}`),
+      { ...freshContext, projectionCurrent: false },
+    );
+
+    expect(storage.getItem(globalSpaceReturnTargetStorageKey(host))).toBeNull();
+    expect(continuity.read(host, { ...freshContext, projectionCurrent: false })).toBeNull();
   });
 });
