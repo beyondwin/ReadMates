@@ -29,11 +29,11 @@ describe("host settings recovery disposition", () => {
     expect(hostCloseConfirmErrorDisposition(apiError(code, status))).toBe("non-current");
   });
 
-  it("uses fallback status for a non-current close response and preserves only indeterminate outcomes", () => {
+  it("uses fallback status for a non-current close response and preserves only transport uncertainty", () => {
     expect(hostCloseConfirmErrorDisposition(apiError("CONFLICT", 409, true))).toBe("non-current");
     expect(hostCloseConfirmErrorDisposition(apiError("INVALID_REQUEST", 400))).toBe("rejected");
     expect(hostCloseConfirmErrorDisposition(new ReadmatesTransportError())).toBe("unknown");
-    expect(hostCloseConfirmErrorDisposition(new Error("unexpected"))).toBe("unknown");
+    expect(hostCloseConfirmErrorDisposition(new Error("unexpected"))).toBe("rejected");
   });
 
   it.each([

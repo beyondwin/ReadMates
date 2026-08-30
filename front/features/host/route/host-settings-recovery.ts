@@ -16,7 +16,9 @@ const NON_CURRENT_PREVIEW_CODES = new Set([
 ]);
 
 export function hostCloseConfirmErrorDisposition(error: unknown): HostCloseConfirmErrorDisposition {
-  if (!isReadmatesApiError(error)) return "unknown";
+  if (!isReadmatesApiError(error)) {
+    return isReadmatesTransportError(error) ? "unknown" : "rejected";
+  }
   if (
     NON_CURRENT_PREVIEW_CODES.has(error.code)
     || (error.fallback && [404, 409, 410].includes(error.status))
