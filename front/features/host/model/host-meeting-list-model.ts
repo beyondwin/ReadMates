@@ -22,6 +22,7 @@ export type HostMeetingTocRow = {
   attentionLabel: string | null;
   summary: string;
   href: string;
+  state?: unknown;
 };
 
 export type HostMeetingTocSections = {
@@ -92,6 +93,7 @@ function toTocRow(
   item: TocSourceItem,
   basePath: string,
   kind: "upcoming" | "past",
+  detailLinkState?: unknown,
 ): HostMeetingTocRow {
   return {
     id: item.sessionId,
@@ -101,6 +103,7 @@ function toTocRow(
     attentionLabel: tocAttentionLabel(item),
     summary: kind === "upcoming" ? upcomingSummary(item) : pastSummary(item),
     href: sessionDetailHref(basePath, item.sessionId),
+    ...(detailLinkState === undefined ? {} : { state: detailLinkState }),
   };
 }
 
@@ -110,15 +113,16 @@ export function buildHostMeetingTocSections(input: {
   upcomingCursor: string | null;
   pastItems: readonly HostSessionLedgerItem[];
   pastCursor: string | null;
+  detailLinkState?: unknown;
 }): HostMeetingTocSections {
   const basePath = normalizeBasePath(input.basePath);
   return {
     upcoming: {
-      rows: input.upcomingItems.map((item) => toTocRow(item, basePath, "upcoming")),
+      rows: input.upcomingItems.map((item) => toTocRow(item, basePath, "upcoming", input.detailLinkState)),
       nextCursor: input.upcomingCursor,
     },
     past: {
-      rows: input.pastItems.map((item) => toTocRow(item, basePath, "past")),
+      rows: input.pastItems.map((item) => toTocRow(item, basePath, "past", input.detailLinkState)),
       nextCursor: input.pastCursor,
     },
   };

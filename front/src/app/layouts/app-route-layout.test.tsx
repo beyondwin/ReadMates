@@ -376,6 +376,7 @@ describe("AppRouteLayout host session navigation", () => {
     ["scoped person detail", "/clubs/reading-sai/app/host/people/member-7", "사람", "사람", "사람"],
     ["unscoped records", "/app/host/records", "기록", "기록", "기록"],
     ["scoped record closing", "/clubs/reading-sai/app/host/sessions/session-7/closing", "기록", "기록", "기록"],
+    ["scoped feedback document", "/clubs/reading-sai/app/host/sessions/session-7/feedback-document", "기록", "기록", "기록"],
     ["utility compatibility", "/app/host/invitations", null, null, "초대와 설정"],
     ["scoped utility", "/clubs/reading-sai/app/host/notifications", null, null, "알림"],
   ])("matches %s through the normalized app pathname", (_name, initialEntry, desktopLabel, mobileLabel, mobileTitle) => {
@@ -410,6 +411,31 @@ describe("AppRouteLayout host session navigation", () => {
     ]) {
       expect(within(navigation).getByRole("link", { current: "page" })).toHaveTextContent("기록");
     }
+  });
+
+  it.each([
+    "/clubs/reading-sai/app/host/sessions/session-7/closing",
+    "/clubs/reading-sai/app/host/sessions/session-7/feedback-document",
+  ])("returns a direct-entry record workflow to canonical records on mobile for %s", (initialEntry) => {
+    renderHostShellAt(initialEntry);
+
+    const mobileHeader = document.querySelector<HTMLElement>(".mobile-only .m-hdr");
+    expect(mobileHeader).not.toBeNull();
+    expect(within(mobileHeader!).getByRole("link", { name: "뒤로" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/records",
+    );
+  });
+
+  it("keeps a direct-entry meeting detail owned by meetings on mobile", () => {
+    renderHostShellAt("/clubs/reading-sai/app/host/sessions/session-7");
+
+    const mobileHeader = document.querySelector<HTMLElement>(".mobile-only .m-hdr");
+    expect(mobileHeader).not.toBeNull();
+    expect(within(mobileHeader!).getByRole("link", { name: "뒤로" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions",
+    );
   });
 
   it.each([

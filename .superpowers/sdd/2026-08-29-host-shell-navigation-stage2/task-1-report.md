@@ -44,3 +44,17 @@ After minimal production changes, the same focused command passed: `2` files and
 - Targeted private-path, secret-prefix, and private-key pattern scan over all changed source/test/report files: exit `0`, no findings.
 - A baseline invocation used `pnpm --dir front test -- ...`; the package script treated the separator as a full Vitest run, so it ran `402` files and `3,600` tests, all passing. All RED/GREEN verification after that used `pnpm exec vitest` and stayed focused.
 - Full lint, test, build, CT, and E2E gates were intentionally not run for Task 1. New canonical route elements and legacy redirect closure remain Tasks 4 and 5.
+
+## Range-review round 1 — record-owned deep-route continuity
+
+- Review BASE: `e4b6dece3980c540f1b669b388fa931dc53665ea`.
+- TDD RED used Node `v24.18.0` through the portable `<node24-bin>` launcher. The focused four-suite run failed only the eight newly asserted ownership contracts: record-list detail state (`1`), cross-club record-workflow fallback (`2`), and mobile title/back ownership (`5`); the other `169` tests passed.
+- GREEN reused the same route and query owners. It passed `4` files and `177` tests. No CT or E2E was needed because the changed contract is fully exercised through the real data-router link transition plus route-model and shell component tests.
+
+| Closing source SHA-256 | Command | Result | Finding closure |
+| --- | --- | --- | --- |
+| `d037540ce9cd783b339238e1dc5606965137a6822b1a6bd412172fab86a96fa7` (`front/src/app/workspace-route-model.ts`) | `<node24-bin> npx --yes corepack@0.35.0 pnpm --dir front exec vitest run src/app/host-routes/records-route-element.test.tsx src/app/workspace-route-model.test.ts src/app/layouts/app-route-layout.test.tsx tests/unit/responsive-navigation.test.tsx` | GREEN, `177/177` | Actual host closing and feedback-document deep routes are classified as `record-workflow`; cross-club switching falls back to the target club's canonical `/host/records`. Normal `/sessions/:id` remains meeting-owned, and role-switch correspondence behavior is unchanged. |
+| `7ab95cdc63286c8c1996b8c02315b4465ea16889e8f32e981ba9c32550ce841f`, `d1303c846dc2206c5da57f9d629ccbf8056f0f144f0415576e34b9813b21f26f` (`app-route-layout.tsx`, `mobile-header.tsx`) | same focused GREEN command | GREEN, `177/177` | Record-owned closing, feedback-document, and explicitly record-owned detail routes keep `기록` current/title ownership. With no return state, closing and feedback-document return to canonical records; direct meeting detail still returns to meetings. |
+| `5de6f4fe744a91e86a802b5cfff9c2b71eca24232637b9f283ee0e0c1413910c`, `79df239d14103fad56fb1c34b3be693abe8fc77bcc534461e95ab3d1579cb729`, `f6cee1373415bb46c7e70632d16c41b187b0ed93f50919f5d3192ccfed5ecae4` (focused route/shell tests) | exact changed-file ESLint under Node `v24.18.0` and repository-pinned pnpm | exit `0`, no findings | The route-family and mobile ownership regression tests satisfy repository lint rules. |
+
+Round-close safety: `git diff --check` passed. The targeted changed-file scan found no machine-local absolute path, private key marker, token prefix, or BFF secret name. Full frontend gates and the separate mixed-authority review finding remain outside this round.

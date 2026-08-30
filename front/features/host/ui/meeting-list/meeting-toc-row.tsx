@@ -20,7 +20,7 @@ export function MeetingTocRow({
   return (
     <li className="rm-meeting-toc__row">
       <span className="rm-meeting-toc__no mono">{row.ordinalFolio}</span>
-      <LinkComponent to={row.href} className="rm-meeting-toc__title">
+      <LinkComponent to={row.href} state={row.state} className="rm-meeting-toc__title">
         {row.title}
       </LinkComponent>
       {row.attentionLabel ? (

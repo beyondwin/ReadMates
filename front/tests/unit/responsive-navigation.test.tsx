@@ -289,7 +289,7 @@ describe("TopNav responsive variants", () => {
     const mobile = screen.getByRole("navigation", { name: "앱 탭" });
     expect(within(desktop).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
     expect(within(mobile).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
-    expect(document.querySelector(".m-hdr-title")).toHaveTextContent("모임");
+    expect(document.querySelector(".m-hdr-title")).toHaveTextContent("기록");
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/host/records");
   });
 
@@ -382,14 +382,14 @@ describe("MobileHeader route titles and actions", () => {
     expect(screen.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/clubs/reading-sai/app");
   });
 
-  it("keeps scoped record-origin detail title and Back under meetings on mobile", () => {
+  it("keeps scoped record-origin detail title and Back under records on mobile", () => {
     renderAtRecordOrigin(
       "/clubs/reading-sai/app/host/sessions/session-6",
       <MobileHeader variant="host" appBasePath="/clubs/reading-sai/app" />,
       true,
     );
 
-    expect(screen.getByText("모임")).toBeInTheDocument();
+    expect(screen.getByText("기록")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/records",
@@ -399,11 +399,11 @@ describe("MobileHeader route titles and actions", () => {
   it.each([
     "/app/host/sessions/session-6/closing",
     "/app/host/sessions/session-6/feedback-document",
-  ])("keeps the host record workflow title and direct-entry Back under meetings on %s", (pathname) => {
+  ])("keeps the host record workflow title and direct-entry Back under records on %s", (pathname) => {
     renderAt(pathname, <MobileHeader variant="host" />);
 
-    expect(screen.getByText("모임")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/host/sessions");
+    expect(screen.getByText("기록")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/host/records");
   });
 
   it("renders the public session mobile title and authenticated entry action", async () => {

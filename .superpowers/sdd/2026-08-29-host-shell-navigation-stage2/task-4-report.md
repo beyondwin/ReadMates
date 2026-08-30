@@ -45,3 +45,17 @@ PATH="<node24-bin>:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec eslint
 - Final staged `git diff --check` and the targeted private-path, token-prefix, private-key, and BFF-secret scan passed with no findings.
 - Full frontend lint/test/build, CT, E2E, redirects, Stage 4 settings capabilities, and authority purge were intentionally not run or changed under the Task 4 stop conditions.
 - ADR-0048 remains Proposed. Route removal remains Stage 5; authority-loss cache handling remains Task 5; named invitation links and club settings remain Stage 4.
+
+## Range-review round 1 — records adapter ownership state
+
+- Review BASE: `e4b6dece3980c540f1b669b388fa931dc53665ea`.
+- TDD RED under Node `v24.18.0` failed only the eight new ownership assertions while `169` existing assertions passed. The actual records-list transition reached the canonical session detail with `location.state === null`, which reproduced the review finding.
+- GREEN passed the same `4` files and `177` tests. The records adapter still reuses `HostMeetingListRoute`, both existing list query owners, and the shared row UI; it only supplies optional link state, so no query, query key, hook, or fetch owner was duplicated.
+
+| Closing source SHA-256 | Command | Result | Finding closure |
+| --- | --- | --- | --- |
+| `a43bbdc2f9bf5cc0694b1b696ac08e57441f0340ae96572b561122bbb419fa11`, `c68a2e62a290908ebf9df7c4a081b1565cd065f108d36f05690ff395d488585b` (`records-route-element.tsx` and its integration test) | `<node24-bin> npx --yes corepack@0.35.0 pnpm --dir front exec vitest run src/app/host-routes/records-route-element.test.tsx src/app/workspace-route-model.test.ts src/app/layouts/app-route-layout.test.tsx tests/unit/responsive-navigation.test.tsx` | GREEN, `177/177` | The canonical records adapter packages its exact current pathname, search, and hash as a same-club `기록으로` return state before a real row click opens `/sessions/:id`. The meetings adapter passes no state and remains meeting-owned. |
+| `ccd0529c3bb2c72329f7af8359fc535e8e5b79ff462e0917d63ffedb0af149f5`, `28f5a913d557e2cf66e60064c1ac5e8326ec2657ff115b0adf78b52d65925157`, `c7660e265ec8ba0cb6fb67c0923214129f66c8c9a224ccdf3286709beeb3f132` (shared list model, route, row) | same focused GREEN command | GREEN, `177/177` | The shared list pipeline transports an optional `detailLinkState` without changing data fetching or detail hrefs. Both upcoming and past rows preserve the record owner only when their adapter provides it. |
+| all round-1 TypeScript/TSX source and tests | exact changed-file ESLint under Node `v24.18.0` and repository-pinned pnpm | exit `0`, no findings | The adapter and shared optional-state transport satisfy repository lint rules. |
+
+Round-close safety: `git diff --check` passed. The targeted changed-file scan found no machine-local absolute path, private key marker, token prefix, or BFF secret name. Full frontend gates, CT, E2E, and the separate mixed-authority review finding remain outside this round.

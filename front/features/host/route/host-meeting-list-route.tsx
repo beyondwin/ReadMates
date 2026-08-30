@@ -29,8 +29,10 @@ const PAST_FIRST_REQUEST = { page: { limit: HOST_MEETING_LIST_PAGE_LIMIT } } as 
 
 export function HostMeetingListRoute({
   LinkComponent,
+  detailLinkState,
 }: {
   LinkComponent?: HostSessionLedgerLinkComponent;
+  detailLinkState?: unknown;
 }) {
   const loaderData = useLoaderData() as HostMeetingListRouteData;
   const { clubSlug } = useParams<{ clubSlug: string }>();
@@ -51,6 +53,7 @@ export function HostMeetingListRoute({
       navigate={navigate}
       queryClient={queryClient}
       LinkComponent={LinkComponent}
+      detailLinkState={detailLinkState}
     />
   );
 }
@@ -62,6 +65,7 @@ function MeetingListBody({
   navigate,
   queryClient,
   LinkComponent,
+  detailLinkState,
 }: {
   loaderData: Extract<HostMeetingListRouteData, { view: "meeting" }>;
   context: ExplicitReadmatesApiContext;
@@ -69,6 +73,7 @@ function MeetingListBody({
   navigate: ReturnType<typeof useNavigate>;
   queryClient: ReturnType<typeof useQueryClient>;
   LinkComponent?: HostSessionLedgerLinkComponent;
+  detailLinkState?: unknown;
 }) {
   const firstRequest = useMemo(() => ({ limit: HOST_MEETING_LIST_PAGE_LIMIT }), []);
   const query = useQuery({
@@ -203,6 +208,7 @@ function MeetingListBody({
       ? []
       : [...(basePastPage?.items ?? []), ...visiblePastState.appendedItems],
     pastCursor: pastUnavailable ? null : pastNextCursor,
+    detailLinkState,
   });
 
   return (

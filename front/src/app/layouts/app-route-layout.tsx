@@ -373,8 +373,8 @@ function appMobileBackTarget({
   if (appPath === "/app/host/sessions" || appPath === "/app/host/records") return null;
   if (workspace === "host" && recordOwned) {
     const target = readHostRecordsReturnTarget(state, pathname) ?? {
-      href: scopedAppPath(basePath, HOST_ROUTE_HREFS.meetings),
-      label: "모임으로",
+      href: scopedAppPath(basePath, HOST_ROUTE_HREFS.records),
+      label: "기록으로",
     };
     return { href: scopeAppTarget(target.href, basePath), state: target.state, label: "뒤로", icon: "brand" };
   }

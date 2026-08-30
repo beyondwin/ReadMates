@@ -250,6 +250,8 @@ describe("workspace route model", () => {
     ["/clubs/reading-sai/app/host/notifications", "host", "/clubs/next-club/app/host/notifications"],
     ["/clubs/reading-sai/app/sessions/meeting-7", "member", "/clubs/next-club/app/archive"],
     ["/clubs/reading-sai/app/feedback/meeting-7/print", "member", "/clubs/next-club/app/archive"],
+    ["/clubs/reading-sai/app/host/sessions/meeting-7/closing", "host", "/clubs/next-club/app/host/records"],
+    ["/clubs/reading-sai/app/host/sessions/meeting-7/feedback-document", "host", "/clubs/next-club/app/host/records"],
     ["/clubs/reading-sai/app/host/sessions/meeting-7/edit", "host", "/clubs/next-club/app/host"],
   ] as const)("builds a safe club switch for %s", (pathname, targetWorkspace, expected) => {
     expect(buildClubSwitchTarget({ pathname, targetClubSlug: "next-club", targetWorkspace })).toBe(expected);
