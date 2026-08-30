@@ -23,7 +23,7 @@ Command:
 
 Result: exit `1`.
 
-Eight controller/dev-login assertions failed with `PathNotFoundException` for the intentionally absent `$.availableSpaces` path. They cover anonymous, unscoped member, requested-club-not-member, host-fallback, multi-club, platform-only, dev host, and dev platform-admin behavior.
+Eight `AuthMeControllerTest`/`DevLoginControllerTest` assertions failed with `PathNotFoundException` for the intentionally absent `$.availableSpaces` path. They cover anonymous, unscoped member, requested-club-not-member, host-fallback, multi-club, platform-only, dev host, and dev platform-admin behavior. The wildcard's platform-admin pattern selected the separate tagged `com.readmates.club.api.PlatformAdminBffSecurityTest` sibling (5 tests), not the changed untagged `com.readmates.auth.api.PlatformAdminBffSecurityTest`; that sibling result is not used as evidence for the changed harness.
 
 The BFF characterization was introduced before production adapter changes and passed independently because the generic proxy already preserves upstream JSON without a path-specific implementation:
 
@@ -35,18 +35,26 @@ Result: exit `0` (80 tests).
 
 ### GREEN
 
-After injecting the Task 1.1 projection use case into the two controllers and adding only web DTO mapping, the focused combined server lane passed:
+After injecting the Task 1.1 projection use case into the two controllers and adding only web DTO mapping, the AuthMe/DevLogin integration lane passed:
 
 ```bash
-./server/gradlew -p server integrationTest --tests '*AuthMeControllerTest' --tests '*DevLoginControllerTest' --tests '*PlatformAdminBffSecurityTest'
+./server/gradlew -p server integrationTest --tests '*AuthMeControllerTest' --tests '*DevLoginControllerTest'
 ```
 
 Result: exit `0` (`BUILD SUCCESSFUL`).
 
+The earlier `integrationTest --tests '*PlatformAdminBffSecurityTest'` wildcard also exited `0`, but selected the separate `com.readmates.club.api.PlatformAdminBffSecurityTest` sibling (5 tests) and is not used to verify this Task 1.2 test harness. The changed harness was verified with its exact unit-test FQCN:
+
+```bash
+./server/gradlew -p server unitTest --tests 'com.readmates.auth.api.PlatformAdminBffSecurityTest'
+```
+
+Result: exit `0`; the JUnit suite reports 51 tests, 0 failures, and 0 errors.
+
 ## Verification
 
 - `./server/gradlew -p server integrationTest --tests '*AuthMeControllerTest' --tests '*DevLoginControllerTest'` — exit `0` (`BUILD SUCCESSFUL`).
-- `./server/gradlew -p server integrationTest --tests '*PlatformAdminBffSecurityTest'` — exit `0` (`BUILD SUCCESSFUL`).
+- `./server/gradlew -p server unitTest --tests 'com.readmates.auth.api.PlatformAdminBffSecurityTest'` — exit `0`; 51 tests, 0 failures, 0 errors.
 - `./server/gradlew -p server unitTest --tests '*CurrentMemberArgumentResolverTest'` — exit `0` (`BUILD SUCCESSFUL`).
 - `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run tests/unit/cloudflare-bff.test.ts` — exit `0` (1 file, 80 tests).
 - `./scripts/server-ci-check.sh` — exit `1`. The final Detekt report contains only the three known base-owned findings below; no Task 1.2 path is reported:
