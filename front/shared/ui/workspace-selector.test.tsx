@@ -26,6 +26,7 @@ describe("WorkspaceSelector", () => {
     expect(within(navigation).queryByRole("link", { name: "멤버 공간" })).not.toBeInTheDocument();
     expect(within(navigation).getByText("멤버 공간")).toHaveAttribute("aria-current", "page");
     expect(within(navigation).queryByRole("link", { name: "호스트 공간" })).not.toBeInTheDocument();
+    expect(within(navigation).queryByText("플랫폼 운영")).not.toBeInTheDocument();
   });
 
   it("keeps the current workspace name visible on the mobile disclosure", () => {

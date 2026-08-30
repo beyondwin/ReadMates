@@ -1,24 +1,19 @@
 import type { ReactNode } from "react";
 import type {
   AccountMenuModel,
-  ClubNavigationItem,
   ClubShellBackTarget,
   ClubShellLinkComponent,
   ClubShellResponsiveSlot,
   ClubWorkspace,
+  GlobalSpaceSwitcherSlot,
   PrimaryNavigationItem,
-  WorkspaceNavigationItem,
 } from "../model/app-club-shell";
 import { MobileHeader } from "./mobile-header";
 import { MobileTabBar } from "./mobile-tab-bar";
 import { TopNav } from "./top-nav";
-import { SelectorChevron, WorkspaceSelector } from "./workspace-selector";
 
 export type AppClubShellProps = {
-  clubs: ReadonlyArray<ClubNavigationItem>;
-  currentClubSlug: string;
   workspace: ClubWorkspace;
-  workspaceItems: ReadonlyArray<WorkspaceNavigationItem>;
   primaryItems: ReadonlyArray<PrimaryNavigationItem>;
   account: AccountMenuModel;
   brandHref: string;
@@ -26,7 +21,7 @@ export type AppClubShellProps = {
   mobileKicker?: string | null;
   mobileBackTarget?: ClubShellBackTarget | null;
   LinkComponent: ClubShellLinkComponent;
-  contextSlot?: ClubShellResponsiveSlot;
+  spaceSwitcher: GlobalSpaceSwitcherSlot;
   primarySlot?: ClubShellResponsiveSlot;
   utilitySlot?: ClubShellResponsiveSlot;
   beforeContent?: ReactNode;
@@ -35,69 +30,8 @@ export type AppClubShellProps = {
   children: ReactNode;
 };
 
-function ClubSelector({
-  clubs,
-  currentClubSlug,
-  LinkComponent,
-}: Pick<AppClubShellProps, "clubs" | "currentClubSlug" | "LinkComponent">) {
-  const current = clubs.find((club) => club.slug === currentClubSlug) ?? clubs[0];
-
-  if (!current) {
-    return null;
-  }
-
-  return (
-    <details className="rm-context-selector rm-club-selector">
-      <summary className="rm-context-selector__trigger rm-club-selector__trigger" aria-label={`현재 클럽 ${current.name}`}>
-        <span className="rm-context-selector__kind">클럽</span>
-        <strong title={current.name}>{current.name}</strong>
-        <SelectorChevron />
-      </summary>
-      <nav className="rm-context-selector__menu" aria-label="클럽 선택">
-        {clubs.map((club) => club.slug === currentClubSlug ? (
-          <span
-            key={club.slug}
-            className="rm-context-selector__item"
-            aria-current="true"
-          >
-            {club.name}
-          </span>
-        ) : (
-          <LinkComponent
-            key={club.slug}
-            to={club.href}
-            className="rm-context-selector__item"
-          >
-            {club.name}
-          </LinkComponent>
-        ))}
-      </nav>
-    </details>
-  );
-}
-
-function ContextSelectors(props: Pick<AppClubShellProps, "clubs" | "currentClubSlug" | "workspace" | "workspaceItems" | "LinkComponent">) {
-  return (
-    <div className="rm-club-shell-context">
-      <ClubSelector
-        clubs={props.clubs}
-        currentClubSlug={props.currentClubSlug}
-        LinkComponent={props.LinkComponent}
-      />
-      <WorkspaceSelector
-        currentWorkspace={props.workspace}
-        items={props.workspaceItems}
-        LinkComponent={props.LinkComponent}
-      />
-    </div>
-  );
-}
-
 export function AppClubShell({
-  clubs,
-  currentClubSlug,
   workspace,
-  workspaceItems,
   primaryItems,
   account,
   brandHref,
@@ -105,7 +39,7 @@ export function AppClubShell({
   mobileKicker,
   mobileBackTarget,
   LinkComponent,
-  contextSlot,
+  spaceSwitcher,
   primarySlot,
   utilitySlot,
   beforeContent,
@@ -115,16 +49,8 @@ export function AppClubShell({
 }: AppClubShellProps) {
   const desktopNavLabel = workspace === "host" ? "호스트 주 메뉴" : "멤버 주 메뉴";
   const mobileNavLabel = `${desktopNavLabel} 모바일`;
-  const selectors = {
-    clubs,
-    currentClubSlug,
-    workspace,
-    workspaceItems,
-    LinkComponent,
-  };
-  const defaultContextControl = <ContextSelectors {...selectors} />;
-  const desktopContextControl = contextSlot?.desktop ?? defaultContextControl;
-  const mobileContextControl = contextSlot?.mobile ?? contextSlot?.desktop ?? defaultContextControl;
+  const desktopContextControl = spaceSwitcher.desktop;
+  const mobileContextControl = spaceSwitcher.mobile ?? spaceSwitcher.desktop;
 
   return (
     <div className="app-shell rm-app-club-shell" data-workspace={workspace}>

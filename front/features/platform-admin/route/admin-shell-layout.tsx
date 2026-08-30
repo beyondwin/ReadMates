@@ -1,5 +1,6 @@
 import {
   type MouseEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useRef,
@@ -13,11 +14,6 @@ import {
   useNavigate,
   useSearchParams,
 } from "react-router";
-import {
-  adminOtherAccountLoginPath,
-  adminWorkspaceAccountLabel,
-  deriveAdminWorkspaceDestinations,
-} from "@/features/platform-admin/model/admin-workspace-switcher-model";
 import { buildAdminDetailHref } from "@/features/platform-admin/model/admin-route-state";
 import { platformAdminClubListHref } from "@/features/platform-admin/model/platform-admin-club-list-filters";
 import { canAdmin } from "@/features/platform-admin/model/platform-admin-capabilities";
@@ -33,9 +29,9 @@ import { AdminAlarmBar } from "@/features/platform-admin/ui/admin-alarm-bar";
 import { AdminBreadcrumb } from "@/features/platform-admin/ui/admin-breadcrumb";
 import { AdminLayoutNav } from "@/features/platform-admin/ui/admin-layout-nav";
 import { AdminOnboardingModal } from "@/features/platform-admin/ui/admin-onboarding-modal";
-import { AdminWorkspaceSwitcher } from "@/features/platform-admin/ui/admin-workspace-switcher";
 import { PlatformAdminOnboardingWizard } from "@/features/platform-admin/ui/platform-admin-onboarding-wizard";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import { loginPathForReturnTo, safeRelativeReturnTo } from "@/shared/auth/login-return";
 import { logoutCurrentSession } from "@/shared/auth/session-api";
 import { AdminBreadcrumbProvider } from "./admin-breadcrumb-context";
 import { useAdminBreadcrumbExtra } from "./admin-breadcrumb-hook";
@@ -43,20 +39,30 @@ import "@/features/platform-admin/ui/admin-editorial-ledger.css";
 
 export function AdminShellLayout({
   auth = null,
+  spaceSwitcher = null,
 }: {
   auth?: AuthMeResponse | null;
+  spaceSwitcher?: ReactNode;
 }) {
   return (
     <AdminBreadcrumbProvider>
-      <AdminShellLayoutInner auth={auth} />
+      <AdminShellLayoutInner auth={auth} spaceSwitcher={spaceSwitcher} />
     </AdminBreadcrumbProvider>
   );
 }
 
-function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
+function AdminShellLayoutInner({
+  auth,
+  spaceSwitcher,
+}: {
+  auth: AuthMeResponse | null;
+  spaceSwitcher: ReactNode;
+}) {
   const queryClient = useQueryClient();
   const [authorityLost, setAuthorityLost] = useState(false);
-  const [workspaceMenuEpoch, setWorkspaceMenuEpoch] = useState(0);
+  const [spaceControlEpoch, setSpaceControlEpoch] = useState(0);
+  const [accountBusy, setAccountBusy] = useState(false);
+  const [accountError, setAccountError] = useState<string | null>(null);
   const capabilitiesQuery = useQuery({
     ...platformAdminCapabilitiesQuery(),
     enabled: !authorityLost,
@@ -70,8 +76,7 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
   const allowOnboardingNavigation = useRef(false);
   const previewOnboarding = usePreviewPlatformAdminOnboardingMutation();
   const commitOnboarding = useCommitPlatformAdminOnboardingMutation();
-  const workspaceDestinations = deriveAdminWorkspaceDestinations(auth);
-  const workspaceAccountLabel = adminWorkspaceAccountLabel(auth);
+  const workspaceAccountLabel = auth?.accountName || auth?.displayName || auth?.email || "현재 계정";
   const otherAccountLoginPath = adminOtherAccountLoginPath(
     location.pathname,
     location.search,
@@ -164,7 +169,7 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
     installPlatformAdminAuthorityLossHandler(queryClient);
     return subscribePlatformAdminAuthorityLoss(() => {
       setAuthorityLost(true);
-      setWorkspaceMenuEpoch((epoch) => epoch + 1);
+      setSpaceControlEpoch((epoch) => epoch + 1);
       setIsWizardDirty(false);
       allowOnboardingNavigation.current = true;
       const next = new URLSearchParams(searchParams);
@@ -183,12 +188,20 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
   }, [location.pathname, navigate, queryClient, searchParams]);
 
   async function otherAccountLogin() {
-    const response = await logoutCurrentSession();
-    if (response.ok || response.status === 401) {
-      window.location.assign(otherAccountLoginPath);
-      return true;
+    setAccountBusy(true);
+    setAccountError(null);
+    try {
+      const response = await logoutCurrentSession();
+      if (response.ok || response.status === 401) {
+        window.location.assign(otherAccountLoginPath);
+        return;
+      }
+      setAccountError("로그아웃에 실패했습니다. 다시 시도해 주세요.");
+    } catch {
+      setAccountError("로그아웃에 실패했습니다. 다시 시도해 주세요.");
+    } finally {
+      setAccountBusy(false);
     }
-    return false;
   }
 
   return (
@@ -207,12 +220,21 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
           {capabilities ? (
             <span className="admin-shell__role-badge">{capabilities.role}</span>
           ) : null}
-          <AdminWorkspaceSwitcher
-            key={workspaceMenuEpoch}
-            accountLabel={workspaceAccountLabel}
-            destinations={workspaceDestinations}
-            onOtherAccountLogin={otherAccountLogin}
-          />
+          <div key={spaceControlEpoch} className="admin-shell__space-control">
+            {spaceSwitcher}
+          </div>
+          <div className="admin-shell__account-control">
+            <span className="admin-shell__account-label">{workspaceAccountLabel}</span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={accountBusy}
+              onClick={() => void otherAccountLogin()}
+            >
+              {accountBusy ? "로그아웃 중" : "다른 계정으로 로그인"}
+            </button>
+            {accountError ? <p role="alert">{accountError}</p> : null}
+          </div>
         </div>
       </header>
       <div className="admin-shell__body">
@@ -256,6 +278,11 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
       ) : null}
     </div>
   );
+}
+
+function adminOtherAccountLoginPath(pathname: string, search: string, hash: string): string {
+  const returnTo = safeRelativeReturnTo(`${pathname}${search}${hash}`);
+  return loginPathForReturnTo(returnTo?.startsWith("/admin") ? returnTo : "/admin");
 }
 
 function focusAdminMain(event: MouseEvent<HTMLAnchorElement>) {

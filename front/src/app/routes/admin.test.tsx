@@ -1,4 +1,4 @@
-import { act, cleanup, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, MemoryRouter, useLocation } from "react-router";
 import { RouterProvider } from "react-router/dom";
@@ -13,6 +13,7 @@ import { hostClubQueryPrefix } from "@/features/host/queries/host-state-purge";
 import { fetchAdminOperationCases } from "@/features/platform-admin/api/platform-admin-operations-api";
 import { globalSpaceReturnTargetStorageKey } from "../global-space-continuity";
 import { useGlobalSpaceTransitionController } from "../global-space-transition-controller";
+import { AppGlobalSpaceSwitcherBridge } from "../global-space-switcher-bridge";
 import { AdminTransitionBoundary } from "./admin";
 
 vi.mock("@/features/platform-admin/api/platform-admin-operations-api", async (importOriginal) => ({
@@ -88,6 +89,11 @@ function AdminTargetHostHarness({
   );
 }
 
+function LocationProbe() {
+  const location = useLocation();
+  return <output aria-label="current-location">{location.pathname}</output>;
+}
+
 let queryClient: QueryClient;
 
 beforeEach(() => {
@@ -117,6 +123,69 @@ describe("AdminTransitionBoundary", () => {
 
     expect(result.current.registerDirty).toEqual(expect.any(Function));
     expect(result.current.beginPending).toEqual(expect.any(Function));
+  });
+
+  it("renders the shared projection-owned switcher and executes selection through the app controller", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (input.toString().includes("/api/bff/api/auth/me")) {
+        return new Response(JSON.stringify(multiSpaceAuth), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`Unexpected fetch: ${input.toString()}`);
+    }));
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/admin/today"]}>
+          <AdminTransitionBoundary auth={multiSpaceAuth}>
+            <AppGlobalSpaceSwitcherBridge auth={multiSpaceAuth} />
+            <LocationProbe />
+          </AdminTransitionBoundary>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "공간 전환, 현재 플랫폼 운영" }));
+    expect(screen.getByRole("menuitemradio", { name: "다른 모임 멤버로 보기" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: "다른 모임 호스트로 운영" })).toBeInTheDocument();
+    expect(screen.queryByText(/HOST|MEMBER|ACTIVE/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "다른 모임 멤버로 보기" }));
+    await waitFor(() => expect(screen.getByLabelText("current-location")).toHaveTextContent(
+      "/clubs/other-club/app",
+    ));
+  });
+
+  it("does not recreate destinations from legacy joined clubs omitted by availableSpaces", () => {
+    const projectionOnlyPlatform: AuthMeResponse = {
+      ...auth,
+      joinedClubs: [{
+        clubId: "legacy-club",
+        clubSlug: "legacy-club",
+        clubName: "레거시 모임",
+        membershipId: "legacy-membership",
+        role: "HOST",
+        status: "ACTIVE",
+        approvalState: "ACTIVE",
+        primaryHost: null,
+      }],
+    };
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/admin/today"]}>
+          <AdminTransitionBoundary auth={projectionOnlyPlatform}>
+            <AppGlobalSpaceSwitcherBridge auth={projectionOnlyPlatform} />
+          </AdminTransitionBoundary>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.queryByRole("button", { name: /^공간 전환/ })).not.toBeInTheDocument();
+    expect(screen.getByText("현재 공간 플랫폼 운영")).toHaveClass("sr-only");
+    expect(screen.queryByText("레거시 모임")).not.toBeInTheDocument();
   });
 
   it("subscribes once at the real admin boundary and cancels only a revoked target-host navigation", async () => {

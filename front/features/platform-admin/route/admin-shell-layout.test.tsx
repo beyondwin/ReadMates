@@ -11,6 +11,7 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useState, type ReactNode } from "react";
 import type {
   PlatformAdminClubListResponse,
   PlatformAdminSummaryResponse,
@@ -228,13 +229,14 @@ const auth = {
 function renderShell(
   initialEntry: string,
   opts: {
-    auth?: typeof auth | null;
+    auth?: AuthMeResponse | null;
     operations?: AdminOperationCasesResponse;
     summary?: PlatformAdminSummaryResponse;
     capabilities?: PlatformAdminCapabilities;
     health?: typeof healthSnapshot;
     initialEntries?: string[];
     initialIndex?: number;
+    spaceSwitcher?: ReactNode;
   } = {},
 ) {
   const queryClient = new QueryClient({
@@ -269,7 +271,12 @@ function renderShell(
     [
       {
         path: "/admin",
-        element: <AdminShellLayout auth={opts.auth ?? auth} />,
+        element: (
+          <AdminShellLayout
+            auth={opts.auth === undefined ? auth : opts.auth}
+            spaceSwitcher={opts.spaceSwitcher ?? <button type="button">주입된 공간 전환</button>}
+          />
+        ),
         children: [
           { path: "today", element: <div>today content</div> },
           { path: "clubs", element: <div>clubs content</div> },
@@ -288,6 +295,16 @@ function renderShell(
     </QueryClientProvider>,
   );
   return { ...view, queryClient, router };
+}
+
+function SpaceControlProbe() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <button type="button" onClick={() => setOpen(true)}>테스트 공간 전환</button>
+      {open ? <div role="menu" aria-label="테스트 공간 메뉴" /> : null}
+    </div>
+  );
 }
 
 describe("AdminShellLayout", () => {
@@ -388,6 +405,9 @@ describe("AdminShellLayout", () => {
     expect(source).not.toContain("platformAdminSummaryQuery");
     expect(source).toContain("AdminAlarmBar");
     expect(source).toContain("useAdminAlarmSummary");
+    expect(source).not.toContain("AdminWorkspaceSwitcher");
+    expect(source).not.toContain("admin-workspace-switcher-model");
+    expect(source).not.toContain("@/src/app");
   });
 
   it("does not render a global header 새 클럽 CTA", () => {
@@ -450,20 +470,30 @@ describe("AdminShellLayout", () => {
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });
 
-  it("replaces the member-space link with current-account workspace destinations", () => {
+  it("renders the app-owned space control and keeps account identity and login outside it", () => {
     renderShell("/admin/today");
 
-    expect(
-      screen.queryByRole("link", { name: /멤버 공간/ }),
-    ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "내 공간" }));
+    expect(screen.getByRole("button", { name: "주입된 공간 전환" })).toBeInTheDocument();
+    expect(screen.getByText("OWNER admin", { selector: ".admin-shell__account-label" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "다른 계정으로 로그인" })).toBeInTheDocument();
+  });
 
-    expect(
-      screen.getByRole("menuitem", { name: "읽는사이 호스트 공간" }),
-    ).toHaveAttribute("href", "/clubs/reading-sai/app/host");
-    expect(
-      screen.getByRole("menuitem", { name: "읽는사이 멤버 공간" }),
-    ).toHaveAttribute("href", "/clubs/reading-sai/app");
+  it.each([
+    {
+      label: "email",
+      shellAuth: { ...auth, accountName: null, displayName: null },
+      expected: "owner@example.com",
+    },
+    { label: "anonymous fallback", shellAuth: null, expected: "현재 계정" },
+  ])("keeps the $label account label outside the space control", ({ shellAuth, expected }) => {
+    renderShell("/admin/today", {
+      auth: shellAuth,
+      spaceSwitcher: <div data-testid="space-control">플랫폼 운영</div>,
+    });
+
+    const spaceControl = screen.getByTestId("space-control");
+    expect(screen.getByText(expected, { selector: ".admin-shell__account-label" })).toBeInTheDocument();
+    expect(within(spaceControl).queryByText(expected)).not.toBeInTheDocument();
   });
 
   it("sends other-account login through logout and a safe admin return path", async () => {
@@ -474,10 +504,7 @@ describe("AdminShellLayout", () => {
     vi.stubGlobal("location", { assign });
 
     renderShell("/admin/clubs?filter=ready#top");
-    fireEvent.click(screen.getByRole("button", { name: "내 공간" }));
-    fireEvent.click(
-      screen.getByRole("menuitem", { name: "다른 계정으로 로그인" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "다른 계정으로 로그인" }));
 
     await waitFor(() => {
       expect(logoutCurrentSession).toHaveBeenCalledTimes(1);
@@ -485,6 +512,23 @@ describe("AdminShellLayout", () => {
         "/login?returnTo=%2Fadmin%2Fclubs%3Ffilter%3Dready%23top",
       );
     });
+  });
+
+  it("keeps the operator in place and reports a logout failure outside the space control", async () => {
+    vi.mocked(logoutCurrentSession).mockResolvedValue(
+      new Response(null, { status: 500 }),
+    );
+    renderShell("/admin/today", {
+      spaceSwitcher: <div data-testid="space-control">플랫폼 운영</div>,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "다른 계정으로 로그인" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "로그아웃에 실패했습니다. 다시 시도해 주세요.",
+    );
+    expect(within(screen.getByTestId("space-control")).queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByText("today content")).toBeInTheDocument();
   });
 
   it("hides create-club actions when the projection omits CREATE_CLUB even if summary role is OWNER", () => {
@@ -549,11 +593,13 @@ describe("AdminShellLayout", () => {
   });
 
   it("purges platform-admin state and closes onboarding and workspace menus on 401", async () => {
-    const { queryClient } = renderShell("/admin/today?onboarding=1");
-    fireEvent.click(screen.getByRole("button", { name: "내 공간" }));
+    const { queryClient } = renderShell("/admin/today?onboarding=1", {
+      spaceSwitcher: <SpaceControlProbe />,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "테스트 공간 전환" }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(
-      screen.getByRole("menu", { name: "내 ReadMates 공간" }),
+      screen.getByRole("menu", { name: "테스트 공간 메뉴" }),
     ).toBeInTheDocument();
 
     await waitFor(async () => {
@@ -570,7 +616,7 @@ describe("AdminShellLayout", () => {
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(
-        screen.queryByRole("menu", { name: "내 ReadMates 공간" }),
+        screen.queryByRole("menu", { name: "테스트 공간 메뉴" }),
       ).not.toBeInTheDocument();
     });
     expect(
@@ -589,8 +635,10 @@ describe("AdminShellLayout", () => {
   });
 
   it("purges platform-admin state and closes onboarding and workspace menus on 403", async () => {
-    const { queryClient } = renderShell("/admin/today?onboarding=1");
-    fireEvent.click(screen.getByRole("button", { name: "내 공간" }));
+    const { queryClient } = renderShell("/admin/today?onboarding=1", {
+      spaceSwitcher: <SpaceControlProbe />,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "테스트 공간 전환" }));
     const error = await forbiddenError();
 
     await waitFor(async () => {
@@ -607,7 +655,7 @@ describe("AdminShellLayout", () => {
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(
-        screen.queryByRole("menu", { name: "내 ReadMates 공간" }),
+        screen.queryByRole("menu", { name: "테스트 공간 메뉴" }),
       ).not.toBeInTheDocument();
     });
     const nav = screen.getByRole("navigation", { name: "Admin 콘솔" });

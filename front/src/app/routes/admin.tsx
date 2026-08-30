@@ -13,6 +13,7 @@ import {
 } from "@/features/platform-admin/model/admin-route-catalog";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { GlobalSpaceTransitionController } from "@/src/app/global-space-transition-controller";
+import { AppGlobalSpaceSwitcherBridge } from "@/src/app/global-space-switcher-bridge";
 import { AppHostAuthorityLossBridge } from "@/src/app/app-route-security-controller";
 
 // This route-only boundary is intentionally colocated with the router configuration.
@@ -47,7 +48,10 @@ export function adminRoutes(queryClient: QueryClient): RouteObject[] {
           return (
             <RequirePlatformAdmin>
               <AdminTransitionBoundary auth={auth}>
-                <AdminShellLayout auth={auth} />
+                <AdminShellLayout
+                  auth={auth}
+                  spaceSwitcher={<AppGlobalSpaceSwitcherBridge auth={auth} />}
+                />
               </AdminTransitionBoundary>
             </RequirePlatformAdmin>
           );

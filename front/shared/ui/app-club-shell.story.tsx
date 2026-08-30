@@ -22,21 +22,15 @@ export function AppClubShellStory({
 }) {
   return (
     <AppClubShell
-      clubs={[
-        { slug: "reading-sai", name: "읽는사이", href: "/clubs/reading-sai/app" },
-        { slug: "long-club", name: "아주 긴 이름의 두 번째 독서 클럽", href: "/clubs/long-club/app" },
-      ]}
-      currentClubSlug="reading-sai"
       workspace="member"
-      workspaceItems={[
-        { id: "member", label: "멤버 공간", href: "/clubs/reading-sai/app" },
-        { id: "host", label: "호스트 공간", href: "/clubs/reading-sai/app/host" },
-      ]}
       primaryItems={primaryItems}
       account={{ control: <button type="button" aria-label="계정 메뉴">계정</button> }}
       brandHref="/clubs/reading-sai/app"
       mobileTitle="읽는사이"
       LinkComponent={StoryLink}
+      spaceSwitcher={{
+        desktop: <button type="button" aria-label="공간 전환, 현재 내 클럽">내 클럽</button>,
+      }}
     >
       {children}
     </AppClubShell>
