@@ -176,6 +176,7 @@ describe("host workbox wire contract", () => {
       items: [{ ...valid.items[0], count: -1 }],
     })).toThrow();
     expect(() => HostWorkboxPageSchema.parse({ ...valid, nextCursor: "" })).toThrow();
+    expect(() => HostWorkboxPageSchema.parse({ ...valid, nextCursor: "   " })).toThrow();
   });
 });
 
@@ -194,6 +195,36 @@ describe("host workbox API", () => {
       expect.objectContaining({ cache: "no-store" }),
     );
   });
+
+  it("preserves every byte of a nonblank opaque cursor without trimming it", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(page("NOW")));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchHostWorkboxPage(
+      { state: "NOW", limit: 20, cursor: "  cursor+/=  " },
+      { clubSlug: "reading-sai" },
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/host/workbox?state=NOW&limit=20&cursor=++cursor%2B%2F%3D++&clubSlug=reading-sai",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
+  it.each(["", "   ", "\t\n"])(
+    "rejects blank request cursor %j before any network request",
+    (cursor) => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+
+      expect(() => fetchHostWorkboxPage(
+        { state: "NOW", limit: 20, cursor },
+        { clubSlug: "reading-sai" },
+      )).toThrow();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
 
   it("URL-encodes the authoritative key once and parses the PUT receipt", async () => {
     const receipt = {

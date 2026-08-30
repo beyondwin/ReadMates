@@ -43,3 +43,9 @@
 - Full frontend lint/test/build, full server CI/integration, Playwright E2E, CT/screenshots and public-release gates were not run; the Stage 4 plan reserves them for Task 9/stage closeout.
 - No UI or route was exercised because Task 6 deliberately ships no rendering or route composition; those belong to Tasks 7 and 8.
 - No real email, OAuth/provider action, deployment, push, PR or tag was performed.
+
+## Review round 1 closure — blank cursor identity
+
+The remaining finding was isolated to continuation cursor validation. RED proved seven gaps across the affected API/query suites: a whitespace-only response cursor was admitted, three blank request forms reached the API boundary, and the same three forms could create continuation query keys. `HostWorkboxCursorSchema` now shares one no-transform nonblank refinement between the response schema, API request boundary and query identity. Empty or whitespace-only values fail before fetch/key creation, while valid opaque values retain every byte, including leading and trailing spaces.
+
+Focused evidence: Node 24 pinned-pnpm API/query tests GREEN 23/23; exact five-file ESLint 0 errors and 0 warnings; `git diff --check` clean. No model, purge, server, fixture, UI, route or Task 7+ surface changed. The five-file delta is sealed in `task-6-review-1-manifest.sha256`, which excludes itself and this report.

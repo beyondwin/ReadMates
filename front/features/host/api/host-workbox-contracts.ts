@@ -2,6 +2,10 @@ import { z } from "zod";
 
 const OffsetDateTimeSchema = z.string().datetime({ offset: true });
 const SafeCodeSchema = z.string().regex(/^[A-Z][A-Z0-9_]{0,63}$/);
+export const HostWorkboxCursorSchema = z.string().min(1).refine(
+  (value) => value.trim().length > 0,
+  "workbox cursor must contain a non-whitespace byte",
+);
 
 export const HostWorkboxStateSchema = z.enum(["NOW", "DEFERRED", "COMPLETED"]);
 export const HostWorkItemTypeSchema = z.enum([
@@ -105,7 +109,7 @@ export const HostWorkboxPageSchema = z.object({
   evaluatedAt: OffsetDateTimeSchema,
   sourceAvailability: z.array(HostWorkSourceAvailabilitySchema).length(5),
   items: z.array(HostWorkboxItemSchema),
-  nextCursor: z.string().min(1).nullable(),
+  nextCursor: HostWorkboxCursorSchema.nullable(),
 }).strict().superRefine((page, context) => {
   const types = page.sourceAvailability.map(({ type }) => type);
   if (new Set(types).size !== 5 || !HostWorkItemTypeSchema.options.every((type) => types.includes(type))) {
@@ -148,4 +152,8 @@ export function parseHostWorkboxPage(value: unknown): HostWorkboxPage {
 
 export function parseHostWorkboxDeferralReceipt(value: unknown): HostWorkboxDeferralReceipt {
   return HostWorkboxDeferralReceiptSchema.parse(value);
+}
+
+export function parseOptionalHostWorkboxCursor(value: string | null | undefined): string | null {
+  return value == null ? null : HostWorkboxCursorSchema.parse(value);
 }

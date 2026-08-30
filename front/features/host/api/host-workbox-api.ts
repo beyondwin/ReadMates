@@ -9,6 +9,7 @@ import {
 } from "@/shared/api/host-authority-event";
 import {
   HostWorkboxDeferralRequestSchema,
+  parseOptionalHostWorkboxCursor,
   parseHostWorkboxDeferralReceipt,
   parseHostWorkboxPage,
   type HostWorkboxDeferralReceipt,
@@ -27,10 +28,11 @@ export function fetchHostWorkboxPage(
   request: HostWorkboxPageRequest,
   context: ExplicitReadmatesApiContext,
 ): Promise<HostWorkboxPage> {
+  const cursor = parseOptionalHostWorkboxCursor(request.cursor);
   const params = new URLSearchParams();
   params.set("state", request.state);
   if (request.limit !== undefined) params.set("limit", String(request.limit));
-  if (request.cursor) params.set("cursor", request.cursor);
+  if (cursor !== null) params.set("cursor", cursor);
   return readmatesFetch<unknown>(
     `/api/host/workbox?${params.toString()}`,
     undefined,

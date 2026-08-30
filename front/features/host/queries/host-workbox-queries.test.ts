@@ -47,6 +47,7 @@ describe("host workbox query identity", () => {
     const now = hostWorkboxKeys.page({ state: "NOW", cursor: null, limit: 20 }, context);
     const deferred = hostWorkboxKeys.page({ state: "DEFERRED", cursor: null, limit: 20 }, context);
     const continued = hostWorkboxKeys.page({ state: "NOW", cursor: "next-1", limit: 20 }, context);
+    const byteExact = hostWorkboxKeys.page({ state: "NOW", cursor: "  next-1  ", limit: 20 }, context);
     const otherLimit = hostWorkboxKeys.page({ state: "NOW", cursor: null, limit: 50 }, context);
     const otherClub = hostWorkboxKeys.page(
       { state: "NOW", cursor: null, limit: 20 },
@@ -54,8 +55,17 @@ describe("host workbox query identity", () => {
     );
 
     expect(hostWorkboxKeys.scope(context)).toEqual(["host", "reading-sai", "workbox"]);
+    expect(byteExact.at(-1)).toEqual({ state: "NOW", cursor: "  next-1  ", limit: 20 });
     expect(new Set([now, deferred, continued, otherLimit, otherClub].map(JSON.stringify)).size).toBe(5);
   });
+
+  it.each(["", "   ", "\t\n"])(
+    "rejects blank continuation %j before creating a query key or calling the API",
+    (cursor) => {
+      expect(() => hostWorkboxPageQuery({ state: "NOW", cursor, limit: 20 }, context)).toThrow();
+      expect(fetchHostWorkboxPage).not.toHaveBeenCalled();
+    },
+  );
 
   it("passes the authoritative page request and club context to the API", async () => {
     const request = { state: "COMPLETED" as const, cursor: "next-2", limit: 20 };

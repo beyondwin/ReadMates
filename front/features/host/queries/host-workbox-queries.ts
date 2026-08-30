@@ -10,7 +10,10 @@ import {
   removeHostWorkboxDeferral,
   type HostWorkboxPageRequest,
 } from "../api/host-workbox-api";
-import type { HostWorkboxDeferralRequest } from "../api/host-workbox-contracts";
+import {
+  parseOptionalHostWorkboxCursor,
+  type HostWorkboxDeferralRequest,
+} from "../api/host-workbox-contracts";
 import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
 import { hostSessionKeys } from "./host-session-queries";
 import { hostClubQueryPrefix, hostMutationKey } from "./host-state-purge";
@@ -18,7 +21,7 @@ import { hostClubQueryPrefix, hostMutationKey } from "./host-state-purge";
 function pageIdentity(request: HostWorkboxPageRequest) {
   return {
     state: request.state,
-    cursor: request.cursor ?? null,
+    cursor: parseOptionalHostWorkboxCursor(request.cursor),
     limit: request.limit ?? 20,
   } as const;
 }
