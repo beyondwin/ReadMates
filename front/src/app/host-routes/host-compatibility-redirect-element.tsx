@@ -1,12 +1,17 @@
-import { Navigate, useLocation } from "react-router";
+import { Navigate, useLocation, useRouteLoaderData } from "react-router";
 import {
   hostCompatibilityRedirectState,
   hostCompatibilityRedirectTarget,
+  type HostCompatibilityLoaderData,
 } from "@/src/app/route-continuity";
 
 export function HostCompatibilityRedirectElement() {
   const location = useLocation();
-  const target = hostCompatibilityRedirectTarget(location);
+  const loaderData = useRouteLoaderData("app-host") as HostCompatibilityLoaderData | undefined;
+  const target = hostCompatibilityRedirectTarget({
+    ...location,
+    currentClubSlug: loaderData?.hostCompatibilityClubSlug,
+  });
 
   if (!target) {
     return null;

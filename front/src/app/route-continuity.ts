@@ -74,10 +74,12 @@ export function hostCompatibilityRedirectTarget({
   pathname,
   search = "",
   hash = "",
+  currentClubSlug,
 }: {
   pathname: string;
   search?: string;
   hash?: string;
+  currentClubSlug?: string;
 }) {
   const match = /^(?<root>\/app\/host|\/clubs\/[^/]+\/app\/host)\/(?<legacy>members|invitations|operations)$/.exec(pathname);
   if (!match?.groups) {
@@ -86,11 +88,18 @@ export function hostCompatibilityRedirectTarget({
 
   const legacy = match.groups.legacy as keyof typeof hostCompatibilityDestinations;
   const destination = hostCompatibilityDestinations[legacy];
-  const targetPathname = destination.segment
-    ? `${match.groups.root}/${destination.segment}`
+  const targetRoot = match.groups.root === "/app/host" && currentClubSlug
+    ? `/clubs/${encodeURIComponent(currentClubSlug)}/app/host`
     : match.groups.root;
+  const targetPathname = destination.segment
+    ? `${targetRoot}/${destination.segment}`
+    : targetRoot;
   return `${targetPathname}${search}${destination.hash ?? hash}`;
 }
+
+export type HostCompatibilityLoaderData = {
+  hostCompatibilityClubSlug: string;
+};
 
 export function hostCompatibilityRedirectState(state: unknown, targetPathname: string) {
   const returnTarget = readAppReturnTarget(state, targetPathname, invalidCompatibilityReturnTarget);

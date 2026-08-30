@@ -1,11 +1,40 @@
 import { QueryClient } from "@tanstack/react-query";
-import { render, waitFor } from "@testing-library/react";
-import { createMemoryRouter, RouterProvider, type LoaderFunctionArgs, type RouteObject } from "react-router";
+import { act, render, waitFor } from "@testing-library/react";
+import { createMemoryRouter, Outlet, RouterProvider, type LoaderFunctionArgs, type RouteObject } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { hostRoutes } from "./host";
 
 function childPaths(route: RouteObject | undefined) {
   return (route?.children ?? []).map((child) => (child.index ? "index" : child.path));
+}
+
+function combinedCompatibilityRoutes(destinationChildPath: string | null) {
+  return hostRoutes(new QueryClient()).map((route) => ({
+    ...route,
+    element: <Outlet />,
+    children: route.children?.map((child) => {
+      const isDestination = destinationChildPath === null
+        ? child.index === true
+        : child.path === destinationChildPath;
+      if (!isDestination) {
+        return child;
+      }
+      return destinationChildPath === null
+        ? { index: true, element: <main>canonical destination</main> }
+        : { path: destinationChildPath, element: <main>canonical destination</main> };
+    }),
+  }));
+}
+
+function stubHostAuth() {
+  vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(JSON.stringify({
+    authenticated: true,
+    membershipId: "membership-1",
+    role: "HOST",
+    membershipStatus: "ACTIVE",
+    approvalState: "ACTIVE",
+    currentMembership: { clubSlug: "reading-sai" },
+  }), { headers: { "Content-Type": "application/json" } }))));
 }
 
 afterEach(() => {
@@ -57,6 +86,87 @@ describe("host compatibility routes", () => {
         "/clubs/reading-sai/app/host/sessions?cursor=old#draft",
       );
     }
+  });
+
+  it.each([
+    ["members", "people", "#member-7", "/clubs/reading-sai/app/host/people#member-7"],
+    ["invitations", "settings", "#obsolete-invitations", "/clubs/reading-sai/app/host/settings#invitations"],
+    ["operations", null, "#current-work", "/clubs/reading-sai/app/host#current-work"],
+  ])("replaces the real combined unscoped %s route once without leaving a legacy Back entry", async (
+    legacyPath,
+    destinationChildPath,
+    incomingHash,
+    expectedHref,
+  ) => {
+    stubHostAuth();
+    const initialState = {
+      readmatesReturnTo: "/app/host/records?view=all#session-7",
+      readmatesReturnLabel: "기록으로",
+    };
+    const expectedState = {
+      readmatesReturnTo: "/clubs/reading-sai/app/host/records?view=all#session-7",
+      readmatesReturnLabel: "기록으로",
+    };
+    const scopedLegacyPath = `/clubs/reading-sai/app/host/${legacyPath}`;
+    const visited = new Set<string>();
+    const router = createMemoryRouter([
+      { path: "/before", element: <main>before</main> },
+      ...combinedCompatibilityRoutes(destinationChildPath),
+    ], {
+      initialEntries: [
+        "/before",
+        {
+          pathname: `/app/host/${legacyPath}`,
+          search: "?status=active",
+          hash: incomingHash,
+          state: initialState,
+        },
+      ],
+      initialIndex: 1,
+    });
+    router.subscribe((state) => {
+      visited.add(state.location.pathname);
+    });
+
+    render(<RouterProvider router={router} />);
+    const expected = new URL(expectedHref, "https://readmates.local");
+    await waitFor(() => expect(router.state.location.pathname).toBe(expected.pathname));
+    expect.soft(router.state.historyAction).toBe("REPLACE");
+    expect.soft(router.state.location.search).toBe("?status=active");
+    expect.soft(router.state.location.hash).toBe(expected.hash);
+    expect.soft(router.state.location.state).toEqual(expectedState);
+    expect.soft(visited).not.toContain(scopedLegacyPath);
+
+    await act(async () => router.navigate(-1));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/before"));
+
+    await act(async () => router.navigate(1));
+    await waitFor(() => expect(router.state.location.pathname).toBe(expected.pathname));
+    expect(router.state.location.state).toEqual(expectedState);
+  });
+
+  it.each([
+    ["external", "https://evil.example/app/host/records"],
+    ["cross-club", "/clubs/other-club/app/host/records"],
+  ])("drops %s route state through the real combined unscoped invitation redirect", async (_name, readmatesReturnTo) => {
+    stubHostAuth();
+    const router = createMemoryRouter(combinedCompatibilityRoutes("settings"), {
+      initialEntries: [{
+        pathname: "/app/host/invitations",
+        state: {
+          readmatesReturnTo,
+          readmatesReturnLabel: "unsafe",
+          clubSlug: "other-club",
+        },
+      }],
+    });
+
+    render(<RouterProvider router={router} />);
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe("/clubs/reading-sai/app/host/settings");
+    });
+    expect(router.state.location.hash).toBe("#invitations");
+    expect(router.state.location.state).toBeNull();
   });
 });
 

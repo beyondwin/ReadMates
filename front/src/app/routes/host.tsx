@@ -8,6 +8,7 @@ import { memoizeRouteModule } from "@/src/app/routes/route-module-loader";
 import { ClubHostAppRouteLayout } from "@/src/app/layouts/club-app-route-layout";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequireHost } from "@/src/app/route-guards";
+import { hostCompatibilityRedirectTarget } from "@/src/app/route-continuity";
 import { canonicalizeCompatibilityEntry, resolveUnavailableDetailTarget } from "@/src/app/workspace-route-model";
 import { readLastSafeWorkspaceTarget } from "@/src/app/workspace-route-continuity";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
@@ -27,6 +28,14 @@ async function canonicalHostCompatibilityLoader(args: LoaderFunctionArgs) {
   }
 
   const url = new URL(args.request.url);
+  const hostCompatibilityTarget = hostCompatibilityRedirectTarget({
+    pathname: url.pathname,
+    search: url.search,
+    currentClubSlug: clubSlug,
+  });
+  if (hostCompatibilityTarget) {
+    return { hostCompatibilityClubSlug: clubSlug };
+  }
   throw redirect(
     canonicalizeCompatibilityEntry({
       pathname: url.pathname,
