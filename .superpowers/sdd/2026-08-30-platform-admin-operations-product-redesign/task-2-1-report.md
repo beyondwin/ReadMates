@@ -6,7 +6,9 @@ Initial commit: `74dfa977482ebf721bdf68ce373a929a5ff35db9`
 
 Fix round 1 commit: `2cafe61ed43b3aea9af8a3a4f2845369636ace94`
 
-Fix round 2 commit intent: `fix(app): tombstone late transition registrations`
+Fix round 2 commit: `90788f42bd64ab1e53cafec05c13fd5291a68b4d`
+
+Fix round 3 commit intent: `fix(app): gate transition publication by authority`
 
 ## Scope and ADR impact
 
@@ -24,8 +26,8 @@ Fix round 2 commit intent: `fix(app): tombstone late transition registrations`
 - A newer pending registration atomically retires an older registration for the same owner; dirty-token cleanup does not mutate pending generations. Different owners remain independently current and the aggregate snapshot stays blocking until every pending owner settles.
 - Receipt capsules now use one managed state across active, retired-registry, and `finally` paths. Invalidation and clear are one-shot, authority changes during an awaited recovery normalize the final observation to `authority-lost`, and callback failures are aggregated without aborting the remaining purge/generation cleanup.
 - Recovery operation identity mismatches fail synchronously before timer, recovery, invalidation, or clear work starts. Destination resolution returns no destination when the available-space projection has no valid identity.
-- After authority loss, dirty registration is a no-op and pending registration returns a tombstoned handle. A late receipt is immediately invalidated and cleared exactly once; no active entry, timer, snapshot, registry entry, recovery I/O, or publication remains. The same gate applies to registration reentered from invalidate/clear/purge callbacks.
-- Added eight named, dependency-free publication boundary ports for UI, cache, receipt callback, success copy, error copy, navigation, return target, and session storage. They receive only generation-authorized operation identity/outcome and import no product implementation or `QueryClient`.
+- After authority loss, dirty registration is a no-op and pending registration reaches the terminal gate before operation-identity/timeout validation or generation mutation. A late receipt is immediately invalidated and cleared exactly once even with an invalid timeout or mismatched capsule identity; repeated tombstones do not advance stored generation and create no active entry, timer, snapshot, registry entry, recovery I/O, or publication. The same gate applies to registration reentered from invalidate/clear/purge callbacks.
+- Replaced the unused coordinator-wide eight-callback fan-out with a handle-local accepted-publication action. Each concrete UI, cache, receipt callback, copy, navigation, return-target, or session-storage publication is requested independently and is admitted once only after accepted settlement while owner generation and authority remain current. Success/error copy are mutually exclusive. Recovery publication remains the separate query-owned `currentOwnerRefetch` sink and imports no product implementation or `QueryClient`.
 - Added an app-owned, typed route-family registry covering every Task 2.1 allowlist row. It composes the existing route-owned parsers for platform-admin filters, host meeting/ledger state, archive view, and notes state.
 - Added versioned per-identity `ReturnTarget` persistence. Unknown keys, hashes, duplicate singleton parameters, absolute URLs, cross-club targets, oversized targets, stale projections, and unsupported parameters are rejected or normalized according to the route-family contract. No auth, pending state, request payload, receipt capsule, or capability data is serialized.
 - Centralized the legacy `ClubWorkspace` alias on the shared `ClubPerspective` type without deleting legacy continuity behavior.
@@ -64,27 +66,32 @@ Fix round 2 RED used the same exact focused command and exited 1 with 4 expected
 
 Fix round 2 GREEN result: exit 0, 4 files passed, 131 tests passed.
 
-The coordinator suite includes the exact interleaving `beginPending -> unregister -> authority loss -> late settle/reconcile`. Original issue count is produced by an instrumented invocation, remains 1, replay count is 0, `currentOwnerRefetch` and each of the eight named boundary ports receive zero calls, canonical request fields are cleared, and retired-registry size is 0. A separate current-owner positive test proves every named port is connected by the coordinator rather than by a test-side fan-out helper.
+Fix round 3 RED used the same exact focused command and exited 1 with 6 expected failures (1 failing suite, 128 passing tests): terminal registration still threw on zero timeout, invalid reentrant registration skipped late capsule cleanup, and four accepted-publication probes had no handle-local gate.
+
+Fix round 3 GREEN result: exit 0, 4 files passed, 134 tests passed.
+
+The coordinator suite includes the exact interleaving `beginPending -> unregister -> authority loss -> late settle/reconcile`. Original issue count is produced by an instrumented invocation, remains 1, replay count is 0, `currentOwnerRefetch` and each independently requested UI/cache/receipt callback/success-copy/error-copy/navigation/return-target/session-storage action receive zero calls, canonical request fields are cleared, and retired-registry size is 0. Separate accepted-settlement tests prove all eight caller actions, outcome-exclusive copy, per-surface one-shot behavior, and the reentrant race where the first UI callback removes authority and all seven subsequent actions are rejected.
 
 ## Verification
 
-- Focused Task 2.1 command: exit 0, 4 files / 131 tests.
+- Focused Task 2.1 command: exit 0, 4 files / 134 tests.
 - Route-parser and boundary bundle: exit 0, 9 files / 236 tests.
-- Full frontend suite: `npx --yes corepack@0.35.0 pnpm --dir front test`; exit 0, 420 files / 3,866 tests.
+- Full frontend suite: `npx --yes corepack@0.35.0 pnpm --dir front test`; exit 0, 420 files / 3,869 tests.
 - Frontend lint: `npx --yes corepack@0.35.0 pnpm --dir front lint`; exit 0. It reports only the two pre-existing Fast Refresh warnings in `meeting-notification-rail.tsx` and `member-invitations-section.tsx`; no touched-file warning or error remains.
 - Frontend build: `npx --yes corepack@0.35.0 pnpm --dir front build`; exit 0, 781 modules transformed.
-- Exploratory `tsc -b --pretty false`: exit 1 with 714 lines of repository-wide existing TypeScript baseline output. Filtering a fresh run for `global-space` and `workspace-route-(model|continuity)` produced no touched-path match, so this command is not claimed as passing.
+- Exploratory `tsc -b --pretty false`: exit 1 with 715 lines of repository-wide existing TypeScript baseline output. Filtering that fresh run for `global-space` and `workspace-route-(model|continuity)` produced no touched-path match, so this command is not claimed as passing.
 - The full test run emitted the existing Node `localStorage` experimental warning; it did not fail tests.
 
 ## Self-review
 
 - Dependency direction remains app -> features -> shared. Shared code imports neither feature nor app modules.
-- Publication seams have no `QueryClient` or product-layer imports. The eight named ports independently record whether a generation-authorized observation crossed each contract boundary.
-- The authority-loss interleaving asserts zero calls independently for UI, cache, receipt callback, success copy, error copy, navigation, return target, and session storage; it does not synthesize those results from one spy.
+- Publication seams have no `QueryClient` or product-layer imports. Recovery owns only the current-owner refetch sink; accepted caller publication is a single-surface action checked against the handle's accepted outcome, generation, and latest authority on every call.
+- The authority-loss interleaving invokes and rejects each UI, cache, receipt callback, success copy, error copy, navigation, return target, and session-storage action independently and asserts each spy remains at zero; it does not synthesize those results from one helper or coordinator fan-out.
+- Accepted success and failure settlements publish only their matching copy action. A callback-triggered synchronous authority loss permits that already-running callback only and rejects every later surface action.
 - The persistence adapter serializes the exact `ReturnTarget` envelope only.
 - Authority loss clears active and retired receipt state synchronously before any late microtask can reconcile.
 - Authority loss during an already-awaited recovery overrides its late result, and managed capsule cleanup remains one-shot even when domain callbacks throw.
-- Authority loss permanently closes both registration APIs: late or reentrant work cannot recreate dirty/pending state, and receipt tombstones retain only primitive operation identity after immediate clear.
+- Authority loss permanently closes both registration APIs: late or reentrant work cannot recreate dirty/pending state, and receipt tombstones retain only primitive operation identity after immediate clear. Terminal receipt cleanup precedes invalid timeout/identity validation, and repeated same-owner tombstones expose the same local generation, proving the generation map is not mutated.
 - Empty or wholly malformed available-space projections produce no destination; Task 2.2 must supply login/selection handling rather than navigating an unprojected identity.
 - Stale projections neither persist nor restore a target, and their pure fallback cannot reuse loaded IDs from stale context.
 - The coordinator owns reconciliation and automatic detached cleanup; callers do not need to orchestrate receipt replay.

@@ -1,4 +1,5 @@
 import type {
+  AcceptedTransitionPublicationAction,
   PendingHandle,
   PendingRegistration,
   ReceiptRecoveryCapsule,
@@ -7,7 +8,6 @@ import type {
   RetiredReceiptCapsuleRegistry,
   ReturnTarget,
   SpaceIdentity,
-  TransitionPublicationBoundaryPort,
   TransitionPublicationPort,
   TransitionSafety,
   TransitionSafetyRegistrationPort,
@@ -76,7 +76,6 @@ type CoordinatorOptions = {
   clearTimer?: (timer: TimerHandle) => void;
   onAuthorityLossPurge?: () => void;
   onSafetyCleanupError?: (error: AggregateError) => void;
-  publicationBoundary?: TransitionPublicationBoundaryPort;
 };
 
 type ActiveRegistration = {
@@ -100,6 +99,7 @@ function authorityLostPendingHandle(generation: number, operationId: string): Pe
   return {
     generation,
     settle: () => Promise.resolve("obsolete"),
+    publishAccepted: () => "rejected",
     unregister: () => undefined,
     reconcile: () => Promise.resolve({ operationId, outcome: "authority-lost" }),
   };
@@ -195,14 +195,6 @@ export function createGlobalSpaceTransitionCoordinator(
   }
 
   function publish(observation: RecoveryObservation) {
-    options.publicationBoundary?.ui(observation);
-    options.publicationBoundary?.cache(observation);
-    options.publicationBoundary?.receiptCallback(observation);
-    options.publicationBoundary?.successCopy(observation);
-    options.publicationBoundary?.errorCopy(observation);
-    options.publicationBoundary?.navigation(observation);
-    options.publicationBoundary?.returnTarget(observation);
-    options.publicationBoundary?.sessionStorage(observation);
     publication?.currentOwnerRefetch(observation);
   }
 
@@ -218,6 +210,17 @@ export function createGlobalSpaceTransitionCoordinator(
   }
 
   function beginPending(registration: PendingRegistration): PendingHandle {
+    if (!authorityAvailable) {
+      const tombstonedGeneration = (ownerGenerations.get(registration.ownerId) ?? 0) + 1;
+      const cleanupErrorStart = cleanupErrors.length;
+      if (registration.recovery.kind === "receipt") {
+        const tombstonedCapsule = managedReceiptCapsule(registration.recovery.capsule);
+        tombstonedCapsule.invalidateForAuthorityLoss();
+        tombstonedCapsule.clear();
+      }
+      reportCleanupErrorsSince(cleanupErrorStart);
+      return authorityLostPendingHandle(tombstonedGeneration, registration.operationId);
+    }
     const recoveryOperationId = registration.recovery.kind === "receipt"
       ? registration.recovery.capsule.operationId
       : registration.recovery.operationId;
@@ -227,17 +230,6 @@ export function createGlobalSpaceTransitionCoordinator(
     const timeoutMs = normalizePendingTimeout(registration.timeoutMs);
     const generation = (ownerGenerations.get(registration.ownerId) ?? 0) + 1;
     ownerGenerations.set(registration.ownerId, generation);
-    if (!authorityAvailable) {
-      const tombstonedOperationId = registration.operationId;
-      const cleanupErrorStart = cleanupErrors.length;
-      if (registration.recovery.kind === "receipt") {
-        const tombstonedCapsule = managedReceiptCapsule(registration.recovery.capsule);
-        tombstonedCapsule.invalidateForAuthorityLoss();
-        tombstonedCapsule.clear();
-      }
-      reportCleanupErrorsSince(cleanupErrorStart);
-      return authorityLostPendingHandle(generation, tombstonedOperationId);
-    }
     for (const previous of [...active.values()]) {
       if (previous.ownerId === registration.ownerId) previous.retire(false, false);
     }
@@ -271,6 +263,8 @@ export function createGlobalSpaceTransitionCoordinator(
     let retiredRemoval: (() => void) | null = null;
     let unregistered = false;
     let reconciliation: Promise<RecoveryObservation> | null = null;
+    let acceptedOutcome: "succeeded" | "failed" | null = null;
+    const publishedSurfaces = new Set<AcceptedTransitionPublicationAction["surface"]>();
 
     entry.timer = setTimer(() => {
       if (!current(entry) || entry.safety.kind !== "pending") return;
@@ -285,7 +279,7 @@ export function createGlobalSpaceTransitionCoordinator(
     }, timeoutMs);
     emit();
 
-    async function settle(): Promise<"accepted" | "obsolete"> {
+    async function settle(result: "succeeded" | "failed"): Promise<"accepted" | "obsolete"> {
       if (!current(entry)) return "obsolete";
       const cleanupErrorStart = cleanupErrors.length;
       removeActive(entry);
@@ -294,7 +288,27 @@ export function createGlobalSpaceTransitionCoordinator(
       retiredRemoval = null;
       emit();
       reportCleanupErrorsSince(cleanupErrorStart);
+      acceptedOutcome = result;
       return "accepted";
+    }
+
+    function publishAccepted(
+      action: AcceptedTransitionPublicationAction,
+    ): "published" | "rejected" {
+      const outcome = acceptedOutcome;
+      if (
+        outcome === null
+        || !authorityAvailable
+        || ownerGenerations.get(entry.ownerId) !== entry.generation
+        || publishedSurfaces.has(action.surface)
+        || (action.surface === "successCopy" && outcome !== "succeeded")
+        || (action.surface === "errorCopy" && outcome !== "failed")
+      ) {
+        return "rejected";
+      }
+      publishedSurfaces.add(action.surface);
+      action.publish({ operationId: entry.operationId, outcome });
+      return "published";
     }
 
     function retire(advanceGeneration: boolean, notify: boolean) {
@@ -369,7 +383,7 @@ export function createGlobalSpaceTransitionCoordinator(
       return reconciliation;
     }
 
-    return { generation, settle, unregister, reconcile };
+    return { generation, settle, publishAccepted, unregister, reconcile };
   }
 
   function invalidateForAuthorityLoss() {

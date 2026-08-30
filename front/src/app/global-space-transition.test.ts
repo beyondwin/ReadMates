@@ -6,7 +6,6 @@ import type {
   RecoveryObservation,
   ReturnTarget,
   SpaceIdentity,
-  TransitionPublicationBoundaryPort,
   TransitionPublicationPort,
 } from "@/shared/model/global-space";
 import {
@@ -132,31 +131,6 @@ function publicationPort() {
   } satisfies TransitionPublicationPort;
 }
 
-function publicationBoundaries() {
-  const observe = () => vi.fn((observation: RecoveryObservation) => observation);
-  return {
-    ui: observe(),
-    cache: observe(),
-    receiptCallback: observe(),
-    successCopy: observe(),
-    errorCopy: observe(),
-    navigation: observe(),
-    returnTarget: observe(),
-    sessionStorage: observe(),
-  } satisfies TransitionPublicationBoundaryPort;
-}
-
-function expectNoBoundaryPublication(boundaries: ReturnType<typeof publicationBoundaries>) {
-  expect(boundaries.ui).not.toHaveBeenCalled();
-  expect(boundaries.cache).not.toHaveBeenCalled();
-  expect(boundaries.receiptCallback).not.toHaveBeenCalled();
-  expect(boundaries.successCopy).not.toHaveBeenCalled();
-  expect(boundaries.errorCopy).not.toHaveBeenCalled();
-  expect(boundaries.navigation).not.toHaveBeenCalled();
-  expect(boundaries.returnTarget).not.toHaveBeenCalled();
-  expect(boundaries.sessionStorage).not.toHaveBeenCalled();
-}
-
 describe("global space transition coordinator", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -199,9 +173,8 @@ describe("global space transition coordinator", () => {
   it("publishes only a current-generation unknown-outcome observation through the refetch sink", async () => {
     vi.useFakeTimers();
     const publication = publicationPort();
-    const publicationBoundary = publicationBoundaries();
     const reconcile = vi.fn(async () => ({ operationId: "history-1", outcome: "succeeded" as const }));
-    const coordinator = createGlobalSpaceTransitionCoordinator({ publication, publicationBoundary });
+    const coordinator = createGlobalSpaceTransitionCoordinator({ publication });
     const handle = coordinator.beginPending({
       ownerId: "owner-1",
       operationId: "history-1",
@@ -214,14 +187,6 @@ describe("global space transition coordinator", () => {
 
     expect(reconcile).toHaveBeenCalledTimes(1);
     expect(publication.currentOwnerRefetch).toHaveBeenCalledTimes(1);
-    expect(publicationBoundary.ui).toHaveBeenCalledTimes(1);
-    expect(publicationBoundary.cache).toHaveBeenCalledTimes(1);
-    expect(publicationBoundary.receiptCallback).toHaveBeenCalledTimes(1);
-    expect(publicationBoundary.successCopy).toHaveBeenCalledTimes(1);
-    expect(publicationBoundary.errorCopy).toHaveBeenCalledTimes(1);
-    expect(publicationBoundary.navigation).toHaveBeenCalledTimes(1);
-    expect(publicationBoundary.returnTarget).toHaveBeenCalledTimes(1);
-    expect(publicationBoundary.sessionStorage).toHaveBeenCalledTimes(1);
     expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
   });
 
@@ -254,7 +219,6 @@ describe("global space transition coordinator", () => {
   it("returns a cleared receipt tombstone when pending registration starts after authority loss", async () => {
     const registry = createRetiredReceiptCapsuleRegistry();
     const publication = publicationPort();
-    const publicationBoundary = publicationBoundaries();
     const timerHandle = {} as ReturnType<typeof globalThis.setTimeout>;
     const setTimer = vi.fn(() => timerHandle);
     const request = {
@@ -270,22 +234,44 @@ describe("global space transition coordinator", () => {
         request.idempotencyKey = null;
       }),
     };
+    const secondCapsule: ReceiptRecoveryCapsule = {
+      operationId: "second-late-operation",
+      reconcileOriginal: vi.fn(async () => ({
+        operationId: "second-late-operation",
+        outcome: "failed" as const,
+      })),
+      invalidateForAuthorityLoss: vi.fn(),
+      clear: vi.fn(),
+    };
     const coordinator = createGlobalSpaceTransitionCoordinator({
       registry,
       publication,
-      publicationBoundary,
       setTimer,
     });
     coordinator.invalidateForAuthorityLoss();
 
-    const handle = coordinator.beginPending({
-      ownerId: "late-owner",
-      operationId: "late-operation",
-      recovery: { kind: "receipt", capsule },
-    });
+    let handle!: PendingHandle;
+    let secondHandle!: PendingHandle;
+    expect(() => {
+      handle = coordinator.beginPending({
+        ownerId: "late-owner",
+        operationId: "late-operation",
+        timeoutMs: 0,
+        recovery: { kind: "receipt", capsule },
+      });
+      secondHandle = coordinator.beginPending({
+        ownerId: "late-owner",
+        operationId: "second-late-operation",
+        timeoutMs: 0,
+        recovery: { kind: "receipt", capsule: secondCapsule },
+      });
+    }).not.toThrow();
 
     expect(capsule.invalidateForAuthorityLoss).toHaveBeenCalledTimes(1);
     expect(capsule.clear).toHaveBeenCalledTimes(1);
+    expect(secondCapsule.invalidateForAuthorityLoss).toHaveBeenCalledTimes(1);
+    expect(secondCapsule.clear).toHaveBeenCalledTimes(1);
+    expect(secondHandle.generation).toBe(handle.generation);
     expect(request).toEqual({ previewId: null, idempotencyKey: null });
     expect(setTimer).not.toHaveBeenCalled();
     expect(registry.size()).toBe(0);
@@ -298,7 +284,6 @@ describe("global space transition coordinator", () => {
     });
     expect(capsule.reconcileOriginal).not.toHaveBeenCalled();
     expect(publication.currentOwnerRefetch).not.toHaveBeenCalled();
-    expectNoBoundaryPublication(publicationBoundary);
     expect(capsule.invalidateForAuthorityLoss).toHaveBeenCalledTimes(1);
     expect(capsule.clear).toHaveBeenCalledTimes(1);
   });
@@ -306,7 +291,6 @@ describe("global space transition coordinator", () => {
   it("tombstones dirty and receipt registrations reentered from authority cleanup callbacks", async () => {
     const registry = createRetiredReceiptCapsuleRegistry();
     const publication = publicationPort();
-    const publicationBoundary = publicationBoundaries();
     const timerHandle = {} as ReturnType<typeof globalThis.setTimeout>;
     const setTimer = vi.fn(() => timerHandle);
     const clearTimer = vi.fn();
@@ -317,8 +301,11 @@ describe("global space transition coordinator", () => {
     } = { unregisterDirty: null, lateHandle: null };
     const lateRequest = { idempotencyKey: "late-intent" as string | null };
     const lateCapsule: ReceiptRecoveryCapsule = {
-      operationId: "late-operation",
-      reconcileOriginal: vi.fn(async () => ({ operationId: "late-operation", outcome: "succeeded" as const })),
+      operationId: "mismatched-late-capsule-operation",
+      reconcileOriginal: vi.fn(async () => ({
+        operationId: "mismatched-late-capsule-operation",
+        outcome: "succeeded" as const,
+      })),
       invalidateForAuthorityLoss: vi.fn(),
       clear: vi.fn(() => {
         lateRequest.idempotencyKey = null;
@@ -334,6 +321,7 @@ describe("global space transition coordinator", () => {
         reentrant.lateHandle = coordinator.beginPending({
           ownerId: "reentrant-pending",
           operationId: "late-operation",
+          timeoutMs: 0,
           recovery: { kind: "receipt", capsule: lateCapsule },
         });
       }),
@@ -341,7 +329,6 @@ describe("global space transition coordinator", () => {
     const coordinator = createGlobalSpaceTransitionCoordinator({
       registry,
       publication,
-      publicationBoundary,
       setTimer,
       clearTimer,
     });
@@ -374,7 +361,6 @@ describe("global space transition coordinator", () => {
     });
     expect(lateCapsule.reconcileOriginal).not.toHaveBeenCalled();
     expect(publication.currentOwnerRefetch).not.toHaveBeenCalled();
-    expectNoBoundaryPublication(publicationBoundary);
     expect(lateCapsule.invalidateForAuthorityLoss).toHaveBeenCalledTimes(1);
     expect(lateCapsule.clear).toHaveBeenCalledTimes(1);
   });
@@ -593,6 +579,106 @@ describe("global space transition coordinator", () => {
     expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
   });
 
+  it.each(["succeeded", "failed"] as const)(
+    "publishes an accepted %s settlement once with mutually exclusive copy",
+    async (outcome) => {
+      const ui = vi.fn();
+      const cache = vi.fn();
+      const receiptCallback = vi.fn();
+      const successCopy = vi.fn();
+      const errorCopy = vi.fn();
+      const navigation = vi.fn();
+      const returnTarget = vi.fn();
+      const sessionStorage = vi.fn();
+      const coordinator = createGlobalSpaceTransitionCoordinator();
+      const handle = coordinator.beginPending({
+        ownerId: "owner-1",
+        operationId: `operation-${outcome}`,
+        recovery: {
+          kind: "authoritative-history",
+          operationId: `operation-${outcome}`,
+          reconcile: vi.fn(async () => ({
+            operationId: `operation-${outcome}`,
+            outcome: "still-unknown" as const,
+          })),
+        },
+      });
+
+      const settlement = await handle.settle(outcome);
+
+      expect(settlement).toBe("accepted");
+      expect(handle.publishAccepted({ surface: "ui", publish: ui })).toBe("published");
+      expect(handle.publishAccepted({ surface: "cache", publish: cache })).toBe("published");
+      expect(handle.publishAccepted({
+        surface: "receiptCallback",
+        publish: receiptCallback,
+      })).toBe("published");
+      if (outcome === "succeeded") {
+        expect(handle.publishAccepted({ surface: "successCopy", publish: successCopy })).toBe("published");
+        expect(handle.publishAccepted({ surface: "errorCopy", publish: errorCopy })).toBe("rejected");
+      } else {
+        expect(handle.publishAccepted({ surface: "successCopy", publish: successCopy })).toBe("rejected");
+        expect(handle.publishAccepted({ surface: "errorCopy", publish: errorCopy })).toBe("published");
+      }
+      expect(handle.publishAccepted({ surface: "navigation", publish: navigation })).toBe("published");
+      expect(handle.publishAccepted({ surface: "returnTarget", publish: returnTarget })).toBe("published");
+      expect(handle.publishAccepted({ surface: "sessionStorage", publish: sessionStorage })).toBe("published");
+      expect(handle.publishAccepted({ surface: "ui", publish: ui })).toBe("rejected");
+      expect(ui).toHaveBeenCalledTimes(1);
+      expect(cache).toHaveBeenCalledTimes(1);
+      expect(receiptCallback).toHaveBeenCalledTimes(1);
+      expect(successCopy).toHaveBeenCalledTimes(outcome === "succeeded" ? 1 : 0);
+      expect(errorCopy).toHaveBeenCalledTimes(outcome === "failed" ? 1 : 0);
+      expect(navigation).toHaveBeenCalledTimes(1);
+      expect(returnTarget).toHaveBeenCalledTimes(1);
+      expect(sessionStorage).toHaveBeenCalledTimes(1);
+      expect(ui).toHaveBeenCalledWith({ operationId: `operation-${outcome}`, outcome });
+    },
+  );
+
+  it("stops accepted publication when a callback synchronously removes authority", async () => {
+    const cache = vi.fn();
+    const receiptCallback = vi.fn();
+    const successCopy = vi.fn();
+    const errorCopy = vi.fn();
+    const navigation = vi.fn();
+    const returnTarget = vi.fn();
+    const sessionStorage = vi.fn();
+    const coordinator = createGlobalSpaceTransitionCoordinator();
+    const ui = vi.fn(() => coordinator.invalidateForAuthorityLoss());
+    const handle = coordinator.beginPending({
+      ownerId: "owner-1",
+      operationId: "operation-1",
+      recovery: {
+        kind: "authoritative-history",
+        operationId: "operation-1",
+        reconcile: vi.fn(async () => ({ operationId: "operation-1", outcome: "still-unknown" as const })),
+      },
+    });
+    await expect(handle.settle("succeeded")).resolves.toBe("accepted");
+
+    expect(handle.publishAccepted({ surface: "ui", publish: ui })).toBe("published");
+    expect(handle.publishAccepted({ surface: "cache", publish: cache })).toBe("rejected");
+    expect(handle.publishAccepted({
+      surface: "receiptCallback",
+      publish: receiptCallback,
+    })).toBe("rejected");
+    expect(handle.publishAccepted({ surface: "successCopy", publish: successCopy })).toBe("rejected");
+    expect(handle.publishAccepted({ surface: "errorCopy", publish: errorCopy })).toBe("rejected");
+    expect(handle.publishAccepted({ surface: "navigation", publish: navigation })).toBe("rejected");
+    expect(handle.publishAccepted({ surface: "returnTarget", publish: returnTarget })).toBe("rejected");
+    expect(handle.publishAccepted({ surface: "sessionStorage", publish: sessionStorage })).toBe("rejected");
+
+    expect(ui).toHaveBeenCalledTimes(1);
+    expect(cache).not.toHaveBeenCalled();
+    expect(receiptCallback).not.toHaveBeenCalled();
+    expect(successCopy).not.toHaveBeenCalled();
+    expect(errorCopy).not.toHaveBeenCalled();
+    expect(navigation).not.toHaveBeenCalled();
+    expect(returnTarget).not.toHaveBeenCalled();
+    expect(sessionStorage).not.toHaveBeenCalled();
+  });
+
   it("invalidates and clears an active receipt synchronously before any later recovery", async () => {
     const registry = createRetiredReceiptCapsuleRegistry();
     const capsule: ReceiptRecoveryCapsule = {
@@ -621,7 +707,14 @@ describe("global space transition coordinator", () => {
   it("invalidates active and retired receipts before purge and permits zero authority-loss replay", async () => {
     const registry = createRetiredReceiptCapsuleRegistry();
     const publication = publicationPort();
-    const publicationBoundary = publicationBoundaries();
+    const ui = vi.fn();
+    const cache = vi.fn();
+    const receiptCallback = vi.fn();
+    const successCopy = vi.fn();
+    const errorCopy = vi.fn();
+    const navigation = vi.fn();
+    const returnTarget = vi.fn();
+    const sessionStorage = vi.fn();
     const order: string[] = [];
     let originalRequestCount = 0;
     const issueOriginalRequest = () => {
@@ -653,7 +746,6 @@ describe("global space transition coordinator", () => {
     const coordinator = createGlobalSpaceTransitionCoordinator({
       registry,
       publication,
-      publicationBoundary,
       onAuthorityLossPurge: () => {
         order.push("purge");
         expect(request).toEqual({ previewId: null, reasonCategory: null, reason: null, idempotencyKey: null });
@@ -669,17 +761,35 @@ describe("global space transition coordinator", () => {
     expect(registry.size()).toBe(1);
     coordinator.invalidateForAuthorityLoss();
     const settlement = await handle.settle("succeeded");
+    const callerPublications = [
+      handle.publishAccepted({ surface: "ui", publish: ui }),
+      handle.publishAccepted({ surface: "cache", publish: cache }),
+      handle.publishAccepted({ surface: "receiptCallback", publish: receiptCallback }),
+      handle.publishAccepted({ surface: "successCopy", publish: successCopy }),
+      handle.publishAccepted({ surface: "errorCopy", publish: errorCopy }),
+      handle.publishAccepted({ surface: "navigation", publish: navigation }),
+      handle.publishAccepted({ surface: "returnTarget", publish: returnTarget }),
+      handle.publishAccepted({ surface: "sessionStorage", publish: sessionStorage }),
+    ] satisfies ReturnType<PendingHandle["publishAccepted"]>[];
     const observation = await handle.reconcile();
 
     expect(originalRequestCount).toBe(1);
     expect(replayCount).toBe(0);
     expect(settlement).toBe("obsolete");
+    expect(callerPublications).toEqual(Array(8).fill("rejected"));
     expect(observation).toEqual({ operationId: "operation-1", outcome: "authority-lost" });
     expect(order.slice(0, 3)).toEqual(["invalidate", "clear", "purge"]);
     expect(request).toEqual({ previewId: null, reasonCategory: null, reason: null, idempotencyKey: null });
     expect(registry.size()).toBe(0);
     expect(publication.currentOwnerRefetch).not.toHaveBeenCalled();
-    expectNoBoundaryPublication(publicationBoundary);
+    expect(ui).not.toHaveBeenCalled();
+    expect(cache).not.toHaveBeenCalled();
+    expect(receiptCallback).not.toHaveBeenCalled();
+    expect(successCopy).not.toHaveBeenCalled();
+    expect(errorCopy).not.toHaveBeenCalled();
+    expect(navigation).not.toHaveBeenCalled();
+    expect(returnTarget).not.toHaveBeenCalled();
+    expect(sessionStorage).not.toHaveBeenCalled();
   });
 
   it("returns authority-lost and publishes nothing when authority changes while recovery awaits", async () => {

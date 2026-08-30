@@ -75,9 +75,32 @@ export type PendingRegistration = {
   timeoutMs?: number;
 };
 
+export type TransitionPublicationSurface =
+  | "ui"
+  | "cache"
+  | "receiptCallback"
+  | "successCopy"
+  | "errorCopy"
+  | "navigation"
+  | "returnTarget"
+  | "sessionStorage";
+
+/**
+ * One caller-owned publication action. The pending handle authorizes each
+ * surface independently after an accepted settlement, so authority or owner
+ * generation can be checked again between concrete product publications.
+ */
+export type AcceptedTransitionPublicationAction = {
+  surface: TransitionPublicationSurface;
+  publish: (observation: RecoveryObservation) => void;
+};
+
 export type PendingHandle = {
   generation: number;
   settle: (result: "succeeded" | "failed") => Promise<"accepted" | "obsolete">;
+  publishAccepted: (
+    action: AcceptedTransitionPublicationAction,
+  ) => "published" | "rejected";
   unregister: () => void;
   reconcile: () => Promise<RecoveryObservation>;
 };
@@ -89,23 +112,6 @@ export type TransitionSafetyRegistrationPort = {
 
 export type TransitionPublicationPort = {
   currentOwnerRefetch: (observation: RecoveryObservation) => void;
-};
-
-/**
- * Generation-authorized publication opportunities at the eight product
- * boundaries named by the transition contract. These callbacks carry only
- * operation identity/outcome and intentionally know nothing about QueryClient
- * or concrete UI/router/storage implementations.
- */
-export type TransitionPublicationBoundaryPort = {
-  ui: (observation: RecoveryObservation) => void;
-  cache: (observation: RecoveryObservation) => void;
-  receiptCallback: (observation: RecoveryObservation) => void;
-  successCopy: (observation: RecoveryObservation) => void;
-  errorCopy: (observation: RecoveryObservation) => void;
-  navigation: (observation: RecoveryObservation) => void;
-  returnTarget: (observation: RecoveryObservation) => void;
-  sessionStorage: (observation: RecoveryObservation) => void;
 };
 
 export function spaceIdentityKey(identity: SpaceIdentity): string {
