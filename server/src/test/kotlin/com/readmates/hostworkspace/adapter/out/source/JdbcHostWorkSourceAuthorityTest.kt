@@ -2,10 +2,20 @@ package com.readmates.hostworkspace.adapter.out.source
 
 import com.readmates.auth.application.port.`in`.GetHostMemberApprovalWorkSourceUseCase
 import com.readmates.auth.application.port.`in`.ManageMemberApprovalsUseCase
+import com.readmates.auth.domain.MembershipRole
+import com.readmates.hostworkspace.application.model.HostWorkboxActor
+import com.readmates.hostworkspace.application.model.HostWorkboxRequest
+import com.readmates.hostworkspace.application.model.HostWorkboxState
+import com.readmates.hostworkspace.application.port.`in`.GetHostWorkboxUseCase
+import com.readmates.hostworkspace.domain.HostWorkboxOwner
+import com.readmates.session.application.model.ExpectedSessionRevision
+import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.port.`in`.GetHostScheduleSeenWorkSourceUseCase
+import com.readmates.session.application.port.`in`.HostSessionLifecycleUseCase
 import com.readmates.sessionclosing.application.port.`in`.GetHostRecordClosingWorkSourceUseCase
 import com.readmates.shared.security.ClubActor
 import com.readmates.shared.security.ClubCapability
+import com.readmates.shared.security.CurrentMember
 import com.readmates.support.ReadmatesDbIntegrationTest
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
@@ -25,10 +35,15 @@ class JdbcHostWorkSourceAuthorityTest(
     @param:Autowired private val memberSource: GetHostMemberApprovalWorkSourceUseCase,
     @param:Autowired private val closingSource: GetHostRecordClosingWorkSourceUseCase,
     @param:Autowired private val memberApprovals: ManageMemberApprovalsUseCase,
+    @param:Autowired private val sessionLifecycle: HostSessionLifecycleUseCase,
+    @param:Autowired private val workbox: GetHostWorkboxUseCase,
 ) : ReadmatesMySqlIntegrationTestSupport() {
+    private val snapshotIds = mutableListOf<UUID>()
+
     @AfterEach
     fun cleanup() {
-        val receiptIds =
+        cleanupSnapshots()
+        val authReceiptIds =
             jdbcTemplate.queryForList(
                 """
                 select id from auth_public_projection_mutation_receipts
@@ -36,6 +51,12 @@ class JdbcHostWorkSourceAuthorityTest(
                 """.trimIndent(),
                 String::class.java,
             )
+        val hostReceiptIds =
+            jdbcTemplate.queryForList(
+                "select id from host_session_mutation_receipts where resource_id like '93000000-0000-0000-0000-%'",
+                String::class.java,
+            )
+        val receiptIds = authReceiptIds + hostReceiptIds
         if (receiptIds.isNotEmpty()) {
             receiptIds.forEach { receiptId ->
                 val convergenceIds =
@@ -60,8 +81,12 @@ class JdbcHostWorkSourceAuthorityTest(
             where subject_membership_id_snapshot like '92000000-%'
             """.trimIndent(),
         )
+        cleanupClosingReceipts()
         jdbcTemplate.update(
-            "delete from host_session_mutation_receipts where resource_id like '93000000-0000-0000-0000-%'",
+            "delete from mutation_idempotency_keys where resource_slot like '93000000-0000-0000-0000-%'",
+        )
+        jdbcTemplate.update(
+            "delete from host_session_lifecycle_audit where session_id like '93000000-0000-0000-0000-%'",
         )
         jdbcTemplate.update("delete from notification_event_outbox where aggregate_id like '93000000-0000-0000-0000-%'")
         jdbcTemplate.update("delete from session_feedback_documents where session_id like '93000000-0000-0000-0000-%'")
@@ -74,6 +99,18 @@ class JdbcHostWorkSourceAuthorityTest(
         jdbcTemplate.update("delete from sessions where id like '93000000-0000-0000-0000-%'")
         jdbcTemplate.update("delete from memberships where id like '92000000-%'")
         jdbcTemplate.update("delete from users where id like '92000000-%'")
+    }
+
+    private fun cleanupSnapshots() {
+        snapshotIds.forEach { snapshotId ->
+            jdbcTemplate.update("delete from host_workbox_snapshots where id = ?", snapshotId.toString())
+        }
+    }
+
+    private fun cleanupClosingReceipts() {
+        jdbcTemplate.update(
+            "delete from host_session_mutation_receipts where resource_id like '93000000-0000-0000-0000-%'",
+        )
     }
 
     @Test
@@ -162,6 +199,61 @@ class JdbcHostWorkSourceAuthorityTest(
         assertThat(completed.resolvedAt).isEqualTo(EVALUATED_AT.plusHours(1))
         assertThat(completed.receiptId).isEqualTo(receiptId)
         assertThat(completed.receiptState).isEqualTo("PUBLISHED")
+    }
+
+    @Test
+    fun `record completion deduplicates actual publish and later no op receipt for one workbox snapshot key`() {
+        val sessionId = insertClosingSession("005", visibility = "PUBLIC", ready = true, notified = true)
+        val prePublishGeneration =
+            closingSource
+                .get(CLUB_ID, EVALUATED_AT, COMPLETED_SINCE)
+                .items
+                .single { it.sessionId == sessionId }
+                .sourceGeneration
+
+        sessionLifecycle.publish(publishCommand(sessionId, 10, "record-authority-publish-actual"))
+        sessionLifecycle.publish(publishCommand(sessionId, 11, "record-authority-publish-no-op"))
+
+        val receiptRows =
+            jdbcTemplate.queryForList(
+                """
+                select id, created_at from host_session_mutation_receipts
+                where resource_id = ? and operation = 'SESSION_PUBLISH'
+                order by created_at, id
+                """.trimIndent(),
+                sessionId.toString(),
+            )
+        assertThat(receiptRows).hasSize(2)
+        val firstReceiptAt =
+            jdbcTemplate
+                .queryForObject(
+                    "select created_at from host_session_mutation_receipts where id = ?",
+                    java.time.LocalDateTime::class.java,
+                    receiptRows.first()["id"],
+                )!!
+                .atOffset(java.time.ZoneOffset.UTC)
+
+        val completed =
+            closingSource
+                .get(CLUB_ID, OffsetDateTime.now(), COMPLETED_SINCE)
+                .items
+                .filter { it.sessionId == sessionId && !it.actionable }
+        assertThat(completed).hasSize(1)
+        assertThat(completed.single().sourceGeneration).isEqualTo(prePublishGeneration)
+        assertThat(completed.single().receiptId.toString()).isEqualTo(receiptRows.first()["id"])
+        assertThat(completed.single().resolvedAt).isEqualTo(firstReceiptAt)
+
+        val page =
+            workbox.get(
+                HostWorkboxRequest(
+                    actor = HostWorkboxActor(HostWorkboxOwner(CLUB_ID, HOST_MEMBERSHIP_ID), activeHost = true),
+                    state = HostWorkboxState.COMPLETED,
+                    limit = 100,
+                    continuation = null,
+                ),
+            )
+        snapshotIds += page.snapshotId
+        assertThat(page.items.map { it.key }).doesNotHaveDuplicates()
     }
 
     private fun insertScheduleSession(
@@ -341,6 +433,17 @@ class JdbcHostWorkSourceAuthorityTest(
         )
     }
 
+    private fun publishCommand(
+        sessionId: UUID,
+        expectedRevision: Long,
+        idempotencyKey: String,
+    ) = HostSessionIdCommand(
+        host = hostMember(),
+        sessionId = sessionId,
+        expectedSessionRevision = ExpectedSessionRevision(expectedRevision),
+        idempotencyKey = idempotencyKey,
+    )
+
     private fun hostActor() =
         ClubActor(
             userId = HOST_USER_ID,
@@ -348,6 +451,18 @@ class JdbcHostWorkSourceAuthorityTest(
             clubId = CLUB_ID,
             clubSlug = "reading-sai",
             capabilities = setOf(ClubCapability.MANAGE_MEMBERS),
+        )
+
+    private fun hostMember() =
+        CurrentMember(
+            userId = HOST_USER_ID,
+            membershipId = HOST_MEMBERSHIP_ID,
+            clubId = CLUB_ID,
+            clubSlug = "reading-sai",
+            email = "host@example.com",
+            displayName = "Host",
+            accountName = "Host",
+            role = MembershipRole.HOST,
         )
 
     private fun sessionId(suffix: String) = UUID.fromString("91000000-0000-0000-0000-${suffix.padStart(12, '0')}")

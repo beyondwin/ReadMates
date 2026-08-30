@@ -218,6 +218,28 @@ private val CURRENT_CLOSING_ROWS_SQL =
 
 private val COMPLETED_CLOSING_ROWS_SQL =
     """
+    with ranked_publish_receipts as (
+      select
+        receipts.*,
+        row_number() over (
+          partition by
+            receipts.club_id,
+            receipts.resource_id,
+            receipts.session_revision,
+            receipts.exposure_revision,
+            receipts.participant_set_revision,
+            coalesce(receipts.record_draft_revision, -1),
+            coalesce(receipts.live_record_revision, -1),
+            receipts.publication_revision,
+            receipts.schedule_revision
+          order by receipts.created_at, receipts.id
+        ) vector_ordinal
+      from host_session_mutation_receipts receipts
+      where receipts.club_id = ?
+        and receipts.operation = 'SESSION_PUBLISH'
+        and receipts.session_revision > 0
+        and receipts.created_at >= ?
+    )
     select
       receipts.id receipt_id,
       receipts.resource_id,
@@ -230,12 +252,9 @@ private val COMPLETED_CLOSING_ROWS_SQL =
       receipts.schedule_revision,
       receipts.created_at resolved_at,
       timestamp(sessions.session_date, sessions.end_time) due_at
-    from host_session_mutation_receipts receipts
+    from ranked_publish_receipts receipts
     join active_sessions sessions
       on sessions.club_id = receipts.club_id and sessions.id = receipts.resource_id
-    where receipts.club_id = ?
-      and receipts.operation = 'SESSION_PUBLISH'
-      and receipts.session_revision > 0
-      and receipts.created_at >= ?
+    where receipts.vector_ordinal = 1
     order by receipts.created_at, receipts.id
     """.trimIndent()

@@ -86,3 +86,30 @@ Review-round manifest SHA-256: `d0a0843dda1938e3f0852ab7b64418d7c74778d79d001bec
 
 - Aggregate, snapshot, cursor, controller, security/BFF, frontend/contracts, full server CI/Testcontainers, CT/E2E, public-release and Stage 4 gates were not rerun because this round did not touch those sealed surfaces.
 - No V66 migration, architecture baseline/exception change, deployment, provider call, push, PR or tag was performed.
+
+## Review round 2 — completed publish receipt deduplication
+
+- Review base: `70a3b32535f278dd4423bf4086b131692933eb30`.
+- Scope is exactly the RECORD completed-receipt query and its real MySQL regression. Schedule, member, aggregate, snapshot implementation, cursor, controller, security, frontend, migrations and architecture ledgers are unchanged.
+- Receipt authority inspection found no explicit changed/outcome field in `host_session_mutation_receipts`: every newly claimed idempotency key records a receipt even when lifecycle publication is already `PUBLISHED` and unchanged.
+
+| Finding | RED evidence | Closure |
+|---|---|---|
+| A real `CLOSED -> PUBLISHED` call followed by `PUBLISHED -> PUBLISHED` with a different idempotency key created two `SESSION_PUBLISH` receipts and two identical completed work items | Focused MySQL test observed two receipts with one canonical resulting vector and failed `Expected size: 1 but was: 2` before snapshot construction | The completed query ranks receipts by the complete canonical resulting vector and selects the deterministic earliest `created_at,id` receipt. Distinct publication generations remain distinct; no-op duplicates of one generation collapse to one item. The retained item keeps the actual transition receipt ID, original `resolvedAt` and the pre-publish generation. A COMPLETED workbox snapshot then constructs with unique keys. |
+
+### Fresh focused evidence
+
+| Source hash / command | Result | Finding closure |
+|---|---|---|
+| Review-round source hashes in `task-5-review-2-manifest.sha256` | 2/2 files verified | Exact RECORD query and JDBC regression surface sealed. |
+| `./server/gradlew -p server unitTest --tests '*HostRecordClosingWorkSourceServiceTest'` | GREEN, 2/2 | Existing record action/completion filtering remains intact. |
+| `./server/gradlew -p server integrationTest --tests '*JdbcHostWorkSourceAuthorityTest.record completion deduplicates*'` | GREEN, 1/1 against MySQL | Two real lifecycle calls produce two receipts; source returns one earliest receipt, stable key/time, and COMPLETED snapshot construction succeeds. |
+| Repository ktlint/detekt reports filtered to the two manifest files | Focused findings 0 | Round 2 formatting and static analysis closed; whole tasks retain only pre-existing findings outside this diff. |
+| `git diff --cached --check`, targeted production privacy scan and forbidden-surface diff | clean / no matches / empty | Patch hygiene, public-repository safety and bounded scope closed. |
+
+Review-round 2 manifest SHA-256: `e139ea58876874f0b58f720636bae911fc2cca426189803916f18128c41ee327`.
+
+### Review-round 2 skipped evidence
+
+- Schedule/member source tests and aggregate/cursor/controller/security/BFF/frontend/contracts were not rerun because their source hashes and behavior surfaces are unchanged.
+- Full server CI/Testcontainers suite, CT/E2E, public-release and Stage 4 gates remain deferred to stage closeout. No migration, deployment, provider call, push, PR or tag was performed.
