@@ -20,6 +20,7 @@ import {
   globalSpaceTransitionEpochKey,
   useGlobalSpaceTransitionController,
   type LatestSpaceProjectionLoader,
+  type SpaceTransitionRequestResult,
   type SpaceRouteValidationLoader,
   type TransitionNavigation,
 } from "./global-space-transition-controller";
@@ -91,9 +92,11 @@ function context(projectionCurrent = true) {
 
 function Harness({
   onPort,
+  onResult,
   onSettled,
 }: {
   onPort?: (port: TransitionSafetyRegistrationPort) => void;
+  onResult?: (result: SpaceTransitionRequestResult) => void;
   onSettled?: (status: string) => void;
 }) {
   const controller = useGlobalSpaceTransitionController();
@@ -124,6 +127,7 @@ function Harness({
       <button
         type="button"
         onClick={() => void controller.requestTransition(platform).then((next) => {
+          onResult?.(next);
           onSettled?.(next.status);
           if (next.status !== "obsolete") setResult(next.status);
         })}
@@ -133,6 +137,7 @@ function Harness({
       <button
         type="button"
         onClick={() => void controller.requestTransition(member).then((next) => {
+          onResult?.(next);
           onSettled?.(next.status);
           if (next.status !== "obsolete") setResult(next.status);
         })}
@@ -142,6 +147,7 @@ function Harness({
       <button
         type="button"
         onClick={() => void controller.requestTransition(host).then((next) => {
+          onResult?.(next);
           onSettled?.(next.status);
           if (next.status !== "obsolete") setResult(next.status);
         })}
@@ -183,6 +189,7 @@ function renderController(input: {
   queryClient?: QueryClient;
   useProductionRouteValidation?: boolean;
   navigateTransition?: TransitionNavigation;
+  onResult?: (result: SpaceTransitionRequestResult) => void;
   onSettled?: (status: string) => void;
 } = {}) {
   const controllerAuth = input.auth ?? authWithSpaces(["PLATFORM", "CLUBS"]);
@@ -202,7 +209,7 @@ function renderController(input: {
           storage={input.storage}
           navigateTransition={input.navigateTransition}
         >
-          <Harness onPort={input.onPort} onSettled={input.onSettled} />
+          <Harness onPort={input.onPort} onResult={input.onResult} onSettled={input.onSettled} />
         </GlobalSpaceTransitionController>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -776,6 +783,51 @@ describe("GlobalSpaceTransitionController", () => {
     await act(async () => Promise.resolve());
     expect(settled).toEqual(["obsolete"]);
     expect(screen.getByLabelText("result")).toHaveTextContent("idle");
+  });
+
+  it("keeps a current rejected reconciliation blocked on the same unknown operation", async () => {
+    vi.useFakeTimers();
+    let port!: TransitionSafetyRegistrationPort;
+    const reconcile = vi.fn(async (): Promise<RecoveryObservation> => {
+      throw new Error("authoritative history unavailable");
+    });
+    const settled: string[] = [];
+    const results: SpaceTransitionRequestResult[] = [];
+    renderController({
+      onPort: (value) => { port = value; },
+      onResult: (result) => results.push(result),
+      onSettled: (status) => settled.push(status),
+    });
+    await act(async () => Promise.resolve());
+    port.beginPending({
+      ownerId: "current-rejection",
+      operationId: "current-unknown-operation",
+      timeoutMs: 1,
+      recovery: {
+        kind: "authoritative-history",
+        operationId: "current-unknown-operation",
+        reconcile,
+      },
+    });
+    act(() => vi.advanceTimersByTime(1));
+
+    await act(async () => {
+      screen.getByRole("button", { name: "클럽으로" }).click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(settled).toEqual(["blocked-unknown"]);
+    expect(results).toEqual([{
+      status: "blocked-unknown",
+      observation: {
+        operationId: "current-unknown-operation",
+        outcome: "still-unknown",
+      },
+    }]);
+    expect(screen.getByLabelText("result")).toHaveTextContent("blocked-unknown");
+    expect(screen.getByLabelText("safety")).toHaveTextContent("unknown-outcome");
+    expect(screen.getByLabelText("location")).toHaveTextContent("/admin/today");
   });
 
   it("aborts an older deferred navigation and reports obsolete after its settlement", async () => {

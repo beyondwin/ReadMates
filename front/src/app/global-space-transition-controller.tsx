@@ -82,6 +82,7 @@ export type GlobalSpaceTransitionControllerValue = {
 
 const GlobalSpaceTransitionContext = createContext<GlobalSpaceTransitionControllerValue | null>(null);
 const RESTORE_STATE_KEY = "readmatesGlobalSpaceRestore";
+export const GLOBAL_SPACE_ROUTER_CANCELLATION_HASH_PREFIX = "#readmates-authority-loss-cancel";
 
 export function GlobalSpaceTransitionController({
   auth,
@@ -111,6 +112,7 @@ export function GlobalSpaceTransitionController({
   const [retainedRecoveryCount, setRetainedRecoveryCount] = useState(0);
   const transitionIntentRef = useRef(0);
   const transitionAbortRef = useRef<AbortController | null>(null);
+  const routerCancellationRef = useRef<Promise<void>>(Promise.resolve());
   const [safety, setSafety] = useState<TransitionSafety>(() => coordinator.getSnapshot());
   const normalizedAuth = useMemo(() => normalizeAuthAvailableSpaces(auth), [auth]);
   const projectedIdentities = useMemo(() => projectedSpaceIdentities(normalizedAuth), [normalizedAuth]);
@@ -134,6 +136,29 @@ export function GlobalSpaceTransitionController({
       ? injectedNavigation(href, options, signal)
       : navigate(href, options);
   }, [injectedNavigation, navigate]);
+  const cancelPendingRouterNavigation = useCallback(() => {
+    const current = locationRef.current;
+    const cancellationHash = current.hash === `${GLOBAL_SPACE_ROUTER_CANCELLATION_HASH_PREFIX}-1`
+      ? `${GLOBAL_SPACE_ROUTER_CANCELLATION_HASH_PREFIX}-2`
+      : `${GLOBAL_SPACE_ROUTER_CANCELLATION_HASH_PREFIX}-1`;
+    try {
+      const cancellation = navigate({
+        pathname: current.pathname,
+        search: current.search,
+        hash: cancellationHash,
+      }, {
+        replace: true,
+        state: current.state,
+        preventScrollReset: true,
+      });
+      routerCancellationRef.current = cancellation
+        ? cancellation.catch(() => undefined)
+        : Promise.resolve();
+    } catch {
+      // Generation and receipt invalidation remain authoritative if router cancellation cannot start.
+      routerCancellationRef.current = Promise.resolve();
+    }
+  }, [navigate]);
   const syncRetainedRecoveryCount = useCallback(() => {
     setRetainedRecoveryCount(handles.current.size);
   }, []);
@@ -244,10 +269,6 @@ export function GlobalSpaceTransitionController({
       signal,
     );
     if (!intentIsCurrent()) return { status: "obsolete" };
-    continuity.purgeUnavailable(latestAvailable);
-    if (currentValidation) {
-      continuity.remember(currentIdentity, returnTargetFromLocation(currentLocation), currentValidation);
-    }
     const lastSafeTarget = continuity.read(destinationIdentity, destinationValidation);
     const destination = resolveGlobalSpaceDestination({
       currentIdentity,
@@ -272,6 +293,10 @@ export function GlobalSpaceTransitionController({
       state: { [RESTORE_STATE_KEY]: { focusId: target.focusId, scrollTop: target.scrollTop } },
     }, signal);
     if (!intentIsCurrent()) return { status: "obsolete" };
+    continuity.purgeUnavailable(latestAvailable);
+    if (currentValidation) {
+      continuity.remember(currentIdentity, returnTargetFromLocation(currentLocation), currentValidation);
+    }
     return { status: "navigated", href };
   }, [continuity, continuityStorage, navigateTransition, normalizedAuth, routeValidationLoader]);
 
@@ -293,9 +318,18 @@ export function GlobalSpaceTransitionController({
       }
       if (currentSafety.kind === "unknown-outcome") {
         const handle = handles.current.get(handleKey(currentSafety.operationId, currentSafety.generation));
-        const observation = handle
-          ? await handle.reconcile()
-          : { operationId: currentSafety.operationId, outcome: "still-unknown" as const };
+        let observation: RecoveryObservation;
+        try {
+          observation = handle
+            ? await handle.reconcile()
+            : { operationId: currentSafety.operationId, outcome: "still-unknown" };
+        } catch {
+          if (!intentIsCurrent()) return { status: "obsolete" };
+          observation = {
+            operationId: currentSafety.operationId,
+            outcome: "still-unknown",
+          };
+        }
         if (!intentIsCurrent()) return { status: "obsolete" };
         if (observation.outcome === "still-unknown" || observation.outcome === "authority-lost") {
           return { status: "blocked-unknown", observation };
@@ -324,6 +358,7 @@ export function GlobalSpaceTransitionController({
     coordinator.invalidateForAuthorityLoss();
     handles.current.clear();
     syncRetainedRecoveryCount();
+    cancelPendingRouterNavigation();
     const stillAvailable = availableIdentitiesRef.current.filter((identity) => !(
       identity.productSpace === "clubs"
       && identity.perspective === "host"
@@ -332,9 +367,10 @@ export function GlobalSpaceTransitionController({
     availableIdentitiesRef.current = stillAvailable;
     setRevokedHostClubs((current) => new Set(current).add(event.clubSlug));
     continuity.purgeUnavailable(stillAvailable);
-  }, [continuity, coordinator, syncRetainedRecoveryCount]);
+  }, [cancelPendingRouterNavigation, continuity, coordinator, syncRetainedRecoveryCount]);
 
   const resolveHostAuthorityLossTarget = useCallback(async (event: HostAuthorityLossEvent) => {
+    await routerCancellationRef.current;
     const authorityController = new AbortController();
     const latest = await loadFreshProjection(authorityController.signal);
     if (!latest) return safeProjectionFallback(latestAuthRef.current);

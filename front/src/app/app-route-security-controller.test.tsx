@@ -23,6 +23,7 @@ import {
   GlobalSpaceTransitionController,
   useGlobalSpaceTransitionController,
 } from "./global-space-transition-controller";
+import { globalSpaceReturnTargetStorageKey } from "./global-space-continuity";
 
 let transitionStore: WorkspaceRouteTransitionStore;
 let queryClient: QueryClient;
@@ -145,6 +146,28 @@ function ProductionPublicationHarness({ scenario }: { scenario: ProductionIngres
       <output aria-label="success-publications">{successCopy}</output>
       <output aria-label="error-publications">{errorCopy}</output>
       <output aria-label="return-target-publications">{returnTarget}</output>
+    </>
+  );
+}
+
+function PendingDataRouterTransitionHarness() {
+  const controller = useGlobalSpaceTransitionController();
+  const location = useLocation();
+  const [result, setResult] = useState("idle");
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => void controller.requestTransition({ productSpace: "platform" }).then((next) => {
+          if (next.status !== "obsolete") setResult(next.status);
+        })}
+      >
+        플랫폼 loader 시작
+      </button>
+      <output aria-label="pending-router-location">{location.pathname}</output>
+      <output aria-label="pending-router-result">{result}</output>
+      <main><h1>호스트 현재 화면</h1></main>
     </>
   );
 }
@@ -381,7 +404,7 @@ describe("AppRouteSecurityController", () => {
     const memberOnly: AuthMeResponse = {
       ...auth,
       availableSpaces: {
-        version: 2,
+        version: 1,
         kinds: ["CLUBS"],
         clubs: [{
           clubId: "club-1",
@@ -463,6 +486,172 @@ describe("AppRouteSecurityController", () => {
     await waitFor(() => expect(screen.getByLabelText("production-location"))
       .toHaveTextContent("/clubs/reading-sai/app"));
     expect(queryClient.getQueryData(hostPrivateKey)).toBeUndefined();
+  });
+
+  it("cancels a pending production Data Router loader before purge and lets only the safe route commit", async () => {
+    let hostLoaderRequestCount = 0;
+    const hostReloadSentinelKey = ["host-cancellation-reload-sentinel"] as const;
+    const hostLoader = vi.fn(() => {
+      hostLoaderRequestCount += 1;
+      if (hostLoaderRequestCount > 1) {
+        queryClient.setQueryData(hostReloadSentinelKey, "repopulated-by-cancellation");
+      }
+      return null;
+    });
+    let destinationLoaderSignal: AbortSignal | null = null;
+    let resolveDestinationLoader!: () => void;
+    const destinationLoader = vi.fn(({ request }: { request: Request }) => {
+      destinationLoaderSignal = request.signal;
+      return new Promise<null>((resolve, reject) => {
+        resolveDestinationLoader = () => resolve(null);
+        request.signal.addEventListener("abort", () => {
+          reject(new DOMException("Superseded by authority-loss safety navigation", "AbortError"));
+        }, { once: true });
+      });
+    });
+    let releasePurge!: () => void;
+    const purgeObservations: boolean[] = [];
+    const storage: HostSensitiveStorage = {
+      register: vi.fn(() => vi.fn()),
+      clearClub: vi.fn(() => {
+        purgeObservations.push(destinationLoaderSignal?.aborted === true);
+        return new Promise<void>((resolve) => { releasePurge = resolve; });
+      }),
+    };
+    const auth: AuthMeResponse = {
+      authenticated: true,
+      userId: "user-1",
+      membershipId: "membership-1",
+      clubId: "club-1",
+      email: null,
+      displayName: "운영자",
+      accountName: "operator",
+      role: "MEMBER",
+      membershipStatus: "ACTIVE",
+      approvalState: "ACTIVE",
+      availableSpaces: {
+        version: 1,
+        kinds: ["PLATFORM", "CLUBS"],
+        clubs: [{
+          clubId: "club-1",
+          clubSlug: "reading-sai",
+          clubName: "읽는사이",
+          perspectives: ["MEMBER", "HOST"],
+        }],
+      },
+    };
+    const memberOnly: AuthMeResponse = {
+      ...auth,
+      availableSpaces: {
+        version: 1,
+        kinds: ["CLUBS"],
+        clubs: [{
+          clubId: "club-1",
+          clubSlug: "reading-sai",
+          clubName: "읽는사이",
+          perspectives: ["MEMBER"],
+        }],
+      },
+    };
+    const loadLatestProjection = vi.fn()
+      .mockResolvedValueOnce(auth)
+      .mockResolvedValue(memberOnly);
+    const loadRouteValidation = vi.fn(async () => ({
+      projectionCurrent: true,
+      loadedCaseIds: new Set<string>(),
+      authorizedClubIds: new Set(["club-1"]),
+      availableFocusIds: new Set<string>(),
+      noteSessionIds: new Set<string>(),
+      hostSessionIds: [] as string[],
+    }));
+    const hostIdentity = {
+      productSpace: "clubs" as const,
+      clubId: "club-1",
+      clubSlug: "reading-sai",
+      perspective: "host" as const,
+    };
+    const platformIdentity = { productSpace: "platform" as const };
+    const router = createMemoryRouter([
+      {
+        id: "pending-host-route",
+        path: "/clubs/reading-sai/app/host",
+        loader: hostLoader,
+        element: (
+          <GlobalSpaceTransitionController
+            auth={auth}
+            loadLatestProjection={loadLatestProjection}
+            loadRouteValidation={loadRouteValidation}
+          >
+            <AppRouteSecurityController
+              workspace="host"
+              transitionStore={transitionStore}
+              hostAuthorityStorage={storage}
+            />
+            <PendingDataRouterTransitionHarness />
+          </GlobalSpaceTransitionController>
+        ),
+      },
+      {
+        id: "pending-platform-route",
+        path: "/admin/today",
+        loader: destinationLoader,
+        element: <main><h1>취소되어야 할 플랫폼 화면</h1></main>,
+      },
+      {
+        id: "pending-member-route",
+        path: "/clubs/reading-sai/app",
+        element: <main><h1>안전한 멤버 화면</h1></main>,
+      },
+    ], {
+      initialEntries: ["/clubs/reading-sai/app/host"],
+      hydrationData: { loaderData: { "pending-host-route": null } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+
+    (await screen.findByRole("button", { name: "플랫폼 loader 시작" })).click();
+    await waitFor(() => expect(destinationLoader).toHaveBeenCalledTimes(1));
+    expect(router.state.navigation.location?.pathname).toBe("/admin/today");
+    expect(router.state.location.pathname).toBe("/clubs/reading-sai/app/host");
+
+    act(() => signalHostAuthorityLoss({
+      code: "HOST_AUTHORITY_REVOKED",
+      clubSlug: "reading-sai",
+      requestKind: "SESSION_BASIC_SAVE",
+    }));
+
+    expect(destinationLoaderSignal?.aborted).toBe(true);
+    await waitFor(() => expect(purgeObservations).toEqual([true]));
+    expect(hostLoader).not.toHaveBeenCalled();
+    expect(queryClient.getQueryData(hostReloadSentinelKey)).toBeUndefined();
+    expect(router.state.location.pathname).toBe("/clubs/reading-sai/app/host");
+    expect(router.state.location.hash).toMatch(/^#readmates-authority-loss-cancel-/);
+    expect(screen.queryByRole("heading", { name: "취소되어야 할 플랫폼 화면" })).not.toBeInTheDocument();
+    expect(window.sessionStorage.getItem(globalSpaceReturnTargetStorageKey(hostIdentity))).toBeNull();
+    expect(window.sessionStorage.getItem(globalSpaceReturnTargetStorageKey(platformIdentity))).toBeNull();
+    expect(screen.getByLabelText("pending-router-result")).toHaveTextContent("idle");
+
+    act(() => releasePurge());
+    await waitFor(() => expect(router.state.location.pathname).toBe("/clubs/reading-sai/app"));
+    expect(router.state.location.hash).toBe("");
+    expect(screen.getByRole("heading", { name: "안전한 멤버 화면" })).toBeInTheDocument();
+    expect(loadLatestProjection).toHaveBeenCalledTimes(2);
+    expect(loadRouteValidation).toHaveBeenCalledTimes(3);
+
+    await act(async () => {
+      resolveDestinationLoader();
+      await Promise.resolve();
+    });
+    expect(router.state.location.pathname).toBe("/clubs/reading-sai/app");
+    expect(router.state.location.hash).toBe("");
+    expect(hostLoader).not.toHaveBeenCalled();
+    expect(queryClient.getQueryData(hostReloadSentinelKey)).toBeUndefined();
+    expect(screen.queryByRole("heading", { name: "취소되어야 할 플랫폼 화면" })).not.toBeInTheDocument();
+    expect(window.sessionStorage.getItem(globalSpaceReturnTargetStorageKey(hostIdentity))).toBeNull();
+    expect(window.sessionStorage.getItem(globalSpaceReturnTargetStorageKey(platformIdentity))).toBeNull();
   });
 
   it("announces every committed member-host transition across click, Back, and Forward", async () => {

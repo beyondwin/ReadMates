@@ -13,6 +13,7 @@ import {
 } from "@/features/host/storage/host-sensitive-storage";
 import { subscribeHostAuthorityLoss } from "@/shared/api/host-authority-event";
 import type { HostAuthorityLossEvent } from "@/shared/api/host-authority-event";
+import { GLOBAL_SPACE_ROUTER_CANCELLATION_HASH_PREFIX } from "./global-space-transition-controller";
 
 let authorityLossHandoffSequence = 0;
 
@@ -60,13 +61,24 @@ export function HostAuthorityLossController({
   const location = useLocation();
   const navigate = useNavigate();
   const pathnameRef = useRef(location.pathname);
+  const hrefRef = useRef(`${location.pathname}${location.search}${location.hash}`);
   const navigationEpochRef = useRef(0);
   const handlingClubSlugsRef = useRef(new Set<string>());
 
   useEffect(() => {
+    const href = `${location.pathname}${location.search}${location.hash}`;
     pathnameRef.current = location.pathname;
-    navigationEpochRef.current += 1;
-  }, [location.key, location.pathname]);
+    const previous = hrefRef.current;
+    const previousBase = previous.split("#", 1)[0];
+    const isSafetyCancellation = location.hash.startsWith(GLOBAL_SPACE_ROUTER_CANCELLATION_HASH_PREFIX)
+      && previousBase === `${location.pathname}${location.search}`;
+    if (previous !== href && !isSafetyCancellation) {
+      hrefRef.current = href;
+      navigationEpochRef.current += 1;
+    } else if (previous !== href) {
+      hrefRef.current = href;
+    }
+  }, [location.hash, location.key, location.pathname, location.search]);
 
   useEffect(() => subscribeHostAuthorityLoss((event) => {
     if (handlingClubSlugsRef.current.has(event.clubSlug)) return;
