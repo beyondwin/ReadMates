@@ -59,3 +59,16 @@ PATH="<node24-bin>:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec eslint
 | all round-1 TypeScript/TSX source and tests | exact changed-file ESLint under Node `v24.18.0` and repository-pinned pnpm | exit `0`, no findings | The adapter and shared optional-state transport satisfy repository lint rules. |
 
 Round-close safety: `git diff --check` passed. The targeted changed-file scan found no machine-local absolute path, private key marker, token prefix, or BFF secret name. Full frontend gates, CT, E2E, and the separate mixed-authority review finding remain outside this round.
+
+## Record-ownership round 2 — feedback preview assertion alignment
+
+- Review BASE: `b78f311b9436a9da7640f2d6abfa78e74178d0ce`.
+- The controller-reported full frontend run had one failure among `3,661` tests. A focused RED reproduction ran the feedback-document route file under Node `v24.18.0`: `14` tests passed and the sole stale assertion expected mobile title `모임` while the record-owned preview correctly rendered `기록`.
+- The test already verified records-current desktop/mobile navigation and canonical records Back ownership around that assertion. Only the title expectation changed; production source was untouched.
+
+| Closing source SHA-256 | Command | Result | Finding closure |
+| --- | --- | --- | --- |
+| `4df3a608f409e4db8168c6e9c30168b0cce7c59e9ff4a3754074dd28eb0ab5a2` (`front/tests/unit/feedback-document-route.test.tsx`) | `<node24-bin> npx --yes corepack@0.35.0 pnpm --dir front exec vitest run tests/unit/feedback-document-route.test.tsx src/app/host-routes/records-route-element.test.tsx src/app/workspace-route-model.test.ts src/app/layouts/app-route-layout.test.tsx tests/unit/responsive-navigation.test.tsx` | GREEN, `5` files and `192/192` tests | The scoped feedback-preview return flow now asserts the same `기록` title ownership as its records-current primary navigation and records Back target. The prior four-file record suite remains green. |
+| same focused test source | `<node24-bin> npx --yes corepack@0.35.0 pnpm --dir front exec eslint tests/unit/feedback-document-route.test.tsx` | exit `0`, no findings | The assertion-only correction satisfies repository lint rules. |
+
+Round-close safety: `git diff --check` passed. The targeted changed-file scan found no machine-local absolute path, private key marker, token prefix, or BFF secret name. The full frontend suite was intentionally not rerun here; the controller owns the single post-fix rerun.

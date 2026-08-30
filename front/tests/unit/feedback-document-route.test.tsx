@@ -558,7 +558,7 @@ describe("Host feedback document preview route", () => {
       );
       expect(within(navigation).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
     }
-    expect(document.querySelector(".m-hdr-title")).toHaveTextContent("모임");
+    expect(document.querySelector(".m-hdr-title")).toHaveTextContent("기록");
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute(
       "href",
       "/clubs/club-a/app/host/records",
