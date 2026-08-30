@@ -1,4 +1,4 @@
-import type { DevLoginRequest, InvitationPreviewResponse } from "@/features/auth/api/auth-contracts";
+import { InvitationPreviewResponseSchema, type DevLoginRequest, type InvitationPreviewResponse } from "@/features/auth/api/auth-contracts";
 import {
   readmatesApiPath,
   readmatesFetchResponse,
@@ -45,7 +45,7 @@ export async function fetchInvitationPreview(token: string, clubSlug?: string): 
 }
 
 export async function parseInvitationPreview(response: Response): Promise<InvitationPreviewResponse> {
-  return (await response.json()) as InvitationPreviewResponse;
+  return InvitationPreviewResponseSchema.parse(await response.json());
 }
 
 export function logout() {

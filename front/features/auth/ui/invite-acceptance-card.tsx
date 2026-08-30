@@ -66,6 +66,7 @@ export default function InviteAcceptanceCard({
   const canAccept = preview?.canAccept === true;
   const isAccepted = preview?.status === "ACCEPTED";
   const acceptHref = googleInviteHref(token, preview);
+  const isNamedLink = preview?.invitationType === "NAMED_LINK";
 
   return (
     <section className="auth-shell">
@@ -81,7 +82,7 @@ export default function InviteAcceptanceCard({
           <h1 className="h2 editorial auth-card__title">{heading}</h1>
           {copy ? (
             <p className="body auth-card__lede">
-              {copy.body}
+              {isNamedLink && preview.status === "PENDING" ? "이 링크를 받은 Google 계정으로 인증해 초대를 수락해 주세요." : copy.body}
             </p>
           ) : isLoading ? (
             <p className="body auth-card__lede" role="status" aria-live="polite">
@@ -99,16 +100,16 @@ export default function InviteAcceptanceCard({
                 <span>클럽</span>
                 <strong>{preview.clubName}</strong>
               </div>
-              <div className="auth-boundary-row">
+              {!isNamedLink ? <div className="auth-boundary-row">
                 <span>초대 대상</span>
                 <strong>{preview.name}</strong>
                 <em>{preview.email}</em>
-              </div>
-              <div className="auth-boundary-row">
+              </div> : null}
+              {!isNamedLink ? <div className="auth-boundary-row">
                 <span>Google 계정</span>
                 <strong>{preview.emailHint}</strong>
                 <em>로그인 계정은 초대 이메일과 일치해야 합니다.</em>
-              </div>
+              </div> : <div className="auth-boundary-row"><span>Google 계정</span><strong>링크를 받은 Google 계정</strong><em>인증된 계정은 MEMBER 권한으로만 연결됩니다.</em></div>}
               <div className="auth-boundary-row">
                 <span>멤버십</span>
                 <strong>{membershipStatusLabel(preview.status)}</strong>

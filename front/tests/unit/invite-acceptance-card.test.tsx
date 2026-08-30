@@ -17,6 +17,7 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 const pendingPreview = {
+  invitationType: "EMAIL" as const,
   clubName: "읽는사이",
   clubSlug: "reading-sai",
   canonicalPath: "/clubs/reading-sai/invite/raw-token",
@@ -29,9 +30,30 @@ const pendingPreview = {
 };
 
 describe("InviteAcceptanceRouteContent", () => {
+  it("renders a named-link preview without recipient or token internals", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jsonResponse({
+      invitationType: "NAMED_LINK",
+      clubName: "읽는사이",
+      clubSlug: "reading-sai",
+      canonicalPath: "/clubs/reading-sai/invite/lnk_fixture",
+      email: null,
+      name: null,
+      emailHint: null,
+      status: "PENDING",
+      expiresAt: "2026-09-20T12:00:00Z",
+      canAccept: true,
+    })));
+    render(<InviteAcceptanceRouteContent clubSlug="reading-sai" token="lnk_fixture" />);
+    expect(await screen.findByText("링크를 받은 Google 계정")).toBeInTheDocument();
+    expect(screen.getByText(/MEMBER 권한으로만/)).toBeInTheDocument();
+    expect(screen.queryByText("초대 대상")).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("lnk_fixture");
+  });
+
   it("shows pending invitation details after the legacy password endpoint is gone", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(
       jsonResponse({
+        invitationType: "EMAIL",
         clubName: "읽는사이",
         clubSlug: "reading-sai",
         canonicalPath: "/clubs/reading-sai/invite/raw-token",
@@ -71,6 +93,7 @@ describe("InviteAcceptanceRouteContent", () => {
   it("loads invitation previews from the token prop", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(
       jsonResponse({
+        invitationType: "EMAIL",
         clubName: "읽는사이",
         clubSlug: "reading-sai",
         canonicalPath: "/clubs/reading-sai/invite/raw-token",
@@ -97,6 +120,7 @@ describe("InviteAcceptanceRouteContent", () => {
   it("loads club-scoped invitation previews from the route slug", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(
       jsonResponse({
+        invitationType: "EMAIL",
         clubName: "읽는사이",
         clubSlug: "reading-sai",
         canonicalPath: "/clubs/reading-sai/invite/raw-token",
@@ -147,6 +171,7 @@ describe("InviteAcceptanceRouteContent", () => {
         .fn()
         .mockResolvedValueOnce(
           jsonResponse({
+            invitationType: "EMAIL",
             clubName: "읽는사이",
             clubSlug: "reading-sai",
             canonicalPath: "/clubs/reading-sai/invite/expired-token",
@@ -176,6 +201,7 @@ describe("InviteAcceptanceRouteContent", () => {
         .fn()
         .mockResolvedValueOnce(
           jsonResponse({
+            invitationType: "EMAIL",
             clubName: "읽는사이",
             clubSlug: "reading-sai",
             canonicalPath: "/clubs/reading-sai/invite/accepted-token",
@@ -201,6 +227,7 @@ describe("InviteAcceptanceRouteContent", () => {
       .fn()
       .mockResolvedValueOnce(
         jsonResponse({
+          invitationType: "EMAIL",
           clubName: "읽는사이",
           clubSlug: "reading-sai",
           canonicalPath: "/clubs/reading-sai/invite/old-token",
@@ -238,6 +265,7 @@ describe("InviteAcceptanceRouteContent", () => {
 
     resolveSecondPreview(
       jsonResponse({
+        invitationType: "EMAIL",
         clubName: "읽는사이",
         clubSlug: "reading-sai",
         canonicalPath: "/clubs/reading-sai/invite/new-token",
@@ -263,6 +291,7 @@ describe("InviteAcceptanceRouteContent", () => {
       .fn()
       .mockResolvedValueOnce(
         jsonResponse({
+          invitationType: "EMAIL",
           clubName: "읽는사이",
           clubSlug: "reading-sai",
           canonicalPath: "/clubs/reading-sai/invite/shared-token",
@@ -295,6 +324,7 @@ describe("InviteAcceptanceRouteContent", () => {
 
     resolveSecondPreview(
       jsonResponse({
+        invitationType: "EMAIL",
         clubName: "샘플 독서클럽",
         clubSlug: "sample-book-club",
         canonicalPath: "/clubs/sample-book-club/invite/shared-token",

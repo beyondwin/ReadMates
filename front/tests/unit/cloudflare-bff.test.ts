@@ -43,6 +43,29 @@ afterEach(() => {
 });
 
 describe("Cloudflare BFF function", () => {
+  it.each([
+    { method: "GET", path: ["api", "host", "invitation-links"], suffix: "/api/host/invitation-links?cursor=opaque%2Bcursor&limit=20&clubSlug=reading-sai", body: undefined },
+    { method: "PUT", path: ["api", "host", "club-settings"], suffix: "/api/host/club-settings?clubSlug=reading-sai", body: JSON.stringify({ expectedRevision: 3 }) },
+  ])("preserves named-link/settings $method path query club and strips browser trust headers", async ({ method, path, suffix, body }) => {
+    const problem = { code: "STALE_HOST_CLUB_SETTINGS", status: 409, message: "stale" };
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(problem), { status: 409, headers: { "Content-Type": "application/problem+json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const request = new Request(`https://readmates.pages.dev/api/bff${suffix}`, {
+      method,
+      headers: { Origin: "https://readmates.pages.dev", "Content-Type": "application/json", "X-Readmates-Client-Contract": "v3", "X-Readmates-Bff-Secret": "attacker", "X-Readmates-Club-Slug": "attacker", "X-Readmates-Client-IP": "attacker" },
+      body,
+    });
+    const response = await onRequest(context(request, { path }));
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual(problem);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(`https://api.example.com${suffix}`);
+    const headers = init.headers as Headers;
+    expect(headers.get("X-Readmates-Bff-Secret")).toBe("secret");
+    expect(headers.get("X-Readmates-Club-Slug")).toBe("reading-sai");
+    expect(headers.get("X-Readmates-Client-IP")).toBeNull();
+  });
+
   it("forwards the host operating-room current GET generically", async () => {
     const upstreamBody = JSON.stringify({
       currentMeeting: {

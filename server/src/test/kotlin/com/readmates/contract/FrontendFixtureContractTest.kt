@@ -129,6 +129,27 @@ class FrontendFixtureContractTest
             assertTopLevelKeySetMatches(response, "host-notification-delivery-list.json")
         }
 
+        @Test
+        fun `host invitation links and club settings match frontend fixture key sets`() {
+            val links =
+                mockMvc
+                    .get("/api/host/invitation-links") { with(user("host@example.com")) }
+                    .andExpect { status { isOk() } }
+                    .andReturn()
+                    .response.contentAsString
+            val settings =
+                mockMvc
+                    .get("/api/host/club-settings") { with(user("host@example.com")) }
+                    .andExpect { status { isOk() } }
+                    .andReturn()
+                    .response.contentAsString
+
+            assertTopLevelKeySetMatches(links, "host-invitation-links.json")
+            assertTopLevelKeySetMatches(settings, "host-club-settings.json")
+            assertThat(links.lowercase()).doesNotContain("token", "email", "oauth", "provider")
+            assertThat(settings.lowercase()).doesNotContain("email", "oauth", "provider", "session")
+        }
+
         private fun assertTopLevelKeySetMatches(
             actualJson: String,
             fixtureFileName: String,

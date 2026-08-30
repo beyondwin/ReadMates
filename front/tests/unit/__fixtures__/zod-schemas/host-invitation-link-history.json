@@ -1,0 +1,17 @@
+{
+  "items": [
+    {
+      "receiptId": "00000000-0000-0000-0000-00000000e102",
+      "revision": 2,
+      "action": "UPDATED",
+      "beforeSettings": {
+        "status": "ACTIVE"
+      },
+      "afterSettings": {
+        "status": "PAUSED"
+      },
+      "occurredAt": "2026-08-30T00:00:00Z"
+    }
+  ],
+  "nextCursor": null
+}

@@ -21,11 +21,20 @@ import {
 } from "../features/host/api/host-contracts";
 import { CurrentSessionResponseSchema } from "../shared/model/current-session-contracts";
 import { HostPersonDetailSchema } from "../features/host/api/host-person-contracts";
+import { HostInvitationLinkHistorySchema, HostInvitationLinkListSchema } from "../features/host/api/host-invitation-link-contracts";
+import { HostClubClosePreviewSchema, HostClubCloseResultSchema, HostClubSettingsSchema } from "../features/host/api/host-club-settings-contracts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, "../tests/unit/__fixtures__/zod-schemas");
+const topLevelFixturesDir = join(__dirname, "../tests/unit/__fixtures__");
 
 mkdirSync(fixturesDir, { recursive: true });
+
+const hostInvitationLinkList = HostInvitationLinkListSchema.parse({ items: [{ linkId: "00000000-0000-0000-0000-00000000e101", name: "Public fixture link", status: "ACTIVE", maxUses: 20, usedCount: 1, expiresAt: "2026-09-30T00:00:00Z", revision: 2, createdAt: "2026-08-30T00:00:00Z", updatedAt: "2026-08-30T00:00:00Z" }], nextCursor: null });
+const hostInvitationLinkHistory = HostInvitationLinkHistorySchema.parse({ items: [{ receiptId: "00000000-0000-0000-0000-00000000e102", revision: 2, action: "UPDATED", beforeSettings: { status: "ACTIVE" }, afterSettings: { status: "PAUSED" }, occurredAt: "2026-08-30T00:00:00Z" }], nextCursor: null });
+const hostClubSettings = HostClubSettingsSchema.parse({ clubId: "00000000-0000-0000-0000-000000000101", clubSlug: "reading-sai", name: "Public fixture club", approvalPolicy: "INVITE_ONLY", defaultTimezone: "Asia/Seoul", scheduleReminderEnabled: true, recordPublicationDefault: "MEMBER", revision: 0, status: "ACTIVE" });
+const hostClubClosePreview = HostClubClosePreviewSchema.parse({ previewId: "00000000-0000-0000-0000-00000000e103", clubId: hostClubSettings.clubId, actorMembershipId: "00000000-0000-0000-0000-000000000201", clubRevision: 0, effectHash: "a".repeat(64), effects: { clubStatus: "ARCHIVED", memberAccess: "ENDED", publicRecords: "UNCHANGED" }, expiresAt: "2026-08-30T01:00:00Z" });
+const hostClubCloseResult = HostClubCloseResultSchema.parse({ receiptId: "00000000-0000-0000-0000-00000000e104", status: "ARCHIVED", revision: 1, replayed: false });
 
 // ---------------------------------------------------------------------------
 // HostSessionDetailResponseSchema top-level keys
@@ -659,6 +668,10 @@ function write(filename: string, data: unknown): void {
   writeFileSync(path, JSON.stringify(data, null, 2) + "\n", "utf-8");
 }
 
+function writeTopLevel(filename: string, data: unknown): void {
+  writeFileSync(join(topLevelFixturesDir, filename), JSON.stringify(data, null, 2) + "\n", "utf-8");
+}
+
 write("host-session-detail.json", hostSessionDetail);
 write("host-session-record-editor.json", hostSessionRecordEditor);
 write("host-session-change-receipt.json", hostSessionChangeReceipt);
@@ -689,3 +702,10 @@ write("platform-admin-club-list.json", platformAdminClubList);
 write("platform-admin-club-detail.json", platformAdminClubDetail);
 write("platform-admin-onboarding-preview.json", platformAdminOnboardingPreview);
 write("platform-admin-onboarding-result.json", platformAdminOnboardingResult);
+write("host-invitation-link-list.json", hostInvitationLinkList);
+write("host-invitation-link-history.json", hostInvitationLinkHistory);
+write("host-club-settings.json", hostClubSettings);
+write("host-club-close-preview.json", hostClubClosePreview);
+write("host-club-close-result.json", hostClubCloseResult);
+writeTopLevel("host-invitation-links.json", { items: [], nextCursor: null });
+writeTopLevel("host-club-settings.json", hostClubSettings);

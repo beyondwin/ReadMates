@@ -63,6 +63,7 @@ class SecurityConfig(
                     "/api/sessions/current/one-line-reviews",
                     "/api/host/sessions",
                     "/api/host/invitations",
+                    "/api/host/invitation-links",
                 )
                 it.ignoringRequestMatchers(
                     methodAndPath("PUT", Regex("^/api/me/club-access$")),
@@ -99,6 +100,10 @@ class SecurityConfig(
                     methodAndPath("DELETE", Regex("^/api/host/sessions/[^/]+/ai-generate/jobs/[^/]+$")),
                     methodAndPath("PUT", Regex("^/api/host/clubs/[^/]+/ai-defaults$")),
                     methodAndPath("POST", Regex("^/api/host/invitations/[^/]+/revoke$")),
+                    methodAndPath("PUT", Regex("^/api/host/invitation-links/[^/]+$")),
+                    methodAndPath("PUT", Regex("^/api/host/club-settings$")),
+                    methodAndPath("POST", Regex("^/api/host/club-settings/co-hosts/[^/]+/(promote|demote)$")),
+                    methodAndPath("POST", Regex("^/api/host/club-settings/end/(preview|confirm)$")),
                     methodAndPath("POST", Regex("^/api/host/members/[^/]+/(activate|deactivate-viewer)$")),
                     methodAndPath("POST", Regex("^/api/host/members/[^/]+/approve$")),
                     methodAndPath("POST", Regex("^/api/host/members/[^/]+/reject$")),

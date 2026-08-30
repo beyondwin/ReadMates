@@ -343,6 +343,10 @@ where lower(users.email) = ${sqlString(normalizedEmail)}
 }
 
 function acceptGoogleInviteFixture(email: string, inviteToken: string, options: GoogleFixtureOptions = {}) {
+  if (inviteToken.startsWith("lnk_")) {
+    acceptGoogleNamedInviteFixture(email, inviteToken, options);
+    return;
+  }
   const normalizedEmail = normalizeEmail(email);
   const tokenHash = sha256Hex(inviteToken);
   const userId = randomUUID();
@@ -477,6 +481,55 @@ where token_hash = ${sqlString(tokenHash)}
   and status = 'ACCEPTED';
 `);
 
+  expect(result.trim().split(/\s+/).at(-1)).toBe("1");
+}
+
+function acceptGoogleNamedInviteFixture(email: string, inviteToken: string, options: GoogleFixtureOptions = {}) {
+  const normalizedEmail = normalizeEmail(email);
+  const tokenHash = sha256Hex(inviteToken);
+  const userId = randomUUID();
+  const membershipId = randomUUID();
+  const eventId = randomUUID();
+  const googleSubjectId = googleSubjectForEmail(normalizedEmail);
+  const displayName = options.displayName?.trim() || displayNameForEmail(normalizedEmail);
+  const shortName = displayName.slice(0, 50);
+  const profileImageUrl = options.profileImageUrl ?? null;
+  const idempotencyHash = sha256Hex(`named-accept:${googleSubjectId}`);
+  const requestHash = sha256Hex(`named-accept:${normalizedEmail}`);
+
+  const result = runMysql(`
+start transaction;
+set @task4_link_id = (select id from host_invitation_links where token_hash = ${sqlString(tokenHash)} and status = 'ACTIVE' and used_count < max_uses and expires_at > utc_timestamp(6) for update);
+set @task4_club_id = (select club_id from host_invitation_links where id = @task4_link_id);
+
+insert into users (id, google_subject_id, email, name, short_name, profile_image_url, auth_provider)
+select ${sqlString(userId)}, ${sqlString(googleSubjectId)}, ${sqlString(normalizedEmail)}, ${sqlString(displayName)}, ${sqlString(shortName)}, ${profileImageUrl === null ? "null" : sqlString(profileImageUrl)}, 'GOOGLE'
+from host_invitation_links where id = @task4_link_id
+  and not exists (select 1 from users where lower(email) = ${sqlString(normalizedEmail)});
+
+update users set google_subject_id = coalesce(google_subject_id, ${sqlString(googleSubjectId)}), auth_provider = 'GOOGLE', updated_at = utc_timestamp(6)
+where lower(email) = ${sqlString(normalizedEmail)} and @task4_link_id is not null;
+
+insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+select ${sqlString(membershipId)}, @task4_club_id, users.id, 'MEMBER', 'ACTIVE', utc_timestamp(6), users.short_name, ${sqlString(fixtureAvatarKeys.acceptedGoogleInvite)}
+from users where lower(users.email) = ${sqlString(normalizedEmail)} and @task4_link_id is not null
+on duplicate key update role = 'MEMBER', status = 'ACTIVE', joined_at = coalesce(joined_at, utc_timestamp(6)), updated_at = utc_timestamp(6);
+
+update host_invitation_links set used_count = used_count + 1, revision = revision + 1,
+  status = if(used_count + 1 >= max_uses, 'EXHAUSTED', 'ACTIVE'), updated_at = utc_timestamp(6)
+where id = @task4_link_id;
+
+insert into host_invitation_link_events (id, link_id, club_id, revision, action, before_settings_json, after_settings_json, actor_membership_id, idempotency_key_hash, request_hash, occurred_at)
+select ${sqlString(eventId)}, id, club_id, revision, 'ACCEPTED',
+  json_object('status', 'ACTIVE', 'maxUses', cast(max_uses as char), 'usedCount', cast(used_count - 1 as char), 'expiresAt', cast(expires_at as char)),
+  json_object('status', status, 'maxUses', cast(max_uses as char), 'usedCount', cast(used_count as char), 'expiresAt', cast(expires_at as char)),
+  null, ${sqlString(idempotencyHash)}, ${sqlString(requestHash)}, utc_timestamp(6)
+from host_invitation_links where id = @task4_link_id;
+commit;
+
+select count(*) from memberships join users on users.id = memberships.user_id
+where memberships.club_id = @task4_club_id and lower(users.email) = ${sqlString(normalizedEmail)} and memberships.role = 'MEMBER' and memberships.status = 'ACTIVE';
+`);
   expect(result.trim().split(/\s+/).at(-1)).toBe("1");
 }
 
