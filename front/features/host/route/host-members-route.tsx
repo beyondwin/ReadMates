@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- route module exports its owner adapter for exact transition tests */
 import { useMemo } from "react";
 import { useLoaderData, useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -5,7 +6,43 @@ import { requireHostClubContext } from "@/features/host/model/host-authority-los
 import HostMembers, { type HostMembersLinkComponent } from "@/features/host/ui/host-members";
 import { createHostInvitationsActions } from "./host-invitations-data";
 import { createHostMembersActions, type HostMembersRouteData } from "./host-members-data";
+import type { HostMembersActions } from "@/features/host/model/host-member-actions";
+import { TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import { registerHostInvitationActions } from "./host-invitations-route";
 import "@/features/host/ui/host-editorial-ledger.css";
+
+export function registerHostMemberActions(
+  actions: HostMembersActions,
+  owner: ReturnType<typeof useTransitionSafetyOwner>,
+): HostMembersActions {
+  const execute = async <T,>(operationId: string, request: () => Promise<T>) => {
+    const handle = owner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
+    try {
+      const result = await request();
+      if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
+      return result;
+    } catch (error) {
+      if (error instanceof TransitionOwnerObsoleteError) throw error;
+      if (await handle.settle("failed") !== "accepted") throw new TransitionOwnerObsoleteError();
+      throw error;
+    }
+  };
+  return {
+    ...actions,
+    submitLifecycle: (membershipId, path, body) => execute(
+      `host-member:lifecycle:${membershipId}:${path}`,
+      () => actions.submitLifecycle(membershipId, path, body),
+    ),
+    submitProfile: (membershipId, displayName) => execute(
+      `host-member:profile:${membershipId}`,
+      () => actions.submitProfile(membershipId, displayName),
+    ),
+    submitViewerAction: (membershipId, action) => execute(
+      `host-member:viewer:${membershipId}:${action}`,
+      () => actions.submitViewerAction(membershipId, action),
+    ),
+  };
+}
 
 export function HostMembersRoute({ LinkComponent }: { LinkComponent?: HostMembersLinkComponent }) {
   const { members, invitations } = useLoaderData() as HostMembersRouteData;
@@ -19,6 +56,16 @@ export function HostMembersRoute({ LinkComponent }: { LinkComponent?: HostMember
   const invitationActions = useMemo(
     () => createHostInvitationsActions(queryClient, context),
     [context, queryClient],
+  );
+  const memberOwner = useTransitionSafetyOwner("host-members");
+  const invitationOwner = useTransitionSafetyOwner("host-member-invitations");
+  const registeredActions = useMemo(
+    () => registerHostMemberActions(actions, memberOwner),
+    [actions, memberOwner],
+  );
+  const registeredInvitationActions = useMemo(
+    () => registerHostInvitationActions(invitationActions, invitationOwner),
+    [invitationActions, invitationOwner],
   );
 
   return (
@@ -37,9 +84,9 @@ export function HostMembersRoute({ LinkComponent }: { LinkComponent?: HostMember
       <section className="container rm-host-members-page__body">
         <HostMembers
           initialMembers={members}
-          actions={actions}
+          actions={registeredActions}
           initialInvitations={invitations}
-          invitationActions={invitationActions}
+          invitationActions={registeredInvitationActions}
           LinkComponent={LinkComponent}
         />
       </section>

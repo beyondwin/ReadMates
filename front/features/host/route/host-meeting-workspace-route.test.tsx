@@ -52,6 +52,7 @@ vi.mock("@/features/host/queries/host-session-record-queries", async (importOrig
     isPending: false,
     mutateAsync: routeMocks.restoreRevision,
   }),
+  publishRestoredHostSessionRevisionDraft: vi.fn(),
 }));
 
 vi.mock("@/features/host/queries/host-session-recovery-queries", () => ({
@@ -63,6 +64,7 @@ vi.mock("@/features/host/queries/host-session-recovery-queries", () => ({
     isPending: false,
     mutateAsync: routeMocks.restoreChange,
   }),
+  publishRestoredHostSessionChange: vi.fn(),
 }));
 
 vi.mock("./host-meeting-workspace-actions", () => ({

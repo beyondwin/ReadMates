@@ -1,4 +1,4 @@
-import { infiniteQueryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import { infiniteQueryOptions, useMutation, type QueryClient } from "@tanstack/react-query";
 import {
   confirmAdminSupportGrant,
   confirmAdminSupportGrantRevoke,
@@ -39,16 +39,16 @@ export function platformAdminSupportLedgerInfiniteQuery(filters: AdminSupportGra
 
 type PrivateRequest<TResult> = () => Promise<TResult>;
 
-function usePrivateSupportMutation<TResult>(key: readonly unknown[], invalidateLedger = false) {
-  const queryClient = useQueryClient();
+function usePrivateSupportMutation<TResult>(key: readonly unknown[]) {
   return useMutation({
     mutationKey: key,
     gcTime: 0,
     mutationFn: (request: PrivateRequest<TResult>) => request(),
-    onSuccess: invalidateLedger
-      ? () => queryClient.invalidateQueries({ queryKey: platformAdminSupportKeys.ledgerRoot() })
-      : undefined,
   });
+}
+
+export function publishAdminSupportLedger(client: QueryClient) {
+  return client.invalidateQueries({ queryKey: platformAdminSupportKeys.ledgerRoot() });
 }
 
 export function useAdminSupportSearchMutation() {
@@ -74,7 +74,6 @@ export function useAdminSupportCreatePreviewMutation() {
 export function useAdminSupportCreateConfirmMutation() {
   const mutation = usePrivateSupportMutation<Awaited<ReturnType<typeof confirmAdminSupportGrant>>>(
     platformAdminSupportKeys.createMutation(),
-    true,
   );
   return {
     ...mutation,
@@ -97,7 +96,6 @@ export function useAdminSupportRevokePreviewMutation() {
 export function useAdminSupportRevokeConfirmMutation() {
   const mutation = usePrivateSupportMutation<Awaited<ReturnType<typeof confirmAdminSupportGrantRevoke>>>(
     platformAdminSupportKeys.revokeMutation(),
-    true,
   );
   return {
     ...mutation,

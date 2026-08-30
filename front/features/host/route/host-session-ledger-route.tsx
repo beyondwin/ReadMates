@@ -14,6 +14,7 @@ import { openAlreadyExistsMessage } from "@/features/host/model/host-session-lif
 import {
   hostSessionTrashListQuery,
   isHostSessionTrashExpiredError,
+  publishRestoredHostSession,
   useRestoreHostSessionMutation,
 } from "@/features/host/queries/host-session-queries";
 import { hostSessionRecordLedgerQuery } from "@/features/host/queries/host-session-record-queries";
@@ -29,6 +30,7 @@ import {
   HOST_SESSION_LEDGER_PAGE_LIMIT,
   type HostSessionLedgerRouteData,
 } from "./host-session-ledger-data";
+import { useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 function sameFilters(left: HostSessionLedgerFilters, right: HostSessionLedgerFilters) {
   return left.view === right.view
@@ -75,6 +77,7 @@ export function HostSessionLedgerRoute({
     enabled: trashView,
   });
   const restoreMutation = useRestoreHostSessionMutation(context);
+  const transitionOwner = useTransitionSafetyOwner("host-session-ledger");
   const loaderPage = !trashView && sameFilters(filters, loaderData.filters) ? loaderData.page : null;
   const loaderTrashPage = trashView && sameFilters(filters, loaderData.filters) ? loaderData.trashPage : null;
   const basePage = query.data ?? loaderPage;
@@ -196,8 +199,12 @@ export function HostSessionLedgerRoute({
       ...current,
       [sessionId]: { restoring: true, restoreError: null, restoreConflict: null },
     }));
+    const operationId = `host-session-restore:${sessionId}`;
+    const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
     try {
-      await restoreMutation.mutateAsync(sessionId);
+      const detail = await restoreMutation.mutateAsync(sessionId);
+      if (await handle.settle("succeeded") !== "accepted") return;
+      await publishRestoredHostSession(queryClient, detail, sessionId, context);
       await trashQuery.refetch();
       setTrashAppended(null);
       setRestoreState((current) => {
@@ -206,6 +213,7 @@ export function HostSessionLedgerRoute({
         return next;
       });
     } catch (error) {
+      await handle.settle("failed");
       if (isHostSessionTrashExpiredError(error)) {
         setRestoreState((current) => ({
           ...current,

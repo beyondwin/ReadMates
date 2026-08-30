@@ -39,6 +39,8 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.post
+import java.nio.file.Files
+import java.nio.file.Path
 import java.sql.Timestamp
 import java.time.Clock
 import java.time.Duration
@@ -98,7 +100,7 @@ class PlatformAdminPublicTakedownIntegrationTest(
 
     @Test
     fun `preview binds exact public target generation surfaces ttl and remote copy limitation`() {
-        mockMvc
+        val body = mockMvc
             .post("/api/admin/public-takedowns/preview") {
                 contentType = MediaType.APPLICATION_JSON
                 content = previewRequest()
@@ -115,7 +117,17 @@ class PlatformAdminPublicTakedownIntegrationTest(
                 jsonPath("$.confirmEnabled") { value(false) }
                 jsonPath("$.activationBoundary") { value("PROTECTED_CACHE_SAFETY_EVIDENCE_REQUIRED") }
                 jsonPath("$.remoteCopyLimitation") { value(REMOTE_COPY_LIMITATION) }
-            }
+            }.andReturn().response.contentAsString
+        val fixture = sharedFixture("platform-admin-takedown-preview.server.json")
+        assertThat(JsonPath.read<String>(body, "$.schema")).isEqualTo(JsonPath.read<String>(fixture, "$.schema"))
+        assertThat(JsonPath.read<String>(body, "$.activationBoundary"))
+            .isEqualTo(JsonPath.read<String>(fixture, "$.activationBoundary"))
+        assertThat(JsonPath.read<Boolean>(body, "$.confirmEnabled"))
+            .isEqualTo(JsonPath.read<Boolean>(fixture, "$.confirmEnabled"))
+        assertThat(JsonPath.read<String>(body, "$.remoteCopyLimitation"))
+            .isEqualTo(JsonPath.read<String>(fixture, "$.remoteCopyLimitation"))
+        assertThat(JsonPath.read<List<String>>(body, "$.currentSurfaces").sorted())
+            .isEqualTo(JsonPath.read<List<String>>(fixture, "$.currentSurfaces").sorted())
     }
 
     @Test
@@ -179,6 +191,22 @@ class PlatformAdminPublicTakedownIntegrationTest(
             assertThat(JsonPath.read<String>(body, "$.reasonCategory")).isEqualTo("PRIVATE_DATA")
             assertThat(JsonPath.read<String>(body, "$.cdnPurgeOutcome")).isEqualTo("QUEUED")
             assertThat(JsonPath.read<String>(body, "$.bffEvictionOutcome")).isEqualTo("NOT_STARTED")
+            val fixture = sharedFixture("platform-admin-takedown-receipt.server.json")
+            listOf(
+                "schema",
+                "originResult",
+                "committedGeneration",
+                "reasonCategory",
+                "reasonRedacted",
+                "bffEvictionOutcome",
+                "cdnPurgeOutcome",
+                "browserRevalidationOutcome",
+                "remoteCopyLimitation",
+            ).forEach { field ->
+                assertThat(JsonPath.read<Any>(body, "$.${field}"))
+                    .isEqualTo(JsonPath.read<Any>(fixture, "$.${field}"))
+            }
+            assertThat(body).doesNotContain("committedClubGeneration", "limitationCode")
             assertThat(
                 jdbcTemplate.queryForObject(
                     "select reason_category from admin_public_takedown_receipts",
@@ -198,6 +226,12 @@ class PlatformAdminPublicTakedownIntegrationTest(
             assertThat(originReadable()).isFalse()
             assertThat(generation()).isEqualTo(8)
         }
+    }
+
+    private fun sharedFixture(name: String): String {
+        val repositoryRelative = Path.of("front/tests/unit/__fixtures__/$name")
+        val serverRelative = Path.of("../front/tests/unit/__fixtures__/$name")
+        return Files.readString(if (Files.exists(repositoryRelative)) repositoryRelative else serverRelative)
     }
 
     @Test

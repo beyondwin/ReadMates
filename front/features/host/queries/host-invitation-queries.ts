@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation } from "@tanstack/react-query";
 import type {
   CreateHostInvitationRequest,
   HostInvitationListPage,
@@ -42,25 +42,21 @@ export function invalidateHostInvitations(client: QueryClient, context: Explicit
 }
 
 export function useCreateInvitationMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "invitations", "create"),
     mutationFn: async (request: CreateHostInvitationRequest) => {
       const response = await createHostInvitation(request, context);
       return parseHostInvitationResponse(response);
     },
-    onSuccess: () => invalidateHostInvitations(client, context),
   });
 }
 
 export function useRevokeInvitationMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "invitations", "revoke"),
     mutationFn: async (invitationId: string) => {
       const response = await revokeHostInvitation(invitationId, context);
       return parseHostInvitationResponse(response);
     },
-    onSuccess: () => invalidateHostInvitations(client, context),
   });
 }

@@ -23,3 +23,11 @@ export function useSpaceTransitionSafetyRegistration(): TransitionSafetyRegistra
   }
   return port;
 }
+
+// Route unit tests that intentionally render a leaf controller without the app
+// shell may inspect this optional projection. Production owners are always
+// mounted below SpaceTransitionSafetyProvider.
+// eslint-disable-next-line react-refresh/only-export-components
+export function useOptionalSpaceTransitionSafetyRegistration(): TransitionSafetyRegistrationPort | null {
+  return useContext(SpaceTransitionSafetyContext);
+}

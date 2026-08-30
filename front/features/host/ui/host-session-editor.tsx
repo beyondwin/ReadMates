@@ -105,6 +105,7 @@ import {
 } from "./session-editor/session-editor-feedback";
 import { HostSessionNotificationActions } from "./session-editor/session-editor-notifications";
 import type { AiGenerateCommitResult } from "./session-editor/session-record-completion-panel";
+import type { AiGenerationPanelRenderer } from "./session-editor/session-record-completion-panel";
 import type {
   DraftSaveState,
   SessionRecordDraftSnapshot,
@@ -252,6 +253,7 @@ export default function HostSessionEditor({
   composeDeck = true,
   primaryActionRef,
   recordReadiness,
+  renderAiGeneration,
 }: {
   session?: HostSessionDetailResponse | null;
   notificationDispatches?: ManualNotificationDispatchListItem[];
@@ -277,6 +279,7 @@ export default function HostSessionEditor({
   composeDeck?: boolean;
   primaryActionRef?: MutableRefObject<(() => void) | null>;
   recordReadiness?: HostMeetingRecordReadiness;
+  renderAiGeneration?: AiGenerationPanelRenderer;
 }) {
   const resolvedScheduleDefaults = scheduleDefaultsLoadState?.defaults ?? scheduleDefaults ?? null;
 
@@ -1552,6 +1555,7 @@ export default function HostSessionEditor({
                   rebaseError: recordWorkflow!.rebaseError,
                 }}
                 reviewPending={recordWorkflow.confirmation.submitting}
+                renderAiGeneration={renderAiGeneration}
                 freshnessBlocked={recordWorkflow.freshness?.blocked ?? false}
                 freshnessObservedAt={recordWorkflow.freshness?.observedAt ?? null}
                 onRetryFreshness={recordWorkflow.freshness?.onRetry}

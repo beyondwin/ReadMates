@@ -170,6 +170,21 @@ async function confirmReverseDialog(user: ReturnType<typeof userEvent.setup>, na
 
 type HostSessionEditorProps = Parameters<typeof HostSessionEditor>[0];
 
+const renderAiGeneration: NonNullable<HostSessionEditorProps["renderAiGeneration"]> = ({
+  sessionId,
+  clubSlug,
+  onCommitted,
+}) => (
+  <div data-testid="aigen-tab" data-session-id={sessionId} data-club-slug={clubSlug}>
+    <button
+      type="button"
+      onClick={() => onCommitted({ draftRevision: 5, baseLiveRevision: 0, liveApplied: false })}
+    >
+      simulate AI commit
+    </button>
+  </div>
+);
+
 function HostSessionEditorForTest({
   actions,
   navigation,
@@ -208,6 +223,7 @@ function HostSessionEditorForTest({
       actions={actions ?? hostSessionEditorTestActions}
       navigation={navigation ?? { location, onChange: setLocation }}
       recordWorkflow={effectiveWorkflow}
+      renderAiGeneration={props.renderAiGeneration ?? renderAiGeneration}
     />
   );
 }

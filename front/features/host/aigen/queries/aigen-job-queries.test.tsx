@@ -25,6 +25,7 @@ import {
   aiJobDetailQuery,
   aiJobKeys,
   availableAiModelsQuery,
+  publishCommittedAiJob,
   recentAiJobQuery,
   useCommitAiJobMutation,
 } from "./aigen-job-queries";
@@ -195,6 +196,10 @@ describe("AI job query helpers", () => {
       { recordVisibility: "MEMBER" },
       context,
     );
+    for (const [key] of invalidatedEntries) {
+      expect(client.getQueryState(key)?.isInvalidated, JSON.stringify(key)).toBe(false);
+    }
+    await publishCommittedAiJob(client, "session-1", context);
     for (const [key, value] of invalidatedEntries) {
       expect(client.getQueryState(key)?.isInvalidated, JSON.stringify(key)).toBe(true);
       expect(client.getQueryData(key), JSON.stringify(key)).toEqual(value);

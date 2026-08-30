@@ -1,0 +1,13 @@
+{
+  "schema": "admin.public_takedown.preview.v1",
+  "previewId": "40000000-0000-4000-8000-000000000004",
+  "expiresAt": "2026-08-30T04:05:00Z",
+  "clubId": "00000000-0000-0000-0000-000000000001",
+  "sessionId": "00000000-0000-0000-0000-00000000d551",
+  "publicationId": "00000000-0000-0000-0000-00000000d552",
+  "targetGeneration": 7,
+  "currentSurfaces": ["BFF_CACHE", "BROWSER_CACHE", "CDN_CACHE", "ORIGIN"],
+  "confirmEnabled": false,
+  "activationBoundary": "PROTECTED_CACHE_SAFETY_EVIDENCE_REQUIRED",
+  "remoteCopyLimitation": "이미 표시되었거나 저장된 사본과 연결이 끊긴 오프라인 사본은 원격으로 삭제할 수 없습니다."
+}

@@ -1,4 +1,4 @@
-import { infiniteQueryOptions, queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import { infiniteQueryOptions, queryOptions, useMutation, type QueryClient } from "@tanstack/react-query";
 import {
   confirmForceCancelPlatformAdminAiJob,
   confirmRetryCommitPlatformAdminAiJob,
@@ -84,7 +84,6 @@ export function usePreviewPlatformAdminAiJobCommandMutation() {
 type AiOpsConfirmVariables = AiOpsPreviewVariables & { request: ConfirmPlatformAdminAiOpsCommandRequest };
 
 export function useConfirmPlatformAdminAiJobCommandMutation() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationKey: [...platformAdminAiOpsKeys.all, "confirm"],
     retry: 0,
@@ -92,6 +91,9 @@ export function useConfirmPlatformAdminAiJobCommandMutation() {
       action === "FORCE_CANCEL"
         ? confirmForceCancelPlatformAdminAiJob(jobId, request)
         : confirmRetryCommitPlatformAdminAiJob(jobId, request),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: platformAdminAiOpsKeys.all }),
   });
+}
+
+export function publishPlatformAdminAiOps(client: QueryClient) {
+  return client.invalidateQueries({ queryKey: platformAdminAiOpsKeys.all });
 }

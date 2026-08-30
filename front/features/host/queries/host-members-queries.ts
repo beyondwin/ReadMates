@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation } from "@tanstack/react-query";
 import {
   fetchHostMembers,
   submitHostMemberLifecycle,
@@ -44,7 +44,6 @@ export function invalidateHostMembers(client: QueryClient, context: ExplicitRead
 }
 
 export function useHostMemberLifecycleMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "members", "lifecycle"),
     mutationFn: async ({
@@ -56,12 +55,10 @@ export function useHostMemberLifecycleMutation(context: ExplicitReadmatesApiCont
       path: HostMemberLifecyclePath;
       body?: MemberLifecycleRequest;
     }) => submitHostMemberLifecycle(membershipId, path, body, context),
-    onSuccess: () => invalidateHostMembers(client, context),
   });
 }
 
 export function useHostMemberProfileMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "members", "profile"),
     mutationFn: async ({
@@ -71,12 +68,10 @@ export function useHostMemberProfileMutation(context: ExplicitReadmatesApiContex
       membershipId: string;
       displayName: string;
     }) => submitHostMemberProfile(membershipId, displayName, context),
-    onSuccess: () => invalidateHostMembers(client, context),
   });
 }
 
 export function useHostViewerActionMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "members", "viewer"),
     mutationFn: async ({
@@ -86,6 +81,5 @@ export function useHostViewerActionMutation(context: ExplicitReadmatesApiContext
       membershipId: string;
       action: HostViewerAction;
     }) => submitHostViewerAction(membershipId, action, context),
-    onSuccess: () => invalidateHostMembers(client, context),
   });
 }

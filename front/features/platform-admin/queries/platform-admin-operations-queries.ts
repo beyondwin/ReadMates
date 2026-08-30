@@ -1,4 +1,4 @@
-import { infiniteQueryOptions, queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import { infiniteQueryOptions, queryOptions, useMutation, type QueryClient } from "@tanstack/react-query";
 import {
   acknowledgeAdminOperationCase,
   fetchAdminOperationCase,
@@ -98,46 +98,35 @@ export function platformAdminOperationCaseQuery(caseId: string) {
 }
 
 export function useAcknowledgeAdminOperationCaseMutation() {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: adminOperationsKeys.all,
     retry: 0,
     mutationFn: ({ caseId, expectedVersion }: VersionedCaseMutation) =>
       acknowledgeAdminOperationCase(caseId, expectedVersion),
-    onSuccess: (_response, variables) =>
-      Promise.all([
-        client.invalidateQueries({ queryKey: adminOperationsKeys.lists() }),
-        client.invalidateQueries({ queryKey: adminOperationsKeys.detail(variables.caseId), exact: true }),
-      ]),
   });
 }
 
 export function useSnoozeAdminOperationCaseMutation() {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: adminOperationsKeys.all,
     retry: 0,
     mutationFn: ({ caseId, expectedVersion, snoozedUntil }: SnoozeCaseMutation) =>
       snoozeAdminOperationCase(caseId, expectedVersion, snoozedUntil),
-    onSuccess: (_response, variables) =>
-      Promise.all([
-        client.invalidateQueries({ queryKey: adminOperationsKeys.lists() }),
-        client.invalidateQueries({ queryKey: adminOperationsKeys.detail(variables.caseId), exact: true }),
-      ]),
   });
 }
 
 export function useResolveAdminOperationCaseMutation() {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: adminOperationsKeys.all,
     retry: 0,
     mutationFn: ({ caseId, expectedVersion }: VersionedCaseMutation) =>
       resolveAdminOperationCase(caseId, expectedVersion),
-    onSuccess: (_response, variables) =>
-      Promise.all([
-        client.invalidateQueries({ queryKey: adminOperationsKeys.lists() }),
-        client.invalidateQueries({ queryKey: adminOperationsKeys.detail(variables.caseId), exact: true }),
-      ]),
   });
+}
+
+export function publishAdminOperationCase(client: QueryClient, caseId: string) {
+  return Promise.all([
+    client.invalidateQueries({ queryKey: adminOperationsKeys.lists() }),
+    client.invalidateQueries({ queryKey: adminOperationsKeys.detail(caseId), exact: true }),
+  ]);
 }

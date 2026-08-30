@@ -23,7 +23,7 @@ import type { SessionImportCommitResult } from "@/features/host/model/session-im
 import type { ReadmatesReturnState } from "@/shared/routing/readmates-route-state";
 import { formatDateTimeLabel } from "@/shared/ui/readmates-display";
 import type { HostSessionEditorLinkComponent } from "./session-editor-links";
-import type { AiGenerateCommitResult } from "./session-record-completion-panel";
+import type { AiGenerateCommitResult, AiGenerationPanelRenderer } from "./session-record-completion-panel";
 import { SessionRecordCompletionPanel } from "./session-record-completion-panel";
 import type {
   DraftSaveState,
@@ -81,6 +81,7 @@ export type SessionRecordWorkspaceProps = {
     onImportCommit: () => void;
     onSetGuestReadable?: () => void | Promise<void>;
   };
+  renderAiGeneration?: AiGenerationPanelRenderer;
 };
 
 const recordSources = [
@@ -214,6 +215,7 @@ export function SessionRecordWorkspace({
   feedbackDocument,
   creation,
   actions,
+  renderAiGeneration,
 }: SessionRecordWorkspaceProps): JSX.Element {
   const canUseAi = Boolean(creation.sessionId) && Boolean(creation.clubSlug);
   const wrapUpFirstView = source === "json";
@@ -458,6 +460,7 @@ export function SessionRecordWorkspace({
                   onFileSelected={actions.onImportFileSelected}
                   onCommit={actions.onImportCommit}
                   onSetGuestReadable={actions.onSetGuestReadable}
+                  renderAiGeneration={renderAiGeneration}
                 />
               </div>
             ) : null

@@ -54,4 +54,16 @@ describe("createHostInvitationsActions.refreshInvitations", () => {
     expect(page.items).toHaveLength(1);
     expect(page.items[0]?.invitationId).toBe("invite-new");
   });
+
+  it("keeps detached list observation outside Query cache", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    vi.mocked(listHostInvitationsResponse).mockResolvedValue(new Response(JSON.stringify(createdPage), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+
+    await createHostInvitationsActions(client, context).listInvitations({ limit: 50 });
+
+    expect(client.getQueryCache().getAll()).toHaveLength(0);
+  });
 });

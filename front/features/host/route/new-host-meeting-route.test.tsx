@@ -44,11 +44,16 @@ vi.mock("@tanstack/react-query", () => ({
     error: routeMocks.defaultsState === "error" ? new Error("defaults unavailable") : null,
     refetch: routeMocks.refetchDefaults,
   }),
+  useQueryClient: () => ({
+    invalidateQueries: vi.fn(),
+  }),
 }));
 
 vi.mock("@/features/host/queries/host-session-queries", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/host/queries/host-session-queries")>()),
   hostSessionScheduleDefaultsQuery: () => ({}),
+  publishHostSessionCreated: vi.fn(),
+  publishHostSessionResponse: vi.fn(),
   useCreateHostSessionMutation: () => ({
     mutateAsync: routeMocks.create,
     reconcilePendingCreate: routeMocks.reconcileCreate,

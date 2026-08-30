@@ -12,7 +12,7 @@ import { updateMyAvatar } from "@/features/archive/api/archive-api";
 import type { MemberProfileResponse } from "@/features/archive/api/archive-contracts";
 import { readmatesFetchResponse } from "@/shared/api/client";
 import { archiveKeys } from "./archive-queries";
-import { useUpdateMyProfileMutation } from "./profile-queries";
+import { publishUpdatedProfile, useUpdateMyProfileMutation } from "./profile-queries";
 
 const savedProfile: MemberProfileResponse = {
   membershipId: "membership-1",
@@ -109,6 +109,8 @@ describe("profile mutations", () => {
       await expect(save).resolves.toEqual(savedProfile);
     });
 
+    expect(invalidateQueries).not.toHaveBeenCalled();
+    await publishUpdatedProfile(client);
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: archiveKeys.all });
     expect(client.getQueryState([...archiveKeys.all, "profile"])?.isInvalidated).toBe(true);
   });

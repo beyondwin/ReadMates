@@ -1,4 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MemberProfileResponse, MyPageResponse } from "@/features/archive/api/archive-contracts";
 import { ReadmatesApiError } from "@/shared/api/errors";
@@ -11,6 +12,7 @@ const mutations = vi.hoisted(() => ({
 
 vi.mock("@/features/archive/queries/profile-queries", () => ({
   useUpdateMyProfileMutation: mutations.useUpdateMyProfileMutation,
+  publishUpdatedProfile: vi.fn().mockResolvedValue(undefined),
 }));
 
 const profile: MyPageResponse = {
@@ -48,6 +50,10 @@ function deferred<T>() {
 function renderController(sourceProfile = profile, clubSlug = "reading-sai", canEditProfile = true) {
   const onProfileUpdated = vi.fn().mockResolvedValue(undefined);
   const onRevalidate = vi.fn();
+  const queryClient = new QueryClient();
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
   const hook = renderHook(
     (props: { sourceProfile: MyPageResponse; clubSlug: string }) => useProfileUpdateController({
       ...props,
@@ -55,7 +61,7 @@ function renderController(sourceProfile = profile, clubSlug = "reading-sai", can
       onProfileUpdated,
       onRevalidate,
     }),
-    { initialProps: { sourceProfile, clubSlug } },
+    { initialProps: { sourceProfile, clubSlug }, wrapper },
   );
   return { ...hook, onProfileUpdated, onRevalidate };
 }

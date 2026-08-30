@@ -8,6 +8,7 @@ import type {
   NotificationPreferencesLoadState,
 } from "../model/notification-preferences-model";
 import { MemberNotificationSettingsPage } from "../ui/member-notification-settings-page";
+import { useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 const SAVE_ERROR = "알림 설정 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.";
 
@@ -54,6 +55,13 @@ export function MemberNotificationSettingsRoute() {
     data.status === "ready" && draft
       ? { status: "ready", preferences: draft }
       : data;
+  const dirty = initialPreferences !== null && draft !== null
+    && JSON.stringify(initialPreferences) !== JSON.stringify(draft);
+  const transitionOwner = useTransitionSafetyOwner(
+    "member-notification-preferences",
+    dirty,
+    "저장하지 않은 알림 설정이 있습니다.",
+  );
 
   useEffect(() => {
     currentSourceRef.current = currentSource;
@@ -86,14 +94,16 @@ export function MemberNotificationSettingsRoute() {
     pendingSaveRef.current = saveToken;
     setPendingSave(saveToken);
     setErrorState({ source: data, message: null });
+    const operationId = `notification-preferences-${globalThis.crypto.randomUUID()}`;
+    const handle = transitionOwner.begin(operationId, "L1", async () => ({ operationId, outcome: "still-unknown" }));
     try {
       const saved = await saveNotificationPreferences(draft);
-      if (matchesSaveSource(currentSourceRef.current, saveToken)) {
-        setDraftState({ source: data, draft: saved });
+      if (await handle.settle("succeeded") === "accepted" && matchesSaveSource(currentSourceRef.current, saveToken)) {
+        handle.publishAccepted({ surface: "ui", publish: () => setDraftState({ source: data, draft: saved }) });
       }
     } catch {
-      if (matchesSaveSource(currentSourceRef.current, saveToken)) {
-        setErrorState({ source: data, message: SAVE_ERROR });
+      if (await handle.settle("failed") === "accepted" && matchesSaveSource(currentSourceRef.current, saveToken)) {
+        handle.publishAccepted({ surface: "errorCopy", publish: () => setErrorState({ source: data, message: SAVE_ERROR }) });
       }
     } finally {
       if (pendingSaveRef.current === saveToken) {

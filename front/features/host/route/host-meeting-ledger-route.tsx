@@ -24,6 +24,8 @@ import {
   hostMeetingSessionListQuery,
   hostSessionScheduleDefaultsQuery,
   invalidateHostSessionManualDispatches,
+  publishHostSessionCreated,
+  publishHostSessionVisibility,
   resolveHostScheduleDefaultsLoadState,
   useCreateHostSessionMutation,
   useSaveHostSessionAccessScopeMutation,
@@ -40,6 +42,7 @@ import {
 } from "@/features/host/ui/meeting-ledger/host-meeting-ledger";
 import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
+import { TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 function contextFromClubSlug(clubSlug?: string): ExplicitReadmatesApiContext {
   return requireHostClubContext(clubSlug);
@@ -146,6 +149,7 @@ export function HostMeetingLedgerRoute({
   const { mutateAsync: createSession, isPending: creatingSession } = useCreateHostSessionMutation(context);
   const { mutateAsync: saveAccessScope, isPending: savingAccessScope } = useSaveHostSessionAccessScopeMutation(context);
   const [composerRequest, setComposerRequest] = useState<HostNotificationComposerRequest | null>(null);
+  const transitionOwner = useTransitionSafetyOwner("host-meeting-ledger");
   const scheduleDefaultsQuery = useQuery(hostSessionScheduleDefaultsQuery(context));
   const scheduleDefaultsLoadState = resolveHostScheduleDefaultsLoadState(scheduleDefaultsQuery);
 
@@ -205,27 +209,41 @@ export function HostMeetingLedgerRoute({
     sessionId: string;
     accessScope: SessionAccessScope;
   }) => {
-    const result = await saveAccessScope({
-      sessionId: input.sessionId,
-      request: { accessScope: input.accessScope },
-    });
-    openFirstPublicationComposer(result.composer);
-  }, [openFirstPublicationComposer, saveAccessScope]);
+    const operationId = `host-session-visibility:${input.sessionId}`;
+    const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
+    try {
+      const result = await saveAccessScope({
+        sessionId: input.sessionId,
+        request: { accessScope: input.accessScope },
+      });
+      if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
+      await publishHostSessionVisibility(queryClient, result, input.sessionId, context);
+      openFirstPublicationComposer(result.composer);
+    } catch (error) {
+      if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");
+      throw error;
+    }
+  }, [context, openFirstPublicationComposer, queryClient, saveAccessScope, transitionOwner]);
 
   const handleCreateUpcomingSession = useCallback(async (input: UpcomingBookCreateInput) => {
-    const response = await createSession(buildHostSessionRequest(
-      upcomingBookCreateFormValues(input),
-      undefined,
-      { accessScope: input.accessScope },
-    ));
-    if (!response.ok) {
-      throw new Error("create-upcoming-failed");
+    const operationId = "host-session-create:upcoming";
+    const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
+    try {
+      const response = await createSession(buildHostSessionRequest(
+        upcomingBookCreateFormValues(input),
+        undefined,
+        { accessScope: input.accessScope },
+      ));
+      if (!response.ok) throw new Error("create-upcoming-failed");
+      const created = await readHostResponseJson<CreatedSessionResponse>(response);
+      if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
+      await publishHostSessionCreated(queryClient, response, context);
+      if (created.composer) openFirstPublicationComposer(created.composer);
+    } catch (error) {
+      if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");
+      throw error;
     }
-    const created = await readHostResponseJson<CreatedSessionResponse>(response);
-    if (created.composer) {
-      openFirstPublicationComposer(created.composer);
-    }
-  }, [createSession, openFirstPublicationComposer]);
+  }, [context, createSession, openFirstPublicationComposer, queryClient, transitionOwner]);
 
   return (
     <>

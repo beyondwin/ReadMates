@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef } from "react";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLoaderData, useParams } from "react-router";
-import { getAiGenerationCapabilities, getClubAiDefault } from "@/features/host/aigen/api/aigen-api";
+import { getAiGenerationCapabilities, getClubAiDefault, putClubAiDefault } from "@/features/host/aigen/api/aigen-api";
 import { aiClubKeys } from "@/features/host/aigen/queries/aigen-job-queries";
+import { hostMutationKey } from "@/features/host/queries/host-state-purge";
 import { hostClubOperationsQuery } from "@/features/host/queries/host-club-operations-queries";
 import { hostNotificationHealthQuery } from "@/features/host/queries/host-notification-queries";
 import { hostSessionRecordAttentionPagesQuery } from "@/features/host/queries/host-session-record-queries";
@@ -11,6 +12,7 @@ import { HostOperationsPage } from "@/features/host/ui/host-operations-page";
 import type { HostOperationsCard } from "@/shared/observability/frontend-observability-contracts";
 import { recordHostOperationsCardLoad } from "@/shared/observability/frontend-observability";
 import type { HostOperationsRouteData } from "./host-operations-data";
+import { useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 function useRecordHostOperationsCardLoad(
   card: HostOperationsCard,
@@ -58,6 +60,7 @@ export function HostOperationsRoute({
     throw new Error("HOST_API_CONTEXT_REQUIRED");
   }
   const context = useMemo(() => ({ clubSlug: resolvedSlug }), [resolvedSlug]);
+  const queryClient = useQueryClient();
 
   const attentionQuery = useInfiniteQuery(hostSessionRecordAttentionPagesQuery(context));
   const clubOpsQuery = useQuery(hostClubOperationsQuery(context));
@@ -75,6 +78,30 @@ export function HostOperationsRoute({
     queryFn: () => getClubAiDefault(resolvedSlug),
     enabled: Boolean(resolvedSlug) && aiGenerationEnabled,
   });
+  const serverModel = aiDefaultsQuery.data?.defaultModel ?? null;
+  const [selectedModelOverride, setSelectedModelOverride] = useState<string | null>(null);
+  const selectedModel = selectedModelOverride ?? serverModel;
+  const [savedModel, setSavedModel] = useState(false);
+  const aiDefaultMutation = useMutation({
+    mutationKey: hostMutationKey(resolvedSlug, "aigen", "club-default"),
+    mutationFn: (model: string) => putClubAiDefault(resolvedSlug, { defaultModel: model }),
+  });
+  const aiDefaultDirty = selectedModel !== null && serverModel !== null && selectedModel !== serverModel;
+  const transitionOwner = useTransitionSafetyOwner("host-ai-defaults", aiDefaultDirty, "저장하지 않은 AI 기본 모델이 있습니다.");
+  const saveAiDefault = async () => {
+    if (!selectedModel || !aiDefaultDirty || aiDefaultMutation.isPending) return;
+    const operationId = `host-ai-default-${globalThis.crypto.randomUUID()}`;
+    const handle = transitionOwner.begin(operationId, "L1", async () => ({ operationId, outcome: "still-unknown" }));
+    try {
+      await aiDefaultMutation.mutateAsync(selectedModel);
+      if (await handle.settle("succeeded") === "accepted") {
+        handle.publishAccepted({ surface: "cache", publish: () => { void queryClient.invalidateQueries({ queryKey: aiClubKeys.defaults(context) }); } });
+        handle.publishAccepted({ surface: "successCopy", publish: () => setSavedModel(true) });
+      }
+    } catch {
+      await handle.settle("failed");
+    }
+  };
   useRecordHostOperationsCardLoad("attention", attentionQuery);
   useRecordHostOperationsCardLoad("club_readiness", clubOpsQuery);
   useRecordHostOperationsCardLoad("notifications", notificationsQuery);
@@ -92,6 +119,21 @@ export function HostOperationsRoute({
     <HostOperationsPage
       clubSlug={resolvedSlug ?? ""}
       LinkComponent={LinkComponent}
+      aiDefaults={{
+        enabled: aiGenerationEnabled,
+        capabilityLoading: aiCapabilitiesQuery.isFetching,
+        capabilityError: aiCapabilitiesQuery.isError,
+        model: selectedModel ?? serverModel,
+        loading: aiDefaultsQuery.isLoading,
+        pending: aiDefaultMutation.isPending,
+        error: aiDefaultsQuery.isError ? "기본 모델 정보를 불러오지 못했습니다." : aiDefaultMutation.error instanceof Error ? aiDefaultMutation.error.message : null,
+        saved: savedModel,
+        canSave: aiGenerationEnabled && aiDefaultDirty && !aiDefaultMutation.isPending && !aiDefaultsQuery.isLoading,
+        onModelChange: (model) => { setSavedModel(false); aiDefaultMutation.reset(); setSelectedModelOverride(model); },
+        onSave: () => { void saveAiDefault(); },
+        onRetryCapabilities: () => { void aiCapabilitiesQuery.refetch(); },
+        onRetryDefault: () => { void aiDefaultsQuery.refetch(); },
+      }}
       attention={{
         items: attentionItems,
         totalCount,

@@ -12,6 +12,7 @@ import {
   type HostMembersActions,
 } from "@/features/host/model/host-member-actions";
 import type { HostInvitationsActions } from "@/features/host/model/host-invitation-actions";
+import { isTransitionOwnerObsoleteError } from "@/shared/ui/use-transition-safety-owner";
 import { LifecyclePolicyDialog } from "./members/member-approval-actions";
 import { actionKey, disabledProfileReason, isMembershipPending } from "./members/member-action-rules";
 import { MemberActionButton } from "./members/member-list";
@@ -270,7 +271,8 @@ export default function HostMembers({
         current.map((item) => (item.membershipId === result.member.membershipId ? result.member : item)),
       );
       setMessage({ kind: "status", text: "멤버 상태를 업데이트했습니다." });
-    } catch {
+    } catch (error) {
+      if (isTransitionOwnerObsoleteError(error)) return;
       setMessage({ kind: "alert", text: "멤버 상태 업데이트에 실패했습니다. 멤버 상태를 확인한 뒤 다시 시도해 주세요." });
     } finally {
       setActionPending(key, false);
@@ -300,7 +302,8 @@ export default function HostMembers({
       } catch {
         setMessage({ kind: "alert", text: "처리는 완료됐지만 멤버 목록 새로고침에 실패했습니다. 새로고침해서 최신 상태를 확인해 주세요." });
       }
-    } catch {
+    } catch (error) {
+      if (isTransitionOwnerObsoleteError(error)) return;
       setMessage({
         kind: "alert",
         text:
@@ -329,6 +332,7 @@ export default function HostMembers({
       );
       setMessage({ kind: "status", text: "이름을 저장했습니다." });
     } catch (error) {
+      if (isTransitionOwnerObsoleteError(error)) return;
       const failure = error instanceof HostMemberProfileActionError
         ? new Error(hostProfileErrorMessage(error.status, error.code), { cause: error })
         : error;

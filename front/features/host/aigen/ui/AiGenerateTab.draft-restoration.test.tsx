@@ -33,7 +33,7 @@ import {
   getRecentJob,
   startGeneration,
 } from "@/features/host/aigen/api/aigen-api";
-import { AiGenerateTab } from "@/features/host/aigen/ui/AiGenerateTab";
+import { AiGenerateController as AiGenerateTab } from "@/features/host/route/ai-generate-controller";
 
 const mockedStart = vi.mocked(startGeneration);
 const mockedGetJob = vi.mocked(getJob);

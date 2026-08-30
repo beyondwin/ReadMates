@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { MemberProfileResponse, MyPageResponse } from "@/features/archive/api/archive-contracts";
 import { profileSaveErrorMessage } from "@/features/archive/model/archive-model";
 import {
@@ -6,9 +7,10 @@ import {
   profileFailureField,
   ProfileUpdateFailure,
 } from "@/features/archive/model/profile-update";
-import { useUpdateMyProfileMutation } from "@/features/archive/queries/profile-queries";
+import { publishUpdatedProfile, useUpdateMyProfileMutation } from "@/features/archive/queries/profile-queries";
 import { isReadmatesApiError } from "@/shared/api/errors";
 import { normalizeBookClubAvatarKey } from "@/shared/ui/book-club-avatar";
+import { useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 type ProfileUpdateControllerInput = {
   sourceProfile: MyPageResponse;
@@ -49,6 +51,8 @@ export function useProfileUpdateController({
   profile: MyPageResponse;
   saveProfile: (profile: EditableMemberProfile) => Promise<MemberProfileResponse>;
 } {
+  const queryClient = useQueryClient();
+  const transitionOwner = useTransitionSafetyOwner("member-profile-update");
   const { mutateAsync: updateMyProfile } = useUpdateMyProfileMutation(clubSlug ? { clubSlug } : undefined);
   const [savedState, setSavedState] = useState<{
     clubSlug: string | null | undefined;
@@ -75,12 +79,20 @@ export function useProfileUpdateController({
     }
     const requestGeneration = latestRequestGeneration.current + 1;
     latestRequestGeneration.current = requestGeneration;
+    const operationId = `profile-update-${globalThis.crypto.randomUUID()}`;
+    const handle = transitionOwner.begin(operationId, "L1", async () => ({ operationId, outcome: "still-unknown" }));
 
     try {
       const updated = await updateMyProfile(editable);
+      if (await handle.settle("succeeded") !== "accepted") return updated;
       if (requestGeneration !== latestRequestGeneration.current) return updated;
       const saved = editableProfile(updated as MyPageResponse);
-      await onProfileUpdated();
+      let publishCache = false;
+      handle.publishAccepted({ surface: "cache", publish: () => { publishCache = true; } });
+      if (publishCache) {
+        await publishUpdatedProfile(queryClient);
+        await onProfileUpdated();
+      }
       if (requestGeneration !== latestRequestGeneration.current) return updated;
       setSavedState((currentState) => {
         const current = currentState?.clubSlug === clubSlug ? currentState.override : null;
@@ -99,6 +111,7 @@ export function useProfileUpdateController({
       onRevalidate();
       return updated;
     } catch (error) {
+      await handle.settle("failed");
       if (error instanceof ProfileUpdateFailure) throw error;
       const errorCode = isReadmatesApiError(error) ? error.code : null;
       throw new ProfileUpdateFailure(
@@ -108,7 +121,7 @@ export function useProfileUpdateController({
         { cause: error },
       );
     }
-  }, [canEditProfile, clubSlug, onProfileUpdated, onRevalidate, sourceProfile, updateMyProfile]);
+  }, [canEditProfile, clubSlug, onProfileUpdated, onRevalidate, queryClient, sourceProfile, transitionOwner, updateMyProfile]);
 
   return { profile, saveProfile };
 }

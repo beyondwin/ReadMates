@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, type QueryClient } from "@tanstack/react-query";
 import { updateMyProfile } from "@/features/archive/api/archive-api";
 import type { MemberProfileResponse } from "@/features/archive/api/archive-contracts";
 import type { EditableMemberProfile } from "@/features/archive/model/profile-update";
@@ -15,11 +15,12 @@ async function updatedProfileFromResponse(response: Response): Promise<MemberPro
 }
 
 export function useUpdateMyProfileMutation(context?: ReadmatesApiContext) {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async (profile: EditableMemberProfile) =>
       updatedProfileFromResponse(await updateMyProfile(profile, context)),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: archiveKeys.all }),
   });
+}
+
+export function publishUpdatedProfile(client: QueryClient) {
+  return client.invalidateQueries({ queryKey: archiveKeys.all });
 }

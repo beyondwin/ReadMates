@@ -1,0 +1,38 @@
+import { act, renderHook } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { createGlobalSpaceTransitionCoordinator } from "@/src/app/global-space-transition";
+import { SpaceTransitionSafetyProvider } from "./space-transition-safety-context";
+import { useTransitionSafetyOwner } from "./use-transition-safety-owner";
+
+describe("useTransitionSafetyOwner", () => {
+  it("unregisters active handles on unmount and gates publication on accepted settlement", async () => {
+    const coordinator = createGlobalSpaceTransitionCoordinator();
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <SpaceTransitionSafetyProvider port={coordinator}>{children}</SpaceTransitionSafetyProvider>
+    );
+    const { result, unmount } = renderHook(() => useTransitionSafetyOwner("owner"), { wrapper });
+    const handle = result.current.begin("operation", "L1", async () => ({ operationId: "operation", outcome: "still-unknown" }));
+    expect(coordinator.getSnapshot().kind).toBe("pending");
+    expect(await handle.settle("succeeded")).toBe("accepted");
+    const publication = vi.fn();
+    expect(handle.publishAccepted({ surface: "ui", publish: publication })).toBe("published");
+    expect(publication).toHaveBeenCalledTimes(1);
+    act(() => unmount());
+    expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
+  });
+
+  it("registers and clears dirty state from a boolean projection", () => {
+    const coordinator = createGlobalSpaceTransitionCoordinator();
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <SpaceTransitionSafetyProvider port={coordinator}>{children}</SpaceTransitionSafetyProvider>
+    );
+    const { rerender, unmount } = renderHook(
+      ({ dirty }) => useTransitionSafetyOwner("owner", dirty, "저장되지 않은 변경"),
+      { initialProps: { dirty: true }, wrapper },
+    );
+    expect(coordinator.getSnapshot()).toEqual({ kind: "dirty", message: "저장되지 않은 변경" });
+    rerender({ dirty: false });
+    expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
+    unmount();
+  });
+});

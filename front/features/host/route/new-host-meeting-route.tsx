@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router";
 import {
   adoptSensitiveMeetingSuggestion,
@@ -19,6 +19,8 @@ import {
   HostMutationPendingError,
   classifyScheduleDefaultsError,
   hostSessionScheduleDefaultsQuery,
+  publishHostSessionCreated,
+  publishHostSessionResponse,
   useCreateHostSessionMutation,
   useOpenHostSessionMutation,
 } from "../queries/host-session-queries";
@@ -26,6 +28,8 @@ import { registerHostSensitiveState } from "../storage/host-sensitive-storage";
 import { NewHostMeetingPage, type SavedNewMeeting } from "../ui/new-meeting/new-host-meeting-page";
 import { hostApiErrorFromResponse, readHostResponseJson } from "@/shared/api/host-authority-event";
 import { recordHostScheduleDefaults } from "@/shared/observability/frontend-observability";
+import type { PendingHandle } from "@/shared/model/global-space";
+import { useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 import "@/features/host/ui/host-editorial-ledger.css";
 
 export type NewHostMeetingRouteProps = {
@@ -62,6 +66,7 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
   const context = useMemo(() => requireHostClubContext(routeClubSlug), [routeClubSlug]);
   const clubSlug = context.clubSlug;
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const defaultsQuery = useQuery(hostSessionScheduleDefaultsQuery(context));
   const defaultsTelemetryRecordedRef = useRef(false);
   const createMutation = useCreateHostSessionMutation(context, { retainUntilResolved: true });
@@ -83,6 +88,12 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
   const [prepareConfirmationOpen, setPrepareConfirmationOpen] = useState(false);
   const [prepareError, setPrepareError] = useState<string | null>(null);
   const [focusTarget, setFocusTarget] = useState<NewMeetingField | "summary" | null>(null);
+  const transitionOwner = useTransitionSafetyOwner(
+    "host-new-meeting",
+    dirty.size > 0,
+    "저장하지 않은 새 모임 정보가 있습니다.",
+  );
+  const pendingCreateHandleRef = useRef<PendingHandle | null>(null);
 
   useEffect(() => {
     if (
@@ -140,6 +151,8 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
   }, []);
 
   const clearAllSensitiveState = useCallback(() => {
+    pendingCreateHandleRef.current?.unregister();
+    pendingCreateHandleRef.current = null;
     clearDraftState();
     setSavedMeeting(null);
     setPrepareConfirmationOpen(false);
@@ -191,6 +204,8 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
       const body = await readHostResponseJson(response.clone()).catch(() => null);
       const fieldFailure = classifyNewMeetingServerFailure(response.status, body);
       resolvePendingCreate();
+      await pendingCreateHandleRef.current?.settle("failed");
+      pendingCreateHandleRef.current = null;
       const apiError = await hostApiErrorFromResponse(response, {
         clubSlug,
         requestKind: "SESSION_CREATE",
@@ -225,13 +240,18 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
     } catch {
       throw new HostMutationPendingError();
     }
+    const handle = pendingCreateHandleRef.current;
+    if (!handle) throw new Error("MISSING_CREATE_TRANSITION_OWNER");
+    if (await handle.settle("succeeded") !== "accepted") return;
+    pendingCreateHandleRef.current = null;
+    await publishHostSessionCreated(queryClient, response, context);
     resolvePendingCreate();
     clearDraftState();
     resetCreate();
     setSavedMeeting(projected);
     setStatus("saved");
     await onSessionRecordsChanged?.({ sessionId: projected.sessionId, clubSlug });
-  }, [clubSlug, clearDraftState, onSessionRecordsChanged, resetCreate, resolvePendingCreate]);
+  }, [clubSlug, clearDraftState, context, onSessionRecordsChanged, queryClient, resetCreate, resolvePendingCreate]);
 
   const submit = useCallback(async () => {
     if (status === "saving" || status === "pending" || status === "checking") return;
@@ -247,6 +267,12 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
     setStatus("saving");
     setErrors({});
     setFormError(null);
+    const operationId = `host-session-create:${clubSlug}`;
+    pendingCreateHandleRef.current = transitionOwner.begin(
+      operationId,
+      "L2",
+      async () => ({ operationId, outcome: "still-unknown" }),
+    );
     try {
       const response = await createMeeting(buildNewMeetingRequest(draftRef.current));
       await acceptCreateResponse(response);
@@ -257,12 +283,14 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
         setFormError(null);
         return;
       }
+      await pendingCreateHandleRef.current?.settle("failed");
+      pendingCreateHandleRef.current = null;
       setStatus("error");
       setErrors({});
       setFormError("모임 초안을 저장하지 못했습니다. 입력을 유지한 채 다시 시도해 주세요.");
       setFocusTarget("summary");
     }
-  }, [acceptCreateResponse, createMeeting, status]);
+  }, [acceptCreateResponse, clubSlug, createMeeting, status, transitionOwner]);
 
   const checkPendingCreate = useCallback(async () => {
     if (status !== "pending") return;
@@ -283,6 +311,8 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
     if (!savedMeeting || status === "preparing") return;
     setStatus("preparing");
     setPrepareError(null);
+    const operationId = `host-session-open:${savedMeeting.sessionId}`;
+    const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
     try {
       const response = await openMeeting(savedMeeting.sessionId);
       if (!response.ok) {
@@ -296,14 +326,17 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
       if (opened.state !== "OPEN" || opened.accessScope !== "GUEST_READABLE") {
         throw new Error("UNSAFE_PREPARE_RESULT");
       }
+      if (await handle.settle("succeeded") !== "accepted") return;
+      await publishHostSessionResponse(queryClient, response, savedMeeting.sessionId, context);
       setPrepareConfirmationOpen(false);
       await onSessionRecordsChanged?.({ sessionId: savedMeeting.sessionId, clubSlug });
       void navigate(`/clubs/${encodeURIComponent(clubSlug)}/app/host/sessions/${encodeURIComponent(savedMeeting.sessionId)}`);
     } catch {
+      await handle.settle("failed");
       setStatus("saved");
       setPrepareError("준비를 시작하지 못했습니다. 초안은 그대로 유지됩니다.");
     }
-  }, [clubSlug, navigate, onSessionRecordsChanged, openMeeting, savedMeeting, status]);
+  }, [clubSlug, context, navigate, onSessionRecordsChanged, openMeeting, queryClient, savedMeeting, status, transitionOwner]);
 
   const reason = suggestions.status === "ready" ? suggestions.message : null;
   const count = suggestions.meetingTime?.sourceMeetingCount

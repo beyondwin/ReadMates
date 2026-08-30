@@ -17,6 +17,10 @@ import {
   hostNotificationPolicyQuery,
   hostNotificationSessionsQuery,
   hostNotificationSummaryQuery,
+  invalidateHostNotificationOverview,
+  publishHostNotificationPolicy,
+  publishHostNotificationPolicyFailure,
+  publishManualNotificationConfirm,
   useConfirmManualNotificationMutation,
   usePreviewManualNotificationMutation,
   useProcessHostNotificationsMutation,
@@ -36,6 +40,7 @@ import {
 import type { HostNotificationsRouteData } from "./host-notifications-data";
 import { combineManualOptions } from "./host-notifications-route-model";
 import "@/features/host/ui/host-editorial-ledger.css";
+import { TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 const HOST_NOTIFICATION_LEDGER_PAGE_LIMIT = 50;
 const MANUAL_DISPATCH_PAGE_LIMIT = 20;
@@ -56,6 +61,19 @@ export function HostNotificationsRoute() {
   const [manualDispatchCursors, setManualDispatchCursors] = useState<string[]>([]);
   const [manualMemberCursors, setManualMemberCursors] = useState<string[]>([]);
   const [policyError, setPolicyError] = useState<string | null>(null);
+  const transitionOwner = useTransitionSafetyOwner("host-notifications");
+  const executeAccepted = async <T,>(operationId: string, request: () => Promise<T>, publish: (result: T) => Promise<unknown>) => {
+    const handle = transitionOwner.begin(operationId, "L3", async () => ({ operationId, outcome: "still-unknown" }));
+    try {
+      const result = await request();
+      if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
+      await publish(result);
+      return result;
+    } catch (error) {
+      if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");
+      throw error;
+    }
+  };
   const [manualOptionsRequest, setManualOptionsRequest] = useState<ManualOptionsQueryRequest>(() => ({
     sessionId: data.initialManualSelection.sessionId,
     page: { limit: MANUAL_MEMBER_PAGE_LIMIT },
@@ -195,24 +213,24 @@ export function HostNotificationsRoute() {
       onLoadMoreAudit={async () => setAuditCursors((current) => appendCursor(current, audit.nextCursor))}
       onLoadMoreManualDispatches={async () => setManualDispatchCursors((current) => appendCursor(current, manualDispatches.nextCursor))}
       onProcess={async () => {
-        await processMutation.mutateAsync();
+        await executeAccepted("host-notifications:process", () => processMutation.mutateAsync(), () => invalidateHostNotificationOverview(queryClient, context));
         resetLedgerPages();
       }}
       onRetry={async (id) => {
-        await retryMutation.mutateAsync(id);
+        await executeAccepted(`host-notifications:retry:${id}`, () => retryMutation.mutateAsync(id), () => invalidateHostNotificationOverview(queryClient, context));
         resetLedgerPages();
       }}
       onRestore={async (id) => {
-        await restoreMutation.mutateAsync(id);
+        await executeAccepted(`host-notifications:restore:${id}`, () => restoreMutation.mutateAsync(id), () => invalidateHostNotificationOverview(queryClient, context));
         resetLedgerPages();
       }}
       onSendTestMail={async (request) => {
-        await testMailMutation.mutateAsync(request);
+        await executeAccepted("host-notifications:test-mail", () => testMailMutation.mutateAsync(request), () => invalidateHostNotificationOverview(queryClient, context));
         resetLedgerPages();
       }}
       onPreviewManual={(request) => previewManualMutation.mutateAsync(request)}
       onConfirmManual={async (request) => {
-        await confirmManualMutation.mutateAsync(request);
+        await executeAccepted(`host-notifications:confirm:${request.previewId}`, () => confirmManualMutation.mutateAsync(request), () => publishManualNotificationConfirm(queryClient, context));
         resetLedgerPages();
       }}
       onLoadManualOptions={loadManualOptions}
@@ -220,8 +238,9 @@ export function HostNotificationsRoute() {
       onPolicyChange={async (enabled) => {
         setPolicyError(null);
         try {
-          await updatePolicyMutation.mutateAsync({ sessionReminderEnabled: enabled });
+          await executeAccepted("host-notifications:policy", () => updatePolicyMutation.mutateAsync({ sessionReminderEnabled: enabled }), (policy) => publishHostNotificationPolicy(queryClient, context, policy));
         } catch (error) {
+          await publishHostNotificationPolicyFailure(queryClient, context, error);
           setPolicyError("리마인더 정책을 저장하지 못했습니다. 다시 시도해 주세요.");
           throw error;
         }

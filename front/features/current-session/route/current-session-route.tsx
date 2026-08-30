@@ -3,7 +3,9 @@ import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-quer
 import { useLoaderData, useParams } from "react-router";
 import {
   currentSessionQuery,
+  invalidateCurrentSession,
   isCurrentScheduleSeenConflict,
+  publishCurrentScheduleSeen,
   useMarkCurrentScheduleSeenMutation,
   useSaveCurrentSessionCheckinMutation,
   useSaveCurrentSessionLongReviewMutation,
@@ -20,6 +22,7 @@ import {
   type ReadmatesApiContext,
 } from "@/shared/api/client";
 import { readSurfaceCapabilitiesForAuth } from "@/shared/model/read-surface-capabilities";
+import { useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 export { CurrentSessionRouteError } from "./current-session-route-error";
 
 const renderedScheduleAcknowledgements = new WeakMap<QueryClient, Set<string>>();
@@ -53,6 +56,7 @@ export function CurrentSessionRoute({
   const loaderData = useLoaderData() as CurrentSessionRouteData;
   const params = useParams();
   const queryClient = useQueryClient();
+  const transitionOwner = useTransitionSafetyOwner("member-current-session");
   const context = useMemo(() => contextFromClubSlug(params.clubSlug), [params.clubSlug]);
   const currentQuery = useQuery(currentSessionQuery(context, RECOVER_READ_SESSION_EXPIRY));
   const {
@@ -92,12 +96,18 @@ export function CurrentSessionRoute({
     if (acknowledgements.has(renderedRevisionKey)) return;
 
     acknowledgements.add(renderedRevisionKey);
-    void markScheduleSeen(renderedRevision).catch((error: unknown) => {
-      if (!isCurrentScheduleSeenConflict(error)) {
-        acknowledgements.delete(renderedRevisionKey);
+    const operationId = `schedule-seen-${renderedSession?.sessionId ?? "current"}-${renderedRevision}`;
+    const handle = transitionOwner.begin(operationId, "L1", async () => ({ operationId, outcome: "still-unknown" }));
+    void markScheduleSeen(renderedRevision).then(async (receipt) => {
+      if (await handle.settle("succeeded") !== "accepted") return;
+      handle.publishAccepted({ surface: "cache", publish: () => publishCurrentScheduleSeen(queryClient, context, receipt) });
+    }).catch(async (error: unknown) => {
+      if (await handle.settle("failed") === "accepted" && isCurrentScheduleSeenConflict(error)) {
+        handle.publishAccepted({ surface: "cache", publish: () => { void invalidateCurrentSession(queryClient, context); } });
       }
+      if (!isCurrentScheduleSeenConflict(error)) acknowledgements.delete(renderedRevisionKey);
     });
-  }, [markScheduleSeen, queryClient, renderedRevision, renderedRevisionKey, scheduleSeenWriteEligible]);
+  }, [context, markScheduleSeen, queryClient, renderedRevision, renderedRevisionKey, renderedSession?.sessionId, scheduleSeenWriteEligible, transitionOwner]);
 
   useEffect(() => {
     if (
@@ -110,19 +120,38 @@ export function CurrentSessionRoute({
   }, [acknowledgeRenderedRevision, renderedSession, scheduleSeenWriteEligible]);
 
   const currentSessionSaveActions = useMemo<CurrentSessionSaveActions>(
-    () => ({
-      updateRsvp: (status) => updateRsvpMutation.mutateAsync(status),
-      saveCheckin: (readingProgress) => saveCheckinMutation.mutateAsync(readingProgress),
-      saveQuestions: (questions) => saveQuestionsMutation.mutateAsync(questions),
-      saveLongReview: (body) => saveLongReviewMutation.mutateAsync(body),
-      saveOneLineReview: (text) => saveOneLineReviewMutation.mutateAsync(text),
-    }),
+    () => {
+      const run = async <T,>(name: string, execute: () => Promise<T>): Promise<T> => {
+        const operationId = `${name}-${globalThis.crypto.randomUUID()}`;
+        const handle = transitionOwner.begin(operationId, "L1", async () => ({ operationId, outcome: "still-unknown" }));
+        try {
+          const result = await execute();
+          if (await handle.settle("succeeded") === "accepted") {
+            handle.publishAccepted({ surface: "cache", publish: () => { void invalidateCurrentSession(queryClient, context); } });
+          }
+          return result;
+        } catch (error) {
+          await handle.settle("failed");
+          throw error;
+        }
+      };
+      return {
+        updateRsvp: (status) => run("member-rsvp", () => updateRsvpMutation.mutateAsync(status)),
+        saveCheckin: (readingProgress) => run("member-checkin", () => saveCheckinMutation.mutateAsync(readingProgress)),
+        saveQuestions: (questions) => run("member-questions", () => saveQuestionsMutation.mutateAsync(questions)),
+        saveLongReview: (body) => run("member-long-review", () => saveLongReviewMutation.mutateAsync(body)),
+        saveOneLineReview: (text) => run("member-one-line-review", () => saveOneLineReviewMutation.mutateAsync(text)),
+      };
+    },
     [
       saveCheckinMutation,
       saveLongReviewMutation,
       saveOneLineReviewMutation,
       saveQuestionsMutation,
       updateRsvpMutation,
+      context,
+      queryClient,
+      transitionOwner,
     ],
   );
 

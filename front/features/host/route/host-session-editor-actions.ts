@@ -61,7 +61,7 @@ export type HostSessionChangeReceiptListener = (
   sessionState?: HostSessionState,
 ) => void;
 
-function captureReceipt(
+export function publishHostSessionEditorReceipt(
   receipt: HostSessionChangeReceipt | null | undefined,
   description: string,
   onReceipt: HostSessionChangeReceiptListener,
@@ -79,7 +79,7 @@ async function captureLifecycleResult(
 ) {
   const resolved = await result;
   if (resolved.ok) {
-    captureReceipt(
+    publishHostSessionEditorReceipt(
       resolved.session.changeReceipt,
       lifecycleConfirmCopy(kind).successFlash,
       onReceipt,
@@ -115,7 +115,7 @@ export function wrapHostSessionEditorActionsForUndo(
       const response = await actions.saveSession(sessionId, request);
       if (response.ok && sessionId) {
         const body = await readResponseJson(response);
-        captureReceipt(
+        publishHostSessionEditorReceipt(
           parseOptionalHostSessionChangeReceipt(body),
           hostSessionChangeUndoDescription("BASIC_INFO"),
           onReceipt,
@@ -125,7 +125,7 @@ export function wrapHostSessionEditorActionsForUndo(
     },
     updateAttendance: async (sessionId, attendance) => {
       const result = await actions.updateAttendance(sessionId, attendance);
-      captureReceipt(
+      publishHostSessionEditorReceipt(
         result.changeReceipt,
         hostSessionChangeUndoDescription("ATTENDANCE"),
         onReceipt,

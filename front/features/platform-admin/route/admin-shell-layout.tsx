@@ -21,6 +21,7 @@ import {
   installPlatformAdminAuthorityLossHandler,
   platformAdminCapabilitiesQuery,
   subscribePlatformAdminAuthorityLoss,
+  publishPlatformAdminOnboarding,
   useCommitPlatformAdminOnboardingMutation,
   usePreviewPlatformAdminOnboardingMutation,
 } from "@/features/platform-admin/queries/platform-admin-queries";
@@ -35,6 +36,7 @@ import { loginPathForReturnTo, safeRelativeReturnTo } from "@/shared/auth/login-
 import { logoutCurrentSession } from "@/shared/auth/session-api";
 import { AdminBreadcrumbProvider } from "./admin-breadcrumb-context";
 import { useAdminBreadcrumbExtra } from "./admin-breadcrumb-hook";
+import { TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 import "@/features/platform-admin/ui/admin-editorial-ledger.css";
 
 export function AdminShellLayout({
@@ -76,6 +78,24 @@ function AdminShellLayoutInner({
   const allowOnboardingNavigation = useRef(false);
   const previewOnboarding = usePreviewPlatformAdminOnboardingMutation();
   const commitOnboarding = useCommitPlatformAdminOnboardingMutation();
+  const transitionOwner = useTransitionSafetyOwner(
+    "admin-onboarding",
+    isWizardDirty,
+    "완료하지 않은 클럽 온보딩이 있습니다.",
+  );
+  const commitOnboardingAccepted = async (request: Parameters<typeof commitOnboarding.mutateAsync>[0]) => {
+    const operationId = `admin-onboarding:${request.idempotencyKey}`;
+    const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
+    try {
+      const result = await commitOnboarding.mutateAsync(request);
+      if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
+      await publishPlatformAdminOnboarding(queryClient);
+      return result;
+    } catch (error) {
+      if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");
+      throw error;
+    }
+  };
   const workspaceAccountLabel = auth?.accountName || auth?.displayName || auth?.email || "현재 계정";
   const otherAccountLoginPath = adminOtherAccountLoginPath(
     location.pathname,
@@ -256,7 +276,7 @@ function AdminShellLayoutInner({
           <PlatformAdminOnboardingWizard
             enabled={canCreateClub}
             onPreview={previewOnboarding.mutateAsync}
-            onCommit={commitOnboarding.mutateAsync}
+            onCommit={commitOnboardingAccepted}
             onDirtyChange={setIsWizardDirty}
             onEffectPendingChange={setOnboardingEffectPending}
             onViewClub={(clubId) => {

@@ -8,6 +8,7 @@ import type {
 } from "@/features/host/model/host-view-types";
 import type { HostInvitationsActions } from "@/features/host/model/host-invitation-actions";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
+import { isTransitionOwnerObsoleteError } from "@/shared/ui/use-transition-safety-owner";
 
 const statusLabels: Record<InvitationStatus, string> = {
   PENDING: "대기",
@@ -224,6 +225,7 @@ export default function HostInvitations({
         setNameTouched(false);
       }
     } catch (error) {
+      if (isTransitionOwnerObsoleteError(error)) return;
       const status = (error as { status?: number } | null)?.status;
       showAlert(
         status === 409
@@ -269,7 +271,8 @@ export default function HostInvitations({
       const { refreshed } = await revokeInvitation(invitation.invitationId);
       setLastCreated((current) => (current?.invitationId === invitation.invitationId ? null : current));
       resetPagination(refreshed);
-    } catch {
+    } catch (error) {
+      if (isTransitionOwnerObsoleteError(error)) return;
       showAlert("초대 취소에 실패했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요.");
     } finally {
       setRowPending(invitation.invitationId, null);
@@ -299,7 +302,8 @@ export default function HostInvitations({
         setLastCreated(created);
         resetPagination(refreshed);
       }
-    } catch {
+    } catch (error) {
+      if (isTransitionOwnerObsoleteError(error)) return;
       showAlert("새 링크 발급에 실패했습니다. 대상 이메일을 확인한 뒤 다시 시도해 주세요.");
     } finally {
       setRowPending(invitation.invitationId, null);

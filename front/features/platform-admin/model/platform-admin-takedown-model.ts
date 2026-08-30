@@ -1,23 +1,18 @@
 import { canAdmin, type PlatformAdminCapabilities } from "./platform-admin-capabilities";
 import type {
-  ConvergenceView,
   TakedownPreview,
+  TakedownPreviewRequest,
   TakedownReceipt,
+  TakedownReasonCategory,
 } from "../api/platform-admin-takedown-contracts";
 
-export type TakedownReasonCategory = "PRIVACY" | "SECURITY" | "LEGAL" | "CONTENT_POLICY";
-export type TakedownPreviewRequest = {
-  clubId: string;
-  sessionId: string;
-  publicationId: string;
-};
+export type { TakedownPreviewRequest, TakedownReasonCategory };
 
 export type AdminTakedownState =
   | { kind: "idle" }
   | { kind: "preview"; preview: TakedownPreview }
   | { kind: "confirming"; preview: TakedownPreview }
-  | { kind: "origin-denied"; receipt: TakedownReceipt; convergence: ConvergenceView }
-  | { kind: "convergence-failed"; receipt: TakedownReceipt; convergence: ConvergenceView };
+  | { kind: "origin-denied"; receipt: TakedownReceipt };
 
 export function canOperatePublicTakedown(
   capabilities: PlatformAdminCapabilities | null | undefined,
@@ -31,32 +26,10 @@ export function normalizeTakedownReason(reason: string): string {
   return normalized;
 }
 
-export function remoteCopyLimitationLabel(code: TakedownPreview["limitationCode"]): string {
-  if (code === "STORED_OR_OFFLINE_COPY_MAY_REMAIN") {
-    return "이미 저장하거나 오프라인으로 보관한 사본은 남아 있을 수 있습니다.";
-  }
-  return "원격 사본은 별도로 남아 있을 수 있습니다.";
+export function remoteCopyLimitationLabel(limitation: string): string {
+  return limitation;
 }
 
-export function initialConvergenceFromReceipt(receipt: TakedownReceipt): ConvergenceView {
-  return {
-    schema: "admin.public_takedown.convergence.v1",
-    convergenceId: receipt.convergenceId,
-    originResult: receipt.originResult,
-    committedGeneration: receipt.committedGeneration,
-    status: "PENDING",
-    lastAttemptAt: null,
-    retryable: false,
-    attempts: [],
-  };
-}
-
-export function stateFromReceipt(
-  receipt: TakedownReceipt,
-  convergence: ConvergenceView | undefined,
-): AdminTakedownState {
-  const current = convergence ?? initialConvergenceFromReceipt(receipt);
-  return current.status === "FAILED"
-    ? { kind: "convergence-failed", receipt, convergence: current }
-    : { kind: "origin-denied", receipt, convergence: current };
+export function stateFromReceipt(receipt: TakedownReceipt): AdminTakedownState {
+  return { kind: "origin-denied", receipt };
 }

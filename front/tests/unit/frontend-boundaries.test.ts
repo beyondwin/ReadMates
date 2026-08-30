@@ -275,6 +275,10 @@ function isFeatureModelFile(relativePath: string) {
   return /^features\/[^/]+\/model\//.test(relativePath);
 }
 
+function isTestSourceFile(relativePath: string) {
+  return /\.(?:test|ct)\.[^.]+$/.test(relativePath);
+}
+
 function isFeatureQueriesFile(relativePath: string) {
   return /^features\/[^/]+\/queries\//.test(relativePath);
 }
@@ -284,7 +288,11 @@ function isFeatureComponentsFile(relativePath: string) {
 }
 
 function isFeatureUiFile(relativePath: string) {
-  return /^features\/[^/]+\/ui\//.test(relativePath);
+  return /^features\/(?:[^/]+\/)+ui\//.test(relativePath);
+}
+
+function isNestedFeatureUiFile(relativePath: string) {
+  return /^features\/[^/]+\/(?:[^/]+\/)+ui\//.test(relativePath);
 }
 
 function isFeatureRouteFile(relativePath: string) {
@@ -427,6 +435,13 @@ function isFeatureUiBoundaryImport(sourceFile: SourceFile, projectPath: string |
     isFeatureLayerImport(projectPath, "route") ||
     projectPath.startsWith("src/pages/") ||
     projectPath.startsWith("src/app/")
+  );
+}
+
+function isFeatureUiRouterImport(sourceFile: SourceFile, rawSpecifier: string) {
+  return isNestedFeatureUiFile(sourceFile.relativePath) && (
+    rawSpecifier === routerPackage || rawSpecifier.startsWith(`${routerPackage}/`) ||
+    rawSpecifier === legacyRouterPackage || rawSpecifier.startsWith(`${legacyRouterPackage}/`)
   );
 }
 
@@ -605,6 +620,28 @@ describe("frontend architecture boundaries", () => {
     expect(isFeatureQueriesBoundaryImport(sourceFile, apiImport.projectPath)).toBe(false);
   });
 
+  it("detects forbidden execution imports and fetch in deeply nested feature UI", () => {
+    const sourceFile: SourceFile = {
+      absolutePath: "/unused/features/host/aigen/ui/defaults/unsafe-panel.tsx",
+      displayPath: "front/features/host/aigen/ui/defaults/unsafe-panel.tsx",
+      relativePath: "features/host/aigen/ui/defaults/unsafe-panel.tsx",
+    };
+    const forbidden = [
+      "@/features/host/queries/host-session-queries",
+      "@/features/host/api/host-api",
+      "@/features/host/route/host-meeting-workspace-route",
+      "@/src/app/global-space-transition",
+      "@/src/pages/host-page",
+    ];
+
+    expect(isFeatureUiFile(sourceFile.relativePath)).toBe(true);
+    for (const specifier of forbidden) {
+      expect(isFeatureUiBoundaryImport(sourceFile, normalizeImportSpecifier(sourceFile, specifier).projectPath)).toBe(true);
+    }
+    expect(isFeatureUiRouterImport(sourceFile, "react-router")).toBe(true);
+    expect(/\bfetch\s*\(/.test("export const run = () => fetch('/api/unsafe');")).toBe(true);
+  });
+
   it("keeps shared, feature route, feature model, and feature UI dependencies inside their allowed boundaries", () => {
     assertLegacyBoundaryExceptionsAreUnique();
 
@@ -619,6 +656,10 @@ describe("frontend architecture boundaries", () => {
         const importSpecifier = normalizeImportSpecifier(sourceFile, specifier);
 
         if (isDesignSystemImport(importSpecifier.rawSpecifier)) {
+          continue;
+        }
+
+        if (isTestSourceFile(sourceFile.relativePath)) {
           continue;
         }
 
@@ -668,6 +709,17 @@ describe("frontend architecture boundaries", () => {
           );
         }
 
+        if (isFeatureUiRouterImport(sourceFile, importSpecifier.rawSpecifier)) {
+          addImportViolation(
+            violations,
+            consumedLegacyExceptions,
+            sourceFile,
+            importSpecifier,
+            "feature-ui",
+            "feature UI files must receive routing state and callbacks from route composition.",
+          );
+        }
+
         if (isFeatureRouteBoundaryImport(sourceFile, importSpecifier.projectPath)) {
           addImportViolation(
             violations,
@@ -703,7 +755,7 @@ describe("frontend architecture boundaries", () => {
         }
       }
 
-      if (isFeatureUiFile(sourceFile.relativePath) && /\bfetch\s*\(/.test(source)) {
+      if (!isTestSourceFile(sourceFile.relativePath) && isFeatureUiFile(sourceFile.relativePath) && /\bfetch\s*\(/.test(source)) {
         violations.push(
           `${sourceFile.displayPath} contains direct fetch(...): feature UI files must call through the route/API boundary.`,
         );

@@ -1,8 +1,9 @@
-import { useMutation, useQueryClient, queryOptions } from "@tanstack/react-query";
+import { useMutation, queryOptions, type QueryClient } from "@tanstack/react-query";
 import {
   fetchHostSessionRestorePreview,
   restoreHostSessionChange,
 } from "@/features/host/api/host-session-recovery-api";
+import { fetchHostSessionDetail } from "@/features/host/api/host-api";
 import type { HostSessionRestoreRequest } from "@/features/host/api/host-session-recovery-contracts";
 import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
 import { hostSessionRecordKeys } from "./host-session-record-queries";
@@ -13,7 +14,6 @@ import {
   invalidateHostSessionDetail,
   invalidateHostSessionLists,
   executeHostMutationWithReconciliation,
-  hostSessionDetailQuery,
 } from "./host-session-queries";
 
 import { hostClubQueryPrefix, hostMutationKey } from "./host-state-purge";
@@ -39,7 +39,6 @@ export function hostSessionRestorePreviewQuery(
 }
 
 export function useRestoreHostSessionChangeMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "session-recovery", "restore"),
     mutationFn: ({
@@ -52,7 +51,7 @@ export function useRestoreHostSessionChangeMutation(context: ExplicitReadmatesAp
       request: HostSessionRestoreRequest;
     }) => {
       const explicitContext = context;
-      return client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext)).then((detail) => {
+      return fetchHostSessionDetail(sessionId, explicitContext).then((detail) => {
         const envelope = {
           idempotencyKey: `host-${globalThis.crypto.randomUUID()}`,
           expected: { sessionRevision: detail.versions.sessionRevision },
@@ -69,36 +68,34 @@ export function useRestoreHostSessionChangeMutation(context: ExplicitReadmatesAp
             exactEnvelope,
             explicitContext,
           ),
-          acceptCommitted: async (reconciliation) => {
-            await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
-            return {
+          acceptCommitted: async (reconciliation) => ({
               changeId: reconciliation.receipt?.receiptId ?? changeId,
               kind: "BASIC_INFO" as const,
               undoAvailable: true as const,
-            };
-          },
+            }),
         });
       });
     },
-    onSuccess: async (_receipt, variables) => {
+  });
+}
+
+export async function publishRestoredHostSessionChange(client: QueryClient, sessionId: string, context: ExplicitReadmatesApiContext) {
       await Promise.all([
-        invalidateHostSessionDetail(client, variables.sessionId, context),
-        invalidateHostSessionClosingStatus(client, variables.sessionId, context),
+        invalidateHostSessionDetail(client, sessionId, context),
+        invalidateHostSessionClosingStatus(client, sessionId, context),
         invalidateHostSessionLists(client, context),
         invalidateHostSessionDashboard(client, context),
         invalidateHostCurrentSession(client, context),
         client.invalidateQueries({
-          queryKey: hostSessionRecordKeys.historyRoot(variables.sessionId, context),
+          queryKey: hostSessionRecordKeys.historyRoot(sessionId, context),
         }),
         client.invalidateQueries({
-          queryKey: hostSessionRecordKeys.editor(variables.sessionId, context),
+          queryKey: hostSessionRecordKeys.editor(sessionId, context),
           exact: true,
         }),
         client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) }),
         client.invalidateQueries({
-          queryKey: hostSessionRecoveryKeys.restorePreviews(variables.sessionId, context),
+          queryKey: hostSessionRecoveryKeys.restorePreviews(sessionId, context),
         }),
       ]);
-    },
-  });
 }

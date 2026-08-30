@@ -20,7 +20,6 @@ type Props = {
   error: string | null;
   onPreview: (target: TakedownPreviewRequest) => void;
   onConfirm: (input: ConfirmInput) => void;
-  onRetryConvergence: () => void;
 };
 
 export function AdminPublicTakedownWorkbench({
@@ -30,12 +29,11 @@ export function AdminPublicTakedownWorkbench({
   error,
   onPreview,
   onConfirm,
-  onRetryConvergence,
 }: Props) {
   const [clubId, setClubId] = useState("");
   const [sessionId, setSessionId] = useState("");
   const [publicationId, setPublicationId] = useState("");
-  const [reasonCategory, setReasonCategory] = useState<TakedownReasonCategory>("PRIVACY");
+  const [reasonCategory, setReasonCategory] = useState<TakedownReasonCategory>("PRIVATE_DATA");
   const [reason, setReason] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -72,7 +70,7 @@ export function AdminPublicTakedownWorkbench({
     }
   }
 
-  const receiptState = state.kind === "origin-denied" || state.kind === "convergence-failed" ? state : null;
+  const receiptState = state.kind === "origin-denied" ? state : null;
   const dockState = takedownDockState({ pending, receipt: Boolean(receiptState) });
 
   return (
@@ -114,7 +112,8 @@ export function AdminPublicTakedownWorkbench({
                 <ul>{state.preview.currentSurfaces.map((surface) => <li key={surface}><code>{surface}</code></li>)}</ul>
               ) : <p className="muted">확인된 공개 surface 없음</p>}
             </div>
-            <p className="body">{remoteCopyLimitationLabel(state.preview.limitationCode)}</p>
+            <p className="body">{remoteCopyLimitationLabel(state.preview.remoteCopyLimitation)}</p>
+            <p className="tiny muted">활성화 경계 · <code>{state.preview.activationBoundary}</code></p>
             <label className="field-group">
               <span className="label">사유 분류</span>
               <select
@@ -122,10 +121,10 @@ export function AdminPublicTakedownWorkbench({
                 value={reasonCategory}
                 onChange={(event) => setReasonCategory(event.target.value as TakedownReasonCategory)}
               >
-                <option value="PRIVACY">PRIVACY · 개인정보</option>
-                <option value="SECURITY">SECURITY · 보안</option>
-                <option value="LEGAL">LEGAL · 법적 요청</option>
-                <option value="CONTENT_POLICY">CONTENT_POLICY · 콘텐츠 정책</option>
+                <option value="PRIVATE_DATA">PRIVATE_DATA · 개인정보</option>
+                <option value="LEGAL_REQUEST">LEGAL_REQUEST · 법적 요청</option>
+                <option value="SECURITY_INCIDENT">SECURITY_INCIDENT · 보안 사고</option>
+                <option value="PUBLIC_SAFETY">PUBLIC_SAFETY · 공공 안전</option>
               </select>
             </label>
             <label className="field-group">
@@ -136,10 +135,11 @@ export function AdminPublicTakedownWorkbench({
             {error ? <p role="alert" className="danger">{error}</p> : null}
             <AdminSafeActionDock
               level="L3"
-              authority="allowed"
-              state={pending ? "pending" : "ready"}
+              authority={state.preview.confirmEnabled ? "allowed" : "denied"}
+              state={state.preview.confirmEnabled ? (pending ? "pending" : "ready") : "forbidden"}
+              reason={!state.preview.confirmEnabled ? state.preview.activationBoundary : undefined}
               primary={
-                <button type="button" className="btn btn-primary" disabled={pending} onClick={confirm}>
+                <button type="button" className="btn btn-primary" disabled={pending || !state.preview.confirmEnabled} onClick={confirm}>
                   {state.kind === "confirming" ? "원본 접근 차단 중…" : "긴급 회수 확인"}
                 </button>
               }
@@ -161,9 +161,13 @@ export function AdminPublicTakedownWorkbench({
                 <Detail label="원본 결과" value={receiptState.receipt.originResult} />
                 <Detail label="커밋 generation" value={String(receiptState.receipt.committedGeneration)} />
                 <Detail label="사유 분류" value={receiptState.receipt.reasonCategory} />
+                <Detail label="사유 본문 비공개" value={receiptState.receipt.reasonRedacted ? "예" : "아니요"} />
+                <Detail label="BFF eviction" value={receiptState.receipt.bffEvictionOutcome} />
+                <Detail label="CDN purge" value={receiptState.receipt.cdnPurgeOutcome} />
+                <Detail label="브라우저 재검증" value={receiptState.receipt.browserRevalidationOutcome} />
                 <Detail label="커밋 시각" value={receiptState.receipt.createdAt} />
               </dl>
-              <p className="body">{remoteCopyLimitationLabel(receiptState.receipt.limitationCode)}</p>
+              <p className="body">{remoteCopyLimitationLabel(receiptState.receipt.remoteCopyLimitation)}</p>
             </section>
 
             <AdminReceiptTimeline
@@ -172,47 +176,13 @@ export function AdminPublicTakedownWorkbench({
               entries={[
                 {
                   key: "origin",
-                  label: `원본 접근 차단 완료 · generation ${receiptState.convergence.committedGeneration}`,
+                  label: `원본 접근 차단 완료 · generation ${receiptState.receipt.committedGeneration}`,
                   state: "succeeded",
                 },
-                ...receiptState.convergence.attempts.map((attempt) => ({
-                  key: `attempt-${attempt.attemptNo}`,
-                  label: `시도 ${attempt.attemptNo} · ${attempt.status}${attempt.resultCategory ? ` · ${attempt.resultCategory}` : ""}`,
-                  state: attempt.status === "SUCCEEDED" ? "succeeded" as const : attempt.status === "FAILED" ? "failed" as const : "pending" as const,
-                  occurredAt: attempt.observedAt,
-                })),
+                { key: "bff", label: `BFF eviction · ${receiptState.receipt.bffEvictionOutcome}`, state: "pending" },
+                { key: "cdn", label: `CDN purge · ${receiptState.receipt.cdnPurgeOutcome}`, state: "pending" },
+                { key: "browser", label: `브라우저 재검증 · ${receiptState.receipt.browserRevalidationOutcome}`, state: "pending" },
               ]}
-              convergence={
-                <section className="surface" role="region" aria-label="전파 수렴 타임라인">
-                  <p className="eyebrow">Convergence</p>
-                  <h2 className="h4 editorial">전파 수렴 타임라인</h2>
-                  <p className="body">원본 접근 차단과 CDN 전파는 서로 독립된 결과입니다.</p>
-                  <ol>
-                    <li><strong>원본 접근 차단 완료</strong> · generation {receiptState.convergence.committedGeneration}</li>
-                    {receiptState.convergence.attempts.map((attempt) => (
-                      <li key={attempt.attemptNo}>
-                        <strong>시도 {attempt.attemptNo}</strong> · {attempt.status}
-                        {attempt.resultCategory ? ` · ${attempt.resultCategory}` : ""} · {attempt.observedAt}
-                      </li>
-                    ))}
-                  </ol>
-                  {receiptState.convergence.status === "PENDING" ? <p role="status">전파 상태를 확인하고 있습니다.</p> : null}
-                  {receiptState.convergence.status === "FAILED" ? <p role="alert">원본은 차단됐지만 전파 시도가 완료되지 않았습니다.</p> : null}
-                  {receiptState.convergence.retryable ? (
-                    <AdminSafeActionDock
-                      level="L3"
-                      authority="allowed"
-                      state={pending ? "pending" : "ready"}
-                      primary={
-                        <button type="button" className="btn btn-secondary" disabled={pending} onClick={onRetryConvergence}>
-                          {pending ? "전파 재시도 요청 중…" : "전파 다시 시도"}
-                        </button>
-                      }
-                    />
-                  ) : null}
-                  {error ? <p role="alert" className="danger">{error}</p> : null}
-                </section>
-              }
             />
             <AdminSafeActionDock
               level="L3"

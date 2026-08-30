@@ -1,4 +1,4 @@
-import { infiniteQueryOptions, queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import { infiniteQueryOptions, queryOptions, useMutation, type QueryClient } from "@tanstack/react-query";
 import {
   confirmAdminNotificationReplay,
   fetchAdminNotificationDeliveries,
@@ -75,11 +75,13 @@ export function usePreviewAdminNotificationReplayMutation() {
 }
 
 export function useConfirmAdminNotificationReplayMutation() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationKey: platformAdminNotificationsKeys.all,
     retry: 0,
     mutationFn: (request: AdminNotificationReplayConfirmRequest) => confirmAdminNotificationReplay(request),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: platformAdminNotificationsKeys.all }),
   });
+}
+
+export function publishPlatformAdminNotifications(client: QueryClient) {
+  return client.invalidateQueries({ queryKey: platformAdminNotificationsKeys.all });
 }

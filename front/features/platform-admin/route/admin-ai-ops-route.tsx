@@ -17,6 +17,7 @@ import {
   platformAdminAiOpsJobQuery,
   platformAdminAiOpsJobsInfiniteQuery,
   platformAdminAiOpsSummaryQuery,
+  publishPlatformAdminAiOps,
   useConfirmPlatformAdminAiJobCommandMutation,
   usePreviewPlatformAdminAiJobCommandMutation,
 } from "@/features/platform-admin/queries/platform-admin-ai-ops-queries";
@@ -35,6 +36,7 @@ import {
   type PlatformAdminAiOpsJobView,
   type PlatformAdminAiOpsSummaryView,
 } from "@/features/platform-admin/ui/platform-admin-ai-ops";
+import { useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 export function AdminAiOpsRoute() {
   const queryClient = useQueryClient();
@@ -167,6 +169,8 @@ function AiOpsCommandSession({
   const [commandError, setCommandError] = useState<string | null>(null);
   const previewCommand = usePreviewPlatformAdminAiJobCommandMutation();
   const confirmCommandMutation = useConfirmPlatformAdminAiJobCommandMutation();
+  const queryClient = useQueryClient();
+  const transitionOwner = useTransitionSafetyOwner("admin-ai-ops-command");
 
   useEffect(
     () =>
@@ -221,14 +225,19 @@ function AiOpsCommandSession({
       confirmed: true as const,
     };
     setCommandState({ ...current, phase: "CONFIRMING" });
+    const operationId = `admin-ai-ops:${current.job.jobId}:${current.idempotencyKey}`;
+    const handle = transitionOwner.begin(operationId, "L3", async () => ({ operationId, outcome: "still-unknown" }));
     try {
       const receipt = await confirmCommandMutation.mutateAsync({
         jobId: current.job.jobId,
         action: current.action,
         request,
       });
+      if (await handle.settle("succeeded") !== "accepted") return;
+      await publishPlatformAdminAiOps(queryClient);
       setCommandState({ ...current, phase: "RECEIPT", receipt });
     } catch (error) {
+      await handle.settle("failed");
       if (isPlatformAdminAuthorityLossError(error)) {
         setCommandState(null);
         setCommandError(null);

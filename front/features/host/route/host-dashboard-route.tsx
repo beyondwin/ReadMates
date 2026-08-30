@@ -34,10 +34,12 @@ import {
 import {
   HostMutationPendingError,
   hostSessionDetailQuery,
+  publishHostSessionAttendance,
   useUpdateHostSessionAttendanceMutation,
 } from "@/features/host/queries/host-session-queries";
 import {
   hostSessionRestorePreviewQuery,
+  publishRestoredHostSessionChange,
   useRestoreHostSessionChangeMutation,
 } from "@/features/host/queries/host-session-recovery-queries";
 import { registerHostSensitiveState } from "@/features/host/storage/host-sensitive-storage";
@@ -59,6 +61,7 @@ import {
 import { SessionClosingBoard } from "@/features/host/ui/session-closing-board";
 import type { WorkspacePendingUndo } from "@/features/host/ui/session-workspace/workspace-undo-bar";
 import { formatSessionKicker } from "@/shared/ui/readmates-display";
+import { TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 import type { HostDashboardRouteData } from "./host-dashboard-data";
 
 const PHASE_REASON_STATE_KEY = "hostOperatingRoomPhaseReason";
@@ -130,6 +133,7 @@ export function HostDashboardRoute({
   });
   const attendanceMutation = useUpdateHostSessionAttendanceMutation(context);
   const restoreMutation = useRestoreHostSessionChangeMutation(context);
+  const transitionOwner = useTransitionSafetyOwner(`host-operating-room:${sessionId ?? "empty"}`);
   const [detailOverride, setDetailOverride] = useState<{
     sessionId: string;
     detail: HostSessionDetailResponse;
@@ -315,14 +319,19 @@ export function HostDashboardRoute({
     setAttendanceConflict(null);
     setAttendanceUnknown(null);
     setAttendanceWriteState(expectedSessionId, membershipIds, "saving");
+    const operationId = `host-attendance:${expectedSessionId}:${membershipIds.join(",")}`;
+    const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
     try {
+      const attendanceEntries = membershipIds.map((membershipId) => ({
+        membershipId,
+        attendanceStatus: attendance,
+      }));
       const result = await attendanceMutation.mutateAsync({
         sessionId: expectedSessionId,
-        attendance: membershipIds.map((membershipId) => ({
-          membershipId,
-          attendanceStatus: attendance,
-        })),
+        attendance: attendanceEntries,
       });
+      if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
+      await publishHostSessionAttendance(queryClient, expectedSessionId, attendanceEntries, context);
       if (currentSessionIdRef.current !== expectedSessionId) return;
       setAttendanceWriteState(expectedSessionId, membershipIds, null);
       const receipt = result.changeReceipt ?? null;
@@ -333,7 +342,9 @@ export function HostDashboardRoute({
         error: null,
       } : null);
     } catch (error) {
+      if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");
       if (currentSessionIdRef.current !== expectedSessionId) return;
+      if (error instanceof TransitionOwnerObsoleteError) return;
       if (error instanceof HostMutationPendingError) {
         setAttendanceUnknown({ ...attempt, canonicalLabel: null });
         return;
@@ -349,7 +360,7 @@ export function HostDashboardRoute({
         });
       }
     }
-  }, [attendanceMutation, refreshExactDetail, sessionId, setAttendanceWriteState]);
+  }, [attendanceMutation, context, queryClient, refreshExactDetail, sessionId, setAttendanceWriteState, transitionOwner]);
 
   const reconcileUnknownAttendance = useCallback(async () => {
     const attempt = activeAttendanceUnknown;
@@ -388,11 +399,20 @@ export function HostDashboardRoute({
               });
               return;
             }
-            await restoreMutation.mutateAsync({
-              sessionId: current.sessionId,
-              changeId: preview.changeId,
-              request: { expectedCurrentHash: preview.expectedCurrentHash },
-            });
+            const operationId = `host-attendance-restore:${current.sessionId}:${preview.changeId}`;
+            const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
+            try {
+              await restoreMutation.mutateAsync({
+                sessionId: current.sessionId,
+                changeId: preview.changeId,
+                request: { expectedCurrentHash: preview.expectedCurrentHash },
+              });
+            } catch (error) {
+              await handle.settle("failed");
+              throw error;
+            }
+            if (await handle.settle("succeeded") !== "accepted") return;
+            await publishRestoredHostSessionChange(queryClient, current.sessionId, context);
             if (currentSessionIdRef.current !== current.sessionId) return;
             setPendingAttendanceUndo(null);
           } catch {

@@ -40,8 +40,7 @@ export function createHostInvitationsActions(
   context: { clubSlug: string },
 ): HostInvitationsActions {
   const refreshInvitations = async (page: Parameters<HostInvitationsActions["refreshInvitations"]>[0]) => {
-    await invalidateHostInvitations(client, context);
-    return client.fetchQuery(hostInvitationListQuery(page, context));
+    return publishHostInvitationsRefresh(client, context, page);
   };
 
   return {
@@ -52,4 +51,14 @@ export function createHostInvitationsActions(
     parseInvitation: parseHostInvitationResponse,
     parseInvitationList: parseHostInvitationListResponse,
   };
+}
+
+/** Cache publication. A route owner may call this only after accepted settlement. */
+export async function publishHostInvitationsRefresh(
+  client: QueryClient,
+  context: { clubSlug: string },
+  page: Parameters<HostInvitationsActions["refreshInvitations"]>[0],
+) {
+  await invalidateHostInvitations(client, context);
+  return client.fetchQuery(hostInvitationListQuery(page, context));
 }

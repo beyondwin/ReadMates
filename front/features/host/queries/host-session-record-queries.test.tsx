@@ -41,6 +41,11 @@ import {
   hostSessionRecordHistoryQuery,
   hostSessionRecordKeys,
   hostSessionRecordLedgerQuery,
+  publishAppliedHostSessionRecord,
+  publishDeletedHostSessionRecordDraft,
+  publishRebasedHostSessionRecordDraft,
+  publishRestoredHostSessionRevisionDraft,
+  publishSavedHostSessionRecordDraft,
   useApplyHostSessionRecordMutation,
   useDeleteHostSessionRecordDraftMutation,
   useRebaseHostSessionRecordDraftMutation,
@@ -254,12 +259,14 @@ describe("host session record queries", () => {
     client.setQueryData(hostSessionRecordKeys.editor("session-28", context), editor());
     const { result } = renderHook(() => useSaveHostSessionRecordDraftMutation(context), { wrapper: Wrapper });
 
+    let saved!: ReturnType<typeof draft>;
     await act(async () => {
-      await result.current.mutateAsync({
+      saved = await result.current.mutateAsync({
         sessionId: "session-28",
         request: { expectedDraftRevision: null, snapshot: draft().snapshot },
       });
     });
+    await publishSavedHostSessionRecordDraft(client, "session-28", context, saved);
 
     expect(client.getQueryData(hostSessionRecordKeys.editor("session-28", context))).toMatchObject({
       liveRevision: 2,
@@ -291,12 +298,14 @@ describe("host session record queries", () => {
       { wrapper: Wrapper },
     );
 
+    let saved!: ReturnType<typeof draft>;
     await act(async () => {
-      await result.current.mutateAsync({
+      saved = await result.current.mutateAsync({
         sessionId: "session-28",
         request: { expectedDraftRevision: 3, snapshot: draft().snapshot },
       });
     });
+    await publishSavedHostSessionRecordDraft(client, "session-28", context, saved);
 
     expect(client.getQueryData(key)).toMatchObject({
       draft: { draftRevision: 4 },
@@ -317,6 +326,7 @@ describe("host session record queries", () => {
     await act(async () => {
       await result.current.mutateAsync({ sessionId: "session-28", expectedDraftRevision: 3 });
     });
+    await publishDeletedHostSessionRecordDraft(client, "session-28", context);
 
     expectLedgerIsolation(client, ledgerKeys);
     expect(client.getQueryData(hostSessionRecordKeys.editor("session-28", context))).toMatchObject({ draft: null });
@@ -330,13 +340,15 @@ describe("host session record queries", () => {
     client.setQueryData(hostSessionRecordKeys.editor("session-28", context), editor());
     const { result } = renderHook(() => useRestoreHostSessionRevisionToDraftMutation(context), { wrapper: Wrapper });
 
+    let restored!: ReturnType<typeof draft>;
     await act(async () => {
-      await result.current.mutateAsync({
+      restored = await result.current.mutateAsync({
         sessionId: "session-28",
         revisionId: "revision-2",
         request: { expectedDraftRevision: null },
       });
     });
+    await publishRestoredHostSessionRevisionDraft(client, "session-28", context, restored);
 
     expectLedgerIsolation(client, ledgerKeys);
     expect(client.getQueryData(hostSessionRecordKeys.editor("session-28", context))).toMatchObject({
@@ -380,16 +392,19 @@ describe("host session record queries", () => {
       { wrapper: Wrapper },
     );
 
+    const request = {
+      expectedDraftRevision: 3,
+      expectedLiveRevision: 2,
+      expectedSessionUpdatedAt: "2026-07-23T10:00:00+09:00",
+    };
+    let rebased!: ReturnType<typeof draft>;
     await act(async () => {
-      await result.current.mutateAsync({
+      rebased = await result.current.mutateAsync({
         sessionId: "session-28",
-        request: {
-          expectedDraftRevision: 3,
-          expectedLiveRevision: 2,
-          expectedSessionUpdatedAt: "2026-07-23T10:00:00+09:00",
-        },
+        request,
       });
     });
+    await publishRebasedHostSessionRecordDraft(client, "session-28", request, context, rebased);
 
     expect(client.getQueryData(key)).toMatchObject({
       draft: { draftRevision: 4 },
@@ -445,6 +460,11 @@ describe("host session record queries", () => {
       resolveRebase({ ...draft(), draftRevision: 4 });
       await rebasePromise;
     });
+    await publishRebasedHostSessionRecordDraft(client, "session-28", {
+      expectedDraftRevision: 3,
+      expectedLiveRevision: 2,
+      expectedSessionUpdatedAt: "2026-07-23T10:00:00.000001+09:00",
+    }, context, { ...draft(), draftRevision: 4 });
 
     expect(client.getQueryData(key)).toMatchObject({
       liveSessionUpdatedAt: "2026-07-23T10:00:00.000002+09:00",
@@ -524,6 +544,7 @@ describe("host session record queries", () => {
         },
       });
     });
+    await publishAppliedHostSessionRecord(client, "session-28", context, invalidateMemberAndPublicSurfaces);
 
     expect(client.getQueryState(editorKey)?.isInvalidated).toBe(true);
     expect(client.getQueryState(ledgerKey)?.isInvalidated).toBe(true);

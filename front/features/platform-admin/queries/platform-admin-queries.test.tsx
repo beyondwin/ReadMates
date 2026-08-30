@@ -58,6 +58,9 @@ import {
   platformAdminClubsQuery,
   platformAdminKeys,
   platformAdminSummaryQuery,
+  publishPlatformAdminClubState,
+  publishPlatformAdminOnboarding,
+  publishUpdatedPlatformAdminClub,
   purgePlatformAdminState,
   useCheckPlatformAdminDomainProvisioningMutation,
   useCommitPlatformAdminOnboardingMutation,
@@ -304,6 +307,8 @@ describe("platform admin mutation cache behavior", () => {
         expectedStatus: "ACTION_REQUIRED",
       },
     );
+    expect(client.getQueryState(platformAdminKeys.club("club-1"))?.isInvalidated).toBe(false);
+    await publishPlatformAdminClubState(client, "club-1");
     expect(
       client.getQueryState(platformAdminKeys.club("club-1"))?.isInvalidated,
     ).toBe(true);
@@ -341,6 +346,8 @@ describe("platform admin mutation cache behavior", () => {
     });
 
     expect(returned).toEqual(onboardingResult);
+    expect(invalidate).not.toHaveBeenCalled();
+    await publishPlatformAdminOnboarding(client);
     expect(invalidate).toHaveBeenCalledWith({
       queryKey: platformAdminKeys.clubsRoot(),
     });
@@ -361,6 +368,8 @@ describe("platform admin mutation cache behavior", () => {
         request: { expectedAdminRevision: 7, name: "새 이름" },
       });
     });
+    expect(client.getQueryData(platformAdminKeys.club("club-1"))).toBeUndefined();
+    await publishUpdatedPlatformAdminClub(client, updated);
 
     expect(
       client.getQueryData<PlatformAdminClubDetail>(
@@ -405,6 +414,9 @@ describe("platform admin mutation cache behavior", () => {
         confirmed: true,
       });
     });
+
+    expect(invalidate).not.toHaveBeenCalled();
+    await publishPlatformAdminClubState(client, "club-1");
 
     expect(invalidate).toHaveBeenCalledWith({
       queryKey: platformAdminKeys.club("club-1"),

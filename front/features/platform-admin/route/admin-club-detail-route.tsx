@@ -16,6 +16,8 @@ import {
   isPlatformAdminAuthorityLossError,
   platformAdminCapabilitiesQuery,
   platformAdminClubDetailQuery,
+  publishPlatformAdminClubState,
+  publishUpdatedPlatformAdminClub,
   subscribePlatformAdminAuthorityLoss,
   useCheckPlatformAdminDomainProvisioningMutation,
   useConfirmPlatformAdminClubVisibilityMutation,
@@ -45,6 +47,7 @@ import {
   AdminSafeActionDock,
   type AdminSafeActionState,
 } from "@/features/platform-admin/ui/admin-action-dock";
+import { TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 import { AdminReceiptTimeline } from "@/features/platform-admin/ui/admin-receipt-timeline";
 import { AdminTargetLedgerInline } from "@/features/platform-admin/ui/admin-target-ledger-inline";
 import { useAdminBreadcrumbExtra } from "./admin-breadcrumb-hook";
@@ -229,6 +232,8 @@ function ClubDomainPanel({
   canManageDomains: boolean;
   onRefresh: () => void;
 }) {
+  const queryClient = useQueryClient();
+  const transitionOwner = useTransitionSafetyOwner(`admin-club-domains:${clubId}`);
   const previewMutation = usePreviewPlatformAdminDomainMutation(clubId);
   const confirmMutation = useConfirmPlatformAdminDomainMutation(clubId);
   const recheckMutation =
@@ -239,6 +244,18 @@ function ClubDomainPanel({
     confirmMutation.reset();
     recheckMutation.reset();
   }, [canManageDomains, confirmMutation, previewMutation, recheckMutation]);
+  const runCommand = async <T,>(operationId: string, command: () => Promise<T>) => {
+    const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
+    try {
+      const result = await command();
+      if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
+      await publishPlatformAdminClubState(queryClient, clubId);
+      return result;
+    } catch (error) {
+      if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");
+      throw error;
+    }
+  };
 
   return (
     <AdminClubDomainCommandPanel
@@ -250,9 +267,9 @@ function ClubDomainPanel({
       recheckPending={recheckMutation.isPending}
       onRefresh={onRefresh}
       onPreview={(request) => previewMutation.mutateAsync(request)}
-      onConfirm={(request) => confirmMutation.mutateAsync(request)}
+      onConfirm={(request) => runCommand(`admin-club-domain:confirm:${request.idempotencyKey}`, () => confirmMutation.mutateAsync(request))}
       onRecheck={(domainId, request) =>
-        recheckMutation.mutateAsync({ domainId, request })
+        runCommand(`admin-club-domain:recheck:${request.idempotencyKey}`, () => recheckMutation.mutateAsync({ domainId, request }))
       }
     />
   );
@@ -267,6 +284,7 @@ function ClubMetadataPanel({
   canManage: boolean;
   onRefresh: () => void;
 }) {
+  const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({
     name: club.name,
@@ -274,6 +292,11 @@ function ClubMetadataPanel({
     about: club.about,
   });
   const mutation = useUpdatePlatformAdminClubMutation();
+  const transitionOwner = useTransitionSafetyOwner(
+    `admin-club-metadata:${club.clubId}`,
+    editing,
+    "저장하지 않은 클럽 공개 정보가 있습니다.",
+  );
   const recovery = mutation.isError
     ? adminCommandRecovery(mutation.error)
     : null;
@@ -286,6 +309,22 @@ function ClubMetadataPanel({
     setEditing(false);
     setDraft({ name: club.name, tagline: club.tagline, about: club.about });
     mutation.reset();
+  }
+
+  async function saveMetadata() {
+    const operationId = `admin-club-metadata:${club.clubId}:${club.adminRevision}`;
+    const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
+    try {
+      const updated = await mutation.mutateAsync({
+        clubId: club.clubId,
+        request: { expectedAdminRevision: club.adminRevision, ...draft },
+      });
+      if (await handle.settle("succeeded") !== "accepted") return;
+      await publishUpdatedPlatformAdminClub(queryClient, updated);
+      setEditing(false);
+    } catch {
+      await handle.settle("failed");
+    }
   }
 
   return (
@@ -372,15 +411,7 @@ function ClubMetadataPanel({
               type="button"
               className="btn btn-primary btn-sm"
               disabled={mutation.isPending}
-              onClick={() =>
-                mutation.mutate({
-                  clubId: club.clubId,
-                  request: {
-                    expectedAdminRevision: club.adminRevision,
-                    ...draft,
-                  },
-                })
-              }
+              onClick={() => void saveMetadata()}
             >
               공개 정보 저장
             </button>
@@ -436,6 +467,8 @@ function VisibilityPanel({
   canManage: boolean;
   onRefresh: () => void;
 }) {
+  const queryClient = useQueryClient();
+  const transitionOwner = useTransitionSafetyOwner(`admin-club-visibility:${clubId}`);
   const target = current === "PRIVATE" ? "PUBLIC" : "PRIVATE";
   const previewMutation = usePreviewPlatformAdminClubVisibilityMutation(clubId);
   const confirmMutation = useConfirmPlatformAdminClubVisibilityMutation(clubId);
@@ -490,6 +523,8 @@ function VisibilityPanel({
   async function confirmIntent() {
     if (!preview || !intentKey) return;
     const epoch = commandEpochRef.current;
+    const operationId = `admin-club-visibility:${clubId}:${intentKey}`;
+    const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
     try {
       const result = await confirmMutation.mutateAsync({
         previewId: preview.previewId,
@@ -498,10 +533,13 @@ function VisibilityPanel({
         targetVisibility: target,
         confirmed: true,
       });
+      if (await handle.settle("succeeded") !== "accepted") return;
+      await publishPlatformAdminClubState(queryClient, clubId);
       if (commandEpochRef.current !== epoch) return;
       setReceipt(result);
       setRecovery(null);
     } catch (error) {
+      await handle.settle("failed");
       if (commandEpochRef.current !== epoch) return;
       if (isPlatformAdminAuthorityLossError(error)) {
         purgeVisibilityState();

@@ -24,6 +24,7 @@ import {
 import {
   platformAdminSupportLedgerInfiniteQuery,
   platformAdminSupportKeys,
+  publishAdminSupportLedger,
   useAdminSupportCreateConfirmMutation,
   useAdminSupportCreatePreviewMutation,
   useAdminSupportRevokeConfirmMutation,
@@ -31,6 +32,7 @@ import {
   useAdminSupportSearchMutation,
 } from "@/features/platform-admin/queries/platform-admin-support-queries";
 import { AdminSupportWorkbench } from "@/features/platform-admin/ui/admin-support-workbench";
+import { useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 const DEFAULT_REASON: SupportGrantReasonCategory = "MEMBER_ASSISTANCE";
 
@@ -58,6 +60,7 @@ export function AdminSupportRoute() {
   const createConfirmMutation = useAdminSupportCreateConfirmMutation();
   const revokePreviewMutation = useAdminSupportRevokePreviewMutation();
   const revokeConfirmMutation = useAdminSupportRevokeConfirmMutation();
+  const transitionOwner = useTransitionSafetyOwner("admin-support-command");
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<AdminSupportSearchResult[]>([]);
@@ -200,6 +203,8 @@ export function AdminSupportRoute() {
     if (!canManage || !createPreview || !createSnapshot || !createIntentKey) return;
     setCreateRecovery(null);
     setCreateOutcomeUnknown(true);
+    const operationId = `admin-support-create:${createIntentKey}`;
+    const handle = transitionOwner.begin(operationId, "L3", async () => ({ operationId, outcome: "still-unknown" }));
     try {
       const receipt = await createConfirmMutation.confirm({
         ...createSnapshot,
@@ -207,6 +212,8 @@ export function AdminSupportRoute() {
         idempotencyKey: createIntentKey,
         confirmed: true,
       });
+      if (await handle.settle("succeeded") !== "accepted") return;
+      await publishAdminSupportLedger(queryClient);
       setLatestReceipt(receipt);
       setQuery("");
       setResults([]);
@@ -215,6 +222,7 @@ export function AdminSupportRoute() {
       setCreateOutcomeUnknown(false);
       clearCreateCommand();
     } catch (error) {
+      await handle.settle("failed");
       const recovery = supportGrantCommandRecovery(error);
       setCreateRecovery(recovery.message);
       if (recovery.kind === "RESTART_PREVIEW") {
@@ -268,6 +276,8 @@ export function AdminSupportRoute() {
     if (!canManage || !revokeTarget || !revokePreview || !revokeSnapshot || !revokeIntentKey) return;
     setRevokeRecovery(null);
     setRevokeOutcomeUnknown(true);
+    const operationId = `admin-support-revoke:${revokeIntentKey}`;
+    const handle = transitionOwner.begin(operationId, "L3", async () => ({ operationId, outcome: "still-unknown" }));
     try {
       const receipt = await revokeConfirmMutation.confirm(revokeTarget.grantId, {
         ...revokeSnapshot,
@@ -278,6 +288,8 @@ export function AdminSupportRoute() {
         expiresAt: revokeTarget.expiresAt,
         confirmed: true,
       });
+      if (await handle.settle("succeeded") !== "accepted") return;
+      await publishAdminSupportLedger(queryClient);
       setLatestReceipt(receipt);
       setRevokeTarget(null);
       setRevokeNote("");
@@ -286,6 +298,7 @@ export function AdminSupportRoute() {
       setRevokeIntentKey(null);
       setRevokeOutcomeUnknown(false);
     } catch (error) {
+      await handle.settle("failed");
       const recovery = supportGrantCommandRecovery(error);
       setRevokeRecovery(recovery.message);
       if (recovery.kind === "RESTART_PREVIEW") {

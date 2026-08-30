@@ -24,3 +24,7 @@ export const memberNotificationsActions = {
   markAllRead: markAllMemberNotificationsRead,
   loadMore: fetchMemberNotifications,
 };
+
+export async function publishMemberNotificationsRefresh(refresh: () => void | Promise<void>) {
+  await refresh();
+}

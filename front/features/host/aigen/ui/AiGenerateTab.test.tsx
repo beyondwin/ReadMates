@@ -43,7 +43,7 @@ import {
   regenerateItem,
   startGeneration,
 } from "@/features/host/aigen/api/aigen-api";
-import { AiGenerateTab } from "./AiGenerateTab";
+import { AiGenerateController as AiGenerateTab } from "../../route/ai-generate-controller";
 import { draftStorageKey, saveAigenDraft } from "../storage/aigen-draft-storage";
 
 const mockedStart = vi.mocked(startGeneration);

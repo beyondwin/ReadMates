@@ -1,5 +1,5 @@
-import { lazy, Suspense, type ChangeEvent, type JSX } from "react";
-import type { AiCommitResponse } from "@/features/host/aigen/api/aigen-contracts";
+import type { ChangeEvent, JSX, ReactNode } from "react";
+import type { AiCommitResponse } from "@/features/host/aigen/model/aigen-presentation-types";
 import type { HostSessionDraftSource } from "@/features/host/model/host-session-workspace-navigation";
 import type {
   SessionImportPreviewResponse,
@@ -10,10 +10,12 @@ import { SessionImportPanelBody } from "./session-import-panel";
 export type SessionRecordCompletionMode = Exclude<HostSessionDraftSource, "manual">;
 export type AiGenerateCommitResult = AiCommitResponse | null;
 
-const AiGenerateTab = lazy(async () => {
-  const module = await import("@/features/host/aigen/ui/AiGenerateTab");
-  return { default: module.AiGenerateTab };
-});
+export type AiGenerationPanelRenderer = (input: {
+  sessionId: string;
+  clubSlug: string;
+  expectedDraftRevision: number | null;
+  onCommitted: (result: AiGenerateCommitResult) => void | Promise<void>;
+}) => ReactNode;
 
 type SessionRecordCompletionPanelProps = {
   sessionId: string | undefined;
@@ -29,6 +31,7 @@ type SessionRecordCompletionPanelProps = {
   onFileSelected: (event: ChangeEvent<HTMLInputElement>) => void;
   onCommit: () => void;
   onSetGuestReadable?: () => void | Promise<void>;
+  renderAiGeneration?: AiGenerationPanelRenderer;
 };
 
 export function SessionRecordCompletionPanel({
@@ -45,6 +48,7 @@ export function SessionRecordCompletionPanel({
   onFileSelected,
   onCommit,
   onSetGuestReadable,
+  renderAiGeneration,
 }: SessionRecordCompletionPanelProps): JSX.Element {
   if (mode === "ai") {
     if (!canUseAigen || !sessionId || !clubSlug) {
@@ -55,16 +59,7 @@ export function SessionRecordCompletionPanel({
       );
     }
 
-    return (
-      <Suspense fallback={<p role="status">AI 기록 도구를 불러오는 중입니다.</p>}>
-        <AiGenerateTab
-          sessionId={sessionId}
-          clubSlug={clubSlug}
-          expectedDraftRevision={expectedDraftRevision}
-          onCommitted={onAigenCommitted}
-        />
-      </Suspense>
-    );
+    return <>{renderAiGeneration?.({ sessionId, clubSlug, expectedDraftRevision, onCommitted: onAigenCommitted }) ?? <p role="status">AI 기록 도구를 준비하지 못했습니다.</p>}</>;
   }
 
   return (

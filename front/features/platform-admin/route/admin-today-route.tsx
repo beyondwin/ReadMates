@@ -32,6 +32,7 @@ import {
   adminOperationsKeys,
   platformAdminOperationCaseQuery,
   platformAdminOperationCasePagesQuery,
+  publishAdminOperationCase,
   useAcknowledgeAdminOperationCaseMutation,
   useResolveAdminOperationCaseMutation,
   useSnoozeAdminOperationCaseMutation,
@@ -60,6 +61,7 @@ import {
   beginAdminEditorialLedgerPollMerge,
   beginAdminEditorialLedgerRouteCommit,
 } from "@/shared/observability/admin-editorial-ledger-performance";
+import { TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 type MutationTarget = {
   caseId: string;
@@ -69,6 +71,7 @@ type MutationTarget = {
 
 export function AdminTodayRoute() {
   const queryClient = useQueryClient();
+  const transitionOwner = useTransitionSafetyOwner("admin-today-cases");
   const [searchParams, setSearchParams] = useSearchParams();
   const searchState = useMemo(() => parseAdminOperationsSearch(searchParams), [searchParams]);
   const effectiveFilter = useMemo(() => {
@@ -361,6 +364,11 @@ export function AdminTodayRoute() {
   }
 
   async function runMutation(target: MutationTarget, operation: () => Promise<unknown>): Promise<boolean> {
+    const operationId = `admin-case:${target.caseId}:${target.version}`;
+    const handle = transitionOwner.begin(operationId, "L1", async () => {
+      await queryClient.fetchQuery(platformAdminOperationCaseQuery(target.caseId));
+      return { operationId, outcome: "still-unknown" };
+    });
     setMutationTarget(target);
     if (isCurrentMutationTarget(target)) {
       setActionMessage(null);
@@ -372,6 +380,8 @@ export function AdminTodayRoute() {
     const beforeListAt = queryClient.getQueryState(listKey)?.dataUpdatedAt ?? 0;
     try {
       await operation();
+      if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
+      await publishAdminOperationCase(queryClient, target.caseId);
       if (!isCurrentMutationTarget(target)) return false;
       if (!isPostMutationAuthoritative({
         detail: queryClient.getQueryState(detailKey),
@@ -392,6 +402,7 @@ export function AdminTodayRoute() {
       setActionMessage({ kind: "success", text: "케이스 상태를 반영했습니다." });
       return true;
     } catch (error) {
+      if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");
       if (!isCurrentMutationTarget(target)) return false;
       if (hasHttpStatus(error, 403)) {
         setMutationPermissionDenied(true);
