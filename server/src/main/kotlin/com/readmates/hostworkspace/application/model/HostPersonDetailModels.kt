@@ -28,6 +28,7 @@ data class HostPersonCursorAnchor(
     val evaluatedAt: Instant,
     val expiry: Instant,
     val last: HostPersonAttendanceTuple?,
+    val historyFingerprint: String?,
 )
 
 data class HostPersonDetailRequest(
@@ -43,6 +44,7 @@ data class HostPersonDetailQuery(
     val evaluatedAt: Instant,
     val after: HostPersonAttendanceTuple?,
     val fetchLimit: Int,
+    val expectedHistoryFingerprint: String?,
 )
 
 data class HostPersonSchedule(
@@ -68,11 +70,13 @@ data class HostPersonDetailProjection(
     val currentSchedule: HostPersonSchedule?,
     val currentRsvp: HostPersonRsvpStatus?,
     val attendanceItems: List<HostPersonAttendanceItem>,
+    val attendanceHistoryFingerprint: String,
 )
 
 data class HostPersonAttendanceHistoryPage(
     val items: List<HostPersonAttendanceItem>,
     val next: HostPersonAttendanceTuple?,
+    val historyFingerprint: String,
 )
 
 data class HostPersonDetail(

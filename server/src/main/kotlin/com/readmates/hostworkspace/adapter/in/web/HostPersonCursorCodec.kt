@@ -24,7 +24,7 @@ class HostPersonCursorCodec(
 ) {
     fun begin(): HostPersonCursorAnchor {
         val now = clock.instant()
-        return HostPersonCursorAnchor(now, now.plus(properties.ttl), null)
+        return HostPersonCursorAnchor(now, now.plus(properties.ttl), null, null)
     }
 
     fun encode(
@@ -66,6 +66,7 @@ class HostPersonCursorCodec(
         val claimsHost = uuid(root.get("hostMembershipId")?.asString())
         val claimsTarget = uuid(root.get("targetMembershipId")?.asString())
         val keyVersion = root.get("keyVersion")?.asInt() ?: invalid()
+        val historyFingerprint = fingerprint(root.get("historyFingerprint")?.asString())
         if (root.get("purpose")?.asString() != PURPOSE_CLAIM ||
             root.get("version")?.asInt() != VERSION
         ) {
@@ -87,7 +88,7 @@ class HostPersonCursorCodec(
                 sessionNumber = lastNode.get("sessionNumber")?.asInt() ?: invalid(),
                 sessionId = uuid(lastNode.get("sessionId")?.asString()),
             )
-        val anchor = HostPersonCursorAnchor(evaluatedAt, expiry, last)
+        val anchor = HostPersonCursorAnchor(evaluatedAt, expiry, last, historyFingerprint)
         if (canonical(clubId, hostMembershipId, targetMembershipId, anchor, last, keyVersion) != payload) {
             invalid()
         }
@@ -101,12 +102,15 @@ class HostPersonCursorCodec(
         anchor: HostPersonCursorAnchor,
         last: HostPersonAttendanceTuple,
         keyVersion: Int,
-    ): String =
-        "{\"clubId\":\"$clubId\",\"evaluatedAt\":\"${anchor.evaluatedAt}\",\"expiry\":\"${anchor.expiry}\"," +
-            "\"hostMembershipId\":\"$hostMembershipId\",\"keyVersion\":$keyVersion," +
+    ): String {
+        val historyFingerprint = fingerprint(anchor.historyFingerprint)
+        return "{\"clubId\":\"$clubId\",\"evaluatedAt\":\"${anchor.evaluatedAt}\",\"expiry\":\"${anchor.expiry}\"," +
+            "\"historyFingerprint\":\"$historyFingerprint\",\"hostMembershipId\":\"$hostMembershipId\"," +
+            "\"keyVersion\":$keyVersion," +
             "\"last\":{\"scheduledAt\":\"${last.scheduledAt}\"," +
             "\"sessionId\":\"${last.sessionId}\",\"sessionNumber\":${last.sessionNumber}}," +
             "\"purpose\":\"$PURPOSE_CLAIM\",\"targetMembershipId\":\"$targetMembershipId\",\"version\":$VERSION}"
+    }
 
     private fun key(version: Int): ByteArray? =
         when (version) {
@@ -129,21 +133,24 @@ class HostPersonCursorCodec(
 
     private fun instant(value: String?): Instant = runCatching { Instant.parse(value) }.getOrElse { invalid() }
 
+    private fun fingerprint(value: String?): String = value?.takeIf(FINGERPRINT::matches) ?: invalid()
+
     @Suppress("MaxLineLength")
     private fun localDateTime(value: String?): LocalDateTime = runCatching { LocalDateTime.parse(value) }.getOrElse { invalid() }
 
     private fun invalid(): Nothing = throw HostPersonInvalidCursorException()
 
     private companion object {
-        const val PURPOSE = "readmates:host-person-attendance-cursor:v1"
+        const val PURPOSE = "readmates:host-person-attendance-cursor:v2"
         const val PURPOSE_CLAIM = "host-person-attendance"
-        const val VERSION = 1
+        const val VERSION = 2
         const val CURSOR_PART_COUNT = 3
         val ROOT_KEYS =
             setOf(
                 "clubId",
                 "evaluatedAt",
                 "expiry",
+                "historyFingerprint",
                 "hostMembershipId",
                 "keyVersion",
                 "last",
@@ -152,6 +159,7 @@ class HostPersonCursorCodec(
                 "version",
             )
         val LAST_KEYS = setOf("scheduledAt", "sessionId", "sessionNumber")
+        val FINGERPRINT = Regex("^[0-9a-f]{64}$")
         val encoder: Base64.Encoder = Base64.getUrlEncoder().withoutPadding()
         val decoder: Base64.Decoder = Base64.getUrlDecoder()
     }

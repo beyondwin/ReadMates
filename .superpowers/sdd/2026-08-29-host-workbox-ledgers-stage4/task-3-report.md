@@ -86,3 +86,38 @@ aea396096e8b49a3d0655b87a35ee3ceb3857a4d5c0d000e7b8775c175e9003a  server/src/mai
 | Frontend/server contract drift or BFF trust drift could be accepted silently. | Strict Zod parsing, deterministic dual fixtures, two server contract tests, frontend API/query tests, and generic BFF proof close the contract boundary. |
 
 Status: `READY`. No load-bearing Task 3 finding remains open.
+
+## Review round 1 — mutation-bound attendance continuation
+
+- Review base: `79cd9fd63c13a3d9b16bbd05ec68ce23891238e1`
+- Finding: the first implementation ordered attendance by mutable `session_date`/`start_time`, while its `evaluatedAt` anchor limited only row creation. A reschedule could move an already emitted row below the old tuple and duplicate it; reopen/close could remove or insert a pending row and create a gap.
+- ADR impact remains `none`; this is a correctness repair to the approved signed continuation contract. No migration or response-wire change was introduced.
+
+Cursor v2 now binds a strict lowercase SHA-256 history fingerprint. The fingerprint is domain-separated and length-framed, and covers target membership lifecycle/role plus every pre-anchor target participation's session identity/number/state/date/time/deletion/revisions and participant identity/status/attendance/revision. The adapter recomputes and compares it in the same MySQL `REPEATABLE_READ` transaction as the page query. Any relevant mutation fails closed as controlled `INVALID_CURSOR` before returning attendance rows. Both session and participant creation times are anchored, while the existing schedule-time/session-number/session-ID total order remains the unchanged-generation continuation order.
+
+| Source hash | Command | Result | Finding closure |
+| --- | --- | --- | --- |
+| Review base `79cd9fd6`; two new MySQL mutation tests | `./server/gradlew -p server integrationTest --tests '*continuation fails closed when an emitted attendance session is rescheduled*' --tests '*continuation fails closed when a pending attendance session is reopened*' --no-configuration-cache` | RED, 2 tests run and 2 failed at the expected no-exception assertions: both corrupted continuations returned instead of failing closed. | Proved reschedule duplication and lifecycle omission were not protected by the original `evaluatedAt` anchor. |
+| Review delta manifest `c2ac279a8d6308727aab24a3ca4d97e55f3dbe0e8bfcfd3b160b167773b81ee8` | Same exact two-test command after the fingerprint implementation | GREEN, 2/2 | Both changed-generation continuations now fail closed before page return. |
+| Same manifest | `./server/gradlew -p server integrationTest --tests com.readmates.hostworkspace.adapter.out.persistence.JdbcHostPersonDetailAdapterTest --rerun-tasks --no-configuration-cache` | Fresh GREEN, 5/5 | Existing direct lookup, access provenance, lifecycle, unchanged-generation no-gap/no-duplicate pagination, and both mutation regressions pass against real MySQL. |
+| Same manifest | `./server/gradlew -p server unitTest --tests com.readmates.hostworkspace.application.service.HostPersonDetailServiceTest --tests com.readmates.hostworkspace.api.HostPersonDetailControllerTest --no-configuration-cache` | GREEN, 8/8 | Fingerprint propagation and signed v2 cursor decoding preserve privacy, auth, purpose, expiry and key-rotation behavior. |
+| Same manifest | `./server/gradlew -p server architectureTest --tests '*host workspace composition keeps foreign features behind outbound input-port adapters*' --no-configuration-cache` | GREEN, 1/1 | The repair remains inside the hostworkspace-owned query boundary. |
+| Same manifest | Focused Task 3 filtering after fresh `ktlintMainSourceSetCheck ktlintTestSourceSetCheck` and `detekt` reruns | Zero Task 3 findings. Overall commands still exit 1 only from the sealed base Task 2 notification/contract findings recorded above. | The eight-file review delta is style/static-analysis clean without reopening unrelated findings. |
+| Same manifest | `git diff --check` and final cached diff check | Exit 0 | Review delta whitespace is clean. |
+
+Frontend, BFF and response-contract tests were not rerun because the explicit response DTO and Zod/wire schema are byte-for-byte unchanged; the history fingerprint is internal and exists only inside the signed opaque cursor. Full Stage gates remain deferred as before.
+
+The following eight-file manifest supersedes the changed-file hashes from the original 21-file manifest. Its own SHA-256 is `c2ac279a8d6308727aab24a3ca4d97e55f3dbe0e8bfcfd3b160b167773b81ee8`; the report is excluded to avoid self-reference.
+
+```text
+989030d765a86b9e4bfb458cf942ef939890e6371db12d9066c471eadb048555  server/src/main/kotlin/com/readmates/hostworkspace/adapter/in/web/HostPersonCursorCodec.kt
+edc069814c0a215720c0ab5352d4e32ae20a40445fd6132fc74a3dcbe79315f4  server/src/main/kotlin/com/readmates/hostworkspace/adapter/in/web/HostPersonDetailController.kt
+61beb23f90612b9c384d377cba60056fcb77e60c1c965f3d370178e81c18ab0c  server/src/main/kotlin/com/readmates/hostworkspace/adapter/out/persistence/JdbcHostPersonDetailAdapter.kt
+bfef7a8991e1054af32fccf1c3b6c0564edd1d9919c61bb5bfd2eca6283fef3f  server/src/main/kotlin/com/readmates/hostworkspace/application/model/HostPersonDetailModels.kt
+0fdcff5e4727077faef4fabac2669a1177ff3edb6c2429a9cf014b50f324c3f7  server/src/main/kotlin/com/readmates/hostworkspace/application/service/HostPersonDetailService.kt
+e9e8f1f4fe5c50c15dc72541ba2ed9c9f1deda266de39148ac62c36e87a0e8f4  server/src/test/kotlin/com/readmates/hostworkspace/adapter/out/persistence/JdbcHostPersonDetailAdapterTest.kt
+36cc6f5906d5a98b517d5a0409fd5f3b4990684a2ad78856fda7d332bf889f15  server/src/test/kotlin/com/readmates/hostworkspace/api/HostPersonDetailControllerTest.kt
+c602f664ab10f0c3a103bcfff3a9db832b2cab27f30c08b3c3236eaa59bbe52a  server/src/test/kotlin/com/readmates/hostworkspace/application/service/HostPersonDetailServiceTest.kt
+```
+
+Review round 1 finding status: `CLOSED`. No new load-bearing claim remains.

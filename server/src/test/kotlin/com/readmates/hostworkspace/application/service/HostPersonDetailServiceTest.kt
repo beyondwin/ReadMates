@@ -37,6 +37,7 @@ class HostPersonDetailServiceTest {
         assertThat(queryPort.seenQuery!!.clubId).isEqualTo(CLUB_ID)
         assertThat(queryPort.seenQuery!!.targetMembershipId).isEqualTo(TARGET_ID)
         assertThat(queryPort.seenQuery!!.fetchLimit).isEqualTo(3)
+        assertThat(queryPort.seenQuery!!.expectedHistoryFingerprint).isEqualTo(FINGERPRINT)
         assertThat(queryPort.callCount).isEqualTo(1)
     }
 
@@ -84,6 +85,7 @@ class HostPersonDetailServiceTest {
                 evaluatedAt = Instant.parse("2026-08-30T09:00:00Z"),
                 expiry = Instant.parse("2026-08-31T09:00:00Z"),
                 last = null,
+                historyFingerprint = FINGERPRINT,
             ),
     )
 
@@ -98,6 +100,7 @@ class HostPersonDetailServiceTest {
             currentSchedule = schedule(),
             currentRsvp = HostPersonRsvpStatus.GOING,
             attendanceItems = items,
+            attendanceHistoryFingerprint = FINGERPRINT,
         )
 
     private fun schedule() =
@@ -137,3 +140,4 @@ private val CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-00000000000
 private val HOST_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000201")
 private val TARGET_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000202")
 private val HOST = HostPersonActor(CLUB_ID, HOST_ID, activeHost = true)
+private const val FINGERPRINT = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

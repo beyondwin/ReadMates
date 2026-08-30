@@ -132,7 +132,7 @@ class HostPersonDetailControllerTest {
 
     @Test
     fun `accepts current and previous keys but rejects expired and retired keys`() {
-        val anchor = codec.begin()
+        val anchor = codec.begin().copy(historyFingerprint = FINGERPRINT)
         val tuple = detail(true).attendanceHistory.next!!
         val current = codec.encode(HOST.clubId, HOST.membershipId, TARGET_ID, anchor, tuple)
         val previous = codec.encode(HOST.clubId, HOST.membershipId, TARGET_ID, anchor, tuple, keyVersion = 1)
@@ -162,7 +162,7 @@ class HostPersonDetailControllerTest {
 
     @Test
     fun `continuation restores its anchor and the last page omits a cursor`() {
-        val anchor = codec.begin()
+        val anchor = codec.begin().copy(historyFingerprint = FINGERPRINT)
         val cursor = codec.encode(HOST.clubId, HOST.membershipId, TARGET_ID, anchor, TUPLE)
         useCase.response = detail(hasNext = false)
 
@@ -176,6 +176,7 @@ class HostPersonDetailControllerTest {
 
         assertThat(useCase.request!!.cursor.evaluatedAt).isEqualTo(anchor.evaluatedAt)
         assertThat(useCase.request!!.cursor.last).isEqualTo(TUPLE)
+        assertThat(useCase.request!!.cursor.historyFingerprint).isEqualTo(FINGERPRINT)
     }
 
     @Test
@@ -224,6 +225,7 @@ class HostPersonDetailControllerTest {
                             ),
                         ),
                     next = TUPLE.takeIf { hasNext },
+                    historyFingerprint = FINGERPRINT,
                 ),
         )
 
@@ -243,6 +245,7 @@ private class RecordingHostPersonDetailUseCase : GetHostPersonDetailUseCase {
 }
 
 private val NOW = Instant.parse("2026-08-30T09:00:00Z")
+private const val FINGERPRINT = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 private val TARGET_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000202")
 private val TUPLE =
     HostPersonAttendanceTuple(

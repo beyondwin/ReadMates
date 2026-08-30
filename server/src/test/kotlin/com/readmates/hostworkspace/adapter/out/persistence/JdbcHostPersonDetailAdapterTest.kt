@@ -4,9 +4,11 @@ import com.readmates.hostworkspace.application.model.HostPersonAttendanceItem
 import com.readmates.hostworkspace.application.model.HostPersonAttendanceStatus
 import com.readmates.hostworkspace.application.model.HostPersonAttendanceTuple
 import com.readmates.hostworkspace.application.model.HostPersonDetailQuery
+import com.readmates.hostworkspace.application.model.HostPersonInvalidCursorException
 import com.readmates.hostworkspace.application.model.HostPersonMembershipStatus
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.parallel.ResourceLock
@@ -59,7 +61,15 @@ class JdbcHostPersonDetailAdapterTest(
             val visible = page.take(2)
             paged += visible
             if (page.size <= 2) break
-            page = adapter.load(query(target, limit = 2, after = visible.last().tuple))!!.attendanceItems
+            page =
+                adapter.load(
+                    query(
+                        target,
+                        limit = 2,
+                        after = visible.last().tuple,
+                        expectedHistoryFingerprint = first.attendanceHistoryFingerprint,
+                    ),
+                )!!.attendanceItems
         }
         assertThat(paged).containsExactlyElementsOf(all)
         assertThat(paged.map { it.tuple }).doesNotHaveDuplicates()
@@ -86,16 +96,87 @@ class JdbcHostPersonDetailAdapterTest(
         }
     }
 
+    @Test
+    fun `continuation fails closed when an emitted attendance session is rescheduled`() {
+        val target = membershipId("member5@example.com")
+        val first = adapter.load(query(target, limit = 2))!!
+        val emitted = first.attendanceItems.take(2).last()
+        val original = sessionSchedule(emitted.tuple.sessionId)
+        try {
+            jdbcTemplate.update(
+                RESCHEDULE_SQL,
+                emitted.tuple.sessionId.toString(),
+            )
+
+            assertThatThrownBy {
+                adapter.load(
+                    query(
+                        target,
+                        limit = 2,
+                        after = emitted.tuple,
+                        expectedHistoryFingerprint = first.attendanceHistoryFingerprint,
+                    ),
+                )
+            }.isInstanceOf(HostPersonInvalidCursorException::class.java)
+        } finally {
+            jdbcTemplate.update(
+                "update sessions set session_date = ?, start_time = ?, schedule_revision = ? where id = ?",
+                original["session_date"],
+                original["start_time"],
+                original["schedule_revision"],
+                emitted.tuple.sessionId.toString(),
+            )
+        }
+    }
+
+    @Test
+    fun `continuation fails closed when a pending attendance session is reopened`() {
+        val target = membershipId("member5@example.com")
+        val first = adapter.load(query(target, limit = 2))!!
+        val pending = first.attendanceItems[2]
+        val original =
+            jdbcTemplate.queryForMap(
+                "select state, session_revision from sessions where id = ?",
+                pending.tuple.sessionId.toString(),
+            )
+        try {
+            jdbcTemplate.update(
+                "update sessions set state = 'OPEN', session_revision = session_revision + 1 where id = ?",
+                pending.tuple.sessionId.toString(),
+            )
+
+            assertThatThrownBy {
+                adapter.load(
+                    query(
+                        target,
+                        limit = 2,
+                        after = first.attendanceItems[1].tuple,
+                        expectedHistoryFingerprint = first.attendanceHistoryFingerprint,
+                    ),
+                )
+            }.isInstanceOf(HostPersonInvalidCursorException::class.java)
+        } finally {
+            jdbcTemplate.update(
+                "update sessions set state = ?, session_revision = ? where id = ?",
+                original["state"],
+                original["session_revision"],
+                pending.tuple.sessionId.toString(),
+            )
+        }
+    }
+
     private fun query(
         target: UUID,
         limit: Int,
         after: HostPersonAttendanceTuple? = null,
+        expectedHistoryFingerprint: String? = null,
     ) = HostPersonDetailQuery(
         clubId = UUID.fromString(CLUB_ID),
         targetMembershipId = target,
         evaluatedAt = Instant.parse("2026-08-30T09:00:00Z"),
         after = after,
         fetchLimit = limit + 1,
+        expectedHistoryFingerprint = expectedHistoryFingerprint,
     )
 
     private fun membershipId(email: String): UUID =
@@ -108,10 +189,19 @@ class JdbcHostPersonDetailAdapterTest(
             )!!,
         )
 
+    private fun sessionSchedule(sessionId: UUID): Map<String, Any?> =
+        jdbcTemplate.queryForMap(
+            "select session_date, start_time, schedule_revision from sessions where id = ?",
+            sessionId.toString(),
+        )
+
     private companion object {
         const val CLUB_ID = "00000000-0000-0000-0000-000000000001"
         const val MEMBERSHIP_ID_SQL =
             "select memberships.id from memberships join users on users.id = memberships.user_id " +
                 "where memberships.club_id = ? and users.email = ?"
+        const val RESCHEDULE_SQL =
+            "update sessions set session_date = '2020-01-01', " +
+                "schedule_revision = schedule_revision + 1 where id = ?"
     }
 }

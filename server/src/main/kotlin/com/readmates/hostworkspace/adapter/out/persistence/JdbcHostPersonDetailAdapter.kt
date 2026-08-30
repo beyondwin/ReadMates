@@ -5,6 +5,7 @@ import com.readmates.hostworkspace.application.model.HostPersonAttendanceStatus
 import com.readmates.hostworkspace.application.model.HostPersonAttendanceTuple
 import com.readmates.hostworkspace.application.model.HostPersonDetailProjection
 import com.readmates.hostworkspace.application.model.HostPersonDetailQuery
+import com.readmates.hostworkspace.application.model.HostPersonInvalidCursorException
 import com.readmates.hostworkspace.application.model.HostPersonMembershipRole
 import com.readmates.hostworkspace.application.model.HostPersonMembershipStatus
 import com.readmates.hostworkspace.application.model.HostPersonRsvpStatus
@@ -15,16 +16,23 @@ import com.readmates.shared.db.utcOffsetDateTimeOrNull
 import com.readmates.shared.db.uuid
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import org.springframework.transaction.annotation.Isolation
+import org.springframework.transaction.annotation.Transactional
+import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.sql.ResultSet
 import java.sql.Timestamp
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.util.HexFormat
 
 @Repository
 class JdbcHostPersonDetailAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : HostPersonDetailQueryPort {
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     override fun load(query: HostPersonDetailQuery): HostPersonDetailProjection? {
         val header =
             jdbcTemplate
@@ -34,7 +42,36 @@ class JdbcHostPersonDetailAdapter(
                     query.clubId.dbString(),
                     query.targetMembershipId.dbString(),
                 ).firstOrNull() ?: return null
-        return header.copy(attendanceItems = loadAttendance(query))
+        val fingerprint = loadAttendanceHistoryFingerprint(query, header)
+        if (query.expectedHistoryFingerprint?.let { it != fingerprint } == true) {
+            throw HostPersonInvalidCursorException()
+        }
+        return header.copy(
+            attendanceItems = loadAttendance(query),
+            attendanceHistoryFingerprint = fingerprint,
+        )
+    }
+
+    private fun loadAttendanceHistoryFingerprint(
+        query: HostPersonDetailQuery,
+        header: HostPersonDetailProjection,
+    ): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        digest.append(FINGERPRINT_DOMAIN)
+        digest.append(header.membershipId)
+        digest.append(header.status)
+        digest.append(header.role)
+        jdbcTemplate.query(
+            FINGERPRINT_SQL,
+            { resultSet ->
+                FINGERPRINT_COLUMNS.forEach { column -> digest.append(resultSet.getString(column)) }
+            },
+            query.clubId.dbString(),
+            query.targetMembershipId.dbString(),
+            Timestamp.from(query.evaluatedAt),
+            Timestamp.from(query.evaluatedAt),
+        )
+        return HexFormat.of().formatHex(digest.digest())
     }
 
     private fun loadAttendance(query: HostPersonDetailQuery): List<HostPersonAttendanceItem> {
@@ -55,6 +92,7 @@ class JdbcHostPersonDetailAdapter(
             mutableListOf<Any>(
                 query.clubId.dbString(),
                 query.targetMembershipId.dbString(),
+                Timestamp.from(query.evaluatedAt),
                 Timestamp.from(query.evaluatedAt),
             )
         if (after != null) {
@@ -78,6 +116,7 @@ class JdbcHostPersonDetailAdapter(
             join active_sessions s on s.id = sp.session_id and s.club_id = sp.club_id
             where sp.club_id = ?
               and sp.membership_id = ?
+              and sp.created_at <= ?
               and sp.participation_status = 'ACTIVE'
               and s.state in ('CLOSED', 'PUBLISHED')
               and s.created_at <= ?
@@ -113,6 +152,7 @@ class JdbcHostPersonDetailAdapter(
                 },
             currentRsvp = getString("rsvp_status")?.let(HostPersonRsvpStatus::valueOf),
             attendanceItems = emptyList(),
+            attendanceHistoryFingerprint = "",
         )
     }
 
@@ -136,6 +176,45 @@ class JdbcHostPersonDetailAdapter(
     }
 
     private companion object {
+        const val FINGERPRINT_DOMAIN = "readmates:host-person-attendance-history:v1"
+        val FINGERPRINT_COLUMNS =
+            listOf(
+                "session_id",
+                "session_number",
+                "session_state",
+                "session_date",
+                "start_time",
+                "deleted_at",
+                "session_revision",
+                "schedule_revision",
+                "participant_id",
+                "participation_status",
+                "attendance_status",
+                "attendance_revision",
+            )
+        val FINGERPRINT_SQL =
+            """
+            select
+              s.id session_id,
+              s.number session_number,
+              s.state session_state,
+              s.session_date,
+              s.start_time,
+              s.deleted_at,
+              s.session_revision,
+              s.schedule_revision,
+              sp.id participant_id,
+              sp.participation_status,
+              sp.attendance_status,
+              sp.attendance_revision
+            from sessions s
+            join session_participants sp on sp.club_id = s.club_id and sp.session_id = s.id
+            where s.club_id = ?
+              and sp.membership_id = ?
+              and s.created_at <= ?
+              and sp.created_at <= ?
+            order by s.id, sp.id
+            """.trimIndent()
         val HEADER_SQL =
             """
             select
@@ -167,4 +246,10 @@ class JdbcHostPersonDetailAdapter(
             where m.club_id = ? and m.id = ?
             """.trimIndent()
     }
+}
+
+private fun MessageDigest.append(value: Any?) {
+    val bytes = (value?.toString() ?: "<null>").toByteArray(StandardCharsets.UTF_8)
+    update(ByteBuffer.allocate(Int.SIZE_BYTES).putInt(bytes.size).array())
+    update(bytes)
 }

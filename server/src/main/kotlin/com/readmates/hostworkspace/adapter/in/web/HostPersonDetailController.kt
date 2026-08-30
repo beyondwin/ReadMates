@@ -64,7 +64,13 @@ class HostPersonDetailController(
             )
         return detail.toResponse(
             detail.attendanceHistory.next?.let { last ->
-                cursorCodec.encode(member.clubId, member.membershipId, targetId, anchor, last)
+                cursorCodec.encode(
+                    member.clubId,
+                    member.membershipId,
+                    targetId,
+                    anchor.copy(historyFingerprint = detail.attendanceHistory.historyFingerprint),
+                    last,
+                )
             },
         )
     }

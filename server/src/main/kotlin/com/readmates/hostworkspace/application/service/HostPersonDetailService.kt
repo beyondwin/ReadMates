@@ -36,6 +36,7 @@ class HostPersonDetailService(
                 HostPersonAttendanceHistoryPage(
                     items = visibleItems,
                     next = visibleItems.lastOrNull()?.tuple.takeIf { projection.attendanceItems.size > request.limit },
+                    historyFingerprint = projection.attendanceHistoryFingerprint,
                 ),
         )
     }
@@ -53,6 +54,7 @@ class HostPersonDetailService(
                 evaluatedAt = request.cursor.evaluatedAt,
                 after = request.cursor.last,
                 fetchLimit = request.limit + 1,
+                expectedHistoryFingerprint = request.cursor.historyFingerprint,
             ),
         ) ?: throw HostPersonDetailNotFoundException()
 }
