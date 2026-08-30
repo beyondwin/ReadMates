@@ -1,5 +1,6 @@
 package com.readmates.contract
 
+import com.readmates.hostworkspace.adapter.`in`.web.HostWorkboxDeferralReceiptResponse
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Tag
@@ -15,6 +16,7 @@ import org.springframework.test.web.servlet.get
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import java.nio.file.Paths
+import java.time.OffsetDateTime
 
 /**
  * Contract tests that verify server MockMvc responses match the top-level JSON key shapes
@@ -127,6 +129,28 @@ class FrontendFixtureContractTest
                     .response.contentAsString
 
             assertTopLevelKeySetMatches(response, "host-notification-delivery-list.json")
+        }
+
+        @Test
+        fun `host workbox page and deferral receipt match frontend fixture key sets`() {
+            val page =
+                mockMvc
+                    .get("/api/host/workbox") {
+                        with(user("host@example.com"))
+                    }.andExpect { status { isOk() } }
+                    .andReturn()
+                    .response.contentAsString
+            val receipt =
+                objectMapper.writeValueAsString(
+                    HostWorkboxDeferralReceiptResponse(
+                        "SCHEDULE_UNSEEN:session-1:r7",
+                        OffsetDateTime.parse("2026-08-31T09:00:00Z"),
+                    ),
+                )
+
+            assertTopLevelKeySetMatches(page, "zod-schemas/host-workbox-page.json")
+            assertTopLevelKeySetMatches(receipt, "zod-schemas/host-workbox-deferral-receipt.json")
+            assertThat(page.lowercase()).doesNotContain("email", "token", "userid", "providerbody", "pagehistory")
         }
 
         @Test

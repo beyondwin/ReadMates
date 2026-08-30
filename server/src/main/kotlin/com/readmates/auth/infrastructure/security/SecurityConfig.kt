@@ -115,6 +115,8 @@ class SecurityConfig(
                     methodAndPath("POST", Regex("^/api/host/notifications/manual$")),
                     methodAndPath("PUT", Regex("^/api/host/notifications/policy$")),
                     methodAndPath("POST", Regex("^/api/host/notifications/items/[^/]+/(retry|restore)$")),
+                    methodAndPath("PUT", Regex("^/api/host/workbox/items/[^/]+/deferral$")),
+                    methodAndPath("DELETE", Regex("^/api/host/workbox/items/[^/]+/deferral$")),
                     methodAndPath("PUT", Regex("^/api/archive/sessions/[^/]+/my-long-review$")),
                     methodAndPath("POST", Regex("^/api/me/membership/leave$")),
                     methodAndPath("PUT", Regex("^/api/me/profile$")),

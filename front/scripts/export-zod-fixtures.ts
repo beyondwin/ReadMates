@@ -38,6 +38,39 @@ const hostClubClosePreview = HostClubClosePreviewSchema.parse({ previewId: "0000
 const hostClubCloseResult = HostClubCloseResultSchema.parse({ receiptId: "00000000-0000-0000-0000-00000000e104", status: "ARCHIVED", revision: 1, replayed: false });
 const invitationPreviewEmail = InvitationPreviewResponseSchema.parse({ invitationType: "EMAIL", clubSlug: "reading-sai", clubName: "Public fixture club", canonicalPath: `/clubs/reading-sai/invite/${"e".repeat(43)}`, email: "member@example.test", name: "Public fixture member", emailHint: "m***@example.test", status: "PENDING", expiresAt: "2026-09-30T00:00:00Z", canAccept: true });
 const invitationPreviewNamedLink = InvitationPreviewResponseSchema.parse({ invitationType: "NAMED_LINK", clubSlug: "reading-sai", clubName: "Public fixture club", canonicalPath: `/clubs/reading-sai/invite/lnk_${"n".repeat(43)}`, email: null, name: null, emailHint: null, status: "PENDING", expiresAt: "2026-09-30T00:00:00Z", canAccept: true });
+const hostWorkboxPage = {
+  state: "NOW",
+  evaluatedAt: "2026-08-30T09:00:00Z",
+  sourceAvailability: [
+    { type: "SCHEDULE_UNSEEN", state: "AVAILABLE", failureCode: null },
+    { type: "MEMBER_APPROVAL", state: "AVAILABLE", failureCode: null },
+    { type: "RECORD_CLOSING", state: "AVAILABLE", failureCode: null },
+    { type: "INVITATION_EXPIRY", state: "AVAILABLE", failureCode: null },
+    { type: "NOTIFICATION_FAILURE", state: "AVAILABLE", failureCode: null },
+  ],
+  items: [{
+    key: "SCHEDULE_UNSEEN:session-1:r7",
+    type: "SCHEDULE_UNSEEN",
+    state: "NOW",
+    title: "일정 확인",
+    description: "확인이 필요한 멤버가 있어요.",
+    count: 1,
+    dueAt: "2026-08-31T09:00:00Z",
+    deferredUntil: null,
+    resolvedAt: null,
+    destinationHref: "/app/host/sessions/session-1/schedule-review",
+    receiptSummary: {
+      operation: "SCHEDULE_REMINDER",
+      outcome: "PENDING",
+      affectedCount: 1,
+    },
+  }],
+  nextCursor: null,
+};
+const hostWorkboxDeferralReceipt = {
+  key: "SCHEDULE_UNSEEN:session-1:r7",
+  deferredUntil: "2026-08-31T09:00:00Z",
+};
 
 // ---------------------------------------------------------------------------
 // HostSessionDetailResponseSchema top-level keys
@@ -712,5 +745,7 @@ write("host-club-close-preview.json", hostClubClosePreview);
 write("host-club-close-result.json", hostClubCloseResult);
 write("invitation-preview-email.json", invitationPreviewEmail);
 write("invitation-preview-named-link.json", invitationPreviewNamedLink);
+write("host-workbox-page.json", hostWorkboxPage);
+write("host-workbox-deferral-receipt.json", hostWorkboxDeferralReceipt);
 writeTopLevel("host-invitation-links.json", { items: [], nextCursor: null });
 writeTopLevel("host-club-settings.json", hostClubSettings);

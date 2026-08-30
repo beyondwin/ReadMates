@@ -154,3 +154,45 @@ data class HostWorkboxSnapshotPage(
     val items: List<HostWorkboxSnapshotItem>,
     val hasMore: Boolean,
 )
+
+data class HostWorkboxActor(
+    val owner: HostWorkboxOwner,
+    val activeHost: Boolean,
+)
+
+data class HostWorkboxContinuation(
+    val snapshotId: UUID,
+    val afterOrdinal: Int,
+    val filterFingerprint: String,
+    val schemaVersion: Int,
+    val evaluatedAt: OffsetDateTime,
+    val expiresAt: OffsetDateTime,
+)
+
+data class HostWorkboxRequest(
+    val actor: HostWorkboxActor,
+    val state: HostWorkboxState,
+    val limit: Int,
+    val continuation: HostWorkboxContinuation?,
+)
+
+data class HostWorkboxPage(
+    val snapshotId: UUID,
+    val state: HostWorkboxState,
+    val filterFingerprint: String,
+    val schemaVersion: Int,
+    val evaluatedAt: OffsetDateTime,
+    val expiresAt: OffsetDateTime,
+    val sourceAvailability: List<HostWorkSourceAvailability>,
+    val items: List<HostWorkboxItemProjection>,
+    val lastOrdinal: Int?,
+    val hasMore: Boolean,
+)
+
+class HostWorkboxAccessDeniedException : RuntimeException("Active host required")
+
+class HostWorkboxInvalidRequestException : IllegalArgumentException("Invalid workbox request")
+
+class HostWorkboxRestartRequiredException : IllegalArgumentException("Workbox snapshot restart required")
+
+class HostWorkboxAuthoritativeKeyException : IllegalArgumentException("Work item key is not authoritative")

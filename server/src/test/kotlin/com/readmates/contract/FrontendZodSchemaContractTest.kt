@@ -18,6 +18,14 @@ import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.`in`.CommitGenerationResult
 import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.hostworkspace.adapter.`in`.web.HostWorkboxDeferralReceiptResponse
+import com.readmates.hostworkspace.adapter.`in`.web.HostWorkboxItemResponse
+import com.readmates.hostworkspace.adapter.`in`.web.HostWorkboxPageResponse
+import com.readmates.hostworkspace.application.model.HostWorkItemType
+import com.readmates.hostworkspace.application.model.HostWorkSourceAvailability
+import com.readmates.hostworkspace.application.model.HostWorkSourceAvailabilityState
+import com.readmates.hostworkspace.application.model.HostWorkboxReceiptSummary
+import com.readmates.hostworkspace.application.model.HostWorkboxState
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.assertj.core.api.Assertions.assertThat
@@ -41,6 +49,7 @@ import org.springframework.test.web.servlet.post
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import java.nio.file.Paths
+import java.time.OffsetDateTime
 import java.util.UUID
 
 /**
@@ -241,6 +250,50 @@ class FrontendZodSchemaContractTest
                     .response.contentAsString
 
             assertJsonShapeMatches(response, "host-notification-delivery-list.json")
+        }
+
+        @Test
+        fun `host workbox page and deferral receipt match strict zod fixtures`() {
+            val page =
+                HostWorkboxPageResponse(
+                    state = HostWorkboxState.NOW,
+                    evaluatedAt = OffsetDateTime.parse("2026-08-30T09:00:00Z"),
+                    sourceAvailability =
+                        listOf(
+                            HostWorkSourceAvailability(
+                                HostWorkItemType.SCHEDULE_UNSEEN,
+                                HostWorkSourceAvailabilityState.AVAILABLE,
+                            ),
+                        ),
+                    items =
+                        listOf(
+                            HostWorkboxItemResponse(
+                                key = "SCHEDULE_UNSEEN:session-1:r7",
+                                type = HostWorkItemType.SCHEDULE_UNSEEN,
+                                state = HostWorkboxState.NOW,
+                                title = "일정 확인",
+                                description = "확인이 필요한 멤버가 있어요.",
+                                count = 1,
+                                dueAt = OffsetDateTime.parse("2026-08-31T09:00:00Z"),
+                                deferredUntil = null,
+                                resolvedAt = null,
+                                destinationHref = "/app/host/sessions/session-1/schedule-review",
+                                receiptSummary = HostWorkboxReceiptSummary("SCHEDULE_REMINDER", "PENDING", 1),
+                            ),
+                        ),
+                    nextCursor = null,
+                )
+            val receipt =
+                HostWorkboxDeferralReceiptResponse(
+                    "SCHEDULE_UNSEEN:session-1:r7",
+                    OffsetDateTime.parse("2026-08-31T09:00:00Z"),
+                )
+
+            assertJsonShapeMatches(objectMapper.writeValueAsString(page), "host-workbox-page.json")
+            assertJsonShapeMatches(
+                objectMapper.writeValueAsString(receipt),
+                "host-workbox-deferral-receipt.json",
+            )
         }
 
         @Test
