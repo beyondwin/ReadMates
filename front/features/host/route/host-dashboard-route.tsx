@@ -135,6 +135,7 @@ export function HostDashboardRoute({
   const [workboxState, setWorkboxState] = useState<HostWorkboxState>("NOW");
   const [workboxCursor, setWorkboxCursor] = useState<string | null>(null);
   const [workboxPendingKey, setWorkboxPendingKey] = useState<string | null>(null);
+  const workboxMutationKeyRef = useRef<string | null>(null);
   const [workboxRowError, setWorkboxRowError] = useState<{ key: string; message: string } | null>(null);
 
   const nowWorkboxQuery = useQuery({
@@ -500,6 +501,8 @@ export function HostDashboardRoute({
     workItemKey: string,
     option: HostWorkboxDeferralOption,
   ) => {
+    if (workboxMutationKeyRef.current !== null) return;
+    workboxMutationKeyRef.current = workItemKey;
     setWorkboxPendingKey(workItemKey);
     setWorkboxRowError(null);
     try {
@@ -513,11 +516,16 @@ export function HostDashboardRoute({
         message: "작업을 보류하지 못했습니다. 항목을 유지한 채 다시 시도할 수 있습니다.",
       });
     } finally {
-      setWorkboxPendingKey(null);
+      if (workboxMutationKeyRef.current === workItemKey) {
+        workboxMutationKeyRef.current = null;
+      }
+      setWorkboxPendingKey((current) => current === workItemKey ? null : current);
     }
   }, [deferWorkboxMutation]);
 
   const undoWorkItemDeferral = useCallback(async (workItemKey: string) => {
+    if (workboxMutationKeyRef.current !== null) return;
+    workboxMutationKeyRef.current = workItemKey;
     setWorkboxPendingKey(workItemKey);
     setWorkboxRowError(null);
     try {
@@ -528,7 +536,10 @@ export function HostDashboardRoute({
         message: "보류를 해제하지 못했습니다. 항목을 유지한 채 다시 시도할 수 있습니다.",
       });
     } finally {
-      setWorkboxPendingKey(null);
+      if (workboxMutationKeyRef.current === workItemKey) {
+        workboxMutationKeyRef.current = null;
+      }
+      setWorkboxPendingKey((current) => current === workItemKey ? null : current);
     }
   }, [removeWorkboxDeferralMutation]);
 
@@ -577,6 +588,8 @@ export function HostDashboardRoute({
         revalidator.revalidate();
       }}
       onRetryOptional={() => revalidator.revalidate()}
+      nextActionPending={view.nextAction.workItemKey !== null
+        && workboxPendingKey === view.nextAction.workItemKey}
       onDeferNextAction={(workItemKey) => { void deferWorkItem(workItemKey, "TOMORROW"); }}
       LinkComponent={LinkComponent}
     />

@@ -39,3 +39,13 @@
 - No real notification, email/provider action, OAuth action, deployment, push, PR or tag was performed.
 - The focused route tests use mocked Task 2 transports. Browser-level BFF/server integration and mixed-channel provider behavior remain for the stage E2E/full-gate boundary.
 - The repository-wide TypeScript gate is not green because of existing baseline debt described above; Task 7 introduced no diagnostic in its new files.
+
+## Review round 1 closure — exact authority, count and pending boundaries
+
+The three IMPORTANT findings were closed together without reopening any previously sealed Task 7 surface:
+
+- Every Task 2 manual-notification application code is now classified. Expired, missing, reused and otherwise non-current previews are cleared immediately. Recipient, audience, template, state, content and target-snapshot conflicts also clear the preview, preserve the operator draft and fail the composer closed until both exact detail and manual options refetch successfully and agree on URL session, schedule-seen availability, schedule revision and enabled content/audience authority. Refetch failure has an explicit unavailable/retry state, so an old preview can never be confirmed.
+- Workbox tab counts now render only from an exact matching page that has finished loading without error. Literal `0` remains visible for a genuinely loaded empty page, while initial load, error and cursor transition disclose no fabricated or stale count.
+- The operating-room next action receives pending state only when its current authoritative work-item key exactly matches the unresolved mutation. The defer control stays visible-disabled with `보류 중`, and a synchronous key guard prevents a repeated click from submitting twice.
+
+TDD evidence: the four affected Vitest files first failed 13 tests with 42 passing, then passed 55/55 after the minimal implementation. Exact nine-file ESLint completed with 0 errors and 0 warnings; `git diff --check`, cached diff check and the targeted added-line public-safety scan were clean. Repository-wide TypeScript remains non-green on existing debt; the changed-file filter reports only the previously sealed unchanged attendance receipt diagnostic in `host-dashboard-route.tsx:358`, and no review-round-added diagnostic. The previously sealed Chromium CT result remains 3/3 because this round did not change CSS, CT fixtures or responsive composition. The nine-file review delta is sealed in `task-7-review-1-manifest.sha256`, excluding the manifest and this report.

@@ -313,6 +313,68 @@ describe("HostScheduleReviewRoute", () => {
     await waitFor(() => expect(fetchHostSessionDetail).toHaveBeenCalledTimes(2));
   });
 
+  it.each([
+    "MANUAL_NOTIFICATION_PREVIEW_EXPIRED",
+    "MANUAL_NOTIFICATION_PREVIEW_NOT_FOUND",
+    "MANUAL_NOTIFICATION_PREVIEW_REUSED",
+    "MANUAL_NOTIFICATION_SELECTION_INVALID",
+    "MANUAL_NOTIFICATION_COPY_INVALID",
+    "DUPLICATE_NOTIFICATION_DISPATCH",
+  ])("clears the non-current preview after %s", async (code) => {
+    vi.mocked(confirmManualNotification).mockRejectedValueOnce({ code, status: 409 });
+    renderRoute();
+    await screen.findByRole("heading", { name: "일정 미열람 검토" });
+    await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
+    await userEvent.click(await screen.findByRole("button", { name: "2명에게 알림 발송" }));
+
+    expect(await screen.findByRole("alert")).toBeVisible();
+    expect(screen.queryByRole("region", { name: "발송 전 확인" })).not.toBeInTheDocument();
+    expect(confirmManualNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    "MANUAL_NOTIFICATION_PREVIEW_STALE",
+    "MANUAL_NOTIFICATION_CONTENT_STALE",
+    "MANUAL_NOTIFICATION_STATE_INVALID",
+    "MANUAL_NOTIFICATION_RECIPIENTS_CHANGED",
+    "MANUAL_NOTIFICATION_RECIPIENT_INVALID",
+    "MANUAL_NOTIFICATION_AUDIENCE_EMPTY",
+    "MANUAL_NOTIFICATION_TEMPLATE_UNAVAILABLE",
+  ])("refreshes exact authority before re-enabling after %s", async (code) => {
+    vi.mocked(confirmManualNotification).mockRejectedValueOnce({ code, status: 409 });
+    renderRoute();
+    await screen.findByRole("heading", { name: "일정 미열람 검토" });
+    await userEvent.clear(screen.getByRole("textbox", { name: "알림 제목" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "알림 제목" }), "보존할 제목");
+    await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
+    await userEvent.click(await screen.findByRole("button", { name: "2명에게 알림 발송" }));
+
+    await waitFor(() => expect(fetchHostSessionDetail).toHaveBeenCalledTimes(2));
+    expect(fetchManualNotificationOptions).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("textbox", { name: "알림 제목" })).toHaveValue("보존할 제목");
+    expect(screen.queryByRole("region", { name: "발송 전 확인" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the composer fail-closed until both exact authority refetches recover", async () => {
+    vi.mocked(confirmManualNotification).mockRejectedValueOnce({
+      code: "MANUAL_NOTIFICATION_RECIPIENTS_CHANGED",
+      status: 409,
+    });
+    renderRoute();
+    await screen.findByRole("heading", { name: "일정 미열람 검토" });
+    await userEvent.clear(screen.getByRole("textbox", { name: "알림 제목" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "알림 제목" }), "보존할 제목");
+    await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
+    vi.mocked(fetchHostSessionDetail).mockRejectedValueOnce(new Error("detail refetch failed"));
+    await userEvent.click(await screen.findByRole("button", { name: "2명에게 알림 발송" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("최신 권한을 확인하지 못했습니다");
+    expect(screen.queryByRole("button", { name: "알림 미리보기" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "다시 확인" }));
+    expect(await screen.findByRole("textbox", { name: "알림 제목" })).toHaveValue("보존할 제목");
+  });
+
   it("renders an unknown receipt after an indeterminate transport outcome without a resend action", async () => {
     vi.mocked(confirmManualNotification).mockRejectedValueOnce(new ReadmatesTransportError());
     renderRoute();

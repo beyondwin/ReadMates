@@ -46,8 +46,9 @@ export function HostWorkbox({
   onUndoDeferral,
   LinkComponent,
 }: HostWorkboxProps) {
-  const activeCount = view?.state === state ? view.items.length : 0;
-  const hasContinuation = view?.state === state && view.nextCursor !== null;
+  const loadedView = !loading && !error && view?.state === state ? view : null;
+  const activeCount = loadedView?.items.length ?? null;
+  const hasContinuation = loadedView?.nextCursor !== null && loadedView !== null;
 
   const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
@@ -83,7 +84,7 @@ export function HostWorkbox({
               onClick={() => onStateChange(value)}
               onKeyDown={(event) => onTabKeyDown(event, index)}
             >
-              {label} {value === state ? <span>{activeCount}{suffix}</span> : null}
+              {label} {value === state && activeCount !== null ? <span>{activeCount}{suffix}</span> : null}
             </button>
           );
         })}

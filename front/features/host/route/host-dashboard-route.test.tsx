@@ -329,6 +329,60 @@ describe("HostDashboardRoute", () => {
     }));
     expect(new Date(routeMocks.deferWorkbox.mock.calls[0][0].deferredUntil).getTime()).toBeGreaterThan(Date.now());
   });
+
+  it("submits a pending next-action deferral only once", async () => {
+    const key = "SCHEDULE_UNSEEN:opaque/server:key:r7";
+    const pendingDeferral: {
+      resolve: ((value: { key: string; deferredUntil: string }) => void) | null;
+    } = { resolve: null };
+    routeMocks.deferWorkbox.mockImplementationOnce(() => new Promise((resolve) => {
+      pendingDeferral.resolve = resolve;
+    }));
+    routeMocks.workboxPages.set("NOW", {
+      state: "NOW",
+      evaluatedAt: "2026-08-30T09:00:00Z",
+      sourceAvailability: [
+        { type: "SCHEDULE_UNSEEN", state: "AVAILABLE" },
+        { type: "MEMBER_APPROVAL", state: "AVAILABLE" },
+        { type: "RECORD_CLOSING", state: "AVAILABLE" },
+        { type: "INVITATION_EXPIRY", state: "AVAILABLE" },
+        { type: "NOTIFICATION_FAILURE", state: "AVAILABLE" },
+      ],
+      items: [{
+        key,
+        type: "SCHEDULE_UNSEEN",
+        state: "NOW",
+        title: "일정 확인이 필요한 멤버",
+        description: "미열람 1명",
+        count: 1,
+        dueAt: null,
+        deferredUntil: null,
+        resolvedAt: null,
+        destinationHref: "/app/host/sessions/session-7/schedule-review",
+        receiptSummary: null,
+      }],
+      nextCursor: null,
+    });
+    const futureMeeting = { ...meetingDetail, date: "2999-01-01" };
+    renderRoute("/clubs/reading-sai/app/host?phase=prep", dashboardData({
+      currentMeeting: futureMeeting,
+      operatingRoom: {
+        currentMeeting: {
+          sessionId: futureMeeting.sessionId,
+          selection: "OPEN",
+          scheduleSeenAvailability: "AVAILABLE",
+        },
+      },
+    }));
+
+    const button = await screen.findByRole("button", { name: "내일 09:00까지 보류" });
+    await userEvent.click(button);
+    expect(screen.getByRole("button", { name: "보류 중" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "보류 중" }));
+    expect(routeMocks.deferWorkbox).toHaveBeenCalledTimes(1);
+
+    pendingDeferral.resolve?.({ key, deferredUntil: "2026-09-01T00:00:00Z" });
+  });
   it("normalizes an unavailable URL phase with replace navigation and a visible reason", async () => {
     const futureDraft = { ...meetingDetail, state: "DRAFT" as const, date: "2999-01-01" };
     const { router } = renderRoute(

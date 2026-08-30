@@ -36,6 +36,12 @@ describe("HostNextAction", () => {
     expect(onDefer).toHaveBeenCalledWith("server/opaque:key:with exact bytes");
   });
 
+  it("disables the exact defer action while its authoritative key is pending", () => {
+    render(<HostNextAction action={actionable} onDefer={vi.fn()} pending />);
+
+    expect(screen.getByRole("button", { name: "보류 중" })).toBeDisabled();
+  });
+
   it("does not offer deferral without both server authority and a callback", () => {
     const { rerender } = render(
       <HostNextAction action={{ ...actionable, workItemKey: null }} onDefer={vi.fn()} />,

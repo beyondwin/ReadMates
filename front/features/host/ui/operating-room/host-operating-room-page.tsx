@@ -39,6 +39,7 @@ export type HostOperatingRoomPageProps = {
   onPhaseChange: (phase: HostMeetingPhase) => void;
   onRetryPreparation: () => void;
   onRetryOptional: () => void;
+  nextActionPending: boolean;
   onDeferNextAction: (workItemKey: string) => void;
   LinkComponent: HostLinkComponent;
 };
@@ -58,6 +59,7 @@ export function HostOperatingRoomPage({
   onPhaseChange,
   onRetryPreparation,
   onRetryOptional,
+  nextActionPending,
   onDeferNextAction,
   LinkComponent,
 }: HostOperatingRoomPageProps) {
@@ -109,6 +111,7 @@ export function HostOperatingRoomPage({
         <div className="rm-host-operating-room__primary">
           <HostNextAction
             action={view.nextAction}
+            pending={nextActionPending}
             onDefer={onDeferNextAction}
             LinkComponent={LinkComponent}
           />

@@ -2,7 +2,9 @@ import { useMemo, useRef, useState, type ComponentType, type ReactNode } from "r
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router";
 import type {
+  HostSessionDetailResponse,
   ManualNotificationConfirmResponse,
+  ManualNotificationOptionsResponse,
   ManualNotificationPreviewRequest,
   ManualNotificationPreviewResponse,
   ManualNotificationRequestedChannels,
@@ -59,12 +61,23 @@ type DurableReceipt = {
   detail: string;
 };
 
-const STALE_CODES = new Set([
+const AUTHORITY_CONFLICT_CODES = new Set([
   "MANUAL_NOTIFICATION_PREVIEW_STALE",
   "MANUAL_NOTIFICATION_CONTENT_STALE",
   "MANUAL_NOTIFICATION_STATE_INVALID",
   "MANUAL_NOTIFICATION_RECIPIENTS_CHANGED",
+  "MANUAL_NOTIFICATION_RECIPIENT_INVALID",
+  "MANUAL_NOTIFICATION_AUDIENCE_EMPTY",
+  "MANUAL_NOTIFICATION_TEMPLATE_UNAVAILABLE",
+]);
+
+const NON_CURRENT_PREVIEW_CODES = new Set([
+  "MANUAL_NOTIFICATION_PREVIEW_EXPIRED",
+  "MANUAL_NOTIFICATION_PREVIEW_NOT_FOUND",
+  "MANUAL_NOTIFICATION_PREVIEW_REUSED",
   "MANUAL_NOTIFICATION_SELECTION_INVALID",
+  "MANUAL_NOTIFICATION_COPY_INVALID",
+  "DUPLICATE_NOTIFICATION_DISPATCH",
 ]);
 
 export function HostScheduleReviewRoute({
@@ -108,23 +121,16 @@ function HostScheduleReviewSession({
     retry: false,
   });
   const template = optionsQuery.data?.templates.find((item) => item.eventType === "SESSION_REMINDER_DUE") ?? null;
-  const exactOptions = optionsQuery.data?.session?.sessionId === sessionId
-    && optionsQuery.data.session.scheduleRevision === detail?.scheduleRevision;
-  const authorityReady = Boolean(
-    detail
-    && detail.sessionId === sessionId
-    && scheduleAvailable
-    && exactOptions
-    && template?.enabled
-    && template.allowedAudiences.includes("SELECTED_MEMBERS"),
-  );
   const previewMutation = usePreviewManualNotificationMutation(context);
   const confirmMutation = useConfirmManualNotificationMutation(context);
   const [draftOverride, setDraftOverride] = useState<ScheduleReviewDraft | null>(null);
   const [previewSnapshot, setPreviewSnapshot] = useState<PreviewSnapshot | null>(null);
   const [receipt, setReceipt] = useState<DurableReceipt | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [authorityRecovery, setAuthorityRecovery] = useState<"idle" | "refreshing" | "failed">("idle");
   const currentSessionRef = useRef(sessionId);
+  const authorityReady = authorityRecovery === "idle"
+    && hasExactScheduleAuthority(detail, optionsQuery.data, sessionId);
   const eligibleIds = useMemo(() => detail?.attendees
       .filter((attendee) => attendee.scheduleSeenState === "STALE" || attendee.scheduleSeenState === "UNSEEN")
       .map((attendee) => attendee.membershipId) ?? [], [detail?.attendees]);
@@ -181,12 +187,31 @@ function HostScheduleReviewSession({
 
   const refreshAuthority = async () => {
     setPreviewSnapshot(null);
-    await Promise.all([
+    setAuthorityRecovery("refreshing");
+    await Promise.allSettled([
       queryClient.invalidateQueries({ queryKey: hostWorkboxKeys.scope(context) }),
       queryClient.invalidateQueries({ queryKey: hostSessionKeys.operatingRoomCurrent(context) }),
-      detailQuery.refetch(),
-      optionsQuery.refetch(),
-    ]).catch(() => undefined);
+    ]);
+    try {
+      const [detailResult, optionsResult] = await Promise.all([
+        detailQuery.refetch(),
+        optionsQuery.refetch(),
+      ]);
+      const recovered = !detailResult.isError
+        && !optionsResult.isError
+        && hasExactScheduleAuthority(detailResult.data, optionsResult.data, sessionId);
+      if (!recovered) {
+        setAuthorityRecovery("failed");
+        setError("최신 권한을 확인하지 못했습니다. 다시 확인한 뒤 새 미리보기를 만들어 주세요.");
+        return false;
+      }
+      setAuthorityRecovery("idle");
+      return true;
+    } catch {
+      setAuthorityRecovery("failed");
+      setError("최신 권한을 확인하지 못했습니다. 다시 확인한 뒤 새 미리보기를 만들어 주세요.");
+      return false;
+    }
   };
 
   const previewNotification = async () => {
@@ -198,9 +223,15 @@ function HostScheduleReviewSession({
       if (currentSessionRef.current !== selection.sessionId) return;
       setPreviewSnapshot({ response, selection });
     } catch (previewError) {
-      if (isStaleError(previewError)) {
+      const disposition = manualNotificationErrorDisposition(previewError);
+      if (disposition !== "unknown") setPreviewSnapshot(null);
+      if (disposition === "authority") {
         setError("일정 또는 수신 대상이 변경되었습니다. 최신 정보로 새 미리보기를 만들어 주세요.");
         await refreshAuthority();
+        return;
+      }
+      if (disposition === "preview") {
+        setError("이 미리보기는 더 이상 사용할 수 없습니다. 새 미리보기를 만들어 주세요.");
         return;
       }
       setError("미리보기를 만들지 못했습니다. 대상과 문구를 확인한 뒤 다시 시도해 주세요.");
@@ -241,9 +272,15 @@ function HostScheduleReviewSession({
         setPreviewSnapshot(null);
         return;
       }
-      if (isStaleError(confirmError)) {
+      const disposition = manualNotificationErrorDisposition(confirmError);
+      if (disposition !== "unknown") setPreviewSnapshot(null);
+      if (disposition === "authority") {
         setError("미리보기 이후 일정 또는 수신 대상이 변경되었습니다. 최신 정보로 새 미리보기를 만들어 주세요.");
         await refreshAuthority();
+        return;
+      }
+      if (disposition === "preview") {
+        setError("이 미리보기는 더 이상 사용할 수 없습니다. 새 미리보기를 만들어 주세요.");
         return;
       }
       setError("발송 요청이 완료되지 않았습니다. 현재 미리보기와 재발송 여부를 확인해 주세요.");
@@ -252,6 +289,23 @@ function HostScheduleReviewSession({
 
   if (!sessionId) {
     return <ScheduleReviewUnavailable message="검토할 모임을 찾을 수 없습니다." returnHref={returnHref} LinkComponent={LinkComponent} />;
+  }
+  if (authorityRecovery === "refreshing") {
+    return <main className="rm-schedule-review"><p role="status">최신 일정과 알림 권한을 다시 확인하는 중입니다.</p></main>;
+  }
+  if (authorityRecovery === "failed") {
+    return (
+      <ScheduleReviewUnavailable
+        message="최신 권한을 확인하지 못했습니다. 다시 확인한 뒤 새 미리보기를 만들어 주세요."
+        returnHref={returnHref}
+        onRetry={() => {
+          void refreshAuthority().then((recovered) => {
+            if (recovered) setError(null);
+          });
+        }}
+        LinkComponent={LinkComponent}
+      />
+    );
   }
   if (detailQuery.isPending) {
     return <main className="rm-schedule-review"><p role="status">모임 일정 상태를 불러오는 중입니다.</p></main>;
@@ -435,10 +489,30 @@ function ScheduleReviewUnavailable({
   );
 }
 
-function isStaleError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
+function manualNotificationErrorDisposition(error: unknown): "authority" | "preview" | "unknown" {
+  if (!error || typeof error !== "object") return "unknown";
   const code = (error as { code?: unknown }).code;
-  return typeof code === "string" && STALE_CODES.has(code);
+  if (typeof code !== "string") return "unknown";
+  if (AUTHORITY_CONFLICT_CODES.has(code)) return "authority";
+  if (NON_CURRENT_PREVIEW_CODES.has(code)) return "preview";
+  return "unknown";
+}
+
+function hasExactScheduleAuthority(
+  detail: HostSessionDetailResponse | undefined,
+  options: ManualNotificationOptionsResponse | undefined,
+  sessionId: string,
+): boolean {
+  const template = options?.templates.find((item) => item.eventType === "SESSION_REMINDER_DUE");
+  return Boolean(
+    detail
+    && detail.sessionId === sessionId
+    && detail.scheduleSeenAvailability === "AVAILABLE"
+    && options?.session?.sessionId === sessionId
+    && options.session.scheduleRevision === detail.scheduleRevision
+    && template?.enabled
+    && template.allowedAudiences.includes("SELECTED_MEMBERS"),
+  );
 }
 
 function receiptFromConfirm(result: ManualNotificationConfirmResponse): DurableReceipt {

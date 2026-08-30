@@ -91,6 +91,8 @@ describe("HostWorkbox", () => {
       onUndoDeferral={vi.fn()}
     />);
     expect(screen.getByRole("status")).toHaveTextContent("작업함을 불러오는 중");
+    expect(screen.getByRole("tab", { name: "지금" })).toBeVisible();
+    expect(screen.queryByRole("tab", { name: "지금 0" })).not.toBeInTheDocument();
 
     rerender(<HostWorkbox
       state="NOW"
@@ -105,6 +107,7 @@ describe("HostWorkbox", () => {
       onUndoDeferral={vi.fn()}
     />);
     expect(screen.getByRole("alert")).toHaveTextContent("작업함을 불러오지 못했습니다");
+    expect(screen.getByRole("tab", { name: "지금" })).toBeVisible();
 
     rerender(<HostWorkbox
       state="NOW"
@@ -119,6 +122,14 @@ describe("HostWorkbox", () => {
       onUndoDeferral={vi.fn()}
     />);
     expect(screen.getByText("지금 처리할 작업이 없습니다.")).toBeVisible();
+    expect(screen.getByRole("tab", { name: "지금 0" })).toBeVisible();
+  });
+
+  it("hides a stale page count during a cursor transition", () => {
+    renderWorkbox({ loading: true });
+
+    expect(screen.getByRole("tab", { name: "지금" })).toBeVisible();
+    expect(screen.queryByRole("tab", { name: "지금 1+" })).not.toBeInTheDocument();
   });
 
   it("marks overdue work and follows only the server destination", () => {
