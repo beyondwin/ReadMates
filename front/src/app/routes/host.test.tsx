@@ -1,5 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
-import type { LoaderFunctionArgs, RouteObject } from "react-router";
+import { render, waitFor } from "@testing-library/react";
+import { createMemoryRouter, RouterProvider, type LoaderFunctionArgs, type RouteObject } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { hostRoutes } from "./host";
 
@@ -100,6 +101,40 @@ describe("hostRoutes", () => {
         "operations",
       ]));
     }
+  });
+
+  it.each([
+    ["members", "HostMembersRedirectElement"],
+    ["invitations", "HostInvitationsRedirectElement"],
+    ["operations", "HostOperationsRedirectElement"],
+  ])("loads only the %s compatibility redirect in the unscoped route", async (path, componentName) => {
+    const route = hostRoutes(new QueryClient())
+      .find((candidate) => candidate.id === "app-host")
+      ?.children?.find((candidate) => candidate.path === path);
+
+    const module = await route?.lazy?.({} as never);
+    expect(module?.Component?.name).toBe(componentName);
+    expect(module?.loader).toBeUndefined();
+  });
+
+  it.each([
+    ["members", "/clubs/reading-sai/app/host/people"],
+    ["invitations", "/clubs/reading-sai/app/host/settings#invitations"],
+    ["operations", "/clubs/reading-sai/app/host"],
+  ])("renders only the scoped %s compatibility redirect", async (path, destination) => {
+    const route = hostRoutes(new QueryClient())
+      .find((candidate) => candidate.id === "club-app-host")
+      ?.children?.find((candidate) => candidate.path === path);
+    const destinationUrl = new URL(destination, "https://readmates.local");
+    const router = createMemoryRouter([
+      { path: `/clubs/:clubSlug/app/host/${path}`, element: route?.element },
+      { path: destinationUrl.pathname, element: <div>canonical</div> },
+    ], { initialEntries: [`/clubs/reading-sai/app/host/${path}`] });
+
+    render(<RouterProvider router={router} />);
+    await waitFor(() => expect(router.state.location.pathname).toBe(destinationUrl.pathname));
+    expect(router.state.location.hash).toBe(destinationUrl.hash);
+    expect(router.state.historyAction).toBe("REPLACE");
   });
 
   it("registers the schedule review route in both scoped and compatibility trees", () => {

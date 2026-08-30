@@ -1,5 +1,5 @@
 import { HostCompatibilityRedirectElement } from "./host-compatibility-redirect-element";
 
-export function HostOperationsRedirectElement() {
+export function HostMembersRedirectElement() {
   return <HostCompatibilityRedirectElement />;
 }

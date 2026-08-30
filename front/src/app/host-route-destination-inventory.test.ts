@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { HOST_ROUTE_DESTINATION_INVENTORY } from "./route-continuity";
+import {
+  HOST_ROUTE_DESTINATION_INVENTORY,
+  hostCompatibilityRedirectTarget,
+} from "./route-continuity";
 import { HOST_ROUTE_HREFS, HOST_ROUTE_PATHS } from "@/shared/routing/host-route-destinations";
 
 describe("host route destination inventory", () => {
@@ -126,7 +129,7 @@ describe("host route destination inventory", () => {
     expect(HOST_ROUTE_HREFS.trashCompatibility).toBe(`${HOST_ROUTE_HREFS.meetings}?view=trash`);
   });
 
-  it("preserves only the named compatibility route aliases until Stage 5", () => {
+  it("keeps only the named legacy aliases as exact compatibility redirect entries", () => {
     expect(HOST_ROUTE_PATHS).toMatchObject({
       today: "",
       members: "members",
@@ -139,6 +142,33 @@ describe("host route destination inventory", () => {
       invitations: "/app/host/invitations",
       operations: "/app/host/operations",
     });
+    expect(HOST_ROUTE_DESTINATION_INVENTORY.filter((entry) => entry.kind === "compatibility"))
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ owner: "host-members-compatibility", returnHref: "/app/host/people" }),
+        expect.objectContaining({ owner: "host-invitations-compatibility", returnHref: "/app/host/settings" }),
+        expect.objectContaining({ owner: "host-operations-compatibility", returnHref: "/app/host" }),
+      ]));
+  });
+
+  it.each([
+    ["/app/host/members", "/app/host/people"],
+    ["/app/host/invitations", "/app/host/settings#invitations"],
+    ["/app/host/operations", "/app/host"],
+    ["/clubs/reading-sai/app/host/members", "/clubs/reading-sai/app/host/people"],
+    ["/clubs/reading-sai/app/host/invitations", "/clubs/reading-sai/app/host/settings#invitations"],
+    ["/clubs/reading-sai/app/host/operations", "/clubs/reading-sai/app/host"],
+  ])("maps only the approved compatibility pathname %s", (pathname, expected) => {
+    expect(hostCompatibilityRedirectTarget({ pathname })).toBe(expected);
+  });
+
+  it.each([
+    "/app/host/records",
+    "/clubs/reading-sai/app/host/records",
+    "/app/host/sessions/session-previous/edit",
+    "/clubs/reading-sai/app/host/sessions/session-previous/closing",
+  ])("does not redirect canonical or non-current session deep link %s", (pathname) => {
+    expect(hostCompatibilityRedirectTarget({ pathname, search: "?from=bookmark", hash: "#focus" }))
+      .toBeNull();
   });
 
   it("assigns canonical return ownership to session, person, and record details", () => {

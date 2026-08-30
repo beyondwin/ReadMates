@@ -109,13 +109,9 @@ function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
       path: HOST_ROUTE_PATHS.members,
       errorElement: <HostRouteError />,
       fallback: <ReadmatesRouteLoading label="멤버 목록을 불러오는 중" variant="host" />,
-      load: async () => {
-        const [{ HostMembersRouteElement: Component }, { hostMembersLoaderFactory }] = await Promise.all([
-          import("@/src/app/host-routes/members-route-element"),
-          import("@/features/host/route/host-members-data"),
-        ]);
-        return { Component, loader: hostMembersLoaderFactory(queryClient) };
-      },
+      load: async () => ({
+        Component: (await import("@/src/app/host-routes/members-redirect-element")).HostMembersRedirectElement,
+      }),
     }),
     scopedHostRoute({
       path: HOST_ROUTE_PATHS.invitations,
@@ -287,14 +283,8 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
       errorElement: <HostRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 목록을 불러오는 중" variant="host" />,
       lazy: async () => {
-        const [{ HostMembersRouteElement }, { hostMembersLoaderFactory }] = await Promise.all([
-          import("@/src/app/host-routes/members-route-element"),
-          import("@/features/host/route/host-members-data"),
-        ]);
-        return {
-          Component: HostMembersRouteElement,
-          loader: hostMembersLoaderFactory(queryClient),
-        };
+        const { HostMembersRedirectElement } = await import("@/src/app/host-routes/members-redirect-element");
+        return { Component: HostMembersRedirectElement };
       },
     },
     {

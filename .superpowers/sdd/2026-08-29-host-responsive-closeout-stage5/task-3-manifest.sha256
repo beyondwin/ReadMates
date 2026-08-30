@@ -1,0 +1,10 @@
+deff9d491bdee52eded6a6ee39f33577dd2dc99467ee74d3f05f4ef8bd9eca0f  .superpowers/sdd/2026-08-29-host-responsive-closeout-stage5/task-3-brief.md
+72557a8c5f26b92680d63a32b9c64d627bd27e3d402658e27334e545c8ae8183  front/src/app/host-route-destination-inventory.test.ts
+191855fd6098794b4276795ec8f1f6c729ce082e1b47e63c55334c7cf005d968  front/src/app/host-routes/host-compatibility-redirect-element.tsx
+a3f98889f3afbdbcf117a3641cdd95ac73c67700a0f694a5beeac3e10ee7d01f  front/src/app/host-routes/host-redirects.test.tsx
+b8853887aa34d6adcb11ff3e5dbcf35f855162d46ec68a0463e8dc945a9ca029  front/src/app/host-routes/invitations-redirect-element.tsx
+180cacebd5e0e0ffb6ac5657a121ae50dc494471b24f215f33f06cb48372a234  front/src/app/host-routes/members-redirect-element.tsx
+6cb356f82795183e380139b046aff5a9b09a7afab3dd60e5329421ad5eb847e1  front/src/app/host-routes/operations-redirect-element.tsx
+8ea74ccfcb9f8a98ef582cc055b6cc7aef9ff0afbf905e955e440f4dad759fa0  front/src/app/route-continuity.ts
+b0a8d7e8b07751653f9d6f21aa979a9d7bcbad8c0cdadc61178ca80d07a8e38e  front/src/app/routes/host.test.tsx
+43495712605954268cb8c9907faee52edc7d621883f8dafa719d8af09a5b40a1  front/src/app/routes/host.tsx

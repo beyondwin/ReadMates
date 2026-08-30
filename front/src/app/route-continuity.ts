@@ -1,4 +1,5 @@
 import {
+  readAppReturnTarget,
   readmatesReturnState,
   type ReadmatesReturnState,
   type ReadmatesReturnTarget,
@@ -57,6 +58,46 @@ export const hostRecordsReturnTarget: ReadmatesReturnTarget = {
 };
 
 export const hostDashboardReturnTarget = hostOperatingRoomReturnTarget;
+
+const invalidCompatibilityReturnTarget: ReadmatesReturnTarget = {
+  href: "",
+  label: "",
+};
+
+const hostCompatibilityDestinations = {
+  members: { segment: "people", hash: null },
+  invitations: { segment: "settings", hash: "#invitations" },
+  operations: { segment: "", hash: null },
+} as const;
+
+export function hostCompatibilityRedirectTarget({
+  pathname,
+  search = "",
+  hash = "",
+}: {
+  pathname: string;
+  search?: string;
+  hash?: string;
+}) {
+  const match = /^(?<root>\/app\/host|\/clubs\/[^/]+\/app\/host)\/(?<legacy>members|invitations|operations)$/.exec(pathname);
+  if (!match?.groups) {
+    return null;
+  }
+
+  const legacy = match.groups.legacy as keyof typeof hostCompatibilityDestinations;
+  const destination = hostCompatibilityDestinations[legacy];
+  const targetPathname = destination.segment
+    ? `${match.groups.root}/${destination.segment}`
+    : match.groups.root;
+  return `${targetPathname}${search}${destination.hash ?? hash}`;
+}
+
+export function hostCompatibilityRedirectState(state: unknown, targetPathname: string) {
+  const returnTarget = readAppReturnTarget(state, targetPathname, invalidCompatibilityReturnTarget);
+  return returnTarget === invalidCompatibilityReturnTarget
+    ? null
+    : readmatesReturnState(returnTarget);
+}
 
 export type HostRouteDestinationInventoryEntry = {
   owner: string;
