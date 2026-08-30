@@ -1,8 +1,10 @@
 # Task 2.4 — workflow transition safety registration report
 
-Date: 2026-08-30
+Date: 2026-08-31
 
-Base: `b3c9c5cad478634792e6fe73dcd65608e6b25dcb`
+Initial Task 2.4 base: `b3c9c5cad478634792e6fe73dcd65608e6b25dcb`
+
+Reviewer round 1 base: `828cdde508e8d8c76142af6e3985d08f0ab15399`
 
 Branch: `codex/admin-operations-product-redesign`
 
@@ -34,9 +36,23 @@ Ruling: no `sessionStorage` recovery capsule is introduced — takedown canonica
 
 Ruling: live CDN/provider execution is not measured — the focused fake-clock browser contract proves bounded browser/BFF behavior without billable or external side effects — a live purge would exceed authority and could affect real users.
 
+## Reviewer round 1 remediation
+
+Ruling: 공개 takedown의 transport-error handle은 mounted route가 계속 보유하고 confirm을 잠근다 — unknown 상태에서 재요청을 금지하고, normal unmount가 원 요청과 byte-identical한 lookup을 최대 한 번 수행한 뒤 capsule/registry를 비우며, authority loss 뒤 late settlement는 request 1/replay 0/zero publication을 보장하는 실제 route test가 통과한다 — stale render state로 handle을 지우면 private capsule 고아와 중복 destructive command가 다시 생긴다.
+
+Ruling: inventory의 mounted 집합은 `src/main.tsx`에서 시작하는 실제 production import graph로 계산하고 exported-write scan은 repository-wide로 수행한다 — nested runtime chain, manifest 없는 mounted import, mounted out-of-domain action, API/query/storage/logout export의 negative fixture가 모두 실패를 강제한다 — owner manifest 자체에서 reachability를 만들면 누락된 owner를 영원히 탐지하지 못한다.
+
+Ruling: settlement acceptance는 publication 권한의 대체물이 아니므로 cache/UI/error/copy/navigation/receipt/draft/refetch 각각을 `publishAccepted` generation fence 안에서 수행한다 — AI cancel, admin command failures, profile/current-session/host workflows, notification navigation, session receipt callback의 obsolete interleaving은 publication 0을 증명한다 — settle 직후 unmount나 authority change가 오면 obsolete 결과가 새 화면과 cache를 오염시킨다.
+
+Ruling: invitation refresh와 row/link publication은 route-owned registered action의 cache/UI publisher로만 노출한다 — host invitations와 host members presentation은 cache writer를 import하지 않고 accepted 결과만 반영하며 obsolete owner는 refresh와 row publication을 모두 0회 수행한다 — UI가 response 뒤 refresh를 직접 하면 route owner를 잃은 요청도 새 화면을 갱신한다.
+
+Ruling: nested frontend boundary는 `features/**/ui/**`에서 sibling/nested `features/**/{api,queries,route}/**`, app/page/router, direct fetch를 모두 금지한다 — host/aigen nested query와 API negative fixture는 실패하고 callback-only presentation fixture만 통과한다 — one-segment matcher는 실제 nested host feature를 검사하지 않는 거짓 안전망이다.
+
+Ruling: factory-fence 첫 재실행의 단일 실패는 `gcTime: 0` inactive cache seed 소멸에 의존한 test fixture를 제거해 해결했다 — mutation이 cache를 자동 생성하지 않고 explicit publisher만 생성한다는 동일 계약을 deterministic하게 검증해 재실행 17/17·118/118이 통과했다 — product publication을 바꾸면 테스트 타이밍 결함을 기능 변경으로 은폐한다.
+
 ## Regenerated mutation producer and import-reachability inventory
 
-The candidate scan was regenerated from the clean current tree before implementation across `front/src/app`, `front/shared`, and all `front/features`. It combines mounted reachable writes with repository-wide exported writes. The current typed inventory has 69 entries: 25 `register`, 19 `modify`, 17 `verified-no-change`, and 8 `out-of-domain`. Recovery counts are L1 17, L2 8, L3 19, and none 25. Paths below are exact and relative to `front/`.
+The candidate scan was regenerated from the clean current tree before implementation across `front/src`, `front/shared`, and all `front/features`. It combines a production import graph rooted at `src/main.tsx` with a repository-wide exported-write scan. The current typed inventory has 88 entries: 25 `register`, 33 `modify`, 22 `verified-no-change`, and 8 `out-of-domain`. Recovery counts are L1 20, L2 9, L3 29, and none 30. Paths below are exact and relative to `front/`.
 
 | Path/export | Classification | Owner(s) | Recovery | Evidence |
 |---|---|---|---|---|
@@ -46,9 +62,14 @@ The candidate scan was regenerated from the clean current tree before implementa
 | `features/notifications/route/member-notification-settings-route.tsx` | register | same path | L1 | saveNotificationPreferences; dirty-preferences |
 | `features/notifications/route/member-notifications-route.tsx` | register | same path | L1 | memberNotificationsActions; notifications-refetch |
 | `features/auth/route/login-route.tsx` | verified-no-change | — | none | pre-auth; outside authenticated transitions |
+| `features/auth/api/auth-api.ts` | verified-no-change | login route | none | pre-auth transport; outside authenticated transitions |
 | `features/host/queries/host-state-purge.ts` | verified-no-change | `src/app/host-authority-loss-controller.tsx` | none | authority cleanup; not a user command |
+| `shared/api/host-authority-event.ts` | verified-no-change | host authority-loss controller | none | request cancellation; not a user command |
 | `shared/auth/club-access-api.ts` | verified-no-change | `src/app/layouts/app-route-layout.tsx` | none | transport primitive; response ignored |
-| `src/app/layouts/app-route-layout.tsx` | verified-no-change | same path | none | ambient touch; one request |
+| `shared/auth/session-api.ts` | verified-no-change | app route layout | none | logout transport; out-of-space terminal transition |
+| `src/app/layouts/app-route-layout.tsx#touchClubAccessOnce` | verified-no-change | same path | none | ambient touch; one request |
+| `src/app/layouts/app-route-layout.tsx#logoutCurrentSession` | verified-no-change | same path | none | out-of-space terminal transition; cache clear; auth reset; navigation replace |
+| `features/auth/route/logout-button.tsx` | verified-no-change | app route layout | none | mounted logout trigger; callback only |
 | `features/host/route/host-operations-route.tsx` | register | same path | L1 | AI defaults; accepted publication |
 | `features/host/route/host-dashboard-route.tsx` | register | same path | L1 | attendance and restore mutations |
 | `features/host/route/host-meeting-ledger-route.tsx` | register | same path | L2 | create session; access scope |
@@ -63,12 +84,22 @@ The candidate scan was regenerated from the clean current tree before implementa
 | `features/host/route/host-session-ledger-route.tsx` | register | same path | L2 | restore; receipt recovery |
 | `features/host/route/new-host-meeting-route.tsx` | register | same path | L2 | dirty draft; create meeting |
 | `features/notifications/route/member-notifications-data.ts` | modify | `features/notifications/route/member-notifications-route.tsx` | L1 | observation only; explicit publisher |
+| `features/notifications/api/notifications-api.ts` | modify | member notifications data/route | L1 | transport write; registered route owner |
+| `features/notifications/api/notification-preferences-api.ts` | modify | member notification settings route | L1 | transport write; registered route owner |
+| `features/archive/api/archive-api.ts` | modify | account/profile route owners | L2 | transport writes; registered route owners |
+| `features/current-session/api/current-session-api.ts` | modify | current session route | L1 | transport writes; registered route owner |
 | `features/host/route/host-members-data.ts` | modify | `features/host/route/host-members-route.tsx` | L1 | observation only; explicit publisher |
 | `features/host/route/host-invitations-data.ts` | modify | invitation and members routes | L1 | uncached list; accepted refresh only |
 | `features/host/route/host-session-editor-actions.ts` | modify | session editor route | L3 | observation only; explicit receipt callback |
 | `features/archive/queries/profile-queries.ts` | modify | profile update controller | L1 | useMutation; explicit publisher |
 | `features/current-session/queries/current-session-queries.ts` | modify | current session route | L1 | useMutation; explicit publisher |
 | `features/host/aigen/queries/aigen-job-queries.ts` | modify | session editor and meeting workspace routes | L3 | useMutation; explicit publisher |
+| `features/host/aigen/api/aigen-api.ts` | modify | AI generate controller | L3 | transport writes; registered route owner |
+| `features/host/aigen/storage/aigen-draft-storage.ts` | modify | AI generate controller | L3 | local draft writes; registered dirty owner |
+| `features/host/api/host-api.ts` | modify | host workspace/member/invitation route owners | L3 | transport writes; registered route owners |
+| `features/host/api/host-session-record-api.ts` | modify | host session editor route | L3 | transport writes; registered route owner |
+| `features/host/api/host-session-recovery-api.ts` | modify | host session editor route | L3 | transport writes; registered route owner |
+| `features/host/storage/host-sensitive-storage.ts` | modify | session editor/workspace route owners | L3 | sensitive local writes; registered route owners |
 | `features/host/queries/host-invitation-queries.ts` | modify | invitation and members routes | L1 | useMutation; explicit publisher |
 | `features/host/queries/host-members-queries.ts` | modify | members route | L1 | useMutation; explicit publisher |
 | `features/host/queries/host-notification-queries.ts` | modify | notifications, composer, and workspace routes | L3 | useMutation; explicit publisher |
@@ -88,6 +119,10 @@ The candidate scan was regenerated from the clean current tree before implementa
 | `features/platform-admin/queries/platform-admin-queries.ts` | modify | admin shell and club detail routes | L3 | useMutation; explicit publisher |
 | `features/platform-admin/queries/platform-admin-support-queries.ts` | modify | support route | L3 | useMutation; explicit publisher |
 | `features/platform-admin/queries/platform-admin-takedown-queries.ts` | modify | public takedown route | L3 | one confirm request; explicit publisher |
+| `features/platform-admin/api/platform-admin-api.ts` | modify | AI ops/club detail/admin shell owners | L3 | transport writes; registered route owners |
+| `features/platform-admin/api/platform-admin-notifications-api.ts` | modify | admin notifications route | L3 | transport write; registered route owner |
+| `features/platform-admin/api/platform-admin-support-api.ts` | modify | support route | L3 | transport write; registered route owner |
+| `features/platform-admin/api/platform-admin-takedown-api.ts` | modify | public takedown route | L3 | transport write; registered receipt owner |
 | `features/host/aigen/ui/AiGenerateTab.tsx` | verified-no-change | AI route controller | none | presentation slot |
 | `features/host/aigen/ui/PreviewView.tsx` | verified-no-change | session editor route | none | callback only |
 | `features/host/aigen/ui/RegenerateModal.tsx` | verified-no-change | session editor route | none | callback only |
@@ -116,9 +151,9 @@ The audit result is exact: no unclassified paths, no out-of-domain export with a
 
 Ruling: `host-draft-route-navigation-guard.ts` and `use-session-record-draft-controller.ts` remain unchanged — their existing `shouldBlockNavigation` projection is consumed by the new route owner without weakening their domain-specific guard — editing them would duplicate dirty-state authority.
 
-Ruling: `src/app/layouts/app-route-layout.tsx`, `shared/auth/club-access-query.ts`, and their two exact tests remain unchanged — source and request-count tests already prove a response-ignored one-time ambient touch, and the inventory classifies it as verified-no-change — registering it would incorrectly turn a best-effort timestamp into a user command.
+Ruling: `src/app/layouts/app-route-layout.tsx`, `shared/auth/club-access-query.ts`, and their two exact tests remain unchanged — `touchClubAccessOnce` is the response-ignored one-time ambient touch, while mounted logout is separately classified as an out-of-space terminal transition with cache/auth/navigation evidence — conflating the two would hide a multi-write logout path.
 
-Ruling: the existing route tests for account settings, current session, member notification settings, host operations, host notification composer, Admin Today, admin club detail, admin support, admin notifications, admin AI ops, and admin shell remain unchanged — the existing behavior suites pass in the 504-test focused partition while shared-owner, factory-fence, and newly added route-owner tests cover the new settlement boundary — mechanical edits with no new assertion would add churn but no evidence.
+Ruling: unchanged route tests remain valid where their production behavior did not need a new interleaving assertion; account settings, invitation, takedown, shared owner, and session-editor action tests changed because reviewer findings required precise obsolete-owner evidence — changing every plan-listed test mechanically would add churn without strengthening the authority proof.
 
 Ruling: `host-session-editor-route.test.tsx` remains unchanged — its existing route behavior is covered in the focused partition and the new `host-session-editor-transition-safety.test.tsx`, workspace-action test, action publisher test, and full legacy route suite cover registration/publication composition — altering the planned file merely to mark it changed would weaken review signal.
 
@@ -134,6 +169,8 @@ Ruling: `aigen-presentation-types.ts`, `ai-generate-controller.tsx`, and the new
 
 Ruling: `host-session-editor.test.tsx` injects an AI renderer in its presentation harness — the real app injects the route controller, while the UI test must remain independent of it — importing the controller into the UI test would reverse the intended dependency.
 
+Ruling: `tests/unit/host-invitations.test.tsx` and `tests/unit/host-members.test.tsx` now adapt raw transport doubles into registered result publishers — full-suite RED proved their old mocks represented a pre-owner contract — adding a production fallback would let presentation call cache writers and violate the reviewed boundary.
+
 ## TDD and debugging evidence
 
 - Inventory/boundary RED: eight planned source-fixture tests initially failed because Vitest transformed `import.meta.url` into a non-file URL; changing the test reader to repository-relative fixture paths produced 11 files / 14 tests GREEN.
@@ -143,16 +180,21 @@ Ruling: `host-session-editor.test.tsx` injects an AI renderer in its presentatio
 - Playwright RED: two runs were 0/5 because the admin shell's unmocked health snapshot returned 401 and redirected to login. Network response instrumentation identified `/api/bff/api/admin/health/snapshot`; adding the real shell dependency to the fixtures produced 5/5 GREEN.
 - Full frontend RED: 5/440 files and 19/3933 tests failed. Cache-aware authoritative pre-command lookup had been replaced by unconditional fetch, notification failure reconciliation was not invoked by its owner, and presentation tests lacked the injected AI renderer. No automatic mutation publication was restored; the corrected owner boundary produced 440/440 and 3933/3933 GREEN.
 - Server CI RED: the first run found three MaxLineLength issues in the changed takedown integration test plus three pre-existing Detekt issues. The changed lines were fixed. The second run reports only the three untouched baseline issues, proven by an empty `git diff --exit-code HEAD --` over those files.
+- Reviewer round 1 RED: 7/33 targeted tests failed across all five findings: missing production graph/export scan, nested matcher escape, obsolete account success, invitation refresh outside owner, takedown duplicate confirm, and mounted late cache publication. Focused fixes produced 51/51 files and 516/516 tests GREEN.
+- Full-suite round 1 RED: 2 legacy invitation UI files had 8 failures because their raw transport mocks bypassed the new registered result contract. Test-only registered adapters retained the request/refresh assertions without production fallback; the final full suite is 440/440 and 3948/3948 GREEN.
+- Owner-wide round 1 audit found and fenced additional notification finally/navigation, host restore/attendance, new-meeting error, current-session local cache/result, AI regeneration result, and host-ledger composer publications. The final targeted partition is 5/5 files and 53/53 tests GREEN and the production build succeeds.
+- Final self-review RED: create and revoke route tests proved definite invitation HTTP failures incorrectly entered detached response-loss reconciliation and could retain a pending handle. Known HTTP failures now settle once and expose only an owner-fenced `errorCopy` callback; the component publisher tests and actual host-members obsolete interleaving are GREEN.
+- Final full-suite rerun diagnosed one unrelated status-copy race in `host-session-editor-authority-navigation.test.tsx`; its isolated 3/3 rerun and the next complete 440/440·3947/3947 run passed without source changes. A subsequent final-source run, including the added host-members obsolete interleaving, passed 440/440·3948/3948. The isolated failure is recorded as non-deterministic test evidence, not hidden as product GREEN.
 
 ## Verification ledger
 
 | Command | Exit | Result |
 |---|---:|---|
-| Exact Task 2.4 focused Vitest command from the brief | 0 | 51 files, 504 tests passed |
+| Exact Task 2.4 focused Vitest command from the brief | 0 | 51 files, 516 tests passed |
 | Exact factory/publication fence command from the brief | 0 | 17 files, 118 tests passed |
-| `npx --yes corepack@0.35.0 pnpm --dir front test` | 0 | 440 files, 3933 tests passed |
-| `npx --yes corepack@0.35.0 pnpm --dir front lint` | 0 | 0 errors; 2 pre-existing Fast Refresh warnings |
-| `npx --yes corepack@0.35.0 pnpm --dir front build` | 0 | 789 modules; chunk-size warning only |
+| `npx --yes corepack@0.35.0 pnpm --dir front test` | 0 | final rerun: 440 files, 3948 tests passed |
+| `npx --yes corepack@0.35.0 pnpm --dir front lint` | 0 | 0 errors; 2 existing Fast Refresh warnings |
+| `npx --yes corepack@0.35.0 pnpm --dir front build` | 0 | 790 modules; chunk-size warning only |
 | Exact focused Playwright command from the brief | 0 | Chromium 5/5 passed |
 | `./server/gradlew -p server integrationTest --tests '*PlatformAdminPublicTakedownIntegrationTest' --rerun-tasks` | 0 | fresh BUILD SUCCESSFUL, 5 executed tasks |
 | `./scripts/server-ci-check.sh` after scoped style fix | 1 | only 3 untouched baseline Detekt violations remain |
@@ -165,6 +207,8 @@ Ruling: `host-session-editor.test.tsx` injects an AI renderer in its presentatio
 | changed/untracked path scan for local absolute paths, private-key headers, and AWS access-key shapes | 0 | no matches |
 | in-progress `python3 scripts/agent-preflight.py ... --json` | 2 | expected safety stop because planned edit paths overlapped the dirty implementation |
 | post-commit `python3 scripts/agent-preflight.py --intent change --base b3c9c5cad478634792e6fe73dcd65608e6b25dcb --paths front --paths server/src/test/kotlin/com/readmates/admin/takedown/api/PlatformAdminPublicTakedownIntegrationTest.kt --paths .superpowers/sdd/2026-08-30-platform-admin-operations-product-redesign/task-2-4-report.md --json` | 0 | clean tree; no stop reasons |
+| reviewer round 1 dirty-tree `python3 scripts/agent-preflight.py --intent change --base 828cdde508e8d8c76142af6e3985d08f0ab15399 --paths front --paths .superpowers/sdd/2026-08-30-platform-admin-operations-product-redesign/task-2-4-report.md --json` | 2 | expected sole stop: planned edit paths overlap the preserved dirty implementation |
+| reviewer round 1 post-commit preflight with the same base and paths | 0 | clean tree; 54 base paths classified and no stop reasons |
 
 The exact focused and factory commands are the literal file lists in `task-2-4-brief.md`; they were run without omission. Corepack was unavailable, so every frontend command used the required `npx --yes corepack@0.35.0 pnpm` launcher (pnpm 11.13.1).
 
@@ -174,7 +218,8 @@ The exact focused and factory commands are the literal file lists in `task-2-4-b
 - The exact authority-loss proof orders begin, unregister, authority loss, original late settlement, and reconciliation. It observes original request count 1, replay count 0, `authority-lost`, eight rejected publication surfaces including sessionStorage, cleared retained request, and registry size 0.
 - The separate normal-unmount proof performs one byte-identical lookup, then clears the capsule and registry.
 - Query/action factories contain no automatic `onSuccess` or `onError` publication. Explicit publisher functions are called only from registering owners after accepted settlement.
-- Invitation detached recovery lists without cache writes and never replays create/reissue/revoke. Accepted owners alone invoke refresh.
+- Cache, UI, error/copy, navigation, receipt, draft, and refetch effects are individually guarded by `publishAccepted`/`publishTransitionAction`; an accepted settlement alone does not authorize later async publication.
+- Invitation detached recovery lists without cache writes and never replays create/reissue/revoke. Accepted owners alone invoke refresh, and the actual host-members obsolete interleaving publishes neither rows nor success copy.
 - Nested UI imports no query, API, route, app, page, router, or direct fetch; the negative fixtures prove the scanner catches these imports at arbitrary UI nesting depth.
 - No real member data, secret, private domain, deployment state, token, or local absolute path is present in tracked changes.
 

@@ -42,7 +42,7 @@ import {
 } from "@/features/host/ui/meeting-ledger/host-meeting-ledger";
 import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
-import { TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import { publishTransitionAction, TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 function contextFromClubSlug(clubSlug?: string): ExplicitReadmatesApiContext {
   return requireHostClubContext(clubSlug);
@@ -217,8 +217,8 @@ export function HostMeetingLedgerRoute({
         request: { accessScope: input.accessScope },
       });
       if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
-      await publishHostSessionVisibility(queryClient, result, input.sessionId, context);
-      openFirstPublicationComposer(result.composer);
+      await publishTransitionAction(handle, "cache", () => publishHostSessionVisibility(queryClient, result, input.sessionId, context));
+      await publishTransitionAction(handle, "ui", () => openFirstPublicationComposer(result.composer));
     } catch (error) {
       if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");
       throw error;
@@ -237,8 +237,8 @@ export function HostMeetingLedgerRoute({
       if (!response.ok) throw new Error("create-upcoming-failed");
       const created = await readHostResponseJson<CreatedSessionResponse>(response);
       if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
-      await publishHostSessionCreated(queryClient, response, context);
-      if (created.composer) openFirstPublicationComposer(created.composer);
+      await publishTransitionAction(handle, "cache", () => publishHostSessionCreated(queryClient, response, context));
+      if (created.composer) await publishTransitionAction(handle, "ui", () => openFirstPublicationComposer(created.composer));
     } catch (error) {
       if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");
       throw error;

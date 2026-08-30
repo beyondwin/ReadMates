@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SpaceTransitionSafetyProvider } from "@/shared/ui/space-transition-safety-context";
+import { ReadmatesTransportError } from "@/shared/api/errors";
 import type { TransitionPublicationSurface } from "@/shared/model/global-space";
 import {
   createGlobalSpaceTransitionCoordinator,
@@ -49,7 +50,7 @@ const summary = {
   domainsRequiringAction: [],
 };
 
-function renderRoute(granted = true) {
+function renderRoute(granted = true, registry = createRetiredReceiptCapsuleRegistry()) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity }, mutations: { retry: false } },
   });
@@ -61,10 +62,11 @@ function renderRoute(granted = true) {
     capabilities: granted ? capabilities : ["VIEW_TODAY", "VIEW_CLUBS"],
     generatedAt: "2026-08-30T04:00:00Z",
   });
-  const coordinator = createGlobalSpaceTransitionCoordinator();
+  const coordinator = createGlobalSpaceTransitionCoordinator({ registry });
   return {
     queryClient,
     coordinator,
+    registry,
     ...render(
       <QueryClientProvider client={queryClient}>
         <SpaceTransitionSafetyProvider port={coordinator}>
@@ -130,6 +132,54 @@ describe("AdminPublicTakedownRoute", () => {
     expect(queryClient.getQueryData(adminTakedownKeys.receipt(receipt.receiptId))).toEqual(receipt);
     expect(storageWrite).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: /전파.*시도/ })).not.toBeInTheDocument();
+    storageWrite.mockRestore();
+  });
+
+  it("keeps transport-unknown confirm disabled and unmount performs one byte-identical lookup", async () => {
+    vi.mocked(previewAdminPublicTakedown).mockResolvedValue(enabledPreview);
+    vi.mocked(confirmAdminPublicTakedown)
+      .mockRejectedValueOnce(new ReadmatesTransportError())
+      .mockResolvedValueOnce(receipt);
+    const { unmount, registry, coordinator } = renderRoute();
+    await previewTarget();
+    fireEvent.change(screen.getByLabelText("회수 사유"), { target: { value: "transport unknown reason" } });
+    fireEvent.click(screen.getByRole("button", { name: "긴급 회수 확인" }));
+
+    await waitFor(() => expect(confirmAdminPublicTakedown).toHaveBeenCalledTimes(1));
+    const confirmButton = screen.getByRole("button", { name: "원본 접근 차단 중…" });
+    expect(confirmButton).toBeDisabled();
+    fireEvent.click(confirmButton);
+    expect(confirmAdminPublicTakedown).toHaveBeenCalledTimes(1);
+
+    const originalRequest = vi.mocked(confirmAdminPublicTakedown).mock.calls[0]?.[0];
+    unmount();
+    await waitFor(() => expect(confirmAdminPublicTakedown).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(confirmAdminPublicTakedown).mock.calls[1]?.[0]).toEqual(originalRequest);
+    await waitFor(() => expect(registry.size()).toBe(0));
+    expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
+  });
+
+  it("runs mounted begin -> unregister -> authority loss -> late settlement with no replay or publication", async () => {
+    vi.mocked(previewAdminPublicTakedown).mockResolvedValue(enabledPreview);
+    const original = deferred<typeof receipt>();
+    vi.mocked(confirmAdminPublicTakedown).mockReturnValue(original.promise);
+    const storageWrite = vi.spyOn(Storage.prototype, "setItem");
+    const { unmount, registry, coordinator, queryClient } = renderRoute();
+    await previewTarget();
+    fireEvent.change(screen.getByLabelText("회수 사유"), { target: { value: "authority lost reason" } });
+    fireEvent.click(screen.getByRole("button", { name: "긴급 회수 확인" }));
+    await waitFor(() => expect(confirmAdminPublicTakedown).toHaveBeenCalledTimes(1));
+
+    unmount();
+    coordinator.invalidateForAuthorityLoss();
+    original.resolve(receipt);
+    await original.promise;
+    await waitFor(() => expect(registry.size()).toBe(0));
+
+    expect(confirmAdminPublicTakedown).toHaveBeenCalledTimes(1);
+    expect(queryClient.getQueryData(adminTakedownKeys.receipt(receipt.receiptId))).toBeUndefined();
+    expect(storageWrite).not.toHaveBeenCalled();
+    expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
     storageWrite.mockRestore();
   });
 

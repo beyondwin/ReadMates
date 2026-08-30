@@ -2,7 +2,7 @@ import { useId, useState, type CSSProperties } from "react";
 import type {
   AiEvidenceExcerpt,
   ExpandedEvidenceTurn,
-} from "../api/aigen-contracts";
+} from "../model/aigen-presentation-types";
 
 export type EvidencePanelProps = {
   targetId: string | null;

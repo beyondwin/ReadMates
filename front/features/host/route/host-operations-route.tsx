@@ -12,7 +12,7 @@ import { HostOperationsPage } from "@/features/host/ui/host-operations-page";
 import type { HostOperationsCard } from "@/shared/observability/frontend-observability-contracts";
 import { recordHostOperationsCardLoad } from "@/shared/observability/frontend-observability";
 import type { HostOperationsRouteData } from "./host-operations-data";
-import { useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import { publishTransitionAction, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 function useRecordHostOperationsCardLoad(
   card: HostOperationsCard,
@@ -95,8 +95,8 @@ export function HostOperationsRoute({
     try {
       await aiDefaultMutation.mutateAsync(selectedModel);
       if (await handle.settle("succeeded") === "accepted") {
-        handle.publishAccepted({ surface: "cache", publish: () => { void queryClient.invalidateQueries({ queryKey: aiClubKeys.defaults(context) }); } });
-        handle.publishAccepted({ surface: "successCopy", publish: () => setSavedModel(true) });
+        await publishTransitionAction(handle, "cache", () => queryClient.invalidateQueries({ queryKey: aiClubKeys.defaults(context) }));
+        await publishTransitionAction(handle, "successCopy", () => setSavedModel(true));
       }
     } catch {
       await handle.settle("failed");

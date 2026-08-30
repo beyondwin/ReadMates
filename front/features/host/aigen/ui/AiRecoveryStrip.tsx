@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { AiRecentJobResponse } from "@/features/host/aigen/api/aigen-contracts";
+import type { AiRecentJobResponse } from "@/features/host/aigen/model/aigen-presentation-types";
 
 type AiRecoveryStripProps = {
   job: AiRecentJobResponse | null;

@@ -22,7 +22,7 @@ import {
   platformAdminCapabilitiesQuery,
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { AdminNotificationsPage } from "@/features/platform-admin/ui/admin-notifications-page";
-import { useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import { publishTransitionAction, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 const GENERIC_ERROR = "알림 운영 정보를 처리하지 못했습니다. 다시 시도해 주세요.";
 
@@ -169,17 +169,21 @@ function NotificationReplaySession({
         idempotencyKey: replayIntentKey,
       });
       if (await handle.settle("succeeded") !== "accepted") return;
-      await publishPlatformAdminNotifications(queryClient);
-      setReplayResult(result);
-      setUnknownOutcome(false);
+      await publishTransitionAction(handle, "cache", () => publishPlatformAdminNotifications(queryClient));
+      await publishTransitionAction(handle, "ui", () => {
+        setReplayResult(result);
+        setUnknownOutcome(false);
+      });
     } catch (caught) {
-      await handle.settle("failed");
+      if (await handle.settle("failed") !== "accepted") return;
       if (isPlatformAdminAuthorityLossError(caught)) {
-        purgeReplayState();
+        await publishTransitionAction(handle, "errorCopy", purgeReplayState);
         return;
       }
-      setUnknownOutcome(true);
-      setError("재처리 결과를 확인하지 못했습니다. 같은 요청으로 다시 확인해 주세요.");
+      await publishTransitionAction(handle, "errorCopy", () => {
+        setUnknownOutcome(true);
+        setError("재처리 결과를 확인하지 못했습니다. 같은 요청으로 다시 확인해 주세요.");
+      });
     }
   }
 

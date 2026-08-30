@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useLoaderData, useNavigate, useRevalidator } from "react-router";
 import type { ReadmatesReturnState } from "@/shared/routing/readmates-route-state";
-import { useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import { publishTransitionAction, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 import { MemberNotificationsPage } from "../ui/member-notifications-page";
 import { memberNotificationsActions, publishMemberNotificationsRefresh, type MemberNotificationsRouteData } from "./member-notifications-data";
 
@@ -39,7 +39,7 @@ export function MemberNotificationsRoute() {
     setPendingReadIds(next);
   };
 
-  const markRead = async (id: string) => {
+  const markRead = async (id: string, onAccepted?: () => void | Promise<void>) => {
     if (pendingReadIdsRef.current.has(id) || markAllReadPendingRef.current) {
       return false;
     }
@@ -52,9 +52,8 @@ export function MemberNotificationsRoute() {
     try {
       await memberNotificationsActions.markRead(id);
       if (await handle.settle("succeeded") !== "accepted") return false;
-      let publish = false;
-      handle.publishAccepted({ surface: "cache", publish: () => { publish = true; } });
-      if (publish) await publishMemberNotificationsRefresh(() => revalidator.revalidate());
+      await publishTransitionAction(handle, "cache", () => publishMemberNotificationsRefresh(() => revalidator.revalidate()));
+      if (onAccepted) await publishTransitionAction(handle, "navigation", onAccepted);
       return true;
     } catch {
       if (await handle.settle("failed") === "accepted") {
@@ -62,7 +61,7 @@ export function MemberNotificationsRoute() {
       }
       return false;
     } finally {
-      setReadPending(id, false);
+      handle.publishAccepted({ surface: "ui", publish: () => setReadPending(id, false) });
     }
   };
 
@@ -80,26 +79,25 @@ export function MemberNotificationsRoute() {
     try {
       await memberNotificationsActions.markAllRead();
       if (await handle.settle("succeeded") === "accepted") {
-        let publish = false;
-        handle.publishAccepted({ surface: "cache", publish: () => { publish = true; } });
-        if (publish) await publishMemberNotificationsRefresh(() => revalidator.revalidate());
+        await publishTransitionAction(handle, "cache", () => publishMemberNotificationsRefresh(() => revalidator.revalidate()));
       }
     } catch {
       if (await handle.settle("failed") === "accepted") {
         handle.publishAccepted({ surface: "errorCopy", publish: () => setActionError(READ_ACTION_ERROR) });
       }
     } finally {
-      markAllReadPendingRef.current = false;
-      setMarkAllReadPending(false);
+      handle.publishAccepted({
+        surface: "ui",
+        publish: () => {
+          markAllReadPendingRef.current = false;
+          setMarkAllReadPending(false);
+        },
+      });
     }
   };
 
   const openNotification = (id: string, href: string, state?: ReadmatesReturnState) => {
-    void (async () => {
-      if (await markRead(id)) {
-        await navigate(href, { state });
-      }
-    })();
+    void markRead(id, () => navigate(href, { state }));
   };
 
   const navigateNotification = (href: string, state: ReadmatesReturnState) => {

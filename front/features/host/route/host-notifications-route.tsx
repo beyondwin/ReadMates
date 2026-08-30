@@ -40,7 +40,7 @@ import {
 import type { HostNotificationsRouteData } from "./host-notifications-data";
 import { combineManualOptions } from "./host-notifications-route-model";
 import "@/features/host/ui/host-editorial-ledger.css";
-import { TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import { publishTransitionAction, TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 const HOST_NOTIFICATION_LEDGER_PAGE_LIMIT = 50;
 const MANUAL_DISPATCH_PAGE_LIMIT = 20;
@@ -67,7 +67,7 @@ export function HostNotificationsRoute() {
     try {
       const result = await request();
       if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
-      await publish(result);
+      await publishTransitionAction(handle, "cache", () => publish(result));
       return result;
     } catch (error) {
       if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");

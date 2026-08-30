@@ -61,7 +61,7 @@ import {
   beginAdminEditorialLedgerPollMerge,
   beginAdminEditorialLedgerRouteCommit,
 } from "@/shared/observability/admin-editorial-ledger-performance";
-import { TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import { publishTransitionAction, TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 type MutationTarget = {
   caseId: string;
@@ -381,30 +381,34 @@ export function AdminTodayRoute() {
     try {
       await operation();
       if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
-      await publishAdminOperationCase(queryClient, target.caseId);
-      if (!isCurrentMutationTarget(target)) return false;
-      if (!isPostMutationAuthoritative({
+      await publishTransitionAction(handle, "cache", () => publishAdminOperationCase(queryClient, target.caseId));
+      return await publishTransitionAction(handle, "ui", async () => {
+        if (!isCurrentMutationTarget(target)) return false;
+        if (!isPostMutationAuthoritative({
         detail: queryClient.getQueryState(detailKey),
         list: queryClient.getQueryState(listKey),
         beforeDetailAt,
         beforeListAt,
         expectedMinVersion: target.version,
-      })) {
-        setActionState("unknown-outcome");
-        setActionMessage({
-          kind: "unknown-outcome",
-          text: "명령 응답을 확인하지 못했습니다. 최신 상태를 확인한 뒤 다시 시도해 주세요.",
-        });
-        await reconcileAuthoritativeState(target.caseId);
-        return false;
-      }
-      setActionState("complete");
-      setActionMessage({ kind: "success", text: "케이스 상태를 반영했습니다." });
-      return true;
+        })) {
+          setActionState("unknown-outcome");
+          setActionMessage({
+            kind: "unknown-outcome",
+            text: "명령 응답을 확인하지 못했습니다. 최신 상태를 확인한 뒤 다시 시도해 주세요.",
+          });
+          await reconcileAuthoritativeState(target.caseId);
+          return false;
+        }
+        setActionState("complete");
+        setActionMessage({ kind: "success", text: "케이스 상태를 반영했습니다." });
+        return true;
+      });
     } catch (error) {
-      if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");
-      if (!isCurrentMutationTarget(target)) return false;
-      if (hasHttpStatus(error, 403)) {
+      if (error instanceof TransitionOwnerObsoleteError) return false;
+      if (await handle.settle("failed") !== "accepted") return false;
+      return await publishTransitionAction(handle, "errorCopy", async () => {
+        if (!isCurrentMutationTarget(target)) return false;
+        if (hasHttpStatus(error, 403)) {
         setMutationPermissionDenied(true);
         setActionState("forbidden");
         return false;
@@ -432,12 +436,13 @@ export function AdminTodayRoute() {
         await reconcileAuthoritativeState(target.caseId);
         return false;
       }
-      setActionState("ready");
-      setActionMessage({
-        kind: "error",
-        text: "상태를 변경하지 못했습니다. 잠시 뒤 다시 시도해 주세요.",
+        setActionState("ready");
+        setActionMessage({
+          kind: "error",
+          text: "상태를 변경하지 못했습니다. 잠시 뒤 다시 시도해 주세요.",
+        });
+        return false;
       });
-      return false;
     }
   }
 

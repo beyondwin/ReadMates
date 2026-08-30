@@ -2,7 +2,10 @@ export type {
   AiCommitResponse,
   AiEvidenceExcerpt,
   AiGenerationItem,
+  AiGenerationJobResponse,
   AiGenerationProblem,
+  AiGenerationStage,
+  AiRecentJobResponse,
   AiRecordVisibility,
   AvailableGenerationModel,
   CommitGenerationRequest,
@@ -11,5 +14,6 @@ export type {
   RegenerateResponse,
   ReviewSection,
   SessionImportV1,
+  SessionImportAuthoredText,
   StartGenerationRequest,
 } from "../api/aigen-contracts";

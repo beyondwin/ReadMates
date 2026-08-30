@@ -36,7 +36,7 @@ import {
   type PlatformAdminAiOpsJobView,
   type PlatformAdminAiOpsSummaryView,
 } from "@/features/platform-admin/ui/platform-admin-ai-ops";
-import { useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import { publishTransitionAction, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 export function AdminAiOpsRoute() {
   const queryClient = useQueryClient();
@@ -234,25 +234,28 @@ function AiOpsCommandSession({
         request,
       });
       if (await handle.settle("succeeded") !== "accepted") return;
-      await publishPlatformAdminAiOps(queryClient);
-      setCommandState({ ...current, phase: "RECEIPT", receipt });
+      await publishTransitionAction(handle, "cache", () => publishPlatformAdminAiOps(queryClient));
+      await publishTransitionAction(handle, "ui", () => setCommandState({ ...current, phase: "RECEIPT", receipt }));
     } catch (error) {
-      await handle.settle("failed");
+      const accepted = await handle.settle("failed") === "accepted";
+      if (!accepted) return;
       if (isPlatformAdminAuthorityLossError(error)) {
-        setCommandState(null);
-        setCommandError(null);
+        await publishTransitionAction(handle, "errorCopy", () => {
+          setCommandState(null);
+          setCommandError(null);
+        });
         return;
       }
       const classified = classifyAiOpsError(error);
-      setCommandState({
-        ...current,
-        phase: "UNKNOWN",
-        code: classified.code ?? "NETWORK_UNKNOWN",
-        message:
-          classified.kind === "CONFLICT"
-            ? "작업 상태가 변경되었습니다. 최신 상태로 다시 검토해 주세요."
-            : "명령 응답을 확인하지 못했습니다. 같은 명령으로 다시 확인해 주세요.",
-      });
+      await publishTransitionAction(handle, "errorCopy", () => setCommandState({
+          ...current,
+          phase: "UNKNOWN",
+          code: classified.code ?? "NETWORK_UNKNOWN",
+          message:
+            classified.kind === "CONFLICT"
+              ? "작업 상태가 변경되었습니다. 최신 상태로 다시 검토해 주세요."
+              : "명령 응답을 확인하지 못했습니다. 같은 명령으로 다시 확인해 주세요.",
+        }));
     }
   }
 

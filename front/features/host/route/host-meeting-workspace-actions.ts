@@ -30,7 +30,7 @@ import {
   useUpdateHostSessionAttendanceMutation,
   useUpdateHostSessionMutation,
 } from "@/features/host/queries/host-session-queries";
-import { TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import { publishTransitionAction, TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 export function useHostMeetingWorkspaceActions(
   context: ExplicitReadmatesApiContext,
@@ -61,7 +61,7 @@ export function useHostMeetingWorkspaceActions(
     try {
       const result = await request();
       if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
-      await publish(result);
+      await publishTransitionAction(handle, "cache", () => publish(result));
       return result;
     } catch (error) {
       if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");

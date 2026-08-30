@@ -10,7 +10,11 @@ import {
 import { publishUpdatedProfile, useUpdateMyProfileMutation } from "@/features/archive/queries/profile-queries";
 import { isReadmatesApiError } from "@/shared/api/errors";
 import { normalizeBookClubAvatarKey } from "@/shared/ui/book-club-avatar";
-import { useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import {
+  isTransitionOwnerObsoleteError,
+  publishTransitionAction,
+  useTransitionSafetyOwner,
+} from "@/shared/ui/use-transition-safety-owner";
 
 type ProfileUpdateControllerInput = {
   sourceProfile: MyPageResponse;
@@ -87,30 +91,31 @@ export function useProfileUpdateController({
       if (await handle.settle("succeeded") !== "accepted") return updated;
       if (requestGeneration !== latestRequestGeneration.current) return updated;
       const saved = editableProfile(updated as MyPageResponse);
-      let publishCache = false;
-      handle.publishAccepted({ surface: "cache", publish: () => { publishCache = true; } });
-      if (publishCache) {
+      await publishTransitionAction(handle, "cache", async () => {
         await publishUpdatedProfile(queryClient);
         await onProfileUpdated();
-      }
-      if (requestGeneration !== latestRequestGeneration.current) return updated;
-      setSavedState((currentState) => {
-        const current = currentState?.clubSlug === clubSlug ? currentState.override : null;
-        return {
-          clubSlug,
-          override: {
-            source: editableProfile(sourceProfile),
-            saved,
-            generation: requestGeneration,
-            staleSources: current
-              ? [...current.staleSources, { ...current.saved, generation: current.generation }]
-              : [],
-          },
-        };
       });
-      onRevalidate();
+      if (requestGeneration !== latestRequestGeneration.current) return updated;
+      await publishTransitionAction(handle, "ui", () => {
+        setSavedState((currentState) => {
+          const current = currentState?.clubSlug === clubSlug ? currentState.override : null;
+          return {
+            clubSlug,
+            override: {
+              source: editableProfile(sourceProfile),
+              saved,
+              generation: requestGeneration,
+              staleSources: current
+                ? [...current.staleSources, { ...current.saved, generation: current.generation }]
+                : [],
+            },
+          };
+        });
+        onRevalidate();
+      });
       return updated;
     } catch (error) {
+      if (isTransitionOwnerObsoleteError(error)) throw error;
       await handle.settle("failed");
       if (error instanceof ProfileUpdateFailure) throw error;
       const errorCode = isReadmatesApiError(error) ? error.code : null;

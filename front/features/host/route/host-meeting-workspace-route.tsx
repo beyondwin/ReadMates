@@ -71,7 +71,7 @@ import {
   usePreviewManualNotificationMutation,
   useUpdateHostNotificationPolicyMutation,
 } from "@/features/host/queries/host-notification-queries";
-import { TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import { publishTransitionAction, TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 import type { HostSessionRecordsChangedEvent } from "./host-session-editor-route";
 import { useHostMeetingWorkspaceActions } from "./host-meeting-workspace-actions";
 import type { HostMeetingWorkspaceRouteData } from "./host-meeting-workspace-data";
@@ -273,7 +273,7 @@ export function HostMeetingWorkspaceRoute({
     try {
       const result = await request();
       if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
-      await publish(result);
+      await publishTransitionAction(handle, "cache", () => publish(result));
       return result;
     } catch (error) {
       if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");

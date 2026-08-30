@@ -30,7 +30,7 @@ import {
   HOST_SESSION_LEDGER_PAGE_LIMIT,
   type HostSessionLedgerRouteData,
 } from "./host-session-ledger-data";
-import { useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import { publishTransitionAction, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 function sameFilters(left: HostSessionLedgerFilters, right: HostSessionLedgerFilters) {
   return left.view === right.view
@@ -204,50 +204,60 @@ export function HostSessionLedgerRoute({
     try {
       const detail = await restoreMutation.mutateAsync(sessionId);
       if (await handle.settle("succeeded") !== "accepted") return;
-      await publishRestoredHostSession(queryClient, detail, sessionId, context);
-      await trashQuery.refetch();
-      setTrashAppended(null);
-      setRestoreState((current) => {
+      await publishTransitionAction(handle, "cache", async () => {
+        await publishRestoredHostSession(queryClient, detail, sessionId, context);
+        await trashQuery.refetch();
+      });
+      await publishTransitionAction(handle, "ui", () => {
+        setTrashAppended(null);
+        setRestoreState((current) => {
         const next = { ...current };
         delete next[sessionId];
         return next;
+        });
       });
     } catch (error) {
-      await handle.settle("failed");
+      if (await handle.settle("failed") !== "accepted") return;
       if (isHostSessionTrashExpiredError(error)) {
-        setRestoreState((current) => ({
-          ...current,
-          [sessionId]: {
-            restoring: false,
-            restoreDisabled: true,
-            restoreDisabledReason: "복원 기간이 지났습니다.",
-            restoreError: null,
-            restoreConflict: null,
-          },
-        }));
+        await publishTransitionAction(handle, "errorCopy", () => {
+          setRestoreState((current) => ({
+            ...current,
+            [sessionId]: {
+              restoring: false,
+              restoreDisabled: true,
+              restoreDisabledReason: "복원 기간이 지났습니다.",
+              restoreError: null,
+              restoreConflict: null,
+            },
+          }));
+        });
         return;
       }
       if (isReadmatesApiError(error) && error.code === "SESSION_OPEN_ALREADY_EXISTS" && error.openSessionId) {
+        await publishTransitionAction(handle, "errorCopy", () => {
+          setRestoreState((current) => ({
+            ...current,
+            [sessionId]: {
+              restoring: false,
+              restoreError: null,
+              restoreConflict: {
+                openSessionHref: openSessionHref(error.openSessionId as string),
+                message: openAlreadyExistsMessage(),
+              },
+            },
+          }));
+        });
+        return;
+      }
+      await publishTransitionAction(handle, "errorCopy", () => {
         setRestoreState((current) => ({
           ...current,
           [sessionId]: {
             restoring: false,
-            restoreError: null,
-            restoreConflict: {
-              openSessionHref: openSessionHref(error.openSessionId as string),
-              message: openAlreadyExistsMessage(),
-            },
+            restoreError: "모임을 복원하지 못했습니다.",
           },
         }));
-        return;
-      }
-      setRestoreState((current) => ({
-        ...current,
-        [sessionId]: {
-          restoring: false,
-          restoreError: "모임을 복원하지 못했습니다.",
-        },
-      }));
+      });
     }
   };
 

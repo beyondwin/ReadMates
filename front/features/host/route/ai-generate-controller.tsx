@@ -41,7 +41,12 @@ import { AiRecoveryStrip } from "@/features/host/aigen/ui/AiRecoveryStrip";
 import { GenerationProgressView } from "@/features/host/aigen/ui/GenerationProgressView";
 import { PreviewView } from "@/features/host/aigen/ui/PreviewView";
 import { TranscriptUploadForm } from "@/features/host/aigen/ui/TranscriptUploadForm";
-import { useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import {
+  isTransitionOwnerObsoleteError,
+  publishTransitionAction,
+  TransitionOwnerObsoleteError,
+  useTransitionSafetyOwner,
+} from "@/shared/ui/use-transition-safety-owner";
 
 type Stage =
   | { tag: "idle"; startError: AiGenerationProblem | null }
@@ -262,7 +267,6 @@ export function AiGenerateController({
     discardPendingDraft();
     clearAigenDraft(clubSlug, stage.jobId);
     adoptedRevisionRef.current = null;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- terminal server event resets local workspace
     clearWorkspace();
     setStage({ tag: "idle", startError: null });
   }, [clubSlug, stage, jobStatus, clearWorkspace, discardPendingDraft]);
@@ -314,7 +318,6 @@ export function AiGenerateController({
     discardPendingDraft();
     clearAigenDraft(clubSlug, stage.jobId);
     adoptedRevisionRef.current = null;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- committed server event clears local draft state
     clearWorkspace();
     setStage({ tag: "committed", result: null });
     onCommitted(null);
@@ -328,18 +331,24 @@ export function AiGenerateController({
     try {
       const response = await startMutation.mutateAsync(payload);
       if (await handle.settle("succeeded") !== "accepted") return;
-      purgeAigenDrafts(clubSlug, response.jobId);
-      adoptedRevisionRef.current = null;
-      clearWorkspace();
-      setStage({ tag: "active", jobId: response.jobId, cancelling: false });
+      await publishTransitionAction(handle, "sessionStorage", () => purgeAigenDrafts(clubSlug, response.jobId));
+      await publishTransitionAction(handle, "ui", () => {
+        adoptedRevisionRef.current = null;
+        clearWorkspace();
+        setStage({ tag: "active", jobId: response.jobId, cancelling: false });
+        setSubmittingStart(false);
+      });
     } catch (caught) {
-      await handle.settle("failed");
+      if (await handle.settle("failed") !== "accepted") return;
       const problem = caught instanceof AiGenerationApiError
         ? caught.problem
         : { code: "AI_GENERATION_REQUEST_FAILED", detail: "생성 시작에 실패했습니다." };
-      setStage({ tag: "idle", startError: problem });
+      await publishTransitionAction(handle, "errorCopy", () => {
+        setStage({ tag: "idle", startError: problem });
+        setSubmittingStart(false);
+      });
     } finally {
-      setSubmittingStart(false);
+      // Accepted success/error branches own their own final UI publication.
     }
   }, [clubSlug, startMutation, clearWorkspace, transitionOwner]);
 
@@ -350,14 +359,21 @@ export function AiGenerateController({
     try {
       await cancelMutation.mutateAsync(jobId);
       if (await handle.settle("succeeded") !== "accepted") return;
+      await publishTransitionAction(handle, "sessionStorage", () => {
+        discardPendingDraft();
+        clearAigenDraft(clubSlug, jobId);
+      });
+      await publishTransitionAction(handle, "ui", () => {
+        adoptedRevisionRef.current = null;
+        clearWorkspace();
+        setStage({ tag: "idle", startError: null });
+      });
     } catch {
-      await handle.settle("failed");
+      if (await handle.settle("failed") !== "accepted") return;
+      await publishTransitionAction(handle, "errorCopy", () => {
+        setStage({ tag: "active", jobId, cancelling: false });
+      });
     }
-    discardPendingDraft();
-    clearAigenDraft(clubSlug, jobId);
-    adoptedRevisionRef.current = null;
-    clearWorkspace();
-    setStage({ tag: "idle", startError: null });
   }, [clubSlug, cancelMutation, clearWorkspace, discardPendingDraft, transitionOwner]);
 
   const handleSnapshotChange = useCallback((next: SessionImportV1, section?: ReviewSection) => {
@@ -414,22 +430,32 @@ export function AiGenerateController({
       };
       const result = await commitMutation.mutateAsync(request);
       if (await handle.settle("succeeded") !== "accepted") return;
-      discardPendingDraft();
-      clearAigenDraft(clubSlug, stage.jobId);
-      adoptedRevisionRef.current = null;
-      clearWorkspace();
-      setStage({ tag: "committed", result });
-      onCommitted(result);
+      await publishTransitionAction(handle, "sessionStorage", () => {
+        discardPendingDraft();
+        clearAigenDraft(clubSlug, stage.jobId);
+      });
+      await publishTransitionAction(handle, "ui", () => {
+        adoptedRevisionRef.current = null;
+        clearWorkspace();
+        setStage({ tag: "committed", result });
+        setCommitting(false);
+      });
+      await publishTransitionAction(handle, "receiptCallback", () => onCommitted(result));
     } catch (caught) {
-      await handle.settle("failed");
+      if (await handle.settle("failed") !== "accepted") return;
+      await publishTransitionAction(handle, "errorCopy", () => {
+        if (caught instanceof AiGenerationApiError && caught.status === 409) {
+          setRevisionConflict(caught.problem);
+        } else {
+          setCommitError(caught instanceof Error ? caught.message : "기록 저장에 실패했습니다.");
+        }
+        setCommitting(false);
+      });
       if (caught instanceof AiGenerationApiError && caught.status === 409) {
-        setRevisionConflict(caught.problem);
-        await jobQuery.refetch();
-      } else {
-        setCommitError(caught instanceof Error ? caught.message : "기록 저장에 실패했습니다.");
+        await publishTransitionAction(handle, "cache", () => jobQuery.refetch());
       }
     } finally {
-      setCommitting(false);
+      // Accepted success/error branches own their own final UI publication.
     }
   }, [clubSlug, stage, editedSnapshot, reviewState, serverSnapshot, recordVisibility, expectedDraftRevision, commitMutation, onCommitted, clearWorkspace, jobQuery, discardPendingDraft, transitionOwner]);
 
@@ -489,9 +515,10 @@ export function AiGenerateController({
             const handle = transitionOwner.begin(operationId, "L3", async () => ({ operationId, outcome: "still-unknown" }));
             try {
               const response = await regenerateItem(sessionId, stage.jobId, request, context);
-              if (await handle.settle("succeeded") !== "accepted") throw new Error("AI_REGENERATION_OWNER_OBSOLETE");
-              return response;
+              if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
+              return await publishTransitionAction(handle, "ui", () => response);
             } catch (error) {
+              if (isTransitionOwnerObsoleteError(error)) throw error;
               await handle.settle("failed");
               throw error;
             }

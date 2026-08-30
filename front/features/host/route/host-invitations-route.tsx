@@ -6,13 +6,21 @@ import type { HostInvitationListPage } from "@/features/host/api/host-contracts"
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import HostInvitations from "@/features/host/ui/host-invitations";
 import { createHostInvitationsActions } from "./host-invitations-data";
-import type { HostInvitationsActions } from "@/features/host/model/host-invitation-actions";
-import { TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import type {
+  HostInvitationsActions,
+  OwnerFencedInvitationError,
+  RegisteredHostInvitationsActions,
+} from "@/features/host/model/host-invitation-actions";
+import {
+  publishTransitionAction,
+  TransitionOwnerObsoleteError,
+  useTransitionSafetyOwner,
+} from "@/shared/ui/use-transition-safety-owner";
 
 export function registerHostInvitationActions(
   actions: HostInvitationsActions,
   owner: ReturnType<typeof useTransitionSafetyOwner>,
-): HostInvitationsActions {
+): RegisteredHostInvitationsActions {
   const reconcile = async (operationId: string) => {
     try {
       await actions.listInvitations({ limit: 50 });
@@ -21,14 +29,36 @@ export function registerHostInvitationActions(
     }
     return { operationId, outcome: "still-unknown" as const };
   };
-  const execute = async <T,>(operationId: string, request: () => Promise<T>) => {
+  const execute = async <T, U>(
+    operationId: string,
+    request: () => Promise<T>,
+    publishCache: (result: T) => Promise<U>,
+  ) => {
     const handle = owner.begin(operationId, "L1", () => reconcile(operationId));
     try {
       const result = await request();
       if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
-      return result;
+      const publication = await publishTransitionAction(handle, "cache", () => publishCache(result));
+      return {
+        ...publication,
+        publishUi(publish: (value: U) => void) {
+          return handle.publishAccepted({
+            surface: "ui",
+            publish: () => publish(publication),
+          });
+        },
+      };
     } catch (error) {
       if (error instanceof TransitionOwnerObsoleteError) throw error;
+      if (typeof (error as { status?: unknown } | null)?.status === "number") {
+        if (await handle.settle("failed") !== "accepted") throw new TransitionOwnerObsoleteError();
+        const failure = error as OwnerFencedInvitationError;
+        failure.publishUi = (publish) => handle.publishAccepted({
+          surface: "errorCopy",
+          publish: () => publish(failure),
+        });
+        throw failure;
+      }
       const observation = await handle.reconcile();
       if (observation.outcome === "still-unknown" || observation.outcome === "authority-lost") {
         throw new TransitionOwnerObsoleteError();
@@ -38,9 +68,34 @@ export function registerHostInvitationActions(
     }
   };
   return {
-    ...actions,
-    createInvitation: (request) => execute(`host-invitation:create:${request.email}`, () => actions.createInvitation(request)),
-    revokeInvitation: (invitationId) => execute(`host-invitation:revoke:${invitationId}`, () => actions.revokeInvitation(invitationId)),
+    listInvitations: actions.listInvitations,
+    parseInvitationList: actions.parseInvitationList,
+    createInvitation: (request) => execute(
+      `host-invitation:create:${request.email}`,
+      async () => {
+        const response = await actions.createInvitation(request);
+        if (!response.ok) {
+          const error = new Error("create-failed") as Error & { status?: number };
+          error.status = response.status;
+          throw error;
+        }
+        return actions.parseInvitation(response);
+      },
+      async (created) => ({ created, refreshed: await actions.refreshInvitations({ limit: 50 }) }),
+    ),
+    revokeInvitation: (invitationId) => execute(
+      `host-invitation:revoke:${invitationId}`,
+      async () => {
+        const response = await actions.revokeInvitation(invitationId);
+        if (!response.ok) {
+          const error = new Error("revoke-failed") as Error & { status?: number };
+          error.status = response.status;
+          throw error;
+        }
+        return actions.parseInvitation(response);
+      },
+      async (revoked) => ({ revoked, refreshed: await actions.refreshInvitations({ limit: 50 }) }),
+    ),
   };
 }
 

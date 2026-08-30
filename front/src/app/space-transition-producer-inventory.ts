@@ -27,9 +27,14 @@ export const SPACE_TRANSITION_PRODUCER_INVENTORY = [
   register("features/notifications/route/member-notification-settings-route.tsx", "L1", ["saveNotificationPreferences", "dirty-preferences"]),
   register("features/notifications/route/member-notifications-route.tsx", "L1", ["memberNotificationsActions", "notifications-refetch"]),
   leaf("features/auth/route/login-route.tsx", [], ["pre-auth", "outside-authenticated-space-transition"]),
+  leaf("features/auth/api/auth-api.ts", ["features/auth/route/login-route.tsx"], ["pre-auth-transport", "outside-authenticated-space-transition"]),
   leaf("features/host/queries/host-state-purge.ts", ["src/app/host-authority-loss-controller.tsx"], ["authority-loss-cleanup", "not-user-command"]),
+  leaf("shared/api/host-authority-event.ts", ["src/app/host-authority-loss-controller.tsx"], ["authority-loss-request-cancel", "not-user-command"]),
   leaf("shared/auth/club-access-api.ts", ["src/app/layouts/app-route-layout.tsx"], ["transport-primitive", "response-ignored"]),
-  leaf("src/app/layouts/app-route-layout.tsx", ["src/app/layouts/app-route-layout.tsx"], ["ambient-touch-owner", "request-count:1"]),
+  leaf("shared/auth/session-api.ts", ["src/app/layouts/app-route-layout.tsx"], ["logout-transport", "out-of-space-terminal-transition"]),
+  leaf("src/app/layouts/app-route-layout.tsx", ["src/app/layouts/app-route-layout.tsx"], ["touchClubAccessOnce", "ambient-touch", "request-count:1"]),
+  leaf("src/app/layouts/app-route-layout.tsx", ["src/app/layouts/app-route-layout.tsx"], ["logoutCurrentSession", "out-of-space-terminal-transition", "cache-clear", "auth-reset", "navigation-replace"]),
+  leaf("features/auth/route/logout-button.tsx", ["src/app/layouts/app-route-layout.tsx"], ["mounted-logout-trigger", "callback-only"]),
   register("features/host/route/host-operations-route.tsx", "L1", ["ai-defaults", "accepted-publication"]),
   register("features/host/route/host-dashboard-route.tsx", "L1", ["attendanceMutation", "restoreMutation"]),
   register("features/host/route/host-meeting-ledger-route.tsx", "L2", ["createSession", "saveAccessScope"]),
@@ -44,12 +49,22 @@ export const SPACE_TRANSITION_PRODUCER_INVENTORY = [
   register("features/host/route/host-session-ledger-route.tsx", "L2", ["restoreMutation", "receipt-recovery"]),
   register("features/host/route/new-host-meeting-route.tsx", "L2", ["dirty-draft", "createMeeting"]),
   modify("features/notifications/route/member-notifications-data.ts", ["features/notifications/route/member-notifications-route.tsx"], "L1", ["observation-only", "explicit-publisher"]),
+  modify("features/notifications/api/notifications-api.ts", ["features/notifications/route/member-notifications-data.ts"], "L1", ["transport-write", "registered-route-owner"]),
+  modify("features/notifications/api/notification-preferences-api.ts", ["features/notifications/route/member-notification-settings-route.tsx"], "L1", ["transport-write", "registered-route-owner"]),
+  modify("features/archive/api/archive-api.ts", ["features/archive/route/account-settings-route.tsx", "features/archive/route/profile-update-controller.ts"], "L2", ["transport-write", "registered-route-owner"]),
+  modify("features/current-session/api/current-session-api.ts", ["features/current-session/route/current-session-route.tsx"], "L1", ["transport-write", "registered-route-owner"]),
   modify("features/host/route/host-members-data.ts", ["features/host/route/host-members-route.tsx"], "L1", ["observation-only", "explicit-publisher"]),
   modify("features/host/route/host-invitations-data.ts", ["features/host/route/host-invitations-route.tsx", "features/host/route/host-members-route.tsx"], "L1", ["listInvitations:no-cache", "refreshInvitations:accepted-only"]),
   modify("features/host/route/host-session-editor-actions.ts", ["features/host/route/host-session-editor-route.tsx"], "L3", ["observation-only", "explicit-publisher"]),
   modify("features/archive/queries/profile-queries.ts", ["features/archive/route/profile-update-controller.ts"], "L1", ["useMutation", "explicit-publisher"]),
   modify("features/current-session/queries/current-session-queries.ts", ["features/current-session/route/current-session-route.tsx"], "L1", ["useMutation", "explicit-publisher"]),
   modify("features/host/aigen/queries/aigen-job-queries.ts", ["features/host/route/host-session-editor-route.tsx", "features/host/route/host-meeting-workspace-route.tsx"], "L3", ["useMutation", "explicit-publisher"]),
+  modify("features/host/aigen/api/aigen-api.ts", ["features/host/route/ai-generate-controller.tsx"], "L3", ["transport-write", "registered-route-owner"]),
+  modify("features/host/aigen/storage/aigen-draft-storage.ts", ["features/host/route/ai-generate-controller.tsx"], "L3", ["local-draft-write", "registered-dirty-owner"]),
+  modify("features/host/api/host-api.ts", ["features/host/route/host-meeting-workspace-actions.ts", "features/host/route/host-members-route.tsx", "features/host/route/host-invitations-route.tsx"], "L3", ["transport-writes", "registered-route-owners"]),
+  modify("features/host/api/host-session-record-api.ts", ["features/host/route/host-session-editor-route.tsx"], "L3", ["transport-write", "registered-route-owner"]),
+  modify("features/host/api/host-session-recovery-api.ts", ["features/host/route/host-session-editor-route.tsx"], "L3", ["transport-write", "registered-route-owner"]),
+  modify("features/host/storage/host-sensitive-storage.ts", ["features/host/route/host-session-editor-route.tsx", "features/host/route/host-meeting-workspace-route.tsx"], "L3", ["sensitive-local-write", "registered-route-owner"]),
   modify("features/host/queries/host-invitation-queries.ts", ["features/host/route/host-invitations-route.tsx", "features/host/route/host-members-route.tsx"], "L1", ["useMutation", "explicit-publisher"]),
   modify("features/host/queries/host-members-queries.ts", ["features/host/route/host-members-route.tsx"], "L1", ["useMutation", "explicit-publisher"]),
   modify("features/host/queries/host-notification-queries.ts", ["features/host/route/host-notifications-route.tsx", "features/host/route/host-notification-composer-controller.tsx", "features/host/route/host-meeting-workspace-route.tsx"], "L3", ["useMutation", "explicit-publisher"]),
@@ -69,6 +84,10 @@ export const SPACE_TRANSITION_PRODUCER_INVENTORY = [
   modify("features/platform-admin/queries/platform-admin-queries.ts", ["features/platform-admin/route/admin-shell-layout.tsx", "features/platform-admin/route/admin-club-detail-route.tsx"], "L3", ["useMutation", "explicit-publisher"]),
   modify("features/platform-admin/queries/platform-admin-support-queries.ts", ["features/platform-admin/route/admin-support-route.tsx"], "L3", ["useMutation", "explicit-publisher"]),
   modify("features/platform-admin/queries/platform-admin-takedown-queries.ts", ["features/platform-admin/route/admin-public-takedown-route.tsx"], "L3", ["one-confirm-request", "explicit-publisher"]),
+  modify("features/platform-admin/api/platform-admin-api.ts", ["features/platform-admin/route/admin-ai-ops-route.tsx", "features/platform-admin/route/admin-club-detail-route.tsx", "features/platform-admin/route/admin-shell-layout.tsx"], "L3", ["transport-writes", "registered-route-owners"]),
+  modify("features/platform-admin/api/platform-admin-notifications-api.ts", ["features/platform-admin/route/admin-notifications-route.tsx"], "L3", ["transport-write", "registered-route-owner"]),
+  modify("features/platform-admin/api/platform-admin-support-api.ts", ["features/platform-admin/route/admin-support-route.tsx"], "L3", ["transport-write", "registered-route-owner"]),
+  modify("features/platform-admin/api/platform-admin-takedown-api.ts", ["features/platform-admin/route/admin-public-takedown-route.tsx"], "L3", ["transport-write", "registered-receipt-owner"]),
   leaf("features/host/aigen/ui/AiGenerateTab.tsx", ["features/host/route/ai-generate-controller.tsx"], ["presentation-slot"]),
   leaf("features/host/aigen/ui/PreviewView.tsx", ["features/host/route/host-session-editor-route.tsx"], ["callback-only"]),
   leaf("features/host/aigen/ui/RegenerateModal.tsx", ["features/host/route/host-session-editor-route.tsx"], ["callback-only"]),
@@ -99,16 +118,16 @@ export type ProducerInventoryAudit = {
   verifiedLeavesWithForbiddenPublication: string[];
 };
 
-const WRITE_VERB = "(?:save|update|delete|create|revoke|leave|mark|submit|confirm|commit|retry|restore|open|close|publish|unpublish|reopen|process|send|cancel|regenerate|touch)";
+const WRITE_VERB = "(?:save|update|delete|create|revoke|leave|logout|mark|submit|confirm|commit|retry|restore|open|close|publish|unpublish|reopen|process|send|cancel|regenerate|touch)";
 const MUTATION_PATTERN = new RegExp(`\\buseMutation\\b|\\.mutate(?:Async)?\\s*\\(|\\bactions\\.${WRITE_VERB}[A-Z][A-Za-z0-9_]*\\s*\\(`);
-const DIRECT_RISKY_WRITE_PATTERN = /\b(?:regenerateItem|touchClubAccess(?:Once)?)\s*\(/;
+const DIRECT_RISKY_WRITE_PATTERN = /\b(?:regenerateItem|touchClubAccess(?:Once)?|logoutCurrentSession)\s*\(/;
 const FORBIDDEN_LEAF_PATTERN = /from\s+["'][^"']*\/(?:api|queries|route)(?:\/|["'])|from\s+["'](?:react-router|@\/src\/app|@\/src\/pages)|\bfetch\s*\(/;
 
 function hasImportedWriteInvocation(source: string): boolean {
   const importPattern = /import\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']/g;
   for (const match of source.matchAll(importPattern)) {
     const modulePath = match[2] ?? "";
-    if (!/(?:\/api(?:\/|$)|\/actions(?:\/|$)|shared\/auth\/club-access-query)/.test(modulePath)) {
+    if (!/(?:\/api(?:\/|$)|\/actions(?:\/|$)|\/queries(?:\/|$)|\/storage(?:\/|$)|shared\/auth\/(?:club-access-query|session-api))/.test(modulePath)) {
       continue;
     }
     const names = (match[1] ?? "")
@@ -124,13 +143,84 @@ function hasImportedWriteInvocation(source: string): boolean {
 }
 
 export function detectMutationProducerPaths(sources: ReadonlyMap<string, string>): string[] {
+  const exportedWritePaths = new Set(detectExportedWriteSymbols(sources).map((symbol) => symbol.slice(0, symbol.lastIndexOf("#"))));
   return [...sources]
     .filter(([path, source]) => !/\.(?:test|ct|story)\.[jt]sx?$/.test(path)
-      && !path.includes("/api/") && !path.includes("/model/") && !path.includes("/storage/")
       && path !== "src/app/space-transition-producer-inventory.ts"
-      && (MUTATION_PATTERN.test(source) || DIRECT_RISKY_WRITE_PATTERN.test(source) || hasImportedWriteInvocation(source)))
+      && (exportedWritePaths.has(path) || MUTATION_PATTERN.test(source) || DIRECT_RISKY_WRITE_PATTERN.test(source) || hasImportedWriteInvocation(source)))
     .map(([path]) => path)
     .sort();
+}
+
+const EXPORTED_WRITE_PATH = /(?:^|\/)(?:api|actions|queries|storage)(?:\/|$)|^shared\/auth\/(?:club-access|session-api)/;
+
+export function detectExportedWriteSymbols(sources: ReadonlyMap<string, string>): string[] {
+  const exportedWrites: string[] = [];
+  const declaration = new RegExp(`\\bexport\\s+(?:async\\s+)?(?:function|const)\\s+(${WRITE_VERB}[A-Z][A-Za-z0-9_]*)`, "g");
+  for (const [path, source] of sources) {
+    if (/\.(?:test|ct|story)\.[jt]sx?$/.test(path) || !EXPORTED_WRITE_PATH.test(path)) continue;
+    for (const match of source.matchAll(declaration)) {
+      exportedWrites.push(`${path}#${match[1]}`);
+    }
+  }
+  return exportedWrites.sort();
+}
+
+function runtimeImportSpecifiers(source: string): string[] {
+  const specifiers = new Set<string>();
+  const patterns = [
+    /\b(?:import|export)\s+(?:[\s\S]*?\s+from\s+)?["']([^"']+)["']/g,
+    /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g,
+  ];
+  for (const pattern of patterns) {
+    for (const match of source.matchAll(pattern)) {
+      if (match[1]) specifiers.add(match[1]);
+    }
+  }
+  return [...specifiers];
+}
+
+function resolveProductionImport(
+  importer: string,
+  specifier: string,
+  sources: ReadonlyMap<string, string>,
+): string | null {
+  const raw = specifier.startsWith("@/")
+    ? specifier.slice(2)
+    : specifier.startsWith(".")
+      ? normalizePath(`${importer.slice(0, importer.lastIndexOf("/") + 1)}${specifier}`)
+      : null;
+  if (raw === null) return null;
+  const candidates = [raw, `${raw}.ts`, `${raw}.tsx`, `${raw}.js`, `${raw}.jsx`, `${raw}/index.ts`, `${raw}/index.tsx`];
+  return candidates.find((candidate) => sources.has(candidate)) ?? null;
+}
+
+function normalizePath(value: string): string {
+  const parts: string[] = [];
+  for (const part of value.split("/")) {
+    if (!part || part === ".") continue;
+    if (part === "..") parts.pop();
+    else parts.push(part);
+  }
+  return parts.join("/");
+}
+
+export function buildMountedProductionPaths(
+  sources: ReadonlyMap<string, string>,
+  roots: readonly string[],
+): ReadonlySet<string> {
+  const mounted = new Set<string>();
+  const pending = [...roots];
+  while (pending.length > 0) {
+    const path = pending.pop()!;
+    if (mounted.has(path) || !sources.has(path)) continue;
+    mounted.add(path);
+    for (const specifier of runtimeImportSpecifiers(sources.get(path) ?? "")) {
+      const resolved = resolveProductionImport(path, specifier, sources);
+      if (resolved && !mounted.has(resolved)) pending.push(resolved);
+    }
+  }
+  return new Set([...mounted].sort());
 }
 
 export function auditMutationProducerInventory(

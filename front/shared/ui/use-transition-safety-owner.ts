@@ -5,6 +5,7 @@ import type {
   RecoveryObservation,
   TransitionSafetyRegistrationPort,
 } from "@/shared/model/global-space";
+import type { TransitionPublicationSurface } from "@/shared/model/global-space";
 import { useOptionalSpaceTransitionSafetyRegistration } from "./space-transition-safety-context";
 
 const TEST_LEAF_FALLBACK: TransitionSafetyRegistrationPort = {
@@ -30,6 +31,22 @@ export class TransitionOwnerObsoleteError extends Error {
 
 export function isTransitionOwnerObsoleteError(error: unknown): error is TransitionOwnerObsoleteError {
   return error instanceof TransitionOwnerObsoleteError;
+}
+
+export async function publishTransitionAction<T>(
+  handle: Pick<PendingHandle, "publishAccepted">,
+  surface: TransitionPublicationSurface,
+  publish: () => T | Promise<T>,
+): Promise<T> {
+  let publication: T | Promise<T> | undefined;
+  const outcome = handle.publishAccepted({
+    surface,
+    publish: () => {
+      publication = publish();
+    },
+  });
+  if (outcome !== "published") throw new TransitionOwnerObsoleteError();
+  return await publication!;
 }
 
 export function useTransitionSafetyOwner(

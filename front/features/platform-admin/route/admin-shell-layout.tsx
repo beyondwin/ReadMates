@@ -36,7 +36,7 @@ import { loginPathForReturnTo, safeRelativeReturnTo } from "@/shared/auth/login-
 import { logoutCurrentSession } from "@/shared/auth/session-api";
 import { AdminBreadcrumbProvider } from "./admin-breadcrumb-context";
 import { useAdminBreadcrumbExtra } from "./admin-breadcrumb-hook";
-import { TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import { publishTransitionAction, TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 import "@/features/platform-admin/ui/admin-editorial-ledger.css";
 
 export function AdminShellLayout({
@@ -89,7 +89,7 @@ function AdminShellLayoutInner({
     try {
       const result = await commitOnboarding.mutateAsync(request);
       if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
-      await publishPlatformAdminOnboarding(queryClient);
+      await publishTransitionAction(handle, "cache", () => publishPlatformAdminOnboarding(queryClient));
       return result;
     } catch (error) {
       if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");

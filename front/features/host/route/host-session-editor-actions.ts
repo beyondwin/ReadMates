@@ -61,6 +61,12 @@ export type HostSessionChangeReceiptListener = (
   sessionState?: HostSessionState,
 ) => void;
 
+export type HostSessionEditorActionExecutor = <T>(
+  operationId: string,
+  request: () => Promise<T>,
+  publishReceipt: (result: T) => void | Promise<void>,
+) => Promise<T>;
+
 export function publishHostSessionEditorReceipt(
   receipt: HostSessionChangeReceipt | null | undefined,
   description: string,
@@ -92,27 +98,27 @@ async function captureLifecycleResult(
 export function wrapHostSessionEditorActionsForUndo(
   actions: HostSessionEditorActions,
   onReceipt: HostSessionChangeReceiptListener,
+  execute: HostSessionEditorActionExecutor = async (_operationId, request, publishReceipt) => {
+    const result = await request();
+    await publishReceipt(result);
+    return result;
+  },
 ): HostSessionEditorActions {
   return {
     ...actions,
     openSession: (sessionId) =>
-      captureLifecycleResult(actions.openSession(sessionId), "open", onReceipt),
+      execute(`host-session-editor:open:${sessionId}`, () => actions.openSession(sessionId), (result) => captureLifecycleResult(Promise.resolve(result), "open", onReceipt)),
     closeSession: (sessionId) =>
-      captureLifecycleResult(actions.closeSession(sessionId), "close", onReceipt),
+      execute(`host-session-editor:close:${sessionId}`, () => actions.closeSession(sessionId), (result) => captureLifecycleResult(Promise.resolve(result), "close", onReceipt)),
     publishSession: (sessionId) =>
-      captureLifecycleResult(actions.publishSession(sessionId), "publish", onReceipt),
+      execute(`host-session-editor:publish:${sessionId}`, () => actions.publishSession(sessionId), (result) => captureLifecycleResult(Promise.resolve(result), "publish", onReceipt)),
     reopenSession: (sessionId, request) =>
-      captureLifecycleResult(actions.reopenSession(sessionId, request), "reopen", onReceipt),
+      execute(`host-session-editor:reopen:${sessionId}`, () => actions.reopenSession(sessionId, request), (result) => captureLifecycleResult(Promise.resolve(result), "reopen", onReceipt)),
     unpublishSession: (sessionId, request) =>
-      captureLifecycleResult(actions.unpublishSession(sessionId, request), "unpublish", onReceipt),
+      execute(`host-session-editor:unpublish:${sessionId}`, () => actions.unpublishSession(sessionId, request), (result) => captureLifecycleResult(Promise.resolve(result), "unpublish", onReceipt)),
     returnSessionToDraft: (sessionId, request) =>
-      captureLifecycleResult(
-        actions.returnSessionToDraft(sessionId, request),
-        "return-to-draft",
-        onReceipt,
-      ),
-    saveSession: async (sessionId, request) => {
-      const response = await actions.saveSession(sessionId, request);
+      execute(`host-session-editor:return-to-draft:${sessionId}`, () => actions.returnSessionToDraft(sessionId, request), (result) => captureLifecycleResult(Promise.resolve(result), "return-to-draft", onReceipt)),
+    saveSession: (sessionId, request) => execute(`host-session-editor:save:${sessionId ?? "new"}`, () => actions.saveSession(sessionId, request), async (response) => {
       if (response.ok && sessionId) {
         const body = await readResponseJson(response);
         publishHostSessionEditorReceipt(
@@ -121,17 +127,14 @@ export function wrapHostSessionEditorActionsForUndo(
           onReceipt,
         );
       }
-      return response;
-    },
-    updateAttendance: async (sessionId, attendance) => {
-      const result = await actions.updateAttendance(sessionId, attendance);
+    }),
+    updateAttendance: (sessionId, attendance) => execute(`host-session-editor:attendance:${sessionId}`, () => actions.updateAttendance(sessionId, attendance), (result) => {
       publishHostSessionEditorReceipt(
         result.changeReceipt,
         hostSessionChangeUndoDescription("ATTENDANCE"),
         onReceipt,
       );
-      return result;
-    },
+    }),
   };
 }
 

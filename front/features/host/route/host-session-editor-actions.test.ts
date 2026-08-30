@@ -47,4 +47,17 @@ describe("host session editor receipt publication fence", () => {
     expect(acceptedListener).toHaveBeenCalledOnce();
     expect(failedListener).not.toHaveBeenCalled();
   });
+
+  it("keeps the receipt callback inside the registered owner fence", async () => {
+    const accepted = actions(new Response(JSON.stringify({
+      changeReceipt: { changeId: "change-1", kind: "BASIC_INFO", undoAvailable: true },
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    const listener = vi.fn();
+    const obsoleteExecutor = vi.fn(async <T,>(_operationId: string, request: () => Promise<T>) => request());
+
+    await wrapHostSessionEditorActionsForUndo(accepted, listener, obsoleteExecutor).saveSession("session-1", {} as never);
+
+    expect(obsoleteExecutor).toHaveBeenCalledOnce();
+    expect(listener).not.toHaveBeenCalled();
+  });
 });

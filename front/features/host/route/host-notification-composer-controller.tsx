@@ -24,7 +24,7 @@ import { HostNotificationComposerDialog } from "@/features/host/ui/notifications
 import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import { registerHostSensitiveState } from "@/features/host/storage/host-sensitive-storage";
-import { useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import { publishTransitionAction, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 export type HostNotificationComposerRequest = {
   sessionId: string;
@@ -368,12 +368,12 @@ function ReadyComposerController({
         resendConfirmed,
       });
       if (await handle.settle("succeeded") !== "accepted") return;
-      await publishManualNotificationConfirm(client, context);
-      onConfirmed?.(result);
-      onClose();
+      await publishTransitionAction(handle, "cache", () => publishManualNotificationConfirm(client, context));
+      await publishTransitionAction(handle, "receiptCallback", () => onConfirmed?.(result));
+      await publishTransitionAction(handle, "ui", onClose);
     } catch (mutationError) {
-      await handle.settle("failed");
-      setError(recoverFromMutationError(mutationError, "confirm"));
+      if (await handle.settle("failed") !== "accepted") return;
+      await publishTransitionAction(handle, "errorCopy", () => setError(recoverFromMutationError(mutationError, "confirm")));
     }
   };
 

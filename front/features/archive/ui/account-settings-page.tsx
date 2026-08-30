@@ -7,7 +7,7 @@ import {
 
 export type AccountSettingsPageProps = {
   data: MyPageProfile;
-  onLeaveMembership: () => Promise<void>;
+  onLeaveMembership: () => Promise<"accepted" | "obsolete">;
 };
 
 export function AccountSettingsPage({

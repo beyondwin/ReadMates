@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { ReviewSection } from "../api/aigen-contracts";
+import type { ReviewSection } from "../model/aigen-presentation-types";
 import type { SectionReviewState } from "../model/aigen-review-state";
 
 const SECTIONS: ReviewSection[] = [

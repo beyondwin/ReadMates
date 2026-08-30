@@ -2,7 +2,10 @@ import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { createGlobalSpaceTransitionCoordinator } from "@/src/app/global-space-transition";
 import { SpaceTransitionSafetyProvider } from "./space-transition-safety-context";
-import { useTransitionSafetyOwner } from "./use-transition-safety-owner";
+import {
+  publishTransitionAction,
+  useTransitionSafetyOwner,
+} from "./use-transition-safety-owner";
 
 describe("useTransitionSafetyOwner", () => {
   it("unregisters active handles on unmount and gates publication on accepted settlement", async () => {
@@ -34,5 +37,24 @@ describe("useTransitionSafetyOwner", () => {
     rerender({ dirty: false });
     expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
     unmount();
+  });
+
+  it("invokes async publication only through the current accepted handle", async () => {
+    const published = vi.fn(async () => "done");
+    const acceptedHandle = {
+      publishAccepted: vi.fn(({ publish }) => {
+        publish({ operationId: "operation", outcome: "succeeded" });
+        return "published" as const;
+      }),
+    };
+    const obsoleteHandle = {
+      publishAccepted: vi.fn(() => "rejected" as const),
+    };
+
+    await expect(publishTransitionAction(acceptedHandle as never, "cache", published)).resolves.toBe("done");
+    await expect(publishTransitionAction(obsoleteHandle as never, "errorCopy", published)).rejects.toMatchObject({
+      name: "TransitionOwnerObsoleteError",
+    });
+    expect(published).toHaveBeenCalledTimes(1);
   });
 });

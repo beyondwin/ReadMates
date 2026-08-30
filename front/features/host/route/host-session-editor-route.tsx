@@ -110,7 +110,7 @@ import {
   type HostNotificationComposerRequest,
 } from "./host-notification-composer-controller";
 import { AiGenerateController } from "./ai-generate-controller";
-import { TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import { publishTransitionAction, TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 const EDITOR_MANUAL_DISPATCH_PAGE_LIMIT = 20;
 const EDITOR_HISTORY_PAGE_LIMIT = 30;
@@ -696,7 +696,7 @@ export function EditHostSessionRecordWorkflow({
     try {
       const result = await request();
       if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
-      await publish(result);
+      await publishTransitionAction(handle, "cache", () => publish(result));
       return result;
     } catch (error) {
       if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");
@@ -1049,9 +1049,26 @@ export function EditHostSessionRecordWorkflow({
     setRestoreNotice(null);
   }, []);
 
+  const executeReceiptFencedAction = useCallback(async <T,>(
+    operationId: string,
+    request: () => Promise<T>,
+    publishReceipt: (result: T) => void | Promise<void>,
+  ) => {
+    const handle = transitionOwner.begin(operationId, "L3", async () => ({ operationId, outcome: "still-unknown" }));
+    try {
+      const result = await request();
+      if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
+      await publishTransitionAction(handle, "receiptCallback", () => publishReceipt(result));
+      return result;
+    } catch (error) {
+      if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");
+      throw error;
+    }
+  }, [transitionOwner]);
+
   const editorActions = useMemo(
-    () => wrapHostSessionEditorActionsForUndo(actions, captureChangeReceipt),
-    [actions, captureChangeReceipt],
+    () => wrapHostSessionEditorActionsForUndo(actions, captureChangeReceipt, executeReceiptFencedAction),
+    [actions, captureChangeReceipt, executeReceiptFencedAction],
   );
 
   const openHistoryPanel = useCallback(() => {

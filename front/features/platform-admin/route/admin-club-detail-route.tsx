@@ -47,7 +47,7 @@ import {
   AdminSafeActionDock,
   type AdminSafeActionState,
 } from "@/features/platform-admin/ui/admin-action-dock";
-import { TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import { publishTransitionAction, TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 import { AdminReceiptTimeline } from "@/features/platform-admin/ui/admin-receipt-timeline";
 import { AdminTargetLedgerInline } from "@/features/platform-admin/ui/admin-target-ledger-inline";
 import { useAdminBreadcrumbExtra } from "./admin-breadcrumb-hook";
@@ -249,7 +249,7 @@ function ClubDomainPanel({
     try {
       const result = await command();
       if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
-      await publishPlatformAdminClubState(queryClient, clubId);
+      await publishTransitionAction(handle, "cache", () => publishPlatformAdminClubState(queryClient, clubId));
       return result;
     } catch (error) {
       if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");
@@ -320,10 +320,10 @@ function ClubMetadataPanel({
         request: { expectedAdminRevision: club.adminRevision, ...draft },
       });
       if (await handle.settle("succeeded") !== "accepted") return;
-      await publishUpdatedPlatformAdminClub(queryClient, updated);
-      setEditing(false);
+      await publishTransitionAction(handle, "cache", () => publishUpdatedPlatformAdminClub(queryClient, updated));
+      await publishTransitionAction(handle, "ui", () => setEditing(false));
     } catch {
-      await handle.settle("failed");
+      if (await handle.settle("failed") !== "accepted") return;
     }
   }
 
@@ -534,30 +534,29 @@ function VisibilityPanel({
         confirmed: true,
       });
       if (await handle.settle("succeeded") !== "accepted") return;
-      await publishPlatformAdminClubState(queryClient, clubId);
+      await publishTransitionAction(handle, "cache", () => publishPlatformAdminClubState(queryClient, clubId));
       if (commandEpochRef.current !== epoch) return;
-      setReceipt(result);
-      setRecovery(null);
+      await publishTransitionAction(handle, "ui", () => {
+        setReceipt(result);
+        setRecovery(null);
+      });
     } catch (error) {
-      await handle.settle("failed");
+      if (await handle.settle("failed") !== "accepted") return;
       if (commandEpochRef.current !== epoch) return;
-      if (isPlatformAdminAuthorityLossError(error)) {
-        purgeVisibilityState();
-        return;
-      }
-      const nextRecovery = adminCommandRecovery(error);
-      setRecovery(nextRecovery);
-      if (
-        nextRecovery.kind === "RESTART_PREVIEW" ||
-        nextRecovery.kind === "RESTART_INTENT" ||
-        nextRecovery.kind === "REFRESH_STATE" ||
-        nextRecovery.kind === "CORRECT_DRAFT"
-      ) {
-        setPreview(null);
-        setConfirmed(false);
-        setIntentKey(null);
-      }
-      if (nextRecovery.kind === "REFRESH_STATE") onRefresh();
+      await publishTransitionAction(handle, "errorCopy", () => {
+        if (isPlatformAdminAuthorityLossError(error)) {
+          purgeVisibilityState();
+          return;
+        }
+        const nextRecovery = adminCommandRecovery(error);
+        setRecovery(nextRecovery);
+        if (nextRecovery.kind === "RESTART_PREVIEW" || nextRecovery.kind === "RESTART_INTENT" || nextRecovery.kind === "REFRESH_STATE" || nextRecovery.kind === "CORRECT_DRAFT") {
+          setPreview(null);
+          setConfirmed(false);
+          setIntentKey(null);
+        }
+        if (nextRecovery.kind === "REFRESH_STATE") onRefresh();
+      });
     }
   }
   return (

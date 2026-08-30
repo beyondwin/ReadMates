@@ -15,6 +15,120 @@ function actions(): HostInvitationsActions {
 }
 
 describe("host invitation transition owner", () => {
+  it("publishes accepted create refresh inside the route owner and exposes only an owner-fenced UI result", async () => {
+    const created = {
+      invitationId: "invite-1", email: "member@example.com", name: "멤버", acceptUrl: "https://example.invalid/invite",
+      applyToCurrentSession: true, effectiveStatus: "PENDING", expiresAt: "2026-09-01T00:00:00Z",
+    } as never;
+    const refreshed = { items: [], nextCursor: null };
+    const source = actions();
+    vi.mocked(source.createInvitation).mockResolvedValue(new Response("{}", { status: 201 }));
+    vi.mocked(source.parseInvitation).mockResolvedValue(created);
+    vi.mocked(source.refreshInvitations).mockResolvedValue(refreshed);
+    const publishAccepted = vi.fn(({ publish }) => {
+      publish({ operationId: "create", outcome: "succeeded" });
+      return "published" as const;
+    });
+    const owner = {
+      begin: vi.fn(() => ({
+        generation: 1,
+        settle: vi.fn(async () => "accepted" as const),
+        publishAccepted,
+        unregister: vi.fn(),
+        reconcile: vi.fn(),
+      })),
+      beginReceipt: vi.fn(),
+    };
+
+    const result = await registerHostInvitationActions(source, owner as never).createInvitation({
+      email: "member@example.com", name: "멤버", applyToCurrentSession: true,
+    });
+    const uiPublication = vi.fn();
+
+    expect(source.createInvitation).toHaveBeenCalledTimes(1);
+    expect(source.refreshInvitations).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ created, refreshed });
+    expect(result.publishUi(uiPublication)).toBe("published");
+    expect(uiPublication).toHaveBeenCalledWith({ created, refreshed });
+    expect(publishAccepted.mock.calls.map(([action]) => action.surface)).toEqual(["cache", "ui"]);
+  });
+
+  it("never refreshes or exposes row publication after accepted response becomes obsolete", async () => {
+    const source = actions();
+    vi.mocked(source.createInvitation).mockResolvedValue(new Response("{}", { status: 201 }));
+    const owner = {
+      begin: vi.fn(() => ({
+        generation: 1,
+        settle: vi.fn(async () => "obsolete" as const),
+        publishAccepted: vi.fn(() => "rejected" as const),
+        unregister: vi.fn(),
+        reconcile: vi.fn(),
+      })),
+      beginReceipt: vi.fn(),
+    };
+
+    await expect(registerHostInvitationActions(source, owner as never).createInvitation({
+      email: "member@example.com", name: "멤버", applyToCurrentSession: true,
+    })).rejects.toBeInstanceOf(TransitionOwnerObsoleteError);
+    expect(source.createInvitation).toHaveBeenCalledTimes(1);
+    expect(source.refreshInvitations).not.toHaveBeenCalled();
+  });
+
+  it("settles a definite HTTP failure without detached lookup or cache publication", async () => {
+    const source = actions();
+    vi.mocked(source.createInvitation).mockResolvedValue(new Response("{}", { status: 409 }));
+    const settle = vi.fn(async () => "accepted" as const);
+    const publishAccepted = vi.fn(({ publish }) => {
+      publish({ operationId: "create", outcome: "failed" });
+      return "published" as const;
+    });
+    const owner = {
+      begin: vi.fn(() => ({
+        generation: 1,
+        settle,
+        publishAccepted,
+        unregister: vi.fn(),
+        reconcile: vi.fn(),
+      })),
+      beginReceipt: vi.fn(),
+    };
+
+    const failure = await registerHostInvitationActions(source, owner as never).createInvitation({
+      email: "member@example.com", name: "멤버", applyToCurrentSession: true,
+    }).catch((error: unknown) => error as { status: number; publishUi: (publish: (value: unknown) => void) => string });
+    const errorPublication = vi.fn();
+
+    expect(failure).toMatchObject({ status: 409 });
+    expect(failure.publishUi(errorPublication)).toBe("published");
+    expect(errorPublication).toHaveBeenCalledWith(failure);
+    expect(settle).toHaveBeenCalledWith("failed");
+    expect(source.listInvitations).not.toHaveBeenCalled();
+    expect(source.refreshInvitations).not.toHaveBeenCalled();
+    expect(publishAccepted.mock.calls.map(([action]) => action.surface)).toEqual(["errorCopy"]);
+  });
+
+  it("settles a definite revoke HTTP failure without detached lookup or cache publication", async () => {
+    const source = actions();
+    vi.mocked(source.revokeInvitation).mockResolvedValue(new Response("{}", { status: 500 }));
+    const settle = vi.fn(async () => "accepted" as const);
+    const owner = {
+      begin: vi.fn(() => ({
+        generation: 1,
+        settle,
+        publishAccepted: vi.fn(),
+        unregister: vi.fn(),
+        reconcile: vi.fn(),
+      })),
+      beginReceipt: vi.fn(),
+    };
+
+    await expect(registerHostInvitationActions(source, owner as never).revokeInvitation("invite-1"))
+      .rejects.toMatchObject({ status: 500 });
+    expect(settle).toHaveBeenCalledWith("failed");
+    expect(source.listInvitations).not.toHaveBeenCalled();
+    expect(source.refreshInvitations).not.toHaveBeenCalled();
+  });
+
   it.each(["create", "revoke"] as const)("keeps %s response loss L1 unknown without replay or cache publication", async (kind) => {
     const source = actions();
     let reconcile!: () => Promise<{ operationId: string; outcome: "still-unknown" }>;

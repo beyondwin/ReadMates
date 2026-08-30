@@ -61,7 +61,7 @@ import {
 import { SessionClosingBoard } from "@/features/host/ui/session-closing-board";
 import type { WorkspacePendingUndo } from "@/features/host/ui/session-workspace/workspace-undo-bar";
 import { formatSessionKicker } from "@/shared/ui/readmates-display";
-import { TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import { publishTransitionAction, TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 import type { HostDashboardRouteData } from "./host-dashboard-data";
 
 const PHASE_REASON_STATE_KEY = "hostOperatingRoomPhaseReason";
@@ -331,32 +331,36 @@ export function HostDashboardRoute({
         attendance: attendanceEntries,
       });
       if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
-      await publishHostSessionAttendance(queryClient, expectedSessionId, attendanceEntries, context);
+      await publishTransitionAction(handle, "cache", () => publishHostSessionAttendance(queryClient, expectedSessionId, attendanceEntries, context));
       if (currentSessionIdRef.current !== expectedSessionId) return;
-      setAttendanceWriteState(expectedSessionId, membershipIds, null);
       const receipt = result.changeReceipt ?? null;
-      setPendingAttendanceUndo(receipt?.undoAvailable ? {
-        sessionId: expectedSessionId,
-        receipt,
-        description: hostSessionChangeUndoDescription("ATTENDANCE"),
-        error: null,
-      } : null);
+      await publishTransitionAction(handle, "ui", () => {
+        setAttendanceWriteState(expectedSessionId, membershipIds, null);
+        setPendingAttendanceUndo(receipt?.undoAvailable ? {
+          sessionId: expectedSessionId,
+          receipt,
+          description: hostSessionChangeUndoDescription("ATTENDANCE"),
+          error: null,
+        } : null);
+      });
     } catch (error) {
-      if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");
+      if (!(error instanceof TransitionOwnerObsoleteError) && await handle.settle("failed") !== "accepted") return;
       if (currentSessionIdRef.current !== expectedSessionId) return;
       if (error instanceof TransitionOwnerObsoleteError) return;
       if (error instanceof HostMutationPendingError) {
-        setAttendanceUnknown({ ...attempt, canonicalLabel: null });
+        await publishTransitionAction(handle, "errorCopy", () => setAttendanceUnknown({ ...attempt, canonicalLabel: null }));
         return;
       }
       const writeState = meetingDayAttendanceWriteStateFromError(error);
-      setAttendanceWriteState(expectedSessionId, membershipIds, writeState);
+      await publishTransitionAction(handle, "errorCopy", () => setAttendanceWriteState(expectedSessionId, membershipIds, writeState));
       if (writeState === "conflict") {
         const refreshed = await refreshExactDetail(expectedSessionId);
         if (currentSessionIdRef.current !== expectedSessionId) return;
-        setAttendanceConflict({
-          ...attempt,
-          canonicalLabel: attendanceAttemptCanonicalLabel(refreshed, membershipIds),
+        await publishTransitionAction(handle, "errorCopy", () => {
+          setAttendanceConflict({
+            ...attempt,
+            canonicalLabel: attendanceAttemptCanonicalLabel(refreshed, membershipIds),
+          });
         });
       }
     }
@@ -407,15 +411,22 @@ export function HostDashboardRoute({
                 changeId: preview.changeId,
                 request: { expectedCurrentHash: preview.expectedCurrentHash },
               });
-            } catch (error) {
-              await handle.settle("failed");
-              throw error;
+            } catch {
+              if (await handle.settle("failed") !== "accepted") return;
+              await publishTransitionAction(handle, "errorCopy", () => {
+                setPendingAttendanceUndo({
+                  ...current,
+                  error: "되돌리지 못했습니다. 변경 내역에서 다시 시도해 주세요.",
+                });
+              });
+              return;
             }
             if (await handle.settle("succeeded") !== "accepted") return;
-            await publishRestoredHostSessionChange(queryClient, current.sessionId, context);
+            await publishTransitionAction(handle, "cache", () => publishRestoredHostSessionChange(queryClient, current.sessionId, context));
             if (currentSessionIdRef.current !== current.sessionId) return;
-            setPendingAttendanceUndo(null);
-          } catch {
+            await publishTransitionAction(handle, "ui", () => setPendingAttendanceUndo(null));
+          } catch (error) {
+            if (error instanceof TransitionOwnerObsoleteError) return;
             if (currentSessionIdRef.current !== current.sessionId) return;
             setPendingAttendanceUndo({
               ...current,

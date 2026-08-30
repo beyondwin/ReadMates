@@ -7,7 +7,10 @@ import { RouterProvider } from "react-router/dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { HostMembersActions } from "@/features/host/model/host-member-actions";
-import type { HostInvitationsActions } from "@/features/host/model/host-invitation-actions";
+import type {
+  HostInvitationsActions,
+  RegisteredHostInvitationsActions,
+} from "@/features/host/model/host-invitation-actions";
 import HostMembers from "@/features/host/ui/host-members";
 import { createHostMembersActions, hostMembersLoaderFactory } from "@/features/host";
 import HostMembersPage from "@/src/pages/host-members";
@@ -160,6 +163,45 @@ const noopHostInvitationsActions = {
 
 type HostMembersProps = Parameters<typeof HostMembers>[0];
 
+function registerTestInvitationActions(actions: HostInvitationsActions): RegisteredHostInvitationsActions {
+  return {
+    listInvitations: actions.listInvitations,
+    parseInvitationList: actions.parseInvitationList,
+    createInvitation: async (request) => {
+      const response = await actions.createInvitation(request);
+      if (!response.ok) {
+        const failure = new Error(`create-invitation-${response.status}`) as Error & {
+          status: number;
+          publishUi: (publish: (error: Error) => void) => "published";
+        };
+        failure.status = response.status;
+        failure.publishUi = (publish) => (publish(failure), "published");
+        throw failure;
+      }
+      const created = await actions.parseInvitation(response);
+      const refreshed = await actions.refreshInvitations({ limit: 50 });
+      const result = { created, refreshed };
+      return { ...result, publishUi: (publish) => (publish(result), "published") };
+    },
+    revokeInvitation: async (invitationId) => {
+      const response = await actions.revokeInvitation(invitationId);
+      if (!response.ok) {
+        const failure = new Error(`revoke-invitation-${response.status}`) as Error & {
+          status: number;
+          publishUi: (publish: (error: Error) => void) => "published";
+        };
+        failure.status = response.status;
+        failure.publishUi = (publish) => (publish(failure), "published");
+        throw failure;
+      }
+      const revoked = await actions.parseInvitation(response);
+      const refreshed = await actions.refreshInvitations({ limit: 50 });
+      const result = { revoked, refreshed };
+      return { ...result, publishUi: (publish) => (publish(result), "published") };
+    },
+  };
+}
+
 function HostMembersForTest({
   actions,
   invitationActions,
@@ -177,7 +219,7 @@ function HostMembersForTest({
       initialMembers={initialMembers}
       initialInvitations={initialInvitations}
       actions={actions ?? noopHostMembersActions}
-      invitationActions={invitationActions ?? noopHostInvitationsActions}
+      invitationActions={registerTestInvitationActions(invitationActions ?? noopHostInvitationsActions)}
     />
   );
 }
@@ -1248,5 +1290,54 @@ describe("HostMembersPage", () => {
     const invitations = screen.getByRole("region", { name: "초대" });
     expect(await within(invitations).findByText("새멤버")).toBeInTheDocument();
     expect(invitationActions.refreshInvitations).toHaveBeenCalledWith({ limit: 50 });
+  });
+
+  it("publishes no invitation row or success copy when the registered host-members owner becomes obsolete", async () => {
+    const user = userEvent.setup();
+    const created: HostInvitationListItem = {
+      invitationId: "invite-obsolete",
+      email: "obsolete@example.com",
+      name: "사라진 소유자",
+      role: "MEMBER",
+      status: "PENDING",
+      effectiveStatus: "PENDING",
+      expiresAt: "2026-09-20T12:00:00Z",
+      acceptedAt: null,
+      createdAt: "2026-08-31T00:00:00Z",
+      canRevoke: true,
+      canReissue: true,
+      applyToCurrentSession: true,
+    };
+    const publishUi = vi.fn(() => "rejected" as const);
+    const createInvitation = vi.fn(async () => ({
+      created,
+      refreshed: { items: [created], nextCursor: null },
+      publishUi,
+    }));
+    const registeredActions: RegisteredHostInvitationsActions = {
+      listInvitations: noopHostInvitationsActions.listInvitations,
+      parseInvitationList: noopHostInvitationsActions.parseInvitationList,
+      createInvitation,
+      revokeInvitation: vi.fn(),
+    };
+
+    render(
+      <HostMembers
+        initialMembers={[members[0]]}
+        initialInvitations={[]}
+        actions={noopHostMembersActions}
+        invitationActions={registeredActions}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("이름"), "사라진 소유자");
+    await user.type(screen.getByLabelText("초대 이메일"), "obsolete@example.com");
+    await user.click(screen.getByRole("button", { name: "초대 보내기" }));
+
+    const invitationRegion = screen.getByRole("region", { name: "초대" });
+    expect(createInvitation).toHaveBeenCalledTimes(1);
+    expect(publishUi).toHaveBeenCalledTimes(1);
+    expect(within(invitationRegion).queryByText("사라진 소유자")).not.toBeInTheDocument();
+    expect(within(invitationRegion).queryByText("초대를 보냈습니다.")).not.toBeInTheDocument();
   });
 });

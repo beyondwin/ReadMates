@@ -22,7 +22,11 @@ import {
   type ReadmatesApiContext,
 } from "@/shared/api/client";
 import { readSurfaceCapabilitiesForAuth } from "@/shared/model/read-surface-capabilities";
-import { useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import {
+  publishTransitionAction,
+  TransitionOwnerObsoleteError,
+  useTransitionSafetyOwner,
+} from "@/shared/ui/use-transition-safety-owner";
 export { CurrentSessionRouteError } from "./current-session-route-error";
 
 const renderedScheduleAcknowledgements = new WeakMap<QueryClient, Set<string>>();
@@ -100,12 +104,14 @@ export function CurrentSessionRoute({
     const handle = transitionOwner.begin(operationId, "L1", async () => ({ operationId, outcome: "still-unknown" }));
     void markScheduleSeen(renderedRevision).then(async (receipt) => {
       if (await handle.settle("succeeded") !== "accepted") return;
-      handle.publishAccepted({ surface: "cache", publish: () => publishCurrentScheduleSeen(queryClient, context, receipt) });
+      await publishTransitionAction(handle, "cache", () => publishCurrentScheduleSeen(queryClient, context, receipt));
     }).catch(async (error: unknown) => {
-      if (await handle.settle("failed") === "accepted" && isCurrentScheduleSeenConflict(error)) {
-        handle.publishAccepted({ surface: "cache", publish: () => { void invalidateCurrentSession(queryClient, context); } });
+      if (await handle.settle("failed") !== "accepted") return;
+      if (isCurrentScheduleSeenConflict(error)) {
+        await publishTransitionAction(handle, "cache", () => invalidateCurrentSession(queryClient, context));
+      } else {
+        await publishTransitionAction(handle, "cache", () => acknowledgements.delete(renderedRevisionKey));
       }
-      if (!isCurrentScheduleSeenConflict(error)) acknowledgements.delete(renderedRevisionKey);
     });
   }, [context, markScheduleSeen, queryClient, renderedRevision, renderedRevisionKey, renderedSession?.sessionId, scheduleSeenWriteEligible, transitionOwner]);
 
@@ -126,11 +132,11 @@ export function CurrentSessionRoute({
         const handle = transitionOwner.begin(operationId, "L1", async () => ({ operationId, outcome: "still-unknown" }));
         try {
           const result = await execute();
-          if (await handle.settle("succeeded") === "accepted") {
-            handle.publishAccepted({ surface: "cache", publish: () => { void invalidateCurrentSession(queryClient, context); } });
-          }
+          if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
+          await publishTransitionAction(handle, "cache", () => invalidateCurrentSession(queryClient, context));
           return result;
         } catch (error) {
+          if (error instanceof TransitionOwnerObsoleteError) throw error;
           await handle.settle("failed");
           throw error;
         }

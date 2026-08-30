@@ -32,7 +32,7 @@ import {
   useAdminSupportSearchMutation,
 } from "@/features/platform-admin/queries/platform-admin-support-queries";
 import { AdminSupportWorkbench } from "@/features/platform-admin/ui/admin-support-workbench";
-import { useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import { publishTransitionAction, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 const DEFAULT_REASON: SupportGrantReasonCategory = "MEMBER_ASSISTANCE";
 
@@ -213,22 +213,26 @@ export function AdminSupportRoute() {
         confirmed: true,
       });
       if (await handle.settle("succeeded") !== "accepted") return;
-      await publishAdminSupportLedger(queryClient);
-      setLatestReceipt(receipt);
-      setQuery("");
-      setResults([]);
-      setSelectedResult(null);
-      setCreateNote("");
-      setCreateOutcomeUnknown(false);
-      clearCreateCommand();
-    } catch (error) {
-      await handle.settle("failed");
-      const recovery = supportGrantCommandRecovery(error);
-      setCreateRecovery(recovery.message);
-      if (recovery.kind === "RESTART_PREVIEW") {
+      await publishTransitionAction(handle, "cache", () => publishAdminSupportLedger(queryClient));
+      await publishTransitionAction(handle, "ui", () => {
+        setLatestReceipt(receipt);
+        setQuery("");
+        setResults([]);
+        setSelectedResult(null);
+        setCreateNote("");
         setCreateOutcomeUnknown(false);
         clearCreateCommand();
-      }
+      });
+    } catch (error) {
+      if (await handle.settle("failed") !== "accepted") return;
+      const recovery = supportGrantCommandRecovery(error);
+      await publishTransitionAction(handle, "errorCopy", () => {
+        setCreateRecovery(recovery.message);
+        if (recovery.kind === "RESTART_PREVIEW") {
+          setCreateOutcomeUnknown(false);
+          clearCreateCommand();
+        }
+      });
     } finally {
       createConfirmMutation.reset();
     }
@@ -289,24 +293,28 @@ export function AdminSupportRoute() {
         confirmed: true,
       });
       if (await handle.settle("succeeded") !== "accepted") return;
-      await publishAdminSupportLedger(queryClient);
-      setLatestReceipt(receipt);
-      setRevokeTarget(null);
-      setRevokeNote("");
-      setRevokePreview(null);
-      setRevokeSnapshot(null);
-      setRevokeIntentKey(null);
-      setRevokeOutcomeUnknown(false);
-    } catch (error) {
-      await handle.settle("failed");
-      const recovery = supportGrantCommandRecovery(error);
-      setRevokeRecovery(recovery.message);
-      if (recovery.kind === "RESTART_PREVIEW") {
-        setRevokeOutcomeUnknown(false);
+      await publishTransitionAction(handle, "cache", () => publishAdminSupportLedger(queryClient));
+      await publishTransitionAction(handle, "ui", () => {
+        setLatestReceipt(receipt);
+        setRevokeTarget(null);
+        setRevokeNote("");
         setRevokePreview(null);
         setRevokeSnapshot(null);
         setRevokeIntentKey(null);
-      }
+        setRevokeOutcomeUnknown(false);
+      });
+    } catch (error) {
+      if (await handle.settle("failed") !== "accepted") return;
+      const recovery = supportGrantCommandRecovery(error);
+      await publishTransitionAction(handle, "errorCopy", () => {
+        setRevokeRecovery(recovery.message);
+        if (recovery.kind === "RESTART_PREVIEW") {
+          setRevokeOutcomeUnknown(false);
+          setRevokePreview(null);
+          setRevokeSnapshot(null);
+          setRevokeIntentKey(null);
+        }
+      });
     } finally {
       revokeConfirmMutation.reset();
     }

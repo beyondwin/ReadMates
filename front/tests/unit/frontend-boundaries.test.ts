@@ -256,7 +256,7 @@ function getImportedFeatureName(projectPath: string) {
 }
 
 function isFeatureLayerImport(projectPath: string, layer: string) {
-  return new RegExp(`^features/[^/]+/${layer}(?:/|$)`).test(projectPath);
+  return new RegExp(`^features/[^/]+/(?:[^/]+/)*${layer}(?:/|$)`).test(projectPath);
 }
 
 function isSharedApiImport(projectPath: string) {
@@ -629,6 +629,8 @@ describe("frontend architecture boundaries", () => {
     const forbidden = [
       "@/features/host/queries/host-session-queries",
       "@/features/host/api/host-api",
+      "@/features/host/aigen/queries/aigen-job-queries",
+      "@/features/host/aigen/api/aigen-api",
       "@/features/host/route/host-meeting-workspace-route",
       "@/src/app/global-space-transition",
       "@/src/pages/host-page",
@@ -640,6 +642,24 @@ describe("frontend architecture boundaries", () => {
     }
     expect(isFeatureUiRouterImport(sourceFile, "react-router")).toBe(true);
     expect(/\bfetch\s*\(/.test("export const run = () => fetch('/api/unsafe');")).toBe(true);
+  });
+
+  it("allows deeply nested feature UI to remain callback-only presentation", () => {
+    const sourceFile: SourceFile = {
+      absolutePath: "/unused/features/host/aigen/ui/defaults/safe-panel.tsx",
+      displayPath: "front/features/host/aigen/ui/defaults/safe-panel.tsx",
+      relativePath: "features/host/aigen/ui/defaults/safe-panel.tsx",
+    };
+
+    const presentationImports = [
+      "@/features/host/aigen/model/aigen-review-state",
+      "@/features/host/aigen/ui/aigen-presentation-types",
+      "@/shared/ui/button",
+    ];
+
+    for (const specifier of presentationImports) {
+      expect(isFeatureUiBoundaryImport(sourceFile, normalizeImportSpecifier(sourceFile, specifier).projectPath)).toBe(false);
+    }
   });
 
   it("keeps shared, feature route, feature model, and feature UI dependencies inside their allowed boundaries", () => {

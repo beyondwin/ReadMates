@@ -357,7 +357,6 @@ describe("platform admin mutation cache behavior", () => {
     const updated = { ...detail, name: "새 이름", adminRevision: 8 };
     vi.mocked(updatePlatformAdminClubMetadata).mockResolvedValue(updated);
     const { client, Wrapper } = createWrapper();
-    client.setQueryData(platformAdminKeys.club("club-1"), detail);
     const { result } = renderHook(() => useUpdatePlatformAdminClubMutation(), {
       wrapper: Wrapper,
     });
