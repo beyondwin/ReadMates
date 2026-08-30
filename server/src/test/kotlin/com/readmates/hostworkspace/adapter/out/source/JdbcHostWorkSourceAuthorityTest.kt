@@ -256,6 +256,24 @@ class JdbcHostWorkSourceAuthorityTest(
         assertThat(page.items.map { it.key }).doesNotHaveDuplicates()
     }
 
+    @Test
+    fun `record retention does not resurrect an old actual publish through a recent no op receipt`() {
+        val sessionId = insertClosingSession("006", visibility = "PUBLIC", ready = true, notified = true)
+        sessionLifecycle.publish(publishCommand(sessionId, 10, "record-retention-publish-actual"))
+        sessionLifecycle.publish(publishCommand(sessionId, 11, "record-retention-publish-no-op"))
+        val receiptTimes = publishReceiptTimes(sessionId)
+        assertThat(receiptTimes).hasSize(2)
+        assertThat(receiptTimes.last()).isAfter(receiptTimes.first())
+
+        val completed =
+            closingSource
+                .get(CLUB_ID, receiptTimes.last(), receiptTimes.last())
+                .items
+                .filter { it.sessionId == sessionId && !it.actionable }
+
+        assertThat(completed).isEmpty()
+    }
+
     private fun insertScheduleSession(
         suffix: String,
         state: String,
@@ -443,6 +461,18 @@ class JdbcHostWorkSourceAuthorityTest(
         expectedSessionRevision = ExpectedSessionRevision(expectedRevision),
         idempotencyKey = idempotencyKey,
     )
+
+    private fun publishReceiptTimes(sessionId: UUID): List<OffsetDateTime> =
+        jdbcTemplate
+            .queryForList(
+                """
+                select created_at from host_session_mutation_receipts
+                where resource_id = ? and operation = 'SESSION_PUBLISH'
+                order by created_at, id
+                """.trimIndent(),
+                java.time.LocalDateTime::class.java,
+                sessionId.toString(),
+            ).map { requireNotNull(it).atOffset(java.time.ZoneOffset.UTC) }
 
     private fun hostActor() =
         ClubActor(

@@ -113,3 +113,29 @@ Review-round 2 manifest SHA-256: `e139ea58876874f0b58f720636bae911fc2cca42618980
 
 - Schedule/member source tests and aggregate/cursor/controller/security/BFF/frontend/contracts were not rerun because their source hashes and behavior surfaces are unchanged.
 - Full server CI/Testcontainers suite, CT/E2E, public-release and Stage 4 gates remain deferred to stage closeout. No migration, deployment, provider call, push, PR or tag was performed.
+
+## Review round 3 — retention after authoritative receipt selection
+
+- Review base: `71a8469186cfe11a5e4dec819c01154e5b7fd8dc`.
+- Scope remains exactly the RECORD completed-receipt SQL and its real MySQL regression. No other source, aggregate, snapshot implementation, cursor, controller, security, frontend, migration or architecture file changed.
+
+| Finding | RED evidence | Closure |
+|---|---|---|
+| Applying `completedSince` inside the receipt-ranking CTE discarded an old actual-transition receipt before ranking and promoted a recent same-vector no-op receipt to authoritative completion | Two real lifecycle publish calls produced distinct receipt times. With `completedSince` between them, the source incorrectly returned one completed item using the recent no-op receipt instead of zero. | The query now ranks all club-scoped valid `SESSION_PUBLISH` receipts by complete canonical resulting vector first, selects `vector_ordinal = 1`, and only then applies retention to that authoritative earliest receipt. The indexed club filter, operation constraint and valid session-revision filter remain before ranking; only the semantically unsafe time predicate moved. |
+
+### Fresh focused evidence
+
+| Source hash / command | Result | Finding closure |
+|---|---|---|
+| Review-round source hashes in `task-5-review-3-manifest.sha256` | 2/2 files verified | Exact SQL-ordering and regression surface sealed. |
+| `./server/gradlew -p server integrationTest --tests '*JdbcHostWorkSourceAuthorityTest.record completion deduplicates*' --tests '*JdbcHostWorkSourceAuthorityTest.record retention does not resurrect*'` | GREEN, 2/2 against MySQL | Existing duplicate/snapshot behavior remains closed; an old actual receipt plus recent same-vector no-op now yields zero completed items. |
+| `./server/gradlew -p server unitTest --tests '*HostRecordClosingWorkSourceServiceTest'` | GREEN, 2/2 | Record action/completion projection remains intact. |
+| Repository ktlint/detekt reports filtered to the two manifest files | Focused findings 0 | Round 3 formatting and static analysis closed; whole tasks retain only pre-existing findings outside this diff. |
+| `git diff --cached --check`, targeted production privacy scan and forbidden-surface diff | clean / no matches / empty | Patch hygiene, public-repository safety and bounded scope closed. |
+
+Review-round 3 manifest SHA-256: `aa78535a2f0d497ea5dc6cf510b5a4904ce7e440e2c7b9acb057995fdb906b1b`.
+
+### Review-round 3 skipped evidence
+
+- Schedule/member sources, aggregate/snapshot implementation, cursor/controller/security/BFF/frontend/contracts and all unrelated tests were not rerun because their source hashes are unchanged.
+- Full server CI/Testcontainers suite, CT/E2E, public-release and Stage 4 gates remain deferred to stage closeout. No migration, deployment, provider call, push, PR or tag was performed.

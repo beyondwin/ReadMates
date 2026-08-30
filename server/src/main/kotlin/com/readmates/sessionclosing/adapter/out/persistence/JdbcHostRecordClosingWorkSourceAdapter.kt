@@ -238,7 +238,6 @@ private val COMPLETED_CLOSING_ROWS_SQL =
       where receipts.club_id = ?
         and receipts.operation = 'SESSION_PUBLISH'
         and receipts.session_revision > 0
-        and receipts.created_at >= ?
     )
     select
       receipts.id receipt_id,
@@ -256,5 +255,6 @@ private val COMPLETED_CLOSING_ROWS_SQL =
     join active_sessions sessions
       on sessions.club_id = receipts.club_id and sessions.id = receipts.resource_id
     where receipts.vector_ordinal = 1
+      and receipts.created_at >= ?
     order by receipts.created_at, receipts.id
     """.trimIndent()
