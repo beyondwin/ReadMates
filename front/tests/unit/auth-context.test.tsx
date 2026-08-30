@@ -106,6 +106,16 @@ function AuthProbe() {
   return <div data-testid="auth-state">{state.auth.approvalState}</div>;
 }
 
+function AuthSpacesProbe() {
+  const state = useAuth();
+
+  if (state.status !== "ready") {
+    return <div data-testid="available-spaces">loading</div>;
+  }
+
+  return <div data-testid="available-spaces">{state.auth.availableSpaces?.kinds.join(",") ?? "missing"}</div>;
+}
+
 function AuthAwareLogoutButton() {
   const { markLoggedOut } = useAuthActions();
 
@@ -206,6 +216,22 @@ afterEach(() => {
 });
 
 describe("AuthProvider", () => {
+  it("fails closed when the app context receives an unknown available-spaces version", async () => {
+    mockAuthFetch({
+      ...activeMemberAuth,
+      availableSpaces: { version: 99, kinds: ["PLATFORM", "CLUBS"], clubs: [] } as never,
+    });
+
+    render(
+      <AuthProvider>
+        <AuthSpacesProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("available-spaces")).toBeEmptyDOMElement();
+    });
+  });
   it("accepts viewer auth payloads from the API contract", () => {
     expect(viewerAuth.membershipStatus).toBe("VIEWER");
     expect(viewerAuth.approvalState).toBe("VIEWER");

@@ -33,6 +33,18 @@ export const authMeContractFixture = {
   role: "MEMBER",
   membershipStatus: "ACTIVE",
   approvalState: "ACTIVE",
+  availableSpaces: {
+    version: 1,
+    kinds: ["CLUBS"],
+    clubs: [
+      {
+        clubId: "club-1",
+        clubSlug: "reading-sai",
+        clubName: "읽는 사이",
+        perspectives: ["MEMBER"],
+      },
+    ],
+  },
   currentMembership: {
     membershipId: "membership-1",
     clubId: "club-1",

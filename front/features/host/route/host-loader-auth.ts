@@ -1,6 +1,7 @@
 import { redirect, replace } from "react-router";
 import { readmatesFetch, readmatesPublicFetch } from "@/shared/api/client";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import { normalizeAuthAvailableSpaces } from "@/shared/auth/available-spaces";
 import { loginPathForReturnTo } from "@/shared/auth/login-return";
 import { canUseHostApp } from "@/shared/auth/member-app-access";
 import { authMePath, clubSlugFromLoaderArgs, returnToFromRequest, scopedAppPath } from "@/shared/auth/member-app-loader";
@@ -16,7 +17,7 @@ type ClubScopedLoaderArgs = {
 const pendingScopedHostAuthorizations = new WeakMap<Request, Promise<AuthMeResponse>>();
 
 async function requireScopedHostLoaderAuth(clubSlug: string): Promise<AuthMeResponse> {
-  const auth = await readmatesPublicFetch<AuthMeResponse>(authMePath(clubSlug));
+  const auth = normalizeAuthAvailableSpaces(await readmatesPublicFetch<AuthMeResponse>(authMePath(clubSlug)));
   if (!auth.authenticated || !canUseHostApp(auth)) {
     throw replace(scopedAppPath(clubSlug));
   }
@@ -49,7 +50,9 @@ export async function requireHostLoaderAuth(args?: ClubScopedLoaderArgs): Promis
     return requireScopedHostLoaderAuthForRequest(clubSlug, args?.request);
   }
 
-  const auth = await readmatesFetch<AuthMeResponse>(authMePath(clubSlug), undefined, { clubSlug });
+  const auth = normalizeAuthAvailableSpaces(
+    await readmatesFetch<AuthMeResponse>(authMePath(clubSlug), undefined, { clubSlug }),
+  );
 
   if (!auth.authenticated) {
     throw redirect(loginPathForReturnTo(returnToFromRequest(args?.request)));

@@ -57,7 +57,7 @@ describe("requireHostLoaderAuth", () => {
     expect(second.status).toBe("rejected");
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    await expect(requireHostLoaderAuth(args)).resolves.toEqual(hostAuth);
+    await expect(requireHostLoaderAuth(args)).resolves.toMatchObject(hostAuth);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
@@ -92,5 +92,22 @@ describe("requireHostLoaderAuth", () => {
     await Promise.all([requireHostLoaderAuth(), requireHostLoaderAuth()]);
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ["public scoped branch", { params: { clubSlug: "alpha" }, request: new Request("https://readmates.local/clubs/alpha/app/host") }],
+    ["authenticated unscoped branch", undefined],
+  ])("normalizes malformed available spaces before the %s host capability guard", async (_branch, args) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(jsonResponse({
+        ...hostAuth,
+        availableSpaces: { version: 7, kinds: ["PLATFORM", "CLUBS"], clubs: [] },
+      }))),
+    );
+
+    await expect(requireHostLoaderAuth(args)).resolves.toMatchObject({
+      availableSpaces: { version: 1, kinds: [], clubs: [] },
+    });
   });
 });

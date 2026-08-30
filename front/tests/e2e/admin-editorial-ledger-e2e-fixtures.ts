@@ -51,6 +51,11 @@ function platformAdminAuth(role: PlatformAdminRole): AuthMeResponse {
       email: `${account}@example.test`,
       role,
     },
+    availableSpaces: {
+      version: 1,
+      kinds: ["PLATFORM"],
+      clubs: [],
+    },
     recommendedAppEntryUrl: "/admin",
   };
 }

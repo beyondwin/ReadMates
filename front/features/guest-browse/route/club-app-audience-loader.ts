@@ -4,6 +4,7 @@ import type { GuestBrowseShell } from "@/features/guest-browse/api/guest-browse-
 import { deriveClubAppAudience, type ClubAppAudience } from "@/features/guest-browse/model/club-app-audience";
 import { readmatesPublicFetch } from "@/shared/api/client";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import { normalizeAuthAvailableSpaces } from "@/shared/auth/available-spaces";
 import { authMePath, clubSlugFromLoaderArgs, type ClubScopedLoaderArgs } from "@/shared/auth/member-app-loader";
 import { isReadmatesApiError } from "@/shared/api/errors";
 
@@ -33,7 +34,7 @@ function requiredClubSlug(args?: ClubScopedLoaderArgs) {
 
 async function loadClubAppAudienceForRequest(args?: Pick<LoaderFunctionArgs, "params" | "request">): Promise<ClubAppAccess> {
   const clubSlug = requiredClubSlug(args);
-  const auth = await readmatesPublicFetch<AuthMeResponse>(authMePath(clubSlug));
+  const auth = normalizeAuthAvailableSpaces(await readmatesPublicFetch<AuthMeResponse>(authMePath(clubSlug)));
   const audience = deriveClubAppAudience(auth);
 
   if (audience !== "GUEST") {

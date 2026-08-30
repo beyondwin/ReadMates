@@ -55,6 +55,18 @@ export function hostAuthResponse(clubSlug: string): AuthMeResponse {
         primaryHost: null,
       },
     ],
+    availableSpaces: {
+      version: 1,
+      kinds: ["CLUBS"],
+      clubs: [
+        {
+          clubId: "club-a-id",
+          clubSlug,
+          clubName: "E2E 클럽",
+          perspectives: ["MEMBER", "HOST"],
+        },
+      ],
+    },
     recommendedAppEntryUrl: `/clubs/${encodeURIComponent(clubSlug)}/app`,
   };
 }

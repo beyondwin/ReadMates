@@ -1,6 +1,21 @@
 export type MemberRole = "HOST" | "MEMBER";
 export type MembershipStatus = "INVITED" | "VIEWER" | "ACTIVE" | "SUSPENDED" | "LEFT" | "INACTIVE";
 export type ApprovalState = "ANONYMOUS" | "VIEWER" | "ACTIVE" | "SUSPENDED" | "INACTIVE";
+export type ProductSpaceKind = "PLATFORM" | "CLUBS";
+export type ClubPerspective = "MEMBER" | "HOST";
+
+export type AvailableClubSpaceV1 = {
+  clubId: string;
+  clubSlug: string;
+  clubName: string;
+  perspectives: ClubPerspective[];
+};
+
+export type AvailableSpacesV1 = {
+  version: 1;
+  kinds: ProductSpaceKind[];
+  clubs: AvailableClubSpaceV1[];
+};
 
 export type AuthMeResponse = {
   authenticated: boolean;
@@ -18,6 +33,7 @@ export type AuthMeResponse = {
   joinedClubs?: AuthJoinedClub[];
   platformAdmin?: AuthPlatformAdmin | null;
   recommendedAppEntryUrl?: string | null;
+  availableSpaces?: AvailableSpacesV1;
 };
 
 export type AuthCurrentMembership = {
