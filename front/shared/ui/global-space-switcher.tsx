@@ -313,7 +313,7 @@ export function GlobalSpaceSwitcher({
           <div id={menuId} role="menu" aria-label="ReadMates 공간 전환">
             {level === "root" ? (
               <>
-                <p className="rm-global-space-switcher__section-label">현재 범위</p>
+                <p className="rm-global-space-switcher__section-label">범위 선택</p>
                 <div className="rm-global-space-switcher__root-list">
                   {platformOption ? (
                     <button

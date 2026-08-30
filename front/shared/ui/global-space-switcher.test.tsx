@@ -97,22 +97,42 @@ describe("GlobalSpaceSwitcher", () => {
       label: "platform+member",
       current: platform.identity,
       options: [platform, readingMember],
+      currentKind: "platform",
     },
     {
       label: "platform+host+member",
       current: readingHost.identity,
       options: [platform, readingMember, readingHost],
+      currentKind: "clubs",
     },
-  ])("shows only the two authorized first-level kinds: $label", async ({ current, options }) => {
+  ])("shows truthful current semantics for the two authorized first-level kinds: $label", async ({
+    current,
+    options,
+    currentKind,
+  }) => {
     const user = userEvent.setup();
     renderSwitcher({ currentIdentity: current, options });
 
     const trigger = screen.getByRole("button", { name: /공간 전환/ });
     await user.click(trigger);
     const menu = screen.getByRole("menu", { name: "ReadMates 공간 전환" });
+    const platformItem = within(menu).getByRole("menuitemradio", { name: "플랫폼 운영" });
+    const clubsItem = within(menu).getByRole("menuitem", { name: "내 클럽" });
 
-    expect(within(menu).getByRole("menuitemradio", { name: "플랫폼 운영" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "내 클럽" })).toBeInTheDocument();
+    expect(within(menu).getByText("범위 선택", { selector: ".rm-global-space-switcher__section-label" }))
+      .toBeInTheDocument();
+    expect(within(menu).queryByText("현재 범위", { selector: ".rm-global-space-switcher__section-label" }))
+      .not.toBeInTheDocument();
+    expect(platformItem).toHaveAttribute("aria-checked", String(currentKind === "platform"));
+    if (currentKind === "clubs") {
+      expect(clubsItem).toHaveAttribute("aria-current", "true");
+      expect(within(clubsItem).getByText("현재 범위")).toBeInTheDocument();
+      expect(within(platformItem).queryByText("현재 범위")).not.toBeInTheDocument();
+    } else {
+      expect(clubsItem).not.toHaveAttribute("aria-current");
+      expect(within(platformItem).getByText("현재 범위")).toBeInTheDocument();
+      expect(within(clubsItem).queryByText("현재 범위")).not.toBeInTheDocument();
+    }
     expect(within(menu).queryByRole("group", { name: "읽는사이" })).not.toBeInTheDocument();
     expect(within(menu).queryByText("PLATFORM")).not.toBeInTheDocument();
     expect(within(menu).queryByText("CLUBS")).not.toBeInTheDocument();
@@ -231,6 +251,21 @@ describe("GlobalSpaceSwitcher", () => {
 
     expect(screen.getByRole("menuitem", { name: "내 클럽" })).toHaveFocus();
     expect(screen.queryByRole("heading", { name: "내 클럽" })).not.toBeInTheDocument();
+  });
+
+  it("returns from the club level with ArrowLeft and focuses the 내 클럽 parent", async () => {
+    const user = userEvent.setup();
+    renderSwitcher();
+
+    await user.click(screen.getByRole("button", { name: /공간 전환/ }));
+    await user.click(screen.getByRole("menuitem", { name: "내 클럽" }));
+    expect(screen.getByRole("menuitemradio", { name: "읽는사이 멤버로 보기" })).toHaveFocus();
+
+    await user.keyboard("{ArrowLeft}");
+
+    expect(screen.getByRole("menuitem", { name: "내 클럽" })).toHaveFocus();
+    expect(screen.getByRole("menuitemradio", { name: "플랫폼 운영" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitemradio", { name: "읽는사이 멤버로 보기" })).not.toBeInTheDocument();
   });
 
   it("closes on Escape or outside click, removes hidden items, and returns focus", async () => {

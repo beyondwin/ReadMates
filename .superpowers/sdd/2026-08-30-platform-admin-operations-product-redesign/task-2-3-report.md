@@ -46,6 +46,19 @@ Round 1 RED command:
 
 The fix preserves the Task 2.2 app-owned controller/callback bridge. The shared component still accepts only projection-derived props; no feature imports `src/app`, and no new query/router/policy ownership was introduced.
 
+## Review fix round 2
+
+Ruling: 첫 단계의 목록 제목은 `현재 범위`가 아니라 중립적인 `범위 선택`으로 표시하고, 실제 current 상태는 해당 peer 안의 `aria-checked` 또는 `aria-current`와 `현재 범위` 보조 copy로만 나타낸다 — platform-current와 club-current 모두 같은 두 destination 아래에서 truthfully 읽혀야 하며 non-current peer를 current 제목 아래 배치하면 정보 구조가 거짓이 된다 — 틀렸을 때 비용은 운영자가 목록 전체를 현재 범위로 오해하고 보조기기에도 현재 destination 관계가 모호해지는 것이다.
+
+Ruling: club drill-in에서 ArrowLeft는 Back/Escape와 동일하게 첫 단계로 돌아가되 `내 클럽` parent에 focus를 복귀한다 — 이미 구현된 keyboard behavior를 explicit regression contract로 봉인하는 것이 이번 review 범위이며 controller/policy 변화는 필요 없다 — 틀렸을 때 비용은 키보드 사용자가 시각적 계층과 다른 focus 위치로 이동하거나 상위 destination을 다시 찾는 것이다.
+
+Round 2 TDD evidence:
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run shared/ui/global-space-switcher.test.tsx` | 1 | RED: 15 tests 중 platform-current와 club-current 두 table case가 neutral `범위 선택` 부재로 실패했다. 새 ArrowLeft regression case는 기존 behavior를 검증했다. |
+| `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run shared/ui/global-space-switcher.test.tsx` | 0 | GREEN: 목록 제목 한 줄을 중립 copy로 변경한 뒤 15/15 tests가 통과했다. |
+
 ## TDD and debugging evidence
 
 ### RED
@@ -63,9 +76,9 @@ The stale suite was not made green by restoring old selectors. Fixtures were giv
 
 | Command | Exit | Result |
 | --- | ---: | --- |
-| `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run shared/ui/global-space-switcher.test.tsx shared/ui/app-club-shell.test.tsx shared/ui/workspace-selector.test.tsx features/platform-admin/route/admin-shell-layout.test.tsx src/app/routes/admin.test.tsx src/app/layouts/app-route-layout.test.tsx tests/unit/spa-layout.test.tsx tests/unit/frontend-boundaries.test.ts` | 0 | Review-fix final run: 8 files / 109 tests passed. |
+| `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run shared/ui/global-space-switcher.test.tsx shared/ui/app-club-shell.test.tsx shared/ui/workspace-selector.test.tsx features/platform-admin/route/admin-shell-layout.test.tsx src/app/routes/admin.test.tsx src/app/layouts/app-route-layout.test.tsx tests/unit/spa-layout.test.tsx tests/unit/frontend-boundaries.test.ts` | 0 | Review round 2 final run: 8 files / 110 tests passed. |
 | `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run src/app/routes/admin.test.tsx` | 0 | 1 file / 4 tests passed, including the final legacy-`joinedClubs` non-authority case. |
-| `npx --yes corepack@0.35.0 pnpm --dir front test` | 0 | Review-fix final run: 421 files / 3,915 tests passed. |
+| `npx --yes corepack@0.35.0 pnpm --dir front test` | 0 | Review round 2 final run: 421 files / 3,916 tests passed. |
 | `npx --yes corepack@0.35.0 pnpm --dir front lint` | 0 | No errors; two pre-existing Fast Refresh warnings remain in unrelated host UI files. |
 | `npx --yes corepack@0.35.0 pnpm --dir front build` | 0 | 785 modules transformed and the production build completed; the existing chunk-size advisory remains. |
 | `git diff --check` | 0 | No whitespace errors. |
