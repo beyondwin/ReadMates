@@ -1,6 +1,6 @@
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { StrictMode, useState } from "react";
+import { StrictMode, useEffect, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, Link, MemoryRouter, useLocation, useNavigate } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -16,6 +16,8 @@ import type {
   AcceptedTransitionPublicationAction,
   PendingHandle,
   ReceiptRecoveryCapsule,
+  SpaceIdentity,
+  TransitionSafetyRegistrationPort,
 } from "@/shared/model/global-space";
 import type { HostSensitiveStorage } from "@/features/host/storage/host-sensitive-storage";
 import { hostClubQueryPrefix } from "@/features/host/queries/host-state-purge";
@@ -173,6 +175,45 @@ function PendingDataRouterTransitionHarness({
       <output aria-label="pending-router-location">{location.pathname}</output>
       <output aria-label="pending-router-result">{result}</output>
       <main><h1>호스트 현재 화면</h1></main>
+    </>
+  );
+}
+
+function TargetHostDataRouterTransitionHarness({
+  target,
+  onPort,
+  onSettled,
+}: {
+  target: SpaceIdentity;
+  onPort: (port: TransitionSafetyRegistrationPort) => void;
+  onSettled: (status: string) => void;
+}) {
+  const controller = useGlobalSpaceTransitionController();
+  const location = useLocation();
+
+  useEffect(() => onPort(controller.registrationPort), [controller.registrationPort, onPort]);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => void controller.requestTransition(target).then((result) => {
+          onSettled(result.status);
+        })}
+      >
+        다른 클럽 호스트 loader 시작
+      </button>
+      <output aria-label="target-host-location">
+        {`${location.pathname}${location.search}${location.hash}`}
+      </output>
+      <output aria-label="target-host-safety">{controller.safety.kind}</output>
+      <output aria-label="target-host-spaces">
+        {controller.availableIdentities.map((identity) => (
+          identity.productSpace === "platform"
+            ? "platform"
+            : `${identity.clubSlug}:${identity.perspective}`
+        )).join(",")}
+      </output>
     </>
   );
 }
@@ -895,6 +936,169 @@ describe("AppRouteSecurityController", () => {
     await waitFor(() => expect(router.state.location.pathname).toBe("/admin/today"));
     await waitFor(() => expect(settled).toEqual(["navigated"]));
     expect(router.state.location.hash).toBe("");
+  });
+
+  it.each([
+    {
+      label: "member",
+      pathname: "/clubs/reading-sai/app",
+      workspace: "member" as const,
+    },
+    {
+      label: "host",
+      pathname: "/clubs/reading-sai/app/host",
+      workspace: "host" as const,
+    },
+  ])("cancels only a revoked target-host navigation from a safe $label source", async ({
+    pathname,
+    workspace,
+  }) => {
+    const auth = multiClubHostAuth();
+    const targetHost: SpaceIdentity = {
+      productSpace: "clubs",
+      clubId: "club-2",
+      clubSlug: "other-club",
+      perspective: "host",
+    };
+    const sourceIdentity: SpaceIdentity = {
+      productSpace: "clubs",
+      clubId: "club-1",
+      clubSlug: "reading-sai",
+      perspective: workspace,
+    };
+    let destinationSignal: AbortSignal | null = null;
+    const destinationLoader = vi.fn(({ request }: { request: Request }) => {
+      destinationSignal = request.signal;
+      return new Promise<null>((_resolve, reject) => {
+        request.signal.addEventListener("abort", () => {
+          reject(new DOMException("Revoked target host was superseded", "AbortError"));
+        }, { once: true });
+      });
+    });
+    const clearClub = vi.fn(async () => undefined);
+    const sourceQueryKey = [...hostClubQueryPrefix("reading-sai"), "target-only-source"];
+    const targetQueryKey = [...hostClubQueryPrefix("other-club"), "target-only-revoked"];
+    queryClient.setQueryData(sourceQueryKey, "keep-source");
+    queryClient.setQueryData(targetQueryKey, "remove-target");
+    const sourceContinuityKey = globalSpaceReturnTargetStorageKey(sourceIdentity);
+    const targetContinuityKey = globalSpaceReturnTargetStorageKey(targetHost);
+    window.sessionStorage.setItem(sourceContinuityKey, JSON.stringify({
+      pathname,
+      search: "?view=queue",
+      hash: "#source-focus",
+      focusId: null,
+      scrollTop: 0,
+    }));
+    window.sessionStorage.setItem(targetContinuityKey, JSON.stringify({
+      pathname: "/clubs/other-club/app/host",
+      search: "",
+      hash: "",
+      focusId: null,
+      scrollTop: 0,
+    }));
+    const settled: string[] = [];
+    let registrationPort!: TransitionSafetyRegistrationPort;
+    const initialEntry = {
+      pathname,
+      search: "?view=queue",
+      hash: "#source-focus",
+      state: { sourceState: `${workspace}-preserved` },
+    };
+    const router = createMemoryRouter([
+      {
+        path: pathname,
+        element: (
+          <GlobalSpaceTransitionController
+            auth={auth}
+            loadLatestProjection={async () => auth}
+            loadRouteValidation={async () => ({
+              projectionCurrent: true,
+              loadedCaseIds: new Set<string>(),
+              authorizedClubIds: new Set(["club-1", "club-2"]),
+              availableFocusIds: new Set<string>(),
+              noteSessionIds: new Set<string>(),
+              hostSessionIds: [] as string[],
+            })}
+          >
+            <AppRouteSecurityController
+              workspace={workspace}
+              transitionStore={transitionStore}
+              hostAuthorityStorage={{ register: vi.fn(() => vi.fn()), clearClub }}
+            />
+            <TargetHostDataRouterTransitionHarness
+              target={targetHost}
+              onPort={(port) => { registrationPort = port; }}
+              onSettled={(status) => settled.push(status)}
+            />
+            <main><h1>{workspace === "host" ? "읽는사이 운영" : "읽는사이 멤버"}</h1></main>
+          </GlobalSpaceTransitionController>
+        ),
+      },
+      {
+        path: "/clubs/other-club/app/host",
+        loader: destinationLoader,
+        element: <main><h1>커밋되면 안 되는 다른 클럽 운영</h1></main>,
+      },
+    ], { initialEntries: [initialEntry] });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+
+    (await screen.findByRole("button", { name: "다른 클럽 호스트 loader 시작" })).click();
+    await waitFor(() => expect(destinationLoader).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(registrationPort).toBeDefined());
+    const existingHandle = registrationPort.beginPending({
+      ownerId: `${workspace}-source-work`,
+      operationId: `${workspace}-source-operation`,
+      recovery: {
+        kind: "authoritative-history",
+        operationId: `${workspace}-source-operation`,
+        reconcile: async () => ({
+          operationId: `${workspace}-source-operation`,
+          outcome: "still-unknown",
+        }),
+      },
+    });
+
+    act(() => signalHostAuthorityLoss({
+      code: "HOST_AUTHORITY_REVOKED",
+      clubSlug: "other-club",
+      requestKind: "SESSION_BASIC_SAVE",
+    }));
+
+    await waitFor(() => expect(destinationSignal?.aborted).toBe(true));
+    await waitFor(() => expect(clearClub).toHaveBeenCalledTimes(1));
+    expect(clearClub).toHaveBeenCalledWith("other-club");
+    await waitFor(() => expect(settled).toEqual(["obsolete"]));
+    await waitFor(() => expect(queryClient.getQueryData(targetQueryKey)).toBeUndefined());
+    expect(queryClient.getQueryData(sourceQueryKey)).toBe("keep-source");
+    expect(window.sessionStorage.getItem(targetContinuityKey)).toBeNull();
+    expect(window.sessionStorage.getItem(sourceContinuityKey)).not.toBeNull();
+    expect(screen.getByLabelText("target-host-spaces")).not.toHaveTextContent("other-club:host");
+    expect(screen.getByLabelText("target-host-spaces")).toHaveTextContent(`reading-sai:${workspace}`);
+    expect(screen.getByLabelText("target-host-safety")).toHaveTextContent("pending");
+    expect(router.state.location).toMatchObject(initialEntry);
+    expect(screen.queryByRole("heading", {
+      name: "커밋되면 안 되는 다른 클럽 운영",
+    })).not.toBeInTheDocument();
+
+    await expect(existingHandle.settle("succeeded")).resolves.toBe("accepted");
+    const freshHandle = registrationPort.beginPending({
+      ownerId: `${workspace}-fresh-work`,
+      operationId: `${workspace}-fresh-operation`,
+      recovery: {
+        kind: "authoritative-history",
+        operationId: `${workspace}-fresh-operation`,
+        reconcile: async () => ({
+          operationId: `${workspace}-fresh-operation`,
+          outcome: "still-unknown",
+        }),
+      },
+    });
+    await waitFor(() => expect(screen.getByLabelText("target-host-safety")).toHaveTextContent("pending"));
+    await expect(freshHandle.settle("succeeded")).resolves.toBe("accepted");
   });
 
   it("fails closed to the safe member route without host-loader revalidation when same-club purge fails", async () => {

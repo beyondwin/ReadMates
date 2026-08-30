@@ -89,6 +89,8 @@ type RouterCancellationRecord = {
   promise: Promise<void>;
 };
 
+type RouterCancellationMode = "revoked-current-host" | "preserve-safe-source";
+
 type InFlightTransitionScope = {
   sourceIdentity: SpaceIdentity | null;
   targetIdentity: SpaceIdentity;
@@ -148,11 +150,16 @@ export function GlobalSpaceTransitionController({
       ? injectedNavigation(href, options, signal)
       : navigate(href, options);
   }, [injectedNavigation, navigate]);
-  const cancelPendingRouterNavigation = useCallback((clubSlug: string) => {
+  const cancelPendingRouterNavigation = useCallback((
+    clubSlug: string,
+    mode: RouterCancellationMode,
+  ) => {
     const current = locationRef.current;
-    const cancellationHash = current.hash === `${GLOBAL_SPACE_ROUTER_CANCELLATION_HASH_PREFIX}-1`
-      ? `${GLOBAL_SPACE_ROUTER_CANCELLATION_HASH_PREFIX}-2`
-      : `${GLOBAL_SPACE_ROUTER_CANCELLATION_HASH_PREFIX}-1`;
+    const cancellationHash = mode === "preserve-safe-source"
+      ? current.hash
+      : current.hash === `${GLOBAL_SPACE_ROUTER_CANCELLATION_HASH_PREFIX}-1`
+        ? `${GLOBAL_SPACE_ROUTER_CANCELLATION_HASH_PREFIX}-2`
+        : `${GLOBAL_SPACE_ROUTER_CANCELLATION_HASH_PREFIX}-1`;
     try {
       const cancellation = navigate({
         pathname: current.pathname,
@@ -396,13 +403,11 @@ export function GlobalSpaceTransitionController({
     ) ?? identityFromLocation(locationRef.current.pathname, normalizedAuth);
     const transitionScope = inFlightTransitionScopeRef.current;
     const ownsCurrentHostSpace = hostClubSlugForAuthorityScope(currentIdentity) === event.clubSlug;
-    const ownsInFlightTransition = transitionScope !== null && (
-      hostClubSlugForAuthorityScope(transitionScope.sourceIdentity) === event.clubSlug
-      || hostClubSlugForAuthorityScope(transitionScope.targetIdentity) === event.clubSlug
-    );
+    const targetsRevokedHostSpace = transitionScope !== null
+      && hostClubSlugForAuthorityScope(transitionScope.targetIdentity) === event.clubSlug;
     const ownsManagedMutation = [...handleHostClubScopes.current.values()]
       .some((clubSlug) => clubSlug === event.clubSlug);
-    const ownsCoordinator = ownsCurrentHostSpace || ownsInFlightTransition || ownsManagedMutation;
+    const ownsCoordinator = ownsCurrentHostSpace || ownsManagedMutation;
     if (ownsCoordinator) {
       transitionIntentRef.current += 1;
       transitionAbortRef.current?.abort();
@@ -410,7 +415,11 @@ export function GlobalSpaceTransitionController({
       handles.current.clear();
       handleHostClubScopes.current.clear();
       syncRetainedRecoveryCount();
-      cancelPendingRouterNavigation(event.clubSlug);
+      cancelPendingRouterNavigation(event.clubSlug, "revoked-current-host");
+    } else if (targetsRevokedHostSpace) {
+      transitionIntentRef.current += 1;
+      transitionAbortRef.current?.abort();
+      cancelPendingRouterNavigation(event.clubSlug, "preserve-safe-source");
     }
     const revokedClubs = new Set(revokedHostClubsRef.current).add(event.clubSlug);
     revokedHostClubsRef.current = revokedClubs;

@@ -13,10 +13,16 @@ import {
 } from "@/features/platform-admin/model/admin-route-catalog";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { GlobalSpaceTransitionController } from "@/src/app/global-space-transition-controller";
+import { AppHostAuthorityLossBridge } from "@/src/app/app-route-security-controller";
 
 // This route-only boundary is intentionally colocated with the router configuration.
 export function AdminTransitionBoundary({ auth, children }: PropsWithChildren<{ auth: AuthMeResponse }>) {
-  return <GlobalSpaceTransitionController auth={auth}>{children}</GlobalSpaceTransitionController>;
+  return (
+    <GlobalSpaceTransitionController auth={auth}>
+      <AppHostAuthorityLossBridge />
+      {children}
+    </GlobalSpaceTransitionController>
+  );
 }
 
 export function adminRoutes(queryClient: QueryClient): RouteObject[] {
