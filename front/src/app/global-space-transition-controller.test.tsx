@@ -48,6 +48,12 @@ const member: SpaceIdentity = {
   perspective: "member",
 };
 const host: SpaceIdentity = { ...member, perspective: "host" };
+const otherHost: SpaceIdentity = {
+  productSpace: "clubs",
+  clubId: "club-2",
+  clubSlug: "other-club",
+  perspective: "host",
+};
 
 function authWithSpaces(
   kinds: Array<"PLATFORM" | "CLUBS">,
@@ -75,6 +81,26 @@ function authWithSpaces(
             perspectives,
           }]
         : [],
+    },
+  };
+}
+
+function authWithTwoHostClubs(): AuthMeResponse {
+  const auth = authWithSpaces(["PLATFORM", "CLUBS"], ["MEMBER", "HOST"]);
+  return {
+    ...auth,
+    availableSpaces: {
+      version: 1,
+      kinds: ["PLATFORM", "CLUBS"],
+      clubs: [
+        ...auth.availableSpaces!.clubs,
+        {
+          clubId: "club-2",
+          clubSlug: "other-club",
+          clubName: "다른 모임",
+          perspectives: ["MEMBER", "HOST"],
+        },
+      ],
     },
   };
 }
@@ -156,6 +182,16 @@ function Harness({
       </button>
       <button
         type="button"
+        onClick={() => void controller.requestTransition(otherHost).then((next) => {
+          onResult?.(next);
+          onSettled?.(next.status);
+          if (next.status !== "obsolete") setResult(next.status);
+        })}
+      >
+        다른 클럽 호스트로
+      </button>
+      <button
+        type="button"
         onClick={() => void controller.resolveHostAuthorityLossTarget({
           code: "HOST_AUTHORITY_REVOKED",
           clubSlug: "reading-sai",
@@ -173,6 +209,16 @@ function Harness({
         })}
       >
         호스트 권한 즉시 무효화
+      </button>
+      <button
+        type="button"
+        onClick={() => controller.invalidateForHostAuthorityLoss({
+          code: "CROSS_CLUB_SCOPE",
+          clubSlug: "other-club",
+          requestKind: "MEMBER_LIST",
+        })}
+      >
+        다른 클럽 권한 즉시 무효화
       </button>
     </>
   );
@@ -708,6 +754,35 @@ describe("GlobalSpaceTransitionController", () => {
     expect(observedStorage.storage.setItem).toHaveBeenCalledTimes(acceptedPublicationCount);
   });
 
+  it("keeps a background-revoked host club fenced when an older projection settles later", async () => {
+    const projection = deferred<AuthMeResponse | null>();
+    const auth = authWithTwoHostClubs();
+    const loadLatestProjection = vi.fn<LatestSpaceProjectionLoader>()
+      .mockReturnValueOnce(projection.promise)
+      .mockResolvedValue(auth);
+    const settled: string[] = [];
+    renderController({
+      initialEntry: "/clubs/reading-sai/app/host",
+      auth,
+      loadLatestProjection,
+      onSettled: (status) => settled.push(status),
+    });
+
+    screen.getByRole("button", { name: "플랫폼으로" }).click();
+    await waitFor(() => expect(loadLatestProjection).toHaveBeenCalledTimes(1));
+    act(() => screen.getByRole("button", { name: "다른 클럽 권한 즉시 무효화" }).click());
+    projection.resolve(auth);
+
+    await waitFor(() => expect(screen.getByLabelText("location")).toHaveTextContent("/admin/today"));
+    expect(screen.getByLabelText("available-spaces")).not.toHaveTextContent("other-club:host");
+    await userEvent.click(screen.getByRole("button", { name: "다른 클럽 호스트로" }));
+
+    await waitFor(() => expect(settled).toEqual(["navigated", "unavailable"]));
+    expect(screen.getByLabelText("location")).toHaveTextContent("/admin/today");
+    expect(screen.getByLabelText("result")).toHaveTextContent("unavailable");
+    expect(screen.getByLabelText("available-spaces")).not.toHaveTextContent("other-club:host");
+  });
+
   it("keeps the newer UI result when an obsolete projection refresh rejects", async () => {
     const first = deferred<AuthMeResponse | null>();
     const auth = authWithSpaces(["PLATFORM", "CLUBS"]);
@@ -762,6 +837,8 @@ describe("GlobalSpaceTransitionController", () => {
     const reconcile = vi.fn(() => reconciliation.promise);
     const settled: string[] = [];
     renderController({
+      initialEntry: "/clubs/reading-sai/app/host",
+      auth: authWithSpaces(["PLATFORM", "CLUBS"], ["MEMBER", "HOST"]),
       onPort: (value) => { port = value; },
       onSettled: (status) => settled.push(status),
     });

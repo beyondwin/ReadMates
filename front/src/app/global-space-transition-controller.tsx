@@ -84,6 +84,16 @@ const GlobalSpaceTransitionContext = createContext<GlobalSpaceTransitionControll
 const RESTORE_STATE_KEY = "readmatesGlobalSpaceRestore";
 export const GLOBAL_SPACE_ROUTER_CANCELLATION_HASH_PREFIX = "#readmates-authority-loss-cancel";
 
+type RouterCancellationRecord = {
+  clubSlug: string;
+  promise: Promise<void>;
+};
+
+type InFlightTransitionScope = {
+  sourceIdentity: SpaceIdentity | null;
+  targetIdentity: SpaceIdentity;
+};
+
 export function GlobalSpaceTransitionController({
   auth,
   loadLatestProjection = fetchLatestSpaceProjection,
@@ -109,19 +119,21 @@ export function GlobalSpaceTransitionController({
   );
   const coordinator = useMemo(() => createGlobalSpaceTransitionCoordinator(), []);
   const handles = useRef(new Map<string, PendingHandle>());
+  const handleHostClubScopes = useRef(new Map<string, string>());
   const [retainedRecoveryCount, setRetainedRecoveryCount] = useState(0);
   const transitionIntentRef = useRef(0);
   const transitionAbortRef = useRef<AbortController | null>(null);
-  const routerCancellationRef = useRef<Promise<void>>(Promise.resolve());
+  const inFlightTransitionScopeRef = useRef<InFlightTransitionScope | null>(null);
+  const routerCancellationRef = useRef<RouterCancellationRecord | null>(null);
   const [safety, setSafety] = useState<TransitionSafety>(() => coordinator.getSnapshot());
   const normalizedAuth = useMemo(() => normalizeAuthAvailableSpaces(auth), [auth]);
   const projectedIdentities = useMemo(() => projectedSpaceIdentities(normalizedAuth), [normalizedAuth]);
   const [revokedHostClubs, setRevokedHostClubs] = useState<ReadonlySet<string>>(() => new Set());
-  const availableIdentities = useMemo(() => projectedIdentities.filter((identity) => !(
-    identity.productSpace === "clubs"
-    && identity.perspective === "host"
-    && revokedHostClubs.has(identity.clubSlug)
-  )), [projectedIdentities, revokedHostClubs]);
+  const revokedHostClubsRef = useRef<ReadonlySet<string>>(revokedHostClubs);
+  const availableIdentities = useMemo(
+    () => withoutRevokedHostIdentities(projectedIdentities, revokedHostClubs),
+    [projectedIdentities, revokedHostClubs],
+  );
   const availableIdentitiesRef = useRef(availableIdentities);
   const latestAuthRef = useRef(normalizedAuth);
   const locationRef = useRef(location);
@@ -136,7 +148,7 @@ export function GlobalSpaceTransitionController({
       ? injectedNavigation(href, options, signal)
       : navigate(href, options);
   }, [injectedNavigation, navigate]);
-  const cancelPendingRouterNavigation = useCallback(() => {
+  const cancelPendingRouterNavigation = useCallback((clubSlug: string) => {
     const current = locationRef.current;
     const cancellationHash = current.hash === `${GLOBAL_SPACE_ROUTER_CANCELLATION_HASH_PREFIX}-1`
       ? `${GLOBAL_SPACE_ROUTER_CANCELLATION_HASH_PREFIX}-2`
@@ -151,12 +163,16 @@ export function GlobalSpaceTransitionController({
         state: current.state,
         preventScrollReset: true,
       });
-      routerCancellationRef.current = cancellation
-        ? cancellation.catch(() => undefined)
-        : Promise.resolve();
+      const record: RouterCancellationRecord = {
+        clubSlug,
+        promise: cancellation
+          ? cancellation.catch(() => undefined)
+          : Promise.resolve(),
+      };
+      routerCancellationRef.current = record;
     } catch {
       // Generation and receipt invalidation remain authoritative if router cancellation cannot start.
-      routerCancellationRef.current = Promise.resolve();
+      routerCancellationRef.current = null;
     }
   }, [navigate]);
   const syncRetainedRecoveryCount = useCallback(() => {
@@ -179,14 +195,22 @@ export function GlobalSpaceTransitionController({
     beginPending(registration: PendingRegistration) {
       const coordinatorHandle = coordinator.beginPending(registration);
       const key = handleKey(registration.operationId, coordinatorHandle.generation);
+      const registrationIdentity = identityFromLocation(
+        locationRef.current.pathname,
+        latestAuthRef.current,
+      ) ?? identityFromLocation(locationRef.current.pathname, normalizedAuth);
+      const registrationHostClubSlug = hostClubSlugForAuthorityScope(registrationIdentity);
+      const removeTrackedHandle = (trackedHandle: PendingHandle) => {
+        if (handles.current.get(key) !== trackedHandle) return;
+        handles.current.delete(key);
+        handleHostClubScopes.current.delete(key);
+        syncRetainedRecoveryCount();
+      };
       const trackedHandle: PendingHandle = {
         generation: coordinatorHandle.generation,
         async settle(result) {
           const outcome = await coordinatorHandle.settle(result);
-          if (outcome === "accepted" && handles.current.get(key) === trackedHandle) {
-            handles.current.delete(key);
-            syncRetainedRecoveryCount();
-          }
+          if (outcome === "accepted") removeTrackedHandle(trackedHandle);
           return outcome;
         },
         publishAccepted: coordinatorHandle.publishAccepted,
@@ -194,10 +218,7 @@ export function GlobalSpaceTransitionController({
           coordinatorHandle.unregister();
           queueMicrotask(() => {
             void trackedHandle.reconcile().catch(() => {
-              if (handles.current.get(key) === trackedHandle) {
-                handles.current.delete(key);
-                syncRetainedRecoveryCount();
-              }
+              removeTrackedHandle(trackedHandle);
             });
           });
         },
@@ -205,18 +226,16 @@ export function GlobalSpaceTransitionController({
           try {
             return await coordinatorHandle.reconcile();
           } finally {
-            if (handles.current.get(key) === trackedHandle) {
-              handles.current.delete(key);
-              syncRetainedRecoveryCount();
-            }
+            removeTrackedHandle(trackedHandle);
           }
         },
       };
       handles.current.set(key, trackedHandle);
+      if (registrationHostClubSlug) handleHostClubScopes.current.set(key, registrationHostClubSlug);
       syncRetainedRecoveryCount();
       return trackedHandle;
     },
-  }), [coordinator, syncRetainedRecoveryCount]);
+  }), [coordinator, normalizedAuth, syncRetainedRecoveryCount]);
 
   const loadFreshProjection = useCallback(async (signal: AbortSignal) => {
     try {
@@ -237,7 +256,10 @@ export function GlobalSpaceTransitionController({
   ): Promise<SpaceTransitionRequestResult> => {
     const intentIsCurrent = () => transitionIntentRef.current === intent && !signal.aborted;
     if (!intentIsCurrent()) return { status: "obsolete" };
-    const latestAvailable = projectedSpaceIdentities(latestAuth);
+    const latestAvailable = withoutRevokedHostIdentities(
+      projectedSpaceIdentities(latestAuth),
+      revokedHostClubsRef.current,
+    );
     if (reason === "user" && !containsIdentity(latestAvailable, targetIdentity)) {
       return { status: "unavailable" };
     }
@@ -307,6 +329,14 @@ export function GlobalSpaceTransitionController({
     transitionAbortRef.current?.abort();
     const abortController = new AbortController();
     transitionAbortRef.current = abortController;
+    const transitionScope: InFlightTransitionScope = {
+      sourceIdentity: identityFromLocation(
+        locationRef.current.pathname,
+        latestAuthRef.current,
+      ) ?? identityFromLocation(locationRef.current.pathname, normalizedAuth),
+      targetIdentity,
+    };
+    inFlightTransitionScopeRef.current = transitionScope;
     const intentIsCurrent = () => (
       transitionIntentRef.current === intent && !abortController.signal.aborted
     );
@@ -339,7 +369,10 @@ export function GlobalSpaceTransitionController({
       if (!intentIsCurrent()) return { status: "obsolete" };
       if (!latest) return { status: "unavailable" };
       latestAuthRef.current = latest;
-      availableIdentitiesRef.current = projectedSpaceIdentities(latest);
+      availableIdentitiesRef.current = withoutRevokedHostIdentities(
+        projectedSpaceIdentities(latest),
+        revokedHostClubsRef.current,
+      );
       return await performTransition(
         targetIdentity,
         "user",
@@ -349,37 +382,58 @@ export function GlobalSpaceTransitionController({
       );
     } catch {
       return intentIsCurrent() ? { status: "unavailable" } : { status: "obsolete" };
+    } finally {
+      if (inFlightTransitionScopeRef.current === transitionScope) {
+        inFlightTransitionScopeRef.current = null;
+      }
     }
-  }, [confirmDirtyLeave, coordinator, loadFreshProjection, performTransition]);
+  }, [confirmDirtyLeave, coordinator, loadFreshProjection, normalizedAuth, performTransition]);
 
   const invalidateForHostAuthorityLoss = useCallback((event: HostAuthorityLossEvent) => {
-    transitionIntentRef.current += 1;
-    transitionAbortRef.current?.abort();
-    coordinator.invalidateForAuthorityLoss();
-    handles.current.clear();
-    syncRetainedRecoveryCount();
-    cancelPendingRouterNavigation();
-    const stillAvailable = availableIdentitiesRef.current.filter((identity) => !(
-      identity.productSpace === "clubs"
-      && identity.perspective === "host"
-      && identity.clubSlug === event.clubSlug
-    ));
+    const currentIdentity = identityFromLocation(
+      locationRef.current.pathname,
+      latestAuthRef.current,
+    ) ?? identityFromLocation(locationRef.current.pathname, normalizedAuth);
+    const transitionScope = inFlightTransitionScopeRef.current;
+    const ownsCurrentHostSpace = hostClubSlugForAuthorityScope(currentIdentity) === event.clubSlug;
+    const ownsInFlightTransition = transitionScope !== null && (
+      hostClubSlugForAuthorityScope(transitionScope.sourceIdentity) === event.clubSlug
+      || hostClubSlugForAuthorityScope(transitionScope.targetIdentity) === event.clubSlug
+    );
+    const ownsManagedMutation = [...handleHostClubScopes.current.values()]
+      .some((clubSlug) => clubSlug === event.clubSlug);
+    const ownsCoordinator = ownsCurrentHostSpace || ownsInFlightTransition || ownsManagedMutation;
+    if (ownsCoordinator) {
+      transitionIntentRef.current += 1;
+      transitionAbortRef.current?.abort();
+      coordinator.invalidateForAuthorityLoss();
+      handles.current.clear();
+      handleHostClubScopes.current.clear();
+      syncRetainedRecoveryCount();
+      cancelPendingRouterNavigation(event.clubSlug);
+    }
+    const revokedClubs = new Set(revokedHostClubsRef.current).add(event.clubSlug);
+    revokedHostClubsRef.current = revokedClubs;
+    const stillAvailable = withoutRevokedHostIdentities(
+      availableIdentitiesRef.current,
+      revokedClubs,
+    );
     availableIdentitiesRef.current = stillAvailable;
-    setRevokedHostClubs((current) => new Set(current).add(event.clubSlug));
+    setRevokedHostClubs(revokedClubs);
     continuity.purgeUnavailable(stillAvailable);
-  }, [cancelPendingRouterNavigation, continuity, coordinator, syncRetainedRecoveryCount]);
+  }, [cancelPendingRouterNavigation, continuity, coordinator, normalizedAuth, syncRetainedRecoveryCount]);
 
   const resolveHostAuthorityLossTarget = useCallback(async (event: HostAuthorityLossEvent) => {
-    await routerCancellationRef.current;
+    const routerCancellation = routerCancellationRef.current;
+    if (routerCancellation?.clubSlug === event.clubSlug) await routerCancellation.promise;
     const authorityController = new AbortController();
     const latest = await loadFreshProjection(authorityController.signal);
     if (!latest) return safeProjectionFallback(latestAuthRef.current);
     try {
-      const latestAvailable = projectedSpaceIdentities(latest).filter((identity) => !(
-        identity.productSpace === "clubs"
-        && identity.perspective === "host"
-        && identity.clubSlug === event.clubSlug
-      ));
+      const latestAvailable = withoutRevokedHostIdentities(
+        projectedSpaceIdentities(latest),
+        revokedHostClubsRef.current,
+      );
       latestAuthRef.current = latest;
       availableIdentitiesRef.current = latestAvailable;
       continuity.purgeUnavailable(latestAvailable);
@@ -619,6 +673,23 @@ function defaultConfirmDirtyLeave(message: string) {
 
 function containsIdentity(available: readonly SpaceIdentity[], target: SpaceIdentity) {
   return available.some((identity) => sameSpaceIdentity(identity, target));
+}
+
+function hostClubSlugForAuthorityScope(identity: SpaceIdentity | null): string | null {
+  return identity?.productSpace === "clubs" && identity.perspective === "host"
+    ? identity.clubSlug
+    : null;
+}
+
+function withoutRevokedHostIdentities(
+  identities: readonly SpaceIdentity[],
+  revokedHostClubs: ReadonlySet<string>,
+): SpaceIdentity[] {
+  return identities.filter((identity) => !(
+    identity.productSpace === "clubs"
+    && identity.perspective === "host"
+    && revokedHostClubs.has(identity.clubSlug)
+  ));
 }
 
 function identityFromLocation(pathname: string, auth: AuthMeResponse): SpaceIdentity | null {
