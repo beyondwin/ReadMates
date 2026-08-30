@@ -1,14 +1,14 @@
 import { createContext, useContext } from "react";
-import type { AuthMeResponse, NormalizedAuthMeResponse } from "@/shared/auth/auth-contracts";
+import type { NormalizedAuthMeResponse } from "@/shared/auth/auth-contracts";
 import { emptyAvailableSpaces } from "@/shared/auth/available-spaces";
 import type { SessionExpiryCause } from "@/shared/auth/session-expiry";
 
 export type AuthState =
   | { status: "loading" }
-  | { status: "ready"; auth: AuthMeResponse }
+  | { status: "ready"; auth: NormalizedAuthMeResponse }
   | {
       status: "session_expired";
-      lastAuth?: AuthMeResponse;
+      lastAuth?: NormalizedAuthMeResponse;
       cause?: SessionExpiryCause;
       episode?: number;
     };

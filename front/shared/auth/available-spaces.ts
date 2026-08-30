@@ -133,6 +133,7 @@ function mergeClub(
   rejected: RejectedClubIdentity,
 ) {
   if (rejected.ids.has(candidate.clubId) || rejected.slugs.has(candidate.clubSlug)) {
+    rejectConflictingClubIdentity(clubs, candidate, undefined, undefined, rejected);
     return;
   }
 

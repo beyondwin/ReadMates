@@ -163,6 +163,24 @@ describe("normalizeAuthAvailableSpaces", () => {
     expect(auth.availableSpaces).toEqual({ version: 1, kinds: [], clubs: [] });
   });
 
+  it("propagates rejected identity tombstones through chained duplicate conflicts", () => {
+    const auth = normalizeAuthAvailableSpaces({
+      ...baseAuth,
+      availableSpaces: {
+        version: 1,
+        kinds: ["CLUBS"],
+        clubs: [
+          { clubId: "club-1", clubSlug: "slug-a", clubName: "A", perspectives: ["MEMBER"] },
+          { clubId: "club-1", clubSlug: "slug-b", clubName: "B", perspectives: ["MEMBER"] },
+          { clubId: "club-2", clubSlug: "slug-b", clubName: "B", perspectives: ["MEMBER"] },
+          { clubId: "club-2", clubSlug: "slug-c", clubName: "C", perspectives: ["MEMBER"] },
+        ],
+      },
+    });
+
+    expect(auth.availableSpaces).toEqual({ version: 1, kinds: [], clubs: [] });
+  });
+
   it("does not infer a host perspective for inactive host-shaped memberships", () => {
     const auth = normalizeAuthAvailableSpaces({
       ...baseAuth,
