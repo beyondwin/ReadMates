@@ -184,6 +184,14 @@ function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
       }),
     }),
     scopedHostRoute({
+      path: HOST_ROUTE_PATHS.scheduleReview,
+      errorElement: <HostRouteError />,
+      fallback: <ReadmatesRouteLoading label="일정 미열람 검토를 불러오는 중" variant="host" />,
+      load: async () => ({
+        Component: (await import("@/src/app/host-routes/schedule-review-route-element")).HostScheduleReviewRouteElement,
+      }),
+    }),
+    scopedHostRoute({
       path: HOST_ROUTE_PATHS.feedbackDocument,
       errorElement: <HostRouteError />,
       fallback: <ReadmatesRouteLoading label="피드백 문서 미리보기를 불러오는 중" variant="host" />,
@@ -360,6 +368,15 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
       lazy: async () => {
         const { HostSessionClosingRouteElement } = await import("@/src/app/host-routes/session-closing-route-element");
         return { Component: HostSessionClosingRouteElement };
+      },
+    },
+    {
+      path: HOST_ROUTE_PATHS.scheduleReview,
+      errorElement: <HostRouteError />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="일정 미열람 검토를 불러오는 중" variant="host" />,
+      lazy: async () => {
+        const { HostScheduleReviewRouteElement } = await import("@/src/app/host-routes/schedule-review-route-element");
+        return { Component: HostScheduleReviewRouteElement, loader: requireHostLoaderAuth };
       },
     },
     {

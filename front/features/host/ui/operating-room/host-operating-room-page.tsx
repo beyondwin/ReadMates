@@ -34,10 +34,12 @@ export type HostOperatingRoomPageProps = {
   recovery: AttendanceRecoveryView | null;
   liveContent: ReactNode;
   closingContent: ReactNode;
+  workboxContent: ReactNode;
   createMeetingHref: string;
   onPhaseChange: (phase: HostMeetingPhase) => void;
   onRetryPreparation: () => void;
   onRetryOptional: () => void;
+  onDeferNextAction: (workItemKey: string) => void;
   LinkComponent: HostLinkComponent;
 };
 
@@ -51,23 +53,30 @@ export function HostOperatingRoomPage({
   recovery,
   liveContent,
   closingContent,
+  workboxContent,
   createMeetingHref,
   onPhaseChange,
   onRetryPreparation,
   onRetryOptional,
+  onDeferNextAction,
   LinkComponent,
 }: HostOperatingRoomPageProps) {
   if (!view.meeting || !headerLinks) {
     return (
       <main className="rm-host-operating-room rm-host-operating-room--empty">
-        <section className="rm-host-operating-room__empty" aria-labelledby="host-operating-room-empty-title">
-          <h1 className="h1 editorial">모임 운영실</h1>
-          <h2 id="host-operating-room-empty-title" className="h2 editorial">현재 운영할 모임이 없습니다</h2>
-          <p>첫 모임을 만들면 준비부터 현장, 마감까지 한 흐름에서 이어갈 수 있습니다.</p>
-          <LinkComponent to={createMeetingHref} className="rm-operating-room-next-action__primary">
-            첫 모임 만들기
-          </LinkComponent>
-        </section>
+        <div className="rm-host-operating-room__body rm-host-operating-room__body--empty">
+          <section className="rm-host-operating-room__empty" aria-labelledby="host-operating-room-empty-title">
+            <h1 className="h1 editorial">모임 운영실</h1>
+            <h2 id="host-operating-room-empty-title" className="h2 editorial">현재 운영할 모임이 없습니다</h2>
+            <p>첫 모임을 만들면 준비부터 현장, 마감까지 한 흐름에서 이어갈 수 있습니다.</p>
+            <LinkComponent to={createMeetingHref} className="rm-operating-room-next-action__primary">
+              첫 모임 만들기
+            </LinkComponent>
+          </section>
+          <aside className="rm-host-operating-room__workbox-rail" aria-label="클럽 작업함">
+            {workboxContent}
+          </aside>
+        </div>
       </main>
     );
   }
@@ -97,9 +106,14 @@ export function HostOperatingRoomPage({
       ) : null}
 
       <div className="rm-host-operating-room__body">
-        <HostNextAction action={view.nextAction} LinkComponent={LinkComponent} />
+        <div className="rm-host-operating-room__primary">
+          <HostNextAction
+            action={view.nextAction}
+            onDefer={onDeferNextAction}
+            LinkComponent={LinkComponent}
+          />
 
-        {recovery?.kind === "conflict" ? (
+          {recovery?.kind === "conflict" ? (
           <section
             className="rm-host-operating-room__recovery"
             role="alert"
@@ -114,7 +128,7 @@ export function HostOperatingRoomPage({
           </section>
         ) : null}
 
-        {recovery?.kind === "unknown" ? (
+          {recovery?.kind === "unknown" ? (
           <section
             className="rm-host-operating-room__recovery"
             role="status"
@@ -130,7 +144,7 @@ export function HostOperatingRoomPage({
           </section>
         ) : null}
 
-        {optionalFailureMessages.length > 0 ? (
+          {optionalFailureMessages.length > 0 ? (
           <section
             className="rm-host-operating-room__partial"
             role="region"
@@ -144,22 +158,26 @@ export function HostOperatingRoomPage({
           </section>
         ) : null}
 
-        <section
-          id="host-operating-room-phase-panel"
-          className="rm-host-operating-room__phase-panel"
-          role="tabpanel"
-          aria-label={`${phaseLabel(view.phase)} 운영`}
-        >
-          {view.phase === "prep" ? (
-            <PreparationLedger
-              rows={view.preparation}
-              onRetry={onRetryPreparation}
-              LinkComponent={LinkComponent}
-            />
-          ) : null}
-          {view.phase === "live" ? liveContent : null}
-          {view.phase === "closing" ? closingContent : null}
-        </section>
+          <section
+            id="host-operating-room-phase-panel"
+            className="rm-host-operating-room__phase-panel"
+            role="tabpanel"
+            aria-label={`${phaseLabel(view.phase)} 운영`}
+          >
+            {view.phase === "prep" ? (
+              <PreparationLedger
+                rows={view.preparation}
+                onRetry={onRetryPreparation}
+                LinkComponent={LinkComponent}
+              />
+            ) : null}
+            {view.phase === "live" ? liveContent : null}
+            {view.phase === "closing" ? closingContent : null}
+          </section>
+        </div>
+        <aside className="rm-host-operating-room__workbox-rail" aria-label="클럽 작업함">
+          {workboxContent}
+        </aside>
       </div>
     </main>
   );

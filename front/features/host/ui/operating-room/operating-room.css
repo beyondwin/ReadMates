@@ -288,9 +288,7 @@
 }
 
 .rm-host-operating-room__body {
-  width: min(100%, 1180px);
-  margin-inline: auto;
-  border-inline: 1px solid var(--line-soft);
+  min-width: 0;
 }
 
 .rm-host-operating-room__phase-notice {
@@ -644,10 +642,6 @@
 }
 
 @media (max-width: 640px) {
-  .rm-host-operating-room__body {
-    border-inline: 0;
-  }
-
   .rm-host-operating-room__phase-notice,
   .rm-host-operating-room__partial,
   .rm-host-operating-room__recovery,

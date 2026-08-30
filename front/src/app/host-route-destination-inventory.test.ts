@@ -86,6 +86,7 @@ describe("host route destination inventory", () => {
       "host-new-meeting",
       "host-session-edit",
       "host-session-closing",
+      "host-schedule-review",
       "host-feedback-document",
       "host-meeting-detail",
       "host-record-detail",
@@ -105,6 +106,7 @@ describe("host route destination inventory", () => {
       sessionDetail: "sessions/:sessionId",
       sessionEdit: "sessions/:sessionId/edit",
       sessionClosing: "sessions/:sessionId/closing",
+      scheduleReview: "sessions/:sessionId/schedule-review",
       personDetail: "people/:membershipId",
     });
     expect(HOST_ROUTE_HREFS).toMatchObject({
@@ -118,6 +120,7 @@ describe("host route destination inventory", () => {
       sessionDetail: "/app/host/sessions/:sessionId",
       sessionEdit: "/app/host/sessions/:sessionId/edit",
       sessionClosing: "/app/host/sessions/:sessionId/closing",
+      scheduleReview: "/app/host/sessions/:sessionId/schedule-review",
       personDetail: "/app/host/people/:membershipId",
     });
     expect(HOST_ROUTE_HREFS.trashCompatibility).toBe(`${HOST_ROUTE_HREFS.meetings}?view=trash`);

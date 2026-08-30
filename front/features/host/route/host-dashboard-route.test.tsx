@@ -17,6 +17,9 @@ const routeMocks = vi.hoisted(() => ({
   resetRestore: vi.fn(),
   fetchRestorePreview: vi.fn(),
   reconciliationState: "idle" as "idle" | "checking" | "pending",
+  workboxPages: new Map<string, unknown>(),
+  deferWorkbox: vi.fn(),
+  removeWorkboxDeferral: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -58,6 +61,16 @@ vi.mock("@/features/host/queries/host-session-recovery-queries", () => ({
     mutateAsync: routeMocks.restoreChange,
     reset: routeMocks.resetRestore,
   }),
+}));
+
+vi.mock("@/features/host/queries/host-workbox-queries", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/host/queries/host-workbox-queries")>()),
+  hostWorkboxPageQuery: (request: { state: string }) => ({
+    queryKey: ["workbox", request.state],
+    testData: routeMocks.workboxPages.get(request.state),
+  }),
+  useDeferHostWorkboxItemMutation: () => ({ mutateAsync: routeMocks.deferWorkbox }),
+  useRemoveHostWorkboxDeferralMutation: () => ({ mutateAsync: routeMocks.removeWorkboxDeferral }),
 }));
 
 import { hostSensitiveStorage } from "@/features/host/storage/host-sensitive-storage";
@@ -215,6 +228,12 @@ beforeEach(() => {
   routeMocks.resetRestore.mockReset();
   routeMocks.fetchRestorePreview.mockReset();
   routeMocks.reconciliationState = "idle";
+  routeMocks.workboxPages.clear();
+  routeMocks.deferWorkbox.mockReset().mockResolvedValue({
+    key: "opaque",
+    deferredUntil: "2026-09-01T00:00:00Z",
+  });
+  routeMocks.removeWorkboxDeferral.mockReset().mockResolvedValue(undefined);
   routeMocks.updateAttendance.mockResolvedValue({
     changeReceipt: {
       changeId: "change-1",
@@ -240,6 +259,76 @@ afterEach(async () => {
 });
 
 describe("HostDashboardRoute", () => {
+  it("keeps the global workbox visible when there is no current meeting", async () => {
+    routeMocks.workboxPages.set("NOW", {
+      state: "NOW",
+      evaluatedAt: "2026-08-30T09:00:00Z",
+      sourceAvailability: [
+        { type: "SCHEDULE_UNSEEN", state: "AVAILABLE" },
+        { type: "MEMBER_APPROVAL", state: "AVAILABLE" },
+        { type: "RECORD_CLOSING", state: "AVAILABLE" },
+        { type: "INVITATION_EXPIRY", state: "AVAILABLE" },
+        { type: "NOTIFICATION_FAILURE", state: "AVAILABLE" },
+      ],
+      items: [],
+      nextCursor: null,
+    });
+    renderRoute("/clubs/reading-sai/app/host", dashboardData({
+      operatingRoom: { currentMeeting: null },
+      currentMeeting: null,
+    }));
+
+    expect(await screen.findByRole("heading", { name: "현재 운영할 모임이 없습니다" })).toBeVisible();
+    expect(screen.getByRole("complementary", { name: "클럽 작업함" })).toBeVisible();
+    expect(screen.getByText("지금 처리할 작업이 없습니다.")).toBeVisible();
+  });
+
+  it("defers the next action with the exact workbox key and a future ISO instant", async () => {
+    const key = "SCHEDULE_UNSEEN:opaque/server:key:r7";
+    routeMocks.workboxPages.set("NOW", {
+      state: "NOW",
+      evaluatedAt: "2026-08-30T09:00:00Z",
+      sourceAvailability: [
+        { type: "SCHEDULE_UNSEEN", state: "AVAILABLE" },
+        { type: "MEMBER_APPROVAL", state: "AVAILABLE" },
+        { type: "RECORD_CLOSING", state: "AVAILABLE" },
+        { type: "INVITATION_EXPIRY", state: "AVAILABLE" },
+        { type: "NOTIFICATION_FAILURE", state: "AVAILABLE" },
+      ],
+      items: [{
+        key,
+        type: "SCHEDULE_UNSEEN",
+        state: "NOW",
+        title: "일정 확인이 필요한 멤버",
+        description: "미열람 1명",
+        count: 1,
+        dueAt: null,
+        deferredUntil: null,
+        resolvedAt: null,
+        destinationHref: "/app/host/sessions/session-7/schedule-review",
+        receiptSummary: null,
+      }],
+      nextCursor: null,
+    });
+    const futureMeeting = { ...meetingDetail, date: "2999-01-01" };
+    renderRoute("/clubs/reading-sai/app/host?phase=prep", dashboardData({
+      currentMeeting: futureMeeting,
+      operatingRoom: {
+        currentMeeting: {
+          sessionId: futureMeeting.sessionId,
+          selection: "OPEN",
+          scheduleSeenAvailability: "AVAILABLE",
+        },
+      },
+    }));
+
+    await userEvent.click(await screen.findByRole("button", { name: "내일 09:00까지 보류" }));
+    expect(routeMocks.deferWorkbox).toHaveBeenCalledWith(expect.objectContaining({
+      key,
+      deferredUntil: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+    }));
+    expect(new Date(routeMocks.deferWorkbox.mock.calls[0][0].deferredUntil).getTime()).toBeGreaterThan(Date.now());
+  });
   it("normalizes an unavailable URL phase with replace navigation and a visible reason", async () => {
     const futureDraft = { ...meetingDetail, state: "DRAFT" as const, date: "2999-01-01" };
     const { router } = renderRoute(
@@ -284,7 +373,7 @@ describe("HostDashboardRoute", () => {
     expect(within(ledger).getByText("현재 일정 확인 1/2")).toBeVisible();
     expect(screen.getByRole("link", { name: "일정 미확인 멤버 검토" })).toHaveAttribute(
       "href",
-      "/clubs/reading-sai/app/host/sessions/session-7?section=responses&scheduleSeen=unseen",
+      "/clubs/reading-sai/app/host/sessions/session-7/schedule-review",
     );
   });
 
@@ -360,7 +449,7 @@ describe("HostDashboardRoute", () => {
     );
     expect(within(ledger).getByRole("link", { name: "일정 확인 자세히 보기" })).toHaveAttribute(
       "href",
-      "/clubs/reading-sai/app/host/sessions/session-7?section=responses&scheduleSeen=unseen",
+      "/clubs/reading-sai/app/host/sessions/session-7/schedule-review",
     );
   });
 

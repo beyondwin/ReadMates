@@ -267,7 +267,7 @@ function scheduleSeenRow(
   failures: OperatingRoomFailure[],
 ): PreparationLedgerRowView {
   const summary = hostScheduleSeenSummary(meeting);
-  const href = hostSessionPath(basePath, meeting.sessionId, "?section=responses&scheduleSeen=unseen");
+  const href = hostSessionPath(basePath, meeting.sessionId, "/schedule-review");
   if (summary.availability === "UNAVAILABLE") {
     if (meeting.state === "DRAFT") {
       return unavailableRow("schedule-seen", "일정 확인", "아직 멤버에게 공개되지 않음", "멤버 공개 뒤 집계가 시작됩니다.", null);

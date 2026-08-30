@@ -102,6 +102,15 @@ describe("hostRoutes", () => {
     }
   });
 
+  it("registers the schedule review route in both scoped and compatibility trees", () => {
+    const routes = hostRoutes(new QueryClient());
+
+    for (const routeId of ["app-host", "club-app-host"]) {
+      const route = routes.find((candidate) => candidate.id === routeId);
+      expect(childPaths(route)).toContain("sessions/:sessionId/schedule-review");
+    }
+  });
+
   it.each(["people", "records", "settings"])(
     "keeps the unscoped %s destination behind a lazy route module",
     (path) => {

@@ -19,13 +19,17 @@ import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import type { HostSessionDetailResponse } from "@/features/host/api/host-contracts";
 import type { HostSessionChangeReceipt } from "@/features/host/api/host-session-recovery-contracts";
+import type { HostWorkboxState } from "@/features/host/api/host-workbox-contracts";
+import type { HostWorkboxItem } from "@/features/host/api/host-workbox-contracts";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import {
   buildHostOperatingRoomView,
   type HostMeetingPhase,
+  type HostAuthoritativeWorkItem,
   type HostOperatingRoomSource,
   type HostOperatingRoomView,
 } from "@/features/host/model/host-operating-room-model";
+import { buildHostWorkboxView } from "@/features/host/model/host-workbox-model";
 import type { SessionClosingStatusInput } from "@/features/host/model/session-closing-model";
 import {
   hostSessionChangeUndoDescription,
@@ -40,6 +44,11 @@ import {
   hostSessionRestorePreviewQuery,
   useRestoreHostSessionChangeMutation,
 } from "@/features/host/queries/host-session-recovery-queries";
+import {
+  hostWorkboxPageQuery,
+  useDeferHostWorkboxItemMutation,
+  useRemoveHostWorkboxDeferralMutation,
+} from "@/features/host/queries/host-workbox-queries";
 import { registerHostSensitiveState } from "@/features/host/storage/host-sensitive-storage";
 import type { HostLinkComponent } from "@/features/host/ui/host-link-types";
 import {
@@ -57,6 +66,8 @@ import {
   type AttendanceRecoveryView,
 } from "@/features/host/ui/operating-room/host-operating-room-page";
 import { SessionClosingBoard } from "@/features/host/ui/session-closing-board";
+import { HostWorkbox } from "@/features/host/ui/workbox/host-workbox";
+import type { HostWorkboxDeferralOption } from "@/features/host/ui/workbox/host-work-item";
 import type { WorkspacePendingUndo } from "@/features/host/ui/session-workspace/workspace-undo-bar";
 import { formatSessionKicker } from "@/shared/ui/readmates-display";
 import type { HostDashboardRouteData } from "./host-dashboard-data";
@@ -121,6 +132,21 @@ export function HostDashboardRoute({
   const navigate = useNavigate();
   const revalidator = useRevalidator();
   const sessionId = loaderData.operatingRoom.currentMeeting?.sessionId ?? null;
+  const [workboxState, setWorkboxState] = useState<HostWorkboxState>("NOW");
+  const [workboxCursor, setWorkboxCursor] = useState<string | null>(null);
+  const [workboxPendingKey, setWorkboxPendingKey] = useState<string | null>(null);
+  const [workboxRowError, setWorkboxRowError] = useState<{ key: string; message: string } | null>(null);
+
+  const nowWorkboxQuery = useQuery({
+    ...hostWorkboxPageQuery({ state: "NOW", limit: 20 }, context),
+    retry: false,
+  });
+  const workboxQuery = useQuery({
+    ...hostWorkboxPageQuery({ state: workboxState, cursor: workboxCursor, limit: 20 }, context),
+    retry: false,
+  });
+  const deferWorkboxMutation = useDeferHostWorkboxItemMutation(context);
+  const removeWorkboxDeferralMutation = useRemoveHostWorkboxDeferralMutation(context);
 
   const detailQuery = useQuery({
     ...hostSessionDetailQuery(sessionId ?? "", context),
@@ -208,8 +234,11 @@ export function HostDashboardRoute({
     questions: { state: "absent" },
     closing: closingSource,
     pendingOutcome: null,
-    authoritativeWorkItems: [],
-  }), [closingSource, paths.hostBasePath, requestedPhase, selectedDetail]);
+    authoritativeWorkItems: authoritativeOperatingRoomItems(
+      nowWorkboxQuery.data?.items,
+      selectedDetail?.sessionId ?? null,
+    ),
+  }), [closingSource, nowWorkboxQuery.data?.items, paths.hostBasePath, requestedPhase, selectedDetail]);
 
   const view = useMemo<HostOperatingRoomView>(() => {
     if (activeAttendanceConflict) {
@@ -465,6 +494,67 @@ export function HostDashboardRoute({
   const dDayLabel = view.meeting
     ? formatSessionKicker(view.meeting.sessionNumber, view.meeting.date).split(" · ")[1] ?? null
     : null;
+  const workboxView = workboxQuery.data ? buildHostWorkboxView(workboxQuery.data) : null;
+
+  const deferWorkItem = useCallback(async (
+    workItemKey: string,
+    option: HostWorkboxDeferralOption,
+  ) => {
+    setWorkboxPendingKey(workItemKey);
+    setWorkboxRowError(null);
+    try {
+      await deferWorkboxMutation.mutateAsync({
+        key: workItemKey,
+        deferredUntil: deferredUntilForOption(option),
+      });
+    } catch {
+      setWorkboxRowError({
+        key: workItemKey,
+        message: "작업을 보류하지 못했습니다. 항목을 유지한 채 다시 시도할 수 있습니다.",
+      });
+    } finally {
+      setWorkboxPendingKey(null);
+    }
+  }, [deferWorkboxMutation]);
+
+  const undoWorkItemDeferral = useCallback(async (workItemKey: string) => {
+    setWorkboxPendingKey(workItemKey);
+    setWorkboxRowError(null);
+    try {
+      await removeWorkboxDeferralMutation.mutateAsync(workItemKey);
+    } catch {
+      setWorkboxRowError({
+        key: workItemKey,
+        message: "보류를 해제하지 못했습니다. 항목을 유지한 채 다시 시도할 수 있습니다.",
+      });
+    } finally {
+      setWorkboxPendingKey(null);
+    }
+  }, [removeWorkboxDeferralMutation]);
+
+  const workboxContent = (
+    <HostWorkbox
+      state={workboxState}
+      view={workboxView}
+      loading={workboxQuery.isPending || workboxQuery.isFetching}
+      error={workboxQuery.isError ? "작업함을 불러오지 못했습니다." : null}
+      pendingKey={workboxPendingKey}
+      rowError={workboxRowError}
+      onStateChange={(nextState) => {
+        setWorkboxState(nextState);
+        setWorkboxCursor(null);
+        setWorkboxRowError(null);
+      }}
+      onRetry={() => { void workboxQuery.refetch(); }}
+      onLoadMore={(cursor) => {
+        setWorkboxCursor(cursor);
+        setWorkboxRowError(null);
+      }}
+      onDefer={(key, option) => { void deferWorkItem(key, option); }}
+      onUndoDeferral={(key) => { void undoWorkItemDeferral(key); }}
+      LinkComponent={LinkComponent}
+    />
+  );
 
   return (
     <HostOperatingRoomPage
@@ -477,6 +567,7 @@ export function HostDashboardRoute({
       recovery={recovery}
       liveContent={liveContent}
       closingContent={closingContent}
+      workboxContent={workboxContent}
       createMeetingHref={paths.newMeetingHref}
       onPhaseChange={(phase) => {
         void navigate(phaseHref(phase), { state: withoutPhaseReason(location.state) });
@@ -486,9 +577,41 @@ export function HostDashboardRoute({
         revalidator.revalidate();
       }}
       onRetryOptional={() => revalidator.revalidate()}
+      onDeferNextAction={(workItemKey) => { void deferWorkItem(workItemKey, "TOMORROW"); }}
       LinkComponent={LinkComponent}
     />
   );
+}
+
+function authoritativeOperatingRoomItems(
+  items: readonly HostWorkboxItem[] | undefined,
+  sessionId: string | null,
+): readonly HostAuthoritativeWorkItem[] {
+  if (!sessionId) return [];
+  return (items ?? []).flatMap((item): HostAuthoritativeWorkItem[] => {
+    const expectedSuffix = item.type === "SCHEDULE_UNSEEN"
+      ? "schedule-review"
+      : item.type === "RECORD_CLOSING"
+        ? "closing"
+        : null;
+    if (!expectedSuffix || !destinationTargetsSession(item.destinationHref, sessionId, expectedSuffix)) {
+      return [];
+    }
+    return [{
+      kind: item.type === "SCHEDULE_UNSEEN" ? "schedule-seen" : "closing",
+      workItemKey: item.key,
+      state: item.state === "DEFERRED" ? "deferred" : "actionable",
+    }];
+  });
+}
+
+function destinationTargetsSession(
+  destinationHref: string,
+  sessionId: string,
+  suffix: "schedule-review" | "closing",
+): boolean {
+  const pathname = new URL(destinationHref, "https://readmates.local").pathname;
+  return pathname.endsWith(`/sessions/${encodeURIComponent(sessionId)}/${suffix}`);
 }
 
 function closingSourceFromLoader(
@@ -583,6 +706,18 @@ function todayIsoDate(now = new Date()): string {
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function deferredUntilForOption(
+  option: HostWorkboxDeferralOption,
+  now = new Date(),
+): string {
+  const days = option === "TOMORROW" ? 1 : option === "THREE_DAYS" ? 3 : 7;
+  const result = new Date(now);
+  result.setDate(result.getDate() + days);
+  result.setHours(9, 0, 0, 0);
+  if (result.getTime() <= now.getTime()) result.setDate(result.getDate() + 1);
+  return result.toISOString();
 }
 
 function attendanceLabel(attendance: MeetingAttendance): string {

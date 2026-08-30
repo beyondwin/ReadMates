@@ -97,6 +97,7 @@ export const HOST_ROUTE_DESTINATION_INVENTORY: readonly HostRouteDestinationInve
   { owner: "host-record-detail", kind: "detail", href: HOST_ROUTE_HREFS.sessionDetail, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.sessionDetail), lifecycle: "CLOSED", returnHref: HOST_ROUTE_HREFS.records },
   { owner: "host-session-edit", kind: "detail", href: HOST_ROUTE_HREFS.sessionEdit, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.sessionEdit), lifecycle: null, returnHref: HOST_ROUTE_HREFS.meetings },
   { owner: "host-session-closing", kind: "detail", href: HOST_ROUTE_HREFS.sessionClosing, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.sessionClosing), lifecycle: "CLOSED", returnHref: HOST_ROUTE_HREFS.records },
+  { owner: "host-schedule-review", kind: "detail", href: HOST_ROUTE_HREFS.scheduleReview, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.scheduleReview), lifecycle: "OPEN", returnHref: HOST_ROUTE_HREFS.operatingRoom },
   { owner: "host-feedback-document", kind: "detail", href: HOST_ROUTE_HREFS.feedbackDocument, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.feedbackDocument), lifecycle: "CLOSED", returnHref: HOST_ROUTE_HREFS.records },
   { owner: "host-trash-compatibility", kind: "compatibility", href: HOST_ROUTE_HREFS.trashCompatibility, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.trashCompatibility), lifecycle: null },
   { owner: "member-today", kind: "member-primary", href: "/app", scopedHref: "/clubs/:slug/app", lifecycle: null },
