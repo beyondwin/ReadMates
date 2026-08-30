@@ -1,6 +1,6 @@
 # ADR-0047: 플랫폼 어드민을 케이스 데스크 + 운영 서사로 재구성
 
-- 상태: Accepted
+- 상태: Superseded by ADR-0050
 - 결정일: 2026-08-27
 - 작성자: design/front
 - 관련: ADR-0039, ADR-0040, ADR-0045, `docs/development/2026-08-27-readmates-admin-case-desk-narrative-redesign-design.md`, `front/DESIGN.md`, `front/features/platform-admin/**`

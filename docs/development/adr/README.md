@@ -50,7 +50,7 @@ Routine refactor, component-local layout, reversible implementation detail은 AD
 | [0023](0023-revision-guarded-host-mutations.md) | Domain revision으로 host mutation을 조건부 실행 | Accepted | 2026-08-22 | server, front |
 | [0024](0024-explicit-unknown-actual-attendance.md) | 실제 출석에 명시적 `UNKNOWN` correction 상태 제공 | Accepted | 2026-08-22 | product, server, front |
 | [0025](0025-session-participant-snapshot-owns-response-denominator.md) | 모임 참여자 snapshot이 응답 분모를 소유 | Accepted | 2026-08-22 | product, server |
-| [0026](0026-common-global-club-shell.md) | Member와 host가 공통 global club shell을 사용 | Proposed | 2026-08-22 | product, design, front |
+| [0026](0026-common-global-club-shell.md) | Member와 host가 공통 global club shell을 사용 | Superseded by ADR-0051 | 2026-08-22 | product, design, front |
 | [0027](0027-current-meeting-local-task-navigation.md) | 현재 모임 작업은 local task navigation으로 분리 | Superseded by ADR-0044 | 2026-08-22 | product, design, front |
 | [0028](0028-idempotent-host-mutation-receipts.md) | Host mutation을 idempotency receipt로 재조정 | Accepted | 2026-08-22 | server, front |
 | [0029](0029-bff-secret-and-origin-validation.md) | Mutating API에 BFF secret과 Origin/Referer를 함께 검증 | Accepted | 2026-08-22 | server, security |
@@ -71,9 +71,11 @@ Routine refactor, component-local layout, reversible implementation detail은 AD
 | [0044](0044-host-focus-deck-primary-action-composition.md) | 호스트 현재 모임을 Focus Deck 단일 주 행동으로 구성 | Superseded by ADR-0046 | 2026-08-26 | product, design, front |
 | [0045](0045-host-admin-focus-deck-editorial-ledger-composition.md) | 호스트·플랫폼 관리자 composition을 Focus Deck·Editorial Operations Ledger로 고정 | Accepted | 2026-08-26 | product, design, platform ops, front |
 | [0046](0046-host-triage-home-meeting-diary-composition.md) | 호스트 워크스페이스를 오늘 트리아지 + 모임 다이어리로 재구성 | Superseded by ADR-0048 | 2026-08-27 | product, design, front |
-| [0047](0047-admin-case-desk-narrative-composition.md) | 플랫폼 어드민을 케이스 데스크 + 운영 서사로 재구성 | Accepted | 2026-08-27 | product, design, platform ops, front |
+| [0047](0047-admin-case-desk-narrative-composition.md) | 플랫폼 어드민을 케이스 데스크 + 운영 서사로 재구성 | Superseded by ADR-0050 | 2026-08-27 | product, design, platform ops, front |
 | [0048](0048-host-lifecycle-operating-room-composition.md) | 호스트 워크스페이스를 모임 생애주기 운영실 + 작업함으로 구성 | Proposed | 2026-08-29 | product, design, front |
 | [0049](0049-schedule-revision-seen-state.md) | 일정 revision 확인을 접속·참석 응답·실제 출석과 분리 | Proposed | 2026-08-29 | product, server, front, privacy |
+| [0050](0050-platform-admin-today-operations-desk.md) | 플랫폼 어드민을 오늘 할 일 중심 운영 데스크로 재구성 | Proposed | 2026-08-30 | product, design, platform ops, front |
+| [0051](0051-global-platform-and-club-space-transition.md) | 전역 공간을 플랫폼 운영·내 클럽 두 축으로 고정 | Proposed | 2026-08-30 | product, front, server, security |
 
 ## 상태 범례
 
