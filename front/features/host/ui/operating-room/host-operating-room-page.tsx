@@ -31,6 +31,13 @@ export type HostOperatingRoomPageProps = {
   phaseLinks: readonly MeetingPhaseTabLink[];
   phaseNormalizationReason: string | null;
   optionalFailureMessages: readonly string[];
+  optionalFailureActions?: readonly {
+    key: string;
+    message: string;
+    label: string;
+    busy: boolean;
+    onRetry: () => void;
+  }[];
   recovery: AttendanceRecoveryView | null;
   liveContent: ReactNode;
   closingContent: ReactNode;
@@ -51,6 +58,7 @@ export function HostOperatingRoomPage({
   phaseLinks,
   phaseNormalizationReason,
   optionalFailureMessages,
+  optionalFailureActions = [],
   recovery,
   liveContent,
   closingContent,
@@ -147,7 +155,7 @@ export function HostOperatingRoomPage({
           </section>
         ) : null}
 
-          {optionalFailureMessages.length > 0 ? (
+          {optionalFailureMessages.length > 0 || optionalFailureActions.length > 0 ? (
           <section
             className="rm-host-operating-room__partial"
             role="region"
@@ -156,8 +164,23 @@ export function HostOperatingRoomPage({
             <h2>일부 운영 정보는 따로 다시 불러올 수 있습니다</h2>
             <ul>
               {optionalFailureMessages.map((message) => <li key={message}>{message}</li>)}
+              {optionalFailureActions.map((action) => (
+                <li key={action.key}>
+                  <span>{action.message}</span>{" "}
+                  <button
+                    type="button"
+                    disabled={action.busy}
+                    aria-busy={action.busy}
+                    onClick={action.onRetry}
+                  >
+                    {action.label}
+                  </button>
+                </li>
+              ))}
             </ul>
-            <button type="button" onClick={onRetryOptional}>일부 운영 정보 다시 불러오기</button>
+            {optionalFailureMessages.length > 0 ? (
+              <button type="button" onClick={onRetryOptional}>일부 운영 정보 다시 불러오기</button>
+            ) : null}
           </section>
         ) : null}
 

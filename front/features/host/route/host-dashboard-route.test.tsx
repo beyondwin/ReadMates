@@ -23,6 +23,7 @@ const routeMocks = vi.hoisted(() => ({
   workboxQueryBatches: [] as string[][],
   deferWorkbox: vi.fn(),
   removeWorkboxDeferral: vi.fn(),
+  retryNotificationHealth: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -89,6 +90,14 @@ vi.mock("@/features/host/queries/host-workbox-queries", async (importOriginal) =
   }),
   useDeferHostWorkboxItemMutation: () => ({ mutateAsync: routeMocks.deferWorkbox }),
   useRemoveHostWorkboxDeferralMutation: () => ({ mutateAsync: routeMocks.removeWorkboxDeferral }),
+}));
+
+vi.mock("@/features/host/queries/host-notification-queries", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/host/queries/host-notification-queries")>()),
+  hostNotificationHealthQuery: () => ({
+    queryKey: ["host-notification-health", "reading-sai"],
+    queryFn: routeMocks.retryNotificationHealth,
+  }),
 }));
 
 import { hostSensitiveStorage } from "@/features/host/storage/host-sensitive-storage";
@@ -253,6 +262,13 @@ beforeEach(() => {
     deferredUntil: "2026-09-01T00:00:00Z",
   });
   routeMocks.removeWorkboxDeferral.mockReset().mockResolvedValue(undefined);
+  routeMocks.retryNotificationHealth.mockReset().mockResolvedValue({
+    pending: 0,
+    failed: 0,
+    dead: 0,
+    sentLast24h: 1,
+    latestFailures: [],
+  });
   routeMocks.updateAttendance.mockResolvedValue({
     changeReceipt: {
       changeId: "change-1",
@@ -713,6 +729,37 @@ describe("HostDashboardRoute", () => {
     expect(partial).toHaveTextContent("알림 상태를 불러오지 못했습니다.");
     await userEvent.click(within(partial).getByRole("button", { name: "일부 운영 정보 다시 불러오기" }));
     expect(revalidate).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries only failed notification health while keeping the current meeting and workbox usable", async () => {
+    routeMocks.workboxPages.set("NOW", {
+      state: "NOW",
+      evaluatedAt: "2026-08-30T09:00:00Z",
+      sourceAvailability: [
+        { type: "SCHEDULE_UNSEEN", state: "AVAILABLE" },
+        { type: "MEMBER_APPROVAL", state: "AVAILABLE" },
+        { type: "RECORD_CLOSING", state: "AVAILABLE" },
+        { type: "INVITATION_EXPIRY", state: "AVAILABLE" },
+        { type: "NOTIFICATION_FAILURE", state: "UNAVAILABLE", failureCode: "NOTIFICATION_SOURCE_UNAVAILABLE" },
+      ],
+      items: [],
+      nextCursor: null,
+    });
+    renderRoute("/clubs/reading-sai/app/host?phase=prep", dashboardData({
+      notificationHealth: {
+        state: "failed",
+        error: { message: "알림 상태를 불러오지 못했습니다.", retryable: true },
+      },
+    }));
+
+    expect(await screen.findByRole("group", { name: "현재 모임" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "작업함" })).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "알림 상태 다시 불러오기" }));
+
+    await waitFor(() => expect(routeMocks.retryNotificationHealth).toHaveBeenCalledTimes(1));
+    expect(routeMocks.refetchDetail).not.toHaveBeenCalled();
+    expect(screen.getByRole("group", { name: "현재 모임" })).toBeVisible();
+    await waitFor(() => expect(screen.queryByText("알림 상태를 불러오지 못했습니다.")).not.toBeInTheDocument());
   });
 
   it("preserves the intended attendance on 409, refetches exact detail, and offers comparison retry", async () => {

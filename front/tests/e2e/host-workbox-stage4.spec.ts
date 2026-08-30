@@ -85,7 +85,15 @@ delete from host_workbox_snapshot_items where snapshot_id in (
 );
 delete from host_workbox_snapshots where club_id in (${sqlString(CLUB_ID)}, ${sqlString(OTHER_CLUB_ID)});
 delete from host_work_item_deferrals where club_id in (${sqlString(CLUB_ID)}, ${sqlString(OTHER_CLUB_ID)});
+delete from notification_manual_dispatches where club_id in (${sqlString(CLUB_ID)}, ${sqlString(OTHER_CLUB_ID)});
+delete from member_notifications where event_id in (
+  select id from notification_event_outbox where club_id in (${sqlString(CLUB_ID)}, ${sqlString(OTHER_CLUB_ID)})
+);
+delete from notification_deliveries where event_id in (
+  select id from notification_event_outbox where club_id in (${sqlString(CLUB_ID)}, ${sqlString(OTHER_CLUB_ID)})
+);
 delete from notification_manual_dispatch_previews where club_id in (${sqlString(CLUB_ID)}, ${sqlString(OTHER_CLUB_ID)});
+delete from notification_event_outbox where club_id in (${sqlString(CLUB_ID)}, ${sqlString(OTHER_CLUB_ID)});
 delete from auth_public_projection_mutation_receipts where club_id_snapshot in (${sqlString(CLUB_ID)}, ${sqlString(OTHER_CLUB_ID)});
 delete from host_invitation_link_events where club_id in (${sqlString(CLUB_ID)}, ${sqlString(OTHER_CLUB_ID)});
 delete from host_invitation_links where club_id in (${sqlString(CLUB_ID)}, ${sqlString(OTHER_CLUB_ID)});
@@ -364,6 +372,8 @@ where id = ${sqlString(OPEN_SESSION_ID)} and club_id = ${sqlString(CLUB_ID)};
 
   await page.route("**/api/bff/api/host/notifications/manual?**", async (route) => {
     if (route.request().method() === "POST") {
+      const committed = await route.fetch();
+      expect(committed.status(), await committed.text()).toBe(200);
       await route.abort("connectionfailed");
       return;
     }
@@ -375,8 +385,78 @@ where id = ${sqlString(OPEN_SESSION_ID)} and club_id = ${sqlString(CLUB_ID)};
   await expect(unknownReceipt).toContainText("같은 알림을 다시 보내지 말고");
   await expect(unknownReceipt.getByRole("link", { name: "알림 장부에서 결과 확인" })).toBeVisible();
   expect(confirmRequests).toBe(2);
+  expect(runMysql(`
+select concat(
+  (select count(*) from notification_manual_dispatches
+   where club_id = ${sqlString(CLUB_ID)} and session_id = ${sqlString(OPEN_SESSION_ID)}),
+  '|',
+  (select count(*) from notification_event_outbox
+   where club_id = ${sqlString(CLUB_ID)} and aggregate_id = ${sqlString(OPEN_SESSION_ID)})
+);
+`).trim().split("\n").at(-1)).toBe("1|1");
   await page.waitForTimeout(250);
   expect(confirmRequests).toBe(2);
+});
+
+test("partial workbox and notification failures retry only their failed source", async ({ page }) => {
+  ({ sessionId: authSessionId } = await loginWithGoogleFixture(page, "host@example.com"));
+  let workboxRequests = 0;
+  let notificationRequests = 0;
+  let allowWorkboxRecovery = false;
+  let allowNotificationRecovery = false;
+
+  await page.route("**/api/bff/api/host/workbox?**", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    workboxRequests += 1;
+    if (!allowWorkboxRecovery) {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/problem+json",
+        body: JSON.stringify({ code: "WORKBOX_UNAVAILABLE", status: 503 }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+  await page.route("**/api/bff/api/host/notifications/summary?**", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    notificationRequests += 1;
+    if (!allowNotificationRecovery) {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/problem+json",
+        body: JSON.stringify({ code: "NOTIFICATION_SOURCE_UNAVAILABLE", status: 503 }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto(HOST_PATH);
+  await expect(page).toHaveURL(`${HOST_PATH}?phase=prep`);
+  await expect(page.getByRole("group", { name: "현재 모임" })).toBeVisible();
+  const workboxFailure = page.getByRole("alert").filter({ hasText: "작업함을 불러오지 못했습니다" });
+  await expect(workboxFailure).toBeVisible();
+  await expect(page.getByText("알림 상태를 불러오지 못했습니다.")).toBeVisible();
+  const workboxBaseline = workboxRequests;
+  const notificationBaseline = notificationRequests;
+  expect(workboxBaseline).toBeGreaterThanOrEqual(1);
+  expect(notificationBaseline).toBeGreaterThanOrEqual(1);
+
+  allowNotificationRecovery = true;
+  await page.getByRole("button", { name: "알림 상태 다시 불러오기" }).click();
+  await expect.poll(() => notificationRequests).toBe(notificationBaseline + 1);
+  expect(workboxRequests).toBe(workboxBaseline);
+  await expect(page.getByRole("group", { name: "현재 모임" })).toBeVisible();
+  await expect(page.getByText("알림 상태를 불러오지 못했습니다.")).toHaveCount(0);
+  await expect(workboxFailure).toBeVisible();
+
+  allowWorkboxRecovery = true;
+  await workboxFailure.getByRole("button", { name: "다시 불러오기" }).click();
+  await expect.poll(() => workboxRequests).toBe(workboxBaseline + 1);
+  expect(notificationRequests).toBe(notificationBaseline + 1);
+  await expect(page.getByRole("group", { name: "현재 모임" })).toBeVisible();
+  await expect(workboxFailure).toHaveCount(0);
 });
 
 test("workbox continuation submits the opaque cursor and preserves loaded rows through a controlled stale response", async ({ page }) => {

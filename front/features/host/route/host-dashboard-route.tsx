@@ -45,6 +45,7 @@ import {
   hostSessionRestorePreviewQuery,
   useRestoreHostSessionChangeMutation,
 } from "@/features/host/queries/host-session-recovery-queries";
+import { hostNotificationHealthQuery } from "@/features/host/queries/host-notification-queries";
 import {
   hostWorkboxPageQuery,
   useDeferHostWorkboxItemMutation,
@@ -139,6 +140,10 @@ export function HostDashboardRoute({
   const [workboxPendingKey, setWorkboxPendingKey] = useState<string | null>(null);
   const workboxMutationKeyRef = useRef<string | null>(null);
   const [workboxRowError, setWorkboxRowError] = useState<{ key: string; message: string } | null>(null);
+  const [notificationRetry, setNotificationRetry] = useState<{
+    failureKey: string;
+    state: "retrying" | "recovered";
+  } | null>(null);
 
   const nowWorkboxQuery = useQuery({
     ...hostWorkboxPageQuery({ state: "NOW", limit: 20 }, context),
@@ -479,6 +484,14 @@ export function HostDashboardRoute({
   );
 
   const optionalFailureMessages = uniqueFailureMessages(loaderData, view);
+  const notificationFailure = loaderData.notificationHealth.state === "failed"
+    ? loaderData.notificationHealth.error
+    : null;
+  const notificationFailureKey = notificationFailure
+    ? `${context.clubSlug}:${notificationFailure.message}`
+    : null;
+  const notificationRecovered = notificationRetry?.failureKey === notificationFailureKey
+    && notificationRetry.state === "recovered";
   const recovery: AttendanceRecoveryView | null = activeAttendanceConflict ? {
     kind: "conflict",
     intendedLabel: attendanceLabel(activeAttendanceConflict.attendance),
@@ -598,6 +611,28 @@ export function HostDashboardRoute({
       phaseLinks={phaseLinks}
       phaseNormalizationReason={phaseReasonFromState(location.state)}
       optionalFailureMessages={optionalFailureMessages}
+      optionalFailureActions={notificationFailure && !notificationRecovered ? [{
+        key: "notification-health",
+        message: notificationFailure.message,
+        label: notificationRetry?.failureKey === notificationFailureKey
+          && notificationRetry.state === "retrying"
+          ? "알림 상태 불러오는 중"
+          : "알림 상태 다시 불러오기",
+        busy: notificationRetry?.failureKey === notificationFailureKey
+          && notificationRetry.state === "retrying",
+        onRetry: () => {
+          if (!notificationFailureKey) return;
+          setNotificationRetry({ failureKey: notificationFailureKey, state: "retrying" });
+          void queryClient.fetchQuery({
+            ...hostNotificationHealthQuery(context),
+            staleTime: 0,
+          }).then(() => {
+            setNotificationRetry({ failureKey: notificationFailureKey, state: "recovered" });
+          }).catch(() => {
+            setNotificationRetry(null);
+          });
+        },
+      }] : []}
       recovery={recovery}
       liveContent={liveContent}
       closingContent={closingContent}
@@ -677,7 +712,6 @@ function uniqueFailureMessages(
   for (const source of [
     loaderData.recordAttention,
     loaderData.clubOperations,
-    loaderData.notificationHealth,
   ]) {
     if (source.state === "failed") messages.push(source.error.message);
   }

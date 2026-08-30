@@ -190,6 +190,17 @@ type HostSessionRecordWorkflow = {
 
 const emptyManagementMessage = "모임을 만든 뒤 참석과 피드백 문서를 관리할 수 있습니다.";
 
+type BasicScheduleComparison = {
+  date: string;
+  startTime: string;
+  locationLabel: string;
+};
+
+type BasicSaveConflict = {
+  intended: BasicScheduleComparison;
+  latest: BasicScheduleComparison;
+};
+
 async function runSessionLifecycleAction(
   actions: HostSessionEditorActions,
   kind: SessionLifecycleConfirmKind,
@@ -312,6 +323,7 @@ export default function HostSessionEditor({
   // Transient UI state (separate useState — not form data)
   // ---------------------------------------------------------------------------
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [basicSaveConflict, setBasicSaveConflict] = useState<BasicSaveConflict | null>(null);
   const [lifecycleSaveState, setLifecycleSaveState] = useState<"idle" | "saving" | "error">("idle");
   const [lifecycleConfirm, setLifecycleConfirm] = useState<SessionLifecycleConfirmKind | null>(null);
   const [lifecycleError, setLifecycleError] = useState<{
@@ -365,6 +377,7 @@ export default function HostSessionEditor({
       clear: () => {
         dispatch({ type: "CLEAR_SENSITIVE" });
         setSaveState("idle");
+        setBasicSaveConflict(null);
         setLifecycleSaveState("idle");
         setLifecycleConfirm(null);
         setLifecycleError(null);
@@ -598,6 +611,7 @@ export default function HostSessionEditor({
   }, []);
 
   const setField = useCallback((key: BasicSessionField, value: string) => {
+    setBasicSaveConflict(null);
     dispatch({ type: "SET_FIELD", key, value });
   }, []);
 
@@ -795,14 +809,14 @@ export default function HostSessionEditor({
     trashedSession,
   ]);
 
-  const handleSubmit = useCallback(
-    async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
+  const saveBasicSession = useCallback(
+    async () => {
       if (saveState === "saving") {
         return;
       }
 
       setSaveState("saving");
+      setBasicSaveConflict(null);
       const payload = buildHostSessionRequest({
         title,
         bookTitle,
@@ -829,6 +843,26 @@ export default function HostSessionEditor({
           }
 
           return;
+        }
+
+        if (response.status === 409 && session) {
+          try {
+            const latest = await actions.reloadSession(session.sessionId);
+            setBasicSaveConflict({
+              intended: { date, startTime: time, locationLabel },
+              latest: {
+                date: latest.date,
+                startTime: latest.startTime,
+                locationLabel: latest.locationLabel,
+              },
+            });
+            setSaveState("error");
+            return;
+          } catch {
+            setSaveState("error");
+            flash("최신 일정을 불러오지 못했습니다. 잠시 뒤 다시 시도하세요");
+            return;
+          }
         }
 
         setSaveState("error");
@@ -859,6 +893,11 @@ export default function HostSessionEditor({
       flash,
     ],
   );
+
+  const handleSubmit = useCallback(async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await saveBasicSession();
+  }, [saveBasicSession]);
 
   const requestLifecycleConfirm = useCallback((kind: SessionLifecycleConfirmKind) => {
     if (lifecycleSaveState === "saving") {
@@ -1491,9 +1530,51 @@ export default function HostSessionEditor({
                         ? "저장되었습니다. 모임 문서 편집 화면으로 이동합니다."
                         : "저장되었습니다."
                       : saveState === "error"
-                        ? "저장에 실패했습니다. 입력값을 확인한 뒤 다시 시도하세요."
+                        ? basicSaveConflict
+                          ? "최신 일정과 비교한 뒤 다시 저장할 수 있습니다."
+                          : "저장에 실패했습니다. 입력값을 확인한 뒤 다시 시도하세요."
                         : "책, 일정, 장소와 접속 정보만 저장합니다."}
                 </div>
+                {basicSaveConflict ? (
+                  <section
+                    className="surface-quiet stack"
+                    role="alert"
+                    aria-label="일정 변경 충돌"
+                    style={{ "--stack": "12px", padding: "16px" } as CSSProperties}
+                  >
+                    <h3 className="h4 editorial" style={{ margin: 0 }}>최신 일정과 내 입력이 다릅니다</h3>
+                    <p className="small" style={{ margin: 0 }}>
+                      최신 값을 확인했습니다. 입력한 일정은 그대로 두었으며, 아래 비교 뒤에만 다시 저장합니다.
+                    </p>
+                    <dl className="stack" style={{ "--stack": "8px", margin: 0 } as CSSProperties}>
+                      {([
+                        ["날짜", basicSaveConflict.intended.date, basicSaveConflict.latest.date],
+                        ["시작 시간", basicSaveConflict.intended.startTime, basicSaveConflict.latest.startTime],
+                        ["장소", basicSaveConflict.intended.locationLabel, basicSaveConflict.latest.locationLabel],
+                      ] as const).map(([label, intended, latest]) => (
+                        <div className="row-between" key={label} style={{ gap: "12px", alignItems: "start" }}>
+                          <dt className="small" style={{ fontWeight: 700 }}>{label}</dt>
+                          <dd className="small" style={{ margin: 0, textAlign: "right" }}>
+                            <span>내 입력 {intended || "비어 있음"}</span>
+                            <span style={{ display: "block", color: "var(--text-3)" }}>
+                              최신 값 {latest || "비어 있음"}
+                            </span>
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                    <div className="row" style={{ justifyContent: "flex-end" }}>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        type="button"
+                        disabled={saveState === "saving"}
+                        onClick={() => { void saveBasicSession(); }}
+                      >
+                        내 일정으로 다시 저장
+                      </button>
+                    </div>
+                  </section>
+                ) : null}
                 {session ? (
                   <section className="surface" aria-labelledby="host-session-danger-title" style={{ padding: "22px" }}>
                     <div className="eyebrow" id="host-session-danger-title" style={{ marginBottom: "10px" }}>

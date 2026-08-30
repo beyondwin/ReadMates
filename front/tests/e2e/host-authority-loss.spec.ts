@@ -115,6 +115,43 @@ insert into session_record_drafts (
   return { sessionId, title };
 }
 
+function createHostParticipantSeenFact() {
+  const { sessionId } = createDraftSession();
+  const participantId = randomUUID();
+  runMysql(`
+update sessions
+set state = 'OPEN',
+    visibility = 'MEMBER',
+    access_scope = 'GUEST_READABLE',
+    schedule_revision = 3,
+    session_revision = session_revision + 1,
+    updated_at = utc_timestamp(6)
+where id = ${sqlString(sessionId)} and club_id = ${sqlString(CLUB_ID)};
+
+insert into session_participants (
+  id, club_id, session_id, membership_id, rsvp_status, attendance_status,
+  participation_status, seen_schedule_revision, seen_schedule_at
+) values (
+  ${sqlString(participantId)}, ${sqlString(CLUB_ID)}, ${sqlString(sessionId)},
+  ${sqlString(HOST_MEMBERSHIP_ID)}, 'GOING', 'UNKNOWN', 'ACTIVE', 3,
+  '2026-08-30 12:34:56.123456'
+);
+`);
+  return sessionId;
+}
+
+function participantSeenFact(sessionId: string) {
+  return runMysql(`
+select concat(
+  participation_status, '|', seen_schedule_revision, '|',
+  date_format(seen_schedule_at, '%Y-%m-%dT%H:%i:%s.%fZ')
+)
+from session_participants
+where session_id = ${sqlString(sessionId)}
+  and membership_id = ${sqlString(HOST_MEMBERSHIP_ID)};
+`).trim().split("\n").at(-1);
+}
+
 async function seedScopedBrowserState(
   page: Page,
   secret: string,
@@ -307,6 +344,9 @@ test.afterEach(() => {
 test("revoked authority cancels in-flight host work and cannot resurrect a meeting form", async ({ page, context }) => {
   const secret = "D5-owning-club-private-passcode";
   const originalHostUrl = `${HOST_PATH}/sessions/new`;
+  const seenSessionId = createHostParticipantSeenFact();
+  const seenFactBeforeDowngrade = participantSeenFact(seenSessionId);
+  expect(seenFactBeforeDowngrade).toBe("ACTIVE|3|2026-08-30T12:34:56.123456Z");
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto(SAFE_PATH);
   await page.goto(originalHostUrl);
@@ -342,6 +382,7 @@ test("revoked authority cancels in-flight host work and cannot resurrect a meeti
   const failure = await triggerSecurityFailure(page);
   expect(failure).toMatchObject({ code: "HOST_AUTHORITY_REVOKED", name: "ReadmatesApiError" });
   await expectSafeReplacement(page, /호스트 권한이 해제/);
+  expect(participantSeenFact(seenSessionId)).toBe(seenFactBeforeDowngrade);
   releasePending();
   await expect.poll(() => page.evaluate(() => (
     globalThis as typeof globalThis & { __d5PendingStatus?: string }
@@ -430,7 +471,7 @@ test("cross-club scope purges the requested club without touching an open other-
 
 });
 
-test("revision conflict preserves the local meeting form draft", async ({ page }) => {
+test("revision conflict preserves the local meeting form draft, compares latest schedule, and retries explicitly", async ({ page }) => {
   const { sessionId } = createDraftSession();
   const draftTitle = "리비전 충돌 뒤에도 남아야 하는 제목";
   await loginWithGoogleFixture(page, "host@example.com");
@@ -438,21 +479,44 @@ test("revision conflict preserves the local meeting form draft", async ({ page }
   await page.getByRole("button", { name: "모임 정보" }).click();
   const title = page.getByLabel("모임 제목");
   await title.fill(draftTitle);
+  await page.getByLabel("모임 날짜").fill("2026-08-27");
+  await page.getByLabel("시작 시간").fill("20:30");
+  await page.getByLabel("장소").fill("내가 선택한 합성 장소");
   let attempts = 0;
-  await page.route(`**/api/bff/api/host/sessions/${sessionId}?clubSlug=${CLUB_SLUG}`, async (route) => {
-    if (route.request().method() !== "PATCH") return route.continue();
-    attempts += 1;
-    await route.fulfill({
-      status: 409,
-      contentType: "application/json",
-      body: JSON.stringify({ code: "REVISION_CONFLICT", message: "최신 모임 정보를 확인해 주세요.", status: 409 }),
-    });
+  page.on("request", (request) => {
+    if (
+      request.method() === "PATCH"
+      && new URL(request.url()).pathname.endsWith(`/api/host/sessions/${sessionId}`)
+    ) attempts += 1;
   });
+  runMysql(`
+update sessions
+set session_date = '2026-08-26',
+    start_time = '21:00:00',
+    location_label = '최신 서버 합성 장소',
+    session_revision = session_revision + 1,
+    schedule_revision = schedule_revision + 1,
+    updated_at = utc_timestamp(6)
+where id = ${sqlString(sessionId)} and club_id = ${sqlString(CLUB_ID)};
+`);
   await page.getByRole("button", { name: "기본 정보 저장" }).click();
 
-  await expect(page.locator("#host-session-basic-save-state")).toHaveAttribute("role", "alert");
+  const conflict = page.getByRole("alert", { name: "일정 변경 충돌" });
+  await expect(conflict).toBeVisible();
+  await expect(conflict).toContainText("2026-08-27");
+  await expect(conflict).toContainText("2026-08-26");
+  await expect(conflict).toContainText("내가 선택한 합성 장소");
+  await expect(conflict).toContainText("최신 서버 합성 장소");
   await expect(title).toHaveValue(draftTitle);
   expect(attempts).toBe(1);
+
+  await conflict.getByRole("button", { name: "내 일정으로 다시 저장" }).click();
+  await expect(page.locator("#host-session-basic-save-state")).toHaveText("저장되었습니다.");
+  expect(attempts).toBe(2);
+  expect(runMysql(`
+select concat(date_format(session_date, '%Y-%m-%d'), '|', time_format(start_time, '%H:%i'), '|', location_label)
+from sessions where id = ${sqlString(sessionId)};
+`).trim().split("\n").at(-1)).toBe("2026-08-27|20:30|내가 선택한 합성 장소");
   await expect(page).toHaveURL(`${HOST_PATH}/sessions/${sessionId}?section=basic`);
 
 });
