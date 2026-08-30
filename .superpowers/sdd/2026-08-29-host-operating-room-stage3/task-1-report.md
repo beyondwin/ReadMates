@@ -42,3 +42,18 @@ Result: `1` file, `19/19` tests passed, `0` failures.
 - Targeted machine-local path, private-key marker, token prefix, and BFF-secret-name scan over the task files: exit `0`, no findings.
 - The first attempted focused invocation omitted `exec`; pnpm rejected it before running tests. The corrected focused command is the one recorded above.
 - Full lint, test, build, CT, E2E, server, and public-release gates were intentionally not run for this task. Loader/API integration, visual rendering, and browser behavior remain later Stage 3 tasks.
+
+## Review round 1 — authoritative work identity and scoped closing links
+
+- Review BASE: `99cdf6a293a03e76772b8a7811b554725c26c1c4`.
+- Load-bearing findings were limited to locally synthesized deferral authority and legacy closing href normalization.
+- RED used the same focused Vitest command under Node `v24.18.0`: `4` intended failures and `20` passes. Failures proved a predictable local attendance key could defer, supplied server authority was ignored, and IMPORT_RECORDS/SEND_NOTIFICATION escaped the URL-owned club scope.
+- GREEN used the same focused command: `1` file, `24/24` tests passed, `0` failures.
+
+| Closing source SHA-256 | Command | Result | Finding closure |
+| --- | --- | --- | --- |
+| `e72baa925a36e6ef253ab91955d669198e7dd33f5d533bf878a24b8ee712fb71` (`host-operating-room-model.ts`) | focused Vitest command above | GREEN, `24/24` | Schedule, RSVP, questions, place, attendance, and closing no longer synthesize work-item keys. Only explicit `authoritativeWorkItems` supply identity and actionable/deferred state; absent authority yields `workItemKey: null` and cannot be deferred by a predictable local string. |
+| `0db0049f57f59cebf8d3a68e3c4ef1267ad8d922067caec8910d0f1326130905` (`host-operating-room-model.test.ts`) | focused Vitest command above | GREEN, `24/24` | Regression tests prove invented-key deferral is ignored, an opaque authoritative key/state is preserved byte-for-byte, legacy IMPORT_RECORDS and SEND_NOTIFICATION links become club-scoped, and public/already-scoped links remain unchanged. |
+| same two source hashes | `<node24-bin> npx --yes corepack@0.35.0 pnpm --dir front exec eslint features/host/model/host-operating-room-model.ts features/host/model/host-operating-room-model.test.ts` | exit `0`, no findings | The focused fix and tests satisfy the repository lint rules. |
+
+Round-close safety: no local synthesized key prefixes remain in production source; `git diff --check` and the targeted public-safety scan passed with no findings. No other surface or full gate was reopened.

@@ -108,6 +108,12 @@ export type HostPendingOutcome = {
   href: string;
 };
 
+export type HostAuthoritativeWorkItem = {
+  kind: Exclude<HostNextActionKind, "create-meeting" | "schedule-notification" | "none">;
+  workItemKey: string;
+  state: Extract<HostNextActionState, "actionable" | "deferred">;
+};
+
 export type HostOperatingRoomInput = {
   currentMeeting: HostSessionDetailResponse | null;
   requestedPhase: string | null;
@@ -116,7 +122,9 @@ export type HostOperatingRoomInput = {
   questions: HostOperatingRoomSource<HostQuestionPreparation>;
   closing: HostOperatingRoomSource<SessionClosingStatusInput>;
   pendingOutcome: HostPendingOutcome | null;
-  deferredWorkItemKeys: readonly string[];
+  /** @deprecated Local key guesses are deliberately ignored. */
+  deferredWorkItemKeys?: readonly string[];
+  authoritativeWorkItems: readonly HostAuthoritativeWorkItem[];
 };
 
 const PHASE_LABELS: Record<HostMeetingPhase, string> = {
@@ -134,12 +142,23 @@ export function buildHostOperatingRoomView(input: HostOperatingRoomInput): HostO
   const partialFailures: OperatingRoomFailure[] = [];
   const phases = buildPhases(meeting, input.today);
   const phase = normalizePhase(input.requestedPhase, phases, defaultPhase(meeting, input.today));
-  const schedule = scheduleSeenRow(meeting, input.basePath, partialFailures);
-  const rsvp = rsvpRow(meeting, input.basePath);
-  const questions = questionRow(meeting, input.questions, input.basePath, partialFailures);
-  const place = placeRow(meeting, input.basePath);
+  const schedule = scheduleSeenRow(
+    meeting,
+    input.basePath,
+    authoritativeKey(input, "schedule-seen"),
+    partialFailures,
+  );
+  const rsvp = rsvpRow(meeting, input.basePath, authoritativeKey(input, "rsvp"));
+  const questions = questionRow(
+    meeting,
+    input.questions,
+    input.basePath,
+    authoritativeKey(input, "questions"),
+    partialFailures,
+  );
+  const place = placeRow(meeting, input.basePath, authoritativeKey(input, "place"));
   const preparation = [schedule, rsvp, questions, place] as const;
-  const closing = closingView(meeting, input.closing, partialFailures);
+  const closing = closingView(meeting, input.closing, input.basePath, partialFailures);
   const nextAction = resolveNextAction({
     input,
     meeting,
@@ -244,6 +263,7 @@ function normalizePhase(
 function scheduleSeenRow(
   meeting: HostSessionDetailResponse,
   basePath: string,
+  authoritativeWorkItemKey: string | null,
   failures: OperatingRoomFailure[],
 ): PreparationLedgerRowView {
   const summary = hostScheduleSeenSummary(meeting);
@@ -272,7 +292,7 @@ function scheduleSeenRow(
     numerator: countFor(summary, "CURRENT"),
     denominator: summary.eligibleCount,
     href,
-    workItemKey: pendingCount > 0 ? `SCHEDULE_UNSEEN:${meeting.sessionId}:${summary.scheduleRevision}` : null,
+    workItemKey: pendingCount > 0 ? authoritativeWorkItemKey : null,
   };
 }
 
@@ -284,7 +304,11 @@ function countFor(summary: HostScheduleSeenSummary, state: "CURRENT" | "STALE" |
   return summary.states.find((candidate) => candidate.state === state)?.count ?? 0;
 }
 
-function rsvpRow(meeting: HostSessionDetailResponse, basePath: string): PreparationLedgerRowView {
+function rsvpRow(
+  meeting: HostSessionDetailResponse,
+  basePath: string,
+  authoritativeWorkItemKey: string | null,
+): PreparationLedgerRowView {
   const participants = activeParticipants(meeting);
   const responded = participants.filter(({ rsvpStatus }) => rsvpStatus !== "NO_RESPONSE").length;
   const missing = participants.length - responded;
@@ -297,7 +321,7 @@ function rsvpRow(meeting: HostSessionDetailResponse, basePath: string): Preparat
     numerator: responded,
     denominator: participants.length,
     href: hostSessionPath(basePath, meeting.sessionId, "?section=responses"),
-    workItemKey: missing > 0 ? `RSVP:${meeting.sessionId}:${meeting.scheduleRevision}` : null,
+    workItemKey: missing > 0 ? authoritativeWorkItemKey : null,
   };
 }
 
@@ -305,6 +329,7 @@ function questionRow(
   meeting: HostSessionDetailResponse,
   source: HostOperatingRoomSource<HostQuestionPreparation>,
   basePath: string,
+  authoritativeWorkItemKey: string | null,
   failures: OperatingRoomFailure[],
 ): PreparationLedgerRowView {
   const href = hostSessionPath(basePath, meeting.sessionId, "?section=responses&focus=questions");
@@ -324,11 +349,15 @@ function questionRow(
     numerator: respondingMemberCount,
     denominator: eligibleMemberCount,
     href,
-    workItemKey: questionCount === 0 ? `QUESTIONS:${meeting.sessionId}:${meeting.scheduleRevision}` : null,
+    workItemKey: questionCount === 0 ? authoritativeWorkItemKey : null,
   };
 }
 
-function placeRow(meeting: HostSessionDetailResponse, basePath: string): PreparationLedgerRowView {
+function placeRow(
+  meeting: HostSessionDetailResponse,
+  basePath: string,
+  authoritativeWorkItemKey: string | null,
+): PreparationLedgerRowView {
   const location = meeting.locationLabel.trim();
   const prepared = location.length > 0 || Boolean(meeting.meetingUrl);
   return {
@@ -340,7 +369,7 @@ function placeRow(meeting: HostSessionDetailResponse, basePath: string): Prepara
     numerator: null,
     denominator: null,
     href: hostSessionPath(basePath, meeting.sessionId, "?section=basic&edit=1"),
-    workItemKey: prepared ? null : `PLACE:${meeting.sessionId}:${meeting.scheduleRevision}`,
+    workItemKey: prepared ? null : authoritativeWorkItemKey,
   };
 }
 
@@ -357,10 +386,20 @@ function unavailableRow(
 function closingView(
   meeting: HostSessionDetailResponse,
   source: HostOperatingRoomSource<SessionClosingStatusInput>,
+  basePath: string,
   failures: OperatingRoomFailure[],
 ): SessionClosingBoardView | null {
   if (meeting.state !== "CLOSED" && meeting.state !== "PUBLISHED") return null;
-  if (source.state === "ready") return getSessionClosingBoardView(source.data);
+  if (source.state === "ready") {
+    const view = getSessionClosingBoardView(source.data);
+    return {
+      ...view,
+      primaryAction: {
+        ...view.primaryAction,
+        href: normalizeLegacyHostHref(view.primaryAction.href, basePath),
+      },
+    };
+  }
   failures.push(source.state === "failed"
     ? source.failure
     : { source: "closing", message: "마감 상태 계약이 없습니다.", retryable: true });
@@ -392,7 +431,6 @@ function resolveNextAction(context: {
     if (context.closing.primaryAction.label === "추가 조치 없음") return noNextAction();
     return actionState(context.input, {
       kind: "closing",
-      workItemKey: `CLOSING:${meeting.sessionId}:${meeting.versions.lifecycleRevision}`,
       label: context.closing.primaryAction.label,
       reason: context.closing.primaryAction.reason,
       href: context.closing.primaryAction.href,
@@ -404,7 +442,6 @@ function resolveNextAction(context: {
   if (liveAvailable && unknownAttendanceCount > 0) {
     return actionState(context.input, {
       kind: "attendance",
-      workItemKey: `ATTENDANCE:${meeting.sessionId}:${meeting.attendanceSnapshotId}`,
       label: "실제 출석 확인",
       reason: `출석이 확인되지 않은 멤버가 ${unknownAttendanceCount}명입니다.`,
       href: hostSessionPath(context.input.basePath, meeting.sessionId, "?section=attendance"),
@@ -413,10 +450,9 @@ function resolveNextAction(context: {
 
   for (const kind of ["schedule-seen", "rsvp", "questions", "place"] as const) {
     const row = context.preparation.find(({ id }) => id === kind);
-    if (row?.workItemKey) {
+    if (row?.state === "warning") {
       return actionState(context.input, {
         kind,
-        workItemKey: row.workItemKey,
         label: nextActionLabel(kind),
         reason: row.detail,
         href: row.href,
@@ -438,12 +474,28 @@ function resolveNextAction(context: {
 
 function actionState(
   input: HostOperatingRoomInput,
-  action: Omit<HostNextActionView, "state"> & { workItemKey: string },
+  action: Omit<HostNextActionView, "state" | "workItemKey">,
 ): HostNextActionView {
+  const authority = authoritativeWorkItem(input, action.kind);
   return {
     ...action,
-    state: input.deferredWorkItemKeys.includes(action.workItemKey) ? "deferred" : "actionable",
+    state: authority?.state ?? "actionable",
+    workItemKey: authority?.workItemKey ?? null,
   };
+}
+
+function authoritativeKey(
+  input: HostOperatingRoomInput,
+  kind: HostAuthoritativeWorkItem["kind"],
+): string | null {
+  return authoritativeWorkItem(input, kind)?.workItemKey ?? null;
+}
+
+function authoritativeWorkItem(
+  input: HostOperatingRoomInput,
+  kind: HostNextActionKind,
+): HostAuthoritativeWorkItem | null {
+  return input.authoritativeWorkItems.find((item) => item.kind === kind) ?? null;
 }
 
 function nextActionLabel(kind: Extract<PreparationRowId, "schedule-seen" | "rsvp" | "questions" | "place">): string {
@@ -482,4 +534,13 @@ function hostSessionPath(basePath: string, sessionId: string, suffix: string): s
 
 function hostPath(basePath: string, suffix: string): string {
   return `${basePath.replace(/\/+$/, "")}${suffix}`;
+}
+
+function normalizeLegacyHostHref(href: string | null, basePath: string): string | null {
+  if (!href) return null;
+  if (href === "/app/host") return hostPath(basePath, "/");
+  if (href.startsWith("/app/host/") || href.startsWith("/app/host?")) {
+    return hostPath(basePath, href.slice("/app/host".length));
+  }
+  return href;
 }

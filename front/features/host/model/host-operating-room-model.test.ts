@@ -123,6 +123,7 @@ function input(
     closing: { state: "absent" },
     pendingOutcome: null,
     deferredWorkItemKeys: [],
+    authoritativeWorkItems: [],
     ...overrides,
   };
 }
@@ -286,16 +287,33 @@ describe("buildHostOperatingRoomView", () => {
     })).nextAction).toMatchObject({ kind: "closing", label: "기록 패키지 검토" });
   });
 
-  it("marks an authoritative work item as deferred without promoting a lower-priority action", () => {
+  it("does not synthesize authority or defer from a locally predictable key", () => {
     const view = buildHostOperatingRoomView(input({
       deferredWorkItemKeys: ["ATTENDANCE:session-12:attendance-snapshot-1"],
     }));
 
     expect(view.nextAction).toMatchObject({
+      state: "actionable",
+      kind: "attendance",
+      workItemKey: null,
+    });
+  });
+
+  it("preserves an authoritative work-item key and state verbatim", () => {
+    const view = buildHostOperatingRoomView(input({
+      authoritativeWorkItems: [{
+        kind: "attendance",
+        workItemKey: "server/opaque:key:with exact bytes",
+        state: "deferred",
+      }],
+    }));
+
+    expect(view.nextAction).toMatchObject({
       state: "deferred",
       kind: "attendance",
-      workItemKey: "ATTENDANCE:session-12:attendance-snapshot-1",
+      workItemKey: "server/opaque:key:with exact bytes",
     });
+    expect(view.preparation.find(({ id }) => id === "schedule-seen")?.workItemKey).toBeNull();
   });
 
   it("preserves zero as measured data instead of calling it unavailable", () => {
@@ -323,5 +341,21 @@ describe("buildHostOperatingRoomView", () => {
     }));
 
     expect(view.closing?.primaryAction.label).toBe(label);
+  });
+
+  it.each([
+    ["IMPORT_RECORDS", "https://example.com/unused", "/clubs/book-club/app/host/sessions/session-12/edit?records=json"],
+    ["SEND_NOTIFICATION", "https://example.com/unused", "/clubs/book-club/app/host/notifications"],
+    ["REVIEW_PUBLIC_PAGE", "https://public.example.com/records/12", "https://public.example.com/records/12"],
+    ["REVIEW_PUBLIC_PAGE", "/clubs/book-club/app/host/records/12", "/clubs/book-club/app/host/records/12"],
+  ] as const)("normalizes only legacy closing hrefs for %s", (action, publicRecordHref, expectedHref) => {
+    const status = closing(action === "REVIEW_PUBLIC_PAGE" ? "PUBLISHED" : "BLOCKED", action);
+    status.evidence.publicRecordHref = publicRecordHref;
+    const view = buildHostOperatingRoomView(input({
+      currentMeeting: session({ state: "CLOSED", date: "2026-08-29" }),
+      closing: ready(status),
+    }));
+
+    expect(view.closing?.primaryAction.href).toBe(expectedHref);
   });
 });
