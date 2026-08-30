@@ -3,14 +3,14 @@ import { fetchGuestBrowseShell } from "@/features/guest-browse/api/guest-browse-
 import type { GuestBrowseShell } from "@/features/guest-browse/api/guest-browse-contracts";
 import { deriveClubAppAudience, type ClubAppAudience } from "@/features/guest-browse/model/club-app-audience";
 import { readmatesPublicFetch } from "@/shared/api/client";
-import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import type { AuthMeResponse, NormalizedAuthMeResponse } from "@/shared/auth/auth-contracts";
 import { normalizeAuthAvailableSpaces } from "@/shared/auth/available-spaces";
 import { authMePath, clubSlugFromLoaderArgs, type ClubScopedLoaderArgs } from "@/shared/auth/member-app-loader";
 import { isReadmatesApiError } from "@/shared/api/errors";
 
 export type ClubAppAccess = {
   audience: ClubAppAudience;
-  auth: AuthMeResponse;
+  auth: NormalizedAuthMeResponse;
   club: GuestBrowseShell | null;
 };
 

@@ -244,12 +244,14 @@ describe("AuthProvider", () => {
     render(
       <AuthProvider>
         <AuthProbe />
+        <AuthSpacesProbe />
       </AuthProvider>,
     );
 
     await waitFor(() => {
       expect(screen.getByTestId("auth-state")).toHaveTextContent("ANONYMOUS");
     });
+    expect(screen.getByTestId("available-spaces")).toBeEmptyDOMElement();
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", { cache: "no-store" });
   });
 
@@ -260,12 +262,14 @@ describe("AuthProvider", () => {
     render(
       <AuthProvider>
         <AuthProbe />
+        <AuthSpacesProbe />
       </AuthProvider>,
     );
 
     await waitFor(() => {
       expect(screen.getByTestId("auth-state")).toHaveTextContent("ANONYMOUS");
     });
+    expect(screen.getByTestId("available-spaces")).toBeEmptyDOMElement();
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", { cache: "no-store" });
   });
 
@@ -516,12 +520,14 @@ describe("AuthProvider", () => {
     render(
       <AuthProvider>
         <AuthProbe />
+        <AuthSpacesProbe />
       </AuthProvider>,
     );
 
     await waitFor(() => {
       expect(screen.getByTestId("auth-state")).toHaveTextContent("ANONYMOUS");
     });
+    expect(screen.getByTestId("available-spaces")).toBeEmptyDOMElement();
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", { cache: "no-store" });
   });
 
@@ -556,6 +562,7 @@ describe("AuthProvider", () => {
     render(
       <AuthProvider>
         <AuthProbe />
+        <AuthSpacesProbe />
         <AuthAwareLogoutButton />
       </AuthProvider>,
     );
@@ -569,6 +576,7 @@ describe("AuthProvider", () => {
     await waitFor(() => {
       expect(screen.getByTestId("auth-state")).toHaveTextContent("ANONYMOUS");
     });
+    expect(screen.getByTestId("available-spaces")).toBeEmptyDOMElement();
     expect(location.href).toBe("/login");
     expect(fetchMock).toHaveBeenLastCalledWith(
       "/api/bff/api/auth/logout",

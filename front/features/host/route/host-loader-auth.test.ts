@@ -57,7 +57,10 @@ describe("requireHostLoaderAuth", () => {
     expect(second.status).toBe("rejected");
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    await expect(requireHostLoaderAuth(args)).resolves.toMatchObject(hostAuth);
+    await expect(requireHostLoaderAuth(args)).resolves.toEqual({
+      ...hostAuth,
+      availableSpaces: { version: 1, kinds: [], clubs: [] },
+    });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 

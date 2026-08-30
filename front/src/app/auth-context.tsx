@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
-import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import type { AuthMeResponse, NormalizedAuthMeResponse } from "@/shared/auth/auth-contracts";
 import { normalizeAuthAvailableSpaces } from "@/shared/auth/available-spaces";
 import {
   READMATES_SESSION_EXPIRED_EVENT,
@@ -8,7 +8,7 @@ import {
 import { anonymousAuth, AuthActionsContext, AuthContext, type AuthState } from "@/src/app/auth-state";
 
 type FetchAuthMeOutcome =
-  | { kind: "ok"; auth: AuthMeResponse }
+  | { kind: "ok"; auth: NormalizedAuthMeResponse }
   | { kind: "expired" }
   | { kind: "error" };
 

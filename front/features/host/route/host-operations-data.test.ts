@@ -43,7 +43,7 @@ describe("hostOperationsLoader", () => {
         request: new Request("https://readmates.test/app/host/operations"),
       } as unknown as LoaderFunctionArgs),
     ).resolves.toEqual({
-      auth: hostAuth,
+      auth: { ...hostAuth, availableSpaces: { version: 1, kinds: [], clubs: [] } },
       clubSlug: undefined,
     });
 
@@ -70,7 +70,7 @@ describe("hostOperationsLoader", () => {
         request: new Request("https://readmates.test/clubs/reading-sai/app/host/operations"),
       } as unknown as LoaderFunctionArgs),
     ).resolves.toEqual({
-      auth: hostAuth,
+      auth: { ...hostAuth, availableSpaces: { version: 1, kinds: [], clubs: [] } },
       clubSlug: "reading-sai",
     });
 

@@ -36,6 +36,10 @@ export type AuthMeResponse = {
   availableSpaces?: AvailableSpacesV1;
 };
 
+export type NormalizedAuthMeResponse = Omit<AuthMeResponse, "availableSpaces"> & {
+  availableSpaces: AvailableSpacesV1;
+};
+
 export type AuthCurrentMembership = {
   membershipId: string;
   clubId: string;
