@@ -22,7 +22,8 @@ ReadMates의 전역 공간 kind 전체 집합은 정확히 `플랫폼 운영`과
 - 계정 identity와 로그인/로그아웃은 공간 선택과 분리한다.
 - 서버 projection이 `availableSpaces`와 club별 허용 perspective를 소유한다. 각 목적 route의 기존 capability/guard는 action authority를 다시 확인하고, client는 role/status enum으로 공간 접근을 재계산하지 않는다.
 - return target은 `pathname`, `search`, `hash`, focus target, scroll 위치를 공간·club·perspective별로 보존한다. 민감 state나 command payload는 보존하지 않는다. 복원 전에 최신 `availableSpaces`, route correspondence와 route-owned allowlist를 다시 검사하고 stale/invalid target은 폐기한다.
-- 전환 안전 상태는 `clean`, `dirty`, `pending`, `unknown-outcome`이다. `dirty`는 명시적 이탈 확인을 요구한다. `pending`은 request가 응답하거나 domain별 timeout에 도달할 때까지 이동을 막고, timeout이면 `unknown-outcome`으로 전환한다. `unknown-outcome`은 자동 재실행하지 않고, receipt가 있는 command는 같은 command/receipt identity로 조회·재개하며 L1은 authoritative state/history를 다시 읽는다.
+- 전환 안전 상태는 `clean`, `dirty`, `pending`, `unknown-outcome`이다. `dirty`는 명시적 이탈 확인을 요구한다. `pending` 등록은 operation identity와 domain-owned recovery strategy를 함께 보관하고, request가 응답하거나 기본 30초 timeout(기존 domain 계약이 더 짧으면 그 값)에 도달할 때까지 이동을 막는다. timeout이면 같은 identity와 recovery를 보존한 `unknown-outcome`으로 전환한다. `unknown-outcome`은 자동 재실행하지 않고, receipt가 있는 command는 같은 command/receipt identity로 조회·재개하며 L1은 authoritative state/history를 다시 읽는다.
+- coordinator는 등록마다 generation을 발급한다. unmount/authority loss는 등록·timer·민감 cache와 draft를 폐기하고 generation을 올리며, 이전 generation의 늦은 응답은 UI·cache·return target을 갱신하지 않고 원래 recovery strategy로만 수렴한다. Member·host·admin의 변경 producer는 전수 inventory에서 `register` 또는 근거가 있는 `verified-no-change`로 분류한다.
 - authority loss에서는 ADR-0035대로 해당 민감 cache/draft를 폐기하고, 서버 projection이 허용한 안전 목적지로 replace 이동한다.
 - 대응 route가 없으면 같은 공간·club·perspective의 마지막 안전 목적지, 그 perspective 대표 route 순으로 fallback한다.
 
@@ -58,7 +59,7 @@ ReadMates의 전역 공간 kind 전체 집합은 정확히 `플랫폼 운영`과
 
 - auth/BFF/server DTO와 frontend app/shared 경계를 함께 바꾸는 수직 slice가 필요하다.
 - 기존 workspace continuity storage key migration과 compatibility fallback이 필요하다.
-- dirty/pending/unknown-outcome과 domain별 timeout/reconciliation strategy를 각 workflow가 공통 transition coordinator에 보고해야 한다.
+- dirty/pending/unknown-outcome과 기본 30초(더 짧은 기존 domain 계약 우선) timeout/reconciliation strategy를 각 workflow가 공통 transition coordinator에 보고해야 한다.
 
 ## 검증
 
@@ -71,6 +72,6 @@ ReadMates의 전역 공간 kind 전체 집합은 정확히 `플랫폼 운영`과
 
 ## 후속 작업
 
-- 목적에 맞는 server-owned space projection DTO와 Zod contract fixture를 추가한다.
+- 목적에 맞는 server-owned space projection DTO와 fail-closed TypeScript normalizer contract fixture를 추가한다.
 - 공통 transition coordinator와 versioned session-storage migration을 구현한다.
 - member/host/admin shell을 같은 two-level switcher로 순차 이관한다.

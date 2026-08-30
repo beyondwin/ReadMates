@@ -118,7 +118,8 @@
 - 클럽 identity는 ADR-0019대로 URL이 소유한다.
 - return target은 `pathname + search + hash + focus target + scroll`을 보존하고 공간·club·perspective별로 분리한다. 복원 전에 최신 `availableSpaces`, route correspondence, route-owned allowlist를 다시 검사하고 stale/invalid target과 허용되지 않은 query/hash/focus를 폐기한다.
 - 전환 상태는 `clean`, `dirty`, `pending`, `unknown-outcome` 네 종류다.
-- `dirty`는 이탈 확인 뒤 이동할 수 있다. `pending`은 request가 응답하거나 domain별 timeout에 도달할 때까지 이동을 막고, timeout이면 `unknown-outcome`으로 전환한다. `unknown-outcome`은 자동 재실행하지 않고, receipt가 있는 command는 같은 identity로 조회·재개하며 L1은 authoritative state/history를 다시 읽는다.
+- `dirty`는 이탈 확인 뒤 이동할 수 있다. `pending` 등록은 operation identity와 domain-owned recovery strategy를 함께 소유하며 request가 응답하거나 기본 30초 timeout(기존 domain 계약이 더 짧으면 그 값)에 도달할 때까지 이동을 막는다. timeout이면 같은 identity와 recovery strategy를 보존한 `unknown-outcome`으로 전환한다. `unknown-outcome`은 자동 재실행하지 않고, receipt가 있는 command는 같은 identity로 조회·재개하며 L1은 authoritative state/history를 다시 읽는다.
+- 전환 coordinator는 등록마다 generation을 발급한다. unmount나 authority loss는 등록·draft·민감 cache를 폐기하고 generation을 올리며, 이전 generation의 늦은 응답은 화면·cache·return target을 갱신하지 않고 해당 domain recovery만 실행한다. member·host·admin의 변경 producer는 전수 inventory에서 `register` 또는 근거가 있는 `verified-no-change`로 분류하며 미분류 producer가 남으면 구현 완료로 보지 않는다.
 - authority loss는 민감 cache와 draft를 폐기하고 안전한 허용 공간으로 `replace` 이동한다.
 - 목적 route가 대응되지 않으면 이전 안전 목적지, 해당 perspective의 대표 route 순으로 fallback한다.
 
@@ -159,7 +160,7 @@
 ### 8.5 처리 기록
 
 - 한 행은 `시각 · 누가 · 무엇에 · 무엇을 했고 · 결과가 무엇인지` 읽히는 문장이다.
-- 결과는 `완료`, `실패`, `차단됨`, `진행 중`, `결과 확인 필요`로 번역한다.
+- audit outcome은 `완료`, `실패`, `차단됨`, `실행 전 준비됨`, `결과 확인 필요`로 번역한다. 실제 convergence source가 `PENDING`을 제공할 때만 `진행 중`을 사용한다.
 - 사유, request/receipt identity, 재시도·수렴 상태는 detail에 계층적으로 노출한다.
 - 분석은 처리 결정을 바꾸는 aggregate만 부록으로 제공하고 첫 화면 KPI 벽으로 만들지 않는다.
 
@@ -249,11 +250,11 @@ shared
 
 ## 12. 서버·계약 원칙
 
-- `/api/auth/me`의 additive versioned `availableSpaces` field가 사용자가 열 수 있는 전역 공간과 club perspective를 명시한다. 기존 `joinedClubs`, `platformAdmin`, `recommendedAppEntryUrl`은 호환 기간 유지하며 각 목적 route의 기존 capability/guard는 action authority를 계속 재검증한다.
+- `/api/auth/me`의 additive versioned `availableSpaces` field가 사용자가 열 수 있는 전역 공간과 club perspective를 명시한다. 기존 `joinedClubs`, `platformAdmin`, `recommendedAppEntryUrl`은 이번 구현에서 삭제하지 않으며, 제거는 mixed-version 호환을 실제 배포에서 증명한 뒤 별도 승인 계획으로 수행한다. 각 목적 route의 기존 capability/guard는 action authority를 계속 재검증한다.
 - platform capability와 case `allowedActions`가 권위이며 client role mapping은 표시용 번역에만 사용한다.
 - 현재 보류 UI가 수집하지만 request가 버리는 사유 입력은 제거한다. 향후 사유가 필요하면 raw free-text가 아니라 versioned `reasonCategory`와 필요한 경우 bounded/redacted note를 request, application service, event/audit까지 함께 구현한 뒤 노출한다.
 - `무시`와 `병합`은 1차 비범위다. source identity, reopen, history 보존 규칙을 갖춘 별도 server contract 없이 UI에 표시하지 않는다.
-- 운영 상태를 표현하는 read projection은 generated/as-of, source availability, partial failure를 구분한다.
+- Today·health·audit처럼 현재 freshness/source metadata를 제공하는 운영 status projection은 generated/as-of, source availability, partial failure를 구분한다. Club list/detail처럼 해당 metadata가 없는 응답에 시각이나 availability를 만들어 넣지 않는다.
 - safe-command는 ADR-0040의 L1/L2/L3, idempotency, receipt, convergence를 그대로 사용한다.
 
 ## 13. 접근성·반응형·복구 검증
