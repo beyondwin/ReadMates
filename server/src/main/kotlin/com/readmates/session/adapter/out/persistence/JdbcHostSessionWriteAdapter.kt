@@ -34,6 +34,7 @@ import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import java.time.Clock
 import java.time.Instant
 import java.util.UUID
 
@@ -43,6 +44,7 @@ class JdbcHostSessionWriteAdapter(
     private val jdbcTemplate: JdbcTemplate,
     private val deletionQueries: HostSessionDeletionQueries,
     private val confirmationProperties: HostActionConfirmationProperties,
+    clock: Clock,
 ) : HostSessionQueryPort,
     HostSessionDraftPort,
     HostSessionLifecyclePort,
@@ -51,7 +53,7 @@ class JdbcHostSessionWriteAdapter(
     HostSessionPublicationPort,
     HostSessionProjectionPort {
     private val attentionQueries = HostSessionAttentionQueries()
-    private val queries = HostSessionQueries(attentionQueries)
+    private val queries = HostSessionQueries(attentionQueries, clock)
     private val scheduleDefaultsQueries = HostSessionScheduleDefaultsQueries()
     private val writeQueries = HostSessionWriteQueries(jdbcTemplate, queries)
     private val writePolicy = HostSessionWritePolicy

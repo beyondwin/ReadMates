@@ -262,7 +262,7 @@ export function HostDashboardRoute({
   }, [location.hash, location.pathname, location.search]);
 
   useEffect(() => {
-    if (!view.meeting || requestedPhase === view.phase) return;
+    if (requestedPhase === view.phase || (!view.meeting && requestedPhase === null)) return;
     void navigate(phaseHref(view.phase), {
       replace: true,
       state: withPhaseReason(location.state, phaseNormalizationMessage(requestedPhase, view)),

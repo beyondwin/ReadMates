@@ -3,6 +3,7 @@
 package com.readmates.session.adapter.out.persistence
 
 import com.readmates.session.application.HostSessionAttendee
+import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionFeedbackDocument
 import com.readmates.session.application.HostSessionListItem
 import com.readmates.session.application.HostSessionListPage
@@ -20,6 +21,7 @@ import com.readmates.session.application.model.HostMeetingListMode
 import com.readmates.session.application.model.HostMeetingListTuple
 import com.readmates.session.application.port.out.HostMeetingListPageRead
 import com.readmates.session.application.requireHost
+import com.readmates.session.domain.SessionAccessScope
 import com.readmates.session.domain.SessionParticipationStatus
 import com.readmates.sessionclosing.application.model.SessionRecordReadinessPolicy
 import com.readmates.sessionrecord.application.model.SessionRecordStatus
@@ -29,13 +31,18 @@ import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.jdbc.core.JdbcTemplate
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.UUID
 
 internal class HostSessionQueries(
     private val attentionQueries: HostSessionAttentionQueries = HostSessionAttentionQueries(),
+    private val clock: Clock = Clock.systemUTC(),
 ) {
     @Suppress("LongMethod")
     fun list(
@@ -433,7 +440,7 @@ internal class HostSessionQueries(
                     .joinToString(",") { attendee ->
                         "${attendee.membershipId}:${attendee.attendanceRevision}"
                     }
-            val scheduleSeenSummary = scheduleSeenSummary(detail.state, attendees)
+            val scheduleSeenSummary = scheduleSeenSummary(detail, attendees)
             detail.copy(
                 attendees = attendees,
                 feedbackDocument = findHostSessionFeedbackDocument(jdbcTemplate, sessionId, member.clubId),
@@ -558,14 +565,14 @@ internal class HostSessionQueries(
     )
 
     private fun scheduleSeenSummary(
-        state: String,
+        detail: HostSessionDetailResponse,
         attendees: List<HostSessionAttendee>,
     ): ScheduleSeenSummary {
         val eligible =
             attendees.filter { attendee ->
                 attendee.participationStatus == SessionParticipationStatus.ACTIVE
             }
-        if (state != "OPEN" || eligible.isEmpty()) return ScheduleSeenSummary.UNAVAILABLE
+        if (!scheduleSeenAvailable(detail) || eligible.isEmpty()) return ScheduleSeenSummary.UNAVAILABLE
         return ScheduleSeenSummary(
             currentCount = eligible.count { attendee -> attendee.scheduleSeenState == ScheduleSeenState.CURRENT },
             staleCount = eligible.count { attendee -> attendee.scheduleSeenState == ScheduleSeenState.STALE },
@@ -573,6 +580,18 @@ internal class HostSessionQueries(
             eligibleCount = eligible.size,
         )
     }
+
+    private fun scheduleSeenAvailable(detail: HostSessionDetailResponse): Boolean =
+        when (detail.state) {
+            "OPEN" -> true
+            "DRAFT" ->
+                detail.accessScope == SessionAccessScope.GUEST_READABLE &&
+                    detail.versions.participantSetRevision > 0 &&
+                    !LocalDateTime
+                        .of(LocalDate.parse(detail.date), LocalTime.parse(detail.startTime))
+                        .isBefore(LocalDateTime.now(clock.withZone(HOST_MEETING_ZONE)))
+            else -> false
+        }
 
     private fun findHostSessionFeedbackDocument(
         jdbcTemplate: JdbcTemplate,
@@ -739,6 +758,7 @@ private fun HostSessionListItem.toScanCursor() = HostSessionCursor(sessionNumber
 
 internal const val HOST_SESSION_LEDGER_SCAN_CHUNK_SIZE = 200
 internal const val HOST_SESSION_LEDGER_MAX_SCAN_CHUNKS = 10
+private val HOST_MEETING_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
 
 internal val HOST_SESSION_LEDGER_FACTS_SQL =
     """

@@ -353,6 +353,51 @@ class FrontendZodSchemaContractTest
             statements = [CLEANUP_CONTRACT_HOST_SCHEDULE_SEEN_SQL],
             executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
         )
+        fun `qualifying future draft detail preserves complete schedule seen counts`() {
+            jdbcTemplate.update(
+                """
+                update sessions
+                set state = 'DRAFT',
+                    visibility = 'MEMBER',
+                    access_scope = 'GUEST_READABLE',
+                    participant_set_revision = 1,
+                    session_date = '2999-09-20'
+                where id = ?
+                """.trimIndent(),
+                CONTRACT_HOST_SCHEDULE_SEEN_SESSION_ID,
+            )
+
+            val response =
+                mockMvc
+                    .get("/api/host/sessions/$CONTRACT_HOST_SCHEDULE_SEEN_SESSION_ID") {
+                        with(user("host@example.com"))
+                    }.andExpect { status { isOk() } }
+                    .andReturn()
+                    .response.contentAsString
+
+            val detail = objectMapper.readTree(response)
+            assertThat(detail.path("state").asString()).isEqualTo("DRAFT")
+            assertThat(detail.path("scheduleSeenAvailability").asString()).isEqualTo("AVAILABLE")
+            assertThat(detail.path("scheduleSeenSummary").path("currentCount").asInt()).isEqualTo(1)
+            assertThat(detail.path("scheduleSeenSummary").path("staleCount").asInt()).isEqualTo(1)
+            assertThat(detail.path("scheduleSeenSummary").path("unseenCount").asInt()).isEqualTo(1)
+            assertThat(detail.path("scheduleSeenSummary").path("eligibleCount").asInt()).isEqualTo(3)
+            assertPrivacySafe(response)
+        }
+
+        @Test
+        @Sql(
+            statements = [
+                CLEANUP_CONTRACT_HOST_SCHEDULE_SEEN_SQL,
+                INSERT_CONTRACT_HOST_SCHEDULE_SEEN_SESSION_SQL,
+                INSERT_CONTRACT_HOST_SCHEDULE_SEEN_PARTICIPANTS_SQL,
+            ],
+            executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+        )
+        @Sql(
+            statements = [CLEANUP_CONTRACT_HOST_SCHEDULE_SEEN_SQL],
+            executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+        )
         fun `host schedule seen detail fails fast on a future seen revision`() {
             jdbcTemplate.update(
                 """

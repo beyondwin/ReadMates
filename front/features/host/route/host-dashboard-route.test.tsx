@@ -265,6 +265,29 @@ describe("HostDashboardRoute", () => {
     expect(screen.queryByRole("link", { name: "일정 확인 자세히 보기" })).not.toBeInTheDocument();
   });
 
+  it("keeps a qualifying future draft schedule review actionable from exact detail counts", async () => {
+    const futureDraft = { ...meetingDetail, state: "DRAFT" as const, date: "2999-01-01" };
+    renderRoute(
+      "/clubs/reading-sai/app/host?phase=prep",
+      dashboardData({
+        operatingRoom: { currentMeeting: {
+          sessionId: futureDraft.sessionId,
+          selection: "UPCOMING_DRAFT",
+          scheduleSeenAvailability: "AVAILABLE",
+        } },
+        currentMeeting: futureDraft,
+        closingStatus: { state: "absent" },
+      }),
+    );
+
+    const ledger = await screen.findByRole("region", { name: "준비 현황" });
+    expect(within(ledger).getByText("현재 일정 확인 1/2")).toBeVisible();
+    expect(screen.getByRole("link", { name: "일정 미확인 멤버 검토" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-7?section=responses&scheduleSeen=unseen",
+    );
+  });
+
   it("renders one empty-current action without date or list selection", async () => {
     renderRoute("/clubs/reading-sai/app/host?phase=live", dashboardData({
       operatingRoom: { currentMeeting: null },
@@ -286,6 +309,29 @@ describe("HostDashboardRoute", () => {
     expect(screen.queryByLabelText(/날짜 선택|모임 선택/)).not.toBeInTheDocument();
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
+
+  it.each(["live", "closing", "invalid"])(
+    "normalizes empty-current phase %s to prep while preserving club scope and safe URL state",
+    async (requestedPhase) => {
+      const { router } = renderRoute(
+        `/clubs/reading-sai/app/host?phase=${requestedPhase}&from=notice#retained`,
+        dashboardData({
+          operatingRoom: { currentMeeting: null },
+          currentMeeting: null,
+          closingStatus: { state: "absent" },
+          recordAttention: { state: "absent" },
+          clubOperations: { state: "absent" },
+          notificationHealth: { state: "absent" },
+        }),
+      );
+
+      expect(await screen.findByRole("heading", { name: "현재 운영할 모임이 없습니다" })).toBeVisible();
+      await waitFor(() => expect(router.state.location.search).toBe("?phase=prep&from=notice"));
+      expect(router.state.location.pathname).toBe("/clubs/reading-sai/app/host");
+      expect(router.state.location.hash).toBe("#retained");
+      expect(router.state.historyAction).toBe("REPLACE");
+    },
+  );
 
   it("composes the prep room from the current meeting, next action, and independent ledger rows", async () => {
     renderRoute("/clubs/reading-sai/app/host?phase=prep");
