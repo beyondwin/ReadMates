@@ -9,7 +9,7 @@ import {
   type PropsWithChildren,
 } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { fetchArchiveSessions } from "@/features/archive/api/archive-api";
+import { fetchNoteSessions } from "@/features/archive/api/archive-api";
 import { fetchHostSessionDetail, fetchHostSessions } from "@/features/host/api/host-api";
 import { fetchPlatformAdminClubs, fetchPlatformAdminClub } from "@/features/platform-admin/api/platform-admin-api";
 import { fetchAdminOperationCases } from "@/features/platform-admin/api/platform-admin-operations-api";
@@ -48,12 +48,18 @@ import {
   resolveGlobalSpaceDestination,
 } from "./global-space-transition";
 
-export type LatestSpaceProjectionLoader = () => Promise<AuthMeResponse | null>;
+export type LatestSpaceProjectionLoader = (signal: AbortSignal) => Promise<AuthMeResponse | null>;
 export type SpaceRouteValidationLoader = (
   identity: SpaceIdentity,
   auth: NormalizedAuthMeResponse,
   target: ReturnTarget,
+  signal: AbortSignal,
 ) => Promise<ReturnTargetValidationContext>;
+export type TransitionNavigation = (
+  href: string,
+  options: { replace: boolean; state: Record<string, unknown> },
+  signal: AbortSignal,
+) => void | Promise<void>;
 
 export type SpaceTransitionRequestResult =
   | { status: "navigated"; href: string }
@@ -82,6 +88,7 @@ export function GlobalSpaceTransitionController({
   loadLatestProjection = fetchLatestSpaceProjection,
   loadRouteValidation,
   confirmDirtyLeave = defaultConfirmDirtyLeave,
+  navigateTransition: injectedNavigation,
   storage,
   children,
 }: PropsWithChildren<{
@@ -89,6 +96,7 @@ export function GlobalSpaceTransitionController({
   loadLatestProjection?: LatestSpaceProjectionLoader;
   loadRouteValidation?: SpaceRouteValidationLoader;
   confirmDirtyLeave?: (message: string) => boolean;
+  navigateTransition?: TransitionNavigation;
   storage?: Storage;
 }>) {
   const location = useLocation();
@@ -102,6 +110,7 @@ export function GlobalSpaceTransitionController({
   const handles = useRef(new Map<string, PendingHandle>());
   const [retainedRecoveryCount, setRetainedRecoveryCount] = useState(0);
   const transitionIntentRef = useRef(0);
+  const transitionAbortRef = useRef<AbortController | null>(null);
   const [safety, setSafety] = useState<TransitionSafety>(() => coordinator.getSnapshot());
   const normalizedAuth = useMemo(() => normalizeAuthAvailableSpaces(auth), [auth]);
   const projectedIdentities = useMemo(() => projectedSpaceIdentities(normalizedAuth), [normalizedAuth]);
@@ -119,11 +128,18 @@ export function GlobalSpaceTransitionController({
       defaultRouteValidation(identity, latestAuth, target)
     ))
   ), [loadRouteValidation]);
+  const navigateTransition = useCallback<TransitionNavigation>((href, options, signal) => {
+    if (signal.aborted) return;
+    return injectedNavigation
+      ? injectedNavigation(href, options, signal)
+      : navigate(href, options);
+  }, [injectedNavigation, navigate]);
   const syncRetainedRecoveryCount = useCallback(() => {
     setRetainedRecoveryCount(handles.current.size);
   }, []);
 
   useEffect(() => coordinator.subscribe(() => setSafety(coordinator.getSnapshot())), [coordinator]);
+  useEffect(() => () => transitionAbortRef.current?.abort(), []);
   useEffect(() => {
     availableIdentitiesRef.current = availableIdentities;
     latestAuthRef.current = normalizedAuth;
@@ -177,9 +193,9 @@ export function GlobalSpaceTransitionController({
     },
   }), [coordinator, syncRetainedRecoveryCount]);
 
-  const loadFreshProjection = useCallback(async () => {
+  const loadFreshProjection = useCallback(async (signal: AbortSignal) => {
     try {
-      const loaded = await loadLatestProjection();
+      const loaded = await loadLatestProjection(signal);
       if (!loaded) return null;
       return normalizeAuthAvailableSpaces(loaded);
     } catch {
@@ -192,8 +208,9 @@ export function GlobalSpaceTransitionController({
     reason: "user" | "authority-loss",
     latestAuth: NormalizedAuthMeResponse,
     intent: number,
+    signal: AbortSignal,
   ): Promise<SpaceTransitionRequestResult> => {
-    const intentIsCurrent = () => transitionIntentRef.current === intent;
+    const intentIsCurrent = () => transitionIntentRef.current === intent && !signal.aborted;
     if (!intentIsCurrent()) return { status: "obsolete" };
     const latestAvailable = projectedSpaceIdentities(latestAuth);
     if (reason === "user" && !containsIdentity(latestAvailable, targetIdentity)) {
@@ -214,6 +231,7 @@ export function GlobalSpaceTransitionController({
         currentIdentity,
         latestAuth,
         returnTargetFromLocation(currentLocation),
+        signal,
       );
       if (!intentIsCurrent()) return { status: "obsolete" };
     }
@@ -223,6 +241,7 @@ export function GlobalSpaceTransitionController({
       destinationIdentity,
       latestAuth,
       destinationCandidate,
+      signal,
     );
     if (!intentIsCurrent()) return { status: "obsolete" };
     continuity.purgeUnavailable(latestAvailable);
@@ -248,46 +267,60 @@ export function GlobalSpaceTransitionController({
     );
     const href = `${target.pathname}${target.search}${target.hash}`;
     if (!intentIsCurrent()) return { status: "obsolete" };
-    await navigate(href, {
+    await navigateTransition(href, {
       replace: destination.navigation === "replace",
       state: { [RESTORE_STATE_KEY]: { focusId: target.focusId, scrollTop: target.scrollTop } },
-    });
+    }, signal);
+    if (!intentIsCurrent()) return { status: "obsolete" };
     return { status: "navigated", href };
-  }, [continuity, continuityStorage, navigate, normalizedAuth, routeValidationLoader]);
+  }, [continuity, continuityStorage, navigateTransition, normalizedAuth, routeValidationLoader]);
 
   const requestTransition = useCallback(async (
     targetIdentity: SpaceIdentity,
   ): Promise<SpaceTransitionRequestResult> => {
     const intent = ++transitionIntentRef.current;
-    const currentSafety = coordinator.getSnapshot();
-    if (currentSafety.kind === "pending") return { status: "blocked-pending" };
-    if (currentSafety.kind === "dirty" && !confirmDirtyLeave(currentSafety.message)) {
-      return { status: "cancelled" };
-    }
-    if (currentSafety.kind === "unknown-outcome") {
-      const handle = handles.current.get(handleKey(currentSafety.operationId, currentSafety.generation));
-      const observation = handle
-        ? await handle.reconcile()
-        : { operationId: currentSafety.operationId, outcome: "still-unknown" as const };
-      if (transitionIntentRef.current !== intent) return { status: "obsolete" };
-      if (observation.outcome === "still-unknown" || observation.outcome === "authority-lost") {
-        return { status: "blocked-unknown", observation };
-      }
-    }
-    const latest = await loadFreshProjection();
-    if (transitionIntentRef.current !== intent) return { status: "obsolete" };
-    if (!latest) return { status: "unavailable" };
-    latestAuthRef.current = latest;
-    availableIdentitiesRef.current = projectedSpaceIdentities(latest);
+    transitionAbortRef.current?.abort();
+    const abortController = new AbortController();
+    transitionAbortRef.current = abortController;
+    const intentIsCurrent = () => (
+      transitionIntentRef.current === intent && !abortController.signal.aborted
+    );
     try {
-      return await performTransition(targetIdentity, "user", latest, intent);
+      const currentSafety = coordinator.getSnapshot();
+      if (currentSafety.kind === "pending") return { status: "blocked-pending" };
+      if (currentSafety.kind === "dirty" && !confirmDirtyLeave(currentSafety.message)) {
+        return { status: "cancelled" };
+      }
+      if (currentSafety.kind === "unknown-outcome") {
+        const handle = handles.current.get(handleKey(currentSafety.operationId, currentSafety.generation));
+        const observation = handle
+          ? await handle.reconcile()
+          : { operationId: currentSafety.operationId, outcome: "still-unknown" as const };
+        if (!intentIsCurrent()) return { status: "obsolete" };
+        if (observation.outcome === "still-unknown" || observation.outcome === "authority-lost") {
+          return { status: "blocked-unknown", observation };
+        }
+      }
+      const latest = await loadFreshProjection(abortController.signal);
+      if (!intentIsCurrent()) return { status: "obsolete" };
+      if (!latest) return { status: "unavailable" };
+      latestAuthRef.current = latest;
+      availableIdentitiesRef.current = projectedSpaceIdentities(latest);
+      return await performTransition(
+        targetIdentity,
+        "user",
+        latest,
+        intent,
+        abortController.signal,
+      );
     } catch {
-      return { status: "unavailable" };
+      return intentIsCurrent() ? { status: "unavailable" } : { status: "obsolete" };
     }
   }, [confirmDirtyLeave, coordinator, loadFreshProjection, performTransition]);
 
   const invalidateForHostAuthorityLoss = useCallback((event: HostAuthorityLossEvent) => {
     transitionIntentRef.current += 1;
+    transitionAbortRef.current?.abort();
     coordinator.invalidateForAuthorityLoss();
     handles.current.clear();
     syncRetainedRecoveryCount();
@@ -302,7 +335,8 @@ export function GlobalSpaceTransitionController({
   }, [continuity, coordinator, syncRetainedRecoveryCount]);
 
   const resolveHostAuthorityLossTarget = useCallback(async (event: HostAuthorityLossEvent) => {
-    const latest = await loadFreshProjection();
+    const authorityController = new AbortController();
+    const latest = await loadFreshProjection(authorityController.signal);
     if (!latest) return safeProjectionFallback(latestAuthRef.current);
     try {
       const latestAvailable = projectedSpaceIdentities(latest).filter((identity) => !(
@@ -326,7 +360,12 @@ export function GlobalSpaceTransitionController({
         ?? targetIdentity;
       const targetCandidate = readUnvalidatedReturnTarget(continuityStorage, targetIdentity)
         ?? representativeSpaceReturnTarget(targetIdentity);
-      const validation = await routeValidationLoader(targetIdentity, latest, targetCandidate);
+      const validation = await routeValidationLoader(
+        targetIdentity,
+        latest,
+        targetCandidate,
+        new AbortController().signal,
+      );
       const lastSafeTarget = continuity.read(targetIdentity, validation);
       const destination = resolveGlobalSpaceDestination({
         currentIdentity: sourceIdentity,
@@ -409,9 +448,9 @@ export function globalSpaceTransitionEpochKey(pathname: string, auth: AuthMeResp
   return `route:${pathname}`;
 }
 
-async function fetchLatestSpaceProjection(): Promise<AuthMeResponse | null> {
+async function fetchLatestSpaceProjection(signal: AbortSignal): Promise<AuthMeResponse | null> {
   try {
-    const response = await fetch("/api/bff/api/auth/me", { cache: "no-store" });
+    const response = await fetch("/api/bff/api/auth/me", { cache: "no-store", signal });
     if (!response.ok) return null;
     return await response.json() as AuthMeResponse;
   } catch {
@@ -477,13 +516,16 @@ async function defaultRouteValidation(
     && identity.perspective === "member"
     && target.pathname === `/clubs/${encodeURIComponent(identity.clubSlug)}/app/notes`
   ) {
-    const sessions = await fetchArchiveSessions({ clubSlug: identity.clubSlug }, { limit: 30 });
+    const sessions = await fetchNoteSessions({ clubSlug: identity.clubSlug }, { limit: 30 });
     const sessionIds = new Set(sessions.items.map((session) => session.sessionId));
     return { ...validation, noteSessionIds: sessionIds, availableFocusIds: sessionIds };
   }
 
-  const hostMeetingId = identity.productSpace === "clubs" && identity.perspective === "host"
-    ? /^\/clubs\/[^/]+\/app\/host\/sessions\/([^/]+)(?:\/edit)?$/.exec(target.pathname)?.[1]
+  const expectedHostSessionPrefix = identity.productSpace === "clubs" && identity.perspective === "host"
+    ? `/clubs/${encodeURIComponent(identity.clubSlug)}/app/host/sessions/`
+    : null;
+  const hostMeetingId = expectedHostSessionPrefix && target.pathname.startsWith(expectedHostSessionPrefix)
+    ? /^([^/]+)(?:\/edit)?$/.exec(target.pathname.slice(expectedHostSessionPrefix.length))?.[1]
     : null;
   if (
     identity.productSpace === "clubs"
