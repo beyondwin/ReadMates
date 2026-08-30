@@ -37,6 +37,8 @@ import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.notification.application.model.NotificationTestMailAuditItem
 import com.readmates.notification.application.model.NotificationTestMailStatus
 import com.readmates.notification.application.model.sanitizeNotificationError
+import com.readmates.notification.application.model.defaultManualBody
+import com.readmates.notification.application.model.defaultManualSubject
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventOutboxStatus
@@ -153,6 +155,9 @@ data class ManualNotificationSelectionRequest(
     val excludedMembershipIds: List<UUID>? = null,
     val includedMembershipIds: List<UUID>? = null,
     val sendMode: ManualNotificationSendMode? = null,
+    val scheduleRevision: Long? = null,
+    val subject: String? = null,
+    val body: String? = null,
 ) {
     fun toSelection(): ManualNotificationSelection =
         ManualNotificationSelection(
@@ -165,6 +170,9 @@ data class ManualNotificationSelectionRequest(
             excludedMembershipIds = excludedMembershipIds.orEmpty(),
             includedMembershipIds = includedMembershipIds.orEmpty(),
             sendMode = sendMode ?: ManualNotificationSendMode.NOW,
+            scheduleRevision = scheduleRevision ?: 0,
+            subject = subject ?: defaultManualSubject(eventType),
+            body = body ?: defaultManualBody(eventType),
         )
 }
 
@@ -178,6 +186,9 @@ data class ManualNotificationPreviewRequest(
     val excludedMembershipIds: List<UUID>? = null,
     val includedMembershipIds: List<UUID>? = null,
     val sendMode: ManualNotificationSendMode? = null,
+    val scheduleRevision: Long? = null,
+    val subject: String? = null,
+    val body: String? = null,
 ) {
     fun toCommand(): ManualNotificationPreviewCommand =
         ManualNotificationPreviewCommand(
@@ -191,6 +202,9 @@ data class ManualNotificationPreviewRequest(
                 excludedMembershipIds = excludedMembershipIds,
                 includedMembershipIds = includedMembershipIds,
                 sendMode = sendMode,
+                scheduleRevision = scheduleRevision,
+                subject = subject,
+                body = body,
             ).toSelection(),
         )
 }
@@ -207,6 +221,9 @@ data class ManualNotificationConfirmRequest(
     val includedMembershipIds: List<UUID>? = null,
     val sendMode: ManualNotificationSendMode? = null,
     val resendConfirmed: Boolean? = null,
+    val scheduleRevision: Long? = null,
+    val subject: String? = null,
+    val body: String? = null,
 ) {
     fun toCommand(): ManualNotificationConfirmCommand =
         ManualNotificationConfirmCommand(
@@ -222,6 +239,9 @@ data class ManualNotificationConfirmRequest(
                     excludedMembershipIds = excludedMembershipIds,
                     includedMembershipIds = includedMembershipIds,
                     sendMode = sendMode,
+                    scheduleRevision = scheduleRevision,
+                    subject = subject,
+                    body = body,
                 ).toSelection(),
             resendConfirmed = resendConfirmed ?: false,
         )
@@ -285,6 +305,7 @@ data class ManualNotificationSessionSummaryResponse(
     val state: String,
     val visibility: String,
     val feedbackDocumentUploaded: Boolean,
+    val scheduleRevision: Long,
 )
 
 data class ManualNotificationTemplateOptionResponse(
@@ -296,6 +317,8 @@ data class ManualNotificationTemplateOptionResponse(
     val defaultAudience: ManualNotificationAudience,
     val allowedAudiences: List<ManualNotificationAudience>,
     val defaultChannels: ManualNotificationRequestedChannels,
+    val defaultSubject: String,
+    val defaultBody: String,
 )
 
 data class ManualNotificationMemberOptionResponse(
@@ -342,6 +365,9 @@ data class ManualNotificationPreviewResponse(
     val channels: ManualNotificationChannelPreview,
     val duplicates: ManualNotificationDuplicatePreview,
     val warnings: List<ManualNotificationWarning>,
+    val scheduleRevision: Long,
+    val targetSnapshotHash: String,
+    val contentHash: String,
 )
 
 data class ManualNotificationConfirmResponse(
@@ -450,6 +476,8 @@ fun ManualNotificationOptions.toResponse(): ManualNotificationOptionsResponse =
                     defaultAudience = it.defaultAudience,
                     allowedAudiences = it.allowedAudiences.toList(),
                     defaultChannels = it.defaultChannels,
+                    defaultSubject = it.defaultSubject,
+                    defaultBody = it.defaultBody,
                 )
             },
         members = CursorPageResponse(members.map { it.toResponse() }, nextCursor),
@@ -465,6 +493,7 @@ private fun ManualNotificationSessionSummary.toResponse(): ManualNotificationSes
         state = state,
         visibility = visibility,
         feedbackDocumentUploaded = feedbackDocumentUploaded,
+        scheduleRevision = scheduleRevision,
     )
 
 private fun ManualNotificationMemberOption.toResponse(): ManualNotificationMemberOptionResponse =
@@ -515,6 +544,9 @@ fun ManualNotificationPreview.toResponse(): ManualNotificationPreviewResponse =
         channels = channels,
         duplicates = duplicates,
         warnings = warnings,
+        scheduleRevision = scheduleRevision,
+        targetSnapshotHash = targetSnapshotHash,
+        contentHash = contentHash,
     )
 
 fun ManualNotificationConfirmResult.toResponse(): ManualNotificationConfirmResponse =

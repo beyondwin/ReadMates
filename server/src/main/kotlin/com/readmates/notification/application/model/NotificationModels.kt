@@ -151,6 +151,7 @@ data class NotificationManualDispatchPayload(
     val requestedChannels: ManualNotificationRequestedChannels,
     val audience: ManualNotificationAudience,
     val contentRevision: String? = null,
+    val customCopy: ManualNotificationCopy? = null,
     val selectedMembershipIds: List<UUID>? = null,
     val excludedMembershipIds: List<UUID> = emptyList(),
     val includedMembershipIds: List<UUID> = emptyList(),
@@ -159,6 +160,12 @@ data class NotificationManualDispatchPayload(
     val emailMembershipIds: List<UUID> = emptyList(),
     val resend: Boolean = false,
     val sendMode: ManualNotificationSendMode = ManualNotificationSendMode.NOW,
+)
+
+data class ManualNotificationCopy(
+    val subject: String,
+    val body: String,
+    val contentHash: String,
 )
 
 fun defaultManualAudience(eventType: NotificationEventType): ManualNotificationAudience =
@@ -173,6 +180,26 @@ fun defaultManualAudience(eventType: NotificationEventType): ManualNotificationA
         // (see allowedManualAudiences -> emptySet). Mirror REVIEW_PUBLISHED's default for
         // the unreachable branch to keep `when` exhaustive without inventing semantics.
         NotificationEventType.AI_GENERATION_READY -> ManualNotificationAudience.SESSION_PARTICIPANTS
+    }
+
+fun defaultManualSubject(eventType: NotificationEventType): String =
+    when (eventType) {
+        NotificationEventType.NEXT_BOOK_PUBLISHED -> "다음 책 확정"
+        NotificationEventType.SESSION_REMINDER_DUE -> "모임 전날 리마인더"
+        NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED -> "피드백 문서 등록"
+        NotificationEventType.REVIEW_PUBLISHED -> "새 서평"
+        NotificationEventType.SESSION_RECORD_UPDATED -> "모임 기록 수정"
+        NotificationEventType.AI_GENERATION_READY -> "AI 모임 초안 완료"
+    }
+
+fun defaultManualBody(eventType: NotificationEventType): String =
+    when (eventType) {
+        NotificationEventType.NEXT_BOOK_PUBLISHED -> "다음 모임에서 함께 읽을 책을 확인해 주세요."
+        NotificationEventType.SESSION_REMINDER_DUE -> "모임 전 질문과 읽은 분량, 참석 상태를 확인해 주세요."
+        NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED -> "참석한 모임의 피드백 문서를 확인해 주세요."
+        NotificationEventType.REVIEW_PUBLISHED -> "새 서평을 확인해 주세요."
+        NotificationEventType.SESSION_RECORD_UPDATED -> "수정된 모임 기록을 확인해 주세요."
+        NotificationEventType.AI_GENERATION_READY -> "AI 모임 초안 결과를 확인해 주세요."
     }
 
 fun allowedManualAudiences(eventType: NotificationEventType): Set<ManualNotificationAudience> =
@@ -374,6 +401,7 @@ data class ManualNotificationSessionSummary(
     val state: String,
     val visibility: String,
     val feedbackDocumentUploaded: Boolean,
+    val scheduleRevision: Long = 0,
 )
 
 data class ManualNotificationDispatchListItem(
@@ -420,6 +448,8 @@ data class ManualNotificationTemplateOption(
     val defaultAudience: ManualNotificationAudience,
     val allowedAudiences: Set<ManualNotificationAudience>,
     val defaultChannels: ManualNotificationRequestedChannels = ManualNotificationRequestedChannels.BOTH,
+    val defaultSubject: String = label,
+    val defaultBody: String = "",
 )
 
 data class ManualNotificationMemberOption(
@@ -444,6 +474,9 @@ data class ManualNotificationSelection(
     val excludedMembershipIds: List<UUID> = emptyList(),
     val includedMembershipIds: List<UUID> = emptyList(),
     val sendMode: ManualNotificationSendMode = ManualNotificationSendMode.NOW,
+    val scheduleRevision: Long = 0,
+    val subject: String = "",
+    val body: String = "",
 )
 
 data class ManualNotificationPreviewCommand(
@@ -464,6 +497,9 @@ data class ManualNotificationPreview(
     val channels: ManualNotificationChannelPreview,
     val duplicates: ManualNotificationDuplicatePreview,
     val warnings: List<ManualNotificationWarning>,
+    val scheduleRevision: Long = 0,
+    val targetSnapshotHash: String = "",
+    val contentHash: String = "",
 )
 
 data class ManualNotificationTemplatePreview(

@@ -62,8 +62,9 @@ export function ManualNotificationWorkbench(props: ManualNotificationWorkbenchPr
   const stateKey = [
     resolvedSessionId ?? "none",
     ...props.options.templates.map(
-      (item) => `${item.eventType}:${item.contentRevision}`,
+      (item) => `${item.eventType}:${item.contentRevision}:${item.defaultSubject}:${item.defaultBody}`,
     ),
+    props.options.session?.scheduleRevision ?? 0,
   ].join("|");
 
   return (
@@ -102,6 +103,9 @@ function ManualNotificationWorkbenchState({
     sessionId: initialSessionId ?? "",
     eventType: initialTemplate?.eventType ?? "SESSION_REMINDER_DUE",
     contentRevision: initialTemplate?.contentRevision ?? "",
+    scheduleRevision: options.session?.scheduleRevision ?? 0,
+    subject: initialTemplate?.defaultSubject ?? "",
+    body: initialTemplate?.defaultBody ?? "",
     recipientMode: initialTemplate?.defaultAudience ?? "ALL_ACTIVE_MEMBERS",
     requestedChannels: initialTemplate?.defaultChannels ?? "BOTH",
     selectedMembershipIds: [],
@@ -119,6 +123,9 @@ function ManualNotificationWorkbenchState({
         sessionId: "",
         eventType: "SESSION_REMINDER_DUE",
         contentRevision: "",
+        scheduleRevision: 0,
+        subject: "",
+        body: "",
         recipientMode: "ALL_ACTIVE_MEMBERS",
         requestedChannels: "BOTH",
         selectedMembershipIds: [],
@@ -145,6 +152,9 @@ function ManualNotificationWorkbenchState({
       ...draft,
       eventType,
       contentRevision: template.contentRevision,
+      scheduleRevision: options.session?.scheduleRevision ?? 0,
+      subject: template.defaultSubject,
+      body: template.defaultBody,
       recipientMode: template.defaultAudience,
       requestedChannels: template.defaultChannels,
       selectedMembershipIds: [],

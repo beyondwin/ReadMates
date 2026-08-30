@@ -31,6 +31,7 @@ internal object ManualNotificationDispatchRows {
             feedbackDocumentVersion = resultSet.getInt("feedback_document_version").takeUnless { resultSet.wasNull() },
             sessionRecordContentRevision = resultSet.getString("session_record_content_revision"),
             participantSetRevision = resultSet.getLong("participant_set_revision"),
+            scheduleRevision = resultSet.getLong("schedule_revision"),
         )
 
     fun confirmedDispatch(

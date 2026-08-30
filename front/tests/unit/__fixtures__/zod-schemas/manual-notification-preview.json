@@ -1,0 +1,32 @@
+{
+  "previewId": "00000000-0000-0000-0000-00000000d101",
+  "expiresAt": "2026-08-30T12:10:00Z",
+  "scheduleRevision": 7,
+  "targetSnapshotHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "contentHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "template": {
+    "eventType": "SESSION_REMINDER_DUE",
+    "label": "모임 알림",
+    "subject": "호스트가 고친 제목",
+    "bodyPreview": "호스트가 고친 본문"
+  },
+  "audience": {
+    "baseGroup": "ALL_ACTIVE_MEMBERS",
+    "baseCount": 1,
+    "excludedCount": 0,
+    "includedCount": 0,
+    "finalTargetCount": 1
+  },
+  "channels": {
+    "requested": "BOTH",
+    "inAppEligibleCount": 1,
+    "emailEligibleCount": 1,
+    "emailSkippedByPreferenceCount": 0,
+    "emailMissingCount": 0
+  },
+  "duplicates": {
+    "requiresResendConfirmation": false,
+    "recentDispatches": []
+  },
+  "warnings": []
+}

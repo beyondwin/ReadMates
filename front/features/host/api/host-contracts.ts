@@ -666,6 +666,8 @@ export type ManualNotificationTemplateOption = {
   defaultAudience: ManualNotificationAudience;
   allowedAudiences: ManualNotificationAudience[];
   defaultChannels: ManualNotificationRequestedChannels;
+  defaultSubject: string;
+  defaultBody: string;
 };
 
 export type ManualNotificationMemberOption = {
@@ -675,7 +677,7 @@ export type ManualNotificationMemberOption = {
   role: MemberRole;
   membershipStatus: MembershipStatus;
   sessionParticipationStatus: SessionParticipationStatus | null;
-  attendanceStatus: AttendanceStatus | null;
+  attendanceStatus: AttendanceStatus | "CONFIRMED" | null;
   emailEligibility: ManualNotificationEligibility;
   inAppEligibility: ManualNotificationEligibility;
 };
@@ -695,6 +697,7 @@ export type ManualNotificationSessionSummary = {
   state: string;
   visibility: string;
   feedbackDocumentUploaded: boolean;
+  scheduleRevision: number;
 };
 
 export type ManualNotificationDispatchListItem = {
@@ -728,6 +731,9 @@ export type ManualNotificationSelectionRequest = {
   excludedMembershipIds: string[];
   includedMembershipIds: string[];
   sendMode: ManualNotificationSendMode;
+  scheduleRevision: number;
+  subject: string;
+  body: string;
 };
 
 export type HostNotificationPolicyResponse = {
@@ -744,6 +750,9 @@ export type ManualNotificationPreviewRequest = ManualNotificationSelectionReques
 export type ManualNotificationPreviewResponse = {
   previewId: string;
   expiresAt: string;
+  scheduleRevision: number;
+  targetSnapshotHash: string;
+  contentHash: string;
   template: {
     eventType: HostNotificationEventType;
     label: string;
@@ -795,6 +804,149 @@ export type ManualNotificationConfirmResponse = {
     expectedEmailCount: number;
   };
 };
+
+const ManualNotificationEventTypeSchema = z.enum([
+  "NEXT_BOOK_PUBLISHED",
+  "SESSION_REMINDER_DUE",
+  "FEEDBACK_DOCUMENT_PUBLISHED",
+  "SESSION_RECORD_UPDATED",
+]);
+const ManualNotificationAudienceSchema = z.enum([
+  "ALL_ACTIVE_MEMBERS",
+  "SESSION_PARTICIPANTS",
+  "CONFIRMED_ATTENDEES",
+  "SELECTED_MEMBERS",
+]);
+const ManualNotificationRequestedChannelsSchema = z.enum(["IN_APP", "EMAIL", "BOTH"]);
+const NotificationEventOutboxStatusSchema = z.enum(["PENDING", "PUBLISHING", "PUBLISHED", "FAILED", "DEAD"]);
+const Sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
+const ManualNotificationContentRevisionSchema = z.union([Sha256Schema, z.literal("")]);
+
+const ManualNotificationDispatchListItemSchema = z.object({
+  manualDispatchId: z.string().min(1),
+  eventId: z.string().min(1),
+  source: z.literal("MANUAL"),
+  eventType: ManualNotificationEventTypeSchema,
+  sessionId: z.string().min(1),
+  sessionNumber: z.number().int().positive(),
+  bookTitle: z.string(),
+  requestedChannels: ManualNotificationRequestedChannelsSchema,
+  audience: ManualNotificationAudienceSchema,
+  resend: z.boolean(),
+  requestedBy: z.string(),
+  targetCount: z.number().int().nonnegative(),
+  expectedInAppCount: z.number().int().nonnegative(),
+  expectedEmailCount: z.number().int().nonnegative(),
+  eventStatus: NotificationEventOutboxStatusSchema,
+  createdAt: z.string().min(1),
+}).strict();
+
+export const ManualNotificationDispatchListResponseSchema = z.object({
+  items: z.array(ManualNotificationDispatchListItemSchema),
+  nextCursor: z.string().nullable(),
+}).strict();
+
+export const ManualNotificationOptionsResponseSchema = z.object({
+  session: z.object({
+    sessionId: z.string().min(1),
+    sessionNumber: z.number().int().positive(),
+    bookTitle: z.string(),
+    date: z.string().nullable(),
+    state: z.string(),
+    visibility: z.string(),
+    feedbackDocumentUploaded: z.boolean(),
+    scheduleRevision: z.number().int().nonnegative(),
+  }).strict().nullable(),
+  templates: z.array(z.object({
+    eventType: ManualNotificationEventTypeSchema,
+    contentRevision: ManualNotificationContentRevisionSchema,
+    label: z.string(),
+    enabled: z.boolean(),
+    disabledReason: z.string().nullable(),
+    defaultAudience: ManualNotificationAudienceSchema,
+    allowedAudiences: z.array(ManualNotificationAudienceSchema),
+    defaultChannels: ManualNotificationRequestedChannelsSchema,
+    defaultSubject: z.string().max(200),
+    defaultBody: z.string().max(4_000),
+  }).strict()),
+  members: z.object({
+    items: z.array(z.object({
+      membershipId: z.string().min(1),
+      displayName: z.string(),
+      maskedEmail: z.string(),
+      role: z.enum(["HOST", "MEMBER"]),
+      membershipStatus: z.enum(["INVITED", "VIEWER", "ACTIVE", "SUSPENDED", "LEFT", "INACTIVE"]),
+      sessionParticipationStatus: z.enum(["ACTIVE", "REMOVED"]).nullable(),
+      attendanceStatus: z.enum(["UNKNOWN", "CONFIRMED", "ATTENDED", "ABSENT"]).nullable(),
+      emailEligibility: z.enum(["ELIGIBLE", "INELIGIBLE", "EMAIL_DISABLED", "EMAIL_MISSING"]),
+      inAppEligibility: z.enum(["ELIGIBLE", "INELIGIBLE", "EMAIL_DISABLED", "EMAIL_MISSING"]),
+    }).strict()),
+    nextCursor: z.string().nullable(),
+  }).strict(),
+  recentDispatches: z.array(ManualNotificationDispatchListItemSchema),
+}).strict();
+
+export const ManualNotificationPreviewResponseSchema = z.object({
+  previewId: z.string().min(1),
+  expiresAt: z.string().min(1),
+  scheduleRevision: z.number().int().nonnegative(),
+  targetSnapshotHash: Sha256Schema,
+  contentHash: Sha256Schema,
+  template: z.object({
+    eventType: ManualNotificationEventTypeSchema,
+    label: z.string(),
+    subject: z.string().max(200),
+    bodyPreview: z.string().max(4_000),
+  }).strict(),
+  audience: z.object({
+    baseGroup: ManualNotificationAudienceSchema,
+    baseCount: z.number().int().nonnegative(),
+    excludedCount: z.number().int().nonnegative(),
+    includedCount: z.number().int().nonnegative(),
+    finalTargetCount: z.number().int().nonnegative(),
+  }).strict(),
+  channels: z.object({
+    requested: ManualNotificationRequestedChannelsSchema,
+    inAppEligibleCount: z.number().int().nonnegative(),
+    emailEligibleCount: z.number().int().nonnegative(),
+    emailSkippedByPreferenceCount: z.number().int().nonnegative(),
+    emailMissingCount: z.number().int().nonnegative(),
+  }).strict(),
+  duplicates: z.object({
+    requiresResendConfirmation: z.boolean(),
+    recentDispatches: z.array(z.object({
+      manualDispatchId: z.string().min(1),
+      eventType: ManualNotificationEventTypeSchema,
+      requestedChannels: ManualNotificationRequestedChannelsSchema,
+      createdAt: z.string().min(1),
+      requestedBy: z.string(),
+      targetCount: z.number().int().nonnegative(),
+    }).strict()),
+  }).strict(),
+  warnings: z.array(z.object({ code: z.string(), message: z.string() }).strict()),
+}).strict();
+
+export const ManualNotificationConfirmResponseSchema = z.object({
+  manualDispatchId: z.string().min(1),
+  eventId: z.string().min(1),
+  status: NotificationEventOutboxStatusSchema,
+  createdAt: z.string().min(1),
+  summary: z.object({
+    targetCount: z.number().int().nonnegative(),
+    requestedChannels: ManualNotificationRequestedChannelsSchema,
+    expectedInAppCount: z.number().int().nonnegative(),
+    expectedEmailCount: z.number().int().nonnegative(),
+  }).strict(),
+}).strict();
+
+export const parseManualNotificationOptionsResponse = (value: unknown): ManualNotificationOptionsResponse =>
+  ManualNotificationOptionsResponseSchema.parse(value);
+export const parseManualNotificationPreviewResponse = (value: unknown): ManualNotificationPreviewResponse =>
+  ManualNotificationPreviewResponseSchema.parse(value);
+export const parseManualNotificationConfirmResponse = (value: unknown): ManualNotificationConfirmResponse =>
+  ManualNotificationConfirmResponseSchema.parse(value);
+export const parseManualNotificationDispatchListResponse = (value: unknown): ManualNotificationDispatchListResponse =>
+  ManualNotificationDispatchListResponseSchema.parse(value);
 
 export type HostNotificationMetadata = {
   sessionNumber?: number;

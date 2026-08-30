@@ -12,7 +12,13 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { HostSessionDetailResponseSchema } from "../features/host/api/host-contracts";
+import {
+  HostSessionDetailResponseSchema,
+  ManualNotificationConfirmResponseSchema,
+  ManualNotificationDispatchListResponseSchema,
+  ManualNotificationOptionsResponseSchema,
+  ManualNotificationPreviewResponseSchema,
+} from "../features/host/api/host-contracts";
 import { CurrentSessionResponseSchema } from "../shared/model/current-session-contracts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -176,6 +182,111 @@ const hostNotificationDeliveryList = {
   items: [],
   nextCursor: null,
 };
+
+const manualNotificationOptions = ManualNotificationOptionsResponseSchema.parse({
+  session: {
+    sessionId: "00000000-0000-0000-0000-000000000301",
+    sessionNumber: 1,
+    bookTitle: "공개 계약 도서",
+    date: "2026-08-30",
+    state: "OPEN",
+    visibility: "MEMBER",
+    feedbackDocumentUploaded: true,
+    scheduleRevision: 7,
+  },
+  templates: [{
+    eventType: "SESSION_REMINDER_DUE",
+    contentRevision: "a".repeat(64),
+    label: "모임 알림",
+    enabled: true,
+    disabledReason: null,
+    defaultAudience: "ALL_ACTIVE_MEMBERS",
+    allowedAudiences: ["ALL_ACTIVE_MEMBERS", "SESSION_PARTICIPANTS", "SELECTED_MEMBERS"],
+    defaultChannels: "BOTH",
+    defaultSubject: "모임을 안내합니다",
+    defaultBody: "예정된 모임 정보를 확인해 주세요.",
+  }],
+  members: {
+    items: [{
+      membershipId: "00000000-0000-0000-0000-000000000202",
+      displayName: "공개 계약 멤버",
+      maskedEmail: "m***@example.test",
+      role: "MEMBER",
+      membershipStatus: "ACTIVE",
+      sessionParticipationStatus: "ACTIVE",
+      attendanceStatus: "UNKNOWN",
+      emailEligibility: "ELIGIBLE",
+      inAppEligibility: "ELIGIBLE",
+    }],
+    nextCursor: null,
+  },
+  recentDispatches: [],
+});
+
+const manualNotificationPreview = ManualNotificationPreviewResponseSchema.parse({
+  previewId: "00000000-0000-0000-0000-00000000d101",
+  expiresAt: "2026-08-30T12:10:00Z",
+  scheduleRevision: 7,
+  targetSnapshotHash: "b".repeat(64),
+  contentHash: "c".repeat(64),
+  template: {
+    eventType: "SESSION_REMINDER_DUE",
+    label: "모임 알림",
+    subject: "호스트가 고친 제목",
+    bodyPreview: "호스트가 고친 본문",
+  },
+  audience: {
+    baseGroup: "ALL_ACTIVE_MEMBERS",
+    baseCount: 1,
+    excludedCount: 0,
+    includedCount: 0,
+    finalTargetCount: 1,
+  },
+  channels: {
+    requested: "BOTH",
+    inAppEligibleCount: 1,
+    emailEligibleCount: 1,
+    emailSkippedByPreferenceCount: 0,
+    emailMissingCount: 0,
+  },
+  duplicates: { requiresResendConfirmation: false, recentDispatches: [] },
+  warnings: [],
+});
+
+const manualNotificationConfirm = ManualNotificationConfirmResponseSchema.parse({
+  manualDispatchId: "00000000-0000-0000-0000-00000000d201",
+  eventId: "00000000-0000-0000-0000-00000000d202",
+  status: "PENDING",
+  createdAt: "2026-08-30T12:00:00Z",
+  summary: {
+    targetCount: 1,
+    requestedChannels: "BOTH",
+    expectedInAppCount: 1,
+    expectedEmailCount: 1,
+  },
+});
+
+const manualNotificationDispatchList = ManualNotificationDispatchListResponseSchema.parse({
+  items: [{
+    manualDispatchId: "00000000-0000-0000-0000-00000000d201",
+    eventId: "00000000-0000-0000-0000-00000000d202",
+    source: "MANUAL",
+    eventType: "SESSION_REMINDER_DUE",
+    sessionId: "00000000-0000-0000-0000-000000000301",
+    sessionNumber: 1,
+    bookTitle: "공개 계약 도서",
+    requestedChannels: "BOTH",
+    audience: "ALL_ACTIVE_MEMBERS",
+    resend: false,
+    requestedBy: "공개 계약 호스트",
+    targetCount: 1,
+    expectedInAppCount: 1,
+    expectedEmailCount: 1,
+    eventStatus: "PENDING",
+    createdAt: "2026-08-30T12:00:00Z",
+  }],
+  nextCursor: null,
+});
 
 // ---------------------------------------------------------------------------
 // HostInvitationListPageSchema top-level keys
@@ -536,6 +647,10 @@ write("host-session-history-recovery.json", hostSessionHistoryRecovery);
 write("host-session-trash-item.json", hostSessionTrashItem);
 write("host-session-trash-page.json", hostSessionTrashPage);
 write("host-notification-delivery-list.json", hostNotificationDeliveryList);
+write("manual-notification-options.json", manualNotificationOptions);
+write("manual-notification-preview.json", manualNotificationPreview);
+write("manual-notification-confirm.json", manualNotificationConfirm);
+write("manual-notification-dispatch-list.json", manualNotificationDispatchList);
 write("host-invitation-list.json", hostInvitationList);
 write("admin-analytics-overview.json", adminAnalyticsOverview);
 write("current-session.json", currentSession);

@@ -24,6 +24,7 @@ import com.readmates.session.application.model.AttendanceEntryCommand
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.service.HostSessionAttendanceService
 import com.readmates.shared.paging.PageRequest
+import com.readmates.shared.security.Sha256
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.toClubActor
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
@@ -466,6 +467,78 @@ class JdbcManualNotificationDispatchAdapterTest(
     }
 
     @Test
+    fun `insertPreview freezes schedule target evidence and exact custom copy`() {
+        val expiresAt = OffsetDateTime.of(2026, 5, 13, 9, 10, 0, 0, ZoneOffset.UTC)
+        val currentSelection = selection().copy(subject = "  운영 제목  ", body = "첫 줄\n둘째 줄")
+        val snapshot = adapter.previewTargets(clubId, currentSelection)
+        val context = requireNotNull(adapter.findSessionContext(clubId, sessionId))
+        val contentHash = "c".repeat(64)
+        val id = insertSnapshotPreview(expiresAt, currentSelection, snapshot, context.scheduleRevision, contentHash)
+
+        val record = requireNotNull(adapter.findPreview(id, clubId, hostMembershipId))
+
+        assertThat(record.scheduleRevision).isEqualTo(context.scheduleRevision)
+        assertThat(record.targetMembershipIds).containsExactlyElementsOf(snapshot.targetMembershipIds)
+        assertThat(record.targetSnapshotRevision).isEqualTo(targetSnapshotRevision(snapshot))
+        assertThat(record.eligibilityFingerprint).isEqualTo(eligibilityFingerprint(snapshot))
+        assertThat(record.subject).isEqualTo(currentSelection.subject)
+        assertThat(record.body).isEqualTo(currentSelection.body)
+        assertThat(record.contentHash).isEqualTo(contentHash)
+    }
+
+    @Test
+    fun `confirm dispatch payload uses exact preview copy without exposing a mutable template`() {
+        val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
+        val currentSelection = selection().copy(subject = "호스트가 고친 제목", body = "정확한 첫 줄\n정확한 둘째 줄")
+        val snapshot = adapter.previewTargets(clubId, currentSelection)
+        val context = requireNotNull(adapter.findSessionContext(clubId, sessionId))
+        val contentHash = "d".repeat(64)
+        val previewId = insertSnapshotPreview(now.plusMinutes(10), currentSelection, snapshot, context.scheduleRevision, contentHash)
+
+        val dispatch = confirmed(confirm(previewId, now, currentSelection))
+        val payload =
+            requireNotNull(
+                jdbcTemplate.queryForObject(
+                    "select payload_json from notification_event_outbox where id = ?",
+                    String::class.java,
+                    dispatch.eventId.toString(),
+                ),
+            )
+
+        assertThat(payload).contains("\"subject\": \"호스트가 고친 제목\"")
+        assertThat(payload).contains("\"body\": \"정확한 첫 줄\\n정확한 둘째 줄\"")
+        assertThat(payload).contains("\"contentHash\": \"$contentHash\"")
+    }
+
+    @Test
+    fun `confirm rejects schedule drift as stale before outbox or dispatch`() {
+        val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
+        val currentSelection = selection().copy(subject = "일정 고정 제목", body = "일정 고정 본문")
+        val snapshot = adapter.previewTargets(clubId, currentSelection)
+        val context = requireNotNull(adapter.findSessionContext(clubId, sessionId))
+        val previewId = insertSnapshotPreview(now.plusMinutes(10), currentSelection, snapshot, context.scheduleRevision, "e".repeat(64))
+
+        jdbcTemplate.update(
+            "update sessions set schedule_revision = schedule_revision + 1 where club_id = ? and id = ?",
+            clubId.toString(),
+            sessionId.toString(),
+        )
+
+        val attempt = confirm(previewId, now, currentSelection)
+
+        assertThat(attempt).isEqualTo(
+            ManualNotificationConfirmAttempt.Rejected(ManualNotificationConfirmRejection.PREVIEW_STALE),
+        )
+        assertThat(previewManualDispatchCount(previewId)).isZero()
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from notification_event_outbox where dedupe_key like 'manual:%:preview:$previewId'",
+                Int::class.java,
+            ),
+        ).isZero()
+    }
+
+    @Test
     fun `confirm waits for the preview row lock before consuming it`() {
         val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
         val currentSelection = selection()
@@ -835,7 +908,7 @@ class JdbcManualNotificationDispatchAdapterTest(
                 ),
             ).isEqualTo(
                 ManualNotificationConfirmAttempt.Rejected(
-                    ManualNotificationConfirmRejection.RECIPIENTS_CHANGED,
+                    ManualNotificationConfirmRejection.PREVIEW_STALE,
                 ),
             )
         } finally {
@@ -886,7 +959,7 @@ class JdbcManualNotificationDispatchAdapterTest(
                 ),
             ).isEqualTo(
                 ManualNotificationConfirmAttempt.Rejected(
-                    ManualNotificationConfirmRejection.RECIPIENTS_CHANGED,
+                    ManualNotificationConfirmRejection.PREVIEW_STALE,
                 ),
             )
         } finally {
@@ -1139,7 +1212,7 @@ class JdbcManualNotificationDispatchAdapterTest(
             assertThat(attempt)
                 .isEqualTo(
                     ManualNotificationConfirmAttempt.Rejected(
-                        ManualNotificationConfirmRejection.RECIPIENTS_CHANGED,
+                        ManualNotificationConfirmRejection.PREVIEW_STALE,
                     ),
                 )
             assertThat(previewManualDispatchCount(previewId)).isZero()
@@ -1181,7 +1254,7 @@ class JdbcManualNotificationDispatchAdapterTest(
             assertThat(attempt)
                 .isEqualTo(
                     ManualNotificationConfirmAttempt.Rejected(
-                        ManualNotificationConfirmRejection.RECIPIENTS_CHANGED,
+                        ManualNotificationConfirmRejection.PREVIEW_STALE,
                     ),
                 )
             assertThat(previewManualDispatchCount(previewId)).isZero()
@@ -1264,6 +1337,39 @@ class JdbcManualNotificationDispatchAdapterTest(
                 selection = selection,
                 resendConfirmed = false,
             ),
+        )
+
+    private fun insertSnapshotPreview(
+        expiresAt: OffsetDateTime,
+        selection: ManualNotificationSelection,
+        snapshot: ManualNotificationTargetSnapshot,
+        scheduleRevision: Long,
+        contentHash: String,
+    ): UUID =
+        adapter.insertPreview(
+            clubId = clubId,
+            hostMembershipId = hostMembershipId,
+            selectionHash = "a".repeat(64),
+            targetSnapshotHash = snapshot.snapshotHash(),
+            scheduleRevision = scheduleRevision,
+            targetSnapshotRevision = targetSnapshotRevision(snapshot),
+            targetMembershipIds = snapshot.targetMembershipIds,
+            eligibilityFingerprint = eligibilityFingerprint(snapshot),
+            subject = selection.subject,
+            body = selection.body,
+            contentHash = contentHash,
+            expiresAt = expiresAt,
+        )
+
+    private fun targetSnapshotRevision(snapshot: ManualNotificationTargetSnapshot): String =
+        snapshot.audienceRevision.ifBlank {
+            "members:${Sha256.hex(snapshot.targetMembershipIds.sorted().joinToString(","))}"
+        }
+
+    private fun eligibilityFingerprint(snapshot: ManualNotificationTargetSnapshot): String =
+        Sha256.hex(
+            listOf(snapshot.inAppMembershipIds.sorted(), snapshot.emailMembershipIds.sorted(), snapshot.audienceRevision)
+                .joinToString("|"),
         )
 
     private fun confirmed(

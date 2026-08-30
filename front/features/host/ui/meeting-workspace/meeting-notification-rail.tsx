@@ -80,6 +80,9 @@ function buildInitialDraft(
     sessionId: options.session.sessionId,
     eventType: "SESSION_REMINDER_DUE",
     contentRevision: template.contentRevision,
+    scheduleRevision: options.session.scheduleRevision,
+    subject: template.defaultSubject,
+    body: template.defaultBody,
     recipientMode: "SELECTED_MEMBERS",
     requestedChannels: template.defaultChannels,
     selectedMembershipIds: nonResponderIds,
@@ -131,7 +134,12 @@ export function MeetingNotificationRail({
   const [draftOverride, setDraftOverride] = useState<HostNotificationComposerDraft | null>(null);
   const draft = useMemo(() => {
     if (!draftSeed) return null;
-    if (!draftOverride || draftOverride.sessionId !== draftSeed.sessionId) {
+    if (
+      !draftOverride
+      || draftOverride.sessionId !== draftSeed.sessionId
+      || draftOverride.contentRevision !== draftSeed.contentRevision
+      || draftOverride.scheduleRevision !== draftSeed.scheduleRevision
+    ) {
       return draftSeed;
     }
     if (draftOverride.recipientMode === "SELECTED_MEMBERS") {

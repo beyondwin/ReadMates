@@ -217,6 +217,92 @@ class FrontendZodSchemaContractTest
         }
 
         @Test
+        fun `manual notification options preview confirm and dispatch responses match zod fixtures`() {
+            try {
+                val options =
+                    mockMvc
+                        .get("/api/host/notifications/manual/options") {
+                            with(user("host@example.com"))
+                            param("sessionId", seededHostSessionId)
+                        }.andExpect { status { isOk() } }
+                        .andReturn()
+                        .response.contentAsString
+                assertJsonShapeMatches(options, "manual-notification-options.json")
+                val optionsNode = objectMapper.readTree(options)
+                val template =
+                    optionsNode.get("templates").first {
+                        it.get("eventType").asString() == "FEEDBACK_DOCUMENT_PUBLISHED"
+                    }
+                val contentRevision = template.get("contentRevision").asString()
+                val scheduleRevision = optionsNode.at("/session/scheduleRevision").asLong()
+                val selection =
+                    """
+                    {
+                      "sessionId": "$seededHostSessionId",
+                      "eventType": "FEEDBACK_DOCUMENT_PUBLISHED",
+                      "contentRevision": "$contentRevision",
+                      "scheduleRevision": $scheduleRevision,
+                      "subject": "계약 미리보기 제목",
+                      "body": "계약 미리보기 본문",
+                      "audience": "CONFIRMED_ATTENDEES",
+                      "requestedChannels": "IN_APP"
+                    }
+                    """.trimIndent()
+                val preview =
+                    mockMvc
+                        .post("/api/host/notifications/manual/preview") {
+                            with(user("host@example.com"))
+                            contentType = MediaType.APPLICATION_JSON
+                            content = selection
+                        }.andExpect { status { isOk() } }
+                        .andReturn()
+                        .response.contentAsString
+                assertJsonShapeMatches(preview, "manual-notification-preview.json")
+                val previewId = objectMapper.readTree(preview).get("previewId").asString()
+                val confirm =
+                    mockMvc
+                        .post("/api/host/notifications/manual") {
+                            with(user("host@example.com"))
+                            contentType = MediaType.APPLICATION_JSON
+                            content =
+                                objectMapper.writeValueAsString(
+                                    objectMapper.readTree(selection).properties().associate { it.key to it.value } +
+                                        mapOf(
+                                            "previewId" to objectMapper.valueToTree<JsonNode>(previewId),
+                                            "resendConfirmed" to objectMapper.valueToTree<JsonNode>(false),
+                                        ),
+                                )
+                        }.andExpect { status { isOk() } }
+                        .andReturn()
+                        .response.contentAsString
+                assertJsonShapeMatches(confirm, "manual-notification-confirm.json")
+                val dispatches =
+                    mockMvc
+                        .get("/api/host/notifications/manual/dispatches") {
+                            with(user("host@example.com"))
+                            param("sessionId", seededHostSessionId)
+                        }.andExpect { status { isOk() } }
+                        .andReturn()
+                        .response.contentAsString
+                assertJsonShapeMatches(dispatches, "manual-notification-dispatch-list.json")
+            } finally {
+                jdbcTemplate.update(
+                    "delete from notification_manual_dispatches where club_id = ? and session_id = ?",
+                    "00000000-0000-0000-0000-000000000001",
+                    seededHostSessionId,
+                )
+                jdbcTemplate.update(
+                    "delete from notification_manual_dispatch_previews where club_id = ?",
+                    "00000000-0000-0000-0000-000000000001",
+                )
+                jdbcTemplate.update(
+                    "delete from notification_event_outbox where club_id = ? and dedupe_key like 'manual:%'",
+                    "00000000-0000-0000-0000-000000000001",
+                )
+            }
+        }
+
+        @Test
         fun `host invitation list response matches zod schema fixture key set`() {
             val response =
                 mockMvc

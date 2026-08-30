@@ -25,6 +25,8 @@ import {
   fetchManualNotificationOptions,
   openHostSession,
   processHostNotifications,
+  previewManualNotification,
+  confirmManualNotification,
   parseHostInvitationListResponse,
   parseHostInvitationResponse,
   publishHostSession,
@@ -141,6 +143,10 @@ function stubFetch() {
       : jsonResponse(
       url.includes("/operating-room/current")
         ? { currentMeeting: null }
+        : url.includes("/notifications/manual/options")
+          ? { session: null, templates: [], members: { items: [], nextCursor: null }, recentDispatches: [] }
+        : url.includes("/notifications/manual/dispatches")
+          ? { items: [], nextCursor: null }
         : url.includes("/visibility") || url.includes("/access-scope")
         ? { session: hostSessionDetail(), composer: null }
         : url.includes("/attendance")
@@ -183,6 +189,86 @@ afterEach(() => {
 });
 
 describe("host api wrappers", () => {
+  it("sends exact editable copy and strictly parses preview and confirm responses", async () => {
+    const preview = {
+      previewId: "preview-1",
+      expiresAt: "2026-08-30T00:10:00Z",
+      scheduleRevision: 7,
+      targetSnapshotHash: "b".repeat(64),
+      contentHash: "c".repeat(64),
+      template: {
+        eventType: "SESSION_REMINDER_DUE",
+        label: "리마인더",
+        subject: "고친 제목",
+        bodyPreview: "고친 본문",
+      },
+      audience: {
+        baseGroup: "ALL_ACTIVE_MEMBERS",
+        baseCount: 1,
+        excludedCount: 0,
+        includedCount: 0,
+        finalTargetCount: 1,
+      },
+      channels: {
+        requested: "BOTH",
+        inAppEligibleCount: 1,
+        emailEligibleCount: 1,
+        emailSkippedByPreferenceCount: 0,
+        emailMissingCount: 0,
+      },
+      duplicates: { requiresResendConfirmation: false, recentDispatches: [] },
+      warnings: [],
+    };
+    const confirm = {
+      manualDispatchId: "dispatch-1",
+      eventId: "event-1",
+      status: "PENDING",
+      createdAt: "2026-08-30T00:00:00Z",
+      summary: {
+        targetCount: 1,
+        requestedChannels: "BOTH",
+        expectedInAppCount: 1,
+        expectedEmailCount: 1,
+      },
+    };
+    const fetchMock = vi.fn().mockImplementation((url: string) => Promise.resolve(
+      url.includes("/__internal/client-contract-status")
+        ? new Response(JSON.stringify({ schemaVersion: 1, supportedHostClientContracts: ["v3"] }), {
+            headers: { "Cache-Control": "no-store", "Content-Type": "application/json" },
+          })
+        : jsonResponse(url.includes("/manual/preview") ? preview : confirm),
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+    const context = { clubSlug: "reading-sai" };
+    const selection = {
+      sessionId: "session-1",
+      eventType: "SESSION_REMINDER_DUE" as const,
+      contentRevision: "a".repeat(64),
+      audience: "ALL_ACTIVE_MEMBERS" as const,
+      requestedChannels: "BOTH" as const,
+      selectedMembershipIds: [],
+      excludedMembershipIds: [],
+      includedMembershipIds: [],
+      sendMode: "NOW" as const,
+      scheduleRevision: 7,
+      subject: "고친 제목",
+      body: "고친 본문",
+    };
+
+    await expect(previewManualNotification(selection, context)).resolves.toEqual(preview);
+    await expect(confirmManualNotification({
+      ...selection,
+      previewId: preview.previewId,
+      resendConfirmed: false,
+    }, context)).resolves.toEqual(confirm);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/manual"))
+      .map(([, init]) => JSON.parse(String((init as RequestInit).body))))
+      .toEqual([selection, { ...selection, previewId: preview.previewId, resendConfirmed: false }]);
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ...preview, providerPayload: "금지" }));
+    await expect(previewManualNotification(selection, context)).rejects.toThrow();
+  });
+
   it.each([
     "HOST_AUTHORITY_REVOKED",
     "MEMBERSHIP_SUSPENDED",

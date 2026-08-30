@@ -20,6 +20,8 @@ import com.readmates.notification.application.model.ManualNotificationTemplatePr
 import com.readmates.notification.application.model.ManualNotificationWarning
 import com.readmates.notification.application.model.allowedManualAudiences
 import com.readmates.notification.application.model.defaultManualAudience
+import com.readmates.notification.application.model.defaultManualBody
+import com.readmates.notification.application.model.defaultManualSubject
 import com.readmates.notification.application.port.`in`.ManageManualHostNotificationsUseCase
 import com.readmates.notification.application.port.out.ManualNotificationConfirmAttempt
 import com.readmates.notification.application.port.out.ManualNotificationConfirmInsertStatus
@@ -74,6 +76,8 @@ class HostManualNotificationService(
                     disabledReason = disabledReason,
                     defaultAudience = defaultManualAudience(eventType),
                     allowedAudiences = allowedManualAudiences(eventType),
+                    defaultSubject = defaultManualSubject(eventType),
+                    defaultBody = defaultManualBody(eventType),
                 )
             }
         val members = manualDispatchPort.listMembers(currentHost.clubId, sessionId, search, pageRequest)
@@ -108,32 +112,54 @@ class HostManualNotificationService(
         command: ManualNotificationPreviewCommand,
     ): ManualNotificationPreview {
         val currentHost = requireHost(host)
-        validateSelection(currentHost, command.selection)
-        val targetSnapshot = manualDispatchPort.previewTargets(currentHost.clubId, command.selection)
-        requireEligibleTarget(targetSnapshot, command.selection.requestedChannels)
+        val selection = normalizeCopy(command.selection)
+        val session = validateSelection(currentHost, selection)
+        val targetSnapshot = manualDispatchPort.previewTargets(currentHost.clubId, selection)
+        requireEligibleTarget(targetSnapshot, selection.requestedChannels)
         val recent =
             manualDispatchPort.recentDispatches(
                 currentHost.clubId,
-                command.selection.sessionId,
-                command.selection.eventType,
-                command.selection.contentRevision,
+                selection.sessionId,
+                selection.eventType,
+                selection.contentRevision,
             )
         val expiresAt = clock().plusMinutes(PREVIEW_TTL_MINUTES)
+        val targetSnapshotHash = targetSnapshot.snapshotHash()
+        val contentHash = contentHash(selection.subject, selection.body)
+        val targetSnapshotRevision =
+            targetSnapshot.audienceRevision.ifBlank {
+                "members:${Sha256.hex(targetSnapshot.targetMembershipIds.sorted().joinToString(","))}"
+            }
+        val eligibilityFingerprint =
+            Sha256.hex(
+                listOf(
+                    targetSnapshot.inAppMembershipIds.sorted(),
+                    targetSnapshot.emailMembershipIds.sorted(),
+                    targetSnapshot.audienceRevision,
+                ).joinToString("|"),
+            )
         val previewId =
             manualDispatchPort.insertPreview(
                 clubId = currentHost.clubId,
                 hostMembershipId = currentHost.membershipId,
-                selectionHash = selectionHash(command.selection),
-                targetSnapshotHash = targetSnapshot.snapshotHash(),
+                selectionHash = selectionHash(selection),
+                targetSnapshotHash = targetSnapshotHash,
+                scheduleRevision = session.scheduleRevision,
+                targetSnapshotRevision = targetSnapshotRevision,
+                targetMembershipIds = targetSnapshot.targetMembershipIds,
+                eligibilityFingerprint = eligibilityFingerprint,
+                subject = selection.subject,
+                body = selection.body,
+                contentHash = contentHash,
                 expiresAt = expiresAt,
             )
         return ManualNotificationPreview(
             previewId = previewId,
             expiresAt = expiresAt,
-            template = templatePreview(command.selection.eventType),
+            template = templatePreview(selection),
             audience =
                 ManualNotificationAudiencePreview(
-                    baseGroup = command.selection.audience,
+                    baseGroup = selection.audience,
                     baseCount = targetSnapshot.baseCount,
                     excludedCount = targetSnapshot.excludedCount,
                     includedCount = targetSnapshot.includedCount,
@@ -141,7 +167,7 @@ class HostManualNotificationService(
                 ),
             channels =
                 ManualNotificationChannelPreview(
-                    requested = command.selection.requestedChannels,
+                    requested = selection.requestedChannels,
                     inAppEligibleCount = targetSnapshot.inAppEligibleCount,
                     emailEligibleCount = targetSnapshot.emailEligibleCount,
                     emailSkippedByPreferenceCount = targetSnapshot.emailSkippedByPreferenceCount,
@@ -153,6 +179,9 @@ class HostManualNotificationService(
                     recentDispatches = recent,
                 ),
             warnings = warningsFor(targetSnapshot),
+            scheduleRevision = session.scheduleRevision,
+            targetSnapshotHash = targetSnapshotHash,
+            contentHash = contentHash,
         )
     }
 
@@ -161,15 +190,16 @@ class HostManualNotificationService(
         command: ManualNotificationConfirmCommand,
     ): ManualNotificationConfirmResult {
         val currentHost = requireHost(host)
+        val selection = normalizeCopy(command.selection)
         val attempt =
             manualDispatchPort.confirmManualDispatch(
                 ManualNotificationConfirmTransactionInput(
                     previewId = command.previewId,
                     clubId = currentHost.clubId,
                     hostMembershipId = currentHost.membershipId,
-                    selectionHash = selectionHash(command.selection),
+                    selectionHash = selectionHash(selection),
                     now = clock(),
-                    selection = command.selection,
+                    selection = selection,
                     resendConfirmed = command.resendConfirmed,
                 ),
             )
@@ -199,7 +229,7 @@ class HostManualNotificationService(
     private fun validateSelection(
         host: CurrentMember,
         selection: ManualNotificationSelection,
-    ) {
+    ): ManualNotificationSessionContext {
         if (
             selection.eventType !in manualTemplates ||
             selection.audience !in allowedManualAudiences(selection.eventType)
@@ -220,10 +250,17 @@ class HostManualNotificationService(
                 "Manual notification content revision is stale",
             )
         }
+        if (selection.scheduleRevision != 0L && selection.scheduleRevision != session.scheduleRevision) {
+            throw NotificationApplicationException(
+                NotificationApplicationError.MANUAL_NOTIFICATION_PREVIEW_STALE,
+                "Manual notification schedule revision is stale",
+            )
+        }
         val editedIds = validateSelectionShape(selection)
         if (!manualDispatchPort.validateMembershipEdits(host.clubId, editedIds)) {
             throw recipientInvalid()
         }
+        return session
     }
 
     private fun validateSelectionShape(selection: ManualNotificationSelection): Set<UUID> {
@@ -258,22 +295,15 @@ class HostManualNotificationService(
             state = state,
             visibility = visibility,
             feedbackDocumentUploaded = feedbackDocumentUploaded,
+            scheduleRevision = scheduleRevision,
         )
 
-    private fun templatePreview(eventType: NotificationEventType): ManualNotificationTemplatePreview =
+    private fun templatePreview(selection: ManualNotificationSelection): ManualNotificationTemplatePreview =
         ManualNotificationTemplatePreview(
-            eventType = eventType,
-            label = manualTemplateLabel(eventType),
-            subject = manualTemplateLabel(eventType),
-            bodyPreview =
-                when (eventType) {
-                    NotificationEventType.NEXT_BOOK_PUBLISHED -> "다음 모임에서 함께 읽을 책을 확인해 주세요."
-                    NotificationEventType.SESSION_REMINDER_DUE -> "모임 전 질문과 읽은 분량, 참석 상태를 확인해 주세요."
-                    NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED -> "참석한 모임의 피드백 문서를 확인해 주세요."
-                    NotificationEventType.REVIEW_PUBLISHED -> "새 서평을 확인해 주세요."
-                    NotificationEventType.SESSION_RECORD_UPDATED -> "수정된 모임 기록을 확인해 주세요."
-                    NotificationEventType.AI_GENERATION_READY -> "AI 모임 초안 결과를 확인해 주세요."
-                },
+            eventType = selection.eventType,
+            label = manualTemplateLabel(selection.eventType),
+            subject = selection.subject,
+            bodyPreview = selection.body,
         )
 
     private fun warningsFor(snapshot: ManualNotificationTargetSnapshot): List<ManualNotificationWarning> =
@@ -318,6 +348,9 @@ class HostManualNotificationService(
                 selection.excludedMembershipIds.sorted(),
                 selection.includedMembershipIds.sorted(),
                 selection.sendMode,
+                selection.scheduleRevision,
+                selection.subject,
+                selection.body,
             ).joinToString("|")
         return Sha256.hex(raw)
     }
@@ -409,6 +442,11 @@ class HostManualNotificationService(
                     NotificationApplicationError.MANUAL_NOTIFICATION_RECIPIENTS_CHANGED,
                     "Manual notification recipients changed after preview",
                 )
+            ManualNotificationConfirmRejection.PREVIEW_STALE ->
+                NotificationApplicationException(
+                    NotificationApplicationError.MANUAL_NOTIFICATION_PREVIEW_STALE,
+                    "Manual notification preview is stale",
+                )
             ManualNotificationConfirmRejection.AUDIENCE_EMPTY ->
                 NotificationApplicationException(
                     NotificationApplicationError.MANUAL_NOTIFICATION_AUDIENCE_EMPTY,
@@ -416,8 +454,25 @@ class HostManualNotificationService(
                 )
         }
 
+    private fun normalizeCopy(selection: ManualNotificationSelection): ManualNotificationSelection {
+        val subject = selection.subject.replace("\r\n", "\n").replace('\r', '\n').trim()
+        val body = selection.body.replace("\r\n", "\n").replace('\r', '\n').trim()
+        if (subject.isEmpty() || body.isEmpty() || subject.length > MAX_SUBJECT_LENGTH || body.length > MAX_BODY_LENGTH) {
+            throw NotificationApplicationException(
+                NotificationApplicationError.MANUAL_NOTIFICATION_COPY_INVALID,
+                "Manual notification copy is invalid",
+            )
+        }
+        return selection.copy(subject = subject, body = body)
+    }
+
+    private fun contentHash(subject: String, body: String): String =
+        Sha256.hex("${subject.length}:$subject|${body.length}:$body")
+
     private companion object {
         private const val PREVIEW_TTL_MINUTES = 10L
+        private const val MAX_SUBJECT_LENGTH = 200
+        private const val MAX_BODY_LENGTH = 4_000
         private val manualTemplates =
             listOf(
                 NotificationEventType.NEXT_BOOK_PUBLISHED,
