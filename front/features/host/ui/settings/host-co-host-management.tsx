@@ -5,10 +5,7 @@ import type {
 } from "@/features/host/model/host-settings-model";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 
-const isPermissionFailure = (error: unknown) =>
-  error instanceof Error && /PERMISSION|LAST_HOST|FORBIDDEN|403/.test(error.message);
-const isStaleFailure = (error: unknown) =>
-  error instanceof Error && /STALE|REVISION|409/.test(error.message);
+type ChangeFailureKind = "stale" | "permission" | "unknown" | "rejected";
 
 export function HostCoHostManagement({
   settingsRevision,
@@ -16,12 +13,14 @@ export function HostCoHostManagement({
   busy,
   onChange,
   onRefresh,
+  classifyChangeError = () => "unknown",
 }: {
   settingsRevision: number;
   members: HostCoHostMemberView[];
   busy: boolean;
   onChange: (request: HostCoHostChangeRequest) => Promise<unknown>;
   onRefresh: () => Promise<unknown> | void;
+  classifyChangeError?: (error: unknown) => ChangeFailureKind;
 }) {
   const [pending, setPending] = useState<HostCoHostChangeRequest | null>(null);
   const [alert, setAlert] = useState<string | null>(null);
@@ -33,13 +32,16 @@ export function HostCoHostManagement({
       setPending(null);
       await onRefresh();
     } catch (error) {
-      setPending(request);
+      const failure = classifyChangeError(error);
+      setPending(failure === "unknown" ? request : null);
       await onRefresh();
-      setAlert(isPermissionFailure(error)
+      setAlert(failure === "permission"
         ? "서버가 현재 호스트 권한 변경을 허용하지 않았습니다. 최신 운영 상태를 확인해 주세요."
-        : isStaleFailure(error)
-          ? "설정 revision이 변경되었습니다. 최신 운영 상태에서 같은 요청을 확인해 주세요."
-          : "권한 변경 결과를 확인할 수 없습니다. 최신 상태를 확인한 뒤 같은 요청으로 다시 확인할 수 있습니다.");
+        : failure === "stale"
+          ? "설정 revision이 변경되었습니다. 최신 운영 상태에서 새 요청을 만들어 주세요."
+          : failure === "unknown"
+            ? "권한 변경 결과를 확인할 수 없습니다. 최신 상태를 확인한 뒤 같은 요청으로 다시 확인할 수 있습니다."
+            : "서버가 권한 변경 요청을 거절했습니다. 최신 운영 상태에서 새 요청을 만들어 주세요.");
     }
   }
 

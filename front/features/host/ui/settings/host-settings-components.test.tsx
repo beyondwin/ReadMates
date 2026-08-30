@@ -76,7 +76,7 @@ describe("host settings controls", () => {
     const user = userEvent.setup();
     const preview: HostClubClosePreview = { previewId: "preview-1", clubId: "club-1", actorMembershipId: "member-1", clubRevision: 3, effectHash: "a".repeat(64), effects: { clubStatus: "ARCHIVED", memberAccess: "ENDED", publicRecords: "UNCHANGED" }, expiresAt: "2026-08-30T01:00:00Z" };
     const onPreview = vi.fn().mockResolvedValue(preview);
-    const onConfirm = vi.fn().mockRejectedValue(new Error("NETWORK"));
+    const onConfirm = vi.fn().mockRejectedValue(new Error("indeterminate transport"));
     const onRefresh = vi.fn().mockResolvedValue(undefined);
     render(<HostClubCloseDialog open onClose={vi.fn()} onPreview={onPreview} onConfirm={onConfirm} onRefresh={onRefresh} />);
     expect(screen.queryByRole("button", { name: "클럽 운영 종료 확인" })).not.toBeInTheDocument();
@@ -95,7 +95,7 @@ describe("host settings controls", () => {
   it("uses the visible settings revision and one idempotency key while reconciling a co-host change", async () => {
     const user = userEvent.setup();
     const change = vi.fn()
-      .mockRejectedValueOnce(new Error("NETWORK"))
+      .mockRejectedValueOnce(new Error("indeterminate transport"))
       .mockResolvedValueOnce(undefined);
     const refresh = vi.fn().mockResolvedValue(undefined);
     render(
@@ -156,16 +156,53 @@ describe("host settings controls", () => {
     expect(screen.queryByText("internal stack detail")).not.toBeInTheDocument();
   });
 
-  it("clears an expired close preview and requires a fresh explicit preview", async () => {
+  it.each([
+    ["HOST_CLUB_CLOSE_PREVIEW_EXPIRED", 409],
+    ["HOST_CLUB_CLOSE_PREVIEW_MISMATCH", 409],
+    ["HOST_CLUB_CLOSE_PREVIEW_NOT_FOUND", 404],
+    ["HOST_CLUB_CLOSE_PREVIEW_CONSUMED", 409],
+    ["HOST_SETTINGS_STALE", 409],
+  ])("clears a non-current close preview for %s and cannot reconfirm it", async (code, status) => {
     const user = userEvent.setup();
-    const preview: HostClubClosePreview = { previewId: "preview-1", clubId: "club-1", actorMembershipId: "member-1", clubRevision: 3, effectHash: "a".repeat(64), effects: { clubStatus: "ARCHIVED", memberAccess: "ENDED", publicRecords: "UNCHANGED" }, expiresAt: "2026-08-30T01:00:00Z" };
-    const onConfirm = vi.fn().mockRejectedValue(new Error("PREVIEW_EXPIRED"));
-    render(<HostClubCloseDialog open onClose={vi.fn()} onPreview={vi.fn().mockResolvedValue(preview)} onConfirm={onConfirm} onRefresh={vi.fn()} />);
+    const firstPreview: HostClubClosePreview = { previewId: "preview-1", clubId: "club-1", actorMembershipId: "member-1", clubRevision: 3, effectHash: "a".repeat(64), effects: { clubStatus: "ARCHIVED", memberAccess: "ENDED", publicRecords: "UNCHANGED" }, expiresAt: "2026-08-30T01:00:00Z" };
+    const nextPreview: HostClubClosePreview = { ...firstPreview, previewId: "preview-2", clubRevision: 4, effectHash: "b".repeat(64) };
+    const onPreview = vi.fn().mockResolvedValueOnce(firstPreview).mockResolvedValueOnce(nextPreview);
+    const rejection = new Error(`${code}:${status}`);
+    const onConfirm = vi.fn().mockRejectedValueOnce(rejection).mockResolvedValueOnce(undefined);
+    render(<HostClubCloseDialog open onClose={vi.fn()} onPreview={onPreview} onConfirm={onConfirm} onRefresh={vi.fn()} classifyConfirmError={(error) => error === rejection ? "non-current" : "unknown"} />);
     await user.click(screen.getByRole("button", { name: "종료 영향 미리보기" }));
     await user.click(await screen.findByRole("button", { name: "클럽 운영 종료 확인" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("미리보기가 더 이상 유효하지 않습니다");
     expect(screen.queryByText("공개 기록은 유지됩니다.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "같은 종료 요청 다시 확인" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "새 종료 영향 미리보기" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "새 종료 영향 미리보기" }));
+    await user.click(await screen.findByRole("button", { name: "클럽 운영 종료 확인" }));
+    expect(onConfirm.mock.calls[1][0]).toMatchObject({ previewId: "preview-2", effectHash: "b".repeat(64) });
+    expect(onConfirm.mock.calls[1][0].idempotencyKey).not.toBe(onConfirm.mock.calls[0][0].idempotencyKey);
+  });
+
+  it.each([
+    ["HOST_SETTINGS_STALE", 409, "revision"],
+    ["LAST_ACTIVE_HOST_REQUIRED", 409, "허용하지 않았습니다"],
+    ["PERMISSION_DENIED", 403, "허용하지 않았습니다"],
+  ])("clears a rejected co-host request for %s before a fresh logical attempt", async (code, status, copy) => {
+    const user = userEvent.setup();
+    const rejection = new Error(`${code}:${status}`);
+    const change = vi.fn().mockRejectedValueOnce(rejection).mockResolvedValueOnce(undefined);
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    const member = { membershipId: "membership-1", displayName: "은하", avatarKey: "cloud-green-book", status: "ACTIVE", role: "MEMBER" } as const;
+    const classifyChangeError = () => code === "HOST_SETTINGS_STALE" ? "stale" as const : "permission" as const;
+    const { rerender } = render(<HostCoHostManagement settingsRevision={7} members={[member]} busy={false} onChange={change} onRefresh={refresh} classifyChangeError={classifyChangeError} />);
+
+    await user.click(screen.getByRole("button", { name: "은하 공동 호스트 지정" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(copy);
+    expect(screen.queryByRole("button", { name: "같은 권한 변경 요청 다시 확인" })).not.toBeInTheDocument();
+
+    rerender(<HostCoHostManagement settingsRevision={8} members={[member]} busy={false} onChange={change} onRefresh={refresh} classifyChangeError={classifyChangeError} />);
+    await user.click(screen.getByRole("button", { name: "은하 공동 호스트 지정" }));
+    expect(change.mock.calls[1][0].expectedRevision).toBe(8);
+    expect(change.mock.calls[1][0].idempotencyKey).not.toBe(change.mock.calls[0][0].idempotencyKey);
   });
 
   it("offers a retry when close preview loading fails", async () => {

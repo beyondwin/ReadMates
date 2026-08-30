@@ -39,3 +39,12 @@
 - The repository-wide TypeScript command is not green because of established baseline debt. The five diagnostics whose file names intersect this task are on unchanged base lines (`HostSessionAttentionSummary` fixture and existing `HostMembersActions` test fixtures); no new Task 8 file diagnostic appeared.
 - A separate typography contract still reports the base Task 7 `host-workbox.css` use of `--font-editorial`. That file is byte-identical to Task 8 base and was not reopened under the task authority.
 - Tests use synthetic fixtures and mocked/no-op callbacks. No real club close, email, OAuth, notification, member-role mutation, deployment, push, PR or tag occurred.
+
+## Review round 1 closure — definitive rejection versus unknown reconciliation
+
+The two IMPORTANT settings-recovery findings were closed together without changing another Task 8 destination:
+
+- Club-end confirmation no longer interprets `Error.message`. `ReadmatesApiError` code/status now distinguishes expired, mismatch, not-found, consumed, settings-stale and fallback non-current preview responses. Every definitive API rejection clears both the rendered preview and bound confirm request, exposes fresh-preview recovery, and cannot reconfirm the old preview or reuse its idempotency key. Only a transport or otherwise indeterminate non-API result retains the exact confirm request for same-request reconciliation.
+- Co-host recovery now classifies `HOST_SETTINGS_STALE`, `LAST_ACTIVE_HOST_REQUIRED`, permission status/code and transport uncertainty through the parsed API error contract. Stale, permission and other definitive server rejections clear the pending request; after the settings/members/history refetch, the next operator action uses the newly rendered revision and a new idempotency key. Only `ReadmatesTransportError` retains the exact request/key.
+
+TDD evidence: realistic `ReadmatesApiError` fixtures with non-semantic user messages first produced 8 failures with 8 existing component passes. After routing API interpretation through the architecture-safe recovery adapter, the component file passed 16/16 and the final focused component/recovery/dependency-boundary set passed 41/41. Exact six-file ESLint completed with 0 errors and 0 warnings; focused diff and added-line public-safety checks were clean. The unchanged six-surface CT and other destination evidence remain sealed because this review only changed error disposition and focused tests. The six-file delta is sealed by `task-8-review-1-manifest.sha256`.

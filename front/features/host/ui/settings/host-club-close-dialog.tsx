@@ -2,10 +2,7 @@ import { useState } from "react";
 import type { HostClosePreviewView } from "@/features/host/model/host-settings-model";
 
 type ConfirmRequest = { previewId: string; effectHash: string; idempotencyKey: string };
-type Recovery = "unknown" | "expired" | null;
-
-const isExpiredPreview = (error: unknown) =>
-  error instanceof Error && /PREVIEW_(?:EXPIRED|STALE)|STALE_PREVIEW|410/.test(error.message);
+type Recovery = "unknown" | "non-current" | "rejected" | null;
 
 export function HostClubCloseDialog({
   open,
@@ -13,12 +10,14 @@ export function HostClubCloseDialog({
   onPreview,
   onConfirm,
   onRefresh,
+  classifyConfirmError = () => "unknown",
 }: {
   open: boolean;
   onClose: () => void;
   onPreview: () => Promise<HostClosePreviewView>;
   onConfirm: (request: ConfirmRequest) => Promise<unknown>;
   onRefresh: () => Promise<unknown> | void;
+  classifyConfirmError?: (error: unknown) => Exclude<Recovery, null>;
 }) {
   const [preview, setPreview] = useState<HostClosePreviewView | null>(null);
   const [busy, setBusy] = useState(false);
@@ -58,7 +57,13 @@ export function HostClubCloseDialog({
       await onRefresh();
     } catch (error) {
       setPreview(null);
-      setRecovery(isExpiredPreview(error) ? "expired" : "unknown");
+      const disposition = classifyConfirmError(error);
+      if (disposition === "non-current" || disposition === "rejected") {
+        setConfirmRequest(null);
+        setRecovery(disposition);
+      } else {
+        setRecovery("unknown");
+      }
       await onRefresh();
     } finally {
       setBusy(false);
@@ -71,7 +76,7 @@ export function HostClubCloseDialog({
       <p>종료는 멤버 접근을 끝내는 고위험 작업입니다. 먼저 현재 revision에 묶인 영향을 확인합니다.</p>
       {!preview ? (
         <button disabled={busy} type="button" onClick={() => { void loadPreview(); }}>
-          {recovery === "expired"
+          {recovery === "non-current" || recovery === "rejected"
             ? "새 종료 영향 미리보기"
             : previewError ? "미리보기 다시 시도" : "종료 영향 미리보기"}
         </button>
@@ -88,8 +93,10 @@ export function HostClubCloseDialog({
       {previewError ? <p role="alert">종료 영향을 불러오지 못했습니다. 같은 화면에서 다시 시도할 수 있습니다.</p> : null}
       {recovery ? (
         <div role="alert" className="stack">
-          <p>{recovery === "expired"
+          <p>{recovery === "non-current"
             ? "미리보기가 더 이상 유효하지 않습니다. 최신 상태를 확인하고 새 미리보기를 명시적으로 요청해 주세요."
+            : recovery === "rejected"
+              ? "기존 종료 요청은 서버가 거절했습니다. 최신 상태를 확인하고 새 미리보기를 명시적으로 요청해 주세요."
             : "결과를 확인할 수 없습니다. 최신 클럽 상태를 확인하거나 같은 종료 요청으로 다시 확인해 주세요."}</p>
           <button type="button" onClick={() => { void onRefresh(); }}>최신 클럽 상태 확인</button>
           {confirmRequest ? (

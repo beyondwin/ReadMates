@@ -16,6 +16,10 @@ import { HostClubSettings } from "@/features/host/ui/settings/host-club-settings
 import { HostCoHostManagement } from "@/features/host/ui/settings/host-co-host-management";
 import { HostInvitationLinks } from "@/features/host/ui/settings/host-invitation-links";
 import { HostSettingsHistory } from "@/features/host/ui/settings/host-settings-history";
+import {
+  hostCloseConfirmErrorDisposition,
+  hostCoHostErrorDisposition,
+} from "./host-settings-recovery";
 
 export function HostSettingsRoute() {
   const { clubSlug = "" } = useParams<{ clubSlug: string }>();
@@ -73,6 +77,7 @@ function ScopedHostSettingsRoute({ clubSlug }: { clubSlug: string }) {
         busy={changeCoHost.isPending}
         onChange={(request) => changeCoHost.mutateAsync(request)}
         onRefresh={refreshSettingsSurface}
+        classifyChangeError={hostCoHostErrorDisposition}
       />
     ) : null}
     {members.isError ? <section className="surface-quiet" role="alert">공동 호스트 후보를 불러오지 못했습니다.</section> : null}
@@ -85,6 +90,6 @@ function ScopedHostSettingsRoute({ clubSlug }: { clubSlug: string }) {
     ) : null}
     {history.isPending ? <section className="surface-quiet" role="status">설정 변경 이력을 불러오는 중입니다.</section> : null}
     {history.isError ? <section className="surface-quiet" role="alert">설정 변경 이력을 불러오지 못했습니다.</section> : null}
-    <section className="surface-quiet stack rm-host-editorial-ledger__panel"><h2>클럽 운영 종료</h2><p className="small muted">종료 전 영향을 미리 확인하고 같은 확인 내용으로만 실행합니다.</p><button className="btn-quiet" type="button" onClick={() => setCloseOpen(true)}>종료 검토</button><HostClubCloseDialog open={closeOpen} onClose={() => setCloseOpen(false)} onPreview={() => previewClose.mutateAsync()} onConfirm={(request) => confirmClose.mutateAsync(request)} onRefresh={refreshSettingsSurface} /></section>
+    <section className="surface-quiet stack rm-host-editorial-ledger__panel"><h2>클럽 운영 종료</h2><p className="small muted">종료 전 영향을 미리 확인하고 같은 확인 내용으로만 실행합니다.</p><button className="btn-quiet" type="button" onClick={() => setCloseOpen(true)}>종료 검토</button><HostClubCloseDialog open={closeOpen} onClose={() => setCloseOpen(false)} onPreview={() => previewClose.mutateAsync()} onConfirm={(request) => confirmClose.mutateAsync(request)} onRefresh={refreshSettingsSurface} classifyConfirmError={hostCloseConfirmErrorDisposition} /></section>
   </>;
 }
