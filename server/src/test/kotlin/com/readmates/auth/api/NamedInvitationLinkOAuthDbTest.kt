@@ -68,6 +68,48 @@ class NamedInvitationLinkOAuthDbTest(
                 created.link.linkId.toString(),
             ),
         ).isEqualTo(1)
+        val acceptedHashes =
+            jdbc.queryForMap(
+                "select idempotency_key_hash, request_hash from host_invitation_link_events where link_id = ? and action = 'ACCEPTED'",
+                created.link.linkId.toString(),
+            )
+        assertThat(acceptedHashes.values.map { it.toString() })
+            .doesNotContain(
+                com.readmates.shared.security.TokenHashing.sha256("named-accept:${created.link.linkId}:task4-named-google"),
+                com.readmates.shared.security.TokenHashing.sha256("named-accept:${created.link.linkId}:task4.named@example.com"),
+            )
+    }
+
+    @Test
+    fun `concurrent identical create commands converge to one event and one disclosed path`() {
+        val actor = hostActor()
+        val command = CreateHostInvitationLinkCommand("동시 생성 링크", 3, OffsetDateTime.now(ZoneOffset.UTC).plusDays(2), "same-create-key")
+        val results = concurrently { links.create(actor, command) }
+
+        assertThat(results).allMatch { it.isSuccess }
+        val values = results.map { it.getOrThrow() }
+        assertThat(values.map { it.receipt.receiptId }.distinct()).hasSize(1)
+        assertThat(values.count { it.oneTimeSharePath != null }).isEqualTo(1)
+        assertThat(jdbc.queryForObject("select count(*) from host_invitation_links where name = '동시 생성 링크'", Int::class.java)).isEqualTo(1)
+        assertThat(jdbc.queryForObject("select count(*) from host_invitation_link_events where link_id = ?", Int::class.java, values.first().link.linkId.toString())).isEqualTo(1)
+    }
+
+    @Test
+    fun `concurrent identical updates converge while conflicting canonical command conflicts`() {
+        val actor = hostActor()
+        val created = links.create(actor, CreateHostInvitationLinkCommand("동시 수정 링크", 3, OffsetDateTime.now(ZoneOffset.UTC).plusDays(2), "update-race-create"))
+        val command = UpdateHostInvitationLinkCommand(0, "동시 수정 완료", 5, created.link.expiresAt.plusDays(1), HostInvitationLinkStatus.PAUSED, "same-update-key")
+        val results = concurrently { links.update(actor, created.link.linkId, command) }
+
+        assertThat(results).allMatch { it.isSuccess }
+        val values = results.map { it.getOrThrow() }
+        assertThat(values.map { it.receipt.receiptId }.distinct()).hasSize(1)
+        assertThat(values.map { it.link.revision }).containsOnly(1L)
+        assertThat(jdbc.queryForObject("select count(*) from host_invitation_link_events where link_id = ? and action = 'UPDATED'", Int::class.java, created.link.linkId.toString())).isEqualTo(1)
+
+        assertThatThrownBy {
+            links.update(actor, created.link.linkId, command.copy(name = "충돌", idempotencyKey = "same-update-key"))
+        }.isInstanceOf(InvitationDomainException::class.java).extracting("code").isEqualTo("INVITATION_LINK_IDEMPOTENCY_CONFLICT")
     }
 
     @Test
@@ -165,11 +207,23 @@ class NamedInvitationLinkOAuthDbTest(
         )
     }
 
+    private fun <T> concurrently(block: () -> T): List<Result<T>> {
+        val start = CountDownLatch(1)
+        val pool = Executors.newFixedThreadPool(2)
+        return try {
+            val futures = List(2) { pool.submit<Result<T>> { start.await(); runCatching(block) } }
+            start.countDown()
+            futures.map { it.get() }
+        } finally {
+            pool.shutdownNow()
+        }
+    }
+
     companion object {
         const val CLEANUP = """
             delete from host_invitation_link_events where link_id in (select id from host_invitation_links where name = '신규 멤버 링크');
-            delete from host_invitation_link_events where link_id in (select id from host_invitation_links where name in ('차단 링크','마지막 한 자리'));
-            delete from host_invitation_links where name in ('신규 멤버 링크','차단 링크','마지막 한 자리');
+            delete from host_invitation_link_events where link_id in (select id from host_invitation_links where name in ('차단 링크','마지막 한 자리','동시 생성 링크','동시 수정 링크','동시 수정 완료'));
+            delete from host_invitation_links where name in ('신규 멤버 링크','차단 링크','마지막 한 자리','동시 생성 링크','동시 수정 링크','동시 수정 완료');
             delete from memberships where user_id in (select id from users where email like 'task4.%@example.com');
             delete from users where email like 'task4.%@example.com';
         """

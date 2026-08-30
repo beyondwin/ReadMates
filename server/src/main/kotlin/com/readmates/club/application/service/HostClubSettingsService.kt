@@ -259,7 +259,10 @@ class HostClubSettingsService(
         val name = command.name.trim().takeIf { it.length in 1..120 } ?: bad("INVALID_CLUB_NAME", "Club name must be 1 to 120 characters")
         val zone =
             command.defaultTimezone.trim().also {
-                runCatching { ZoneId.of(it) }.getOrElse { bad("INVALID_DEFAULT_TIMEZONE", "Timezone must be a valid IANA identifier") }
+                if (it !in ZoneId.getAvailableZoneIds()) {
+                    bad("INVALID_DEFAULT_TIMEZONE", "Timezone must be a valid IANA region identifier")
+                }
+                ZoneId.of(it)
             }
         return command.copy(name = name, defaultTimezone = zone, idempotencyKey = normalizeKey(command.idempotencyKey))
     }

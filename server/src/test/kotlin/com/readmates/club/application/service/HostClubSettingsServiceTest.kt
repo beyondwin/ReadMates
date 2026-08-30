@@ -110,6 +110,20 @@ class HostClubSettingsServiceTest {
                 ),
             )
         }.extracting("code").isEqualTo("INVALID_DEFAULT_TIMEZONE")
+        assertThatThrownBy {
+            service.update(
+                actor,
+                UpdateHostClubSettingsCommand(
+                    0,
+                    "변경",
+                    HostClubApprovalPolicy.INVITE_ONLY,
+                    "+09:00",
+                    true,
+                    HostClubRecordPublicationDefault.MEMBER,
+                    "fixed-offset-zone",
+                ),
+            )
+        }.extracting("code").isEqualTo("INVALID_DEFAULT_TIMEZONE")
         assertThat(store.history).isEmpty()
     }
 

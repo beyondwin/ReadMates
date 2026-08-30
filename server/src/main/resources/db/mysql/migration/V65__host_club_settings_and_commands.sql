@@ -41,6 +41,7 @@ create table host_club_command_receipts (
   safe_result_json json not null,
   occurred_at datetime(6) not null,
   primary key (id),
+  unique key host_club_command_receipts_id_club_uk (id, club_id),
   unique key host_club_command_receipts_command_uk (club_id, actor_membership_id, idempotency_key_hash),
   key host_club_command_receipts_page_idx (club_id, occurred_at, id),
   constraint host_club_command_receipts_club_fk foreign key (club_id) references clubs(id) on delete cascade,
@@ -63,7 +64,7 @@ create table host_club_close_previews (
   key host_club_close_previews_target_idx (club_id, expires_at, id),
   constraint host_club_close_previews_club_fk foreign key (club_id) references clubs(id) on delete cascade,
   constraint host_club_close_previews_actor_fk foreign key (actor_membership_id, club_id) references memberships(id, club_id),
-  constraint host_club_close_previews_receipt_fk foreign key (consumed_receipt_id) references host_club_command_receipts(id),
+  constraint host_club_close_previews_receipt_fk foreign key (consumed_receipt_id, club_id) references host_club_command_receipts(id, club_id),
   constraint host_club_close_previews_revision_check check (club_revision >= 0),
   constraint host_club_close_previews_json_check check (json_type(effects_json) = 'OBJECT'),
   constraint host_club_close_previews_expiry_check check (expires_at > created_at)

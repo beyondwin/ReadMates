@@ -49,6 +49,8 @@ data class StoredHostInvitationLinkEvent(
 )
 
 interface HostInvitationLinkStorePort {
+    fun lockClub(clubId: UUID)
+
     fun findCommand(
         clubId: UUID,
         actorMembershipId: UUID,

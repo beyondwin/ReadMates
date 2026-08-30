@@ -41,6 +41,7 @@ class HostInvitationLinkService(
         val normalized = normalize(command)
         val keyHash = hashKey(normalized.idempotencyKey)
         val requestHash = createRequestHash(normalized)
+        store.lockClub(actor.clubId)
         store.findCommand(actor.clubId, actor.membershipId, keyHash)?.let { replay ->
             requireMatchingReplay(replay.requestHash, requestHash)
             val link = store.findForUpdate(actor.clubId, replay.linkId) ?: notFound()
@@ -91,6 +92,7 @@ class HostInvitationLinkService(
         val normalized = normalize(command)
         val keyHash = hashKey(normalized.idempotencyKey)
         val requestHash = updateRequestHash(linkId, normalized)
+        store.lockClub(actor.clubId)
         store.findCommand(actor.clubId, actor.membershipId, keyHash)?.let { replay ->
             requireMatchingReplay(replay.requestHash, requestHash)
             val link = store.findForUpdate(actor.clubId, replay.linkId) ?: notFound()

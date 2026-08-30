@@ -23,6 +23,7 @@ import { CurrentSessionResponseSchema } from "../shared/model/current-session-co
 import { HostPersonDetailSchema } from "../features/host/api/host-person-contracts";
 import { HostInvitationLinkHistorySchema, HostInvitationLinkListSchema } from "../features/host/api/host-invitation-link-contracts";
 import { HostClubClosePreviewSchema, HostClubCloseResultSchema, HostClubSettingsSchema } from "../features/host/api/host-club-settings-contracts";
+import { InvitationPreviewResponseSchema } from "../features/auth/api/auth-contracts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, "../tests/unit/__fixtures__/zod-schemas");
@@ -35,6 +36,8 @@ const hostInvitationLinkHistory = HostInvitationLinkHistorySchema.parse({ items:
 const hostClubSettings = HostClubSettingsSchema.parse({ clubId: "00000000-0000-0000-0000-000000000101", clubSlug: "reading-sai", name: "Public fixture club", approvalPolicy: "INVITE_ONLY", defaultTimezone: "Asia/Seoul", scheduleReminderEnabled: true, recordPublicationDefault: "MEMBER", revision: 0, status: "ACTIVE" });
 const hostClubClosePreview = HostClubClosePreviewSchema.parse({ previewId: "00000000-0000-0000-0000-00000000e103", clubId: hostClubSettings.clubId, actorMembershipId: "00000000-0000-0000-0000-000000000201", clubRevision: 0, effectHash: "a".repeat(64), effects: { clubStatus: "ARCHIVED", memberAccess: "ENDED", publicRecords: "UNCHANGED" }, expiresAt: "2026-08-30T01:00:00Z" });
 const hostClubCloseResult = HostClubCloseResultSchema.parse({ receiptId: "00000000-0000-0000-0000-00000000e104", status: "ARCHIVED", revision: 1, replayed: false });
+const invitationPreviewEmail = InvitationPreviewResponseSchema.parse({ invitationType: "EMAIL", clubSlug: "reading-sai", clubName: "Public fixture club", canonicalPath: `/clubs/reading-sai/invite/${"e".repeat(43)}`, email: "member@example.test", name: "Public fixture member", emailHint: "m***@example.test", status: "PENDING", expiresAt: "2026-09-30T00:00:00Z", canAccept: true });
+const invitationPreviewNamedLink = InvitationPreviewResponseSchema.parse({ invitationType: "NAMED_LINK", clubSlug: "reading-sai", clubName: "Public fixture club", canonicalPath: `/clubs/reading-sai/invite/lnk_${"n".repeat(43)}`, email: null, name: null, emailHint: null, status: "PENDING", expiresAt: "2026-09-30T00:00:00Z", canAccept: true });
 
 // ---------------------------------------------------------------------------
 // HostSessionDetailResponseSchema top-level keys
@@ -707,5 +710,7 @@ write("host-invitation-link-history.json", hostInvitationLinkHistory);
 write("host-club-settings.json", hostClubSettings);
 write("host-club-close-preview.json", hostClubClosePreview);
 write("host-club-close-result.json", hostClubCloseResult);
+write("invitation-preview-email.json", invitationPreviewEmail);
+write("invitation-preview-named-link.json", invitationPreviewNamedLink);
 writeTopLevel("host-invitation-links.json", { items: [], nextCursor: null });
 writeTopLevel("host-club-settings.json", hostClubSettings);

@@ -15,7 +15,7 @@ export const HostInvitationLinkSchema = z.object({
 }).strict().refine((value) => value.usedCount <= value.maxUses, "usedCount exceeds maxUses");
 
 export const HostInvitationLinkListSchema = z.object({ items: z.array(HostInvitationLinkSchema), nextCursor: z.string().min(1).nullable() }).strict();
-export const HostInvitationLinkCreateResultSchema = z.object({ link: HostInvitationLinkSchema, oneTimeSharePath: z.string().regex(/^\/clubs\/[a-z0-9-]+\/invite\/lnk_[A-Za-z0-9_-]{6,}$/).nullable(), receipt: ReceiptSchema }).strict();
+export const HostInvitationLinkCreateResultSchema = z.object({ link: HostInvitationLinkSchema, oneTimeSharePath: z.string().regex(/^\/clubs\/[a-z0-9-]+\/invite\/lnk_[A-Za-z0-9_-]{43}$/).nullable(), receipt: ReceiptSchema }).strict();
 export const HostInvitationLinkUpdateResultSchema = z.object({ link: HostInvitationLinkSchema, receipt: ReceiptSchema }).strict();
 export const HostInvitationLinkHistorySchema = z.object({
   items: z.array(z.object({

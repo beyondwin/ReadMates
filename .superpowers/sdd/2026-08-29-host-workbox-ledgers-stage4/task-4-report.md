@@ -42,6 +42,19 @@
 
 - `host-invitation-links.json`: `458ff8cca9ebe47caa207dd92757ad604f740357269324f8f3e80c9190e61471`
 - `host-club-settings.json`: `6c5d7fb30358ec609de3a81d1da651daa318e18fa859edfc59f1ffdfab2d3fde`
+
+## Review round 1 closure (2026-08-30)
+
+| Finding | RED | GREEN / closure |
+|---|---|---|
+| Same-key concurrency | `NamedInvitationLinkOAuthDbTest`: concurrent create failed to converge | club-row `FOR UPDATE` serialization; identical create/update converge to one receipt/event, conflicting canonical replay remains `INVITATION_LINK_IDEMPOTENCY_CONFLICT`; 5/5 DB tests |
+| OAuth-derived event digests | persisted ACCEPTED hashes matched subject/email-derived digests | random operation digest plus link/revision-scoped request digest; persistence assertion proves neither hash is the prior OAuth/email derivative |
+| V65 constraints | cross-club consumed receipt was admitted by the prior single-column FK | action allowlist contract and `(id, club_id)` parent unique/FK; migration contract 2/2 rejects invalid action and cross-club receipt |
+| TZDB timezone | `+09:00` was accepted | membership in `ZoneId.getAvailableZoneIds()` required; unit tests 11/11 across link/settings services |
+| Zod token families | common nullable object and `{6,}` named token admitted mixed/short shapes | strict discriminated EMAIL/NAMED_LINK union, exact redaction and `lnk_` + 43; contract tests 10/10, invite/BFF regression 47/47, fixture export hashes identical across two runs |
+| Recoverable UI commands | focused component RED: 4/6 recovery/edit cases failed | create/update/close unknown state preserves the original idempotency key, stale/unknown actions refetch, preview errors retry, edit exposes name/maxUses/expiresAt; component suite 6/6 |
+
+Focused verification: named OAuth/concurrency DB 5/5; V65 migration 2/2; frontend contracts/UI 14/14; invite/BFF 47/47; isolated named-link Chromium E2E 1/1. Exact changed-file ESLint and `git diff --check` passed. Repository-wide `tsc --noEmit` and `ktlintCheck` remain skipped as gates: both report pre-existing failures outside Task 4 (archive/current-session type debt; notification ktlint debt), with no changed Task 4 file named by the Kotlin report. No real OAuth/email/provider call or non-fixture club close was performed. The changed-source delta is sealed in `task-4-review-1-manifest.sha256`.
 - `zod-schemas/host-invitation-link-list.json`: `6532e5efe0e4ba2c0d16386d06b0ab4a1e15ad6f4a184b4c87afe5239edfb161`
 - `zod-schemas/host-invitation-link-history.json`: `69d39ae1524956e683d5c86ce0f10065a845cdfb011877ef837b74258584c681`
 - `zod-schemas/host-club-settings.json`: `6c5d7fb30358ec609de3a81d1da651daa318e18fa859edfc59f1ffdfab2d3fde`

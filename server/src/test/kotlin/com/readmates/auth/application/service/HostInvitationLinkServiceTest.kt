@@ -147,6 +147,8 @@ class HostInvitationLinkServiceTest {
         val commands = mutableListOf<StoredHostInvitationLinkCommand>()
         val events = mutableListOf<StoredHostInvitationLinkEvent>()
 
+        override fun lockClub(clubId: UUID) = Unit
+
         override fun findCommand(
             clubId: UUID,
             actorMembershipId: UUID,

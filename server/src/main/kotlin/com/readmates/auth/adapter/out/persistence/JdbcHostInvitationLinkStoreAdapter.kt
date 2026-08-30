@@ -27,6 +27,10 @@ class JdbcHostInvitationLinkStoreAdapter(
     private val jdbcTemplate: JdbcTemplate,
     private val objectMapper: ObjectMapper,
 ) : HostInvitationLinkStorePort {
+    override fun lockClub(clubId: UUID) {
+        jdbcTemplate.queryForObject("select id from clubs where id = ? for update", String::class.java, clubId.dbString())
+    }
+
     override fun findCommand(
         clubId: UUID,
         actorMembershipId: UUID,

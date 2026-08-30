@@ -329,6 +329,7 @@ class InvitationService(
         val nextStatus = if (nextUsed >= link.maxUses) HostInvitationLinkStatus.EXHAUSTED else HostInvitationLinkStatus.ACTIVE
         val before = namedEventSettings(link)
         val after = before + mapOf("usedCount" to nextUsed.toString(), "status" to nextStatus.name)
+        val operationId = UUID.randomUUID().toString()
         linkStore.consume(
             link.id,
             link.revision,
@@ -341,8 +342,8 @@ class InvitationService(
                 beforeSettings = before,
                 afterSettings = after,
                 actorMembershipId = null,
-                idempotencyKeyHash = tokenService.hashToken("named-accept:${link.id}:$normalizedSubject"),
-                requestHash = tokenService.hashToken("named-accept:${link.id}:$normalizedEmail"),
+                idempotencyKeyHash = tokenService.hashToken("named-accept-operation:$operationId"),
+                requestHash = tokenService.hashToken("named-accept-event:${link.id}:${link.revision + 1}:$operationId"),
                 occurredAt = now,
             ),
         )

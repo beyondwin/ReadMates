@@ -35,10 +35,10 @@ function ScopedHostSettingsRoute({ clubSlug }: { clubSlug: string }) {
   }
 
   return <>
-    <HostInvitationLinks links={links.data?.items ?? []} loading={links.isPending} error={links.isError ? "초대 링크를 불러오지 못했습니다." : null} onRetry={() => { void links.refetch(); }} onCreate={(request) => createLink.mutateAsync(request)} onUpdate={(linkId, request) => updateLink.mutateAsync({ linkId, request })} />
+    <HostInvitationLinks links={links.data?.items ?? []} loading={links.isPending} error={links.isError ? "초대 링크를 불러오지 못했습니다." : null} onRetry={() => { void links.refetch(); }} onRefresh={() => links.refetch()} onCreate={(request) => createLink.mutateAsync(request)} onUpdate={(linkId, request) => updateLink.mutateAsync({ linkId, request })} />
     {settings.isPending ? <section className="surface-quiet" role="status">클럽 설정을 불러오는 중입니다.</section> : null}
     {settings.isError ? <section className="surface-quiet" role="alert"><p>클럽 설정을 불러오지 못했습니다.</p><button type="button" onClick={() => { void settings.refetch(); }}>다시 시도</button></section> : null}
     {settings.data ? <HostClubSettings key={settings.data.revision} settings={settings.data as Settings} saving={updateSettings.isPending} stale={stale} error={updateSettings.isError && !stale ? "설정 저장 결과를 확인할 수 없습니다. 최신 revision을 확인해 주세요." : null} onSave={save} /> : null}
-    <section className="surface-quiet stack rm-host-editorial-ledger__panel"><h2>클럽 운영 종료</h2><p className="small muted">종료 전 영향을 미리 확인하고 같은 확인 내용으로만 실행합니다.</p><button className="btn-quiet" type="button" onClick={() => setCloseOpen(true)}>종료 검토</button><HostClubCloseDialog open={closeOpen} onClose={() => setCloseOpen(false)} onPreview={() => previewClose.mutateAsync()} onConfirm={(request) => confirmClose.mutateAsync(request)} /></section>
+    <section className="surface-quiet stack rm-host-editorial-ledger__panel"><h2>클럽 운영 종료</h2><p className="small muted">종료 전 영향을 미리 확인하고 같은 확인 내용으로만 실행합니다.</p><button className="btn-quiet" type="button" onClick={() => setCloseOpen(true)}>종료 검토</button><HostClubCloseDialog open={closeOpen} onClose={() => setCloseOpen(false)} onPreview={() => previewClose.mutateAsync()} onConfirm={(request) => confirmClose.mutateAsync(request)} onRefresh={() => settings.refetch()} /></section>
   </>;
 }

@@ -31,11 +31,12 @@ const pendingPreview = {
 
 describe("InviteAcceptanceRouteContent", () => {
   it("renders a named-link preview without recipient or token internals", async () => {
+    const namedToken = `lnk_${"n".repeat(43)}`;
     vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jsonResponse({
       invitationType: "NAMED_LINK",
       clubName: "읽는사이",
       clubSlug: "reading-sai",
-      canonicalPath: "/clubs/reading-sai/invite/lnk_fixture",
+      canonicalPath: `/clubs/reading-sai/invite/${namedToken}`,
       email: null,
       name: null,
       emailHint: null,
@@ -43,11 +44,11 @@ describe("InviteAcceptanceRouteContent", () => {
       expiresAt: "2026-09-20T12:00:00Z",
       canAccept: true,
     })));
-    render(<InviteAcceptanceRouteContent clubSlug="reading-sai" token="lnk_fixture" />);
+    render(<InviteAcceptanceRouteContent clubSlug="reading-sai" token={namedToken} />);
     expect(await screen.findByText("링크를 받은 Google 계정")).toBeInTheDocument();
     expect(screen.getByText(/MEMBER 권한으로만/)).toBeInTheDocument();
     expect(screen.queryByText("초대 대상")).not.toBeInTheDocument();
-    expect(document.body.textContent).not.toContain("lnk_fixture");
+    expect(document.body.textContent).not.toContain(namedToken);
   });
 
   it("shows pending invitation details after the legacy password endpoint is gone", async () => {
