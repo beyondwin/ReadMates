@@ -98,7 +98,19 @@ export function MeetingPhaseTabs({
                   aria-selected={current}
                   aria-current={current ? "page" : undefined}
                   aria-controls={panelId}
-                  onClick={() => onPhaseChange?.(phase.id)}
+                  onClick={(event) => {
+                    if (
+                      !onPhaseChange
+                      || event.defaultPrevented
+                      || event.button !== 0
+                      || event.metaKey
+                      || event.altKey
+                      || event.ctrlKey
+                      || event.shiftKey
+                    ) return;
+                    event.preventDefault();
+                    onPhaseChange(phase.id);
+                  }}
                   onKeyDown={(event) => moveFocus(event, phase.id)}
                 >
                   {content}

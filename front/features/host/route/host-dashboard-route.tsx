@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useLoaderData,
@@ -53,11 +61,10 @@ import type { WorkspacePendingUndo } from "@/features/host/ui/session-workspace/
 import { formatSessionKicker } from "@/shared/ui/readmates-display";
 import type { HostDashboardRouteData } from "./host-dashboard-data";
 
-const HOST_BASE_PATH = "/app/host";
-const NEW_MEETING_HREF = `${HOST_BASE_PATH}/sessions/new`;
 const PHASE_REASON_STATE_KEY = "hostOperatingRoomPhaseReason";
 
 type AttendanceAttempt = {
+  sessionId: string;
   membershipIds: readonly string[];
   attendance: MeetingAttendance;
 };
@@ -68,6 +75,17 @@ type AttendanceConflict = AttendanceAttempt & {
 
 type AttendanceUnknown = AttendanceAttempt & {
   canonicalLabel: string | null;
+};
+
+type AttendanceWriteStateScope = {
+  sessionId: string;
+  values: ReadonlyMap<string, MeetingDayAttendanceWriteState>;
+};
+
+type HostRoutePaths = {
+  appBasePath: string;
+  hostBasePath: string;
+  newMeetingHref: string;
 };
 
 function DefaultLink({
@@ -97,6 +115,7 @@ export function HostDashboardRoute({
   const loaderData = useLoaderData() as HostDashboardRouteData;
   const { clubSlug } = useParams<{ clubSlug: string }>();
   const context = useMemo(() => requireHostClubContext(clubSlug), [clubSlug]);
+  const paths = useMemo(() => hostRoutePaths(context.clubSlug), [context.clubSlug]);
   const queryClient = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
@@ -115,11 +134,10 @@ export function HostDashboardRoute({
     sessionId: string;
     detail: HostSessionDetailResponse;
   } | null>(null);
-  const [attendanceWriteStates, setAttendanceWriteStates] = useState<
-    ReadonlyMap<string, MeetingDayAttendanceWriteState>
-  >(() => new Map());
+  const [attendanceWriteStates, setAttendanceWriteStates] = useState<AttendanceWriteStateScope | null>(null);
   const [attendanceConflict, setAttendanceConflict] = useState<AttendanceConflict | null>(null);
   const [attendanceUnknown, setAttendanceUnknown] = useState<AttendanceUnknown | null>(null);
+  const [attendanceMutationSessionId, setAttendanceMutationSessionId] = useState<string | null>(null);
   const [pendingAttendanceUndo, setPendingAttendanceUndo] = useState<{
     sessionId: string;
     receipt: HostSessionChangeReceipt;
@@ -128,6 +146,21 @@ export function HostDashboardRoute({
   } | null>(null);
   const resetAttendanceMutation = attendanceMutation.reset;
   const resetRestoreMutation = restoreMutation.reset;
+  const currentSessionIdRef = useRef(sessionId);
+
+  useLayoutEffect(() => {
+    currentSessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  const activeAttendanceWriteStates = attendanceWriteStates?.sessionId === sessionId
+    ? attendanceWriteStates.values
+    : new Map<string, MeetingDayAttendanceWriteState>();
+  const activeAttendanceConflict = attendanceConflict?.sessionId === sessionId
+    ? attendanceConflict
+    : null;
+  const activeAttendanceUnknown = attendanceUnknown?.sessionId === sessionId
+    ? attendanceUnknown
+    : null;
 
   useEffect(() => registerHostSensitiveState({
     clubSlug: context.clubSlug,
@@ -136,7 +169,8 @@ export function HostDashboardRoute({
       setAttendanceConflict(null);
       setAttendanceUnknown(null);
       setPendingAttendanceUndo(null);
-      setAttendanceWriteStates(new Map());
+      setAttendanceWriteStates(null);
+      setAttendanceMutationSessionId(null);
       resetAttendanceMutation();
       resetRestoreMutation();
     },
@@ -170,15 +204,15 @@ export function HostDashboardRoute({
     currentMeeting: selectedDetail ?? null,
     requestedPhase,
     today: todayIsoDate(),
-    basePath: HOST_BASE_PATH,
+    basePath: paths.hostBasePath,
     questions: { state: "absent" },
     closing: closingSource,
     pendingOutcome: null,
     authoritativeWorkItems: [],
-  }), [closingSource, requestedPhase, selectedDetail]);
+  }), [closingSource, paths.hostBasePath, requestedPhase, selectedDetail]);
 
   const view = useMemo<HostOperatingRoomView>(() => {
-    if (attendanceConflict) {
+    if (activeAttendanceConflict) {
       return {
         ...baseView,
         nextAction: {
@@ -191,7 +225,13 @@ export function HostDashboardRoute({
         },
       };
     }
-    if (attendanceUnknown || attendanceMutation.reconciliationState !== "idle") {
+    if (
+      activeAttendanceUnknown
+      || (
+        attendanceMutation.reconciliationState !== "idle"
+        && attendanceMutationSessionId === sessionId
+      )
+    ) {
       return {
         ...baseView,
         nextAction: {
@@ -200,12 +240,20 @@ export function HostDashboardRoute({
           workItemKey: null,
           label: "출석 변경 결과 확인",
           reason: "같은 요청을 다시 보내기 전에 최신 출석과 변경 내역을 확인해야 합니다.",
-          href: sessionId ? hostSessionHref(sessionId, "?section=history") : null,
+          href: sessionId ? hostSessionHref(paths.hostBasePath, sessionId, "?section=history") : null,
         },
       };
     }
     return baseView;
-  }, [attendanceConflict, attendanceMutation.reconciliationState, attendanceUnknown, baseView, sessionId]);
+  }, [
+    activeAttendanceConflict,
+    activeAttendanceUnknown,
+    attendanceMutationSessionId,
+    attendanceMutation.reconciliationState,
+    baseView,
+    paths.hostBasePath,
+    sessionId,
+  ]);
 
   const phaseHref = useCallback((phase: HostMeetingPhase) => {
     const search = new URLSearchParams(location.search);
@@ -221,85 +269,103 @@ export function HostDashboardRoute({
     });
   }, [location.state, navigate, phaseHref, requestedPhase, view]);
 
-  const refreshExactDetail = useCallback(async (): Promise<HostSessionDetailResponse | null> => {
-    if (!sessionId) return null;
+  const refreshExactDetail = useCallback(async (
+    expectedSessionId = sessionId,
+  ): Promise<HostSessionDetailResponse | null> => {
+    if (!expectedSessionId || currentSessionIdRef.current !== expectedSessionId) return null;
     const result = await detailQuery.refetch();
     const refreshed = result.data ?? null;
-    if (refreshed) setDetailOverride({ sessionId, detail: refreshed });
+    if (
+      !refreshed
+      || refreshed.sessionId !== expectedSessionId
+      || currentSessionIdRef.current !== expectedSessionId
+    ) return null;
+    setDetailOverride({ sessionId: expectedSessionId, detail: refreshed });
     return refreshed;
   }, [detailQuery, sessionId]);
+
+  const setAttendanceWriteState = useCallback((
+    expectedSessionId: string,
+    membershipIds: readonly string[],
+    state: MeetingDayAttendanceWriteState | null,
+  ) => {
+    if (currentSessionIdRef.current !== expectedSessionId) return;
+    setAttendanceWriteStates((current) => ({
+      sessionId: expectedSessionId,
+      values: patchMeetingDayAttendanceWriteStates(
+        current?.sessionId === expectedSessionId ? current.values : new Map(),
+        membershipIds,
+        state,
+      ),
+    }));
+  }, []);
 
   const commitAttendance = useCallback(async (
     membershipIds: readonly string[],
     attendance: MeetingAttendance,
+    expectedSessionId = sessionId,
   ) => {
-    if (!sessionId || membershipIds.length === 0) return;
-    const attempt = { membershipIds, attendance };
+    if (
+      !expectedSessionId
+      || currentSessionIdRef.current !== expectedSessionId
+      || membershipIds.length === 0
+    ) return;
+    const attempt = { sessionId: expectedSessionId, membershipIds, attendance };
+    setAttendanceMutationSessionId(expectedSessionId);
     setAttendanceConflict(null);
     setAttendanceUnknown(null);
-    setAttendanceWriteStates((current) => patchMeetingDayAttendanceWriteStates(
-      current,
-      membershipIds,
-      "saving",
-    ));
+    setAttendanceWriteState(expectedSessionId, membershipIds, "saving");
     try {
       const result = await attendanceMutation.mutateAsync({
-        sessionId,
+        sessionId: expectedSessionId,
         attendance: membershipIds.map((membershipId) => ({
           membershipId,
           attendanceStatus: attendance,
         })),
       });
-      setAttendanceWriteStates((current) => patchMeetingDayAttendanceWriteStates(
-        current,
-        membershipIds,
-        null,
-      ));
+      if (currentSessionIdRef.current !== expectedSessionId) return;
+      setAttendanceWriteState(expectedSessionId, membershipIds, null);
       const receipt = result.changeReceipt ?? null;
       setPendingAttendanceUndo(receipt?.undoAvailable ? {
-        sessionId,
+        sessionId: expectedSessionId,
         receipt,
         description: hostSessionChangeUndoDescription("ATTENDANCE"),
         error: null,
       } : null);
     } catch (error) {
+      if (currentSessionIdRef.current !== expectedSessionId) return;
       if (error instanceof HostMutationPendingError) {
         setAttendanceUnknown({ ...attempt, canonicalLabel: null });
         return;
       }
       const writeState = meetingDayAttendanceWriteStateFromError(error);
-      setAttendanceWriteStates((current) => patchMeetingDayAttendanceWriteStates(
-        current,
-        membershipIds,
-        writeState,
-      ));
+      setAttendanceWriteState(expectedSessionId, membershipIds, writeState);
       if (writeState === "conflict") {
-        const refreshed = await refreshExactDetail();
+        const refreshed = await refreshExactDetail(expectedSessionId);
+        if (currentSessionIdRef.current !== expectedSessionId) return;
         setAttendanceConflict({
           ...attempt,
           canonicalLabel: attendanceAttemptCanonicalLabel(refreshed, membershipIds),
         });
       }
     }
-  }, [attendanceMutation, refreshExactDetail, sessionId]);
+  }, [attendanceMutation, refreshExactDetail, sessionId, setAttendanceWriteState]);
 
   const reconcileUnknownAttendance = useCallback(async () => {
-    if (!attendanceUnknown) return;
-    const refreshed = await refreshExactDetail();
-    if (attendanceAttemptMatches(refreshed, attendanceUnknown)) {
-      setAttendanceWriteStates((current) => patchMeetingDayAttendanceWriteStates(
-        current,
-        attendanceUnknown.membershipIds,
-        null,
-      ));
-      setAttendanceUnknown(null);
+    const attempt = activeAttendanceUnknown;
+    if (!attempt || currentSessionIdRef.current !== attempt.sessionId) return;
+    const refreshed = await refreshExactDetail(attempt.sessionId);
+    if (currentSessionIdRef.current !== attempt.sessionId) return;
+    if (attendanceAttemptMatches(refreshed, attempt)) {
+      setAttendanceWriteState(attempt.sessionId, attempt.membershipIds, null);
+      setAttendanceUnknown((current) => current?.sessionId === attempt.sessionId ? null : current);
       return;
     }
-    setAttendanceUnknown((current) => current ? {
+    setAttendanceUnknown((current) => current?.sessionId === attempt.sessionId ? {
       ...current,
       canonicalLabel: attendanceAttemptCanonicalLabel(refreshed, current.membershipIds),
     } : current);
-  }, [attendanceUnknown, refreshExactDetail]);
+  }, [activeAttendanceUnknown, refreshExactDetail, setAttendanceWriteState]);
 
   const pendingUndo: WorkspacePendingUndo | null = pendingAttendanceUndo && sessionId
     && pendingAttendanceUndo.sessionId === sessionId
@@ -310,10 +376,12 @@ export function HostDashboardRoute({
         const current = pendingAttendanceUndo;
         void (async () => {
           try {
+            if (currentSessionIdRef.current !== current.sessionId) return;
             const preview = await queryClient.fetchQuery(
               hostSessionRestorePreviewQuery(current.sessionId, current.receipt.changeId, context),
             );
             if (!preview.canRestore) {
+              if (currentSessionIdRef.current !== current.sessionId) return;
               setPendingAttendanceUndo({
                 ...current,
                 error: hostSessionRestoreBlockedExplanation(preview.blockedReason),
@@ -325,8 +393,10 @@ export function HostDashboardRoute({
               changeId: preview.changeId,
               request: { expectedCurrentHash: preview.expectedCurrentHash },
             });
+            if (currentSessionIdRef.current !== current.sessionId) return;
             setPendingAttendanceUndo(null);
           } catch {
+            if (currentSessionIdRef.current !== current.sessionId) return;
             setPendingAttendanceUndo({
               ...current,
               error: "되돌리지 못했습니다. 변경 내역에서 다시 시도해 주세요.",
@@ -335,7 +405,8 @@ export function HostDashboardRoute({
         })();
       },
       onOpenHistory: () => {
-        void navigate(hostSessionHref(sessionId, "?section=history"));
+        if (currentSessionIdRef.current !== sessionId) return;
+        void navigate(hostSessionHref(paths.hostBasePath, sessionId, "?section=history"));
       },
       onDismiss: () => setPendingAttendanceUndo(null),
     }
@@ -344,7 +415,7 @@ export function HostDashboardRoute({
   const liveContent = selectedDetail ? (
     <MeetingResponseLedger
       presentation="meetingDay"
-      rows={meetingResponseLedgerRowsFromAttendees(selectedDetail.attendees, attendanceWriteStates)}
+      rows={meetingResponseLedgerRowsFromAttendees(selectedDetail.attendees, activeAttendanceWriteStates)}
       onAttendanceChange={(membershipId, attendance) => {
         void commitAttendance([membershipId], attendance);
       }}
@@ -364,25 +435,31 @@ export function HostDashboardRoute({
   );
 
   const optionalFailureMessages = uniqueFailureMessages(loaderData, view);
-  const recovery: AttendanceRecoveryView | null = attendanceConflict ? {
+  const recovery: AttendanceRecoveryView | null = activeAttendanceConflict ? {
     kind: "conflict",
-    intendedLabel: attendanceLabel(attendanceConflict.attendance),
-    canonicalLabel: attendanceConflict.canonicalLabel,
+    intendedLabel: attendanceLabel(activeAttendanceConflict.attendance),
+    canonicalLabel: activeAttendanceConflict.canonicalLabel,
     onRetry: () => {
-      void commitAttendance(attendanceConflict.membershipIds, attendanceConflict.attendance);
+      void commitAttendance(
+        activeAttendanceConflict.membershipIds,
+        activeAttendanceConflict.attendance,
+        activeAttendanceConflict.sessionId,
+      );
     },
-  } : attendanceUnknown ? {
+  } : activeAttendanceUnknown ? {
     kind: "unknown",
-    canonicalLabel: attendanceUnknown.canonicalLabel,
+    canonicalLabel: activeAttendanceUnknown.canonicalLabel,
     onReconcile: () => { void reconcileUnknownAttendance(); },
-    historyHref: sessionId ? hostSessionHref(sessionId, "?section=history") : HOST_BASE_PATH,
+    historyHref: sessionId
+      ? hostSessionHref(paths.hostBasePath, sessionId, "?section=history")
+      : paths.hostBasePath,
   } : null;
 
   const headerLinks = view.meeting ? {
-    infoHref: hostSessionHref(view.meeting.sessionId, "?section=basic"),
-    scheduleHref: hostSessionHref(view.meeting.sessionId, "?section=basic&edit=1"),
-    historyHref: hostSessionHref(view.meeting.sessionId, "?section=history"),
-    memberViewHref: `/app/sessions/${encodeURIComponent(view.meeting.sessionId)}`,
+    infoHref: hostSessionHref(paths.hostBasePath, view.meeting.sessionId, "?section=basic"),
+    scheduleHref: hostSessionHref(paths.hostBasePath, view.meeting.sessionId, "?section=basic&edit=1"),
+    historyHref: hostSessionHref(paths.hostBasePath, view.meeting.sessionId, "?section=history"),
+    memberViewHref: `${paths.appBasePath}/sessions/${encodeURIComponent(view.meeting.sessionId)}`,
   } : null;
   const phaseLinks = view.phases.map((phase) => ({ ...phase, href: phaseHref(phase.id) }));
   const dDayLabel = view.meeting
@@ -400,7 +477,7 @@ export function HostDashboardRoute({
       recovery={recovery}
       liveContent={liveContent}
       closingContent={closingContent}
-      createMeetingHref={NEW_MEETING_HREF}
+      createMeetingHref={paths.newMeetingHref}
       onPhaseChange={(phase) => {
         void navigate(phaseHref(phase), { state: withoutPhaseReason(location.state) });
       }}
@@ -487,8 +564,18 @@ function phaseLabel(phase: HostMeetingPhase): string {
   return "준비실";
 }
 
-function hostSessionHref(sessionId: string, suffix = ""): string {
-  return `${HOST_BASE_PATH}/sessions/${encodeURIComponent(sessionId)}${suffix}`;
+function hostRoutePaths(clubSlug: string): HostRoutePaths {
+  const appBasePath = `/clubs/${encodeURIComponent(clubSlug)}/app`;
+  const hostBasePath = `${appBasePath}/host`;
+  return {
+    appBasePath,
+    hostBasePath,
+    newMeetingHref: `${hostBasePath}/sessions/new`,
+  };
+}
+
+function hostSessionHref(hostBasePath: string, sessionId: string, suffix = ""): string {
+  return `${hostBasePath}/sessions/${encodeURIComponent(sessionId)}${suffix}`;
 }
 
 function todayIsoDate(now = new Date()): string {

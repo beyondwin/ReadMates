@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { MeetingPhaseTabView } from "@/features/host/model/host-operating-room-model";
@@ -55,7 +55,6 @@ describe("MeetingPhaseTabs", () => {
 
   it("reports link activation without deriving or mutating phase state", async () => {
     const onPhaseChange = vi.fn<(phase: MeetingPhaseTabView["id"]) => void>();
-    const user = userEvent.setup();
     render(
       <MeetingPhaseTabs
         phases={phases.map((phase) => ({ ...phase, href: `#${phase.id}` }))}
@@ -64,7 +63,8 @@ describe("MeetingPhaseTabs", () => {
       />,
     );
 
-    await user.click(screen.getByRole("tab", { name: /준비실/ }));
+    const phaseTab = screen.getByRole("tab", { name: /준비실/ });
+    expect(fireEvent.click(phaseTab)).toBe(false);
 
     expect(onPhaseChange).toHaveBeenCalledOnce();
     expect(onPhaseChange).toHaveBeenCalledWith("prep");

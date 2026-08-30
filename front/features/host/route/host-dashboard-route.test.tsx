@@ -275,7 +275,12 @@ describe("HostDashboardRoute", () => {
 
     expect(await screen.findByRole("heading", { level: 1, name: "모임 운영실" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "현재 운영할 모임이 없습니다" })).toBeVisible();
-    expect(screen.getAllByRole("link", { name: "첫 모임 만들기" })).toHaveLength(1);
+    const createLinks = screen.getAllByRole("link", { name: "첫 모임 만들기" });
+    expect(createLinks).toHaveLength(1);
+    expect(createLinks[0]).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/new",
+    );
     expect(screen.queryByLabelText(/날짜 선택|모임 선택/)).not.toBeInTheDocument();
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
@@ -289,6 +294,43 @@ describe("HostDashboardRoute", () => {
     const ledger = screen.getByRole("region", { name: "준비 현황" });
     expect(within(ledger).getAllByRole("listitem")).toHaveLength(4);
     expect(within(ledger).getByText("현재 일정 확인 1/2")).toBeVisible();
+    expect(screen.getByRole("link", { name: "모임 정보" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-7?section=basic",
+    );
+    expect(screen.getByRole("link", { name: "일정 편집" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-7?section=basic&edit=1",
+    );
+    expect(screen.getByRole("link", { name: "멤버 시야" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/sessions/session-7",
+    );
+    expect(screen.getByRole("link", { name: "실제 출석 확인" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-7?section=attendance",
+    );
+    expect(within(ledger).getByRole("link", { name: "일정 확인 자세히 보기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-7?section=responses&scheduleSeen=unseen",
+    );
+  });
+
+  it("changes phase through SPA navigation while preserving unrelated query and recovery state", async () => {
+    const user = userEvent.setup();
+    routeMocks.updateAttendance.mockRejectedValueOnce({ status: 409, code: "REVISION_CONFLICT" });
+    routeMocks.detailRefetchData = meetingDetail;
+    const { router } = renderRoute("/clubs/reading-sai/app/host?phase=live&from=notice");
+
+    await user.click(await screen.findByRole("button", { name: /지후/ }));
+    expect(await screen.findByRole("alert", { name: "출석 변경 충돌" })).toBeVisible();
+    await user.click(screen.getByRole("tab", { name: /준비실/ }));
+
+    await waitFor(() => {
+      expect(router.state.location.search).toBe("?phase=prep&from=notice");
+    });
+    expect(router.state.historyAction).toBe("PUSH");
+    expect(screen.getByRole("alert", { name: "출석 변경 충돌" })).toBeVisible();
   });
 
   it("keeps live attendance writes and the existing restore receipt flow in the operating room", async () => {
@@ -323,8 +365,17 @@ describe("HostDashboardRoute", () => {
     }));
 
     expect(await screen.findByRole("tab", { name: /마감실/ })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("region", { name: "장부 마감 체크리스트" })).toHaveTextContent("출석 확정");
-    expect(screen.getByRole("region", { name: "장부 마감 체크리스트" })).toHaveTextContent("기록 초안");
+    const checklist = screen.getByRole("region", { name: "장부 마감 체크리스트" });
+    expect(checklist).toHaveTextContent("출석 확정");
+    expect(checklist).toHaveTextContent("기록 초안");
+    expect(screen.getByRole("link", { name: "기록 패키지 검토" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-7/edit?records=json",
+    );
+    expect(within(checklist).getByRole("link", { name: "확인하기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-7?section=records",
+    );
   });
 
   it("keeps successful meeting content when optional sources fail and exposes scoped retry", async () => {
@@ -381,6 +432,10 @@ describe("HostDashboardRoute", () => {
 
     const unknown = await screen.findByRole("status", { name: "출석 변경 결과 확인" });
     expect(unknown).toHaveTextContent("같은 변경을 다시 보내지 않습니다");
+    expect(within(unknown).getByRole("link", { name: "변경 내역 열기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-7?section=history",
+    );
     expect(within(unknown).queryByRole("button", { name: /다시 저장|재시도/ })).not.toBeInTheDocument();
     await user.click(within(unknown).getByRole("button", { name: "최신 출석 확인" }));
     expect(routeMocks.refetchDetail).toHaveBeenCalledTimes(1);
@@ -411,5 +466,52 @@ describe("HostDashboardRoute", () => {
     await waitFor(() => expect(screen.queryByRole("alert", { name: "출석 변경 충돌" })).not.toBeInTheDocument());
     expect(routeMocks.resetAttendance).toHaveBeenCalled();
     expect(routeMocks.resetRestore).toHaveBeenCalled();
+  });
+
+  it("drops stale attendance recovery when revalidation selects a different current session", async () => {
+    const user = userEvent.setup();
+    routeMocks.updateAttendance.mockRejectedValueOnce({ status: 409, code: "REVISION_CONFLICT" });
+    routeMocks.detailRefetchData = meetingDetail;
+    const { router } = renderRoute("/clubs/reading-sai/app/host?phase=live");
+
+    await user.click(await screen.findByRole("button", { name: /지후/ }));
+    expect(await screen.findByRole("alert", { name: "출석 변경 충돌" })).toBeVisible();
+
+    const nextMeeting: HostSessionDetailResponse = {
+      ...meetingDetail,
+      sessionId: "session-8",
+      sessionNumber: 8,
+      title: "여덟 번째 독서모임",
+      attendees: [{
+        ...meetingDetail.attendees[0],
+        membershipId: "member-8",
+        displayName: "민수",
+        accountName: "reader-c",
+      }],
+    };
+    routeMocks.loaderData = dashboardData({
+      operatingRoom: { currentMeeting: {
+        sessionId: nextMeeting.sessionId,
+        selection: "OPEN",
+        scheduleSeenAvailability: "AVAILABLE",
+      } },
+      currentMeeting: nextMeeting,
+    });
+    routeMocks.detailRefetchData = null;
+    routeMocks.updateAttendance.mockReset();
+    routeMocks.updateAttendance.mockResolvedValue({ changeReceipt: null });
+    await act(async () => router.revalidate());
+
+    await screen.findByRole("heading", { name: "여덟 번째 독서모임" });
+    expect(screen.queryByRole("alert", { name: "출석 변경 충돌" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "내 선택으로 다시 저장" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /지후/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /민수/ }));
+    expect(routeMocks.updateAttendance).toHaveBeenCalledTimes(1);
+    expect(routeMocks.updateAttendance).toHaveBeenCalledWith({
+      sessionId: "session-8",
+      attendance: [{ membershipId: "member-8", attendanceStatus: "ATTENDED" }],
+    });
   });
 });
