@@ -34,6 +34,19 @@ const mountedOwners = buildMountedProductionPaths(productionSources(), ["src/mai
 
 describe("space transition mutation-producer inventory", () => {
   it("classifies every current mounted producer and exported out-of-domain write", () => {
+    expect(SPACE_TRANSITION_PRODUCER_INVENTORY).toHaveLength(95);
+    expect(SPACE_TRANSITION_PRODUCER_INVENTORY.reduce<Record<string, number>>(
+      (counts, candidate) => ({
+        ...counts,
+        [candidate.classification]: (counts[candidate.classification] ?? 0) + 1,
+      }),
+      {},
+    )).toEqual({
+      register: 27,
+      modify: 36,
+      "verified-no-change": 23,
+      "out-of-domain": 9,
+    });
     expect(auditMutationProducerInventory(productionSources(), mountedOwners)).toEqual({
       unclassifiedPaths: [],
       unclassifiedExportedWrites: [],
@@ -48,6 +61,10 @@ describe("space transition mutation-producer inventory", () => {
     for (const entry of SPACE_TRANSITION_PRODUCER_INVENTORY) {
       expect(entry.evidenceTokens.length, entry.path).toBeGreaterThan(0);
       if (entry.classification === "modify") {
+        expect(
+          Boolean(entry.exportName || entry.exportNames?.length),
+          `${entry.path} must classify exact write exports`,
+        ).toBe(true);
         expect(entry.ownerPaths.length, entry.path).toBeGreaterThan(0);
         expect(
           entry.ownerPaths.some((ownerPath) => mountedOwners.has(ownerPath)),
@@ -220,6 +237,594 @@ describe("space transition mutation-producer inventory", () => {
     expect(auditMutationProducerInventory(sources, mounted, inventory)).toMatchObject({
       unclassifiedPaths: ["features/example/route/rogue-route.tsx"],
       unreachableExportsWithMountedImports: ["features/auth/actions/password-auth.ts#logout"],
+    });
+  });
+
+  it("detects a mounted aliased write consumer even when the classified owner is mounted", () => {
+    const sources = new Map([
+      ["src/main.tsx", `
+        import "@/features/auth/route/logout-button";
+        import "@/features/example/route/rogue-route";
+      `],
+      ["features/auth/api/auth-api.ts", `
+        export function logout() {
+          return fetch("/logout", { method: "POST" });
+        }
+      `],
+      ["features/auth/route/logout-button.tsx", `
+        import { logout } from "../api/auth-api";
+        export function LogoutButton() { return logout(); }
+      `],
+      ["features/example/route/rogue-route.tsx", `
+        import { logout as terminate } from "@/features/auth/api/auth-api";
+        export function RogueRoute() { return terminate(); }
+      `],
+    ]);
+    const inventory: MutationProducerClassification[] = [
+      {
+        path: "features/auth/route/logout-button.tsx",
+        classification: "register",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["registered"],
+      },
+      {
+        path: "features/auth/api/auth-api.ts",
+        exportName: "logout",
+        classification: "modify",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["transport"],
+      },
+    ];
+
+    expect(auditMutationProducerInventory(
+      sources,
+      buildMountedProductionPaths(sources, ["src/main.tsx"]),
+      inventory,
+    )).toMatchObject({
+      unclassifiedPaths: ["features/example/route/rogue-route.tsx"],
+      modifyEntriesWithMissingMountedOwners: [
+        "features/auth/api/auth-api.ts->features/example/route/rogue-route.tsx",
+      ],
+    });
+  });
+
+  it("detects a mounted top-level aliased write invocation", () => {
+    const sources = new Map([
+      ["src/main.tsx", `
+        import "@/features/auth/route/logout-button";
+        import "@/features/example/route/rogue-route";
+      `],
+      ["features/auth/api/auth-api.ts", `
+        export function logout() {
+          return fetch("/logout", { method: "POST" });
+        }
+      `],
+      ["features/auth/route/logout-button.tsx", `
+        import { logout } from "../api/auth-api";
+        export function LogoutButton() { return logout(); }
+      `],
+      ["features/example/route/rogue-route.ts", `
+        import { logout as terminate } from "@/features/auth/api/auth-api";
+        void terminate();
+      `],
+    ]);
+    const inventory: MutationProducerClassification[] = [
+      {
+        path: "features/auth/route/logout-button.tsx",
+        classification: "register",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["registered"],
+      },
+      {
+        path: "features/auth/api/auth-api.ts",
+        exportName: "logout",
+        classification: "modify",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["transport"],
+      },
+    ];
+
+    expect(auditMutationProducerInventory(
+      sources,
+      buildMountedProductionPaths(sources, ["src/main.tsx"]),
+      inventory,
+    )).toMatchObject({
+      unclassifiedPaths: ["features/example/route/rogue-route.ts"],
+      modifyEntriesWithMissingMountedOwners: [
+        "features/auth/api/auth-api.ts->features/example/route/rogue-route.ts",
+      ],
+    });
+  });
+
+  it("detects a mounted namespace write consumer even when the classified owner is mounted", () => {
+    const sources = new Map([
+      ["src/main.tsx", `
+        import "@/features/auth/route/logout-button";
+        import "@/features/example/route/rogue-route";
+      `],
+      ["features/auth/api/auth-api.ts", `
+        export function logout() {
+          return fetch("/logout", { method: "POST" });
+        }
+      `],
+      ["features/auth/route/logout-button.tsx", `
+        import { logout } from "../api/auth-api";
+        export function LogoutButton() { return logout(); }
+      `],
+      ["features/example/route/rogue-route.tsx", `
+        import * as auth from "@/features/auth/api/auth-api";
+        export function RogueRoute() { return auth.logout(); }
+      `],
+    ]);
+    const inventory: MutationProducerClassification[] = [
+      {
+        path: "features/auth/route/logout-button.tsx",
+        classification: "register",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["registered"],
+      },
+      {
+        path: "features/auth/api/auth-api.ts",
+        exportName: "logout",
+        classification: "modify",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["transport"],
+      },
+    ];
+
+    expect(auditMutationProducerInventory(
+      sources,
+      buildMountedProductionPaths(sources, ["src/main.tsx"]),
+      inventory,
+    )).toMatchObject({
+      unclassifiedPaths: ["features/example/route/rogue-route.tsx"],
+      modifyEntriesWithMissingMountedOwners: [
+        "features/auth/api/auth-api.ts->features/example/route/rogue-route.tsx",
+      ],
+    });
+  });
+
+  it.each([
+    ["direct", `import { logout } from "@/features/auth/api/auth-api";`, "logout()"],
+    ["aliased", `import { logout as terminate } from "@/features/auth/api/auth-api";`, "terminate()"],
+    ["namespace", `import * as auth from "@/features/auth/api/auth-api";`, "auth.logout()"],
+  ])("accepts a registered %s write-consumer chain", (_label, importSource, invocation) => {
+    const sources = new Map([
+      ["src/main.tsx", `import "@/features/auth/route/logout-button";`],
+      ["features/auth/api/auth-api.ts", `
+        export function logout() {
+          return fetch("/logout", { method: "POST" });
+        }
+      `],
+      ["features/auth/route/logout-button.tsx", `
+        ${importSource}
+        export function LogoutButton() { return ${invocation}; }
+      `],
+    ]);
+    const inventory: MutationProducerClassification[] = [
+      {
+        path: "features/auth/route/logout-button.tsx",
+        classification: "register",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["registered"],
+      },
+      {
+        path: "features/auth/api/auth-api.ts",
+        exportName: "logout",
+        classification: "modify",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["transport"],
+      },
+    ];
+
+    expect(auditMutationProducerInventory(
+      sources,
+      buildMountedProductionPaths(sources, ["src/main.tsx"]),
+      inventory,
+    )).toEqual({
+      unclassifiedPaths: [],
+      unclassifiedExportedWrites: [],
+      unreachableExportsWithMountedImports: [],
+      modifyEntriesWithoutMountedOwner: [],
+      modifyEntriesWithMissingMountedOwners: [],
+      verifiedLeavesWithForbiddenPublication: [],
+    });
+  });
+
+  it("accepts a registered aliased re-export write-consumer chain", () => {
+    const sources = new Map([
+      ["src/main.tsx", `import "@/features/auth/route/logout-button";`],
+      ["features/auth/api/auth-api.ts", `
+        export function logout() {
+          return fetch("/logout", { method: "POST" });
+        }
+      `],
+      ["features/auth/actions/password-auth.ts", `
+        export { logout as terminate } from "../api/auth-api";
+      `],
+      ["features/auth/route/logout-button.tsx", `
+        import { terminate } from "../actions/password-auth";
+        export function LogoutButton() { return terminate(); }
+      `],
+    ]);
+    const inventory: MutationProducerClassification[] = [
+      {
+        path: "features/auth/route/logout-button.tsx",
+        classification: "register",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["registered"],
+      },
+      {
+        path: "features/auth/actions/password-auth.ts",
+        exportName: "terminate",
+        classification: "modify",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["facade"],
+      },
+      {
+        path: "features/auth/api/auth-api.ts",
+        exportName: "logout",
+        classification: "modify",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["transport"],
+      },
+    ];
+
+    expect(auditMutationProducerInventory(
+      sources,
+      buildMountedProductionPaths(sources, ["src/main.tsx"]),
+      inventory,
+    )).toEqual({
+      unclassifiedPaths: [],
+      unclassifiedExportedWrites: [],
+      unreachableExportsWithMountedImports: [],
+      modifyEntriesWithoutMountedOwner: [],
+      modifyEntriesWithMissingMountedOwners: [],
+      verifiedLeavesWithForbiddenPublication: [],
+    });
+  });
+
+  it("accepts a registered star-barrel write-consumer chain", () => {
+    const sources = new Map([
+      ["src/main.tsx", `import "@/features/auth/route/logout-button";`],
+      ["features/auth/api/auth-api.ts", `
+        export function logout() {
+          return fetch("/logout", { method: "POST" });
+        }
+      `],
+      ["features/auth/actions/index.ts", `export * from "../api/auth-api";`],
+      ["features/auth/route/logout-button.tsx", `
+        import * as auth from "../actions";
+        export function LogoutButton() { return auth.logout(); }
+      `],
+    ]);
+    const inventory: MutationProducerClassification[] = [
+      {
+        path: "features/auth/route/logout-button.tsx",
+        classification: "register",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["registered"],
+      },
+      {
+        path: "features/auth/actions/index.ts",
+        exportName: "logout",
+        classification: "modify",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["barrel"],
+      },
+      {
+        path: "features/auth/api/auth-api.ts",
+        exportName: "logout",
+        classification: "modify",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["transport"],
+      },
+    ];
+
+    expect(auditMutationProducerInventory(
+      sources,
+      buildMountedProductionPaths(sources, ["src/main.tsx"]),
+      inventory,
+    )).toEqual({
+      unclassifiedPaths: [],
+      unclassifiedExportedWrites: [],
+      unreachableExportsWithMountedImports: [],
+      modifyEntriesWithoutMountedOwner: [],
+      modifyEntriesWithMissingMountedOwners: [],
+      verifiedLeavesWithForbiddenPublication: [],
+    });
+  });
+
+  it("accepts a registered write-consumer chain containing a symbol cycle", () => {
+    const sources = new Map([
+      ["src/main.tsx", `import "@/features/auth/route/logout-button";`],
+      ["features/auth/api/auth-api.ts", `
+        export function logout() {
+          return fetch("/logout", { method: "POST" });
+        }
+      `],
+      ["features/auth/actions/step-a.ts", `
+        import { stepB } from "./step-b";
+        export function stepA() { return stepB(false); }
+      `],
+      ["features/auth/actions/step-b.ts", `
+        import { stepA } from "./step-a";
+        import { logout } from "../api/auth-api";
+        export function stepB(repeat: boolean) { return repeat ? stepA() : logout(); }
+      `],
+      ["features/auth/route/logout-button.tsx", `
+        import { stepA } from "../actions/step-a";
+        export function LogoutButton() { return stepA(); }
+      `],
+    ]);
+    const inventory: MutationProducerClassification[] = [
+      {
+        path: "features/auth/route/logout-button.tsx",
+        classification: "register",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["registered"],
+      },
+      {
+        path: "features/auth/api/auth-api.ts",
+        exportName: "logout",
+        classification: "modify",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["transport"],
+      },
+      {
+        path: "features/auth/actions/step-b.ts",
+        exportName: "stepB",
+        classification: "modify",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["cyclic-write-adapter"],
+      },
+    ];
+
+    expect(auditMutationProducerInventory(
+      sources,
+      buildMountedProductionPaths(sources, ["src/main.tsx"]),
+      inventory,
+    )).toEqual({
+      unclassifiedPaths: [],
+      unclassifiedExportedWrites: [],
+      unreachableExportsWithMountedImports: [],
+      modifyEntriesWithoutMountedOwner: [],
+      modifyEntriesWithMissingMountedOwners: [],
+      verifiedLeavesWithForbiddenPublication: [],
+    });
+  });
+
+  it("ignores type-only imports when deriving mounted production consumers", () => {
+    const sources = new Map([
+      ["src/main.tsx", `import "@/features/example/route/read-route";`],
+      ["features/example/route/read-route.ts", `
+        import type { saveThing } from "../actions/save-thing";
+        export type SaveThing = typeof saveThing;
+        export function ReadRoute() { return null; }
+      `],
+      ["features/example/actions/save-thing.ts", `
+        export function saveThing() {
+          return fetch("/write", { method: "POST" });
+        }
+      `],
+    ]);
+    const mounted = buildMountedProductionPaths(sources, ["src/main.tsx"]);
+    const inventory: MutationProducerClassification[] = [{
+      path: "features/example/actions/save-thing.ts",
+      exportName: "saveThing",
+      classification: "out-of-domain",
+      ownerPaths: [],
+      recoveryClass: "none",
+      evidenceTokens: ["mounted-import-count:0"],
+    }];
+
+    expect([...mounted]).toEqual([
+      "features/example/route/read-route.ts",
+      "src/main.tsx",
+    ]);
+    expect(auditMutationProducerInventory(sources, mounted, inventory)
+      .unreachableExportsWithMountedImports).toEqual([]);
+  });
+
+  it("detects an aliased consumer mounted through a dynamic route import", () => {
+    const sources = new Map([
+      ["src/main.tsx", `
+        import "@/features/auth/route/logout-button";
+        void import("@/features/example/route/rogue-route");
+      `],
+      ["features/auth/api/auth-api.ts", `
+        export function logout() {
+          return fetch("/logout", { method: "POST" });
+        }
+      `],
+      ["features/auth/route/logout-button.tsx", `
+        import { logout } from "../api/auth-api";
+        export function LogoutButton() { return logout(); }
+      `],
+      ["features/example/route/rogue-route.tsx", `
+        import { logout as terminate } from "@/features/auth/api/auth-api";
+        export function RogueRoute() { return terminate(); }
+      `],
+    ]);
+    const inventory: MutationProducerClassification[] = [
+      {
+        path: "features/auth/route/logout-button.tsx",
+        classification: "register",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["registered"],
+      },
+      {
+        path: "features/auth/api/auth-api.ts",
+        exportName: "logout",
+        classification: "modify",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["transport"],
+      },
+    ];
+
+    expect(auditMutationProducerInventory(
+      sources,
+      buildMountedProductionPaths(sources, ["src/main.tsx"]),
+      inventory,
+    )).toMatchObject({
+      unclassifiedPaths: ["features/example/route/rogue-route.tsx"],
+      modifyEntriesWithMissingMountedOwners: [
+        "features/auth/api/auth-api.ts->features/example/route/rogue-route.tsx",
+      ],
+    });
+  });
+
+  it("does not treat a runtime import used only in a type position as a write consumer", () => {
+    const sources = new Map([
+      ["src/main.tsx", `
+        import "@/features/auth/route/logout-button";
+        import "@/features/example/route/type-observer";
+      `],
+      ["features/auth/api/auth-api.ts", `
+        export function logout() {
+          return fetch("/logout", { method: "POST" });
+        }
+      `],
+      ["features/auth/route/logout-button.tsx", `
+        import { logout } from "../api/auth-api";
+        export function LogoutButton() { return logout(); }
+      `],
+      ["features/example/route/type-observer.ts", `
+        import { logout } from "@/features/auth/api/auth-api";
+        export function observe(_callback: typeof logout) { return null; }
+      `],
+    ]);
+    const inventory: MutationProducerClassification[] = [
+      {
+        path: "features/auth/route/logout-button.tsx",
+        classification: "register",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["registered"],
+      },
+      {
+        path: "features/auth/api/auth-api.ts",
+        exportName: "logout",
+        classification: "modify",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["transport"],
+      },
+    ];
+
+    expect(auditMutationProducerInventory(
+      sources,
+      buildMountedProductionPaths(sources, ["src/main.tsx"]),
+      inventory,
+    )).toEqual({
+      unclassifiedPaths: [],
+      unclassifiedExportedWrites: [],
+      unreachableExportsWithMountedImports: [],
+      modifyEntriesWithoutMountedOwner: [],
+      modifyEntriesWithMissingMountedOwners: [],
+      verifiedLeavesWithForbiddenPublication: [],
+    });
+  });
+
+  it("does not mount or reify a type-only write re-export", () => {
+    const sources = new Map([
+      ["src/main.tsx", `import type { logout } from "@/features/auth/actions/type-barrel"; type Logout = typeof logout;`],
+      ["features/auth/api/auth-api.ts", `
+        export function logout() {
+          return fetch("/logout", { method: "POST" });
+        }
+      `],
+      ["features/auth/actions/type-barrel.ts", `
+        export type { logout } from "../api/auth-api";
+      `],
+    ]);
+
+    expect([...buildMountedProductionPaths(sources, ["src/main.tsx"])]).toEqual([
+      "src/main.tsx",
+    ]);
+    expect(detectExportedWriteSymbols(sources)).toEqual([
+      "features/auth/api/auth-api.ts#logout",
+    ]);
+  });
+
+  it("detects an unregistered consumer through an aliased re-export chain", () => {
+    const sources = new Map([
+      ["src/main.tsx", `
+        import "@/features/auth/route/logout-button";
+        import "@/features/example/route/rogue-route";
+      `],
+      ["features/auth/api/auth-api.ts", `
+        export function logout() {
+          return fetch("/logout", { method: "POST" });
+        }
+      `],
+      ["features/auth/actions/password-auth.ts", `
+        export { logout as terminate } from "../api/auth-api";
+      `],
+      ["features/auth/route/logout-button.tsx", `
+        import { terminate } from "../actions/password-auth";
+        export function LogoutButton() { return terminate(); }
+      `],
+      ["features/example/route/rogue-route.tsx", `
+        import { terminate } from "@/features/auth/actions/password-auth";
+        export function RogueRoute() { return terminate(); }
+      `],
+    ]);
+    const inventory: MutationProducerClassification[] = [
+      {
+        path: "features/auth/route/logout-button.tsx",
+        classification: "register",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["registered"],
+      },
+      {
+        path: "features/auth/actions/password-auth.ts",
+        exportName: "terminate",
+        classification: "modify",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["facade"],
+      },
+      {
+        path: "features/auth/api/auth-api.ts",
+        exportName: "logout",
+        classification: "modify",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["transport"],
+      },
+    ];
+
+    expect(auditMutationProducerInventory(
+      sources,
+      buildMountedProductionPaths(sources, ["src/main.tsx"]),
+      inventory,
+    )).toMatchObject({
+      unclassifiedPaths: ["features/example/route/rogue-route.tsx"],
+      modifyEntriesWithMissingMountedOwners: [
+        "features/auth/actions/password-auth.ts->features/example/route/rogue-route.tsx",
+        "features/auth/api/auth-api.ts->features/example/route/rogue-route.tsx",
+      ],
     });
   });
 

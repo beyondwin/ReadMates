@@ -21,14 +21,19 @@ const WRITE_EXPORTS_BY_PATH: Readonly<Record<string, readonly string[]>> = {
   "features/host/api/host-api.ts": ["closeHostSession", "commitHostSessionImport", "confirmManualNotification", "correctionPublishHostSession", "createHostInvitation", "createHostSession", "deleteHostSession", "openHostSession", "previewHostSessionImport", "previewManualNotification", "processHostNotifications", "publishHostSession", "reopenHostSession", "restoreHostNotification", "restoreHostSession", "retryHostNotification", "retryHostPublicConvergence", "returnHostSessionToDraft", "revokeHostInvitation", "saveHostSessionAccessScope", "saveHostSessionAttendance", "saveHostSessionPublication", "saveHostSessionVisibility", "sendHostNotificationTestMail", "submitHostMemberLifecycle", "submitHostMemberProfile", "submitHostViewerAction", "unpublishHostSession", "updateHostNotificationPolicy", "updateHostSession"],
   "features/host/api/host-session-record-api.ts": ["applyHostSessionRecord", "deleteHostSessionRecordDraft", "previewHostSessionRecordApply", "rebaseHostSessionRecordDraft", "restoreHostSessionRevisionToDraft", "saveHostSessionRecordDraft"],
   "features/host/api/host-session-recovery-api.ts": ["restoreHostSessionChange"],
+  "features/host/queries/host-invitation-queries.ts": ["invalidateHostInvitations", "useCreateInvitationMutation", "useRevokeInvitationMutation"],
+  "features/host/queries/host-members-queries.ts": ["invalidateHostMembers", "useHostMemberLifecycleMutation", "useHostMemberProfileMutation", "useHostViewerActionMutation"],
   "features/host/queries/host-notification-queries.ts": ["publishHostNotificationPolicy", "publishHostNotificationPolicyFailure", "publishManualNotificationConfirm", "useProcessHostNotificationsMutation"],
   "features/host/queries/host-session-queries.ts": ["publishDeletedHostSession", "publishHostPublicConvergence", "publishHostSessionAttendance", "publishHostSessionCreated", "publishHostSessionImport", "publishHostSessionPublication", "publishHostSessionResponse", "publishHostSessionVisibility", "publishRestoredHostSession"],
   "features/host/queries/host-session-record-queries.ts": ["publishAppliedHostSessionRecord", "publishDeletedHostSessionRecordDraft", "publishRebasedHostSessionRecordDraft", "publishRestoredHostSessionRevisionDraft", "publishSavedHostSessionRecordDraft"],
   "features/host/queries/host-session-recovery-queries.ts": ["publishRestoredHostSessionChange"],
+  "features/host/route/host-invitations-data.ts": ["createHostInvitationsActions"],
+  "features/host/route/host-members-data.ts": ["createHostMembersActions", "publishHostMembersRefresh"],
   "features/host/route/host-session-editor-actions.ts": ["wrapHostSessionEditorActionsForUndo"],
   "features/host/storage/host-sensitive-storage.ts": ["createHostSensitiveStorage", "hostSensitiveStorage", "registerHostSensitiveState"],
   "features/notifications/api/notification-preferences-api.ts": ["saveNotificationPreferences"],
   "features/notifications/api/notifications-api.ts": ["markAllMemberNotificationsRead", "markMemberNotificationRead"],
+  "features/notifications/route/member-notifications-data.ts": ["memberNotificationsActions", "publishMemberNotificationsRefresh"],
   "features/platform-admin/api/platform-admin-api.ts": ["checkPlatformAdminDomainProvisioning", "commitPlatformAdminOnboarding", "confirmForceCancelPlatformAdminAiJob", "confirmPlatformAdminClubVisibility", "confirmPlatformAdminDomain", "confirmRetryCommitPlatformAdminAiJob", "createPlatformAdminDomain", "previewForceCancelPlatformAdminAiJob", "previewPlatformAdminClubVisibility", "previewPlatformAdminDomain", "previewPlatformAdminOnboarding", "previewRetryCommitPlatformAdminAiJob", "updatePlatformAdminClub", "updatePlatformAdminClubMetadata"],
   "features/platform-admin/api/platform-admin-notifications-api.ts": ["confirmAdminNotificationReplay", "previewAdminNotificationReplay"],
   "features/platform-admin/api/platform-admin-operations-api.ts": ["acknowledgeAdminOperationCase", "resolveAdminOperationCase", "snoozeAdminOperationCase"],
@@ -221,11 +226,30 @@ type ProductionSymbolGraph = {
 
 const localSymbol = (path: string, name: string) => `${path}::${name}`;
 const exportedSymbol = (path: string, name: string) => `${path}#${name}`;
+const MODULE_EXECUTION_SYMBOL = "<module-execution>";
 
 function addSymbolEdge(edges: Map<string, Set<string>>, from: string, to: string) {
   const targets = edges.get(from) ?? new Set<string>();
   targets.add(to);
   edges.set(from, targets);
+}
+
+function isTopLevelExecutionStatement(statement: ts.Statement): boolean {
+  return ts.isExpressionStatement(statement)
+    || ts.isIfStatement(statement)
+    || ts.isDoStatement(statement)
+    || ts.isWhileStatement(statement)
+    || ts.isForStatement(statement)
+    || ts.isForInStatement(statement)
+    || ts.isForOfStatement(statement)
+    || ts.isWithStatement(statement)
+    || ts.isSwitchStatement(statement)
+    || ts.isTryStatement(statement)
+    || ts.isLabeledStatement(statement)
+    || ts.isBlock(statement)
+    || ts.isThrowStatement(statement)
+    || ts.isReturnStatement(statement)
+    || ts.isExportAssignment(statement);
 }
 
 function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): ProductionSymbolGraph {
@@ -286,17 +310,16 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
       }
     }
 
-    localsByPath.set(path, new Set(declarations.keys()));
+    const moduleExecutionStatements = sourceFile.statements.filter(isTopLevelExecutionStatement);
+    const localNames = new Set(declarations.keys());
+    if (moduleExecutionStatements.length > 0) localNames.add(MODULE_EXECUTION_SYMBOL);
+    localsByPath.set(path, localNames);
     const pathExports = exportsByPath.get(path) ?? new Set<string>();
     exportsByPath.set(path, pathExports);
 
-    for (const [name, declaration] of declarations) {
-      const from = localSymbol(path, name);
-      if (HTTP_WRITE_METHOD_PATTERN.test(declaration.getText(sourceFile))
-        || (EXPORTED_WRITE_VERB_PATH.test(path) && new RegExp(`^${WRITE_VERB}(?:[A-Z]|$)`).test(name))) {
-        baseWrites.add(from);
-      }
+    const addRuntimeReferences = (from: string, root: ts.Node, ownName?: string) => {
       const visit = (candidate: ts.Node) => {
+        if (ts.isTypeNode(candidate)) return;
         if (ts.isPropertyAccessExpression(candidate) && ts.isIdentifier(candidate.expression)) {
           const binding = imports.get(candidate.expression.text);
           if (binding?.importedName === "*") {
@@ -306,14 +329,30 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
           const binding = imports.get(candidate.text);
           if (binding && binding.importedName !== "*") {
             addSymbolEdge(edges, from, exportedSymbol(binding.providerPath, binding.importedName));
-          } else if (candidate.text !== name && declarations.has(candidate.text)) {
+          } else if (candidate.text !== ownName && declarations.has(candidate.text)) {
             addSymbolEdge(edges, from, localSymbol(path, candidate.text));
             addSymbolEdge(writeEdges, from, localSymbol(path, candidate.text));
           }
         }
         ts.forEachChild(candidate, visit);
       };
-      visit(declaration);
+      visit(root);
+    };
+
+    for (const [name, declaration] of declarations) {
+      const from = localSymbol(path, name);
+      if (HTTP_WRITE_METHOD_PATTERN.test(declaration.getText(sourceFile))
+        || (EXPORTED_WRITE_VERB_PATH.test(path) && new RegExp(`^${WRITE_VERB}(?:[A-Z]|$)`).test(name))) {
+        baseWrites.add(from);
+      }
+      addRuntimeReferences(from, declaration, name);
+    }
+
+    if (moduleExecutionStatements.length > 0) {
+      const moduleExecution = localSymbol(path, MODULE_EXECUTION_SYMBOL);
+      for (const statement of moduleExecutionStatements) {
+        addRuntimeReferences(moduleExecution, statement);
+      }
     }
 
     for (const statement of sourceFile.statements) {
@@ -332,6 +371,7 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
         }
       }
       if (!ts.isExportDeclaration(statement)) continue;
+      if (statement.isTypeOnly) continue;
       const providerPath = statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)
         ? resolveProductionImport(path, statement.moduleSpecifier.text, sources)
         : null;
@@ -341,6 +381,7 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
       }
       if (!ts.isNamedExports(statement.exportClause)) continue;
       for (const element of statement.exportClause.elements) {
+        if (element.isTypeOnly) continue;
         const exportedName = element.name.text;
         const sourceName = element.propertyName?.text ?? exportedName;
         pathExports.add(exportedName);
@@ -394,6 +435,32 @@ function symbolReaches(
   return false;
 }
 
+function symbolPath(symbol: string): string {
+  const localSeparator = symbol.indexOf("::");
+  const exportSeparator = symbol.indexOf("#");
+  const separator = localSeparator >= 0 ? localSeparator : exportSeparator;
+  return separator >= 0 ? symbol.slice(0, separator) : symbol;
+}
+
+function collectReachableSymbols(
+  starts: Iterable<string>,
+  edges: ReadonlyMap<string, ReadonlySet<string>>,
+  blockedPaths: ReadonlySet<string>,
+  rootPath: string,
+): Set<string> {
+  const pending = [...starts];
+  const seen = new Set<string>();
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    if (seen.has(current)) continue;
+    seen.add(current);
+    const currentPath = symbolPath(current);
+    if (currentPath !== rootPath && blockedPaths.has(currentPath)) continue;
+    for (const next of edges.get(current) ?? []) pending.push(next);
+  }
+  return seen;
+}
+
 export function detectExportedWriteSymbols(sources: ReadonlyMap<string, string>): string[] {
   const graph = analyzeProductionSymbolGraph(sources);
   const exportedWrites: string[] = [];
@@ -406,17 +473,49 @@ export function detectExportedWriteSymbols(sources: ReadonlyMap<string, string>)
   return exportedWrites.sort();
 }
 
-function runtimeImportSpecifiers(source: string): string[] {
+function runtimeImportSpecifiers(path: string, source: string): string[] {
   const specifiers = new Set<string>();
-  const patterns = [
-    /\b(?:import|export)\s+(?:[\s\S]*?\s+from\s+)?["']([^"']+)["']/g,
-    /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g,
-  ];
-  for (const pattern of patterns) {
-    for (const match of source.matchAll(pattern)) {
-      if (match[1]) specifiers.add(match[1]);
+  const sourceFile = ts.createSourceFile(
+    path,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    path.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+
+  for (const statement of sourceFile.statements) {
+    if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
+      const clause = statement.importClause;
+      const hasRuntimeBinding = !clause
+        || (!clause.isTypeOnly && (Boolean(clause.name)
+          || Boolean(clause.namedBindings && ts.isNamespaceImport(clause.namedBindings))
+          || Boolean(clause.namedBindings
+            && ts.isNamedImports(clause.namedBindings)
+            && clause.namedBindings.elements.some((element) => !element.isTypeOnly))));
+      if (hasRuntimeBinding) specifiers.add(statement.moduleSpecifier.text);
+    } else if (ts.isExportDeclaration(statement)
+      && !statement.isTypeOnly
+      && statement.moduleSpecifier
+      && ts.isStringLiteral(statement.moduleSpecifier)) {
+      const hasRuntimeBinding = !statement.exportClause
+        || !ts.isNamedExports(statement.exportClause)
+        || statement.exportClause.elements.some((element) => !element.isTypeOnly);
+      if (hasRuntimeBinding) specifiers.add(statement.moduleSpecifier.text);
     }
   }
+
+  const visitDynamicImports = (node: ts.Node) => {
+    if (ts.isImportTypeNode(node) || ts.isTypeNode(node)) return;
+    if (ts.isCallExpression(node)
+      && node.expression.kind === ts.SyntaxKind.ImportKeyword
+      && node.arguments.length === 1
+      && ts.isStringLiteral(node.arguments[0])) {
+      specifiers.add(node.arguments[0].text);
+    }
+    ts.forEachChild(node, visitDynamicImports);
+  };
+  visitDynamicImports(sourceFile);
+
   return [...specifiers];
 }
 
@@ -455,12 +554,105 @@ export function buildMountedProductionPaths(
     const path = pending.pop()!;
     if (mounted.has(path) || !sources.has(path)) continue;
     mounted.add(path);
-    for (const specifier of runtimeImportSpecifiers(sources.get(path) ?? "")) {
+    for (const specifier of runtimeImportSpecifiers(path, sources.get(path) ?? "")) {
       const resolved = resolveProductionImport(path, specifier, sources);
       if (resolved && !mounted.has(resolved)) pending.push(resolved);
     }
   }
   return new Set([...mounted].sort());
+}
+
+type MountedConsumerViolations = {
+  unclassifiedPaths: string[];
+  missingOwnerPairs: string[];
+};
+
+function classifiedWriteTargets(
+  candidate: MutationProducerClassification,
+  symbolGraph: ProductionSymbolGraph,
+): string[] {
+  const names = new Set([
+    ...(candidate.exportName ? [candidate.exportName] : []),
+    ...(candidate.exportNames ?? []),
+  ]);
+  if (names.size === 0) {
+    for (const name of symbolGraph.exportsByPath.get(candidate.path) ?? []) names.add(name);
+  }
+  return [...names].map((name) => exportedSymbol(candidate.path, name));
+}
+
+function detectMountedConsumerViolations(
+  symbolGraph: ProductionSymbolGraph,
+  mountedPaths: ReadonlySet<string>,
+  inventory: readonly MutationProducerClassification[],
+  ownershipBoundaryPaths: ReadonlySet<string>,
+): MountedConsumerViolations {
+  const inventoryPaths = new Set(inventory.map((candidate) => candidate.path));
+  const registeringPaths = new Set(inventory
+    .filter((candidate) => candidate.classification === "register")
+    .map((candidate) => candidate.path));
+  const unclassifiedPaths = new Set<string>();
+  const missingOwnerPairs = new Set<string>();
+
+  for (const candidate of inventory) {
+    if (candidate.classification !== "modify") continue;
+    for (const target of classifiedWriteTargets(candidate, symbolGraph)) {
+      const targetSet = new Set([target]);
+      const ownerCoveredSymbols = new Set<string>();
+
+      // A helper on a declared owner's chain is covered; a separate mounted
+      // boundary reaching the same write symbol is an independent consumer.
+      for (const ownerPath of candidate.ownerPaths) {
+        if (!mountedPaths.has(ownerPath) || !registeringPaths.has(ownerPath)) continue;
+        const ownerStarts = [...symbolGraph.localsByPath.get(ownerPath) ?? []]
+          .map((name) => localSymbol(ownerPath, name));
+        if (!symbolReaches(
+          symbolGraph,
+          ownerStarts,
+          targetSet,
+          symbolGraph.edges,
+          ownershipBoundaryPaths,
+          ownerPath,
+        )) continue;
+        for (const symbol of collectReachableSymbols(
+          ownerStarts,
+          symbolGraph.edges,
+          ownershipBoundaryPaths,
+          ownerPath,
+        )) {
+          ownerCoveredSymbols.add(symbol);
+        }
+      }
+
+      for (const [consumerPath, localNames] of symbolGraph.localsByPath) {
+        if (!mountedPaths.has(consumerPath) || consumerPath === candidate.path) continue;
+        const isRegisteringBoundary = registeringPaths.has(consumerPath);
+        const isUnclassifiedBoundary = !inventoryPaths.has(consumerPath);
+        if (!isRegisteringBoundary && !isUnclassifiedBoundary) continue;
+        const hasUncoveredConsumer = [...localNames]
+          .map((name) => localSymbol(consumerPath, name))
+          .some((symbol) => !ownerCoveredSymbols.has(symbol) && symbolReaches(
+            symbolGraph,
+            [symbol],
+            targetSet,
+            symbolGraph.edges,
+            ownershipBoundaryPaths,
+            consumerPath,
+          ));
+        if (!hasUncoveredConsumer) continue;
+
+        if (!candidate.ownerPaths.includes(consumerPath)) {
+          missingOwnerPairs.add(`${candidate.path}->${consumerPath}`);
+        }
+        if (isUnclassifiedBoundary) unclassifiedPaths.add(consumerPath);
+      }
+    }
+  }
+
+  return {
+    unclassifiedPaths: [...unclassifiedPaths].sort(),
+    missingOwnerPairs: [...missingOwnerPairs].sort(),
+  };
 }
 
 export function auditMutationProducerInventory(
@@ -473,42 +665,26 @@ export function auditMutationProducerInventory(
     .filter((candidate) => candidate.classification === "register" || candidate.classification === "verified-no-change")
     .map((candidate) => candidate.path));
   const inventoryPaths = new Set(inventory.map((candidate) => candidate.path));
+  const mountedConsumerViolations = detectMountedConsumerViolations(
+    symbolGraph,
+    mountedPaths,
+    inventory,
+    ownershipBoundaryPaths,
+  );
   const inventoryExportedWrites = new Set(inventory.flatMap((candidate) => [
     ...(candidate.exportName ? [`${candidate.path}#${candidate.exportName}`] : []),
     ...(candidate.exportNames ?? []).map((exportName) => `${candidate.path}#${exportName}`),
   ]));
   return {
-    unclassifiedPaths: detectMutationProducerPaths(sources).filter((path) => !inventoryPaths.has(path)),
+    unclassifiedPaths: [...new Set([
+      ...detectMutationProducerPaths(sources).filter((path) => !inventoryPaths.has(path)),
+      ...mountedConsumerViolations.unclassifiedPaths,
+    ])].sort(),
     unclassifiedExportedWrites: detectExportedWriteSymbols(sources)
       .filter((symbol) => !inventoryExportedWrites.has(symbol)),
     unreachableExportsWithMountedImports: inventory.filter((candidate) => candidate.classification === "out-of-domain" && mountedPaths.has(candidate.path)).map((candidate) => `${candidate.path}#${candidate.exportName ?? "*"}`),
     modifyEntriesWithoutMountedOwner: inventory.filter((candidate) => candidate.classification === "modify" && !candidate.ownerPaths.some((owner) => mountedPaths.has(owner))).map((candidate) => candidate.path),
-    modifyEntriesWithMissingMountedOwners: inventory
-      .filter((candidate) => candidate.classification === "modify")
-      .flatMap((candidate) => {
-        const targetNames = new Set([
-          ...(candidate.exportName ? [candidate.exportName] : []),
-          ...(candidate.exportNames ?? []),
-        ]);
-        if (targetNames.size === 0) {
-          for (const name of symbolGraph.exportsByPath.get(candidate.path) ?? []) targetNames.add(name);
-        }
-        const targets = new Set([...targetNames].map((name) => exportedSymbol(candidate.path, name)));
-        if (targets.size === 0) return [];
-        return inventory
-          .filter((owner) => owner.classification === "register" && mountedPaths.has(owner.path))
-          .filter((owner) => symbolReaches(
-            symbolGraph,
-            [...symbolGraph.localsByPath.get(owner.path) ?? []].map((name) => localSymbol(owner.path, name)),
-            targets,
-            symbolGraph.edges,
-            ownershipBoundaryPaths,
-            owner.path,
-          ))
-          .filter((owner) => !candidate.ownerPaths.includes(owner.path))
-          .map((owner) => `${candidate.path}->${owner.path}`);
-      })
-      .sort(),
+    modifyEntriesWithMissingMountedOwners: mountedConsumerViolations.missingOwnerPairs,
     verifiedLeavesWithForbiddenPublication: inventory.filter((candidate) => candidate.classification === "verified-no-change" && /^(?:features\/[^/]+\/.*\/ui\/|features\/[^/]+\/ui\/)/.test(candidate.path) && FORBIDDEN_LEAF_PATTERN.test(sources.get(candidate.path) ?? "")).map((candidate) => candidate.path),
   };
 }
