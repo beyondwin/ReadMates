@@ -398,6 +398,14 @@ function closingView(
         ...view.primaryAction,
         href: normalizeLegacyHostHref(view.primaryAction.href, basePath),
       },
+      checklist: view.checklist.map((item) => ({
+        ...item,
+        href: normalizeLegacyHostHref(item.href, basePath),
+      })),
+      surfaces: view.surfaces.map((surface) => ({
+        ...surface,
+        href: normalizeLegacyHostHref(surface.href, basePath),
+      })),
     };
   }
   failures.push(source.state === "failed"

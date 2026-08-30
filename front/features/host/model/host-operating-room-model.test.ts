@@ -358,4 +358,40 @@ describe("buildHostOperatingRoomView", () => {
 
     expect(view.closing?.primaryAction.href).toBe(expectedHref);
   });
+
+  it("scopes legacy closing checklist and host-surface hrefs without rewriting member or public destinations", () => {
+    const status = closing("BLOCKED", "IMPORT_RECORDS");
+    status.checklist = [{
+      id: "RECORD_PACKAGE_SAVED",
+      state: "ACTION_REQUIRED",
+      label: "기록 패키지",
+      detail: "기록을 확인하세요.",
+      href: "/app/host/sessions/session-12/edit?records=json",
+    }];
+    status.evidence.memberReflectionHref = "/clubs/book-club/app/member/sessions/session-12";
+    status.evidence.publicRecordHref = "https://public.example.com/records/12";
+
+    const view = buildHostOperatingRoomView(input({
+      currentMeeting: session({ state: "CLOSED", date: "2026-08-29" }),
+      closing: ready(status),
+    }));
+
+    expect(view.closing?.checklist[0]?.href).toBe(
+      "/clubs/book-club/app/host/sessions/session-12/edit?records=json",
+    );
+    expect(view.closing?.surfaces).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "HOST",
+        href: "/clubs/book-club/app/host/sessions/session-12/edit",
+      }),
+      expect.objectContaining({
+        id: "MEMBER",
+        href: "/clubs/book-club/app/member/sessions/session-12",
+      }),
+      expect.objectContaining({
+        id: "PUBLIC",
+        href: "https://public.example.com/records/12",
+      }),
+    ]));
+  });
 });

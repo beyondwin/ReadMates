@@ -57,3 +57,18 @@ Result: `1` file, `19/19` tests passed, `0` failures.
 | same two source hashes | `<node24-bin> npx --yes corepack@0.35.0 pnpm --dir front exec eslint features/host/model/host-operating-room-model.ts features/host/model/host-operating-room-model.test.ts` | exit `0`, no findings | The focused fix and tests satisfy the repository lint rules. |
 
 Round-close safety: no local synthesized key prefixes remain in production source; `git diff --check` and the targeted public-safety scan passed with no findings. No other surface or full gate was reopened.
+
+## Review round 2 — complete closing-board URL authority
+
+- Review BASE: `2fe9398f22d25082854fdfd825aa7c1301b818f8`.
+- The work-item authority finding remained closed and its source was not changed.
+- RED used the focused Vitest command under Node `v24.18.0`: the new closing-board href assertion failed, while the existing `24` tests passed. The legacy checklist href remained unscoped.
+- GREEN used the same focused command: `1` file, `25/25` tests passed, `0` failures.
+
+| Closing source SHA-256 | Command | Result | Finding closure |
+| --- | --- | --- | --- |
+| `d9a6a46e9b36ecf7b76d4bf3208cdc256d1327d3d2e580f10a8db49dbe939f36` (`host-operating-room-model.ts`) | focused Vitest command above | GREEN, `25/25` | The single legacy-host normalizer now covers closing primary action, every checklist item, and every surface. Only `/app/host...` values are rebased through the URL-owned club `basePath`. |
+| `b0234333380abc4accbd45cf23f297b2ad8f32249ebf14188c20cc6848760e2f` (`host-operating-room-model.test.ts`) | focused Vitest command above | GREEN, `25/25` | Regression evidence covers legacy checklist and HOST-surface scoping while already-scoped member and external public destinations remain byte-identical. |
+| same two source hashes | `<node24-bin> npx --yes corepack@0.35.0 pnpm --dir front exec eslint features/host/model/host-operating-room-model.ts features/host/model/host-operating-room-model.test.ts` | exit `0`, no findings | The round-2 fix and focused regression satisfy repository lint rules. |
+
+Round-close safety: `git diff --check` and the targeted public-safety scan passed with no findings. No loader, route, UI, BFF, server, authority contract, or full gate was reopened.
