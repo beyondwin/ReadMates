@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/features/host/api/host-api", () => ({
   fetchHostCurrentSession: vi.fn(),
+  fetchHostOperatingRoomCurrent: vi.fn(),
   fetchHostSessions: vi.fn(),
   fetchHostSessionDetail: vi.fn(),
   fetchHostSessionDeletionPreview: vi.fn(),
@@ -16,6 +17,7 @@ vi.mock("@/features/host/api/host-api", () => ({
 
 import {
   fetchHostCurrentSession,
+  fetchHostOperatingRoomCurrent,
   fetchHostSessions,
   fetchHostSessionDetail,
   fetchHostSessionDeletionPreview,
@@ -36,6 +38,7 @@ import { BUILTIN_SCHEDULE_DEFAULTS } from "@/features/host/model/host-schedule-d
 import {
   classifyScheduleDefaultsError,
   hostCurrentSessionQuery,
+  hostOperatingRoomCurrentQuery,
   hostPublicConvergenceQuery,
   hostSessionDeletionPreviewQuery,
   hostSessionDetailQuery,
@@ -85,6 +88,12 @@ describe("host session query keys", () => {
       "reading-sai",
       "sessions",
       "current",
+    ]);
+    expect(hostSessionKeys.operatingRoomCurrent({ clubSlug: "reading-sai" })).toEqual([
+      "host",
+      "reading-sai",
+      "sessions",
+      "operatingRoomCurrent",
     ]);
     expect(hostSessionKeys.scheduleDefaults({ clubSlug: "reading-sai" })).toEqual([
       "host",
@@ -136,6 +145,7 @@ describe("host session query keys", () => {
 
   it("query functions call host API wrappers with context and normalized pages", async () => {
     vi.mocked(fetchHostCurrentSession).mockResolvedValue({ currentSession: null });
+    vi.mocked(fetchHostOperatingRoomCurrent).mockResolvedValue({ currentMeeting: null });
     vi.mocked(fetchHostSessions).mockResolvedValue({ items: [], nextCursor: null });
     vi.mocked(fetchHostSessionDetail).mockResolvedValue({
       sessionId: "session-7",
@@ -193,6 +203,7 @@ describe("host session query keys", () => {
     });
 
     await runQuery(hostCurrentSessionQuery({ clubSlug: "reading-sai" }));
+    await runQuery(hostOperatingRoomCurrentQuery({ clubSlug: "reading-sai" }));
     await runQuery(hostSessionListQuery({ limit: 50 }, { clubSlug: "reading-sai" }));
     await runQuery(hostSessionDetailQuery("session-7", { clubSlug: "reading-sai" }));
     await runQuery(hostSessionDeletionPreviewQuery("session-7", { clubSlug: "reading-sai" }));
@@ -203,6 +214,7 @@ describe("host session query keys", () => {
     await runQuery(hostSessionScheduleDefaultsQuery({ clubSlug: "reading-sai" }));
 
     expect(fetchHostCurrentSession).toHaveBeenCalledWith({ clubSlug: "reading-sai" });
+    expect(fetchHostOperatingRoomCurrent).toHaveBeenCalledWith({ clubSlug: "reading-sai" });
     expect(fetchHostSessions).toHaveBeenCalledWith({ clubSlug: "reading-sai" }, { limit: 50 });
     expect(fetchHostSessionDetail).toHaveBeenCalledWith("session-7", { clubSlug: "reading-sai" });
     expect(fetchHostSessionDeletionPreview).toHaveBeenCalledWith("session-7", { clubSlug: "reading-sai" });

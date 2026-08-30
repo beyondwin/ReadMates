@@ -18,6 +18,20 @@ import type {
 export type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
 export type { CurrentSessionResponse } from "@/shared/model/current-session-contracts";
 
+export const HostOperatingRoomCurrentResponseSchema = z.object({
+  currentMeeting: z.object({
+    sessionId: z.string().min(1),
+    selection: z.enum(["OPEN", "UPCOMING_DRAFT", "CLOSING_REQUIRED"]),
+    scheduleSeenAvailability: z.enum(["AVAILABLE", "UNAVAILABLE"]),
+  }).strict().nullable(),
+}).strict();
+
+export type HostOperatingRoomCurrentResponse = z.infer<typeof HostOperatingRoomCurrentResponseSchema>;
+
+export function parseHostOperatingRoomCurrentResponse(value: unknown): HostOperatingRoomCurrentResponse {
+  return HostOperatingRoomCurrentResponseSchema.parse(value);
+}
+
 export type MemberRole = "HOST" | "MEMBER";
 export type MembershipStatus = "INVITED" | "VIEWER" | "ACTIVE" | "SUSPENDED" | "LEFT" | "INACTIVE";
 export type InvitationStatus = "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED";

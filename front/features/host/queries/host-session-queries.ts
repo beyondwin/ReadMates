@@ -8,6 +8,7 @@ import {
   createHostSession,
   deleteHostSession,
   fetchHostCurrentSession,
+  fetchHostOperatingRoomCurrent,
   fetchHostMutationReconciliation,
   fetchHostPublicConvergence,
   fetchHostSessionClosingStatus,
@@ -49,6 +50,7 @@ import type {
   HostSessionVisibilityUpdateResult,
   ManualNotificationDispatchListResponse,
   HostNotificationEventType,
+  HostOperatingRoomCurrentResponse,
   SessionImportRequest,
   HostMutationEnvelope,
   HostMutationOperation,
@@ -194,6 +196,8 @@ export const hostSessionKeys = {
     [...hostSessionKeys.scope(context), "closingStatus", sessionId] as const,
   current: (context: ExplicitReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "current"] as const,
+  operatingRoomCurrent: (context: ExplicitReadmatesApiContext) =>
+    [...hostSessionKeys.scope(context), "operatingRoomCurrent"] as const,
   dashboard: (context: ExplicitReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "dashboard"] as const,
   deletionPreview: (sessionId: string, context: ExplicitReadmatesApiContext) =>
@@ -218,6 +222,13 @@ export function hostCurrentSessionQuery(context: ExplicitReadmatesApiContext) {
   return queryOptions<CurrentSessionResponse>({
     queryKey: hostSessionKeys.current(context),
     queryFn: () => fetchHostCurrentSession(context),
+  });
+}
+
+export function hostOperatingRoomCurrentQuery(context: ExplicitReadmatesApiContext) {
+  return queryOptions<HostOperatingRoomCurrentResponse>({
+    queryKey: hostSessionKeys.operatingRoomCurrent(context),
+    queryFn: () => fetchHostOperatingRoomCurrent(context),
   });
 }
 

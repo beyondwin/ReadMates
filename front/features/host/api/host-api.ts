@@ -35,6 +35,7 @@ import type {
   HostNotificationPolicyResponse,
   HostNotificationSummary,
   HostNotificationStatus,
+  HostOperatingRoomCurrentResponse,
   HostSessionDeletionPreviewResponse,
   HostSessionDeletionResponse,
   HostSessionTrashItem,
@@ -87,6 +88,7 @@ import {
   HostMutationReconciliationSchema,
   HostMutationIdempotencyKeySchema,
   HostPublicConvergenceViewSchema,
+  parseHostOperatingRoomCurrentResponse,
   parseHostAttendanceResponse,
   parseHostSessionDetailResponse,
   parseHostSessionDeletionResponse,
@@ -150,6 +152,14 @@ async function rawHostResponse(
 
 export function fetchHostCurrentSession(context: ExplicitHostApiContext) {
   return readmatesFetch<CurrentSessionResponse>("/api/sessions/current", undefined, context);
+}
+
+export function fetchHostOperatingRoomCurrent(context: ExplicitHostApiContext) {
+  return readmatesFetch<HostOperatingRoomCurrentResponse>(
+    "/api/host/operating-room/current",
+    undefined,
+    context,
+  ).then(parseHostOperatingRoomCurrentResponse);
 }
 
 export function fetchHostClubOperations(context: ExplicitHostApiContext) {
