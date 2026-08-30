@@ -32,20 +32,31 @@ export function registerHostInvitationActions(
   const execute = async <T, U>(
     operationId: string,
     request: () => Promise<T>,
-    publishCache: (result: T) => Promise<U>,
+    observe: (result: T) => Promise<U>,
+    publishCache: (result: U) => void,
   ) => {
     const handle = owner.begin(operationId, "L1", () => reconcile(operationId));
     try {
       const result = await request();
       if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
-      const publication = await publishTransitionAction(handle, "cache", () => publishCache(result));
+      const releaseObservation = handle.retainPublication?.() ?? (() => undefined);
+      let publication: U;
+      try {
+        publication = await observe(result);
+        if (handle.isPublicationCurrent && !handle.isPublicationCurrent()) throw new TransitionOwnerObsoleteError();
+        await publishTransitionAction(handle, "cache", () => publishCache(publication));
+      } finally {
+        releaseObservation();
+      }
       return {
         ...publication,
         publishUi(publish: (value: U) => void) {
-          return handle.publishAccepted({
+          const outcome = handle.publishAccepted({
             surface: "ui",
             publish: () => publish(publication),
           });
+          handle.completePublication?.();
+          return outcome;
         },
       };
     } catch (error) {
@@ -53,10 +64,14 @@ export function registerHostInvitationActions(
       if (typeof (error as { status?: unknown } | null)?.status === "number") {
         if (await handle.settle("failed") !== "accepted") throw new TransitionOwnerObsoleteError();
         const failure = error as OwnerFencedInvitationError;
-        failure.publishUi = (publish) => handle.publishAccepted({
-          surface: "errorCopy",
-          publish: () => publish(failure),
-        });
+        failure.publishUi = (publish) => {
+          const outcome = handle.publishAccepted({
+            surface: "errorCopy",
+            publish: () => publish(failure),
+          });
+          handle.completePublication?.();
+          return outcome;
+        };
         throw failure;
       }
       const observation = await handle.reconcile();
@@ -82,6 +97,7 @@ export function registerHostInvitationActions(
         return actions.parseInvitation(response);
       },
       async (created) => ({ created, refreshed: await actions.refreshInvitations({ limit: 50 }) }),
+      ({ refreshed }) => actions.publishInvitations(refreshed, { limit: 50 }),
     ),
     revokeInvitation: (invitationId) => execute(
       `host-invitation:revoke:${invitationId}`,
@@ -95,6 +111,7 @@ export function registerHostInvitationActions(
         return actions.parseInvitation(response);
       },
       async (revoked) => ({ revoked, refreshed: await actions.refreshInvitations({ limit: 50 }) }),
+      ({ refreshed }) => actions.publishInvitations(refreshed, { limit: 50 }),
     ),
   };
 }

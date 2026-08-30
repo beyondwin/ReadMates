@@ -416,7 +416,7 @@ export function AdminTodayRoute() {
       if (hasAdminOperationErrorCode(error, "CASE_VERSION_CONFLICT")) {
         setActionMessage({ kind: "conflict", text: "최신 상태 확인이 필요합니다." });
         await reconcileAuthoritativeState(target.caseId);
-        if (isCurrentMutationTarget(target)) setActionState("ready");
+        if (handle.isPublicationCurrent() && isCurrentMutationTarget(target)) setActionState("ready");
         return false;
       }
       if (hasAdminOperationErrorCode(error, "CASE_STILL_ACTIVE")) {

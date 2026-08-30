@@ -57,4 +57,31 @@ describe("useTransitionSafetyOwner", () => {
     });
     expect(published).toHaveBeenCalledTimes(1);
   });
+
+  it("invalidates an accepted handle on unmount while an async publication is delayed", async () => {
+    const coordinator = createGlobalSpaceTransitionCoordinator();
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <SpaceTransitionSafetyProvider port={coordinator}>{children}</SpaceTransitionSafetyProvider>
+    );
+    const { result, unmount } = renderHook(() => useTransitionSafetyOwner("owner"), { wrapper });
+    const handle = result.current.begin("operation", "L1", async () => ({
+      operationId: "operation",
+      outcome: "still-unknown",
+    }));
+    await expect(handle.settle("succeeded")).resolves.toBe("accepted");
+    let releasePublication!: () => void;
+    const delayed = new Promise<void>((resolve) => { releasePublication = resolve; });
+    const cachePublication = publishTransitionAction(handle, "cache", async () => {
+      await delayed;
+      return "observed";
+    });
+
+    act(() => unmount());
+    releasePublication();
+
+    await expect(cachePublication).rejects.toMatchObject({ name: "TransitionOwnerObsoleteError" });
+    const uiPublication = vi.fn();
+    expect(handle.publishAccepted({ surface: "ui", publish: uiPublication })).toBe("rejected");
+    expect(uiPublication).not.toHaveBeenCalled();
+  });
 });

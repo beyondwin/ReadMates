@@ -1052,17 +1052,25 @@ export function EditHostSessionRecordWorkflow({
   const executeReceiptFencedAction = useCallback(async <T,>(
     operationId: string,
     request: () => Promise<T>,
-    publishReceipt: (result: T) => void | Promise<void>,
+    prepareReceipt: (result: T) => (() => void | Promise<void>) | Promise<() => void | Promise<void>>,
   ) => {
     const handle = transitionOwner.begin(operationId, "L3", async () => ({ operationId, outcome: "still-unknown" }));
     try {
       const result = await request();
       if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
-      await publishTransitionAction(handle, "receiptCallback", () => publishReceipt(result));
+      const releasePreparation = handle.retainPublication();
+      try {
+        const publishReceipt = await prepareReceipt(result);
+        await publishTransitionAction(handle, "receiptCallback", publishReceipt);
+      } finally {
+        releasePreparation();
+      }
       return result;
     } catch (error) {
       if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");
       throw error;
+    } finally {
+      handle.completePublication();
     }
   }, [transitionOwner]);
 

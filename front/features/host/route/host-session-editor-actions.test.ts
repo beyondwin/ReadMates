@@ -53,9 +53,16 @@ describe("host session editor receipt publication fence", () => {
       changeReceipt: { changeId: "change-1", kind: "BASIC_INFO", undoAvailable: true },
     }), { status: 200, headers: { "Content-Type": "application/json" } }));
     const listener = vi.fn();
-    const obsoleteExecutor = vi.fn(async <T,>(_operationId: string, request: () => Promise<T>) => request());
+    const obsoleteExecutor = vi.fn(async <T,>(
+      _operationId: string,
+      request: () => Promise<T>,
+      prepareReceipt: (result: T) => (() => void | Promise<void>) | Promise<() => void | Promise<void>>,
+    ) => {
+      void prepareReceipt;
+      return request();
+    });
 
-    await wrapHostSessionEditorActionsForUndo(accepted, listener, obsoleteExecutor).saveSession("session-1", {} as never);
+    await wrapHostSessionEditorActionsForUndo(accepted, listener, obsoleteExecutor as never).saveSession("session-1", {} as never);
 
     expect(obsoleteExecutor).toHaveBeenCalledOnce();
     expect(listener).not.toHaveBeenCalled();

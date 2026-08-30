@@ -1,4 +1,4 @@
-import type { MemberProfileErrorCode } from "@/features/archive/api/archive-contracts";
+import type { MemberProfileErrorCode, MemberProfileResponse } from "@/features/archive/api/archive-contracts";
 import type { BookClubAvatarKey } from "@/shared/ui/book-club-avatar";
 
 export type { MemberProfileErrorCode };
@@ -7,6 +7,10 @@ export type EditableMemberProfile = {
   displayName: string;
   avatarKey: BookClubAvatarKey;
 };
+
+export type ProfileSaveResult =
+  | { status: "accepted"; profile: MemberProfileResponse }
+  | { status: "obsolete" };
 
 export type ProfileFailureField = "displayName" | "avatarKey" | "form";
 

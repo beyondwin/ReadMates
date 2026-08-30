@@ -1,12 +1,16 @@
+import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { HostInvitationsActions } from "@/features/host/model/host-invitation-actions";
-import { TransitionOwnerObsoleteError } from "@/shared/ui/use-transition-safety-owner";
+import { createGlobalSpaceTransitionCoordinator } from "@/src/app/global-space-transition";
+import { SpaceTransitionSafetyProvider } from "@/shared/ui/space-transition-safety-context";
+import { TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 import { registerHostInvitationActions } from "./host-invitations-route";
 
 function actions(): HostInvitationsActions {
   return {
     listInvitations: vi.fn(async () => new Response(JSON.stringify({ items: [], nextCursor: null }))),
     refreshInvitations: vi.fn(async () => ({ items: [], nextCursor: null })),
+    publishInvitations: vi.fn(),
     createInvitation: vi.fn(async () => { throw new TypeError("response lost"); }),
     revokeInvitation: vi.fn(async () => { throw new TypeError("response lost"); }),
     parseInvitation: vi.fn(),
@@ -47,6 +51,7 @@ describe("host invitation transition owner", () => {
 
     expect(source.createInvitation).toHaveBeenCalledTimes(1);
     expect(source.refreshInvitations).toHaveBeenCalledTimes(1);
+    expect(source.publishInvitations).toHaveBeenCalledWith(refreshed, { limit: 50 });
     expect(result).toMatchObject({ created, refreshed });
     expect(result.publishUi(uiPublication)).toBe("published");
     expect(uiPublication).toHaveBeenCalledWith({ created, refreshed });
@@ -72,6 +77,51 @@ describe("host invitation transition owner", () => {
     })).rejects.toBeInstanceOf(TransitionOwnerObsoleteError);
     expect(source.createInvitation).toHaveBeenCalledTimes(1);
     expect(source.refreshInvitations).not.toHaveBeenCalled();
+  });
+
+  it("publishes no delayed cache or UI result after the accepted route owner unmounts", async () => {
+    const source = actions();
+    const refreshed = { items: [], nextCursor: null };
+    let releaseRefresh!: () => void;
+    const refreshDelay = new Promise<void>((resolve) => { releaseRefresh = resolve; });
+    const cachePublication = vi.fn();
+    vi.mocked(source.createInvitation).mockResolvedValue(new Response("{}", { status: 201 }));
+    vi.mocked(source.parseInvitation).mockResolvedValue({ invitationId: "invite-1" } as never);
+    vi.mocked(source.listInvitations).mockImplementation(async () => {
+      await refreshDelay;
+      return new Response(JSON.stringify(refreshed), {
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    vi.mocked(source.parseInvitationList).mockResolvedValue(refreshed);
+    vi.mocked(source.refreshInvitations).mockImplementation(async () => {
+      await refreshDelay;
+      return refreshed;
+    });
+    vi.mocked(source.publishInvitations).mockImplementation(cachePublication);
+    const coordinator = createGlobalSpaceTransitionCoordinator();
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <SpaceTransitionSafetyProvider port={coordinator}>{children}</SpaceTransitionSafetyProvider>
+    );
+    const { result, unmount } = renderHook(() => {
+      const owner = useTransitionSafetyOwner("host-invitations");
+      return registerHostInvitationActions(source, owner);
+    }, { wrapper });
+
+    const request = result.current.createInvitation({
+      email: "member@example.com",
+      name: "멤버",
+      applyToCurrentSession: true,
+    });
+    await vi.waitFor(() => expect(
+      vi.mocked(source.listInvitations).mock.calls.length
+      + vi.mocked(source.refreshInvitations).mock.calls.length,
+    ).toBe(1));
+    act(() => unmount());
+    releaseRefresh();
+
+    await expect(request).rejects.toBeInstanceOf(TransitionOwnerObsoleteError);
+    expect(cachePublication).not.toHaveBeenCalled();
   });
 
   it("settles a definite HTTP failure without detached lookup or cache publication", async () => {

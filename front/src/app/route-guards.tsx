@@ -6,7 +6,8 @@ import { loginPathForReturnTo } from "@/shared/auth/login-return";
 import { canUseHostApp, canUseMemberApp } from "@/shared/auth/member-app-access";
 import { scopedAppPath } from "@/shared/auth/member-app-loader";
 import { canUsePlatformAdmin } from "@/shared/auth/platform-admin-access";
-import { useAuth, useAuthActions } from "./auth-state";
+import { useAuth } from "./auth-state";
+import { useAuthenticatedLogoutPublications } from "./use-authenticated-logout-publications";
 
 export function RequireAuth({ children }: { children: ReactNode }) {
   const state = useAuth();
@@ -81,7 +82,7 @@ function useLoginPathForCurrentRoute() {
 }
 
 function BlockedMemberApp() {
-  const { markLoggedOut } = useAuthActions();
+  const onLogoutAccepted = useAuthenticatedLogoutPublications();
   const { clubSlug } = useParams();
   const publicHomePath = clubSlug ? `/clubs/${encodeURIComponent(clubSlug)}` : "/";
   const publicAboutPath = clubSlug ? `/clubs/${encodeURIComponent(clubSlug)}/about` : "/about";
@@ -103,7 +104,7 @@ function BlockedMemberApp() {
               <Link to={publicAboutPath} className="btn btn-ghost">
                 클럽 소개
               </Link>
-              <LogoutButton className="btn btn-ghost" onLoggedOut={markLoggedOut} />
+              <LogoutButton className="btn btn-ghost" onLogoutAccepted={onLogoutAccepted} />
             </div>
           </div>
         </div>

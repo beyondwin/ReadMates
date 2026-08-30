@@ -106,6 +106,10 @@ export function CurrentSessionRoute({
       if (await handle.settle("succeeded") !== "accepted") return;
       await publishTransitionAction(handle, "cache", () => publishCurrentScheduleSeen(queryClient, context, receipt));
     }).catch(async (error: unknown) => {
+      if (error instanceof TransitionOwnerObsoleteError || !handle.isPublicationCurrent()) {
+        acknowledgements.delete(renderedRevisionKey);
+        return;
+      }
       if (await handle.settle("failed") !== "accepted") return;
       if (isCurrentScheduleSeenConflict(error)) {
         await publishTransitionAction(handle, "cache", () => invalidateCurrentSession(queryClient, context));

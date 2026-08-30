@@ -1,9 +1,10 @@
 import { useCallback, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { MemberProfileResponse, MyPageResponse } from "@/features/archive/api/archive-contracts";
+import type { MemberProfileErrorCode, MyPageResponse } from "@/features/archive/api/archive-contracts";
 import { profileSaveErrorMessage } from "@/features/archive/model/archive-model";
 import {
   type EditableMemberProfile,
+  type ProfileSaveResult,
   profileFailureField,
   ProfileUpdateFailure,
 } from "@/features/archive/model/profile-update";
@@ -53,7 +54,7 @@ export function useProfileUpdateController({
   onRevalidate,
 }: ProfileUpdateControllerInput): {
   profile: MyPageResponse;
-  saveProfile: (profile: EditableMemberProfile) => Promise<MemberProfileResponse>;
+  saveProfile: (profile: EditableMemberProfile) => Promise<ProfileSaveResult>;
 } {
   const queryClient = useQueryClient();
   const transitionOwner = useTransitionSafetyOwner("member-profile-update");
@@ -63,7 +64,7 @@ export function useProfileUpdateController({
     override: SavedProfileOverride;
   } | null>(null);
   const latestRequestGeneration = useRef(0);
-  const savedOverride = savedState?.clubSlug === clubSlug ? savedState.override : null;
+  const savedOverride = savedState && savedState.clubSlug === clubSlug ? savedState.override : null;
   const source = editableProfile(sourceProfile);
 
   const sourceIsAuthoritative = savedOverride !== null && profilesEqual(source, savedOverride.saved);
@@ -76,7 +77,7 @@ export function useProfileUpdateController({
     ? { ...sourceProfile, ...savedOverride.saved }
     : sourceProfile;
 
-  const saveProfile = useCallback(async (editable: EditableMemberProfile) => {
+  const saveProfile = useCallback(async (editable: EditableMemberProfile): Promise<ProfileSaveResult> => {
     const code = canEditProfile ? null : "MEMBERSHIP_NOT_ALLOWED" as const;
     if (code) {
       throw new ProfileUpdateFailure(profileSaveErrorMessage(code), code, "form");
@@ -88,17 +89,15 @@ export function useProfileUpdateController({
 
     try {
       const updated = await updateMyProfile(editable);
-      if (await handle.settle("succeeded") !== "accepted") return updated;
-      if (requestGeneration !== latestRequestGeneration.current) return updated;
-      const saved = editableProfile(updated as MyPageResponse);
-      await publishTransitionAction(handle, "cache", async () => {
-        await publishUpdatedProfile(queryClient);
-        await onProfileUpdated();
-      });
-      if (requestGeneration !== latestRequestGeneration.current) return updated;
+      if (await handle.settle("succeeded") !== "accepted") return { status: "obsolete" };
+      if (requestGeneration !== latestRequestGeneration.current) return { status: "obsolete" };
+      const saved = editableProfile(updated);
+      await publishTransitionAction(handle, "cache", () => publishUpdatedProfile(queryClient));
+      await publishTransitionAction(handle, "receiptCallback", onProfileUpdated);
+      if (requestGeneration !== latestRequestGeneration.current) return { status: "obsolete" };
       await publishTransitionAction(handle, "ui", () => {
         setSavedState((currentState) => {
-          const current = currentState?.clubSlug === clubSlug ? currentState.override : null;
+          const current = currentState && currentState.clubSlug === clubSlug ? currentState.override : null;
           return {
             clubSlug,
             override: {
@@ -113,18 +112,20 @@ export function useProfileUpdateController({
         });
         onRevalidate();
       });
-      return updated;
+      return { status: "accepted", profile: updated };
     } catch (error) {
-      if (isTransitionOwnerObsoleteError(error)) throw error;
-      await handle.settle("failed");
+      if (isTransitionOwnerObsoleteError(error)) return { status: "obsolete" };
+      if (await handle.settle("failed") !== "accepted") return { status: "obsolete" };
       if (error instanceof ProfileUpdateFailure) throw error;
-      const errorCode = isReadmatesApiError(error) ? error.code : null;
+      const errorCode = isReadmatesApiError(error) ? error.code as MemberProfileErrorCode : null;
       throw new ProfileUpdateFailure(
         profileSaveErrorMessage(errorCode),
         errorCode,
         profileFailureField(errorCode),
         { cause: error },
       );
+    } finally {
+      handle.completePublication();
     }
   }, [canEditProfile, clubSlug, onProfileUpdated, onRevalidate, queryClient, sourceProfile, transitionOwner, updateMyProfile]);
 

@@ -23,6 +23,7 @@ import {
   type GuestBrowsePage,
 } from "@/features/guest-browse/api/guest-browse-api";
 import { anonymousAuth, useAuth, useAuthActions } from "@/src/app/auth-state";
+import { useAuthenticatedLogoutPublications } from "@/src/app/use-authenticated-logout-publications";
 import { AppRouteSecurityController } from "@/src/app/app-route-security-controller";
 import {
   GlobalSpaceTransitionController,
@@ -68,6 +69,11 @@ import { AppClubShell } from "@/shared/ui/app-club-shell";
 import { MobileHeader } from "@/shared/ui/mobile-header";
 import { MobileTabBar } from "@/shared/ui/mobile-tab-bar";
 import { PublicFooter } from "@/shared/ui/public-footer";
+import {
+  publishTransitionAction,
+  TransitionOwnerObsoleteError,
+  useTransitionSafetyOwner,
+} from "@/shared/ui/use-transition-safety-owner";
 import { READMATES_MOBILE_TAB_LABELS, READMATES_NAV_LABELS, READMATES_PRIMARY_NAV_LABELS } from "@/shared/ui/readmates-copy";
 import { TopNav } from "@/shared/ui/top-nav";
 
@@ -485,6 +491,8 @@ export function AppRouteLayout({
   const queryClient = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
+  const onLogoutAccepted = useAuthenticatedLogoutPublications();
+  const guestLogoutOwner = useTransitionSafetyOwner("guest-continuation-logout");
   const pathname = location.pathname;
   const appPath = appPathname(pathname);
   const guestTarget = useMemo(
@@ -632,16 +640,34 @@ export function AppRouteLayout({
       throw new Error("Guest continuation route changed during verification.");
     }
 
-    const response = await logout();
-    if (!response.ok && response.status !== 401) {
-      throw new Error(`Guest continuation logout failed: ${response.status}`);
+    const operationId = `guest-continuation-logout-${globalThis.crypto.randomUUID()}`;
+    const handle = guestLogoutOwner.begin(operationId, "L1", async () => ({ operationId, outcome: "still-unknown" }));
+    let settled = false;
+    try {
+      const response = await logout();
+      const succeeded = response.ok || response.status === 401;
+      if (await handle.settle(succeeded ? "succeeded" : "failed") !== "accepted") {
+        throw new TransitionOwnerObsoleteError();
+      }
+      settled = true;
+      if (!succeeded) {
+        return await publishTransitionAction(handle, "errorCopy", () => {
+          throw new Error(`Guest continuation logout failed: ${response.status}`);
+        });
+      }
+      await publishTransitionAction(handle, "cache", () => queryClient.clear());
+      await publishTransitionAction(handle, "navigation", () => {
+        markLoggedOut();
+        void navigate(returnTo, { replace: true });
+        navigate(0);
+      });
+      return "completed" as const;
+    } catch (error) {
+      if (error instanceof TransitionOwnerObsoleteError || settled) throw error;
+      return "unknown" as const;
+    } finally {
+      if (settled) handle.completePublication();
     }
-
-    await queryClient.cancelQueries();
-    queryClient.clear();
-    markLoggedOut();
-    await navigate(returnTo, { replace: true });
-    navigate(0);
   };
 
   const accountControl = auth?.authenticated ? (
@@ -649,7 +675,7 @@ export function AppRouteLayout({
       auth={auth}
       appBasePath={basePath}
       LinkComponent={Link}
-      onLoggedOut={markLoggedOut}
+      onLogoutAccepted={onLogoutAccepted}
     />
   ) : null;
   const expiryRecovery = sessionExpiry ? (

@@ -98,6 +98,8 @@ export type AcceptedTransitionPublicationAction = {
 export type PendingHandle = {
   generation: number;
   settle: (result: "succeeded" | "failed") => Promise<"accepted" | "obsolete">;
+  /** Non-consuming generation probe used by route-owner async publication fences. */
+  isAcceptedPublicationCurrent?: () => boolean;
   publishAccepted: (
     action: AcceptedTransitionPublicationAction,
   ) => "published" | "rejected";

@@ -3,16 +3,19 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MemberProfileResponse, MyPageResponse } from "@/features/archive/api/archive-contracts";
 import { ReadmatesApiError } from "@/shared/api/errors";
+import { createGlobalSpaceTransitionCoordinator } from "@/src/app/global-space-transition";
+import { SpaceTransitionSafetyProvider } from "@/shared/ui/space-transition-safety-context";
 import { useProfileUpdateController } from "./profile-update-controller";
 
 const mutations = vi.hoisted(() => ({
   updateMyProfile: vi.fn(),
   useUpdateMyProfileMutation: vi.fn(),
+  publishUpdatedProfile: vi.fn(),
 }));
 
 vi.mock("@/features/archive/queries/profile-queries", () => ({
   useUpdateMyProfileMutation: mutations.useUpdateMyProfileMutation,
-  publishUpdatedProfile: vi.fn().mockResolvedValue(undefined),
+  publishUpdatedProfile: mutations.publishUpdatedProfile,
 }));
 
 const profile: MyPageResponse = {
@@ -51,8 +54,11 @@ function renderController(sourceProfile = profile, clubSlug = "reading-sai", can
   const onProfileUpdated = vi.fn().mockResolvedValue(undefined);
   const onRevalidate = vi.fn();
   const queryClient = new QueryClient();
+  const coordinator = createGlobalSpaceTransitionCoordinator();
   const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <SpaceTransitionSafetyProvider port={coordinator}>{children}</SpaceTransitionSafetyProvider>
+    </QueryClientProvider>
   );
   const hook = renderHook(
     (props: { sourceProfile: MyPageResponse; clubSlug: string }) => useProfileUpdateController({
@@ -63,13 +69,14 @@ function renderController(sourceProfile = profile, clubSlug = "reading-sai", can
     }),
     { initialProps: { sourceProfile, clubSlug }, wrapper },
   );
-  return { ...hook, onProfileUpdated, onRevalidate };
+  return { ...hook, onProfileUpdated, onRevalidate, coordinator };
 }
 
 describe("useProfileUpdateController", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mutations.useUpdateMyProfileMutation.mockReturnValue({ mutateAsync: mutations.updateMyProfile });
+    mutations.publishUpdatedProfile.mockResolvedValue(undefined);
   });
 
   it("saves both fields, refreshes auth once, and revalidates once", async () => {
@@ -83,7 +90,7 @@ describe("useProfileUpdateController", () => {
       await expect(result.current.saveProfile({
         displayName: "새 이름",
         avatarKey: "cloud-green-book",
-      })).resolves.toEqual(saved);
+      })).resolves.toEqual({ status: "accepted", profile: saved });
     });
 
     expect(mutations.updateMyProfile).toHaveBeenCalledWith({
@@ -125,8 +132,8 @@ describe("useProfileUpdateController", () => {
       .mockReturnValueOnce(second.promise);
     const { result, onProfileUpdated, onRevalidate } = renderController();
 
-    let firstRequest!: Promise<MemberProfileResponse>;
-    let secondRequest!: Promise<MemberProfileResponse>;
+    let firstRequest!: ReturnType<typeof result.current.saveProfile>;
+    let secondRequest!: ReturnType<typeof result.current.saveProfile>;
     act(() => {
       firstRequest = result.current.saveProfile({ displayName: "첫 번째 이름", avatarKey: "cloud-green-book" });
       secondRequest = result.current.saveProfile({ displayName: "두 번째 이름", avatarKey: "sun-green-book" });
@@ -192,6 +199,25 @@ describe("useProfileUpdateController", () => {
 
     await expect(result.current.saveProfile({ displayName: "새 이름", avatarKey: "cloud-green-book" }))
       .rejects.toMatchObject({ code: "AVATAR_KEY_INVALID", field: "avatarKey", cause: apiError });
+    expect(onProfileUpdated).not.toHaveBeenCalled();
+    expect(onRevalidate).not.toHaveBeenCalled();
+  });
+
+  it("returns obsolete and publishes no auth refresh or UI after accepted save unmounts during cache refresh", async () => {
+    mutations.updateMyProfile.mockResolvedValue(saved);
+    let releaseCache!: () => void;
+    mutations.publishUpdatedProfile.mockReturnValue(new Promise<void>((resolve) => { releaseCache = resolve; }));
+    const { result, unmount, onProfileUpdated, onRevalidate } = renderController();
+
+    let saveRequest!: ReturnType<typeof result.current.saveProfile>;
+    act(() => {
+      saveRequest = result.current.saveProfile({ displayName: "새 이름", avatarKey: "cloud-green-book" });
+    });
+    await vi.waitFor(() => expect(mutations.publishUpdatedProfile).toHaveBeenCalledTimes(1));
+    unmount();
+    releaseCache();
+
+    await expect(saveRequest).resolves.toEqual({ status: "obsolete" });
     expect(onProfileUpdated).not.toHaveBeenCalled();
     expect(onRevalidate).not.toHaveBeenCalled();
   });

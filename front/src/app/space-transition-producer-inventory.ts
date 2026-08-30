@@ -1,10 +1,48 @@
+import ts from "typescript";
+
 export type MutationProducerClassification = {
   path: string;
   exportName?: string;
+  exportNames?: readonly string[];
   classification: "register" | "modify" | "verified-no-change" | "out-of-domain";
   ownerPaths: string[];
   recoveryClass: "L1" | "L2" | "L3" | "none";
   evidenceTokens: string[];
+};
+
+const WRITE_EXPORTS_BY_PATH: Readonly<Record<string, readonly string[]>> = {
+  "features/archive/api/archive-api.ts": ["leaveMembership", "updateMyAvatar", "updateMyProfile"],
+  "features/archive/queries/profile-queries.ts": ["publishUpdatedProfile"],
+  "features/current-session/api/current-session-api.ts": ["markCurrentScheduleSeen", "saveCurrentSessionCheckin", "saveCurrentSessionLongReview", "saveCurrentSessionOneLineReview", "saveCurrentSessionQuestion", "saveCurrentSessionQuestions", "updateCurrentSessionRsvp"],
+  "features/current-session/queries/current-session-queries.ts": ["publishCurrentScheduleSeen"],
+  "features/host/aigen/api/aigen-api.ts": ["cancelGeneration", "commitGeneration", "putClubAiDefault", "regenerateItem", "startGeneration"],
+  "features/host/aigen/queries/aigen-job-queries.ts": ["publishAiJobDetail", "publishAiJobSession", "publishCommittedAiJob"],
+  "features/host/aigen/storage/aigen-draft-storage.ts": ["saveAigenDraft"],
+  "features/host/api/host-api.ts": ["closeHostSession", "commitHostSessionImport", "confirmManualNotification", "correctionPublishHostSession", "createHostInvitation", "createHostSession", "deleteHostSession", "openHostSession", "previewHostSessionImport", "previewManualNotification", "processHostNotifications", "publishHostSession", "reopenHostSession", "restoreHostNotification", "restoreHostSession", "retryHostNotification", "retryHostPublicConvergence", "returnHostSessionToDraft", "revokeHostInvitation", "saveHostSessionAccessScope", "saveHostSessionAttendance", "saveHostSessionPublication", "saveHostSessionVisibility", "sendHostNotificationTestMail", "submitHostMemberLifecycle", "submitHostMemberProfile", "submitHostViewerAction", "unpublishHostSession", "updateHostNotificationPolicy", "updateHostSession"],
+  "features/host/api/host-session-record-api.ts": ["applyHostSessionRecord", "deleteHostSessionRecordDraft", "previewHostSessionRecordApply", "rebaseHostSessionRecordDraft", "restoreHostSessionRevisionToDraft", "saveHostSessionRecordDraft"],
+  "features/host/api/host-session-recovery-api.ts": ["restoreHostSessionChange"],
+  "features/host/queries/host-notification-queries.ts": ["publishHostNotificationPolicy", "publishHostNotificationPolicyFailure", "publishManualNotificationConfirm", "useProcessHostNotificationsMutation"],
+  "features/host/queries/host-session-queries.ts": ["publishDeletedHostSession", "publishHostPublicConvergence", "publishHostSessionAttendance", "publishHostSessionCreated", "publishHostSessionImport", "publishHostSessionPublication", "publishHostSessionResponse", "publishHostSessionVisibility", "publishRestoredHostSession"],
+  "features/host/queries/host-session-record-queries.ts": ["publishAppliedHostSessionRecord", "publishDeletedHostSessionRecordDraft", "publishRebasedHostSessionRecordDraft", "publishRestoredHostSessionRevisionDraft", "publishSavedHostSessionRecordDraft"],
+  "features/host/queries/host-session-recovery-queries.ts": ["publishRestoredHostSessionChange"],
+  "features/host/storage/host-sensitive-storage.ts": ["createHostSensitiveStorage", "hostSensitiveStorage"],
+  "features/notifications/api/notification-preferences-api.ts": ["saveNotificationPreferences"],
+  "features/notifications/api/notifications-api.ts": ["markAllMemberNotificationsRead", "markMemberNotificationRead"],
+  "features/platform-admin/api/platform-admin-api.ts": ["checkPlatformAdminDomainProvisioning", "commitPlatformAdminOnboarding", "confirmForceCancelPlatformAdminAiJob", "confirmPlatformAdminClubVisibility", "confirmPlatformAdminDomain", "confirmRetryCommitPlatformAdminAiJob", "createPlatformAdminDomain", "previewForceCancelPlatformAdminAiJob", "previewPlatformAdminClubVisibility", "previewPlatformAdminDomain", "previewPlatformAdminOnboarding", "previewRetryCommitPlatformAdminAiJob", "updatePlatformAdminClub", "updatePlatformAdminClubMetadata"],
+  "features/platform-admin/api/platform-admin-notifications-api.ts": ["confirmAdminNotificationReplay", "previewAdminNotificationReplay"],
+  "features/platform-admin/api/platform-admin-operations-api.ts": ["acknowledgeAdminOperationCase", "resolveAdminOperationCase", "snoozeAdminOperationCase"],
+  "features/platform-admin/api/platform-admin-support-api.ts": ["confirmAdminSupportGrant", "confirmAdminSupportGrantRevoke", "previewAdminSupportGrant", "previewAdminSupportGrantRevoke", "searchAdminSupportSubjects"],
+  "features/platform-admin/api/platform-admin-takedown-api.ts": ["confirmAdminPublicTakedown", "previewAdminPublicTakedown"],
+  "features/platform-admin/queries/platform-admin-ai-ops-queries.ts": ["publishPlatformAdminAiOps"],
+  "features/platform-admin/queries/platform-admin-notifications-queries.ts": ["publishPlatformAdminNotifications"],
+  "features/platform-admin/queries/platform-admin-operations-queries.ts": ["publishAdminOperationCase"],
+  "features/platform-admin/queries/platform-admin-queries.ts": ["publishPlatformAdminClubState", "publishPlatformAdminOnboarding", "publishUpdatedPlatformAdminClub"],
+  "features/platform-admin/queries/platform-admin-support-queries.ts": ["publishAdminSupportLedger"],
+  "features/platform-admin/queries/platform-admin-takedown-queries.ts": ["publishAdminTakedownReceipt"],
+  "shared/api/host-authority-event.ts": ["cancelClubHostRequests"],
+  "shared/auth/club-access-api.ts": ["touchClubAccess"],
+  "shared/auth/club-access-query.ts": ["touchClubAccessOnce"],
+  "shared/auth/session-api.ts": ["logoutCurrentSession"],
 };
 
 const entry = (
@@ -14,7 +52,15 @@ const entry = (
   ownerPaths: string[],
   evidenceTokens: string[],
   exportName?: string,
-): MutationProducerClassification => ({ path, classification, recoveryClass, ownerPaths, evidenceTokens, ...(exportName ? { exportName } : {}) });
+): MutationProducerClassification => ({
+  path,
+  classification,
+  recoveryClass,
+  ownerPaths,
+  evidenceTokens,
+  ...(exportName ? { exportName } : {}),
+  ...(WRITE_EXPORTS_BY_PATH[path] ? { exportNames: WRITE_EXPORTS_BY_PATH[path] } : {}),
+});
 const register = (path: string, level: "L1" | "L2" | "L3", evidence: string[]) => entry(path, "register", level, [path], evidence);
 const modify = (path: string, owners: string[], level: "L1" | "L2" | "L3", evidence: string[]) => entry(path, "modify", level, owners, evidence);
 const leaf = (path: string, owners: string[], evidence: string[]) => entry(path, "verified-no-change", "none", owners, evidence);
@@ -27,14 +73,17 @@ export const SPACE_TRANSITION_PRODUCER_INVENTORY = [
   register("features/notifications/route/member-notification-settings-route.tsx", "L1", ["saveNotificationPreferences", "dirty-preferences"]),
   register("features/notifications/route/member-notifications-route.tsx", "L1", ["memberNotificationsActions", "notifications-refetch"]),
   leaf("features/auth/route/login-route.tsx", [], ["pre-auth", "outside-authenticated-space-transition"]),
-  leaf("features/auth/api/auth-api.ts", ["features/auth/route/login-route.tsx"], ["pre-auth-transport", "outside-authenticated-space-transition"]),
+  entry("features/auth/api/auth-api.ts", "verified-no-change", "none", ["features/auth/route/login-route.tsx"], ["pre-auth-dev-login", "outside-authenticated-space-transition"], "submitDevLogin"),
+  entry("features/auth/api/auth-api.ts", "modify", "L1", ["features/auth/route/logout-button.tsx"], ["logout-transport", "registered-authenticated-owner"], "logout"),
   leaf("features/host/queries/host-state-purge.ts", ["src/app/host-authority-loss-controller.tsx"], ["authority-loss-cleanup", "not-user-command"]),
   leaf("shared/api/host-authority-event.ts", ["src/app/host-authority-loss-controller.tsx"], ["authority-loss-request-cancel", "not-user-command"]),
   leaf("shared/auth/club-access-api.ts", ["src/app/layouts/app-route-layout.tsx"], ["transport-primitive", "response-ignored"]),
-  leaf("shared/auth/session-api.ts", ["src/app/layouts/app-route-layout.tsx"], ["logout-transport", "out-of-space-terminal-transition"]),
+  modify("shared/auth/session-api.ts", ["features/auth/route/logout-button.tsx", "src/app/layouts/app-route-layout.tsx"], "L1", ["logout-transport", "registered-authenticated-owner"]),
   leaf("src/app/layouts/app-route-layout.tsx", ["src/app/layouts/app-route-layout.tsx"], ["touchClubAccessOnce", "ambient-touch", "request-count:1"]),
-  leaf("src/app/layouts/app-route-layout.tsx", ["src/app/layouts/app-route-layout.tsx"], ["logoutCurrentSession", "out-of-space-terminal-transition", "cache-clear", "auth-reset", "navigation-replace"]),
-  leaf("features/auth/route/logout-button.tsx", ["src/app/layouts/app-route-layout.tsx"], ["mounted-logout-trigger", "callback-only"]),
+  register("src/app/layouts/app-route-layout.tsx", "L1", ["guest-continuation-logout", "cache-clear", "auth-reset", "navigation-replace"]),
+  register("features/auth/route/logout-button.tsx", "L1", ["authenticated-logout", "accepted-publication"]),
+  entry("shared/auth/oauth-join-intent.ts", "verified-no-change", "none", ["shared/ui/member-start-link.tsx"], ["pre-auth-join-intent", "ephemeral-navigation-token"], "oauthJoinHref"),
+  entry("shared/observability/frontend-observability-client.ts", "verified-no-change", "none", ["shared/observability/frontend-observability.ts"], ["fail-open-telemetry", "no-product-publication"], "createFrontendObservabilityClient"),
   register("features/host/route/host-operations-route.tsx", "L1", ["ai-defaults", "accepted-publication"]),
   register("features/host/route/host-dashboard-route.tsx", "L1", ["attendanceMutation", "restoreMutation"]),
   register("features/host/route/host-meeting-ledger-route.tsx", "L2", ["createSession", "saveAccessScope"]),
@@ -85,6 +134,8 @@ export const SPACE_TRANSITION_PRODUCER_INVENTORY = [
   modify("features/platform-admin/queries/platform-admin-support-queries.ts", ["features/platform-admin/route/admin-support-route.tsx"], "L3", ["useMutation", "explicit-publisher"]),
   modify("features/platform-admin/queries/platform-admin-takedown-queries.ts", ["features/platform-admin/route/admin-public-takedown-route.tsx"], "L3", ["one-confirm-request", "explicit-publisher"]),
   modify("features/platform-admin/api/platform-admin-api.ts", ["features/platform-admin/route/admin-ai-ops-route.tsx", "features/platform-admin/route/admin-club-detail-route.tsx", "features/platform-admin/route/admin-shell-layout.tsx"], "L3", ["transport-writes", "registered-route-owners"]),
+  modify("features/platform-admin/api/platform-admin-operations-api.ts", ["features/platform-admin/route/admin-today-route.tsx"], "L1", ["case-command-posts", "registered-route-owner"]),
+  entry("features/platform-admin/api/platform-admin-audit-api.ts", "verified-no-change", "none", ["features/platform-admin/route/admin-audit-route.tsx", "features/platform-admin/route/admin-club-detail-route.tsx"], ["read-only-sensitive-search-post", "query-observation"], "searchAdminAuditLedger"),
   modify("features/platform-admin/api/platform-admin-notifications-api.ts", ["features/platform-admin/route/admin-notifications-route.tsx"], "L3", ["transport-write", "registered-route-owner"]),
   modify("features/platform-admin/api/platform-admin-support-api.ts", ["features/platform-admin/route/admin-support-route.tsx"], "L3", ["transport-write", "registered-route-owner"]),
   modify("features/platform-admin/api/platform-admin-takedown-api.ts", ["features/platform-admin/route/admin-public-takedown-route.tsx"], "L3", ["transport-write", "registered-receipt-owner"]),
@@ -113,6 +164,7 @@ export const SPACE_TRANSITION_PRODUCER_INVENTORY = [
 
 export type ProducerInventoryAudit = {
   unclassifiedPaths: string[];
+  unclassifiedExportedWrites: string[];
   unreachableExportsWithMountedImports: string[];
   modifyEntriesWithoutMountedOwner: string[];
   verifiedLeavesWithForbiddenPublication: string[];
@@ -152,15 +204,69 @@ export function detectMutationProducerPaths(sources: ReadonlyMap<string, string>
     .sort();
 }
 
-const EXPORTED_WRITE_PATH = /(?:^|\/)(?:api|actions|queries|storage)(?:\/|$)|^shared\/auth\/(?:club-access|session-api)/;
+const HTTP_WRITE_METHOD_PATTERN = /\bmethod\s*:\s*["'](?:POST|PUT|PATCH|DELETE)["']/i;
+const EXPORTED_WRITE_VERB_PATH = /(?:^|\/)(?:api|actions|queries|storage)(?:\/|$)|^shared\/auth\/(?:club-access|session-api)/;
 
 export function detectExportedWriteSymbols(sources: ReadonlyMap<string, string>): string[] {
   const exportedWrites: string[] = [];
-  const declaration = new RegExp(`\\bexport\\s+(?:async\\s+)?(?:function|const)\\s+(${WRITE_VERB}[A-Z][A-Za-z0-9_]*)`, "g");
   for (const [path, source] of sources) {
-    if (/\.(?:test|ct|story)\.[jt]sx?$/.test(path) || !EXPORTED_WRITE_PATH.test(path)) continue;
-    for (const match of source.matchAll(declaration)) {
-      exportedWrites.push(`${path}#${match[1]}`);
+    if (/\.(?:test|ct|story)\.[jt]sx?$/.test(path)) continue;
+    const sourceFile = ts.createSourceFile(
+      path,
+      source,
+      ts.ScriptTarget.Latest,
+      true,
+      path.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+    );
+    const declarations = new Map<string, { exported: boolean; calls: Set<string>; writesHttp: boolean }>();
+    const exportedModifier = (node: ts.Node) => ts.canHaveModifiers(node)
+      && Boolean(ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword));
+    const record = (name: string, node: ts.Node, exported: boolean) => {
+      const calls = new Set<string>();
+      const visit = (candidate: ts.Node) => {
+        if (ts.isCallExpression(candidate) && ts.isIdentifier(candidate.expression)) {
+          calls.add(candidate.expression.text);
+        }
+        ts.forEachChild(candidate, visit);
+      };
+      visit(node);
+      declarations.set(name, {
+        exported,
+        calls,
+        writesHttp: HTTP_WRITE_METHOD_PATTERN.test(node.getText(sourceFile)),
+      });
+    };
+    for (const statement of sourceFile.statements) {
+      if (ts.isFunctionDeclaration(statement) && statement.name && statement.body) {
+        record(statement.name.text, statement, exportedModifier(statement));
+      }
+      if (ts.isVariableStatement(statement)) {
+        for (const declaration of statement.declarationList.declarations) {
+          if (ts.isIdentifier(declaration.name) && declaration.initializer) {
+            record(declaration.name.text, declaration, exportedModifier(statement));
+          }
+        }
+      }
+    }
+    const writeFunctions = new Set([...declarations]
+      .filter(([name, declaration]) => declaration.writesHttp
+        || (EXPORTED_WRITE_VERB_PATH.test(path) && new RegExp(`^${WRITE_VERB}(?:[A-Z]|$)`).test(name)))
+      .map(([name]) => name));
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const [name, declaration] of declarations) {
+        if (writeFunctions.has(name)) continue;
+        if ([...declaration.calls].some((called) => writeFunctions.has(called))) {
+          writeFunctions.add(name);
+          changed = true;
+        }
+      }
+    }
+    for (const [name, declaration] of declarations) {
+      if (declaration.exported && writeFunctions.has(name)) {
+        exportedWrites.push(`${path}#${name}`);
+      }
     }
   }
   return exportedWrites.sort();
@@ -229,8 +335,14 @@ export function auditMutationProducerInventory(
   inventory: readonly MutationProducerClassification[] = SPACE_TRANSITION_PRODUCER_INVENTORY,
 ): ProducerInventoryAudit {
   const inventoryPaths = new Set(inventory.map((candidate) => candidate.path));
+  const inventoryExportedWrites = new Set(inventory.flatMap((candidate) => [
+    ...(candidate.exportName ? [`${candidate.path}#${candidate.exportName}`] : []),
+    ...(candidate.exportNames ?? []).map((exportName) => `${candidate.path}#${exportName}`),
+  ]));
   return {
     unclassifiedPaths: detectMutationProducerPaths(sources).filter((path) => !inventoryPaths.has(path)),
+    unclassifiedExportedWrites: detectExportedWriteSymbols(sources)
+      .filter((symbol) => !inventoryExportedWrites.has(symbol)),
     unreachableExportsWithMountedImports: inventory.filter((candidate) => candidate.classification === "out-of-domain" && mountedPaths.has(candidate.path)).map((candidate) => `${candidate.path}#${candidate.exportName ?? "*"}`),
     modifyEntriesWithoutMountedOwner: inventory.filter((candidate) => candidate.classification === "modify" && !candidate.ownerPaths.some((owner) => mountedPaths.has(owner))).map((candidate) => candidate.path),
     verifiedLeavesWithForbiddenPublication: inventory.filter((candidate) => candidate.classification === "verified-no-change" && /^(?:features\/[^/]+\/.*\/ui\/|features\/[^/]+\/ui\/)/.test(candidate.path) && FORBIDDEN_LEAF_PATTERN.test(sources.get(candidate.path) ?? "")).map((candidate) => candidate.path),

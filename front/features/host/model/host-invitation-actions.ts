@@ -7,7 +7,10 @@ import type { PageRequest } from "@/shared/model/paging";
 
 export type HostInvitationsActions = {
   listInvitations: (page?: PageRequest) => Promise<Response>;
+  /** Uncached post-command observation. */
   refreshInvitations: (page?: PageRequest) => Promise<HostInvitationListPage>;
+  /** Owner-fenced cache publication of an already observed page. */
+  publishInvitations: (page: HostInvitationListPage, request?: PageRequest) => void;
   createInvitation: (request: CreateHostInvitationRequest) => Promise<Response>;
   revokeInvitation: (invitationId: string) => Promise<Response>;
   parseInvitation: (response: Response) => Promise<HostInvitationResponse>;

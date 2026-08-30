@@ -5,6 +5,8 @@ import type { ReactNode } from "react";
 import { createMemoryRouter, Link as RouterLink, RouterProvider, useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HostMeetingWorkspaceRoute } from "./host-meeting-workspace-route";
+import { createGlobalSpaceTransitionCoordinator } from "@/src/app/global-space-transition";
+import { SpaceTransitionSafetyProvider } from "@/shared/ui/space-transition-safety-context";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { hostMeetingWorkspaceLoaderFactory } from "./host-meeting-workspace-data";
 import {
@@ -119,7 +121,7 @@ vi.mock("@/features/host/ui/host-session-editor", () => ({
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              void actions?.saveSession(SESSION_ID, { title: "저장한 제목" });
+              void actions?.saveSession(SESSION_ID, { title: "저장한 제목" }).catch(() => undefined);
             }}
           >
             <label>
@@ -175,6 +177,7 @@ function renderRoute(search: string, extras: {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
   });
+  const coordinator = createGlobalSpaceTransitionCoordinator();
   client.setQueryData(
     hostSessionDetailQuery(SESSION_ID, { clubSlug: "reading-sai" }).queryKey,
     {
@@ -272,10 +275,12 @@ function renderRoute(search: string, extras: {
   ], { initialEntries: [`/clubs/reading-sai/app/host/sessions/${SESSION_ID}${search}`] });
   const rendered = render(
     <QueryClientProvider client={client}>
-      <RouterProvider router={router} />
+      <SpaceTransitionSafetyProvider port={coordinator}>
+        <RouterProvider router={router} />
+      </SpaceTransitionSafetyProvider>
     </QueryClientProvider>,
   );
-  return { router, client, ...rendered };
+  return { router, client, coordinator, ...rendered };
 }
 
 describe("host meeting workspace route", () => {
@@ -883,6 +888,35 @@ describe("host meeting workspace route", () => {
     await user.click(await screen.findByRole("button", { name: "기본 정보 저장" }));
     expect(await screen.findByText("모임 정보를 저장했습니다.")).toBeVisible();
     expect(screen.getByRole("button", { name: "되돌리기" })).toBeVisible();
+  });
+
+  it("publishes no pending undo when workspace authority is lost after save settles", async () => {
+    const user = userEvent.setup();
+    let responseBody!: ReadableStreamDefaultController<Uint8Array>;
+    const parseStarted = vi.fn();
+    const response = new Response(new ReadableStream<Uint8Array>({
+      pull(controller) {
+        responseBody = controller;
+        parseStarted();
+      },
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+    routeMocks.saveSession.mockResolvedValue(response);
+    const { coordinator } = renderRoute("?section=basic");
+
+    await user.click(await screen.findByRole("button", { name: "기본 정보 저장" }));
+    await vi.waitFor(() => expect(routeMocks.saveSession).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(parseStarted).toHaveBeenCalled());
+    act(() => coordinator.invalidateForAuthorityLoss());
+    await act(async () => {
+      responseBody.enqueue(new TextEncoder().encode(JSON.stringify({
+        changeReceipt: { changeId: "change-late-1", kind: "BASIC_INFO", undoAvailable: true },
+      })));
+      responseBody.close();
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByText("모임 정보를 저장했습니다.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "되돌리기" })).not.toBeInTheDocument();
   });
 
   it("purges pending undo on authority loss and does not auto-retry restore", async () => {

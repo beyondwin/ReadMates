@@ -7,6 +7,7 @@ import {
   auditMutationProducerInventory,
   buildMountedProductionPaths,
   detectExportedWriteSymbols,
+  type MutationProducerClassification,
 } from "./space-transition-producer-inventory";
 
 const frontRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -35,6 +36,7 @@ describe("space transition mutation-producer inventory", () => {
   it("classifies every current mounted producer and exported out-of-domain write", () => {
     expect(auditMutationProducerInventory(productionSources(), mountedOwners)).toEqual({
       unclassifiedPaths: [],
+      unclassifiedExportedWrites: [],
       unreachableExportsWithMountedImports: [],
       modifyEntriesWithoutMountedOwner: [],
       verifiedLeavesWithForbiddenPublication: [],
@@ -127,5 +129,45 @@ describe("space transition mutation-producer inventory", () => {
       "features/example/storage/write-storage.ts#saveThing",
       "shared/auth/session-api.ts#logoutCurrentSession",
     ]);
+  });
+
+  it("detects HTTP write exports regardless of their symbol verb", () => {
+    const sources = new Map([
+      ["features/example/api/neutral-api.ts", `
+        export async function acknowledgeCase() {
+          return fetch("/api/cases/1", { method: "POST" });
+        }
+        export const snapshot = () => fetch("/api/cases/1");
+      `],
+    ]);
+
+    expect(detectExportedWriteSymbols(sources)).toEqual([
+      "features/example/api/neutral-api.ts#acknowledgeCase",
+    ]);
+  });
+
+  it("fails when an already classified path gains a new write export symbol", () => {
+    const sources = new Map([
+      ["features/example/api/cases-api.ts", `
+        export function updateCase() {
+          return fetch("/api/cases/1", { method: "PATCH" });
+        }
+        export function acknowledgeCase() {
+          return fetch("/api/cases/1/acknowledge", { method: "POST" });
+        }
+      `],
+    ]);
+    const inventory: MutationProducerClassification[] = [{
+      path: "features/example/api/cases-api.ts",
+      exportName: "updateCase",
+      classification: "out-of-domain",
+      ownerPaths: [],
+      recoveryClass: "none",
+      evidenceTokens: ["exported-write", "mounted-import-count:0"],
+    }];
+
+    expect(auditMutationProducerInventory(sources, new Set(), inventory)).toMatchObject({
+      unclassifiedExportedWrites: ["features/example/api/cases-api.ts#acknowledgeCase"],
+    });
   });
 });

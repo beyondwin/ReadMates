@@ -59,6 +59,7 @@ const hostInvitationsTestActions = {
     const response = await hostInvitationsTestActions.listInvitations(page);
     return hostInvitationsTestActions.parseInvitationList(response);
   },
+  publishInvitations: () => undefined,
   parseInvitation: async (response) => response.json(),
   parseInvitationList: async (response) => response.json(),
 } satisfies HostInvitationsActions;
@@ -82,6 +83,7 @@ function registerTestInvitationActions(actions: HostInvitationsActions): Registe
       }
       const created = await actions.parseInvitation(response);
       const refreshed = await actions.refreshInvitations({ limit: 50 });
+      actions.publishInvitations(refreshed, { limit: 50 });
       const result = { created, refreshed };
       return { ...result, publishUi: (publish) => (publish(result), "published") };
     },
@@ -98,6 +100,7 @@ function registerTestInvitationActions(actions: HostInvitationsActions): Registe
       }
       const revoked = await actions.parseInvitation(response);
       const refreshed = await actions.refreshInvitations({ limit: 50 });
+      actions.publishInvitations(refreshed, { limit: 50 });
       const result = { revoked, refreshed };
       return { ...result, publishUi: (publish) => (publish(result), "published") };
     },

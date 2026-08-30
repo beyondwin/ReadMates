@@ -55,17 +55,23 @@ export function useHostMeetingWorkspaceActions(
   const executeAccepted = useCallback(async <T,>(
     operationId: string,
     request: () => Promise<T>,
-    publish: (result: T) => Promise<unknown>,
+    publish: (
+      result: T,
+      publishAction: typeof publishTransitionAction,
+      handle: Parameters<typeof publishTransitionAction>[0],
+    ) => Promise<unknown>,
   ) => {
     const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
     try {
       const result = await request();
       if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
-      await publishTransitionAction(handle, "cache", () => publish(result));
+      await publish(result, publishTransitionAction, handle);
       return result;
     } catch (error) {
       if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");
       throw error;
+    } finally {
+      handle.completePublication();
     }
   }, [transitionOwner]);
 
@@ -75,26 +81,33 @@ export function useHostMeetingWorkspaceActions(
     operation: string,
     manualDispatches = true,
   ) => {
-    const response = await executeAccepted(
+    const accepted = await executeAccepted(
       `host-session:${operation}:${sessionId}`,
-      mutate,
-      (accepted) => publishHostSessionResponse(queryClient, accepted, sessionId, context, manualDispatches),
+      async () => {
+        const response = await mutate();
+        const result = await hostSessionLifecycleResultFromResponse(response, {
+          clubSlug: context.clubSlug,
+          requestKind: "SESSION_LIFECYCLE",
+        });
+        return { response, result };
+      },
+      async ({ response, result }, publishAction, handle) => {
+        await publishAction(handle, "cache", () => publishHostSessionResponse(
+          queryClient, response, sessionId, context, manualDispatches,
+        ));
+        if (result.ok && onSessionRecordsChanged) {
+          await publishAction(handle, "receiptCallback", () => onSessionRecordsChanged(sessionId));
+        }
+      },
     );
-    const result = await hostSessionLifecycleResultFromResponse(response, {
-      clubSlug: context.clubSlug,
-      requestKind: "SESSION_LIFECYCLE",
-    });
-    if (result.ok) {
-      await onSessionRecordsChanged?.(sessionId);
-    }
-    return result;
+    return accepted.result;
   }, [context, executeAccepted, onSessionRecordsChanged, queryClient]);
 
   return useMemo<HostSessionEditorActions>(() => ({
     loadDeletionPreview: (sessionId) =>
       queryClient.fetchQuery(hostSessionDeletionPreviewQuery(sessionId, context)),
-    deleteSession: (sessionId) => executeAccepted(`host-session:delete:${sessionId}`, () => deleteSession(sessionId), (result) => publishDeletedHostSession(queryClient, result, sessionId, context)),
-    restoreSession: (sessionId) => executeAccepted(`host-session:restore:${sessionId}`, () => restoreSession(sessionId), (result) => publishRestoredHostSession(queryClient, result, sessionId, context)),
+    deleteSession: (sessionId) => executeAccepted(`host-session:delete:${sessionId}`, () => deleteSession(sessionId), (result, publish, handle) => publish(handle, "cache", () => publishDeletedHostSession(queryClient, result, sessionId, context))),
+    restoreSession: (sessionId) => executeAccepted(`host-session:restore:${sessionId}`, () => restoreSession(sessionId), (result, publish, handle) => publish(handle, "cache", () => publishRestoredHostSession(queryClient, result, sessionId, context))),
     openSession: (sessionId) => runLifecycle(() => openSession(sessionId), sessionId, "open", false),
     closeSession: (sessionId) => runLifecycle(() => closeSession(sessionId), sessionId, "close"),
     publishSession: (sessionId) => runLifecycle(() => publishSession(sessionId), sessionId, "publish"),
@@ -106,18 +119,25 @@ export function useHostMeetingWorkspaceActions(
       runLifecycle(() => returnSessionToDraft({ sessionId, request }), sessionId, "return-to-draft"),
     saveSession: (sessionId, request) =>
       sessionId === null
-        ? executeAccepted("host-session:create", () => createSession(request), (response) => publishHostSessionCreated(queryClient, response, context))
-        : executeAccepted(`host-session:update:${sessionId}`, () => updateSession({ sessionId, request }), (response) => publishHostSessionResponse(queryClient, response, sessionId, context)),
+        ? executeAccepted("host-session:create", () => createSession(request), (response, publish, handle) => publish(handle, "cache", () => publishHostSessionCreated(queryClient, response, context)))
+        : executeAccepted(`host-session:update:${sessionId}`, () => updateSession({ sessionId, request }), (response, publish, handle) => publish(handle, "cache", () => publishHostSessionResponse(queryClient, response, sessionId, context))),
     readCreatedSessionId: readCreatedHostSessionId,
     updateAttendance: (sessionId, attendance) =>
-      executeAccepted(`host-session:attendance:${sessionId}`, () => updateAttendance({ sessionId, attendance }), () => publishHostSessionAttendance(queryClient, sessionId, attendance, context)),
+      executeAccepted(`host-session:attendance:${sessionId}`, () => updateAttendance({ sessionId, attendance }), (_result, publish, handle) => publish(handle, "cache", () => publishHostSessionAttendance(queryClient, sessionId, attendance, context))),
     previewSessionImport: hostSessionEditorPreviewActions(context).previewSessionImport,
     commitSessionImport: async (sessionId, request) => {
-      const result = await executeAccepted(`host-session:import:${sessionId}`, () => commitImport({ sessionId, request }), () => publishHostSessionImport(queryClient, sessionId, context));
-      await onSessionRecordsChanged?.(sessionId);
-      return result;
+      return executeAccepted(
+        `host-session:import:${sessionId}`,
+        () => commitImport({ sessionId, request }),
+        async (_result, publish, handle) => {
+          await publish(handle, "cache", () => publishHostSessionImport(queryClient, sessionId, context));
+          if (onSessionRecordsChanged) {
+            await publish(handle, "receiptCallback", () => onSessionRecordsChanged(sessionId));
+          }
+        },
+      );
     },
-    saveSessionAccessScope: (sessionId, request) => executeAccepted(`host-session:access:${sessionId}`, () => saveAccessScope({ sessionId, request }), (result) => publishHostSessionVisibility(queryClient, result, sessionId, context)),
+    saveSessionAccessScope: (sessionId, request) => executeAccepted(`host-session:access:${sessionId}`, () => saveAccessScope({ sessionId, request }), (result, publish, handle) => publish(handle, "cache", () => publishHostSessionVisibility(queryClient, result, sessionId, context))),
   }), [
     closeSession,
     commitImport,

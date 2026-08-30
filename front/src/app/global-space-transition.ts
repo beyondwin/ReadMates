@@ -99,6 +99,7 @@ function authorityLostPendingHandle(generation: number, operationId: string): Pe
   return {
     generation,
     settle: () => Promise.resolve("obsolete"),
+    isAcceptedPublicationCurrent: () => false,
     publishAccepted: () => "rejected",
     unregister: () => undefined,
     reconcile: () => Promise.resolve({ operationId, outcome: "authority-lost" }),
@@ -311,6 +312,12 @@ export function createGlobalSpaceTransitionCoordinator(
       return "published";
     }
 
+    function isAcceptedPublicationCurrent() {
+      return acceptedOutcome !== null
+        && authorityAvailable
+        && ownerGenerations.get(entry.ownerId) === entry.generation;
+    }
+
     function retire(advanceGeneration: boolean, notify: boolean) {
       if (unregistered) return;
       unregistered = true;
@@ -383,7 +390,14 @@ export function createGlobalSpaceTransitionCoordinator(
       return reconciliation;
     }
 
-    return { generation, settle, publishAccepted, unregister, reconcile };
+    return {
+      generation,
+      settle,
+      isAcceptedPublicationCurrent,
+      publishAccepted,
+      unregister,
+      reconcile,
+    };
   }
 
   function invalidateForAuthorityLoss() {

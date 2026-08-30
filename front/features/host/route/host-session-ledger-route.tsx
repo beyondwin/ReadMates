@@ -30,7 +30,11 @@ import {
   HOST_SESSION_LEDGER_PAGE_LIMIT,
   type HostSessionLedgerRouteData,
 } from "./host-session-ledger-data";
-import { publishTransitionAction, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import {
+  publishTransitionAction,
+  TransitionOwnerObsoleteError,
+  useTransitionSafetyOwner,
+} from "@/shared/ui/use-transition-safety-owner";
 
 function sameFilters(left: HostSessionLedgerFilters, right: HostSessionLedgerFilters) {
   return left.view === right.view
@@ -206,6 +210,7 @@ export function HostSessionLedgerRoute({
       if (await handle.settle("succeeded") !== "accepted") return;
       await publishTransitionAction(handle, "cache", async () => {
         await publishRestoredHostSession(queryClient, detail, sessionId, context);
+        if (!handle.isPublicationCurrent()) throw new TransitionOwnerObsoleteError();
         await trashQuery.refetch();
       });
       await publishTransitionAction(handle, "ui", () => {

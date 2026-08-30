@@ -119,7 +119,16 @@ function AuthSpacesProbe() {
 function AuthAwareLogoutButton() {
   const { markLoggedOut } = useAuthActions();
 
-  return <LogoutButton onLoggedOut={markLoggedOut} />;
+  return (
+    <LogoutButton
+      onLogoutAccepted={async (publish) => {
+        await publish("ui", markLoggedOut);
+        await publish("navigation", () => {
+          globalThis.location.href = "/login";
+        });
+      }}
+    />
+  );
 }
 
 function AuthRefreshProbe() {

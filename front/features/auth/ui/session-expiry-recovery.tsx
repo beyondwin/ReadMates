@@ -6,7 +6,7 @@ type SessionExpiryRecoveryProps = {
   loginHref: string;
   guestContinuationStatus: "not-applicable" | "pending" | "available" | "unavailable";
   canContinueAsGuest: boolean;
-  onContinueAsGuest: () => Promise<void>;
+  onContinueAsGuest: () => Promise<"completed" | "unknown">;
 };
 
 export function SessionExpiryRecovery({
@@ -29,7 +29,8 @@ export function SessionExpiryRecovery({
     setError(null);
     setIsContinuing(true);
     try {
-      await onContinueAsGuest();
+      const result = await onContinueAsGuest();
+      if (result === "unknown") return;
     } catch {
       setError("게스트 화면으로 전환하지 못했습니다. 다시 시도해 주세요.");
       setIsContinuing(false);

@@ -177,8 +177,8 @@ export function ProfileEditorDialog({
     setSaving(true);
     setErrors({});
     try {
-      await onSaveProfile({ ...draft, displayName: draft.displayName.trim() });
-      closeNow();
+      const result = await onSaveProfile({ ...draft, displayName: draft.displayName.trim() });
+      if (result.status === "accepted") closeNow();
     } catch (error) {
       const failure = error instanceof ProfileUpdateFailure ? error : null;
       const field = failure?.field ?? "form";

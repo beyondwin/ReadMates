@@ -155,6 +155,7 @@ const noopHostMembersActions = {
 const noopHostInvitationsActions = {
   listInvitations: vi.fn(async () => new Response(JSON.stringify({ items: [], nextCursor: null }))),
   refreshInvitations: vi.fn(async () => ({ items: [], nextCursor: null })),
+  publishInvitations: vi.fn(),
   createInvitation: vi.fn(async () => new Response(JSON.stringify({}), { status: 201 })),
   revokeInvitation: vi.fn(async () => new Response(JSON.stringify({}), { status: 200 })),
   parseInvitation: vi.fn(async (response) => response.json()),
@@ -180,6 +181,7 @@ function registerTestInvitationActions(actions: HostInvitationsActions): Registe
       }
       const created = await actions.parseInvitation(response);
       const refreshed = await actions.refreshInvitations({ limit: 50 });
+      actions.publishInvitations(refreshed, { limit: 50 });
       const result = { created, refreshed };
       return { ...result, publishUi: (publish) => (publish(result), "published") };
     },
@@ -196,6 +198,7 @@ function registerTestInvitationActions(actions: HostInvitationsActions): Registe
       }
       const revoked = await actions.parseInvitation(response);
       const refreshed = await actions.refreshInvitations({ limit: 50 });
+      actions.publishInvitations(refreshed, { limit: 50 });
       const result = { revoked, refreshed };
       return { ...result, publishUi: (publish) => (publish(result), "published") };
     },

@@ -1,9 +1,11 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { logout } from "@/features/auth/api/auth-api";
+import { createGlobalSpaceTransitionCoordinator } from "@/src/app/global-space-transition";
+import { SpaceTransitionSafetyProvider } from "@/shared/ui/space-transition-safety-context";
 import { AccountMenuController } from "./account-menu-controller";
 
 vi.mock("@/features/auth/api/auth-api", () => ({
@@ -39,16 +41,24 @@ async function renderOpenController({
   onLoggedOut?: () => void;
 } = {}) {
   const user = userEvent.setup();
-  render(
-    <AccountMenuController
-      auth={auth}
-      appBasePath={appBasePath}
-      LinkComponent={TestLink}
-      onLoggedOut={onLoggedOut}
-    />,
+  const coordinator = createGlobalSpaceTransitionCoordinator();
+  const rendered = render(
+    <SpaceTransitionSafetyProvider port={coordinator}>
+      <AccountMenuController
+        auth={auth}
+        appBasePath={appBasePath}
+        LinkComponent={TestLink}
+        onLogoutAccepted={async (publish) => {
+          await publish("ui", onLoggedOut);
+          await publish("navigation", () => {
+            globalThis.location.href = "/login";
+          });
+        }}
+      />
+    </SpaceTransitionSafetyProvider>,
   );
   await user.click(screen.getByRole("button", { name: "멤버1 계정 메뉴" }));
-  return { user, onLoggedOut };
+  return { user, onLoggedOut, coordinator, ...rendered };
 }
 
 afterEach(() => {
@@ -118,5 +128,42 @@ describe("AccountMenuController", () => {
     expect(screen.getByRole("button", { name: "로그아웃 중" })).toBeDisabled();
     resolveLogout(new Response(null, { status: 500 }));
     expect(await screen.findByRole("alert")).toBeVisible();
+  });
+
+  it("registers logout before transport and publishes nothing after normal unmount", async () => {
+    let resolveLogout!: (response: Response) => void;
+    vi.mocked(logout).mockReturnValue(new Promise<Response>((resolve) => { resolveLogout = resolve; }));
+    const location = { href: "" };
+    vi.stubGlobal("location", location);
+    const onLoggedOut = vi.fn();
+    const { user, coordinator, unmount } = await renderOpenController({ onLoggedOut });
+
+    await user.click(screen.getByRole("button", { name: "로그아웃" }));
+    expect(coordinator.getSnapshot()).toMatchObject({ kind: "pending" });
+    unmount();
+    await act(async () => {
+      resolveLogout(new Response(null, { status: 204 }));
+      await Promise.resolve();
+    });
+
+    expect(onLoggedOut).not.toHaveBeenCalled();
+    expect(location.href).toBe("");
+    expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
+  });
+
+  it("publishes no failure copy after logout authority becomes obsolete", async () => {
+    let resolveLogout!: (response: Response) => void;
+    vi.mocked(logout).mockReturnValue(new Promise<Response>((resolve) => { resolveLogout = resolve; }));
+    const { user, coordinator } = await renderOpenController();
+
+    await user.click(screen.getByRole("button", { name: "로그아웃" }));
+    expect(coordinator.getSnapshot()).toMatchObject({ kind: "pending" });
+    act(() => coordinator.invalidateForAuthorityLoss());
+    await act(async () => {
+      resolveLogout(new Response(null, { status: 500 }));
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
