@@ -103,13 +103,13 @@ Execution baseline receipt (2026-08-30T04:47:33Z): `BASE_TIP=8ddb02cdb21067cb58a
 
 Post-integration inventory ruling: the base adds `fetchHostOperatingRoomCurrent` / `hostOperatingRoomCurrentQuery` as a read-only dashboard source and rewires `host-dashboard-route.tsx` composition/tests without adding a new mutation factory. Existing attendance/restore producers remain owned by the dashboard route and the existing host session/recovery query factories. Task 2.4 must still regenerate the repository-wide reachable-write candidate set from the integrated tree; this receipt is not a substitute for that executable scan.
 
-- [ ] Run `git status --short --branch --untracked-files=all` and stop if user changes overlap the stage files.
-- [ ] Set `BASE_TIP=8ddb02cdb21067cb58ad9e900850851599d1cdd9` from the immutable execution receipt above; do not resolve `codex/host-lifecycle-operating-room` again. Require only `git merge-base --is-ancestor "$BASE_TIP" HEAD`. If it fails, stop product implementation and diagnose corruption of the recorded integration; later movement of the branch name is neither a new baseline nor a reason to integrate unrelated commits.
-- [ ] After the recorded base tip is an ancestor of `HEAD`, rerun path/interface/producer inventory against the integrated tree. At minimum re-open `host-dashboard-route.tsx`, `host-session-queries.ts`, their tests, and every Task 2.4 scan root; record additions/removals and update this plan before SDD. Because integration changes repository reality, rerun the full `pre-sdd-review` on the new HEAD and final plan hash before the first product-code edit.
-- [ ] Run preflight with all expected frontend/server/docs paths and record any stop reason.
-- [ ] Confirm launcher: use `corepack pnpm` when available; otherwise use `npx --yes corepack@0.35.0 pnpm`. Record the exact launcher in the execution ledger.
-- [ ] Run baseline focused tests for auth, workspace routes, admin shell/Today, frontend boundaries, server architecture. A baseline failure is recorded before product edits and is not silently attributed to this program.
-- [ ] Assign one integration owner for `admin-copy.ts`, `admin-route-catalog.ts`, `admin-editorial-ledger.css`, shared CT fixtures, ADR indexes, and active docs.
+- [x] Run `git status --short --branch --untracked-files=all` and stop if user changes overlap the stage files.
+- [x] Set `BASE_TIP=8ddb02cdb21067cb58ad9e900850851599d1cdd9` from the immutable execution receipt above; do not resolve `codex/host-lifecycle-operating-room` again. Require only `git merge-base --is-ancestor "$BASE_TIP" HEAD`. If it fails, stop product implementation and diagnose corruption of the recorded integration; later movement of the branch name is neither a new baseline nor a reason to integrate unrelated commits.
+- [x] After the recorded base tip is an ancestor of `HEAD`, rerun path/interface/producer inventory against the integrated tree. At minimum re-open `host-dashboard-route.tsx`, `host-session-queries.ts`, their tests, and every Task 2.4 scan root; record additions/removals and update this plan before SDD. Because integration changes repository reality, rerun the full `pre-sdd-review` on the new HEAD and final plan hash before the first product-code edit.
+- [x] Run preflight with all expected frontend/server/docs paths and record any stop reason.
+- [x] Confirm launcher: use `corepack pnpm` when available; otherwise use `npx --yes corepack@0.35.0 pnpm`. Record the exact launcher in the execution ledger.
+- [x] Run baseline focused tests for auth, workspace routes, admin shell/Today, frontend boundaries, server architecture. A baseline failure is recorded before product edits and is not silently attributed to this program.
+- [x] Assign one integration owner for `admin-copy.ts`, `admin-route-catalog.ts`, `admin-editorial-ledger.css`, shared CT fixtures, ADR indexes, and active docs.
 
 The current documentation HEAD is not accepted as an implementation baseline merely because this plan is committed. Stage 0 is a hard gate: base integration, fresh inventory, and a fresh READY pre-SDD receipt must all precede Stage 1.
 
@@ -126,6 +126,17 @@ npx --yes corepack@0.35.0 pnpm --dir front exec vitest run \
   features/platform-admin/route/admin-shell-layout.test.tsx \
   features/platform-admin/route/admin-today-route.test.tsx
 ```
+
+#### Task 0 execution receipt (2026-08-30)
+
+- Start HEAD was `738b65d54096fcc503cda7c33dd6af52651f1208`; the worktree was clean. `git merge-base --is-ancestor 8ddb02cdb21067cb58ad9e900850851599d1cdd9 HEAD` exited 0. No moving branch name was resolved.
+- The immutable READY inputs were re-hashed before this historical receipt edit: design `8f67123957fe43c38cd8236cddc1f7dd55e1fad81eefad52148a5c201dd60ce5`; plan `4c4044303eadcd6072bedc2fe8cb12ae06df15cfce8913e3ef244a07936ab79c`. They match the fresh READY receipt in `.superpowers/sdd/2026-08-30-platform-admin-operations-product-redesign/progress.md`; no new reviewer was spawned. This receipt changes status/evidence only, not the reviewed implementation plan.
+- Integration inventory (`63a85986703c33f7ddb0646953bb2523a6ceedc6..8ddb02cdb21067cb58ad9e900850851599d1cdd9`) modified `host-api`, `host-contracts`, `host-session-queries` and its test, and `host-dashboard-route` and its test; it added or removed none of these paths. The new `fetchHostOperatingRoomCurrent` / `hostOperatingRoomCurrentQuery` chain is read-only. The dashboard still owns attendance and existing restore calls through `useUpdateHostSessionAttendanceMutation` and `useRestoreHostSessionChangeMutation`; no new mutation factory was introduced by the integration.
+- Task 2.4 scan roots were rerun with the required broad candidate expression: 21 matching files under `front/src/app` (68 source files), 28 under `front/shared` (109), and 300 under `front/features` (806). The 349 candidate files are inventory input only; Task 2.4 must still calculate mounted import reachability and classify each factory/consumer.
+- Preflight: the first invocation incorrectly supplied multiple values to one `--paths` flag and exited 2 without inspecting repository state. The corrected command used one `--paths` per path and exited 0 with frontend, server, and documentation surfaces; no stop reason. `corepack` was absent, so the recorded launcher is `npx --yes corepack@0.35.0 pnpm` (`11.13.1`).
+- Baseline exits: `./server/gradlew -p server unitTest --tests '*AuthSessionServiceTest'` 0; `./server/gradlew -p server integrationTest --tests '*AuthMeControllerTest'` 0 (17 tests, 0 failures); `./server/gradlew -p server architectureTest` 0; the five-file frontend Vitest command above 0 (172 tests, 0 failures).
+- Integration owner remains the sequential controller's currently active task implementer for `admin-copy.ts`, `admin-route-catalog.ts`, `admin-editorial-ledger.css`, shared CT fixtures, ADR indexes, and active docs. Subsequent tasks must preserve that single-writer rule.
+- Detailed commands, scoped inventory, and the diagnostic preflight invocation are in `.superpowers/sdd/2026-08-30-platform-admin-operations-product-redesign/task-0-report.md`.
 
 ---
 
