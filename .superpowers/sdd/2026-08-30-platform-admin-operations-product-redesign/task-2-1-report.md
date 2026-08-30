@@ -4,7 +4,9 @@ Status: DONE
 
 Initial commit: `74dfa977482ebf721bdf68ce373a929a5ff35db9`
 
-Fix-round commit intent: `fix(app): harden global space transition lifecycle`
+Fix round 1 commit: `2cafe61ed43b3aea9af8a3a4f2845369636ace94`
+
+Fix round 2 commit intent: `fix(app): tombstone late transition registrations`
 
 ## Scope and ADR impact
 
@@ -22,6 +24,8 @@ Fix-round commit intent: `fix(app): harden global space transition lifecycle`
 - A newer pending registration atomically retires an older registration for the same owner; dirty-token cleanup does not mutate pending generations. Different owners remain independently current and the aggregate snapshot stays blocking until every pending owner settles.
 - Receipt capsules now use one managed state across active, retired-registry, and `finally` paths. Invalidation and clear are one-shot, authority changes during an awaited recovery normalize the final observation to `authority-lost`, and callback failures are aggregated without aborting the remaining purge/generation cleanup.
 - Recovery operation identity mismatches fail synchronously before timer, recovery, invalidation, or clear work starts. Destination resolution returns no destination when the available-space projection has no valid identity.
+- After authority loss, dirty registration is a no-op and pending registration returns a tombstoned handle. A late receipt is immediately invalidated and cleared exactly once; no active entry, timer, snapshot, registry entry, recovery I/O, or publication remains. The same gate applies to registration reentered from invalidate/clear/purge callbacks.
+- Added eight named, dependency-free publication boundary ports for UI, cache, receipt callback, success copy, error copy, navigation, return target, and session storage. They receive only generation-authorized operation identity/outcome and import no product implementation or `QueryClient`.
 - Added an app-owned, typed route-family registry covering every Task 2.1 allowlist row. It composes the existing route-owned parsers for platform-admin filters, host meeting/ledger state, archive view, and notes state.
 - Added versioned per-identity `ReturnTarget` persistence. Unknown keys, hashes, duplicate singleton parameters, absolute URLs, cross-club targets, oversized targets, stale projections, and unsupported parameters are rejected or normalized according to the route-family contract. No auth, pending state, request payload, receipt capsule, or capability data is serialized.
 - Centralized the legacy `ClubWorkspace` alias on the shared `ClubPerspective` type without deleting legacy continuity behavior.
@@ -56,13 +60,17 @@ Fix round 1 added RED probes before production changes. The exact focused comman
 
 Fix round 1 GREEN result: exit 0, 4 files passed, 128 tests passed.
 
-The coordinator suite includes the exact interleaving `beginPending -> unregister -> authority loss -> late settle/reconcile`. Original issue count is produced by an instrumented invocation, remains 1, replay count is 0, the sole currently modeled production publication port (`currentOwnerRefetch`) receives zero calls, canonical request fields are cleared, and retired-registry size is 0. Concrete cache/UI/receipt-copy/success-copy/error-copy/navigation/return-target/sessionStorage wiring is not modeled by Task 2.1; its assertions are explicitly reserved for Task 2.4 instead of being simulated through fan-out spies.
+Fix round 2 RED used the same exact focused command and exited 1 with 4 expected failures (1 failing suite, 127 passing tests): the current-owner positive path did not reach any named boundary, post-authority dirty registration surfaced state, post-authority receipt registration retained its capsule/timer, and cleanup-callback reentry emitted transient state and duplicate timers.
+
+Fix round 2 GREEN result: exit 0, 4 files passed, 131 tests passed.
+
+The coordinator suite includes the exact interleaving `beginPending -> unregister -> authority loss -> late settle/reconcile`. Original issue count is produced by an instrumented invocation, remains 1, replay count is 0, `currentOwnerRefetch` and each of the eight named boundary ports receive zero calls, canonical request fields are cleared, and retired-registry size is 0. A separate current-owner positive test proves every named port is connected by the coordinator rather than by a test-side fan-out helper.
 
 ## Verification
 
-- Focused Task 2.1 command: exit 0, 4 files / 128 tests.
+- Focused Task 2.1 command: exit 0, 4 files / 131 tests.
 - Route-parser and boundary bundle: exit 0, 9 files / 236 tests.
-- Full frontend suite: `npx --yes corepack@0.35.0 pnpm --dir front test`; exit 0, 420 files / 3,863 tests.
+- Full frontend suite: `npx --yes corepack@0.35.0 pnpm --dir front test`; exit 0, 420 files / 3,866 tests.
 - Frontend lint: `npx --yes corepack@0.35.0 pnpm --dir front lint`; exit 0. It reports only the two pre-existing Fast Refresh warnings in `meeting-notification-rail.tsx` and `member-invitations-section.tsx`; no touched-file warning or error remains.
 - Frontend build: `npx --yes corepack@0.35.0 pnpm --dir front build`; exit 0, 781 modules transformed.
 - Exploratory `tsc -b --pretty false`: exit 1 with 714 lines of repository-wide existing TypeScript baseline output. Filtering a fresh run for `global-space` and `workspace-route-(model|continuity)` produced no touched-path match, so this command is not claimed as passing.
@@ -71,11 +79,12 @@ The coordinator suite includes the exact interleaving `beginPending -> unregiste
 ## Self-review
 
 - Dependency direction remains app -> features -> shared. Shared code imports neither feature nor app modules.
-- The publication seam has no `QueryClient` type and exposes only the current-owner recovery observation needed by Task 2.1 tests.
-- Publication tests assert only that real Task 2.1 seam; they do not claim coverage of later product-boundary wiring.
+- Publication seams have no `QueryClient` or product-layer imports. The eight named ports independently record whether a generation-authorized observation crossed each contract boundary.
+- The authority-loss interleaving asserts zero calls independently for UI, cache, receipt callback, success copy, error copy, navigation, return target, and session storage; it does not synthesize those results from one spy.
 - The persistence adapter serializes the exact `ReturnTarget` envelope only.
 - Authority loss clears active and retired receipt state synchronously before any late microtask can reconcile.
 - Authority loss during an already-awaited recovery overrides its late result, and managed capsule cleanup remains one-shot even when domain callbacks throw.
+- Authority loss permanently closes both registration APIs: late or reentrant work cannot recreate dirty/pending state, and receipt tombstones retain only primitive operation identity after immediate clear.
 - Empty or wholly malformed available-space projections produce no destination; Task 2.2 must supply login/selection handling rather than navigating an unprojected identity.
 - Stale projections neither persist nor restore a target, and their pure fallback cannot reuse loaded IDs from stale context.
 - The coordinator owns reconciliation and automatic detached cleanup; callers do not need to orchestrate receipt replay.

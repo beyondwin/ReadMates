@@ -1,10 +1,12 @@
 import { act } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
+  PendingHandle,
   ReceiptRecoveryCapsule,
   RecoveryObservation,
   ReturnTarget,
   SpaceIdentity,
+  TransitionPublicationBoundaryPort,
   TransitionPublicationPort,
 } from "@/shared/model/global-space";
 import {
@@ -130,6 +132,31 @@ function publicationPort() {
   } satisfies TransitionPublicationPort;
 }
 
+function publicationBoundaries() {
+  const observe = () => vi.fn((observation: RecoveryObservation) => observation);
+  return {
+    ui: observe(),
+    cache: observe(),
+    receiptCallback: observe(),
+    successCopy: observe(),
+    errorCopy: observe(),
+    navigation: observe(),
+    returnTarget: observe(),
+    sessionStorage: observe(),
+  } satisfies TransitionPublicationBoundaryPort;
+}
+
+function expectNoBoundaryPublication(boundaries: ReturnType<typeof publicationBoundaries>) {
+  expect(boundaries.ui).not.toHaveBeenCalled();
+  expect(boundaries.cache).not.toHaveBeenCalled();
+  expect(boundaries.receiptCallback).not.toHaveBeenCalled();
+  expect(boundaries.successCopy).not.toHaveBeenCalled();
+  expect(boundaries.errorCopy).not.toHaveBeenCalled();
+  expect(boundaries.navigation).not.toHaveBeenCalled();
+  expect(boundaries.returnTarget).not.toHaveBeenCalled();
+  expect(boundaries.sessionStorage).not.toHaveBeenCalled();
+}
+
 describe("global space transition coordinator", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -172,8 +199,9 @@ describe("global space transition coordinator", () => {
   it("publishes only a current-generation unknown-outcome observation through the refetch sink", async () => {
     vi.useFakeTimers();
     const publication = publicationPort();
+    const publicationBoundary = publicationBoundaries();
     const reconcile = vi.fn(async () => ({ operationId: "history-1", outcome: "succeeded" as const }));
-    const coordinator = createGlobalSpaceTransitionCoordinator({ publication });
+    const coordinator = createGlobalSpaceTransitionCoordinator({ publication, publicationBoundary });
     const handle = coordinator.beginPending({
       ownerId: "owner-1",
       operationId: "history-1",
@@ -186,6 +214,14 @@ describe("global space transition coordinator", () => {
 
     expect(reconcile).toHaveBeenCalledTimes(1);
     expect(publication.currentOwnerRefetch).toHaveBeenCalledTimes(1);
+    expect(publicationBoundary.ui).toHaveBeenCalledTimes(1);
+    expect(publicationBoundary.cache).toHaveBeenCalledTimes(1);
+    expect(publicationBoundary.receiptCallback).toHaveBeenCalledTimes(1);
+    expect(publicationBoundary.successCopy).toHaveBeenCalledTimes(1);
+    expect(publicationBoundary.errorCopy).toHaveBeenCalledTimes(1);
+    expect(publicationBoundary.navigation).toHaveBeenCalledTimes(1);
+    expect(publicationBoundary.returnTarget).toHaveBeenCalledTimes(1);
+    expect(publicationBoundary.sessionStorage).toHaveBeenCalledTimes(1);
     expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
   });
 
@@ -197,6 +233,150 @@ describe("global space transition coordinator", () => {
     unregister();
     unregister();
     expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
+  });
+
+  it("makes dirty registration a no-op after authority loss", () => {
+    const coordinator = createGlobalSpaceTransitionCoordinator();
+    coordinator.invalidateForAuthorityLoss();
+    const listener = vi.fn();
+    coordinator.subscribe(listener);
+
+    const unregister = coordinator.registerDirty("late-owner", "must never surface");
+
+    expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
+    expect(listener).not.toHaveBeenCalled();
+    unregister();
+    unregister();
+    expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("returns a cleared receipt tombstone when pending registration starts after authority loss", async () => {
+    const registry = createRetiredReceiptCapsuleRegistry();
+    const publication = publicationPort();
+    const publicationBoundary = publicationBoundaries();
+    const timerHandle = {} as ReturnType<typeof globalThis.setTimeout>;
+    const setTimer = vi.fn(() => timerHandle);
+    const request = {
+      previewId: "late-preview" as string | null,
+      idempotencyKey: "late-intent" as string | null,
+    };
+    const capsule: ReceiptRecoveryCapsule = {
+      operationId: "late-operation",
+      reconcileOriginal: vi.fn(async () => ({ operationId: "late-operation", outcome: "succeeded" as const })),
+      invalidateForAuthorityLoss: vi.fn(),
+      clear: vi.fn(() => {
+        request.previewId = null;
+        request.idempotencyKey = null;
+      }),
+    };
+    const coordinator = createGlobalSpaceTransitionCoordinator({
+      registry,
+      publication,
+      publicationBoundary,
+      setTimer,
+    });
+    coordinator.invalidateForAuthorityLoss();
+
+    const handle = coordinator.beginPending({
+      ownerId: "late-owner",
+      operationId: "late-operation",
+      recovery: { kind: "receipt", capsule },
+    });
+
+    expect(capsule.invalidateForAuthorityLoss).toHaveBeenCalledTimes(1);
+    expect(capsule.clear).toHaveBeenCalledTimes(1);
+    expect(request).toEqual({ previewId: null, idempotencyKey: null });
+    expect(setTimer).not.toHaveBeenCalled();
+    expect(registry.size()).toBe(0);
+    expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
+    await expect(handle.settle("succeeded")).resolves.toBe("obsolete");
+    handle.unregister();
+    await expect(handle.reconcile()).resolves.toEqual({
+      operationId: "late-operation",
+      outcome: "authority-lost",
+    });
+    expect(capsule.reconcileOriginal).not.toHaveBeenCalled();
+    expect(publication.currentOwnerRefetch).not.toHaveBeenCalled();
+    expectNoBoundaryPublication(publicationBoundary);
+    expect(capsule.invalidateForAuthorityLoss).toHaveBeenCalledTimes(1);
+    expect(capsule.clear).toHaveBeenCalledTimes(1);
+  });
+
+  it("tombstones dirty and receipt registrations reentered from authority cleanup callbacks", async () => {
+    const registry = createRetiredReceiptCapsuleRegistry();
+    const publication = publicationPort();
+    const publicationBoundary = publicationBoundaries();
+    const timerHandle = {} as ReturnType<typeof globalThis.setTimeout>;
+    const setTimer = vi.fn(() => timerHandle);
+    const clearTimer = vi.fn();
+    const listener = vi.fn();
+    const reentrant: {
+      unregisterDirty: (() => void) | null;
+      lateHandle: PendingHandle | null;
+    } = { unregisterDirty: null, lateHandle: null };
+    const lateRequest = { idempotencyKey: "late-intent" as string | null };
+    const lateCapsule: ReceiptRecoveryCapsule = {
+      operationId: "late-operation",
+      reconcileOriginal: vi.fn(async () => ({ operationId: "late-operation", outcome: "succeeded" as const })),
+      invalidateForAuthorityLoss: vi.fn(),
+      clear: vi.fn(() => {
+        lateRequest.idempotencyKey = null;
+      }),
+    };
+    const primaryCapsule: ReceiptRecoveryCapsule = {
+      operationId: "primary-operation",
+      reconcileOriginal: vi.fn(async () => ({ operationId: "primary-operation", outcome: "succeeded" as const })),
+      invalidateForAuthorityLoss: vi.fn(() => {
+        reentrant.unregisterDirty = coordinator.registerDirty("reentrant-dirty", "must never surface");
+      }),
+      clear: vi.fn(() => {
+        reentrant.lateHandle = coordinator.beginPending({
+          ownerId: "reentrant-pending",
+          operationId: "late-operation",
+          recovery: { kind: "receipt", capsule: lateCapsule },
+        });
+      }),
+    };
+    const coordinator = createGlobalSpaceTransitionCoordinator({
+      registry,
+      publication,
+      publicationBoundary,
+      setTimer,
+      clearTimer,
+    });
+    const primaryHandle = coordinator.beginPending({
+      ownerId: "primary-owner",
+      operationId: "primary-operation",
+      recovery: { kind: "receipt", capsule: primaryCapsule },
+    });
+    coordinator.subscribe(listener);
+
+    coordinator.invalidateForAuthorityLoss();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(setTimer).toHaveBeenCalledTimes(1);
+    expect(clearTimer).toHaveBeenCalledTimes(1);
+    expect(primaryCapsule.invalidateForAuthorityLoss).toHaveBeenCalledTimes(1);
+    expect(primaryCapsule.clear).toHaveBeenCalledTimes(1);
+    expect(lateCapsule.invalidateForAuthorityLoss).toHaveBeenCalledTimes(1);
+    expect(lateCapsule.clear).toHaveBeenCalledTimes(1);
+    expect(lateRequest.idempotencyKey).toBeNull();
+    expect(registry.size()).toBe(0);
+    expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
+    reentrant.unregisterDirty?.();
+    if (!reentrant.lateHandle) throw new Error("REENTRANT_HANDLE_NOT_CAPTURED");
+    await expect(primaryHandle.settle("succeeded")).resolves.toBe("obsolete");
+    await expect(reentrant.lateHandle.settle("succeeded")).resolves.toBe("obsolete");
+    await expect(reentrant.lateHandle.reconcile()).resolves.toEqual({
+      operationId: "late-operation",
+      outcome: "authority-lost",
+    });
+    expect(lateCapsule.reconcileOriginal).not.toHaveBeenCalled();
+    expect(publication.currentOwnerRefetch).not.toHaveBeenCalled();
+    expectNoBoundaryPublication(publicationBoundary);
+    expect(lateCapsule.invalidateForAuthorityLoss).toHaveBeenCalledTimes(1);
+    expect(lateCapsule.clear).toHaveBeenCalledTimes(1);
   });
 
   it("normal unmount performs at most one same-identity receipt lookup and always clears in finally", async () => {
@@ -441,6 +621,7 @@ describe("global space transition coordinator", () => {
   it("invalidates active and retired receipts before purge and permits zero authority-loss replay", async () => {
     const registry = createRetiredReceiptCapsuleRegistry();
     const publication = publicationPort();
+    const publicationBoundary = publicationBoundaries();
     const order: string[] = [];
     let originalRequestCount = 0;
     const issueOriginalRequest = () => {
@@ -472,6 +653,7 @@ describe("global space transition coordinator", () => {
     const coordinator = createGlobalSpaceTransitionCoordinator({
       registry,
       publication,
+      publicationBoundary,
       onAuthorityLossPurge: () => {
         order.push("purge");
         expect(request).toEqual({ previewId: null, reasonCategory: null, reason: null, idempotencyKey: null });
@@ -497,6 +679,7 @@ describe("global space transition coordinator", () => {
     expect(request).toEqual({ previewId: null, reasonCategory: null, reason: null, idempotencyKey: null });
     expect(registry.size()).toBe(0);
     expect(publication.currentOwnerRefetch).not.toHaveBeenCalled();
+    expectNoBoundaryPublication(publicationBoundary);
   });
 
   it("returns authority-lost and publishes nothing when authority changes while recovery awaits", async () => {

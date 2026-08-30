@@ -91,6 +91,23 @@ export type TransitionPublicationPort = {
   currentOwnerRefetch: (observation: RecoveryObservation) => void;
 };
 
+/**
+ * Generation-authorized publication opportunities at the eight product
+ * boundaries named by the transition contract. These callbacks carry only
+ * operation identity/outcome and intentionally know nothing about QueryClient
+ * or concrete UI/router/storage implementations.
+ */
+export type TransitionPublicationBoundaryPort = {
+  ui: (observation: RecoveryObservation) => void;
+  cache: (observation: RecoveryObservation) => void;
+  receiptCallback: (observation: RecoveryObservation) => void;
+  successCopy: (observation: RecoveryObservation) => void;
+  errorCopy: (observation: RecoveryObservation) => void;
+  navigation: (observation: RecoveryObservation) => void;
+  returnTarget: (observation: RecoveryObservation) => void;
+  sessionStorage: (observation: RecoveryObservation) => void;
+};
+
 export function spaceIdentityKey(identity: SpaceIdentity): string {
   return identity.productSpace === "platform"
     ? "platform"
