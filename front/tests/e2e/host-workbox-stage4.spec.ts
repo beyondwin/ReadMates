@@ -383,7 +383,8 @@ where id = ${sqlString(OPEN_SESSION_ID)} and club_id = ${sqlString(CLUB_ID)};
   const unknownReceipt = page.getByRole("status", { name: "일정 알림 · 결과 확인 필요" });
   await expect(unknownReceipt).toBeVisible();
   await expect(unknownReceipt).toContainText("같은 알림을 다시 보내지 말고");
-  await expect(unknownReceipt.getByRole("link", { name: "알림 장부에서 결과 확인" })).toBeVisible();
+  const ledgerLink = unknownReceipt.getByRole("link", { name: "알림 장부에서 결과 확인" });
+  await expect(ledgerLink).toBeVisible();
   expect(confirmRequests).toBe(2);
   expect(runMysql(`
 select concat(
@@ -394,6 +395,70 @@ select concat(
    where club_id = ${sqlString(CLUB_ID)} and aggregate_id = ${sqlString(OPEN_SESSION_ID)})
 );
 `).trim().split("\n").at(-1)).toBe("1|1");
+  await page.waitForTimeout(250);
+  expect(confirmRequests).toBe(2);
+
+  const committedIdentity = runMysql(`
+select concat(id, '|', event_id, '|', event_type, '|', requested_channels, '|', audience, '|', target_count, '|', resend)
+from notification_manual_dispatches
+where club_id = ${sqlString(CLUB_ID)} and session_id = ${sqlString(OPEN_SESSION_ID)};
+`).trim().split("\n").at(-1)?.split("|");
+  expect(committedIdentity).toHaveLength(7);
+  const [manualDispatchId, eventId] = committedIdentity!;
+
+  const dispatchLedgerResponse = page.waitForResponse((response) => (
+    response.request().method() === "GET"
+      && new URL(response.url()).pathname.endsWith("/api/host/notifications/manual/dispatches")
+  ));
+  await ledgerLink.click();
+  await expect(page).toHaveURL(`${HOST_PATH}/notifications`);
+  const dispatchResponse = await dispatchLedgerResponse;
+  expect(dispatchResponse.status()).toBe(200);
+  const dispatchPage = await dispatchResponse.json() as {
+    items: Array<{
+      manualDispatchId: string;
+      eventId: string;
+      source: string;
+      eventType: string;
+      sessionId: string;
+      sessionNumber: number;
+      bookTitle: string;
+      requestedChannels: string;
+      audience: string;
+      targetCount: number;
+      resend: boolean;
+      eventStatus: string;
+      requestedBy: string;
+    }>;
+  };
+  expect(dispatchPage.items).toContainEqual(expect.objectContaining({
+    manualDispatchId,
+    eventId,
+    source: "MANUAL",
+    eventType: "SESSION_REMINDER_DUE",
+    sessionId: OPEN_SESSION_ID,
+    sessionNumber: 972,
+    bookTitle: "일정 알림 합성 책",
+    requestedChannels: "BOTH",
+    audience: "SELECTED_MEMBERS",
+    targetCount: 1,
+    resend: false,
+    eventStatus: "PENDING",
+    requestedBy: "h***@example.com",
+  }));
+
+  const ledger = page.getByRole("region", { name: "최근 수동 발송" });
+  const committedRow = ledger.locator("article").filter({ hasText: "모임 리마인더" });
+  await expect(ledger).toBeVisible();
+  await expect(committedRow).toHaveCount(1);
+  await expect(committedRow).toContainText("No.972 · 일정 알림 합성 책");
+  await expect(committedRow).toContainText("수동");
+  await expect(committedRow).toContainText("PENDING");
+  await expect(committedRow).toContainText("앱 + 이메일");
+  await expect(committedRow).toContainText("직접 선택");
+  await expect(committedRow).toContainText("1명");
+  await expect(committedRow).toContainText("요청 h***@example.com");
+  expect(confirmRequests).toBe(2);
   await page.waitForTimeout(250);
   expect(confirmRequests).toBe(2);
 });
