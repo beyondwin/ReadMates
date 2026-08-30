@@ -20,6 +20,7 @@ const routeMocks = vi.hoisted(() => ({
   fetchRestorePreview: vi.fn(),
   reconciliationState: "idle" as "idle" | "checking" | "pending",
   workboxPages: new Map<string, unknown>(),
+  workboxQueryBatches: [] as string[][],
   deferWorkbox: vi.fn(),
   removeWorkboxDeferral: vi.fn(),
 }));
@@ -38,14 +39,16 @@ vi.mock("@tanstack/react-query", () => ({
   useQueries: ({
     queries,
   }: {
-    queries: Array<{ testData?: unknown; enabled?: boolean }>;
-  }) =>
-    queries.map((query) => ({
+    queries: Array<{ testData?: unknown; testCursor?: string; enabled?: boolean }>;
+  }) => {
+    routeMocks.workboxQueryBatches.push(queries.map((query) => query.testCursor ?? "root"));
+    return queries.map((query) => ({
       data: query.enabled === false ? undefined : query.testData,
       isError: false,
       isFetching: false,
       refetch: vi.fn(),
-    })),
+    }));
+  },
   useQueryClient: () => ({
     fetchQuery: (query: { queryFn?: () => unknown }) => query.queryFn?.(),
   }),
@@ -78,9 +81,11 @@ vi.mock("@/features/host/queries/host-session-recovery-queries", () => ({
 
 vi.mock("@/features/host/queries/host-workbox-queries", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/host/queries/host-workbox-queries")>()),
-  hostWorkboxPageQuery: (request: { state: string }) => ({
+  hostWorkboxPageQuery: (request: { state: string; cursor?: string | null }) => ({
     queryKey: ["workbox", request.state],
-    testData: routeMocks.workboxPages.get(request.state),
+    testCursor: request.cursor ?? "root",
+    testData: routeMocks.workboxPages.get(`${request.state}:${request.cursor ?? "root"}`)
+      ?? routeMocks.workboxPages.get(request.state),
   }),
   useDeferHostWorkboxItemMutation: () => ({ mutateAsync: routeMocks.deferWorkbox }),
   useRemoveHostWorkboxDeferralMutation: () => ({ mutateAsync: routeMocks.removeWorkboxDeferral }),
@@ -242,6 +247,7 @@ beforeEach(() => {
   routeMocks.fetchRestorePreview.mockReset();
   routeMocks.reconciliationState = "idle";
   routeMocks.workboxPages.clear();
+  routeMocks.workboxQueryBatches.length = 0;
   routeMocks.deferWorkbox.mockReset().mockResolvedValue({
     key: "opaque",
     deferredUntil: "2026-09-01T00:00:00Z",
@@ -337,6 +343,49 @@ describe("HostDashboardRoute", () => {
     });
     expect(changedGeneration?.sourceAvailability[0]).toMatchObject({ state: "AVAILABLE" });
     expect(mergeCoherentWorkboxPages(undefined, [retainedOldContinuation])).toBeNull();
+  });
+
+  it("resets a loaded cursor chain when the root workbox page disappears", async () => {
+    const page = (title: string, nextCursor: string | null): HostWorkboxPage => ({
+      state: "NOW",
+      evaluatedAt: "2026-08-30T09:00:00Z",
+      sourceAvailability: [
+        { type: "SCHEDULE_UNSEEN", state: "AVAILABLE" },
+        { type: "MEMBER_APPROVAL", state: "AVAILABLE" },
+        { type: "RECORD_CLOSING", state: "AVAILABLE" },
+        { type: "INVITATION_EXPIRY", state: "AVAILABLE" },
+        { type: "NOTIFICATION_FAILURE", state: "AVAILABLE" },
+      ],
+      items: [{
+        key: `SCHEDULE_UNSEEN:${title}`,
+        type: "SCHEDULE_UNSEEN",
+        state: "NOW",
+        title,
+        description: title,
+        count: 1,
+        dueAt: null,
+        deferredUntil: null,
+        resolvedAt: null,
+        destinationHref: "/app/host/sessions/session-7/schedule-review",
+        receiptSummary: null,
+      }],
+      nextCursor,
+    });
+    routeMocks.workboxPages.set("NOW:root", page("root item", "cursor-one"));
+    routeMocks.workboxPages.set("NOW:cursor-one", page("continuation item", null));
+    const { router } = renderRoute();
+
+    await userEvent.click(await screen.findByRole("button", { name: "다음 묶음 불러오기" }));
+    expect(await screen.findByRole("listitem", { name: "continuation item" })).toBeVisible();
+    expect(routeMocks.workboxQueryBatches.at(-1)).toEqual(["root", "cursor-one"]);
+
+    routeMocks.workboxPages.delete("NOW:root");
+    await act(async () => {
+      await router.navigate("/clubs/reading-sai/app/host?phase=prep");
+    });
+
+    await waitFor(() => expect(routeMocks.workboxQueryBatches.at(-1)).toEqual(["root"]));
+    expect(screen.queryByRole("listitem", { name: "continuation item" })).not.toBeInTheDocument();
   });
 
   it("keeps the global workbox visible when there is no current meeting", async () => {

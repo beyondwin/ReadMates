@@ -135,6 +135,7 @@ export function HostDashboardRoute({
   const sessionId = loaderData.operatingRoom.currentMeeting?.sessionId ?? null;
   const [workboxState, setWorkboxState] = useState<HostWorkboxState>("NOW");
   const [workboxCursors, setWorkboxCursors] = useState<readonly (string | null)[]>([null]);
+  const [workboxGeneration, setWorkboxGeneration] = useState<string | null>(null);
   const [workboxPendingKey, setWorkboxPendingKey] = useState<string | null>(null);
   const workboxMutationKeyRef = useRef<string | null>(null);
   const [workboxRowError, setWorkboxRowError] = useState<{ key: string; message: string } | null>(null);
@@ -152,8 +153,13 @@ export function HostDashboardRoute({
   const rootWorkboxPage = workboxQueries[0]?.data?.state === workboxState
     ? workboxQueries[0].data
     : undefined;
-  const rootWorkboxGeneration = rootWorkboxPage?.evaluatedAt ?? null;
-  const workboxGenerationRef = useRef<string | null>(null);
+  const nextWorkboxGeneration = rootWorkboxPage
+    ? `${workboxState}:${rootWorkboxPage.evaluatedAt}`
+    : null;
+  if (workboxGeneration !== nextWorkboxGeneration) {
+    setWorkboxGeneration(nextWorkboxGeneration);
+    setWorkboxCursors([null]);
+  }
   const deferWorkboxMutation = useDeferHostWorkboxItemMutation(context);
   const removeWorkboxDeferralMutation = useRemoveHostWorkboxDeferralMutation(context);
 
@@ -186,15 +192,6 @@ export function HostDashboardRoute({
   useLayoutEffect(() => {
     currentSessionIdRef.current = sessionId;
   }, [sessionId]);
-
-  useEffect(() => {
-    if (rootWorkboxGeneration === null) return;
-    const generation = `${workboxState}:${rootWorkboxGeneration}`;
-    if (workboxGenerationRef.current !== null && workboxGenerationRef.current !== generation) {
-      setWorkboxCursors([null]);
-    }
-    workboxGenerationRef.current = generation;
-  }, [rootWorkboxGeneration, workboxState]);
 
   const activeAttendanceWriteStates = attendanceWriteStates?.sessionId === sessionId
     ? attendanceWriteStates.values
