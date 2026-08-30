@@ -3,6 +3,7 @@
 ## Status and scope
 
 - BASE verified clean at `f7b749ded73fd2b2d433e5f62a4d5aa378dfb5da`.
+- Stage 2 range-review round 1 BASE verified clean at `46209d56861755690bf396fc5442a2d7b65fc7b2`.
 - Task brief SHA-256: `4d039f0757bd70ac04fb96a213dfb6b0749b3703d88fd2b1610cea797a37786e`.
 - ADR impact: `update` — implements only the host layout-composition portion of Proposed ADR-0048. No new ADR; ADR-0048 remains Proposed.
 - The original change wires the Task 2 shell primitives into the existing host layout. It does not add route elements, remove compatibility routes, change authority purge, add redirects, touch server code, or change production state. A later Stage 2 gate recovery changed only its stale responsive E2E contract and ran that one browser file.
@@ -48,11 +49,17 @@ The test-only GREEN uses semantic combined-switcher roles and names, proves iner
 PATH="$(brew --prefix node@24)/bin:$PATH" READMATES_E2E_DB_NAME=readmates_e2e_s2_t3_recovery_20260830 PLAYWRIGHT_PORT=3317 READMATES_API_BASE_URL=http://127.0.0.1:18117 PLAYWRIGHT_WORKERS=1 npx --yes corepack@0.35.0 pnpm --dir front exec playwright test tests/e2e/responsive-navigation-chrome.spec.ts --project=chromium
 ```
 
+Stage 2 range-review round 1 added primitive and layout mixed-authority club-switch tests before production changes. They failed `2/34`: the layout had already computed authority-safe `shellClubs[].href`, but the switcher discarded it and rebuilt the destination from the current host workspace. The closing contract removes that duplicate builder: the adapter remains the single authority-aware URL owner and the primitive consumes the target club's `href`. The same command then passed `34/34`.
+
+```text
+PATH="$(brew --prefix node@24)/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/ui/shell/host-workspace-switcher.test.tsx src/app/layouts/app-route-layout.test.tsx
+```
+
 ## Source hash → command → result → closure
 
 | Closing source SHA-256 | Command | Result | Finding closure |
 | --- | --- | --- | --- |
-| `eba6fb931448f339a32ee08152bdf17114fa5bada7016186788926276f86a429`, `32c89b1bb5d37c25d0fd2c8a24c72f56c65a73621602af48da0536c712fc9807` (`app-route-layout` source/test) | closing focused Vitest above | GREEN, `45/45` | Host layout renders one combined club/workspace control per responsive spine; desktop and mobile expose the exact four approved primary labels in the same href order; settings, member view, notifications, and new meeting remain outside primary navigation but reachable. Member/guest/admin default shell contracts remain covered by the same focused layout/shared-shell suites. |
+| `a06e45d0c9dadc8df5afd5b36c1f4bb8571d2bf1aa33a800c9da56cdc2424638`, `3658206c2f6a295856fe5ff3e16cb80f3ad1ff951250f46c266964f5fb77a91d` (`app-route-layout` source/test) | range-review focused Vitest above | RED `2/34`, then GREEN `34/34` | Host layout remains the single authority-aware owner of target-club URLs. HOST A to MEMBER-only B lands directly at `/clubs/B/app`; HOST-capable B preserves the safe host people family, while person IDs are not carried. The shell composition, current club, same-club workspace, and unavailable-host contracts remain covered. |
 | `3c918bf448b38a35e43d902b53b682ab73174dfbd4b1f8649bef7f692a08f92c`, `7744778753b62515afcfb0b2186c63234c06bee9eb4660164113e6ee20c06c43`, `5a43e66f58d401a781e3bc7d50670232ed8def8449dd60f70a35b4008218beae`, `85c2aa559aa78b794ba577279b45706a304491855c2ff3b15dad488c2fa5f2da`, `1085c2c1e010d1ca408247a5bca88d18fd4ef7ab8a7e535a4f54f8788d3bbede` (shared shell/model/copy) | closing focused Vitest above and review closing Vitest | GREEN, `45/45` and `99/99` | The shared shell accepts generic responsive primary and utility composition without changing the default path. Desktop labels are `운영실 · 일정과 모임 · 사람 · 기록`; mobile labels are `운영실 · 모임 · 사람 · 기록`, while their scoped destination hrefs remain identical. Route-aware shared fallbacks now assign validated record-origin session detail to records exactly like the host layout. |
 | `37905f964ed1fe0038e810c076922318b5a2ff5b01223668ced44b86a2d73d24` (`responsive-navigation.test.tsx`) | review closing Vitest above | RED `22/73`, narrowed RED `3/73`, then GREEN `73/73`; combined GREEN `99/99` | Direct TopNav and MobileTabBar coverage now asserts exact four-area order, canonical/scoped hrefs, compatibility behavior, utility exclusion, direct record routes, validated record-origin ownership, and rejection of external or cross-club ownership without weakening the member/guest assertions. |
 | `852fc891b329174238ddcf988b06aa2a1540bdfa0311dec90740cd921349d3ea`, `d019ca4a87ef4074af8ff68a74966fb603087806845864128d6bdf5b2654c487` (`feedback-document-route.test.tsx`, `spa-layout.test.tsx`) | Stage 2 gate review commands above | RED `4/27`, then GREEN `27/27`; combined GREEN `126/126` | Scoped feedback return preserves desktop `일정과 모임` and mobile `모임` canonical links while assigning current state only to canonical `기록`. Safe club switching registers and reaches the canonical host-records family, and member/archive chrome retains its member navigation while both host-space targets preserve record ownership. |
@@ -91,6 +98,8 @@ PATH="$(brew --prefix node@24)/bin:$PATH" npx --yes corepack@0.35.0 pnpm --dir f
 ## Verification notes and residual risk
 
 - Original focused Vitest: passed, `45/45`; review round 1 responsive plus layout Vitest passed, `99/99`; Stage 2 gate review round 2 exact suites passed `27/27` and the closing four-file set passed `126/126`.
+- Stage 2 range-review round 1 primitive plus layout: RED `2/34`, then GREEN `34/34`; no CT rerun was needed because the adapter-only change does not alter markup or styling.
+- Range-review closing Task 2/3 focused unit set passed `48/48`; focused ESLint passed for the five changed TypeScript/TSX files.
 - Relevant focused Chromium CT: passed, `8/8`, including 390px and 1440px Task 2 primitives, 390px scoped host navigation, the 767px safe-area/content-reserve boundary, and the 768px desktop boundary.
 - Non-blocking CT residual: the original unfiltered focused CT run passed `8/9`; the only failure was the existing member `desktop avatar` screenshot comparison, with `690` pixels (about `1%`) of text anti-aliasing difference in `top-nav-long-account-name-1280.png`. Its DOM and geometry assertions passed. The screenshot artifact is byte-identical between BASE and closing HEAD: both resolve to Git blob `ba40480c43c4d41e16459d1109c37813d6ab5d42`, with SHA-256 `bdea7003385214bbe8956d2387e6552f251d502c72a41ce7cd028c3fe0b9a43a`. This review fix changes only route-aware current selection and unit expectations, so the known avatar CT was not rerun or rewritten.
 - Focused ESLint: passed with no findings.

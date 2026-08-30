@@ -14,7 +14,6 @@ export type HostWorkspaceSwitcherProps = {
   currentWorkspace: ClubWorkspace;
   workspaceItems: readonly WorkspaceNavigationItem[];
   disabledReason?: string | null;
-  buildClubTarget: (slug: string, workspace: ClubWorkspace) => string;
   onSelectTarget: (href: string) => void;
 };
 
@@ -28,7 +27,6 @@ export function HostWorkspaceSwitcher({
   currentWorkspace,
   workspaceItems,
   disabledReason,
-  buildClubTarget,
   onSelectTarget,
 }: HostWorkspaceSwitcherProps) {
   const detailsRef = useRef<HTMLDetailsElement>(null);
@@ -111,7 +109,7 @@ export function HostWorkspaceSwitcher({
                 key={item.slug}
                 type="button"
                 className="rm-host-workspace-switcher__choice"
-                onClick={() => selectTarget(buildClubTarget(item.slug, currentWorkspace))}
+                onClick={() => selectTarget(item.href)}
               >
                 {item.name}
               </button>

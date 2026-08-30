@@ -27,7 +27,6 @@ describe("HostWorkspaceSwitcher", () => {
         clubs={clubs}
         currentWorkspace="host"
         workspaceItems={workspaceItems}
-        buildClubTarget={(slug, workspace) => `/clubs/${slug}/app/${workspace}`}
         onSelectTarget={vi.fn()}
       />,
     );
@@ -40,20 +39,19 @@ describe("HostWorkspaceSwitcher", () => {
     );
   });
 
-  it("uses the same-club safe workspace target and retains the current workspace across club changes", async () => {
+  it("uses the same-club safe workspace target and the target club's precomputed route", async () => {
     const user = userEvent.setup();
     const onSelectTarget = vi.fn();
-    const buildClubTarget = vi.fn((slug: string, workspace: "member" | "host") =>
-      `/clubs/${slug}/app/${workspace === "host" ? "host/records" : "archive"}`,
-    );
 
     render(
       <HostWorkspaceSwitcher
         club={club}
-        clubs={clubs}
+        clubs={[
+          clubs[0],
+          { ...clubs[1], href: "/clubs/next-club/app/host/records" },
+        ]}
         currentWorkspace="host"
         workspaceItems={workspaceItems}
-        buildClubTarget={buildClubTarget}
         onSelectTarget={onSelectTarget}
       />,
     );
@@ -66,8 +64,35 @@ describe("HostWorkspaceSwitcher", () => {
 
     await user.click(screen.getByRole("button", { name: "읽는사이 · 호스트 운영실" }));
     await user.click(within(menu).getByRole("button", { name: "다음 책을 오래 함께 읽는 모임" }));
-    expect(buildClubTarget).toHaveBeenCalledWith("next-club", "host");
     expect(onSelectTarget).toHaveBeenLastCalledWith("/clubs/next-club/app/host/records");
+  });
+
+  it("uses each target club's precomputed authority-safe URL", async () => {
+    const user = userEvent.setup();
+    const onSelectTarget = vi.fn();
+
+    render(
+      <HostWorkspaceSwitcher
+        club={club}
+        clubs={[
+          clubs[0],
+          { slug: "member-only", name: "멤버 전용 클럽", href: "/clubs/member-only/app" },
+          { slug: "host-next", name: "다음 호스트 클럽", href: "/clubs/host-next/app/host/people" },
+        ]}
+        currentWorkspace="host"
+        workspaceItems={workspaceItems}
+        onSelectTarget={onSelectTarget}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: "읽는사이 · 호스트 운영실" });
+    await user.click(trigger);
+    await user.click(screen.getByRole("button", { name: "멤버 전용 클럽" }));
+    expect(onSelectTarget).toHaveBeenLastCalledWith("/clubs/member-only/app");
+
+    await user.click(trigger);
+    await user.click(screen.getByRole("button", { name: "다음 호스트 클럽" }));
+    expect(onSelectTarget).toHaveBeenLastCalledWith("/clubs/host-next/app/host/people");
   });
 
   it("keeps an unavailable host workspace visible with its reason and does not navigate", async () => {
@@ -81,7 +106,6 @@ describe("HostWorkspaceSwitcher", () => {
         currentWorkspace="member"
         workspaceItems={workspaceItems}
         disabledReason="이 클럽의 호스트 권한이 없습니다."
-        buildClubTarget={(slug, workspace) => `/clubs/${slug}/app/${workspace}`}
         onSelectTarget={onSelectTarget}
       />,
     );
@@ -103,7 +127,6 @@ describe("HostWorkspaceSwitcher", () => {
         clubs={clubs}
         currentWorkspace="host"
         workspaceItems={workspaceItems}
-        buildClubTarget={(slug, workspace) => `/clubs/${slug}/app/${workspace}`}
         onSelectTarget={vi.fn()}
       />,
     );
@@ -128,7 +151,6 @@ describe("HostWorkspaceSwitcher", () => {
             currentWorkspace="member"
             workspaceItems={workspaceItems}
             disabledReason="이 클럽의 호스트 권한이 없습니다."
-            buildClubTarget={(slug, workspace) => `/clubs/${slug}/app/${workspace}`}
             onSelectTarget={vi.fn()}
           />
         ))}

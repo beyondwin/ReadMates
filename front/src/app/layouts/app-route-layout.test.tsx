@@ -67,6 +67,33 @@ const memberAuth: AuthMeResponse = {
   role: "MEMBER",
 };
 
+const mixedAuthorityHostAuth: AuthMeResponse = {
+  ...hostAuth,
+  joinedClubs: [
+    ...hostAuth.joinedClubs,
+    {
+      clubId: "club-member-only",
+      clubSlug: "member-only",
+      clubName: "멤버 전용 클럽",
+      membershipId: "membership-member-only",
+      role: "MEMBER",
+      status: "ACTIVE",
+      approvalState: "ACTIVE",
+      primaryHost: "다른 호스트",
+    },
+    {
+      clubId: "club-host-next",
+      clubSlug: "host-next",
+      clubName: "다음 호스트 클럽",
+      membershipId: "membership-host-next",
+      role: "HOST",
+      status: "ACTIVE",
+      approvalState: "ACTIVE",
+      primaryHost: "김호스트",
+    },
+  ],
+};
+
 type Deferred<T> = {
   promise: Promise<T>;
   resolve: (value: T) => void;
@@ -134,7 +161,12 @@ function renderHostLayout({
   );
 }
 
-function renderHostShellAt(initialEntry: string, initialState?: unknown) {
+function renderHostShellAt(
+  initialEntry: string,
+  initialState?: unknown,
+  auth: AuthMeResponse = hostAuth,
+  includeLocationProbe = false,
+) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: 0, gcTime: 0 },
@@ -146,10 +178,18 @@ function renderHostShellAt(initialEntry: string, initialState?: unknown) {
   return render(
     <QueryClientProvider client={queryClient}>
       <AuthActionsContext.Provider value={{ markLoggedOut: vi.fn(), refreshAuth: vi.fn() }}>
-        <AuthContext.Provider value={{ status: "ready", auth: hostAuth }}>
+        <AuthContext.Provider value={{ status: "ready", auth }}>
           <MemoryRouter initialEntries={[initialState === undefined ? initialEntry : { pathname: initialEntry, state: initialState }]}>
             <Routes>
-              <Route path="*" element={<AppRouteLayout scopedAuth={hostAuth} audience="MEMBER" />} />
+              <Route
+                path="*"
+                element={(
+                  <>
+                    <AppRouteLayout scopedAuth={auth} audience="MEMBER" />
+                    {includeLocationProbe ? <LocationProbe /> : null}
+                  </>
+                )}
+              />
             </Routes>
           </MemoryRouter>
         </AuthContext.Provider>
@@ -313,6 +353,19 @@ describe("AppRouteLayout host session navigation", () => {
     expect(screen.getAllByRole("button", { name: "읽는사이 · 호스트 운영실" })).toHaveLength(2);
     expect(screen.queryByRole("navigation", { name: "클럽 선택" })).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "공간 선택" })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["member-only club", "/clubs/reading-sai/app/host/people", "멤버 전용 클럽", "/clubs/member-only/app"],
+    ["host-capable club", "/clubs/reading-sai/app/host/people/member-7", "다음 호스트 클럽", "/clubs/host-next/app/host/people"],
+  ])("uses the target club's authority-safe URL for a %s", async (_caseName, initialEntry, clubName, expected) => {
+    const user = userEvent.setup();
+    renderHostShellAt(initialEntry, undefined, mixedAuthorityHostAuth, true);
+
+    await user.click(screen.getAllByRole("button", { name: "읽는사이 · 호스트 운영실" })[0]);
+    await user.click(screen.getAllByRole("button", { name: clubName })[0]);
+
+    expect(screen.getByRole("status", { name: "현재 경로" }).textContent).toBe(expected);
   });
 
   it.each([

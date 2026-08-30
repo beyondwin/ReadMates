@@ -770,11 +770,6 @@ export function AppRouteLayout({
             clubs={shellClubs}
             currentWorkspace="host"
             workspaceItems={workspaceItems}
-            buildClubTarget={(slug, workspace) => buildClubSwitchTarget({
-              pathname,
-              targetClubSlug: slug,
-              targetWorkspace: workspace,
-            })}
             onSelectTarget={(href) => void navigate(href)}
           />
         ),

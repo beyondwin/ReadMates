@@ -38,7 +38,6 @@ export function HostShellPrimitivesStory({ mode }: { mode: "desktop" | "mobile" 
           { id: "member", label: "멤버 공간", href: "/clubs/long-club/app/archive" },
           { id: "host", label: "호스트 운영실", href: "/clubs/long-club/app/host" },
         ]}
-        buildClubTarget={(slug, workspace) => `/clubs/${slug}/app/${workspace === "host" ? "host" : ""}`}
         onSelectTarget={() => undefined}
       />
       <HostPrimaryNavigation destinations={destinations} mode={mode} />
