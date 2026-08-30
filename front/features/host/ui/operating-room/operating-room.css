@@ -275,6 +275,150 @@
   overflow-wrap: anywhere;
 }
 
+.rm-host-operating-room {
+  min-width: 0;
+  color: var(--text);
+  background: var(--bg);
+  overflow-wrap: anywhere;
+}
+
+.rm-host-operating-room__body,
+.rm-host-operating-room__phase-panel {
+  min-width: 0;
+}
+
+.rm-host-operating-room__body {
+  width: min(100%, 1180px);
+  margin-inline: auto;
+  border-inline: 1px solid var(--line-soft);
+}
+
+.rm-host-operating-room__phase-notice {
+  width: min(100%, 1180px);
+  margin: 0 auto;
+  padding: var(--space-sm) var(--space-xl);
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--accent-soft);
+  color: var(--text-2);
+}
+
+.rm-host-operating-room__empty {
+  display: grid;
+  gap: var(--space-md);
+  align-content: start;
+  width: min(100% - (2 * var(--space-xl)), 760px);
+  min-height: 420px;
+  margin-inline: auto;
+  padding-block: clamp(64px, 12vh, 120px);
+}
+
+.rm-host-operating-room__empty h1,
+.rm-host-operating-room__empty h2,
+.rm-host-operating-room__empty p {
+  margin: 0;
+}
+
+.rm-host-operating-room__empty p {
+  max-width: 65ch;
+  color: var(--text-2);
+}
+
+.rm-host-operating-room__empty .rm-operating-room-next-action__primary {
+  justify-self: start;
+}
+
+.rm-host-operating-room__partial,
+.rm-host-operating-room__recovery,
+.rm-host-operating-room__phase-state {
+  margin: 0;
+  padding: var(--space-lg) var(--space-xl);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-sub);
+}
+
+.rm-host-operating-room__partial h2,
+.rm-host-operating-room__recovery h2 {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--type-size-body-emphasis);
+}
+
+.rm-host-operating-room__partial ul,
+.rm-host-operating-room__recovery dl {
+  margin: 0 0 var(--space-sm);
+  padding: 0;
+}
+
+.rm-host-operating-room__partial ul {
+  padding-inline-start: 1.2em;
+  color: var(--text-2);
+}
+
+.rm-host-operating-room__recovery dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.rm-host-operating-room__recovery dl div {
+  display: grid;
+  gap: 4px;
+}
+
+.rm-host-operating-room__recovery dt {
+  color: var(--text-3);
+  font-size: var(--type-size-label);
+}
+
+.rm-host-operating-room__recovery dd,
+.rm-host-operating-room__recovery p {
+  margin: 0;
+}
+
+.rm-host-operating-room__recovery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.rm-host-operating-room__partial button,
+.rm-host-operating-room__recovery button,
+.rm-host-operating-room__recovery a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding-inline: var(--space-md);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-2);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 650;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.rm-host-operating-room__partial button:hover,
+.rm-host-operating-room__recovery button:hover,
+.rm-host-operating-room__recovery a:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.rm-host-operating-room__partial button:focus-visible,
+.rm-host-operating-room__recovery button:focus-visible,
+.rm-host-operating-room__recovery a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--focus-ring-soft);
+}
+
+.rm-host-operating-room__phase-panel > .rm-meeting-response-ledger,
+.rm-host-operating-room__phase-panel > .rm-host-closing-board--embedded {
+  padding: var(--space-xl);
+}
+
 .rm-operating-room-next-action {
   display: grid;
   gap: var(--space-sm);
@@ -500,6 +644,27 @@
 }
 
 @media (max-width: 640px) {
+  .rm-host-operating-room__body {
+    border-inline: 0;
+  }
+
+  .rm-host-operating-room__phase-notice,
+  .rm-host-operating-room__partial,
+  .rm-host-operating-room__recovery,
+  .rm-host-operating-room__phase-state,
+  .rm-host-operating-room__phase-panel > .rm-meeting-response-ledger,
+  .rm-host-operating-room__phase-panel > .rm-host-closing-board--embedded {
+    padding-inline: var(--space-md);
+  }
+
+  .rm-host-operating-room__empty {
+    width: min(100% - (2 * var(--space-md)), 760px);
+  }
+
+  .rm-host-operating-room__recovery dl {
+    grid-template-columns: 1fr;
+  }
+
   .rm-operating-room-header {
     --rm-operating-room-cover-width: 84px;
     gap: var(--space-sm) var(--space-md);
