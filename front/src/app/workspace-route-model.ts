@@ -1,4 +1,6 @@
-export type ClubWorkspace = "member" | "host";
+import type { ClubPerspective } from "@/shared/model/global-space";
+
+export type ClubWorkspace = ClubPerspective;
 
 export type SafeRouteFamily =
   | "today"
