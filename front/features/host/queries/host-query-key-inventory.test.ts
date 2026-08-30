@@ -9,6 +9,7 @@ import { hostNotificationKeys } from "./host-notification-queries";
 import { hostSessionKeys } from "./host-session-queries";
 import { hostSessionRecordKeys } from "./host-session-record-query-keys";
 import { hostSessionRecoveryKeys } from "./host-session-recovery-queries";
+import { hostWorkboxKeys } from "./host-workbox-queries";
 import { aiClubKeys, aiJobKeys } from "../aigen/queries/aigen-job-queries";
 import { hostClubQueryPrefix } from "./host-state-purge";
 
@@ -32,6 +33,7 @@ describe("host query-key inventory", () => {
       hostInvitationKeys.scope({ clubSlug }),
       hostNotificationKeys.scope({ clubSlug }),
       hostClubOperationsKeys.scope({ clubSlug }),
+      hostWorkboxKeys.scope({ clubSlug }),
       aiJobKeys.scope({ clubSlug }),
       aiClubKeys.scope({ clubSlug }),
     ];
@@ -52,6 +54,7 @@ describe("host query-key inventory", () => {
       invitations: hostInvitationKeys.scope({ clubSlug }),
       notifications: hostNotificationKeys.scope({ clubSlug }),
       clubOperations: hostClubOperationsKeys.scope({ clubSlug }),
+      workbox: hostWorkboxKeys.scope({ clubSlug }),
       aiJobs: aiJobKeys.scope({ clubSlug }),
       aiClub: aiClubKeys.scope({ clubSlug }),
     });

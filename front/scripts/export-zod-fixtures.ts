@@ -24,6 +24,10 @@ import { HostPersonDetailSchema } from "../features/host/api/host-person-contrac
 import { HostInvitationLinkHistorySchema, HostInvitationLinkListSchema } from "../features/host/api/host-invitation-link-contracts";
 import { HostClubClosePreviewSchema, HostClubCloseResultSchema, HostClubSettingsSchema } from "../features/host/api/host-club-settings-contracts";
 import { InvitationPreviewResponseSchema } from "../features/auth/api/auth-contracts";
+import {
+  HostWorkboxDeferralReceiptSchema,
+  HostWorkboxPageSchema,
+} from "../features/host/api/host-workbox-contracts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, "../tests/unit/__fixtures__/zod-schemas");
@@ -38,7 +42,7 @@ const hostClubClosePreview = HostClubClosePreviewSchema.parse({ previewId: "0000
 const hostClubCloseResult = HostClubCloseResultSchema.parse({ receiptId: "00000000-0000-0000-0000-00000000e104", status: "ARCHIVED", revision: 1, replayed: false });
 const invitationPreviewEmail = InvitationPreviewResponseSchema.parse({ invitationType: "EMAIL", clubSlug: "reading-sai", clubName: "Public fixture club", canonicalPath: `/clubs/reading-sai/invite/${"e".repeat(43)}`, email: "member@example.test", name: "Public fixture member", emailHint: "m***@example.test", status: "PENDING", expiresAt: "2026-09-30T00:00:00Z", canAccept: true });
 const invitationPreviewNamedLink = InvitationPreviewResponseSchema.parse({ invitationType: "NAMED_LINK", clubSlug: "reading-sai", clubName: "Public fixture club", canonicalPath: `/clubs/reading-sai/invite/lnk_${"n".repeat(43)}`, email: null, name: null, emailHint: null, status: "PENDING", expiresAt: "2026-09-30T00:00:00Z", canAccept: true });
-const hostWorkboxPage = {
+const hostWorkboxPage = HostWorkboxPageSchema.parse({
   state: "NOW",
   evaluatedAt: "2026-08-30T09:00:00Z",
   sourceAvailability: [
@@ -66,11 +70,11 @@ const hostWorkboxPage = {
     },
   }],
   nextCursor: null,
-};
-const hostWorkboxDeferralReceipt = {
+});
+const hostWorkboxDeferralReceipt = HostWorkboxDeferralReceiptSchema.parse({
   key: "SCHEDULE_UNSEEN:session-1:r7",
   deferredUntil: "2026-08-31T09:00:00Z",
-};
+});
 
 // ---------------------------------------------------------------------------
 // HostSessionDetailResponseSchema top-level keys
@@ -749,3 +753,4 @@ write("host-workbox-page.json", hostWorkboxPage);
 write("host-workbox-deferral-receipt.json", hostWorkboxDeferralReceipt);
 writeTopLevel("host-invitation-links.json", { items: [], nextCursor: null });
 writeTopLevel("host-club-settings.json", hostClubSettings);
+writeTopLevel("host-workbox-page.json", hostWorkboxPage);
