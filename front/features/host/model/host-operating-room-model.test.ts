@@ -213,6 +213,7 @@ describe("buildHostOperatingRoomView", () => {
       value: "아직 멤버에게 공개되지 않음",
       numerator: null,
       denominator: null,
+      href: null,
       workItemKey: null,
     });
     expect(view.nextAction.kind).not.toBe("schedule-seen");

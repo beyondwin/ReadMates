@@ -261,6 +261,8 @@ describe("HostDashboardRoute", () => {
     await waitFor(() => expect(router.state.location.search).toBe("?phase=prep&from=notice"));
     expect(router.state.historyAction).toBe("REPLACE");
     expect(screen.getByRole("tab", { name: /준비실/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("아직 멤버에게 공개되지 않음")).toBeVisible();
+    expect(screen.queryByRole("link", { name: "일정 확인 자세히 보기" })).not.toBeInTheDocument();
   });
 
   it("renders one empty-current action without date or list selection", async () => {

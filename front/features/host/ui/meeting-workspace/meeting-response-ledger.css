@@ -61,6 +61,21 @@
   color: var(--text-3);
 }
 
+.rm-meeting-response-ledger__correction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 4px 10px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.rm-meeting-response-ledger__correction select {
+  min-width: 112px;
+  min-height: 44px;
+}
+
 .rm-meeting-response-ledger__bulk--meeting-day {
   position: static;
   justify-content: stretch;

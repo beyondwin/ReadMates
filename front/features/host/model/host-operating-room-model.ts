@@ -270,14 +270,14 @@ function scheduleSeenRow(
   const href = hostSessionPath(basePath, meeting.sessionId, "?section=responses&scheduleSeen=unseen");
   if (summary.availability === "UNAVAILABLE") {
     if (meeting.state === "DRAFT") {
-      return unavailableRow("schedule-seen", "일정 확인", "아직 멤버에게 공개되지 않음", "멤버 공개 뒤 집계가 시작됩니다.", href);
+      return unavailableRow("schedule-seen", "일정 확인", "아직 멤버에게 공개되지 않음", "멤버 공개 뒤 집계가 시작됩니다.", null);
     }
     failures.push({ source: "schedule-seen", message: "일정 확인 집계를 불러오지 못했습니다.", retryable: true });
-    return unavailableRow("schedule-seen", "일정 확인", "집계 준비 중", "최신 일정 확인 상태를 다시 불러오세요.", href);
+    return unavailableRow("schedule-seen", "일정 확인", "집계 준비 중", "최신 일정 확인 상태를 다시 불러오세요.", null);
   }
   if (!hasScheduleCounts(summary)) {
     failures.push({ source: "schedule-seen", message: "일정 확인 집계 계약이 완전하지 않습니다.", retryable: true });
-    return unavailableRow("schedule-seen", "일정 확인", "집계 준비 중", "분모를 확인한 뒤 다시 표시합니다.", href);
+    return unavailableRow("schedule-seen", "일정 확인", "집계 준비 중", "분모를 확인한 뒤 다시 표시합니다.", null);
   }
 
   const unseenCount = countFor(summary, "UNSEEN");
@@ -378,7 +378,7 @@ function unavailableRow(
   label: string,
   value: string,
   detail: string,
-  href: string,
+  href: string | null,
 ): PreparationLedgerRowView {
   return { id, label, state: "unavailable", value, detail, numerator: null, denominator: null, href, workItemKey: null };
 }

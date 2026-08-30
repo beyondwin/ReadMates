@@ -81,41 +81,37 @@ export function SessionClosingBoard({
         </div>
       </section>
 
-      {!embedded ? (
-        <>
-          <section className="surface rm-host-closing-board__section" aria-label="호스트 멤버 공개 표면 상태">
-            <div className="eyebrow">호스트 문서 / 멤버 회고 / 공개 기록</div>
-            <div className="rm-host-closing-board__surfaces">
-              {view.surfaces.map((surface) => (
-                <article key={surface.id} className="surface-quiet rm-host-closing-board__surface">
-                  <div className="row-between rm-host-closing-board__surface-row">
-                    <h2 className="h3 editorial">{surface.title}</h2>
-                    <span className={badgeClass(surface.tone)}>{surface.title}</span>
-                  </div>
-                  <p className="body muted">{surface.detail}</p>
-                  {surface.href ? (
-                    <LinkComponent className="btn btn-quiet btn-sm" to={surface.href}>
-                      {surface.actionLabel}
-                    </LinkComponent>
-                  ) : null}
-                </article>
-              ))}
-            </div>
-          </section>
+      <section className="surface rm-host-closing-board__section" aria-label="호스트 멤버 공개 표면 상태">
+        <div className="eyebrow">호스트 문서 / 멤버 회고 / 공개 기록</div>
+        <div className="rm-host-closing-board__surfaces">
+          {view.surfaces.map((surface) => (
+            <article key={surface.id} className="surface-quiet rm-host-closing-board__surface">
+              <div className="row-between rm-host-closing-board__surface-row">
+                <h2 className="h3 editorial">{surface.title}</h2>
+                <span className={badgeClass(surface.tone)}>{surface.title}</span>
+              </div>
+              <p className="body muted">{surface.detail}</p>
+              {surface.href ? (
+                <LinkComponent className="btn btn-quiet btn-sm" to={surface.href}>
+                  {surface.actionLabel}
+                </LinkComponent>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      </section>
 
-          <section className="surface rm-host-closing-board__section" aria-label="마감 증거">
-            <div className="eyebrow">마감 증거</div>
-            <dl className="rm-host-closing-board__evidence">
-              {view.evidence.map((item) => (
-                <div key={item.label}>
-                  <dt className="tiny muted">{item.label}</dt>
-                  <dd className="body">{item.value}</dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-        </>
-      ) : null}
+      <section className="surface rm-host-closing-board__section" aria-label="마감 증거">
+        <div className="eyebrow">마감 증거</div>
+        <dl className="rm-host-closing-board__evidence">
+          {view.evidence.map((item) => (
+            <div key={item.label}>
+              <dt className="tiny muted">{item.label}</dt>
+              <dd className="body">{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
     </>
   );
 
