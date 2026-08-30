@@ -24,8 +24,12 @@ import {
   fetchGuestUpcomingSessions,
   type GuestBrowsePage,
 } from "@/features/guest-browse/api/guest-browse-api";
-import { useAuth, useAuthActions } from "@/src/app/auth-state";
+import { anonymousAuth, useAuth, useAuthActions } from "@/src/app/auth-state";
 import { AppRouteSecurityController } from "@/src/app/app-route-security-controller";
+import {
+  GlobalSpaceTransitionController,
+  globalSpaceTransitionEpochKey,
+} from "@/src/app/global-space-transition-controller";
 import {
   archiveReportReturnTarget,
   archiveSessionsReturnTarget,
@@ -429,6 +433,97 @@ function appMobileBackTarget({
   return null;
 }
 
+function useAppSpaceComposition({
+  auth,
+  isGuestAudience,
+  pathname,
+  basePath,
+  currentClubSlug,
+}: {
+  auth: AuthMeResponse | null;
+  isGuestAudience: boolean;
+  pathname: string;
+  basePath: string;
+  currentClubSlug: string;
+}) {
+  const isHostWorkspace = workspaceFromCanonicalPath(pathname) === "host";
+  const isActiveHost = !isGuestAudience && auth ? canUseHostApp(auth) : false;
+  const authorizedWorkspaces = useMemo<ClubWorkspace[]>(() => {
+    if (isGuestAudience || !auth) return [];
+    return [
+      ...(canUseMemberApp(auth) ? ["member" as const] : []),
+      ...(canUseHostApp(auth) ? ["host" as const] : []),
+    ];
+  }, [auth, isGuestAudience]);
+  const roleSwitchAction = useMemo(() => {
+    const targetWorkspace: ClubWorkspace = isHostWorkspace ? "member" : "host";
+    if (!authorizedWorkspaces.includes(targetWorkspace)) return null;
+    const candidate = candidateRoleSwitchTarget({ pathname, targetWorkspace });
+    const target = resolveAuthorizedRoleSwitchTarget({
+      candidate,
+      authorizedWorkspaces,
+      correspondence: "unknown",
+      lastSafeTarget: readLastSafeWorkspaceTarget(targetWorkspace),
+    });
+    return {
+      href: target,
+      label: targetWorkspace === "host" ? "호스트 공간" : "멤버 공간",
+      navigation: candidate.navigation,
+    };
+  }, [authorizedWorkspaces, isHostWorkspace, pathname]);
+  const desktopVariant: ShellClubWorkspace = isHostWorkspace ? "host" : "member";
+  const shellClubs = useMemo<ClubNavigationItem[]>(() => {
+    const joinedClubs = usableJoinedClubs(auth?.joinedClubs ?? []);
+    const clubs = joinedClubs.map((joinedClub) => {
+      const targetWorkspace: ClubWorkspace = auth && canUseJoinedClubHostApp(auth, joinedClub)
+        ? "host"
+        : "member";
+      return {
+        slug: joinedClub.clubSlug,
+        name: joinedClub.clubName,
+        href: joinedClub.clubSlug === currentClubSlug
+          ? pathname
+          : buildClubSwitchTarget({
+              pathname,
+              targetClubSlug: joinedClub.clubSlug,
+              targetWorkspace,
+            }),
+      };
+    });
+    if (currentClubSlug && !clubs.some((club) => club.slug === currentClubSlug)) {
+      clubs.unshift({ slug: currentClubSlug, name: "현재 클럽", href: pathname });
+    }
+    return clubs;
+  }, [auth, currentClubSlug, pathname]);
+  const workspaceItems = useMemo<WorkspaceNavigationItem[]>(() =>
+    authorizedWorkspaces.map((workspace) => {
+      if (workspace === desktopVariant) {
+        return {
+          id: workspace,
+          label: workspace === "host" ? "호스트 공간" : "멤버 공간",
+          href: pathname,
+          navigation: "push" as const,
+        };
+      }
+      return {
+        id: workspace,
+        label: workspace === "host" ? "호스트 공간" : "멤버 공간",
+        href: roleSwitchAction?.href ?? scopedAppPath(basePath, workspace === "host" ? "/app/host" : "/app"),
+        navigation: roleSwitchAction?.navigation ?? "push",
+      };
+    }), [authorizedWorkspaces, basePath, desktopVariant, pathname, roleSwitchAction]);
+
+  return {
+    isHostWorkspace,
+    isActiveHost,
+    authorizedWorkspaces,
+    roleSwitchAction,
+    desktopVariant,
+    shellClubs,
+    workspaceItems,
+  };
+}
+
 export function AppRouteLayout({
   scopedAuth,
   audience,
@@ -457,40 +552,22 @@ export function AppRouteLayout({
       : null;
   const isGuestAudience = audience === "GUEST";
   const AppLinkComponent = isGuestAudience ? GuestNavigationLink : Link;
-  const isHostWorkspace = workspaceFromCanonicalPath(pathname) === "host";
-  const isActiveHost = !isGuestAudience && auth ? canUseHostApp(auth) : false;
-  const authorizedWorkspaces = useMemo<ClubWorkspace[]>(() => {
-    if (isGuestAudience || !auth) {
-      return [];
-    }
-
-    return [
-      ...(canUseMemberApp(auth) ? ["member" as const] : []),
-      ...(canUseHostApp(auth) ? ["host" as const] : []),
-    ];
-  }, [auth, isGuestAudience]);
-  const roleSwitchAction = useMemo(() => {
-    const targetWorkspace: ClubWorkspace = isHostWorkspace ? "member" : "host";
-    if (!authorizedWorkspaces.includes(targetWorkspace)) {
-      return null;
-    }
-
-    const candidate = candidateRoleSwitchTarget({ pathname, targetWorkspace });
-    const target = resolveAuthorizedRoleSwitchTarget({
-      candidate,
-      authorizedWorkspaces,
-      // The target's route loader remains the authority for the same object before it renders.
-      correspondence: "unknown",
-      lastSafeTarget: readLastSafeWorkspaceTarget(targetWorkspace),
-    });
-
-    return {
-      href: target,
-      label: targetWorkspace === "host" ? "호스트 공간" : "멤버 공간",
-      navigation: candidate.navigation,
-    };
-  }, [authorizedWorkspaces, isHostWorkspace, pathname]);
-  const desktopVariant: ShellClubWorkspace = isHostWorkspace ? "host" : "member";
+  const currentClubSlug = clubSlug ?? auth?.currentMembership?.clubSlug ?? "";
+  const {
+    isHostWorkspace,
+    isActiveHost,
+    authorizedWorkspaces,
+    roleSwitchAction,
+    desktopVariant,
+    shellClubs,
+    workspaceItems,
+  } = useAppSpaceComposition({
+    auth,
+    isGuestAudience,
+    pathname,
+    basePath,
+    currentClubSlug,
+  });
   const [guestVerification, setGuestVerification] = useState<{
     key: string | null;
     status: "not-applicable" | "pending" | "available" | "unavailable";
@@ -673,46 +750,6 @@ export function AppRouteLayout({
     );
   }
 
-  const currentClubSlug = clubSlug ?? auth?.currentMembership?.clubSlug ?? "";
-  const joinedClubs = usableJoinedClubs(auth?.joinedClubs ?? []);
-  const shellClubs: ClubNavigationItem[] = joinedClubs.map((joinedClub) => {
-    const targetWorkspace: ClubWorkspace = auth
-      && canUseJoinedClubHostApp(auth, joinedClub)
-      ? "host"
-      : "member";
-    return {
-      slug: joinedClub.clubSlug,
-      name: joinedClub.clubName,
-      href: joinedClub.clubSlug === currentClubSlug
-        ? pathname
-        : buildClubSwitchTarget({
-            pathname,
-            targetClubSlug: joinedClub.clubSlug,
-            targetWorkspace,
-          }),
-    };
-  });
-  if (currentClubSlug && !shellClubs.some((club) => club.slug === currentClubSlug)) {
-    shellClubs.unshift({ slug: currentClubSlug, name: "현재 클럽", href: pathname });
-  }
-
-  const workspaceItems: WorkspaceNavigationItem[] = authorizedWorkspaces.map((workspace) => {
-    if (workspace === desktopVariant) {
-      return {
-        id: workspace,
-        label: workspace === "host" ? "호스트 공간" : "멤버 공간",
-        href: pathname,
-        navigation: "push",
-      };
-    }
-
-    return {
-      id: workspace,
-      label: workspace === "host" ? "호스트 공간" : "멤버 공간",
-      href: roleSwitchAction?.href ?? scopedAppPath(basePath, workspace === "host" ? "/app/host" : "/app"),
-      navigation: roleSwitchAction?.navigation ?? "push",
-    };
-  });
   const recordOwned = desktopVariant === "host" && hostRecordOwnedRoute(appPath, location.state, pathname);
   const primaryItems = primaryNavigationItems({
     workspace: desktopVariant,
@@ -747,57 +784,62 @@ export function AppRouteLayout({
   ) : null;
 
   return (
-    <AppClubShell
-      clubs={shellClubs}
-      currentClubSlug={currentClubSlug}
-      workspace={desktopVariant}
-      workspaceItems={workspaceItems}
-      primaryItems={primaryItems}
-      account={{ control: accountControl }}
-      brandHref={brandHref}
-      mobileTitle={appMobileTitle(desktopVariant, appPath, recordOwned)}
-      mobileKicker={desktopVariant === "host" ? "호스트" : null}
-      mobileBackTarget={mobileBackTarget}
-      LinkComponent={AppLinkComponent}
-      contextSlot={desktopVariant === "host" && currentShellClub ? {
-        desktop: (
-          <HostWorkspaceSwitcher
-            club={{
-              name: currentShellClub.name,
-              slug: currentShellClub.slug,
-              avatarKey: auth?.currentMembership?.avatarKey ?? auth?.avatarKey ?? "cloud-green-book",
-            }}
-            clubs={shellClubs}
-            currentWorkspace="host"
-            workspaceItems={workspaceItems}
-            onSelectTarget={(href) => void navigate(href)}
-          />
-        ),
-      } : undefined}
-      primarySlot={hostDestinations ? {
-        desktop: (
-          <HostPrimaryNavigation
-            destinations={hostDestinations}
-            mode="desktop"
+    <GlobalSpaceTransitionController
+      key={globalSpaceTransitionEpochKey(pathname, auth ?? anonymousAuth)}
+      auth={auth ?? anonymousAuth}
+    >
+      <AppClubShell
+        clubs={shellClubs}
+        currentClubSlug={currentClubSlug}
+        workspace={desktopVariant}
+        workspaceItems={workspaceItems}
+        primaryItems={primaryItems}
+        account={{ control: accountControl }}
+        brandHref={brandHref}
+        mobileTitle={appMobileTitle(desktopVariant, appPath, recordOwned)}
+        mobileKicker={desktopVariant === "host" ? "호스트" : null}
+        mobileBackTarget={mobileBackTarget}
+        LinkComponent={AppLinkComponent}
+        contextSlot={desktopVariant === "host" && currentShellClub ? {
+          desktop: (
+            <HostWorkspaceSwitcher
+              club={{
+                name: currentShellClub.name,
+                slug: currentShellClub.slug,
+                avatarKey: auth?.currentMembership?.avatarKey ?? auth?.avatarKey ?? "cloud-green-book",
+              }}
+              clubs={shellClubs}
+              currentWorkspace="host"
+              workspaceItems={workspaceItems}
+              onSelectTarget={(href) => void navigate(href)}
+            />
+          ),
+        } : undefined}
+        primarySlot={hostDestinations ? {
+          desktop: (
+            <HostPrimaryNavigation
+              destinations={hostDestinations}
+              mode="desktop"
+              LinkComponent={AppLinkComponent}
+            />
+          ),
+        } : undefined}
+        utilitySlot={hostUtilityActions ? {
+          desktop: hostUtilityActions,
+          mobile: <HostMobileUtilityMenu>{hostUtilityActions}</HostMobileUtilityMenu>,
+        } : undefined}
+        beforeContent={expiryRecovery}
+        securityController={<AppRouteSecurityController workspace={desktopVariant} />}
+        desktopFooter={(
+          <PublicFooter
+            publicBasePath=""
+            showGuestMemberActions={false}
             LinkComponent={AppLinkComponent}
           />
-        ),
-      } : undefined}
-      utilitySlot={hostUtilityActions ? {
-        desktop: hostUtilityActions,
-        mobile: <HostMobileUtilityMenu>{hostUtilityActions}</HostMobileUtilityMenu>,
-      } : undefined}
-      beforeContent={expiryRecovery}
-      securityController={<AppRouteSecurityController workspace={desktopVariant} />}
-      desktopFooter={(
-        <PublicFooter
-          publicBasePath=""
-          showGuestMemberActions={false}
-          LinkComponent={AppLinkComponent}
-        />
-      )}
-    >
-      <RouteOutlet />
-    </AppClubShell>
+        )}
+      >
+        <RouteOutlet />
+      </AppClubShell>
+    </GlobalSpaceTransitionController>
   );
 }

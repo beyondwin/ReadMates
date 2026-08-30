@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
-import type { NormalizedAuthMeResponse } from "@/shared/auth/auth-contracts";
-import { emptyAvailableSpaces } from "@/shared/auth/available-spaces";
+import type { AuthMeResponse, NormalizedAuthMeResponse } from "@/shared/auth/auth-contracts";
+import { emptyAvailableSpaces, normalizeAuthAvailableSpaces } from "@/shared/auth/available-spaces";
+import type { SpaceIdentity } from "@/shared/model/global-space";
 import type { SessionExpiryCause } from "@/shared/auth/session-expiry";
 
 export type AuthState =
@@ -37,6 +38,30 @@ export const AuthActionsContext = createContext<AuthActions>({
   markLoggedOut: () => {},
   refreshAuth: async () => {},
 });
+
+export function projectedSpaceIdentities(auth: AuthMeResponse | null | undefined): SpaceIdentity[] {
+  if (!auth) return [];
+  const projection = normalizeAuthAvailableSpaces(auth).availableSpaces;
+  const identities: SpaceIdentity[] = [];
+  if (projection.kinds.includes("PLATFORM")) identities.push({ productSpace: "platform" });
+  if (projection.kinds.includes("CLUBS")) {
+    for (const club of projection.clubs) {
+      for (const perspective of club.perspectives) {
+        identities.push({
+          productSpace: "clubs",
+          clubId: club.clubId,
+          clubSlug: club.clubSlug,
+          perspective: perspective === "HOST" ? "host" : "member",
+        });
+      }
+    }
+  }
+  return identities;
+}
+
+export function safeProjectionFallback(auth: AuthMeResponse | null | undefined): string {
+  return auth?.authenticated ? "/app" : "/login";
+}
 
 export function useAuth() {
   return useContext(AuthContext);

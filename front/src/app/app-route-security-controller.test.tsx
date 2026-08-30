@@ -159,6 +159,34 @@ describe("AppRouteSecurityController", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: "멤버 홈" })).toHaveFocus());
   });
 
+  it("forwards authority loss to the synchronous pre-purge callback before handled navigation", async () => {
+    const onBeforeHostAuthorityPurge = vi.fn();
+    render(
+      <MemoryRouter initialEntries={["/clubs/reading-sai/app/host"]}>
+        <QueryClientProvider client={queryClient}>
+          <AppRouteSecurityController
+            workspace="host"
+            transitionStore={transitionStore}
+            onBeforeHostAuthorityPurge={onBeforeHostAuthorityPurge}
+          />
+        </QueryClientProvider>
+        <main><h1>오늘의 운영</h1></main>
+      </MemoryRouter>,
+    );
+
+    act(() => signalHostAuthorityLoss({
+      code: "HOST_AUTHORITY_REVOKED",
+      clubSlug: "reading-sai",
+      requestKind: "SESSION_RECORD_DRAFT_SAVE",
+    }));
+
+    expect(onBeforeHostAuthorityPurge).toHaveBeenCalledTimes(1);
+    expect(onBeforeHostAuthorityPurge).toHaveBeenCalledWith(expect.objectContaining({
+      code: "HOST_AUTHORITY_REVOKED",
+      clubSlug: "reading-sai",
+    }));
+  });
+
   it("announces every committed member-host transition across click, Back, and Forward", async () => {
     const user = userEvent.setup();
     const router = createMemoryRouter(

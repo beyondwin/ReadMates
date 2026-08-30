@@ -12,6 +12,8 @@ import {
   stageHostAuthorityNavigation,
 } from "@/features/host/model/host-authority-navigation";
 import { HostAuthorityLossController } from "./host-authority-loss-controller";
+import type { HostAuthorityLossEvent } from "@/shared/api/host-authority-event";
+import { useOptionalGlobalSpaceTransitionController } from "./global-space-transition-controller";
 
 const workspaceLabels: Record<ClubWorkspace, string> = {
   member: "멤버 공간",
@@ -37,11 +39,14 @@ const defaultTransitionStore: WorkspaceRouteTransitionStore = {
 export function AppRouteSecurityController({
   workspace,
   transitionStore = defaultTransitionStore,
+  onBeforeHostAuthorityPurge,
 }: {
   workspace: ClubWorkspace;
   transitionStore?: WorkspaceRouteTransitionStore;
+  onBeforeHostAuthorityPurge?: (event: HostAuthorityLossEvent) => void;
 }) {
   const location = useLocation();
+  const globalTransition = useOptionalGlobalSpaceTransitionController();
   const [announcement, setAnnouncement] = useState("");
   const handleAuthorityLoss = useCallback((
     code: HostSecurityPurgeCode,
@@ -50,6 +55,10 @@ export function AppRouteSecurityController({
   ) => {
     stageHostAuthorityNavigation({ code, targetPathname, handoffId });
   }, []);
+  const handleBeforePurge = useCallback((event: HostAuthorityLossEvent) => {
+    globalTransition?.invalidateForHostAuthorityLoss(event);
+    onBeforeHostAuthorityPurge?.(event);
+  }, [globalTransition, onBeforeHostAuthorityPurge]);
 
   useEffect(() => {
     const href = `${location.pathname}${location.search}${location.hash}`;
@@ -85,7 +94,11 @@ export function AppRouteSecurityController({
 
   return (
     <div data-app-route-security-controller>
-      <HostAuthorityLossController onHandled={handleAuthorityLoss} />
+      <HostAuthorityLossController
+        onBeforePurge={handleBeforePurge}
+        resolveSafeTarget={globalTransition?.resolveHostAuthorityLossTarget}
+        onHandled={handleAuthorityLoss}
+      />
       {announcement ? (
         <span className="rm-sr-only" role="status" aria-live="polite" aria-atomic="true">
           {announcement}

@@ -12,6 +12,7 @@ import {
   type HostSensitiveStorage,
 } from "@/features/host/storage/host-sensitive-storage";
 import { subscribeHostAuthorityLoss } from "@/shared/api/host-authority-event";
+import type { HostAuthorityLossEvent } from "@/shared/api/host-authority-event";
 
 let authorityLossHandoffSequence = 0;
 
@@ -42,9 +43,13 @@ function afterMountedSensitiveStateCommit(): Promise<void> {
 
 export function HostAuthorityLossController({
   storage = hostSensitiveStorage,
+  onBeforePurge,
+  resolveSafeTarget,
   onHandled,
 }: {
   storage?: HostSensitiveStorage;
+  onBeforePurge?: (event: HostAuthorityLossEvent) => void;
+  resolveSafeTarget?: (event: HostAuthorityLossEvent) => Promise<string>;
   onHandled: (
     code: HostSecurityPurgeCode,
     targetPathname: string,
@@ -64,6 +69,11 @@ export function HostAuthorityLossController({
   useEffect(() => subscribeHostAuthorityLoss((event) => {
     if (handlingClubSlugsRef.current.has(event.clubSlug)) return;
     handlingClubSlugsRef.current.add(event.clubSlug);
+    try {
+      onBeforePurge?.(event);
+    } catch {
+      // Transition invalidation is best-effort isolated; host request/cache purge must continue.
+    }
     void (async () => {
       let replacementCommitted = false;
       try {
@@ -75,7 +85,9 @@ export function HostAuthorityLossController({
         if (clubSlugFromPathname(pathnameRef.current) !== event.clubSlug) return;
         await afterMountedSensitiveStateCommit();
         if (clubSlugFromPathname(pathnameRef.current) !== event.clubSlug) return;
-        const targetPathname = hostAuthoritySafeDestination(event.clubSlug);
+        const targetPathname = resolveSafeTarget
+          ? await resolveSafeTarget(event)
+          : hostAuthoritySafeDestination(event.clubSlug);
         const handoffId = nextAuthorityLossHandoffId();
         onHandled(event.code, targetPathname, handoffId);
         void navigate(targetPathname, {
@@ -87,7 +99,7 @@ export function HostAuthorityLossController({
         if (!replacementCommitted) handlingClubSlugsRef.current.delete(event.clubSlug);
       }
     })();
-  }), [navigate, onHandled, queryClient, storage]);
+  }), [navigate, onBeforePurge, onHandled, queryClient, resolveSafeTarget, storage]);
 
   return null;
 }

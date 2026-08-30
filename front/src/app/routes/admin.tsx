@@ -1,5 +1,7 @@
+/* eslint-disable react-refresh/only-export-components -- route modules intentionally export components and factories */
 import type { QueryClient } from "@tanstack/react-query";
 import { Navigate, type RouteObject, useLoaderData } from "react-router";
+import type { PropsWithChildren } from "react";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequirePlatformAdmin } from "@/src/app/route-guards";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
@@ -10,6 +12,12 @@ import {
   type AdminRouteDescriptor,
 } from "@/features/platform-admin/model/admin-route-catalog";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import { GlobalSpaceTransitionController } from "@/src/app/global-space-transition-controller";
+
+// This route-only boundary is intentionally colocated with the router configuration.
+export function AdminTransitionBoundary({ auth, children }: PropsWithChildren<{ auth: AuthMeResponse }>) {
+  return <GlobalSpaceTransitionController auth={auth}>{children}</GlobalSpaceTransitionController>;
+}
 
 export function adminRoutes(queryClient: QueryClient): RouteObject[] {
   return [
@@ -32,7 +40,9 @@ export function adminRoutes(queryClient: QueryClient): RouteObject[] {
           const auth = useLoaderData() as AuthMeResponse;
           return (
             <RequirePlatformAdmin>
-              <AdminShellLayout auth={auth} />
+              <AdminTransitionBoundary auth={auth}>
+                <AdminShellLayout auth={auth} />
+              </AdminTransitionBoundary>
             </RequirePlatformAdmin>
           );
         }
