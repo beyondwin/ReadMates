@@ -1,0 +1,2 @@
+67cd9d4557b86e954760684b5cac82f5fe3da88372991f791d7943bd44a55ae9  server/src/main/resources/db/mysql/migration/V65__host_club_settings_and_commands.sql
+a86ee90e25caf262f5920e7c9a9a4a21fd640852e8b824c03b472dbb64201c00  server/src/test/kotlin/com/readmates/support/HostClubSettingsMigrationContractTest.kt

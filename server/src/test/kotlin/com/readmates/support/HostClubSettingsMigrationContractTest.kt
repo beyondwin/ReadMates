@@ -32,6 +32,25 @@ class HostClubSettingsMigrationContractTest(
     }
 
     @Test
+    fun `command receipts reject actions outside the lifecycle allowlist`() {
+        assertThatThrownBy {
+            jdbc.update(
+                """
+                insert into host_club_command_receipts
+                  (id, club_id, actor_membership_id, action, idempotency_key_hash, request_hash,
+                   result_revision, safe_result_json, occurred_at)
+                values (?, ?, ?, 'UNSAFE_ACTION', ?, ?, 0, json_object('status', 'ACTIVE'), utc_timestamp(6))
+                """.trimIndent(),
+                INVALID_RECEIPT_ID,
+                CLUB_ONE,
+                HOST_MEMBERSHIP,
+                "d".repeat(64),
+                "e".repeat(64),
+            )
+        }.isInstanceOf(DataAccessException::class.java)
+    }
+
+    @Test
     fun `close preview rejects a consumed receipt from another club`() {
         jdbc.update(
             """
@@ -81,8 +100,10 @@ class HostClubSettingsMigrationContractTest(
         private const val RECEIPT_ID = "97000000-0000-0000-0000-000000000002"
         private const val PREVIEW_ID = "97000000-0000-0000-0000-000000000003"
         private const val HISTORY_ID = "97000000-0000-0000-0000-000000000004"
+        private const val INVALID_RECEIPT_ID = "97000000-0000-0000-0000-000000000005"
         const val CLEANUP = """
             delete from host_club_close_previews where id = '$PREVIEW_ID';
+            delete from host_club_command_receipts where id = '$INVALID_RECEIPT_ID';
             delete from host_club_command_receipts where id = '$RECEIPT_ID';
             delete from host_club_settings_history where id = '$HISTORY_ID';
             delete from memberships where id = '$CLUB_TWO_MEMBERSHIP';

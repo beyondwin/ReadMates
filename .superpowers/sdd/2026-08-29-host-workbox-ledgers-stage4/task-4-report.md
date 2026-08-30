@@ -55,6 +55,10 @@
 | Recoverable UI commands | focused component RED: 4/6 recovery/edit cases failed | create/update/close unknown state preserves the original idempotency key, stale/unknown actions refetch, preview errors retry, edit exposes name/maxUses/expiresAt; component suite 6/6 |
 
 Focused verification: named OAuth/concurrency DB 5/5; V65 migration 2/2; frontend contracts/UI 14/14; invite/BFF 47/47; isolated named-link Chromium E2E 1/1. Exact changed-file ESLint and `git diff --check` passed. Repository-wide `tsc --noEmit` and `ktlintCheck` remain skipped as gates: both report pre-existing failures outside Task 4 (archive/current-session type debt; notification ktlint debt), with no changed Task 4 file named by the Kotlin report. No real OAuth/email/provider call or non-fixture club close was performed. The changed-source delta is sealed in `task-4-review-1-manifest.sha256`.
+
+## Review round 2 closure (2026-08-30)
+
+The remaining V65 receipt-action finding was isolated to `host_club_command_receipts.action`. RED proved an otherwise valid receipt with `UNSAFE_ACTION` was accepted (migration contract 3 tests, 1 failure). V65 now constrains receipts to exactly `SETTINGS_UPDATED`, `CO_HOST_PROMOTED`, `CO_HOST_DEMOTED`, and `CLUB_ENDED`; the exact migration contract is GREEN 3/3 and preserves the history allowlist plus cross-club consumed-receipt rejection. `git diff --check` passed for the two-file surface. The review-2 delta is sealed in `task-4-review-2-manifest.sha256`; all other closed findings and evidence were reused unchanged.
 - `zod-schemas/host-invitation-link-list.json`: `6532e5efe0e4ba2c0d16386d06b0ab4a1e15ad6f4a184b4c87afe5239edfb161`
 - `zod-schemas/host-invitation-link-history.json`: `69d39ae1524956e683d5c86ce0f10065a845cdfb011877ef837b74258584c681`
 - `zod-schemas/host-club-settings.json`: `6c5d7fb30358ec609de3a81d1da651daa318e18fa859edfc59f1ffdfab2d3fde`

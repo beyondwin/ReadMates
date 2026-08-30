@@ -46,6 +46,8 @@ create table host_club_command_receipts (
   key host_club_command_receipts_page_idx (club_id, occurred_at, id),
   constraint host_club_command_receipts_club_fk foreign key (club_id) references clubs(id) on delete cascade,
   constraint host_club_command_receipts_actor_fk foreign key (actor_membership_id, club_id) references memberships(id, club_id),
+  constraint host_club_command_receipts_action_check
+    check (binary action in (binary 'SETTINGS_UPDATED', binary 'CO_HOST_PROMOTED', binary 'CO_HOST_DEMOTED', binary 'CLUB_ENDED')),
   constraint host_club_command_receipts_revision_check check (result_revision >= 0),
   constraint host_club_command_receipts_json_check check (json_type(safe_result_json) = 'OBJECT')
 ) default character set utf8mb4 collate utf8mb4_0900_ai_ci;
