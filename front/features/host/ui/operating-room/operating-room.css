@@ -306,10 +306,6 @@
     font-size: var(--type-size-label);
   }
 
-  .rm-operating-room-header__book {
-    display: none;
-  }
-
   .rm-operating-room-header__facts {
     display: grid;
     gap: 4px;

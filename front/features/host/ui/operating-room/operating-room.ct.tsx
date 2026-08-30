@@ -9,12 +9,15 @@ import {
 import { CurrentMeetingHeader } from "./current-meeting-header";
 import { MeetingPhaseTabs, type MeetingPhaseTabLink } from "./meeting-phase-tabs";
 
+const LONG_BOOK_TITLE = "도서 제목이 아주 길어도 표지 대체 영역과 헤더를 밀어내지 않는 책";
+const LONG_BOOK_AUTHOR = "긴 이름의 저자와 공동 저자";
+
 const longMeeting: CurrentMeetingHeaderView = {
   sessionId: "session-27",
   sessionNumber: 27,
   title: "경계가 긴 한글 모임 제목과 A deliberately long English meeting title without clipping",
-  bookTitle: "도서 제목이 아주 길어도 표지 대체 영역과 헤더를 밀어내지 않는 책",
-  bookAuthor: "긴 이름의 저자와 공동 저자",
+  bookTitle: LONG_BOOK_TITLE,
+  bookAuthor: LONG_BOOK_AUTHOR,
   bookImageUrl: null,
   date: "2026-09-01",
   startTime: "19:30",
@@ -70,6 +73,12 @@ for (const viewport of [
 
     await expect(component.getByRole("heading", { level: 1 })).toContainText("경계가 긴 한글 모임 제목");
     await expect(component.locator(".rm-book-cover__fallback")).toBeVisible();
+    if (viewport.width === 390) {
+      await expect(component.locator(".rm-operating-room-header__book")).toHaveText(
+        `${LONG_BOOK_TITLE} · ${LONG_BOOK_AUTHOR}`,
+      );
+      await expect(component.locator(".rm-operating-room-header__book")).toBeVisible();
+    }
     await expect(component.getByText("출석을 확정하고 모임을 마친 뒤 사용할 수 있습니다.")).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
@@ -107,6 +116,10 @@ test("meeting context stays usable at the 200 percent zoom proxy", async ({ moun
 
   await expect(component.getByRole("navigation", { name: "현재 모임 작업" })).toBeVisible();
   await expect(component.getByRole("tablist", { name: "모임 운영 단계" })).toBeVisible();
+  await expect(component.locator(".rm-operating-room-header__book")).toHaveText(
+    `${LONG_BOOK_TITLE} · ${LONG_BOOK_AUTHOR}`,
+  );
+  await expect(component.locator(".rm-operating-room-header__book")).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await expectReducedMotion(page);
   await page.screenshot({ path: testInfo.outputPath("operating-room-context-200-percent.png"), fullPage: true });
