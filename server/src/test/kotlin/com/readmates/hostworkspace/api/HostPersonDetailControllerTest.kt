@@ -160,6 +160,14 @@ class HostPersonDetailControllerTest {
     }
 
     @Test
+    fun `codec rejects present blank cursor bytes`() {
+        listOf("", "   ", "\t").forEach { invalid ->
+            assertThatThrownBy { codec.decode(invalid, HOST.clubId, HOST.membershipId, TARGET_ID) }
+                .isInstanceOf(IllegalArgumentException::class.java)
+        }
+    }
+
+    @Test
     fun `continuation restores its anchor and the last page omits a cursor`() {
         val anchor = codec.begin().copy(historyFingerprint = FINGERPRINT)
         val cursor = codec.encode(HOST.clubId, HOST.membershipId, TARGET_ID, anchor, TUPLE)
@@ -176,6 +184,24 @@ class HostPersonDetailControllerTest {
         assertThat(useCase.request!!.cursor.evaluatedAt).isEqualTo(anchor.evaluatedAt)
         assertThat(useCase.request!!.cursor.last).isEqualTo(TUPLE)
         assertThat(useCase.request!!.cursor.historyFingerprint).isEqualTo(FINGERPRINT)
+    }
+
+    @Test
+    fun `present blank attendance cursors fail closed while absence starts the first page`() {
+        useCase.response = detail(hasNext = false)
+
+        mockMvc.get("/api/host/people/$TARGET_ID").andExpect { status { isOk() } }
+        assertThat(useCase.request!!.cursor.last).isNull()
+
+        listOf("", "   ", "\t").forEach { invalid ->
+            mockMvc
+                .get("/api/host/people/$TARGET_ID") {
+                    param("attendanceCursor", invalid)
+                }.andExpect {
+                    status { isBadRequest() }
+                    jsonPath("$.code") { value("INVALID_CURSOR") }
+                }
+        }
     }
 
     @Test

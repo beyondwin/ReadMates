@@ -48,10 +48,7 @@ class HostWorkboxController(
                 .getOrElse { throw HostWorkboxInvalidRequestException() }
         if (limit !in 1..MAX_LIMIT) throw HostWorkboxInvalidRequestException()
         val owner = HostWorkboxOwner(member.clubId, member.membershipId)
-        val continuation =
-            cursor?.takeIf(String::isNotBlank)?.let {
-                cursorCodec.decode(it, owner, parsedState, filterFingerprint(parsedState))
-            }
+        val continuation = decodeCursor(cursor, owner, parsedState)
         val page =
             getWorkbox.get(
                 HostWorkboxRequest(
@@ -94,6 +91,15 @@ class HostWorkboxController(
     private fun key(raw: String): HostWorkItemKey =
         runCatching { HostWorkItemKey(URLDecoder.decode(raw, StandardCharsets.UTF_8)) }
             .getOrElse { throw HostWorkboxInvalidRequestException() }
+
+    private fun decodeCursor(
+        cursor: String?,
+        owner: HostWorkboxOwner,
+        state: HostWorkboxState,
+    ) = cursor?.let {
+        if (it.isBlank()) throw HostWorkboxCursorRestartException()
+        cursorCodec.decode(it, owner, state, filterFingerprint(state))
+    }
 
     private companion object {
         const val MAX_LIMIT = 100

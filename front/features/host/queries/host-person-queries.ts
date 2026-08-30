@@ -1,6 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import {
   fetchHostPersonDetail,
+  parseHostPersonAttendancePage,
   type HostPersonAttendancePage,
 } from "../api/host-person-api";
 import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
@@ -23,8 +24,9 @@ export function hostPersonDetailQuery(
   page: HostPersonAttendancePage | undefined,
   context: ExplicitReadmatesApiContext,
 ) {
+  const parsedPage = parseHostPersonAttendancePage(page);
   return queryOptions({
-    queryKey: hostPersonKeys.detail(membershipId, page, context),
-    queryFn: () => fetchHostPersonDetail(membershipId, page, context),
+    queryKey: hostPersonKeys.detail(membershipId, parsedPage, context),
+    queryFn: () => fetchHostPersonDetail(membershipId, parsedPage, context),
   });
 }

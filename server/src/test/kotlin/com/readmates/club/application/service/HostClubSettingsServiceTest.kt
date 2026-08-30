@@ -71,6 +71,24 @@ class HostClubSettingsServiceTest {
     }
 
     @Test
+    fun `settings update claims the club lock before idempotency replay lookup`() {
+        service.update(
+            actor,
+            UpdateHostClubSettingsCommand(
+                0,
+                "함께 읽는 방",
+                HostClubApprovalPolicy.INVITE_ONLY,
+                "Asia/Seoul",
+                false,
+                HostClubRecordPublicationDefault.MEMBER,
+                "settings-lock-order",
+            ),
+        )
+
+        assertThat(store.calls.take(2)).containsExactly("load:locked", "find-command")
+    }
+
+    @Test
     fun `cohost demotion preserves at least one active host`() {
         assertThatThrownBy { service.demoteCoHost(actor, hostId, 0, "demote-last") }
             .extracting("code")
@@ -183,17 +201,20 @@ class HostClubSettingsServiceTest {
         val history = mutableListOf<StoredHostClubSettingsHistory>()
         val commands = mutableListOf<StoredHostClubSettingsCommand>()
         val previews = mutableListOf<StoredHostClubClosePreview>()
+        val calls = mutableListOf<String>()
 
         override fun load(
             clubId: UUID,
             forUpdate: Boolean,
-        ) = settings.takeIf { it.clubId == clubId }
+        ) = settings.takeIf { it.clubId == clubId }.also {
+            calls += if (forUpdate) "load:locked" else "load"
+        }
 
         override fun findCommand(
             clubId: UUID,
             actorMembershipId: UUID,
             keyHash: String,
-        ) = commands.firstOrNull { it.keyHash == keyHash }
+        ) = commands.firstOrNull { it.keyHash == keyHash }.also { calls += "find-command" }
 
         override fun updateSettings(
             next: StoredHostClubSettings,

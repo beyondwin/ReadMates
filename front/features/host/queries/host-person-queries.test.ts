@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchHostPersonDetail } from "../api/host-person-api";
 import { hostPersonDetailQuery, hostPersonKeys } from "./host-person-queries";
 
-vi.mock("../api/host-person-api", () => ({ fetchHostPersonDetail: vi.fn() }));
+vi.mock("../api/host-person-api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/host-person-api")>()),
+  fetchHostPersonDetail: vi.fn(),
+}));
 
 describe("host person query identity", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -33,5 +36,21 @@ describe("host person query identity", () => {
     expect(hostPersonKeys.detail("member-1", page, context)).not.toEqual(
       hostPersonKeys.detail("member-2", page, context),
     );
+  });
+
+  it.each(["", "   ", "\t"])("rejects present blank cursor %j before key creation", (attendanceCursor) => {
+    expect(() => hostPersonDetailQuery(
+      "member-1",
+      { attendanceCursor, limit: 20 },
+      { clubSlug: "reading-sai" },
+    )).toThrow("host person cursor must contain a non-whitespace byte");
+    expect(fetchHostPersonDetail).not.toHaveBeenCalled();
+  });
+
+  it("preserves valid opaque cursor bytes in the query identity", () => {
+    const context = { clubSlug: "reading-sai" } as const;
+    const page = { attendanceCursor: "  next+/=  ", limit: 20 };
+
+    expect(hostPersonDetailQuery("member-1", page, context).queryKey.at(-1)).toEqual(page);
   });
 });

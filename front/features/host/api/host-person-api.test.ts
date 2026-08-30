@@ -30,13 +30,25 @@ describe("host person API", () => {
 
     await fetchHostPersonDetail(
       "member+with spaces",
-      { attendanceCursor: "cursor+/=", limit: 20 },
+      { attendanceCursor: "  cursor+/=  ", limit: 20 },
       { clubSlug: "reading-sai" },
     );
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      "/api/bff/api/host/people/member%2Bwith%20spaces?attendanceCursor=cursor%2B%2F%3D&limit=20&clubSlug=reading-sai",
+      "/api/bff/api/host/people/member%2Bwith%20spaces?attendanceCursor=++cursor%2B%2F%3D++&limit=20&clubSlug=reading-sai",
     );
+  });
+
+  it.each(["", "   ", "\t"])("rejects present blank cursor %j before fetch", (attendanceCursor) => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(() => fetchHostPersonDetail(
+      "member-1",
+      { attendanceCursor, limit: 20 },
+      { clubSlug: "reading-sai" },
+    )).toThrow("host person cursor must contain a non-whitespace byte");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("uses strict recursive allowlists and rejects forbidden account telemetry", () => {

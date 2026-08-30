@@ -271,6 +271,7 @@ function HostScheduleReviewSession({
           detail: "요청 결과를 확인할 수 없습니다. 같은 알림을 다시 보내지 말고 알림 장부에서 확인해 주세요.",
         });
         setPreviewSnapshot(null);
+        await invalidateAfterConfirm();
         return;
       }
       const disposition = manualNotificationErrorDisposition(confirmError);

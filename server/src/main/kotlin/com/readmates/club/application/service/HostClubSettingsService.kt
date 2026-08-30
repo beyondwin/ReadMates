@@ -57,14 +57,14 @@ class HostClubSettingsService(
                     "${normalized.approvalPolicy}\u0000${normalized.defaultTimezone}\u0000" +
                     "${normalized.scheduleReminderEnabled}\u0000${normalized.recordPublicationDefault}",
             )
+        val current = store.load(actor.clubId, true) ?: guards.notFound()
         store.findCommand(actor.clubId, actor.membershipId, keyHash)?.let { replay ->
             guards.requireReplay(replay, requestHash)
             return HostClubSettingsMutationResult(
-                mapping.toPublic(store.load(actor.clubId, false) ?: guards.notFound()),
+                mapping.toPublic(current),
                 mapping.receipt(replay, replayed = true),
             )
         }
-        val current = store.load(actor.clubId, true) ?: guards.notFound()
         guards.requireActive(current)
         guards.requireRevision(current, normalized.expectedRevision)
         val now = guards.now()
@@ -127,6 +127,7 @@ class HostClubSettingsService(
         val role = if (promote) "HOST" else "MEMBER"
         val keyHash = mapping.keyHash(normalizedKey)
         val requestHash = TokenHashing.sha256("$action\u0000$membershipId\u0000$expectedRevision")
+        val current = store.load(actor.clubId, true) ?: guards.notFound()
         store.findCommand(actor.clubId, actor.membershipId, keyHash)?.let { replay ->
             guards.requireReplay(replay, requestHash)
             return HostCoHostMutationResult(
@@ -136,7 +137,6 @@ class HostClubSettingsService(
                 mapping.receipt(replay, replayed = true),
             )
         }
-        val current = store.load(actor.clubId, true) ?: guards.notFound()
         guards.requireActive(current)
         guards.requireRevision(current, expectedRevision)
         val beforeRole =
@@ -278,6 +278,9 @@ class HostClubSettingsService(
         guards.requireManager(actor)
         val keyHash = mapping.keyHash(mapping.normalizeKey(idempotencyKey))
         val requestHash = TokenHashing.sha256("club-end-confirm\u0000$previewId\u0000$effectHash")
+        val preview =
+            store.loadClosePreview(previewId, true)
+                ?: guards.notFound("HOST_CLUB_CLOSE_PREVIEW_NOT_FOUND")
         store.findCommand(actor.clubId, actor.membershipId, keyHash)?.let { replay ->
             guards.requireReplay(replay, requestHash)
             return HostClubCloseResult(
@@ -287,9 +290,6 @@ class HostClubSettingsService(
                 true,
             )
         }
-        val preview =
-            store.loadClosePreview(previewId, true)
-                ?: guards.notFound("HOST_CLUB_CLOSE_PREVIEW_NOT_FOUND")
         validateClosePreview(preview, actor, effectHash)
         val current = store.load(actor.clubId, true) ?: guards.notFound()
         guards.requireActive(current)

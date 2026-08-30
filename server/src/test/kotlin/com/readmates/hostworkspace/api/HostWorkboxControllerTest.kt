@@ -120,6 +120,23 @@ class HostWorkboxControllerTest {
     }
 
     @Test
+    fun `present blank cursors fail closed while absence starts the first page`() {
+        useCase.page = page(hasMore = false)
+
+        mockMvc.get("/api/host/workbox").andExpect { status { isOk() } }
+        assertThat(useCase.request!!.continuation).isNull()
+
+        listOf("", "   ", "\t").forEach { invalid ->
+            mockMvc
+                .get("/api/host/workbox") { param("cursor", invalid) }
+                .andExpect {
+                    status { isConflict() }
+                    jsonPath("$.code") { value("WORKBOX_RESTART_REQUIRED") }
+                }
+        }
+    }
+
+    @Test
     fun `put and delete submit authoritative encoded key verbatim and reject malformed values`() {
         val encoded = "SCHEDULE_UNSEEN%3Asession-1%3Ar7"
         mockMvc

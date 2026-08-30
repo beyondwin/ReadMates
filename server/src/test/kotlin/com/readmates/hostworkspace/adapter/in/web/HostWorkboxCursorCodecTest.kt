@@ -100,6 +100,17 @@ class HostWorkboxCursorCodecTest {
             .isEqualTo(page().snapshotId)
     }
 
+    @Test
+    fun `present blank cursor bytes fail with restart`() {
+        val codec = HostWorkboxCursorCodec(properties, Clock.fixed(now, ZoneOffset.UTC))
+
+        listOf("", "   ", "\t").forEach { invalid ->
+            assertThatThrownBy {
+                codec.decode(invalid, owner, HostWorkboxState.NOW, "a".repeat(64))
+            }.isInstanceOf(HostWorkboxCursorRestartException::class.java)
+        }
+    }
+
     private fun page(): HostWorkboxPage =
         HostWorkboxPage(
             UUID.fromString("90000000-0000-4000-8000-000000000001"),

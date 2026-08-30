@@ -49,10 +49,7 @@ class HostPersonDetailController(
             runCatching { UUID.fromString(membershipId) }
                 .getOrElse { throw HostPersonInvalidRequestException() }
         if (limit !in 1..HOST_PERSON_MAX_PAGE_SIZE) throw HostPersonInvalidRequestException()
-        val anchor =
-            attendanceCursor?.takeIf(String::isNotBlank)?.let { raw ->
-                cursorCodec.decode(raw, member.clubId, member.membershipId, targetId)
-            } ?: cursorCodec.begin()
+        val anchor = decodeCursor(attendanceCursor, member, targetId)
         val detail =
             getDetail.get(
                 HostPersonDetailRequest(
@@ -74,6 +71,15 @@ class HostPersonDetailController(
             },
         )
     }
+
+    private fun decodeCursor(
+        cursor: String?,
+        member: CurrentMember,
+        targetId: UUID,
+    ) = cursor?.let { raw ->
+        if (raw.isBlank()) throw HostPersonInvalidCursorException()
+        cursorCodec.decode(raw, member.clubId, member.membershipId, targetId)
+    } ?: cursorCodec.begin()
 }
 
 @RestControllerAdvice(assignableTypes = [HostPersonDetailController::class])

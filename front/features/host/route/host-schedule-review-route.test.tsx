@@ -375,9 +375,10 @@ describe("HostScheduleReviewRoute", () => {
     expect(await screen.findByRole("textbox", { name: "알림 제목" })).toHaveValue("보존할 제목");
   });
 
-  it("renders an unknown receipt after an indeterminate transport outcome without a resend action", async () => {
+  it("reconciles scoped caches after an indeterminate confirm without resending or navigating away", async () => {
     vi.mocked(confirmManualNotification).mockRejectedValueOnce(new ReadmatesTransportError());
-    renderRoute();
+    const client = renderRoute();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
     await screen.findByRole("heading", { name: "일정 미열람 검토" });
     await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
     await userEvent.click(await screen.findByRole("button", { name: "2명에게 알림 발송" }));
@@ -389,5 +390,12 @@ describe("HostScheduleReviewRoute", () => {
     );
     expect(screen.queryByRole("button", { name: /다시|재발송|알림 발송/ })).not.toBeInTheDocument();
     expect(confirmManualNotification).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: hostWorkboxKeys.scope(context) });
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: hostNotificationKeys.manual(context) });
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: hostSessionKeys.manualDispatchesRoot(context) });
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: hostSessionKeys.detail("session-7", context) });
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: hostSessionKeys.operatingRoomCurrent(context) });
+    });
   });
 });
