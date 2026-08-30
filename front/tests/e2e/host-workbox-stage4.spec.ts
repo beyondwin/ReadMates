@@ -197,6 +197,17 @@ async function workboxResponse(page: Page, state: "NOW" | "DEFERRED" | "COMPLETE
   }>;
 }
 
+async function revealWorkboxItem(page: Page, accessibleName: string) {
+  const workbox = page.getByRole("region", { name: "작업함" });
+  const item = workbox.getByRole("listitem", { name: accessibleName });
+  for (let pageNumber = 0; pageNumber < 5 && await item.count() === 0; pageNumber += 1) {
+    const loadMore = workbox.getByRole("button", { name: "다음 묶음 불러오기" });
+    await expect(loadMore).toBeVisible();
+    await loadMore.click();
+  }
+  return item;
+}
+
 async function approveViewerThroughBff(page: Page): Promise<number> {
   return page.evaluate(async ({ membershipId, clubSlug }) => {
     const response = await fetch(
@@ -260,12 +271,8 @@ where club_id = ${sqlString(CLUB_ID)}
   and work_item_key = ${sqlString(authoritativeKey)};
 `);
 
-  const expiredNowPromise = workboxResponse(page, "NOW");
   await page.reload();
-  const expiredNow = await expiredNowPromise;
-  expect(expiredNow.items).toEqual(expect.arrayContaining([
-    expect.objectContaining({ key: authoritativeKey, state: "NOW" }),
-  ]));
+  await expect(await revealWorkboxItem(page, "가입 승인 요청")).toBeVisible();
 
   expect(await approveViewerThroughBff(page)).toBe(200);
   const completedPromise = workboxResponse(page, "COMPLETED");

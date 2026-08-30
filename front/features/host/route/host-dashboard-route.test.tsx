@@ -6,6 +6,8 @@ import type {
   HostSessionClosingStatusResponse,
   HostSessionDetailResponse,
 } from "@/features/host/api/host-contracts";
+import type { HostWorkboxPage } from "@/features/host/api/host-workbox-contracts";
+import { mergeCoherentWorkboxPages } from "@/features/host/model/host-workbox-page-chain";
 
 const routeMocks = vi.hoisted(() => ({
   loaderData: null as unknown,
@@ -270,6 +272,73 @@ afterEach(async () => {
 });
 
 describe("HostDashboardRoute", () => {
+  it("never merges retained cursor data across workbox snapshot generations", () => {
+    const page = (
+      evaluatedAt: string,
+      title: string,
+      nextCursor: string | null,
+      sourceState: "AVAILABLE" | "UNAVAILABLE" = "AVAILABLE",
+    ): HostWorkboxPage => ({
+      state: "NOW",
+      evaluatedAt,
+      sourceAvailability: [{
+        type: "SCHEDULE_UNSEEN",
+        state: sourceState,
+        ...(sourceState === "UNAVAILABLE"
+          ? { failureCode: "SCHEDULE_SOURCE_UNAVAILABLE" as const }
+          : {}),
+      },
+      { type: "MEMBER_APPROVAL", state: "AVAILABLE" },
+      { type: "RECORD_CLOSING", state: "AVAILABLE" },
+      { type: "INVITATION_EXPIRY", state: "AVAILABLE" },
+      { type: "NOTIFICATION_FAILURE", state: "AVAILABLE" }],
+      items: [{
+        key: `SCHEDULE_UNSEEN:${title}`,
+        type: "SCHEDULE_UNSEEN",
+        state: "NOW",
+        title,
+        description: title,
+        count: 1,
+        dueAt: null,
+        deferredUntil: null,
+        resolvedAt: null,
+        destinationHref: "/app/host/sessions/session-7/schedule-review",
+        receiptSummary: null,
+      }],
+      nextCursor,
+    });
+    const oldRoot = page("2026-08-30T09:00:00Z", "old root", "old-cursor");
+    const retainedOldContinuation = page(
+      "2026-08-30T09:00:00Z",
+      "retained old continuation",
+      "old-next",
+      "UNAVAILABLE",
+    );
+
+    const unchangedGeneration = mergeCoherentWorkboxPages(
+      oldRoot,
+      [oldRoot, retainedOldContinuation],
+    );
+    expect(unchangedGeneration).toMatchObject({
+      items: [{ title: "old root" }, { title: "retained old continuation" }],
+      nextCursor: "old-next",
+    });
+    expect(unchangedGeneration?.sourceAvailability[0]).toMatchObject({ state: "UNAVAILABLE" });
+
+    const newRoot = page("2026-08-30T10:00:00Z", "new root", "new-cursor");
+    const changedGeneration = mergeCoherentWorkboxPages(
+      newRoot,
+      [newRoot, retainedOldContinuation],
+    );
+    expect(changedGeneration).toMatchObject({
+      evaluatedAt: "2026-08-30T10:00:00Z",
+      items: [{ title: "new root" }],
+      nextCursor: "new-cursor",
+    });
+    expect(changedGeneration?.sourceAvailability[0]).toMatchObject({ state: "AVAILABLE" });
+    expect(mergeCoherentWorkboxPages(undefined, [retainedOldContinuation])).toBeNull();
+  });
+
   it("keeps the global workbox visible when there is no current meeting", async () => {
     routeMocks.workboxPages.set("NOW", {
       state: "NOW",

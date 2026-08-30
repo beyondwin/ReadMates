@@ -19,9 +19,10 @@ import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import type { HostSessionDetailResponse } from "@/features/host/api/host-contracts";
 import type { HostSessionChangeReceipt } from "@/features/host/api/host-session-recovery-contracts";
-import type { HostWorkboxPage, HostWorkboxState } from "@/features/host/api/host-workbox-contracts";
+import type { HostWorkboxState } from "@/features/host/api/host-workbox-contracts";
 import type { HostWorkboxItem } from "@/features/host/api/host-workbox-contracts";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
+import { mergeCoherentWorkboxPages } from "@/features/host/model/host-workbox-page-chain";
 import {
   buildHostOperatingRoomView,
   type HostMeetingPhase,
@@ -148,6 +149,11 @@ export function HostDashboardRoute({
       retry: false,
     })),
   });
+  const rootWorkboxPage = workboxQueries[0]?.data?.state === workboxState
+    ? workboxQueries[0].data
+    : undefined;
+  const rootWorkboxGeneration = rootWorkboxPage?.evaluatedAt ?? null;
+  const workboxGenerationRef = useRef<string | null>(null);
   const deferWorkboxMutation = useDeferHostWorkboxItemMutation(context);
   const removeWorkboxDeferralMutation = useRemoveHostWorkboxDeferralMutation(context);
 
@@ -180,6 +186,15 @@ export function HostDashboardRoute({
   useLayoutEffect(() => {
     currentSessionIdRef.current = sessionId;
   }, [sessionId]);
+
+  useEffect(() => {
+    if (rootWorkboxGeneration === null) return;
+    const generation = `${workboxState}:${rootWorkboxGeneration}`;
+    if (workboxGenerationRef.current !== null && workboxGenerationRef.current !== generation) {
+      setWorkboxCursors([null]);
+    }
+    workboxGenerationRef.current = generation;
+  }, [rootWorkboxGeneration, workboxState]);
 
   const activeAttendanceWriteStates = attendanceWriteStates?.sessionId === sessionId
     ? attendanceWriteStates.values
@@ -498,10 +513,11 @@ export function HostDashboardRoute({
     ? formatSessionKicker(view.meeting.sessionNumber, view.meeting.date).split(" · ")[1] ?? null
     : null;
   const loadedWorkboxPage = useMemo(
-    () => mergeWorkboxPages(
+    () => mergeCoherentWorkboxPages(
+      rootWorkboxPage,
       workboxQueries.flatMap((query) => query.data?.state === workboxState ? [query.data] : []),
     ),
-    [workboxQueries, workboxState],
+    [rootWorkboxPage, workboxQueries, workboxState],
   );
   const workboxView = loadedWorkboxPage ? buildHostWorkboxView(loadedWorkboxPage) : null;
   const workboxLoading = workboxQueries.some((query) => query.isPending || query.isFetching);
@@ -722,22 +738,6 @@ function hostRoutePaths(clubSlug: string): HostRoutePaths {
 
 function hostSessionHref(hostBasePath: string, sessionId: string, suffix = ""): string {
   return `${hostBasePath}/sessions/${encodeURIComponent(sessionId)}${suffix}`;
-}
-
-function mergeWorkboxPages(pages: readonly HostWorkboxPage[]): HostWorkboxPage | null {
-  const first = pages[0];
-  const last = pages.at(-1);
-  if (!first || !last) return null;
-  const seen = new Set<string>();
-  return {
-    ...last,
-    evaluatedAt: first.evaluatedAt,
-    items: pages.flatMap((page) => page.items.filter((item) => {
-      if (seen.has(item.key)) return false;
-      seen.add(item.key);
-      return true;
-    })),
-  };
 }
 
 function todayIsoDate(now = new Date()): string {
