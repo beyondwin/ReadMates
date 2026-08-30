@@ -4,7 +4,7 @@
 - 표면: Platform admin (`/admin/**`) + 전역 공간 전환
 - 상태: 설계 승인, 구현 전
 - ADR impact: **supersede** — ADR-0050이 ADR-0047을, ADR-0051이 ADR-0026을 대체한다. 두 신규 ADR은 구현 전이므로 `Proposed`다.
-- 관련: ADR-0019, ADR-0030, ADR-0035, ADR-0039, ADR-0040, ADR-0045, ADR-0050, ADR-0051
+- 관련: ADR-0019, ADR-0030, ADR-0035, ADR-0037, ADR-0039, ADR-0040, ADR-0045, ADR-0050, ADR-0051
 - 시안: `design/mockups/2026-08-30-admin-operations-redesign/`
 
 ## 1. 한 문장 정의
@@ -119,7 +119,7 @@
 - return target은 `pathname + search + hash + focus target + scroll`을 보존하고 공간·club·perspective별로 분리한다. 복원 전에 최신 `availableSpaces`, route correspondence, route-owned allowlist를 다시 검사하고 stale/invalid target과 허용되지 않은 query/hash/focus를 폐기한다.
 - 전환 상태는 `clean`, `dirty`, `pending`, `unknown-outcome` 네 종류다.
 - `dirty`는 이탈 확인 뒤 이동할 수 있다. `pending` 등록은 operation identity와 domain-owned recovery strategy를 함께 소유하며 request가 응답하거나 기본 30초 timeout(기존 domain 계약이 더 짧으면 그 값)에 도달할 때까지 이동을 막는다. timeout이면 같은 identity와 recovery strategy를 보존한 `unknown-outcome`으로 전환한다. `unknown-outcome`은 자동 재실행하지 않고, receipt가 있는 command는 같은 identity로 조회·재개하며 L1은 authoritative state/history를 다시 읽는다.
-- 전환 coordinator는 등록마다 generation을 발급한다. unmount나 authority loss는 등록·draft·민감 cache를 폐기하고 generation을 올리며, 이전 generation의 늦은 응답은 화면·cache·return target을 갱신하지 않고 해당 domain recovery만 실행한다. member·host·admin의 변경 producer는 전수 inventory에서 `register` 또는 근거가 있는 `verified-no-change`로 분류하며 미분류 producer가 남으면 구현 완료로 보지 않는다.
+- 전환 coordinator는 등록마다 generation을 발급한다. normal unmount는 active registration을 tombstone 처리하되, 이미 발급된 receipt recovery capsule은 detached reconciliation이 끝나거나 명시적으로 clear될 때까지 coordinator가 열거·폐기할 수 있는 retired registry에 둔다. authority loss는 active와 retired capsule을 모두 먼저 invalidate/clear하고 registry·draft·민감 cache를 폐기한 뒤 generation을 올린다. 이전 generation의 늦은 응답은 화면·cache·receipt callback·success/error copy·navigation·return target을 갱신하지 않고, authority loss 뒤에는 network replay 없이 `authority-lost`로 끝난다. member·host·admin의 변경 producer는 전수 inventory에서 `register` 또는 근거가 있는 `verified-no-change`로 분류하며 미분류 producer가 남으면 구현 완료로 보지 않는다.
 - authority loss는 민감 cache와 draft를 폐기하고 안전한 허용 공간으로 `replace` 이동한다.
 - 목적 route가 대응되지 않으면 이전 안전 목적지, 해당 perspective의 대표 route 순으로 fallback한다.
 
@@ -256,6 +256,7 @@ shared
 - `무시`와 `병합`은 1차 비범위다. source identity, reopen, history 보존 규칙을 갖춘 별도 server contract 없이 UI에 표시하지 않는다.
 - Today·health·audit처럼 현재 freshness/source metadata를 제공하는 운영 status projection은 generated/as-of, source availability, partial failure를 구분한다. Club list/detail처럼 해당 metadata가 없는 응답에 시각이나 availability를 만들어 넣지 않는다.
 - safe-command는 ADR-0040의 L1/L2/L3, idempotency, receipt, convergence를 그대로 사용한다.
+- 긴급 공개 회수의 server command semantics, capability, idempotency, fail-closed activation은 ADR-0037/0040을 바꾸지 않는다. 다만 현재 frontend wire adapter는 server authority와 불일치하므로 명시적으로 정합화한다. Reason category는 `PRIVATE_DATA | LEGAL_REQUEST | SECURITY_INCIDENT | PUBLIC_SAFETY`이고, preview는 `confirmEnabled`, `activationBoundary`, `remoteCopyLimitation`을, receipt는 `reasonRedacted`, `bffEvictionOutcome`, `cdnPurgeOutcome`, `browserRevalidationOutcome`, `remoteCopyLimitation`을 실제 wire 그대로 strict parse한다. Server가 내리지 않는 `committedClubGeneration`이나 `limitationCode`를 만들지 않으며, server route가 없는 convergence 조회·재시도 UI도 제공하지 않는다.
 
 ## 13. 접근성·반응형·복구 검증
 
@@ -265,6 +266,7 @@ shared
 - wrapping: 긴 한국어/영어 club name, status sentence, button label
 - states: loading, true empty, filtered empty, stale, partial source failure, 403, 409, invalid cursor, authority loss, pending, unknown outcome
 - recovery: refresh, retry, same receipt 또는 authoritative history lookup, safe fallback, focus/scroll restoration
+- authority-loss interleaving: `beginPending → unregister/unmount → authority loss → late settlement/reconciliation` 순서에서 원래 request count 불변, replay 0회, `authority-lost`, UI/cache/receipt callback/success·error copy/navigation/return target/session storage publication 0회, canonical request field clear, detached capsule registry 0개를 검증한다. Normal unmount의 same-identity receipt lookup은 별도 test에서 최대 1회와 `finally` clear를 검증한다.
 - novice comprehension: 구현 후 처음 보는 운영자 5명 이상에게 `오늘 처리할 일 찾기`, `서비스 이상 구분`, `직전 처리 결과 찾기` 3개 과업을 주고 각 30초 내 3/3 성공을 목표로 측정한다. 측정 전 결과는 `not measured`다.
 - motion: reduced-motion에서 position/opacity animation 제거
 
