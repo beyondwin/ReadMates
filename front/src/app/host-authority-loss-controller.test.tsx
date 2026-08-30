@@ -11,11 +11,6 @@ import {
 } from "@/features/host/storage/host-sensitive-storage";
 import { hostClubQueryPrefix } from "@/features/host/queries/host-state-purge";
 import { signalHostAuthorityLoss } from "@/shared/api/host-authority-event";
-import type { PendingHandle, ReceiptRecoveryCapsule } from "@/shared/model/global-space";
-import {
-  createGlobalSpaceTransitionCoordinator,
-  createRetiredReceiptCapsuleRegistry,
-} from "./global-space-transition";
 import { HostAuthorityLossController } from "./host-authority-loss-controller";
 
 function LocationProbe() {
@@ -214,63 +209,20 @@ describe("HostAuthorityLossController", () => {
     expect(onHandled).not.toHaveBeenCalled();
   });
 
-  it("pre-purges active and retired transition authority before the emitted event awaits host-state purge", async () => {
+  it("does not replace user navigation completed while safe-target resolution is awaiting", async () => {
     const queryClient = client();
-    const registry = createRetiredReceiptCapsuleRegistry();
-    const cachePublication = vi.fn();
-    const coordinator = createGlobalSpaceTransitionCoordinator({
-      registry,
-      publication: { currentOwnerRefetch: cachePublication },
-    });
-    let releaseDraftPurge!: () => void;
-    const clearClub = vi.fn(() => new Promise<void>((resolve) => {
-      releaseDraftPurge = resolve;
+    let finishResolution!: (target: string) => void;
+    const resolveSafeTarget = vi.fn(() => new Promise<string>((resolve) => {
+      finishResolution = resolve;
     }));
-    const request = {
-      previewId: "preview-1" as string | null,
-      reasonCategory: "SECURITY_INCIDENT" as string | null,
-      reason: "bounded reason" as string | null,
-      idempotencyKey: "intent-1" as string | null,
-    };
-    const originalRequestCount = 1;
-    let replayCount = 0;
-    const capsule: ReceiptRecoveryCapsule = {
-      operationId: "operation-1",
-      reconcileOriginal: vi.fn(async () => {
-        replayCount += 1;
-        return { operationId: "operation-1", outcome: "succeeded" as const };
-      }),
-      invalidateForAuthorityLoss: vi.fn(),
-      clear: vi.fn(() => {
-        request.previewId = null;
-        request.reasonCategory = null;
-        request.reason = null;
-        request.idempotencyKey = null;
-      }),
-    };
-    const handle = coordinator.beginPending({
-      ownerId: "takedown",
-      operationId: "operation-1",
-      recovery: { kind: "receipt", capsule },
-    });
-    handle.unregister();
-    expect(registry.size()).toBe(1);
-    const ui = vi.fn();
-    const receiptCallback = vi.fn();
-    const successCopy = vi.fn();
-    const errorCopy = vi.fn();
-    const navigation = vi.fn();
-    const returnTarget = vi.fn();
-    const sessionStoragePublication = vi.fn();
     const onHandled = vi.fn();
-    queryClient.setQueryData([...hostClubQueryPrefix("reading-sai"), "private"], "private");
 
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={["/clubs/reading-sai/app/host"]}>
           <HostAuthorityLossController
-            storage={{ register: vi.fn(() => vi.fn()), clearClub }}
-            onBeforePurge={() => coordinator.invalidateForAuthorityLoss()}
+            storage={createHostSensitiveStorage()}
+            resolveSafeTarget={resolveSafeTarget}
             onHandled={onHandled}
           />
           <LocationProbe />
@@ -278,56 +230,21 @@ describe("HostAuthorityLossController", () => {
       </QueryClientProvider>,
     );
 
-    act(() => signalHostAuthorityLoss({
+    signalHostAuthorityLoss({
       code: "HOST_AUTHORITY_REVOKED",
       clubSlug: "reading-sai",
-      requestKind: "PUBLIC_TAKEDOWN_CONFIRM",
-    }));
-
-    await waitFor(() => expect(clearClub).toHaveBeenCalledWith("reading-sai"));
-    expect(capsule.invalidateForAuthorityLoss).toHaveBeenCalledTimes(1);
-    expect(capsule.clear).toHaveBeenCalledTimes(1);
-    expect(request).toEqual({
-      previewId: null,
-      reasonCategory: null,
-      reason: null,
-      idempotencyKey: null,
+      requestKind: "SESSION_BASIC_SAVE",
     });
-    expect(registry.size()).toBe(0);
+    await waitFor(() => expect(resolveSafeTarget).toHaveBeenCalledTimes(1));
+
+    await userEvent.click(screen.getByRole("button", { name: "other club" }));
+    await waitFor(() => expect(screen.getByLabelText("location"))
+      .toHaveTextContent("/clubs/other-club/app/host"));
+    finishResolution("/clubs/reading-sai/app");
+
+    await act(async () => Promise.resolve());
+    expect(screen.getByLabelText("location")).toHaveTextContent("/clubs/other-club/app/host");
     expect(onHandled).not.toHaveBeenCalled();
-    expect(screen.getByLabelText("location")).toHaveTextContent("/clubs/reading-sai/app/host");
-    expect(queryClient.getQueryData([...hostClubQueryPrefix("reading-sai"), "private"])).toBe("private");
-
-    const settlement = await handle.settle("succeeded");
-    const publicationResults = [
-      handle.publishAccepted({ surface: "ui", publish: ui }),
-      handle.publishAccepted({ surface: "cache", publish: cachePublication }),
-      handle.publishAccepted({ surface: "receiptCallback", publish: receiptCallback }),
-      handle.publishAccepted({ surface: "successCopy", publish: successCopy }),
-      handle.publishAccepted({ surface: "errorCopy", publish: errorCopy }),
-      handle.publishAccepted({ surface: "navigation", publish: navigation }),
-      handle.publishAccepted({ surface: "returnTarget", publish: returnTarget }),
-      handle.publishAccepted({ surface: "sessionStorage", publish: sessionStoragePublication }),
-    ] satisfies ReturnType<PendingHandle["publishAccepted"]>[];
-    const observation = await handle.reconcile();
-
-    expect(settlement).toBe("obsolete");
-    expect(observation).toEqual({ operationId: "operation-1", outcome: "authority-lost" });
-    expect(originalRequestCount).toBe(1);
-    expect(replayCount).toBe(0);
-    expect(publicationResults).toEqual(Array(8).fill("rejected"));
-    expect(cachePublication).not.toHaveBeenCalled();
-    expect(ui).not.toHaveBeenCalled();
-    expect(receiptCallback).not.toHaveBeenCalled();
-    expect(successCopy).not.toHaveBeenCalled();
-    expect(errorCopy).not.toHaveBeenCalled();
-    expect(navigation).not.toHaveBeenCalled();
-    expect(returnTarget).not.toHaveBeenCalled();
-    expect(sessionStoragePublication).not.toHaveBeenCalled();
-
-    act(() => releaseDraftPurge());
-    await waitFor(() => expect(screen.getByLabelText("location")).toHaveTextContent(/^\/clubs\/reading-sai\/app$/));
-    expect(queryClient.getQueryData([...hostClubQueryPrefix("reading-sai"), "private"])).toBeUndefined();
-    expect(onHandled).toHaveBeenCalledTimes(1);
   });
+
 });

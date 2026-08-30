@@ -13,6 +13,7 @@ import {
 } from "@/features/host/model/host-authority-navigation";
 import { HostAuthorityLossController } from "./host-authority-loss-controller";
 import type { HostAuthorityLossEvent } from "@/shared/api/host-authority-event";
+import type { HostSensitiveStorage } from "@/features/host/storage/host-sensitive-storage";
 import { useOptionalGlobalSpaceTransitionController } from "./global-space-transition-controller";
 
 const workspaceLabels: Record<ClubWorkspace, string> = {
@@ -40,10 +41,12 @@ export function AppRouteSecurityController({
   workspace,
   transitionStore = defaultTransitionStore,
   onBeforeHostAuthorityPurge,
+  hostAuthorityStorage,
 }: {
   workspace: ClubWorkspace;
   transitionStore?: WorkspaceRouteTransitionStore;
   onBeforeHostAuthorityPurge?: (event: HostAuthorityLossEvent) => void;
+  hostAuthorityStorage?: HostSensitiveStorage;
 }) {
   const location = useLocation();
   const globalTransition = useOptionalGlobalSpaceTransitionController();
@@ -95,6 +98,7 @@ export function AppRouteSecurityController({
   return (
     <div data-app-route-security-controller>
       <HostAuthorityLossController
+        storage={hostAuthorityStorage}
         onBeforePurge={handleBeforePurge}
         resolveSafeTarget={globalTransition?.resolveHostAuthorityLossTarget}
         onHandled={handleAuthorityLoss}

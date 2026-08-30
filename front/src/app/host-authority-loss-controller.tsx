@@ -60,15 +60,18 @@ export function HostAuthorityLossController({
   const location = useLocation();
   const navigate = useNavigate();
   const pathnameRef = useRef(location.pathname);
+  const navigationEpochRef = useRef(0);
   const handlingClubSlugsRef = useRef(new Set<string>());
 
   useEffect(() => {
     pathnameRef.current = location.pathname;
-  }, [location.pathname]);
+    navigationEpochRef.current += 1;
+  }, [location.key, location.pathname]);
 
   useEffect(() => subscribeHostAuthorityLoss((event) => {
     if (handlingClubSlugsRef.current.has(event.clubSlug)) return;
     handlingClubSlugsRef.current.add(event.clubSlug);
+    const navigationEpoch = navigationEpochRef.current;
     try {
       onBeforePurge?.(event);
     } catch {
@@ -88,6 +91,10 @@ export function HostAuthorityLossController({
         const targetPathname = resolveSafeTarget
           ? await resolveSafeTarget(event)
           : hostAuthoritySafeDestination(event.clubSlug);
+        if (
+          navigationEpochRef.current !== navigationEpoch
+          || clubSlugFromPathname(pathnameRef.current) !== event.clubSlug
+        ) return;
         const handoffId = nextAuthorityLossHandoffId();
         onHandled(event.code, targetPathname, handoffId);
         void navigate(targetPathname, {

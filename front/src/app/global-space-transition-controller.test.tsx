@@ -1,5 +1,6 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +10,10 @@ import type {
   SpaceIdentity,
   TransitionSafetyRegistrationPort,
 } from "@/shared/model/global-space";
+import { adminOperationsKeys } from "@/features/platform-admin/queries/platform-admin-operations-queries";
+import { fetchAdminOperationCases } from "@/features/platform-admin/api/platform-admin-operations-api";
+import { fetchArchiveSessions } from "@/features/archive/api/archive-api";
+import { fetchHostSessionDetail } from "@/features/host/api/host-api";
 import { globalSpaceReturnTargetStorageKey } from "./global-space-continuity";
 import {
   GlobalSpaceTransitionController,
@@ -18,6 +23,20 @@ import {
   type SpaceRouteValidationLoader,
 } from "./global-space-transition-controller";
 
+vi.mock("@/features/platform-admin/api/platform-admin-operations-api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/platform-admin/api/platform-admin-operations-api")>()),
+  fetchAdminOperationCases: vi.fn(),
+}));
+vi.mock("@/features/archive/api/archive-api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/archive/api/archive-api")>()),
+  fetchArchiveSessions: vi.fn(),
+}));
+vi.mock("@/features/host/api/host-api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/host/api/host-api")>()),
+  fetchHostSessionDetail: vi.fn(),
+  fetchHostSessions: vi.fn(),
+}));
+
 const platform: SpaceIdentity = { productSpace: "platform" };
 const member: SpaceIdentity = {
   productSpace: "clubs",
@@ -25,6 +44,7 @@ const member: SpaceIdentity = {
   clubSlug: "reading-sai",
   perspective: "member",
 };
+const host: SpaceIdentity = { ...member, perspective: "host" };
 
 function authWithSpaces(
   kinds: Array<"PLATFORM" | "CLUBS">,
@@ -85,17 +105,37 @@ function Harness({ onPort }: { onPort?: (port: TransitionSafetyRegistrationPort)
           identity.productSpace === "platform" ? "platform" : `${identity.clubSlug}:${identity.perspective}`,
         ).join(",")}
       </output>
+      <output aria-label="retained-recoveries">{controller.retainedRecoveryCount}</output>
+      <output aria-label="restore-focus">
+        {typeof location.state === "object" && location.state
+          ? String((location.state as {
+            readmatesGlobalSpaceRestore?: { focusId?: string | null };
+          }).readmatesGlobalSpaceRestore?.focusId ?? "")
+          : ""}
+      </output>
       <button
         type="button"
-        onClick={() => void controller.requestTransition(platform).then((next) => setResult(next.status))}
+        onClick={() => void controller.requestTransition(platform).then((next) => {
+          if (next.status !== "obsolete") setResult(next.status);
+        })}
       >
         플랫폼으로
       </button>
       <button
         type="button"
-        onClick={() => void controller.requestTransition(member).then((next) => setResult(next.status))}
+        onClick={() => void controller.requestTransition(member).then((next) => {
+          if (next.status !== "obsolete") setResult(next.status);
+        })}
       >
         클럽으로
+      </button>
+      <button
+        type="button"
+        onClick={() => void controller.requestTransition(host).then((next) => {
+          if (next.status !== "obsolete") setResult(next.status);
+        })}
+      >
+        호스트로
       </button>
       <button
         type="button"
@@ -128,26 +168,61 @@ function renderController(input: {
   loadRouteValidation?: SpaceRouteValidationLoader;
   confirmDirtyLeave?: (message: string) => boolean;
   onPort?: (port: TransitionSafetyRegistrationPort) => void;
+  storage?: Storage;
+  queryClient?: QueryClient;
+  useProductionRouteValidation?: boolean;
 } = {}) {
   const controllerAuth = input.auth ?? authWithSpaces(["PLATFORM", "CLUBS"]);
+  const queryClient = input.queryClient ?? new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
-    <MemoryRouter initialEntries={[input.initialEntry ?? "/admin/today"]}>
-      <GlobalSpaceTransitionController
-        auth={controllerAuth}
-        loadLatestProjection={input.loadLatestProjection ?? (async () => controllerAuth)}
-        loadRouteValidation={input.loadRouteValidation}
-        confirmDirtyLeave={input.confirmDirtyLeave}
-      >
-        <Harness onPort={input.onPort} />
-      </GlobalSpaceTransitionController>
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[input.initialEntry ?? "/admin/today"]}>
+        <GlobalSpaceTransitionController
+          auth={controllerAuth}
+          loadLatestProjection={input.loadLatestProjection ?? (async () => controllerAuth)}
+          loadRouteValidation={input.useProductionRouteValidation
+            ? undefined
+            : (input.loadRouteValidation ?? (async () => context()))}
+          confirmDirtyLeave={input.confirmDirtyLeave}
+          storage={input.storage}
+        >
+          <Harness onPort={input.onPort} />
+        </GlobalSpaceTransitionController>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((next) => { resolve = next; });
+  return { promise, resolve };
+}
+
+function observableStorage() {
+  const values = new Map<string, string>();
+  return {
+    storage: {
+      get length() { return values.size; },
+      clear: vi.fn(() => values.clear()),
+      getItem: vi.fn((key: string) => values.get(key) ?? null),
+      key: vi.fn((index: number) => [...values.keys()][index] ?? null),
+      removeItem: vi.fn((key: string) => { values.delete(key); }),
+      setItem: vi.fn((key: string, value: string) => { values.set(key, value); }),
+    } satisfies Storage,
+    values,
+  };
 }
 
 afterEach(() => {
   vi.useRealTimers();
   window.sessionStorage.clear();
   vi.restoreAllMocks();
+  vi.mocked(fetchAdminOperationCases).mockReset();
+  vi.mocked(fetchArchiveSessions).mockReset();
+  vi.mocked(fetchHostSessionDetail).mockReset();
 });
 
 describe("GlobalSpaceTransitionController", () => {
@@ -186,7 +261,125 @@ describe("GlobalSpaceTransitionController", () => {
     await waitFor(() => expect(screen.getByLabelText("location")).toHaveTextContent("/admin/today?q=book"));
     expect(screen.getByLabelText("location")).not.toHaveTextContent("case=stale-case");
     expect(loadLatestProjection).toHaveBeenCalledTimes(1);
-    expect(loadRouteValidation).toHaveBeenCalledWith(platform, latest);
+    expect(loadRouteValidation).toHaveBeenCalledWith(platform, latest, expect.objectContaining({
+      pathname: "/admin/today",
+    }));
+  });
+
+  it("uses a fresh route-owned case read to restore a current target while rejecting stale cache and cross-route focus", async () => {
+    const auth = authWithSpaces(["PLATFORM", "CLUBS"]);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(adminOperationsKeys.detail("case-stale"), { id: "case-stale" });
+    vi.mocked(fetchAdminOperationCases).mockResolvedValue({
+      items: [{ id: "case-current" }],
+      nextCursor: null,
+    } as never);
+    const observedStorage = observableStorage();
+    observedStorage.storage.setItem(
+      globalSpaceReturnTargetStorageKey(platform),
+      JSON.stringify({
+        pathname: "/admin/today",
+        search: "?case=case-current&mode=detail",
+        hash: "",
+        focusId: "club-1",
+        scrollTop: 0,
+      }),
+    );
+    const current = renderController({
+      initialEntry: "/clubs/reading-sai/app",
+      auth,
+      queryClient,
+      storage: observedStorage.storage,
+      useProductionRouteValidation: true,
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "플랫폼으로" }));
+    await waitFor(() => expect(screen.getByLabelText("location"))
+      .toHaveTextContent("/admin/today?case=case-current&mode=detail"));
+    expect(screen.getByLabelText("restore-focus")).toHaveTextContent(/^$/);
+    current.unmount();
+
+    observedStorage.storage.setItem(
+      globalSpaceReturnTargetStorageKey(platform),
+      JSON.stringify({
+        pathname: "/admin/today",
+        search: "?case=case-stale&mode=detail",
+        hash: "",
+        focusId: null,
+        scrollTop: 0,
+      }),
+    );
+    renderController({
+      initialEntry: "/clubs/reading-sai/app",
+      auth,
+      queryClient,
+      storage: observedStorage.storage,
+      useProductionRouteValidation: true,
+    });
+    await userEvent.click(screen.getByRole("button", { name: "플랫폼으로" }));
+
+    await waitFor(() => expect(screen.getByLabelText("location")).toHaveTextContent("/admin/today"));
+    expect(screen.getByLabelText("location")).not.toHaveTextContent("case-stale");
+    expect(fetchAdminOperationCases).toHaveBeenCalledTimes(2);
+  });
+
+  it("restores member notes only from the fresh route-owned club session result", async () => {
+    const auth = authWithSpaces(["PLATFORM", "CLUBS"], ["MEMBER", "HOST"]);
+    vi.mocked(fetchAdminOperationCases).mockResolvedValue({ items: [], nextCursor: null } as never);
+    vi.mocked(fetchArchiveSessions).mockResolvedValue({
+      items: [{ sessionId: "session-current" }],
+      nextCursor: null,
+    } as never);
+    const observedStorage = observableStorage();
+    observedStorage.storage.setItem(
+      globalSpaceReturnTargetStorageKey(member),
+      JSON.stringify({
+        pathname: "/clubs/reading-sai/app/notes",
+        search: "?filter=questions&sessionId=session-current",
+        hash: "",
+        focusId: "session-current",
+        scrollTop: 320,
+      }),
+    );
+    renderController({
+      auth,
+      storage: observedStorage.storage,
+      useProductionRouteValidation: true,
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "클럽으로" }));
+
+    await waitFor(() => expect(screen.getByLabelText("location"))
+      .toHaveTextContent("/clubs/reading-sai/app/notes?filter=questions&sessionId=session-current"));
+    expect(screen.getByLabelText("restore-focus")).toHaveTextContent("session-current");
+  });
+
+  it("restores a host session detail only after its route-owned detail read confirms the session", async () => {
+    const auth = authWithSpaces(["PLATFORM", "CLUBS"], ["MEMBER", "HOST"]);
+    vi.mocked(fetchAdminOperationCases).mockResolvedValue({ items: [], nextCursor: null } as never);
+    vi.mocked(fetchHostSessionDetail).mockResolvedValue({ sessionId: "session-current" } as never);
+    const observedStorage = observableStorage();
+    observedStorage.storage.setItem(
+      globalSpaceReturnTargetStorageKey(host),
+      JSON.stringify({
+        pathname: "/clubs/reading-sai/app/host/sessions/session-current/edit",
+        search: "?task=attendance",
+        hash: "",
+        focusId: null,
+        scrollTop: 0,
+      }),
+    );
+    renderController({
+      auth,
+      storage: observedStorage.storage,
+      useProductionRouteValidation: true,
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "호스트로" }));
+
+    await waitFor(() => expect(screen.getByLabelText("location"))
+      .toHaveTextContent("/clubs/reading-sai/app/host/sessions/session-current/edit?task=attendance"));
+    expect(fetchHostSessionDetail).toHaveBeenCalledWith("session-current", { clubSlug: "reading-sai" });
   });
 
   it("confirms dirty state and preserves the route when the operator cancels", async () => {
@@ -275,6 +468,118 @@ describe("GlobalSpaceTransitionController", () => {
     expect(screen.getByLabelText("location")).toHaveTextContent("/admin/today");
   });
 
+  it("drops a user transition when host authority loss advances the intent during route validation", async () => {
+    const validation = deferred<ReturnType<typeof context>>();
+    const routeValidation = vi.fn<SpaceRouteValidationLoader>(() => validation.promise);
+    const observedStorage = observableStorage();
+    renderController({
+      initialEntry: "/clubs/reading-sai/app/host",
+      auth: authWithSpaces(["PLATFORM", "CLUBS"], ["MEMBER", "HOST"]),
+      loadRouteValidation: routeValidation,
+      storage: observedStorage.storage,
+    });
+
+    screen.getByRole("button", { name: "플랫폼으로" }).click();
+    await waitFor(() => expect(routeValidation).toHaveBeenCalled());
+    screen.getByRole("button", { name: "호스트 권한 즉시 무효화" }).click();
+    validation.resolve(context());
+
+    await act(async () => validation.promise);
+    expect(screen.getByLabelText("location")).toHaveTextContent("/clubs/reading-sai/app/host");
+    expect(screen.getByLabelText("result")).toHaveTextContent("idle");
+    expect(observedStorage.storage.setItem).not.toHaveBeenCalled();
+  });
+
+  it("defers continuity publication until destination validation survives the authority generation", async () => {
+    const destinationValidation = deferred<ReturnType<typeof context>>();
+    const routeValidation = vi.fn<SpaceRouteValidationLoader>()
+      .mockResolvedValueOnce(context())
+      .mockReturnValueOnce(destinationValidation.promise);
+    const observedStorage = observableStorage();
+    renderController({
+      initialEntry: "/clubs/reading-sai/app/host",
+      auth: authWithSpaces(["PLATFORM", "CLUBS"], ["MEMBER", "HOST"]),
+      loadRouteValidation: routeValidation,
+      storage: observedStorage.storage,
+    });
+
+    screen.getByRole("button", { name: "플랫폼으로" }).click();
+    await waitFor(() => expect(routeValidation).toHaveBeenCalledTimes(2));
+    expect(observedStorage.storage.setItem).not.toHaveBeenCalled();
+    act(() => screen.getByRole("button", { name: "호스트 권한 즉시 무효화" }).click());
+    destinationValidation.resolve(context());
+
+    await act(async () => destinationValidation.promise);
+    expect(screen.getByLabelText("location")).toHaveTextContent("/clubs/reading-sai/app/host");
+    expect(screen.getByLabelText("result")).toHaveTextContent("idle");
+    expect(observedStorage.storage.setItem).not.toHaveBeenCalled();
+  });
+
+  it("does not let an obsolete production validation read publish into Query cache", async () => {
+    const freshCases = deferred<Awaited<ReturnType<typeof fetchAdminOperationCases>>>();
+    vi.mocked(fetchAdminOperationCases).mockReturnValue(freshCases.promise);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const observedStorage = observableStorage();
+    observedStorage.storage.setItem(
+      globalSpaceReturnTargetStorageKey(platform),
+      JSON.stringify({
+        pathname: "/admin/today",
+        search: "?case=late-case&mode=detail",
+        hash: "",
+        focusId: "late-case",
+        scrollTop: 0,
+      }),
+    );
+    renderController({
+      initialEntry: "/clubs/reading-sai/app/host",
+      auth: authWithSpaces(["PLATFORM", "CLUBS"], ["MEMBER", "HOST"]),
+      queryClient,
+      storage: observedStorage.storage,
+      useProductionRouteValidation: true,
+    });
+
+    screen.getByRole("button", { name: "플랫폼으로" }).click();
+    await waitFor(() => expect(fetchAdminOperationCases).toHaveBeenCalledTimes(1));
+    act(() => screen.getByRole("button", { name: "호스트 권한 즉시 무효화" }).click());
+    freshCases.resolve({ items: [{ id: "late-case" }], nextCursor: null } as never);
+
+    await act(async () => freshCases.promise);
+    expect(queryClient.getQueriesData({ queryKey: adminOperationsKeys.all })).toEqual([]);
+    expect(screen.getByLabelText("location")).toHaveTextContent("/clubs/reading-sai/app/host");
+    expect(screen.getByLabelText("result")).toHaveTextContent("idle");
+    expect(observedStorage.storage.setItem).toHaveBeenCalledTimes(1);
+  });
+
+  it("publishes only the newest user transition when projection refreshes settle out of order", async () => {
+    const first = deferred<AuthMeResponse | null>();
+    const second = deferred<AuthMeResponse | null>();
+    const auth = authWithSpaces(["PLATFORM", "CLUBS"]);
+    const loadLatestProjection = vi.fn<LatestSpaceProjectionLoader>()
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    const observedStorage = observableStorage();
+    renderController({
+      initialEntry: "/clubs/reading-sai/app",
+      auth,
+      loadLatestProjection,
+      loadRouteValidation: async () => context(),
+      storage: observedStorage.storage,
+    });
+
+    screen.getByRole("button", { name: "플랫폼으로" }).click();
+    screen.getByRole("button", { name: "클럽으로" }).click();
+    second.resolve(auth);
+    await act(async () => second.promise);
+    await waitFor(() => expect(screen.getByLabelText("result")).toHaveTextContent("navigated"));
+    const acceptedPublicationCount = vi.mocked(observedStorage.storage.setItem).mock.calls.length;
+    expect(acceptedPublicationCount).toBeGreaterThan(0);
+    first.resolve(auth);
+    await act(async () => first.promise);
+
+    expect(screen.getByLabelText("location")).toHaveTextContent("/clubs/reading-sai/app");
+    expect(observedStorage.storage.setItem).toHaveBeenCalledTimes(acceptedPublicationCount);
+  });
+
   it("uses the refreshed projection to replace a revoked host space with the same-club member space", async () => {
     const latest = authWithSpaces(["CLUBS"]);
     const loadLatestProjection = vi.fn(async () => latest);
@@ -292,7 +597,9 @@ describe("GlobalSpaceTransitionController", () => {
       /^\/clubs\/reading-sai\/app$/,
     ));
     expect(loadLatestProjection).toHaveBeenCalledTimes(1);
-    expect(loadRouteValidation).toHaveBeenCalledWith(member, latest);
+    expect(loadRouteValidation).toHaveBeenCalledWith(member, latest, expect.objectContaining({
+      pathname: "/clubs/reading-sai/app",
+    }));
   });
 
   it("uses the authenticated safe fallback when authority-loss projection refresh rejects", async () => {
@@ -321,16 +628,19 @@ describe("GlobalSpaceTransitionController", () => {
   it("tombstones the old host coordinator and accepts registrations in a fresh member epoch", async () => {
     const auth = authWithSpaces(["CLUBS"], ["MEMBER", "HOST"]);
     let port!: TransitionSafetyRegistrationPort;
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(
-      <MemoryRouter initialEntries={["/clubs/reading-sai/app/host"]}>
-        <GlobalSpaceTransitionController
-          key={globalSpaceTransitionEpochKey("/clubs/reading-sai/app/host", auth)}
-          auth={auth}
-          loadLatestProjection={async () => auth}
-        >
-          <Harness onPort={(value) => { port = value; }} />
-        </GlobalSpaceTransitionController>
-      </MemoryRouter>,
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/clubs/reading-sai/app/host"]}>
+          <GlobalSpaceTransitionController
+            key={globalSpaceTransitionEpochKey("/clubs/reading-sai/app/host", auth)}
+            auth={auth}
+            loadLatestProjection={async () => auth}
+          >
+            <Harness onPort={(value) => { port = value; }} />
+          </GlobalSpaceTransitionController>
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
     await userEvent.click(screen.getByRole("button", { name: "호스트 권한 즉시 무효화" }));
     const tombstoned = port.beginPending({
@@ -348,15 +658,17 @@ describe("GlobalSpaceTransitionController", () => {
     });
 
     view.rerender(
-      <MemoryRouter initialEntries={["/clubs/reading-sai/app"]}>
-        <GlobalSpaceTransitionController
-          key={globalSpaceTransitionEpochKey("/clubs/reading-sai/app", auth)}
-          auth={auth}
-          loadLatestProjection={async () => auth}
-        >
-          <Harness onPort={(value) => { port = value; }} />
-        </GlobalSpaceTransitionController>
-      </MemoryRouter>,
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/clubs/reading-sai/app"]}>
+          <GlobalSpaceTransitionController
+            key={globalSpaceTransitionEpochKey("/clubs/reading-sai/app", auth)}
+            auth={auth}
+            loadLatestProjection={async () => auth}
+          >
+            <Harness onPort={(value) => { port = value; }} />
+          </GlobalSpaceTransitionController>
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
     let current!: ReturnType<TransitionSafetyRegistrationPort["beginPending"]>;
     act(() => {
@@ -373,6 +685,30 @@ describe("GlobalSpaceTransitionController", () => {
 
     await waitFor(() => expect(screen.getByLabelText("safety")).toHaveTextContent("pending"));
     await act(async () => expect(await current.settle("succeeded")).toBe("accepted"));
+  });
+
+  it("removes a normal-unmount recovery handle from the controller index after auto-reconciliation", async () => {
+    let port!: TransitionSafetyRegistrationPort;
+    const reconcile = vi.fn(async (): Promise<RecoveryObservation> => ({
+      operationId: "operation-unmount",
+      outcome: "succeeded",
+    }));
+    renderController({ onPort: (value) => { port = value; } });
+    await waitFor(() => expect(port).toBeDefined());
+    let handle!: ReturnType<TransitionSafetyRegistrationPort["beginPending"]>;
+    act(() => {
+      handle = port.beginPending({
+        ownerId: "normal-unmount",
+        operationId: "operation-unmount",
+        recovery: { kind: "authoritative-history", operationId: "operation-unmount", reconcile },
+      });
+    });
+    await waitFor(() => expect(screen.getByLabelText("retained-recoveries")).toHaveTextContent("1"));
+
+    act(() => handle.unregister());
+
+    await waitFor(() => expect(reconcile).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByLabelText("retained-recoveries")).toHaveTextContent("0"));
   });
 
   it("keeps legacy child routes in one perspective epoch while separating host and member", () => {
