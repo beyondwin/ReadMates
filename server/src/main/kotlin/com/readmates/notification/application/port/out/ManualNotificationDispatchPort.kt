@@ -149,6 +149,15 @@ fun ManualNotificationTargetSnapshot.snapshotHash(): String =
         }.joinToString("|"),
     )
 
+fun ManualNotificationTargetSnapshot.targetSnapshotRevision(): String =
+    Sha256.hex(
+        listOf(
+            "manual-notification-target-snapshot-revision-v1",
+            "audienceRevision=$audienceRevision",
+            "targetMembershipIds=${targetMembershipIds.sorted().joinToString(",")}",
+        ).joinToString("|"),
+    )
+
 fun ManualNotificationSessionContext.manualDispatchDisabledReason(eventType: NotificationEventType): String? =
     when (eventType) {
         NotificationEventType.NEXT_BOOK_PUBLISHED ->

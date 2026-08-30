@@ -20,6 +20,7 @@ import com.readmates.notification.application.port.out.ManualNotificationTargetS
 import com.readmates.notification.application.port.out.contentRevision
 import com.readmates.notification.application.port.out.manualDispatchDisabledReason
 import com.readmates.notification.application.port.out.snapshotHash
+import com.readmates.notification.application.port.out.targetSnapshotRevision
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTime
 import org.springframework.jdbc.core.JdbcTemplate
@@ -535,9 +536,6 @@ private fun eventPayload(
             sendMode = input.selection.sendMode,
         ),
 )
-
-private fun ManualNotificationTargetSnapshot.targetSnapshotRevision(): String =
-    audienceRevision.ifBlank { "members:${com.readmates.shared.security.Sha256.hex(targetMembershipIds.sorted().joinToString(","))}" }
 
 private fun ManualNotificationTargetSnapshot.eligibilityFingerprint(): String =
     com.readmates.shared.security.Sha256.hex(

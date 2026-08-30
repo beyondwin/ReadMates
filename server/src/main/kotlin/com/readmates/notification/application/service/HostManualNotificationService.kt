@@ -34,6 +34,7 @@ import com.readmates.notification.application.port.out.ManualNotificationTargetS
 import com.readmates.notification.application.port.out.contentRevision
 import com.readmates.notification.application.port.out.manualDispatchDisabledReason
 import com.readmates.notification.application.port.out.snapshotHash
+import com.readmates.notification.application.port.out.targetSnapshotRevision
 import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.shared.paging.PageRequest
@@ -126,10 +127,7 @@ class HostManualNotificationService(
         val expiresAt = clock().plusMinutes(PREVIEW_TTL_MINUTES)
         val targetSnapshotHash = targetSnapshot.snapshotHash()
         val contentHash = contentHash(selection.subject, selection.body)
-        val targetSnapshotRevision =
-            targetSnapshot.audienceRevision.ifBlank {
-                "members:${Sha256.hex(targetSnapshot.targetMembershipIds.sorted().joinToString(","))}"
-            }
+        val targetSnapshotRevision = targetSnapshot.targetSnapshotRevision()
         val eligibilityFingerprint =
             Sha256.hex(
                 listOf(

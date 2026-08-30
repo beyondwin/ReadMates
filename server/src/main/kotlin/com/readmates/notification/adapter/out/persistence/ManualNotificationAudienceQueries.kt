@@ -7,6 +7,7 @@ import com.readmates.notification.application.port.out.ManualNotificationTargetS
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.uuid
+import com.readmates.shared.security.Sha256
 import org.springframework.jdbc.core.JdbcTemplate
 import java.util.UUID
 
@@ -232,8 +233,9 @@ private class ManualNotificationAudienceRevisionQueries(
     private fun attendanceRevisionFingerprint(
         clubId: UUID,
         sessionId: UUID,
-    ): String =
-        jdbcTemplate
+    ): String {
+        val attendanceRevisions =
+            jdbcTemplate
             .query(
                 """
                 select membership_id, attendance_revision
@@ -248,6 +250,8 @@ private class ManualNotificationAudienceRevisionQueries(
                 clubId.dbString(),
                 sessionId.dbString(),
             ).joinToString(",")
+        return Sha256.hex("manual-notification-confirmed-attendance-revision-v1|$attendanceRevisions")
+    }
 }
 
 private fun audienceSql(audience: ManualNotificationAudience): String? =

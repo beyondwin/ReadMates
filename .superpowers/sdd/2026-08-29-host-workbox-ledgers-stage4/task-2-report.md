@@ -103,3 +103,33 @@ db3e0baa8e5f40e59fb176c996585ac8964a4824c8c726e34f810d9f544bb7cc  server/src/tes
 | Provider action could escape focused verification | E2E stops after local outbox/dispatch evidence and never processes provider delivery. |
 
 No load-bearing Task 2 finding remains open.
+
+## Review round 1 — fixed-length confirmed-attendee revision
+
+- Review base: `eac3cfb9a2f20973033668dc999ebc1369f4f6b3`
+- Finding: the `CONFIRMED_ATTENDEES` audience revision joined every membership UUID and attendance revision into an unbounded string, while V63 stored it in `varchar(255)`. Seven confirmed attendees exceeded the column and made preview fail before confirm.
+- ADR impact remains `none`; this is a bounded correctness repair to the approved immutable-preview contract.
+
+The revision query now hashes the ordered attendance rows with the domain `manual-notification-confirmed-attendance-revision-v1`. Preview storage and confirm comparison share a second domain-separated `manual-notification-target-snapshot-revision-v1` SHA-256 over the bounded audience revision and sorted target IDs. V63 stores exactly `char(64)` and permits only an empty legacy value or lowercase SHA-256. Existing target drift, stale-before-mutation, exact-copy, list/history privacy, and provider boundaries are unchanged.
+
+| Source hash | Command | Result | Finding closure |
+| --- | --- | --- | --- |
+| Review base `eac3cfb9`; test-only change | `./server/gradlew -p server integrationTest --tests 'com.readmates.notification.adapter.out.persistence.JdbcManualNotificationDispatchAdapterTest.seven confirmed attendees preview and confirm with a fixed length snapshot revision'` | RED: 1 test failed with `DataIntegrityViolationException` caused by `MysqlDataTruncation` at preview insert. An earlier compile typo in the new assertion was corrected before this behavioral RED and was not used as evidence. | Proved the reported 7-attendee failure against real MySQL and the real preview store. |
+| Review delta manifest `f2da655a8217b348ded72555381f5147fcb2a6e08537c8d8f8162230773bbc61` with the query hash temporarily removed | Same exact single-test command | RED: the bounded `^attendance:[0-9a-f]{64}$` assertion failed. | Proved the query itself no longer exposes the raw joined revision. |
+| Review delta manifest `f2da655a8217b348ded72555381f5147fcb2a6e08537c8d8f8162230773bbc61` | Same exact single-test command | GREEN, 1/1 | Seven confirmed attendees preview and confirm successfully with a stored lowercase 64-character SHA-256 and one dispatch. |
+| Same delta manifest | `./server/gradlew -p server integrationTest --rerun-tasks --tests 'com.readmates.notification.adapter.out.persistence.JdbcManualNotificationDispatchAdapterTest'` | Fresh GREEN, 33/33 | Existing snapshot drift, stale-before-mutation, preview no-send, copy, duplicate/idempotency, and reconciliation regressions remain closed. Repository-wide compilation emitted only pre-existing deprecation/redundant-annotation warnings outside this changed surface. |
+| Same delta manifest | `./server/gradlew -p server unitTest --tests 'com.readmates.notification.application.service.HostManualNotificationServiceTest'` | GREEN, 20/20 | Service preview uses the shared fixed-length revision without changing validation or persistence orchestration. |
+| Same delta manifest | `git diff --check` | Exit 0 | Review delta whitespace is clean. |
+
+The original 42-file manifest above remains the evidence for unchanged Task 2 files. The following review-delta manifest supersedes the six changed-file hashes only; its own SHA-256 is `f2da655a8217b348ded72555381f5147fcb2a6e08537c8d8f8162230773bbc61`.
+
+```text
+a3ae1b84d7abd91287f31a90557d559d9c2d932701466b92ebdd38e7abbd0520  server/src/main/kotlin/com/readmates/notification/adapter/out/persistence/ManualNotificationAudienceQueries.kt
+128c36f524a0f4b19d474f3a870fd6a1562f17ee23cc0b0ad258e8f2a6277d9d  server/src/main/kotlin/com/readmates/notification/adapter/out/persistence/ManualNotificationConfirmStore.kt
+8e669f679380c0e3247cd5da0fbdbbc0e67c3a7ef9b91508e4a68678d1bbba28  server/src/main/kotlin/com/readmates/notification/application/port/out/ManualNotificationDispatchPort.kt
+745e7c4c58c146e3605f41066b95e161692f50f052e0401029b28e17033ce508  server/src/main/kotlin/com/readmates/notification/application/service/HostManualNotificationService.kt
+bb1e2368ec134be5c2bdb9b494ab9fc5307c5d3c825bfcd11b35c419a1cfe76e  server/src/main/resources/db/mysql/migration/V63__manual_notification_custom_copy_snapshot.sql
+0cf8a7b3b624e45aa5abad70db17d34564d22afcad24e39bb47192e1fff356bc  server/src/test/kotlin/com/readmates/notification/adapter/out/persistence/JdbcManualNotificationDispatchAdapterTest.kt
+```
+
+Review round 1 finding status: CLOSED. No new load-bearing claim was introduced.
