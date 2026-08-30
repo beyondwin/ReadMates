@@ -58,8 +58,7 @@ function normalizeClubsFromLegacy(joinedClubs: unknown): AvailableClubSpaceV1[] 
     return [];
   }
 
-  const normalized: AvailableClubSpaceV1[] = [];
-  const rejected = emptyRejectedClubIdentity();
+  const candidates: AvailableClubSpaceV1[] = [];
   for (const club of joinedClubs) {
     if (!isRecord(club)) {
       continue;
@@ -80,10 +79,10 @@ function normalizeClubsFromLegacy(joinedClubs: unknown): AvailableClubSpaceV1[] 
       perspectives,
     });
     if (normalizedClub) {
-      mergeClub(normalized, normalizedClub, rejected);
+      candidates.push(normalizedClub);
     }
   }
-  return normalized;
+  return mergeIdenticalClubRows(candidates);
 }
 
 function normalizeClubs(value: unknown): AvailableClubSpaceV1[] {
@@ -91,15 +90,14 @@ function normalizeClubs(value: unknown): AvailableClubSpaceV1[] {
     return [];
   }
 
-  const normalized: AvailableClubSpaceV1[] = [];
-  const rejected = emptyRejectedClubIdentity();
+  const candidates: AvailableClubSpaceV1[] = [];
   for (const candidate of value) {
     const club = normalizeClub(candidate);
     if (club) {
-      mergeClub(normalized, club, rejected);
+      candidates.push(club);
     }
   }
-  return normalized;
+  return mergeIdenticalClubRows(candidates);
 }
 
 function normalizeClub(value: unknown): AvailableClubSpaceV1 | null {
@@ -118,63 +116,33 @@ function normalizeClub(value: unknown): AvailableClubSpaceV1 | null {
   return { clubId, clubSlug, clubName, perspectives };
 }
 
-type RejectedClubIdentity = {
-  ids: Set<string>;
-  slugs: Set<string>;
-};
+function mergeIdenticalClubRows(candidates: AvailableClubSpaceV1[]): AvailableClubSpaceV1[] {
+  const byId = new Map<string, AvailableClubSpaceV1>();
+  const bySlug = new Map<string, AvailableClubSpaceV1>();
 
-function emptyRejectedClubIdentity(): RejectedClubIdentity {
-  return { ids: new Set(), slugs: new Set() };
-}
+  for (const candidate of candidates) {
+    const sameId = byId.get(candidate.clubId);
+    const sameSlug = bySlug.get(candidate.clubSlug);
+    if ((sameId && !sameIdentity(sameId, candidate)) || (sameSlug && !sameIdentity(sameSlug, candidate))) {
+      return [];
+    }
 
-function mergeClub(
-  clubs: AvailableClubSpaceV1[],
-  candidate: AvailableClubSpaceV1,
-  rejected: RejectedClubIdentity,
-) {
-  if (rejected.ids.has(candidate.clubId) || rejected.slugs.has(candidate.clubSlug)) {
-    rejectConflictingClubIdentity(clubs, candidate, undefined, undefined, rejected);
-    return;
+    if (!sameId) {
+      byId.set(candidate.clubId, candidate);
+      bySlug.set(candidate.clubSlug, candidate);
+      continue;
+    }
+
+    sameId.perspectives = CLUB_PERSPECTIVE_ORDER.filter(
+      (perspective) => sameId.perspectives.includes(perspective) || candidate.perspectives.includes(perspective),
+    );
   }
 
-  const sameId = clubs.find((club) => club.clubId === candidate.clubId);
-  const sameSlug = clubs.find((club) => club.clubSlug === candidate.clubSlug);
-  if ((sameId && !sameIdentity(sameId, candidate)) || (sameSlug && sameSlug.clubId !== candidate.clubId)) {
-    rejectConflictingClubIdentity(clubs, candidate, sameId, sameSlug, rejected);
-    return;
-  }
-
-  if (!sameId) {
-    clubs.push(candidate);
-    return;
-  }
-
-  sameId.perspectives = CLUB_PERSPECTIVE_ORDER.filter(
-    (perspective) => sameId.perspectives.includes(perspective) || candidate.perspectives.includes(perspective),
-  );
+  return [...byId.values()];
 }
 
 function sameIdentity(left: AvailableClubSpaceV1, right: AvailableClubSpaceV1) {
   return left.clubId === right.clubId && left.clubSlug === right.clubSlug && left.clubName === right.clubName;
-}
-
-function rejectConflictingClubIdentity(
-  clubs: AvailableClubSpaceV1[],
-  candidate: AvailableClubSpaceV1,
-  sameId: AvailableClubSpaceV1 | undefined,
-  sameSlug: AvailableClubSpaceV1 | undefined,
-  rejected: RejectedClubIdentity,
-) {
-  const conflicts = [candidate, sameId, sameSlug].filter((club): club is AvailableClubSpaceV1 => club !== undefined);
-  for (const club of conflicts) {
-    rejected.ids.add(club.clubId);
-    rejected.slugs.add(club.clubSlug);
-  }
-  for (let index = clubs.length - 1; index >= 0; index -= 1) {
-    if (rejected.ids.has(clubs[index].clubId) || rejected.slugs.has(clubs[index].clubSlug)) {
-      clubs.splice(index, 1);
-    }
-  }
 }
 
 function normalizeKinds(value: unknown): ProductSpaceKind[] {
