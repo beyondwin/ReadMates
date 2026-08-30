@@ -108,6 +108,20 @@ class FrontendZodSchemaContractTest
         }
 
         @Test
+        fun `host person detail response matches strict zod schema fixture`() {
+            val response =
+                mockMvc
+                    .get("/api/host/people/00000000-0000-0000-0000-000000000206") {
+                        with(user("host@example.com"))
+                    }.andExpect { status { isOk() } }
+                    .andReturn()
+                    .response
+                    .contentAsString
+
+            assertJsonShapeMatches(response, "host-person-detail.json")
+        }
+
+        @Test
         fun `host session record editor preserves the current frontend zod contract`() {
             val response =
                 mockMvc

@@ -76,6 +76,28 @@ describe("Cloudflare BFF function", () => {
     );
   });
 
+  it("forwards encoded host person detail GET query with trusted club context", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await onRequest(
+      context(
+        new Request(
+          "https://readmates.pages.dev/api/bff/api/host/people/00000000-0000-0000-0000-000000000202?attendanceCursor=opaque%2Bcursor&limit=20&clubSlug=reading-sai",
+          { headers: { "X-Readmates-Club-Slug": "attacker-club" } },
+        ),
+        { path: ["api", "host", "people", "00000000-0000-0000-0000-000000000202"] },
+      ),
+    );
+
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(
+      "https://api.example.com/api/host/people/00000000-0000-0000-0000-000000000202?attendanceCursor=opaque%2Bcursor&limit=20&clubSlug=reading-sai",
+    );
+    expect(init.method).toBe("GET");
+    expect((init.headers as Headers).get("X-Readmates-Club-Slug")).toBe("reading-sai");
+  });
+
   it("forwards api requests with bff secret and Cloudflare client ip", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);

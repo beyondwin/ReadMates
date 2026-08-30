@@ -20,6 +20,7 @@ import {
   ManualNotificationPreviewResponseSchema,
 } from "../features/host/api/host-contracts";
 import { CurrentSessionResponseSchema } from "../shared/model/current-session-contracts";
+import { HostPersonDetailSchema } from "../features/host/api/host-person-contracts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, "../tests/unit/__fixtures__/zod-schemas");
@@ -251,6 +252,25 @@ const manualNotificationPreview = ManualNotificationPreviewResponseSchema.parse(
   },
   duplicates: { requiresResendConfirmation: false, recentDispatches: [] },
   warnings: [],
+});
+
+const hostPersonDetail = HostPersonDetailSchema.parse({
+  membershipId: "00000000-0000-0000-0000-000000000206",
+  displayName: "계약 멤버",
+  avatarKey: "apple-green-book",
+  status: "ACTIVE",
+  role: "MEMBER",
+  lastClubAccessAt: "2026-08-30T01:00:00Z",
+  currentSchedule: null,
+  currentRsvp: null,
+  attendanceHistory: {
+    items: [{
+      sessionNumber: 6,
+      scheduledAt: "2026-08-20T19:00:00",
+      attendanceStatus: "ATTENDED",
+    }],
+    nextCursor: null,
+  },
 });
 
 const manualNotificationConfirm = ManualNotificationConfirmResponseSchema.parse({
@@ -651,6 +671,7 @@ write("manual-notification-options.json", manualNotificationOptions);
 write("manual-notification-preview.json", manualNotificationPreview);
 write("manual-notification-confirm.json", manualNotificationConfirm);
 write("manual-notification-dispatch-list.json", manualNotificationDispatchList);
+write("host-person-detail.json", hostPersonDetail);
 write("host-invitation-list.json", hostInvitationList);
 write("admin-analytics-overview.json", adminAnalyticsOverview);
 write("current-session.json", currentSession);

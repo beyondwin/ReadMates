@@ -90,6 +90,32 @@ class FrontendFixtureContractTest
         }
 
         @Test
+        fun `host person detail response matches privacy fixture key set`() {
+            val response =
+                mockMvc
+                    .get("/api/host/people/00000000-0000-0000-0000-000000000206") {
+                        with(user("host@example.com"))
+                    }.andExpect { status { isOk() } }
+                    .andReturn()
+                    .response
+                    .contentAsString
+
+            assertTopLevelKeySetMatches(response, "host-person-detail.json")
+            assertThat(response.lowercase()).doesNotContain(
+                "userid",
+                "email",
+                "accountname",
+                "authsession",
+                "pagepath",
+                "duration",
+                "ipaddress",
+                "useragent",
+                "provider",
+                "token",
+            )
+        }
+
+        @Test
         fun `host notification delivery list response matches frontend fixture key set`() {
             val response =
                 mockMvc
