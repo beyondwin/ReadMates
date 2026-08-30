@@ -98,6 +98,14 @@ function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
       },
     }),
     scopedHostRoute({
+      path: HOST_ROUTE_PATHS.personDetail,
+      errorElement: <HostRouteError />,
+      fallback: <ReadmatesRouteLoading label="사람 정보를 불러오는 중" variant="host" />,
+      load: async () => ({
+        Component: (await import("@/src/app/host-routes/person-detail-route-element")).HostPersonDetailRouteElement,
+      }),
+    }),
+    scopedHostRoute({
       path: HOST_ROUTE_PATHS.members,
       errorElement: <HostRouteError />,
       fallback: <ReadmatesRouteLoading label="멤버 목록을 불러오는 중" variant="host" />,
@@ -154,11 +162,11 @@ function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
       errorElement: <HostRouteError />,
       fallback: <ReadmatesRouteLoading label="기록 목록을 불러오는 중" variant="host" />,
       load: async () => {
-        const [{ HostRecordsRouteElement: Component }, { hostMeetingListLoaderFactory }] = await Promise.all([
+        const [{ HostRecordsRouteElement: Component }, { hostSessionLedgerLoaderFactory }] = await Promise.all([
           import("@/src/app/host-routes/records-route-element"),
-          import("@/features/host/route/host-meeting-list-data"),
+          import("@/features/host/route/host-session-ledger-data"),
         ]);
-        return { Component, loader: hostMeetingListLoaderFactory(queryClient) };
+        return { Component, loader: hostSessionLedgerLoaderFactory(queryClient) };
       },
     }),
     scopedHostRoute({
@@ -266,6 +274,15 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
       },
     },
     {
+      path: HOST_ROUTE_PATHS.personDetail,
+      errorElement: <HostRouteError />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="사람 정보를 불러오는 중" variant="host" />,
+      lazy: async () => {
+        const { HostPersonDetailRouteElement } = await import("@/src/app/host-routes/person-detail-route-element");
+        return { Component: HostPersonDetailRouteElement, loader: requireHostLoaderAuth };
+      },
+    },
+    {
       path: HOST_ROUTE_PATHS.members,
       errorElement: <HostRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 목록을 불러오는 중" variant="host" />,
@@ -333,13 +350,13 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
       errorElement: <HostRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="기록 목록을 불러오는 중" variant="host" />,
       lazy: async () => {
-        const [{ HostRecordsRouteElement }, { hostMeetingListLoaderFactory }] = await Promise.all([
+        const [{ HostRecordsRouteElement }, { hostSessionLedgerLoaderFactory }] = await Promise.all([
           import("@/src/app/host-routes/records-route-element"),
-          import("@/features/host/route/host-meeting-list-data"),
+          import("@/features/host/route/host-session-ledger-data"),
         ]);
         return {
           Component: HostRecordsRouteElement,
-          loader: hostMeetingListLoaderFactory(queryClient),
+          loader: hostSessionLedgerLoaderFactory(queryClient),
         };
       },
     },

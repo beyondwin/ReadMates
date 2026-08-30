@@ -45,6 +45,7 @@ describe("HostSessionLedger", () => {
     render(
       <HostSessionLedger
         items={items}
+        summary={{ needsAttentionCount: 3, incompletePublishedCount: 1, draftCount: 2 }}
         filters={filters}
         nextCursor={null}
         loadingMore={false}
@@ -58,8 +59,32 @@ describe("HostSessionLedger", () => {
     expect(onFiltersChange).toHaveBeenCalledWith({ ...filters, search: "모비 딕" });
 
     expect(screen.queryByRole("combobox", { name: "모임 상태" })).not.toBeInTheDocument();
+    const summary = screen.getByRole("region", { name: "기록 장부 요약" });
+    expect(summary).toHaveTextContent("확인 필요 3건");
+    expect(summary).toHaveTextContent("게시 기록 미완료 1건");
+    expect(summary).toHaveTextContent("초안 2건");
+    expect(summary.querySelector(".card-grid")).toBeNull();
     fireEvent.change(screen.getByRole("combobox", { name: "기록 상태" }), { target: { value: "INCOMPLETE" } });
     expect(onFiltersChange).toHaveBeenCalledWith({ ...filters, recordStatus: "INCOMPLETE" });
+  });
+
+  it("keeps a truthful zero summary as editorial context", () => {
+    render(
+      <HostSessionLedger
+        items={[]}
+        summary={{ needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 }}
+        filters={filters}
+        nextCursor={null}
+        loadingMore={false}
+        onFiltersChange={vi.fn()}
+        onLoadMore={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("region", { name: "기록 장부 요약" })).toHaveTextContent(
+      "확인 필요한 기록 없음",
+    );
+    expect(screen.getByText("조건에 맞는 모임 기록이 없습니다.")).toBeVisible();
   });
 
   it("renders semantic desktop rows and equivalent mobile cards", () => {

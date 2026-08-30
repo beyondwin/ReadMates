@@ -111,6 +111,15 @@ describe("hostRoutes", () => {
     }
   });
 
+  it("registers the dedicated person detail route in both route trees", () => {
+    const routes = hostRoutes(new QueryClient());
+
+    for (const routeId of ["app-host", "club-app-host"]) {
+      const route = routes.find((candidate) => candidate.id === routeId);
+      expect(childPaths(route)).toContain("people/:membershipId");
+    }
+  });
+
   it.each(["people", "records", "settings"])(
     "keeps the unscoped %s destination behind a lazy route module",
     (path) => {

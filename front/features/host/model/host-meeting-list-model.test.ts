@@ -76,6 +76,24 @@ describe("buildHostMeetingTocSections", () => {
     });
     expect(sections.upcoming.rows[0]?.ordinalFolio).toBe("No.25");
     expect(sections.upcoming.rows[0]?.lifecycleLabel).toBe("준비 중");
+    expect(sections.upcoming.rows[0]).toMatchObject({ date: "2026-09-05" });
+  });
+
+  it("deduplicates exact session ids within each server-backed section without reordering", () => {
+    const first = openItem(25);
+    const duplicate = { ...first, title: "중복된 다음 페이지 행" };
+    const second = openItem(26);
+    const sections = buildHostMeetingTocSections({
+      basePath,
+      upcomingItems: [first, duplicate, second],
+      upcomingCursor: null,
+      pastItems: [closedItem(24), closedItem(24)],
+      pastCursor: null,
+    });
+
+    expect(sections.upcoming.rows.map((row) => row.id)).toEqual(["open-25", "open-26"]);
+    expect(sections.upcoming.rows[0]?.title).toBe("책 25");
+    expect(sections.past.rows.map((row) => row.id)).toEqual(["closed-24"]);
   });
 
   it("summarizes past rows with date only so the lifecycle chip is not doubled", () => {

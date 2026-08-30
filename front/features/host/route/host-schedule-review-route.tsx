@@ -23,6 +23,7 @@ import {
 } from "@/features/host/queries/host-session-queries";
 import { hostWorkboxKeys } from "@/features/host/queries/host-workbox-queries";
 import { ManualNotificationPreviewConfirmation } from "@/features/host/ui/notifications/manual-notification-preview";
+import { HostScheduleReviewHeader } from "@/features/host/ui/schedule-review/host-schedule-review-header";
 import {
   OperationReceipt,
   operationReceiptOutcome,
@@ -352,11 +353,13 @@ function HostScheduleReviewSession({
 
   return (
     <main className="rm-schedule-review">
-      <header className="rm-schedule-review__header">
-        <LinkComponent to={returnHref} className="rm-schedule-review__return">운영실로 돌아가기</LinkComponent>
-        <h1>일정 미열람 검토</h1>
-        <p>{detail.sessionNumber}회 · {detail.bookTitle} · 일정 {detail.scheduleRevision}판</p>
-      </header>
+      <HostScheduleReviewHeader
+        returnHref={returnHref}
+        sessionNumber={detail.sessionNumber}
+        bookTitle={detail.bookTitle}
+        scheduleRevision={detail.scheduleRevision}
+        LinkComponent={LinkComponent}
+      />
 
       {receipt ? (
         <OperationReceipt

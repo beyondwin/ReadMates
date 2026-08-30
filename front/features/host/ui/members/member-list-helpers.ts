@@ -24,7 +24,7 @@ export function memberMeta(member: HostMemberListItem) {
 }
 
 export function requestMeta(member: HostMemberListItem) {
-  return `${member.email} · ${statusLabels[member.status]} · 요청일 ${formatDateOnlyLabel(member.createdAt)}`;
+  return `${statusLabels[member.status]} · 요청일 ${formatDateOnlyLabel(member.createdAt)}`;
 }
 
 export function joinedMeta(member: HostMemberListItem) {

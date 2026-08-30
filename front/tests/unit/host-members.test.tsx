@@ -603,7 +603,8 @@ describe("HostMembersPage", () => {
     expect(summary).not.toHaveTextContent("승인 대기");
 
     const viewer = within((await findPendingZone()).getByText("둘").closest("article") as HTMLElement);
-    expect(viewer.getByText("viewer@example.com · 둘러보기 멤버 · 요청일 2026.04.20")).toBeInTheDocument();
+    expect(viewer.getByText("둘러보기 멤버 · 요청일 2026.04.20")).toBeInTheDocument();
+    expect(viewer.queryByText("viewer@example.com")).not.toBeInTheDocument();
     expect(screen.queryByText("승인 대기")).not.toBeInTheDocument();
     expect(screen.getByText("승인·거절은 멤버에게 알림이 갑니다")).toBeInTheDocument();
   });
@@ -641,7 +642,8 @@ describe("HostMembersPage", () => {
 
     const zone = await findPendingZone();
     expect(zone.getByText("둘")).toBeInTheDocument();
-    expect(zone.getByText("viewer@example.com · 둘러보기 멤버 · 요청일 2026.04.20")).toBeInTheDocument();
+    expect(zone.getByText("둘러보기 멤버 · 요청일 2026.04.20")).toBeInTheDocument();
+    expect(zone.queryByText("viewer@example.com")).not.toBeInTheDocument();
   });
 
   it("syncs local member rows when loader data changes", () => {

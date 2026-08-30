@@ -219,3 +219,19 @@
     flex-wrap: wrap;
   }
 }
+.rm-host-member-ledger__person-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong, var(--line));
+  text-underline-offset: 3px;
+}
+
+.rm-host-member-ledger__person-link:hover {
+  text-decoration-color: currentColor;
+}
+
+.rm-host-member-ledger__person-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px var(--focus-ring-soft);
+}

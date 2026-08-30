@@ -6,6 +6,7 @@ import {
   type HostSessionAttentionData,
   type HostSessionLedgerFilters,
   type HostSessionLedgerItem,
+  type HostSessionLedgerSummary,
 } from "@/features/host/model/host-session-ledger-model";
 import { hostMeetingHref } from "@/features/host/model/host-meeting-ledger-model";
 import { resolvedSessionExposure, sessionExposureCopy } from "@/features/host/model/session-exposure-model";
@@ -39,6 +40,7 @@ export type HostSessionLedgerTrashItem = {
 
 export type HostSessionLedgerProps = {
   items: HostSessionLedgerItem[];
+  summary?: HostSessionLedgerSummary;
   filters: HostSessionLedgerFilters;
   nextCursor: string | null;
   loadingMore: boolean;
@@ -341,6 +343,7 @@ function TrashLedger({
 
 export function HostSessionLedger({
   items,
+  summary,
   filters,
   nextCursor,
   loadingMore,
@@ -383,6 +386,17 @@ export function HostSessionLedger({
           )}
         </div>
       </div>
+      {!trashView && summary ? (
+        <section className="rm-document-panel" aria-label="기록 장부 요약" style={{ padding: 18 }}>
+          <h2 className="h4 editorial" style={{ margin: 0 }}>기록 장부 요약</h2>
+          <p className="small" style={{ margin: "8px 0 0", color: "var(--text-2)" }}>
+            {summary.needsAttentionCount === 0
+              ? "확인 필요한 기록 없음"
+              : `확인 필요 ${summary.needsAttentionCount}건`}
+            {` · 게시 기록 미완료 ${summary.incompletePublishedCount}건 · 초안 ${summary.draftCount}건`}
+          </p>
+        </section>
+      ) : null}
       {trashView ? null : (
         <LedgerFilters key={filters.search} filters={filters} onFiltersChange={onFiltersChange} />
       )}

@@ -56,6 +56,19 @@ export function attentionItems(page: Pick<HostSessionAttentionData, "items">): H
   return page.items;
 }
 
+export function dedupeHostSessionLedgerItems(
+  items: readonly HostSessionLedgerItem[],
+): HostSessionLedgerItem[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item.sessionId)) {
+      return false;
+    }
+    seen.add(item.sessionId);
+    return true;
+  });
+}
+
 const RECORD_STATUSES = new Set<HostSessionLedgerRecordStatus>(["NOT_STARTED", "INCOMPLETE", "COMPLETE"]);
 
 export function normalizeHostSessionLedgerFilters(params: URLSearchParams): HostSessionLedgerFilters {

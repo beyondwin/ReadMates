@@ -21,6 +21,7 @@ export type HostMeetingTocRow = {
   lifecycleLabel: string;
   attentionLabel: string | null;
   summary: string;
+  date: string;
   href: string;
   state?: unknown;
 };
@@ -102,6 +103,7 @@ function toTocRow(
     lifecycleLabel: hostMeetingLifecycleLabel(item.state),
     attentionLabel: tocAttentionLabel(item),
     summary: kind === "upcoming" ? upcomingSummary(item) : pastSummary(item),
+    date: item.date,
     href: sessionDetailHref(basePath, item.sessionId),
     ...(detailLinkState === undefined ? {} : { state: detailLinkState }),
   };
@@ -116,13 +118,23 @@ export function buildHostMeetingTocSections(input: {
   detailLinkState?: unknown;
 }): HostMeetingTocSections {
   const basePath = normalizeBasePath(input.basePath);
+  const uniqueBySessionId = <T extends { sessionId: string }>(items: readonly T[]) => {
+    const seen = new Set<string>();
+    return items.filter((item) => {
+      if (seen.has(item.sessionId)) return false;
+      seen.add(item.sessionId);
+      return true;
+    });
+  };
   return {
     upcoming: {
-      rows: input.upcomingItems.map((item) => toTocRow(item, basePath, "upcoming", input.detailLinkState)),
+      rows: uniqueBySessionId(input.upcomingItems)
+        .map((item) => toTocRow(item, basePath, "upcoming", input.detailLinkState)),
       nextCursor: input.upcomingCursor,
     },
     past: {
-      rows: input.pastItems.map((item) => toTocRow(item, basePath, "past", input.detailLinkState)),
+      rows: uniqueBySessionId(input.pastItems)
+        .map((item) => toTocRow(item, basePath, "past", input.detailLinkState)),
       nextCursor: input.pastCursor,
     },
   };

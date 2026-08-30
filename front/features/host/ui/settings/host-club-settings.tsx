@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
-import type { HostClubSettings as Settings, UpdateHostClubSettingsRequest } from "@/features/host/api/host-club-settings-contracts";
+import type { HostSettingsUpdateRequest, HostSettingsView as Settings } from "@/features/host/model/host-settings-model";
 
-export function HostClubSettings({ settings, saving, stale, error, onSave }: { settings: Settings; saving: boolean; stale: boolean; error: string | null; onSave: (request: UpdateHostClubSettingsRequest) => Promise<unknown> }) {
+export function HostClubSettings({ settings, saving, stale, error, onSave }: { settings: Settings; saving: boolean; stale: boolean; error: string | null; onSave: (request: HostSettingsUpdateRequest) => Promise<unknown> }) {
   const [draft, setDraft] = useState(settings);
   function submit(event: FormEvent) {
     event.preventDefault();
