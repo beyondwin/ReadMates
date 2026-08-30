@@ -98,13 +98,9 @@ async function prepareLifecycleReceipt(
 export function wrapHostSessionEditorActionsForUndo(
   actions: HostSessionEditorActions,
   onReceipt: HostSessionChangeReceiptListener,
-  execute: HostSessionEditorActionExecutor = async (_operationId, request, prepareReceipt) => {
-    const result = await request();
-    const publishReceipt = await prepareReceipt(result);
-    await publishReceipt();
-    return result;
-  },
+  execute: HostSessionEditorActionExecutor,
 ): HostSessionEditorActions {
+  if (!execute) throw new Error("HOST_SESSION_EDITOR_ACTION_EXECUTOR_REQUIRED");
   return {
     ...actions,
     openSession: (sessionId) =>

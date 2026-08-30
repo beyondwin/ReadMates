@@ -25,7 +25,8 @@ const WRITE_EXPORTS_BY_PATH: Readonly<Record<string, readonly string[]>> = {
   "features/host/queries/host-session-queries.ts": ["publishDeletedHostSession", "publishHostPublicConvergence", "publishHostSessionAttendance", "publishHostSessionCreated", "publishHostSessionImport", "publishHostSessionPublication", "publishHostSessionResponse", "publishHostSessionVisibility", "publishRestoredHostSession"],
   "features/host/queries/host-session-record-queries.ts": ["publishAppliedHostSessionRecord", "publishDeletedHostSessionRecordDraft", "publishRebasedHostSessionRecordDraft", "publishRestoredHostSessionRevisionDraft", "publishSavedHostSessionRecordDraft"],
   "features/host/queries/host-session-recovery-queries.ts": ["publishRestoredHostSessionChange"],
-  "features/host/storage/host-sensitive-storage.ts": ["createHostSensitiveStorage", "hostSensitiveStorage"],
+  "features/host/route/host-session-editor-actions.ts": ["wrapHostSessionEditorActionsForUndo"],
+  "features/host/storage/host-sensitive-storage.ts": ["createHostSensitiveStorage", "hostSensitiveStorage", "registerHostSensitiveState"],
   "features/notifications/api/notification-preferences-api.ts": ["saveNotificationPreferences"],
   "features/notifications/api/notifications-api.ts": ["markAllMemberNotificationsRead", "markMemberNotificationRead"],
   "features/platform-admin/api/platform-admin-api.ts": ["checkPlatformAdminDomainProvisioning", "commitPlatformAdminOnboarding", "confirmForceCancelPlatformAdminAiJob", "confirmPlatformAdminClubVisibility", "confirmPlatformAdminDomain", "confirmRetryCommitPlatformAdminAiJob", "createPlatformAdminDomain", "previewForceCancelPlatformAdminAiJob", "previewPlatformAdminClubVisibility", "previewPlatformAdminDomain", "previewPlatformAdminOnboarding", "previewRetryCommitPlatformAdminAiJob", "updatePlatformAdminClub", "updatePlatformAdminClubMetadata"],
@@ -74,11 +75,12 @@ export const SPACE_TRANSITION_PRODUCER_INVENTORY = [
   register("features/notifications/route/member-notifications-route.tsx", "L1", ["memberNotificationsActions", "notifications-refetch"]),
   leaf("features/auth/route/login-route.tsx", [], ["pre-auth", "outside-authenticated-space-transition"]),
   entry("features/auth/api/auth-api.ts", "verified-no-change", "none", ["features/auth/route/login-route.tsx"], ["pre-auth-dev-login", "outside-authenticated-space-transition"], "submitDevLogin"),
-  entry("features/auth/api/auth-api.ts", "modify", "L1", ["features/auth/route/logout-button.tsx"], ["logout-transport", "registered-authenticated-owner"], "logout"),
+  entry("features/auth/api/auth-api.ts", "modify", "L1", ["features/auth/route/logout-button.tsx", "src/app/layouts/app-route-layout.tsx"], ["logout-transport", "registered-authenticated-owner"], "logout"),
   leaf("features/host/queries/host-state-purge.ts", ["src/app/host-authority-loss-controller.tsx"], ["authority-loss-cleanup", "not-user-command"]),
   leaf("shared/api/host-authority-event.ts", ["src/app/host-authority-loss-controller.tsx"], ["authority-loss-request-cancel", "not-user-command"]),
+  leaf("src/app/host-authority-loss-controller.tsx", ["src/app/layouts/app-route-layout.tsx"], ["authority-loss-terminal-cleanup", "not-user-command"]),
   leaf("shared/auth/club-access-api.ts", ["src/app/layouts/app-route-layout.tsx"], ["transport-primitive", "response-ignored"]),
-  modify("shared/auth/session-api.ts", ["features/auth/route/logout-button.tsx", "src/app/layouts/app-route-layout.tsx"], "L1", ["logout-transport", "registered-authenticated-owner"]),
+  modify("shared/auth/session-api.ts", ["features/auth/route/logout-button.tsx", "src/app/layouts/app-route-layout.tsx", "features/platform-admin/route/admin-shell-layout.tsx"], "L1", ["logout-transport", "registered-authenticated-owner"]),
   leaf("src/app/layouts/app-route-layout.tsx", ["src/app/layouts/app-route-layout.tsx"], ["touchClubAccessOnce", "ambient-touch", "request-count:1"]),
   register("src/app/layouts/app-route-layout.tsx", "L1", ["guest-continuation-logout", "cache-clear", "auth-reset", "navigation-replace"]),
   register("features/auth/route/logout-button.tsx", "L1", ["authenticated-logout", "accepted-publication"]),
@@ -98,26 +100,26 @@ export const SPACE_TRANSITION_PRODUCER_INVENTORY = [
   register("features/host/route/host-session-ledger-route.tsx", "L2", ["restoreMutation", "receipt-recovery"]),
   register("features/host/route/new-host-meeting-route.tsx", "L2", ["dirty-draft", "createMeeting"]),
   modify("features/notifications/route/member-notifications-data.ts", ["features/notifications/route/member-notifications-route.tsx"], "L1", ["observation-only", "explicit-publisher"]),
-  modify("features/notifications/api/notifications-api.ts", ["features/notifications/route/member-notifications-data.ts"], "L1", ["transport-write", "registered-route-owner"]),
+  modify("features/notifications/api/notifications-api.ts", ["features/notifications/route/member-notifications-data.ts", "features/notifications/route/member-notifications-route.tsx"], "L1", ["transport-write", "registered-route-owner"]),
   modify("features/notifications/api/notification-preferences-api.ts", ["features/notifications/route/member-notification-settings-route.tsx"], "L1", ["transport-write", "registered-route-owner"]),
   modify("features/archive/api/archive-api.ts", ["features/archive/route/account-settings-route.tsx", "features/archive/route/profile-update-controller.ts"], "L2", ["transport-write", "registered-route-owner"]),
   modify("features/current-session/api/current-session-api.ts", ["features/current-session/route/current-session-route.tsx"], "L1", ["transport-write", "registered-route-owner"]),
   modify("features/host/route/host-members-data.ts", ["features/host/route/host-members-route.tsx"], "L1", ["observation-only", "explicit-publisher"]),
   modify("features/host/route/host-invitations-data.ts", ["features/host/route/host-invitations-route.tsx", "features/host/route/host-members-route.tsx"], "L1", ["listInvitations:no-cache", "refreshInvitations:accepted-only"]),
-  modify("features/host/route/host-session-editor-actions.ts", ["features/host/route/host-session-editor-route.tsx"], "L3", ["observation-only", "explicit-publisher"]),
+  modify("features/host/route/host-session-editor-actions.ts", ["features/host/route/host-session-editor-route.tsx", "features/host/route/host-meeting-workspace-route.tsx"], "L3", ["observation-only", "explicit-publisher"]),
   modify("features/archive/queries/profile-queries.ts", ["features/archive/route/profile-update-controller.ts"], "L1", ["useMutation", "explicit-publisher"]),
   modify("features/current-session/queries/current-session-queries.ts", ["features/current-session/route/current-session-route.tsx"], "L1", ["useMutation", "explicit-publisher"]),
   modify("features/host/aigen/queries/aigen-job-queries.ts", ["features/host/route/host-session-editor-route.tsx", "features/host/route/host-meeting-workspace-route.tsx"], "L3", ["useMutation", "explicit-publisher"]),
   modify("features/host/aigen/api/aigen-api.ts", ["features/host/route/ai-generate-controller.tsx"], "L3", ["transport-write", "registered-route-owner"]),
   modify("features/host/aigen/storage/aigen-draft-storage.ts", ["features/host/route/ai-generate-controller.tsx"], "L3", ["local-draft-write", "registered-dirty-owner"]),
-  modify("features/host/api/host-api.ts", ["features/host/route/host-meeting-workspace-actions.ts", "features/host/route/host-members-route.tsx", "features/host/route/host-invitations-route.tsx"], "L3", ["transport-writes", "registered-route-owners"]),
-  modify("features/host/api/host-session-record-api.ts", ["features/host/route/host-session-editor-route.tsx"], "L3", ["transport-write", "registered-route-owner"]),
-  modify("features/host/api/host-session-recovery-api.ts", ["features/host/route/host-session-editor-route.tsx"], "L3", ["transport-write", "registered-route-owner"]),
-  modify("features/host/storage/host-sensitive-storage.ts", ["features/host/route/host-session-editor-route.tsx", "features/host/route/host-meeting-workspace-route.tsx"], "L3", ["sensitive-local-write", "registered-route-owner"]),
+  modify("features/host/api/host-api.ts", ["features/host/route/host-dashboard-route.tsx", "features/host/route/host-meeting-workspace-actions.ts", "features/host/route/host-meeting-workspace-route.tsx", "features/host/route/host-members-route.tsx", "features/host/route/host-invitations-route.tsx", "features/host/route/host-notification-composer-controller.tsx", "features/host/route/host-notifications-route.tsx", "features/host/route/host-session-ledger-route.tsx", "features/host/route/new-host-meeting-route.tsx"], "L3", ["transport-writes", "registered-route-owners"]),
+  modify("features/host/api/host-session-record-api.ts", ["features/host/route/host-session-editor-route.tsx", "features/host/route/host-meeting-workspace-route.tsx"], "L3", ["transport-write", "registered-route-owner"]),
+  modify("features/host/api/host-session-recovery-api.ts", ["features/host/route/host-session-editor-route.tsx", "features/host/route/host-dashboard-route.tsx", "features/host/route/host-meeting-workspace-route.tsx"], "L3", ["transport-write", "registered-route-owner"]),
+  modify("features/host/storage/host-sensitive-storage.ts", ["features/host/route/ai-generate-controller.tsx", "features/host/route/host-dashboard-route.tsx", "features/host/route/host-meeting-workspace-route.tsx", "features/host/route/host-notification-composer-controller.tsx", "features/host/route/host-notifications-route.tsx", "features/host/route/host-session-editor-route.tsx", "features/host/route/new-host-meeting-route.tsx"], "L3", ["sensitive-local-write", "registered-route-owner"]),
   modify("features/host/queries/host-invitation-queries.ts", ["features/host/route/host-invitations-route.tsx", "features/host/route/host-members-route.tsx"], "L1", ["useMutation", "explicit-publisher"]),
   modify("features/host/queries/host-members-queries.ts", ["features/host/route/host-members-route.tsx"], "L1", ["useMutation", "explicit-publisher"]),
   modify("features/host/queries/host-notification-queries.ts", ["features/host/route/host-notifications-route.tsx", "features/host/route/host-notification-composer-controller.tsx", "features/host/route/host-meeting-workspace-route.tsx"], "L3", ["useMutation", "explicit-publisher"]),
-  modify("features/host/queries/host-session-queries.ts", ["features/host/route/host-dashboard-route.tsx", "features/host/route/host-meeting-ledger-route.tsx", "features/host/route/host-meeting-workspace-actions.ts", "features/host/route/host-session-ledger-route.tsx", "features/host/route/new-host-meeting-route.tsx"], "L2", ["useMutation", "explicit-publisher"]),
+  modify("features/host/queries/host-session-queries.ts", ["features/host/route/host-dashboard-route.tsx", "features/host/route/host-meeting-ledger-route.tsx", "features/host/route/host-meeting-workspace-actions.ts", "features/host/route/host-meeting-workspace-route.tsx", "features/host/route/host-session-ledger-route.tsx", "features/host/route/new-host-meeting-route.tsx"], "L2", ["useMutation", "explicit-publisher"]),
   modify("features/host/queries/host-session-record-queries.ts", ["features/host/route/host-session-editor-route.tsx", "features/host/route/host-meeting-workspace-route.tsx"], "L3", ["useMutation", "explicit-publisher"]),
   modify("features/host/queries/host-session-recovery-queries.ts", ["features/host/route/host-session-editor-route.tsx", "features/host/route/host-meeting-workspace-route.tsx", "features/host/route/host-dashboard-route.tsx"], "L2", ["useMutation", "explicit-publisher"]),
   register("features/platform-admin/route/admin-shell-layout.tsx", "L2", ["onboarding", "dirty-preview"]),
@@ -152,6 +154,7 @@ export const SPACE_TRANSITION_PRODUCER_INVENTORY = [
   leaf("features/host/ui/session-editor/session-record-completion-panel.tsx", ["features/host/route/host-session-editor-route.tsx"], ["callback-only"]),
   leaf("features/platform-admin/ui/domain-provisioning-panel.tsx", ["features/platform-admin/route/admin-club-detail-route.tsx"], ["callback-only"]),
   leaf("shared/auth/club-access-query.ts", ["src/app/layouts/app-route-layout.tsx"], ["best-effort", "response-ignored", "request-count:1"]),
+  unreachable("features/auth/actions/password-auth.ts", "logout"),
   unreachable("features/host/actions/invitations.ts", "createInvitation"),
   unreachable("features/host/actions/invitations.ts", "revokeInvitation"),
   unreachable("features/current-session/actions/save-checkin.ts", "saveCheckin"),
@@ -167,6 +170,7 @@ export type ProducerInventoryAudit = {
   unclassifiedExportedWrites: string[];
   unreachableExportsWithMountedImports: string[];
   modifyEntriesWithoutMountedOwner: string[];
+  modifyEntriesWithMissingMountedOwners: string[];
   verifiedLeavesWithForbiddenPublication: string[];
 };
 
@@ -186,7 +190,7 @@ function hasImportedWriteInvocation(source: string): boolean {
       .split(",")
       .map((part) => part.trim().replace(/^type\s+/, ""))
       .map((part) => part.split(/\s+as\s+/).at(-1) ?? "")
-      .filter((name) => new RegExp(`^${WRITE_VERB}[A-Z]`).test(name));
+      .filter((name) => new RegExp(`^${WRITE_VERB}(?:[A-Z]|$)`).test(name));
     if (names.some((name) => new RegExp(`\\b${name}\\s*\\(`).test(source.slice(match.index! + match[0].length)))) {
       return true;
     }
@@ -207,8 +211,31 @@ export function detectMutationProducerPaths(sources: ReadonlyMap<string, string>
 const HTTP_WRITE_METHOD_PATTERN = /\bmethod\s*:\s*["'](?:POST|PUT|PATCH|DELETE)["']/i;
 const EXPORTED_WRITE_VERB_PATH = /(?:^|\/)(?:api|actions|queries|storage)(?:\/|$)|^shared\/auth\/(?:club-access|session-api)/;
 
-export function detectExportedWriteSymbols(sources: ReadonlyMap<string, string>): string[] {
-  const exportedWrites: string[] = [];
+type ProductionSymbolGraph = {
+  edges: Map<string, Set<string>>;
+  writeEdges: Map<string, Set<string>>;
+  exportsByPath: Map<string, Set<string>>;
+  localsByPath: Map<string, Set<string>>;
+  baseWrites: Set<string>;
+};
+
+const localSymbol = (path: string, name: string) => `${path}::${name}`;
+const exportedSymbol = (path: string, name: string) => `${path}#${name}`;
+
+function addSymbolEdge(edges: Map<string, Set<string>>, from: string, to: string) {
+  const targets = edges.get(from) ?? new Set<string>();
+  targets.add(to);
+  edges.set(from, targets);
+}
+
+function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): ProductionSymbolGraph {
+  const edges = new Map<string, Set<string>>();
+  const writeEdges = new Map<string, Set<string>>();
+  const exportsByPath = new Map<string, Set<string>>();
+  const localsByPath = new Map<string, Set<string>>();
+  const baseWrites = new Set<string>();
+  const starExports: Array<{ path: string; providerPath: string }> = [];
+
   for (const [path, source] of sources) {
     if (/\.(?:test|ct|story)\.[jt]sx?$/.test(path)) continue;
     const sourceFile = ts.createSourceFile(
@@ -218,55 +245,162 @@ export function detectExportedWriteSymbols(sources: ReadonlyMap<string, string>)
       true,
       path.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
     );
-    const declarations = new Map<string, { exported: boolean; calls: Set<string>; writesHttp: boolean }>();
+    const declarations = new Map<string, ts.Node>();
+    const imports = new Map<string, { providerPath: string; importedName: string }>();
     const exportedModifier = (node: ts.Node) => ts.canHaveModifiers(node)
       && Boolean(ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword));
-    const record = (name: string, node: ts.Node, exported: boolean) => {
-      const calls = new Set<string>();
-      const visit = (candidate: ts.Node) => {
-        if (ts.isCallExpression(candidate) && ts.isIdentifier(candidate.expression)) {
-          calls.add(candidate.expression.text);
-        }
-        ts.forEachChild(candidate, visit);
-      };
-      visit(node);
-      declarations.set(name, {
-        exported,
-        calls,
-        writesHttp: HTTP_WRITE_METHOD_PATTERN.test(node.getText(sourceFile)),
-      });
-    };
+
     for (const statement of sourceFile.statements) {
+      if (ts.isImportDeclaration(statement)
+        && statement.importClause
+        && !statement.importClause.isTypeOnly
+        && ts.isStringLiteral(statement.moduleSpecifier)) {
+        const providerPath = resolveProductionImport(path, statement.moduleSpecifier.text, sources);
+        if (providerPath) {
+          if (statement.importClause.name) {
+            imports.set(statement.importClause.name.text, { providerPath, importedName: "default" });
+          }
+          const bindings = statement.importClause.namedBindings;
+          if (bindings && ts.isNamedImports(bindings)) {
+            for (const element of bindings.elements) {
+              if (element.isTypeOnly) continue;
+              imports.set(element.name.text, {
+                providerPath,
+                importedName: element.propertyName?.text ?? element.name.text,
+              });
+            }
+          } else if (bindings && ts.isNamespaceImport(bindings)) {
+            imports.set(bindings.name.text, { providerPath, importedName: "*" });
+          }
+        }
+      }
       if (ts.isFunctionDeclaration(statement) && statement.name && statement.body) {
-        record(statement.name.text, statement, exportedModifier(statement));
+        declarations.set(statement.name.text, statement);
       }
       if (ts.isVariableStatement(statement)) {
         for (const declaration of statement.declarationList.declarations) {
           if (ts.isIdentifier(declaration.name) && declaration.initializer) {
-            record(declaration.name.text, declaration, exportedModifier(statement));
+            declarations.set(declaration.name.text, declaration);
           }
         }
       }
     }
-    const writeFunctions = new Set([...declarations]
-      .filter(([name, declaration]) => declaration.writesHttp
-        || (EXPORTED_WRITE_VERB_PATH.test(path) && new RegExp(`^${WRITE_VERB}(?:[A-Z]|$)`).test(name)))
-      .map(([name]) => name));
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (const [name, declaration] of declarations) {
-        if (writeFunctions.has(name)) continue;
-        if ([...declaration.calls].some((called) => writeFunctions.has(called))) {
-          writeFunctions.add(name);
-          changed = true;
+
+    localsByPath.set(path, new Set(declarations.keys()));
+    const pathExports = exportsByPath.get(path) ?? new Set<string>();
+    exportsByPath.set(path, pathExports);
+
+    for (const [name, declaration] of declarations) {
+      const from = localSymbol(path, name);
+      if (HTTP_WRITE_METHOD_PATTERN.test(declaration.getText(sourceFile))
+        || (EXPORTED_WRITE_VERB_PATH.test(path) && new RegExp(`^${WRITE_VERB}(?:[A-Z]|$)`).test(name))) {
+        baseWrites.add(from);
+      }
+      const visit = (candidate: ts.Node) => {
+        if (ts.isPropertyAccessExpression(candidate) && ts.isIdentifier(candidate.expression)) {
+          const binding = imports.get(candidate.expression.text);
+          if (binding?.importedName === "*") {
+            addSymbolEdge(edges, from, exportedSymbol(binding.providerPath, candidate.name.text));
+          }
+        } else if (ts.isIdentifier(candidate)) {
+          const binding = imports.get(candidate.text);
+          if (binding && binding.importedName !== "*") {
+            addSymbolEdge(edges, from, exportedSymbol(binding.providerPath, binding.importedName));
+          } else if (candidate.text !== name && declarations.has(candidate.text)) {
+            addSymbolEdge(edges, from, localSymbol(path, candidate.text));
+            addSymbolEdge(writeEdges, from, localSymbol(path, candidate.text));
+          }
+        }
+        ts.forEachChild(candidate, visit);
+      };
+      visit(declaration);
+    }
+
+    for (const statement of sourceFile.statements) {
+      if ((ts.isFunctionDeclaration(statement) || ts.isVariableStatement(statement)) && exportedModifier(statement)) {
+        if (ts.isFunctionDeclaration(statement) && statement.name) {
+          pathExports.add(statement.name.text);
+          addSymbolEdge(edges, exportedSymbol(path, statement.name.text), localSymbol(path, statement.name.text));
+          addSymbolEdge(writeEdges, exportedSymbol(path, statement.name.text), localSymbol(path, statement.name.text));
+        } else if (ts.isVariableStatement(statement)) {
+          for (const declaration of statement.declarationList.declarations) {
+            if (!ts.isIdentifier(declaration.name)) continue;
+            pathExports.add(declaration.name.text);
+            addSymbolEdge(edges, exportedSymbol(path, declaration.name.text), localSymbol(path, declaration.name.text));
+            addSymbolEdge(writeEdges, exportedSymbol(path, declaration.name.text), localSymbol(path, declaration.name.text));
+          }
         }
       }
-    }
-    for (const [name, declaration] of declarations) {
-      if (declaration.exported && writeFunctions.has(name)) {
-        exportedWrites.push(`${path}#${name}`);
+      if (!ts.isExportDeclaration(statement)) continue;
+      const providerPath = statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)
+        ? resolveProductionImport(path, statement.moduleSpecifier.text, sources)
+        : null;
+      if (!statement.exportClause) {
+        if (providerPath) starExports.push({ path, providerPath });
+        continue;
       }
+      if (!ts.isNamedExports(statement.exportClause)) continue;
+      for (const element of statement.exportClause.elements) {
+        const exportedName = element.name.text;
+        const sourceName = element.propertyName?.text ?? exportedName;
+        pathExports.add(exportedName);
+        const target = providerPath ? exportedSymbol(providerPath, sourceName) : localSymbol(path, sourceName);
+        addSymbolEdge(edges, exportedSymbol(path, exportedName), target);
+        addSymbolEdge(writeEdges, exportedSymbol(path, exportedName), target);
+      }
+    }
+  }
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const { path, providerPath } of starExports) {
+      const targetExports = exportsByPath.get(path) ?? new Set<string>();
+      exportsByPath.set(path, targetExports);
+      for (const name of exportsByPath.get(providerPath) ?? []) {
+        if (!targetExports.has(name)) {
+          targetExports.add(name);
+          changed = true;
+        }
+        addSymbolEdge(edges, exportedSymbol(path, name), exportedSymbol(providerPath, name));
+        addSymbolEdge(writeEdges, exportedSymbol(path, name), exportedSymbol(providerPath, name));
+      }
+    }
+  }
+
+  return { edges, writeEdges, exportsByPath, localsByPath, baseWrites };
+}
+
+function symbolReaches(
+  graph: ProductionSymbolGraph,
+  starts: Iterable<string>,
+  targets: ReadonlySet<string>,
+  edges: ReadonlyMap<string, ReadonlySet<string>> = graph.edges,
+  blockedPaths: ReadonlySet<string> = new Set(),
+  rootPath?: string,
+): boolean {
+  const pending = [...starts];
+  const seen = new Set<string>();
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    if (targets.has(current)) return true;
+    if (seen.has(current)) continue;
+    seen.add(current);
+    const separator = current.includes("::") ? "::" : "#";
+    const currentPath = current.slice(0, current.indexOf(separator));
+    if (currentPath !== rootPath && blockedPaths.has(currentPath)) continue;
+    for (const next of edges.get(current) ?? []) pending.push(next);
+  }
+  return false;
+}
+
+export function detectExportedWriteSymbols(sources: ReadonlyMap<string, string>): string[] {
+  const graph = analyzeProductionSymbolGraph(sources);
+  const exportedWrites: string[] = [];
+  for (const [path, names] of graph.exportsByPath) {
+    for (const name of names) {
+      const symbol = exportedSymbol(path, name);
+      if (symbolReaches(graph, [symbol], graph.baseWrites, graph.writeEdges)) exportedWrites.push(symbol);
     }
   }
   return exportedWrites.sort();
@@ -334,6 +468,10 @@ export function auditMutationProducerInventory(
   mountedPaths: ReadonlySet<string>,
   inventory: readonly MutationProducerClassification[] = SPACE_TRANSITION_PRODUCER_INVENTORY,
 ): ProducerInventoryAudit {
+  const symbolGraph = analyzeProductionSymbolGraph(sources);
+  const ownershipBoundaryPaths = new Set(inventory
+    .filter((candidate) => candidate.classification === "register" || candidate.classification === "verified-no-change")
+    .map((candidate) => candidate.path));
   const inventoryPaths = new Set(inventory.map((candidate) => candidate.path));
   const inventoryExportedWrites = new Set(inventory.flatMap((candidate) => [
     ...(candidate.exportName ? [`${candidate.path}#${candidate.exportName}`] : []),
@@ -345,6 +483,32 @@ export function auditMutationProducerInventory(
       .filter((symbol) => !inventoryExportedWrites.has(symbol)),
     unreachableExportsWithMountedImports: inventory.filter((candidate) => candidate.classification === "out-of-domain" && mountedPaths.has(candidate.path)).map((candidate) => `${candidate.path}#${candidate.exportName ?? "*"}`),
     modifyEntriesWithoutMountedOwner: inventory.filter((candidate) => candidate.classification === "modify" && !candidate.ownerPaths.some((owner) => mountedPaths.has(owner))).map((candidate) => candidate.path),
+    modifyEntriesWithMissingMountedOwners: inventory
+      .filter((candidate) => candidate.classification === "modify")
+      .flatMap((candidate) => {
+        const targetNames = new Set([
+          ...(candidate.exportName ? [candidate.exportName] : []),
+          ...(candidate.exportNames ?? []),
+        ]);
+        if (targetNames.size === 0) {
+          for (const name of symbolGraph.exportsByPath.get(candidate.path) ?? []) targetNames.add(name);
+        }
+        const targets = new Set([...targetNames].map((name) => exportedSymbol(candidate.path, name)));
+        if (targets.size === 0) return [];
+        return inventory
+          .filter((owner) => owner.classification === "register" && mountedPaths.has(owner.path))
+          .filter((owner) => symbolReaches(
+            symbolGraph,
+            [...symbolGraph.localsByPath.get(owner.path) ?? []].map((name) => localSymbol(owner.path, name)),
+            targets,
+            symbolGraph.edges,
+            ownershipBoundaryPaths,
+            owner.path,
+          ))
+          .filter((owner) => !candidate.ownerPaths.includes(owner.path))
+          .map((owner) => `${candidate.path}->${owner.path}`);
+      })
+      .sort(),
     verifiedLeavesWithForbiddenPublication: inventory.filter((candidate) => candidate.classification === "verified-no-change" && /^(?:features\/[^/]+\/.*\/ui\/|features\/[^/]+\/ui\/)/.test(candidate.path) && FORBIDDEN_LEAF_PATTERN.test(sources.get(candidate.path) ?? "")).map((candidate) => candidate.path),
   };
 }

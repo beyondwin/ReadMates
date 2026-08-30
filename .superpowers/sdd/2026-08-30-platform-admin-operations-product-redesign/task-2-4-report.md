@@ -8,6 +8,8 @@ Reviewer round 1 base: `828cdde508e8d8c76142af6e3985d08f0ab15399`
 
 Reviewer round 2 base: `a0550914ade786a4629abb0dbba2ae561976ff4d`
 
+Reviewer round 3 base: `8fc1417657187d74b684bc1ef885b51e082e6860`
+
 Branch: `codex/admin-operations-product-redesign`
 
 ## Outcome
@@ -66,9 +68,21 @@ Ruling: meeting workspace receipt는 response parse를 observation 단계에서 
 
 Ruling: invitation refresh는 command 뒤 uncached observation과 accepted cache publication으로 분리한다 — observation 도중 unmount면 `publishInvitations`가 0회이고 accepted owner만 exact observed page를 cache와 row UI에 게시한다 — `fetchQuery`가 observation과 cache publication을 동시에 수행하면 helper의 post-await 검사가 이미 발생한 cache write를 되돌릴 수 없다.
 
+## Reviewer round 3 remediation
+
+Ruling: exported-write inventory는 TypeScript symbol graph에서 direct/aliased/star re-export와 exact verb identifier를 재구성한다 — `password-auth.ts#logout` facade와 이를 호출하는 mounted rogue owner가 별도 symbol-level candidate로 검출되고, 정당한 logout owner가 동시에 mounted여도 누락이 실패한다 — path 단위 또는 대문자 suffix 전제는 facade 뒤의 write를 숨긴다.
+
+Ruling: modify/write entry는 하나의 mounted owner 존재가 아니라 그 symbol을 실행하는 모든 mounted register chain을 소유자 목록에 요구한다 — 현재 95-entry graph의 누락 목록은 비어 있고 `host-session-editor-actions.ts`는 session editor와 meeting workspace 양쪽 owner를 명시하며 two-owner negative fixture는 한쪽 누락을 실패시킨다 — existential 검사는 두 번째 실제 consumer를 unfenced로 남긴다.
+
+Ruling: `wrapHostSessionEditorActionsForUndo`의 receipt executor는 compile-time 필수이고 runtime guard도 둔다 — 두 실제 route가 각자의 registered receipt fence를 주입하며 executor 생략 test는 즉시 실패한다 — 안전하지 않은 default executor는 새 consumer가 receipt/copy/refetch를 owner 밖에서 게시하게 한다.
+
+Ruling: session-editor delayed receipt proof는 UI presentation 디렉터리가 아니라 actual route test에 둔다 — `EditHostSessionRecordWorkflow`를 실제 coordinator 아래 mount하고 response body parse 시작 뒤 authority loss와 unmount를 순서대로 적용해 request 1, receipt/undo/refetch/copy/navigation 0, obsolete rejection, clean coordinator를 검증하면서 UI test는 callback-only import boundary를 유지한다 — UI test가 route를 import하면 바로 기존 frontend boundary가 실패한다.
+
+Ruling: platform-admin의 다른 계정 로그인 logout도 authenticated L1 transition owner다 — request 전 등록, duplicate 방지, accepted navigation/error copy fence, unknown response의 mounted disable 상태를 적용하고 unmount 뒤 late response는 navigation 0이다 — terminal logout을 admin shell 밖의 기존 owner가 대신 보호한다고 가정하면 실제 mounted consumer chain 하나가 빠진다.
+
 ## Regenerated mutation producer and import-reachability inventory
 
-The candidate scan was regenerated from the current production tree across `front/src`, `front/shared`, and all `front/features`. It combines the actual production import graph rooted at `src/main.tsx` with a repository-wide exported HTTP/write scan. The current typed inventory has 93 entries: 27 `register`, 36 `modify`, 22 `verified-no-change`, and 8 `out-of-domain`. Recovery counts are L1 25, L2 9, L3 29, and none 30. Paths below are exact and relative to `front/`.
+The candidate scan was regenerated from the current production tree across `front/src`, `front/shared`, and all `front/features`. It combines the actual production import/symbol graph rooted at `src/main.tsx` with a repository-wide exported HTTP/write scan and complete mounted-owner derivation. The current typed inventory has 95 entries: 27 `register`, 36 `modify`, 23 `verified-no-change`, and 9 `out-of-domain`. Recovery counts are L1 25, L2 9, L3 29, and none 32. Paths below are exact and relative to `front/`.
 
 | Path/export | Classification | Owner(s) | Recovery | Evidence |
 |---|---|---|---|---|
@@ -79,11 +93,12 @@ The candidate scan was regenerated from the current production tree across `fron
 | `features/notifications/route/member-notifications-route.tsx` | register | same path | L1 | memberNotificationsActions; notifications-refetch |
 | `features/auth/route/login-route.tsx` | verified-no-change | — | none | pre-auth; outside authenticated transitions |
 | `features/auth/api/auth-api.ts#submitDevLogin` | verified-no-change | login route | none | pre-auth transport; outside authenticated transitions |
-| `features/auth/api/auth-api.ts#logout` | modify | logout route | L1 | authenticated logout transport; registered route owner |
+| `features/auth/api/auth-api.ts#logout` | modify | logout route and app route layout | L1 | authenticated logout transport; registered route owners |
 | `features/host/queries/host-state-purge.ts` | verified-no-change | `src/app/host-authority-loss-controller.tsx` | none | authority cleanup; not a user command |
 | `shared/api/host-authority-event.ts` | verified-no-change | host authority-loss controller | none | request cancellation; not a user command |
+| `src/app/host-authority-loss-controller.tsx` | verified-no-change | app route layout | none | terminal authority cleanup; not a user command |
 | `shared/auth/club-access-api.ts` | verified-no-change | `src/app/layouts/app-route-layout.tsx` | none | transport primitive; response ignored |
-| `shared/auth/session-api.ts` | modify | logout route and app route layout | L1 | logout transport; registered authenticated/guest owners |
+| `shared/auth/session-api.ts` | modify | logout route, app route layout, and admin shell | L1 | logout transport; all mounted logout owners registered |
 | `src/app/layouts/app-route-layout.tsx#touchClubAccessOnce` | verified-no-change | same path | none | ambient touch; one request |
 | `src/app/layouts/app-route-layout.tsx#guest-continuation-logout` | register | same path | L1 | unknown-safe logout; cache/auth/navigation publication |
 | `features/auth/route/logout-button.tsx` | register | same path | L1 | authenticated logout; accepted publication |
@@ -109,7 +124,7 @@ The candidate scan was regenerated from the current production tree across `fron
 | `features/current-session/api/current-session-api.ts` | modify | current session route | L1 | transport writes; registered route owner |
 | `features/host/route/host-members-data.ts` | modify | `features/host/route/host-members-route.tsx` | L1 | observation only; explicit publisher |
 | `features/host/route/host-invitations-data.ts` | modify | invitation and members routes | L1 | uncached list; accepted refresh only |
-| `features/host/route/host-session-editor-actions.ts` | modify | session editor route | L3 | observation only; explicit receipt callback |
+| `features/host/route/host-session-editor-actions.ts#wrapHostSessionEditorActionsForUndo` | modify | session editor and meeting workspace routes | L3 | mandatory owner-fenced receipt executor |
 | `features/archive/queries/profile-queries.ts` | modify | profile update controller | L1 | useMutation; explicit publisher |
 | `features/current-session/queries/current-session-queries.ts` | modify | current session route | L1 | useMutation; explicit publisher |
 | `features/host/aigen/queries/aigen-job-queries.ts` | modify | session editor and meeting workspace routes | L3 | useMutation; explicit publisher |
@@ -157,6 +172,7 @@ The candidate scan was regenerated from the current production tree across `fron
 | `features/host/ui/session-editor/session-record-completion-panel.tsx` | verified-no-change | session editor route | none | callback only |
 | `features/platform-admin/ui/domain-provisioning-panel.tsx` | verified-no-change | admin club detail route | none | callback only |
 | `shared/auth/club-access-query.ts` | verified-no-change | app route layout | none | best effort; response ignored; one request |
+| `features/auth/actions/password-auth.ts#logout` | out-of-domain | — | none | re-exported write; mounted import count 0 |
 | `features/host/actions/invitations.ts#createInvitation` | out-of-domain | — | none | exported write; mounted import count 0 |
 | `features/host/actions/invitations.ts#revokeInvitation` | out-of-domain | — | none | exported write; mounted import count 0 |
 | `features/current-session/actions/save-checkin.ts#saveCheckin` | out-of-domain | — | none | exported write; mounted import count 0 |
@@ -166,7 +182,7 @@ The candidate scan was regenerated from the current production tree across `fron
 | `features/current-session/actions/save-review.ts#saveOneLineReview` | out-of-domain | — | none | exported write; mounted import count 0 |
 | `features/current-session/actions/update-rsvp.ts#updateRsvp` | out-of-domain | — | none | exported write; mounted import count 0 |
 
-The audit result is exact: no unclassified paths, no out-of-domain export with a mounted import, no modified factory without a mounted owner, and no verified UI leaf with forbidden publication imports.
+The audit result is exact: no unclassified path or exported write, no out-of-domain export with a mounted import, no modified factory without a mounted owner, no missing mounted registering consumer chain for any modified symbol, and no verified UI leaf with forbidden publication imports.
 
 ## Plan-listed files intentionally unchanged
 
@@ -176,7 +192,7 @@ Ruling: `shared/auth/club-access-query.ts` and its exact ambient-touch tests rem
 
 Ruling: unchanged route tests remain valid where their production behavior did not need a new interleaving assertion; account settings, invitation, takedown, shared owner, and session-editor action tests changed because reviewer findings required precise obsolete-owner evidence — changing every plan-listed test mechanically would add churn without strengthening the authority proof.
 
-Ruling: `host-session-editor-route.test.tsx` remains unchanged — its existing route behavior is covered in the focused partition and the new `host-session-editor-transition-safety.test.tsx`, workspace-action test, action publisher test, and full legacy route suite cover registration/publication composition — altering the planned file merely to mark it changed would weaken review signal.
+Ruling: `host-session-editor-route.test.tsx` changed in round 3 because the reviewer required an actual route interleaving — the test mounts the production workflow with a real coordinator and delays response-body parsing across authority loss and unmount, while `host-session-editor-transition-safety.test.tsx` remains a presentation import-boundary test — importing route code from `features/host/ui/**` would itself violate the enforced UI architecture.
 
 Ruling: `upcoming-book-list.test.tsx` and `domain-provisioning-panel.test.tsx` remain unchanged — their production leaves remained callback-only and the nested boundary test plus their existing focused tests pass — owner registration belongs in the supplying routes.
 
@@ -210,6 +226,9 @@ Ruling: `tests/unit/host-invitations.test.tsx` and `tests/unit/host-members.test
 - Updated exact partition first rerun passed 53/54 files and 554/555 tests. The sole failure exposed current-session acknowledgement cleanup misclassifying an obsolete post-unmount publication as command failure. Local dedupe cleanup was separated from product publication; the focused file passed 9/9 and the complete updated partition passed 54/54·555/555.
 - Round 2 full frontend, final lint/build, focused browser, and server fixture evidence all passed freshly. The only lint/build output is two pre-existing Fast Refresh warnings and the existing chunk-size warning.
 - Optional repository-wide `tsc -b --pretty false` remains exit 1 on the branch's existing type baseline. A changed-path filter initially exposed three round-2-owned fixture/import errors; those were fixed, their 7-file runtime partition passed 112/112, and the remaining filtered diagnostics reproduce pre-existing app-layout/workspace/test-fixture errors already present at the round-2 base. This optional diagnostic is not reported as a pass.
+- Reviewer round 3 RED: the initial inventory/action partition had 5 expected failures and 12 passes: re-exported writes were absent, exact `logout` was ignored, a second mounted owner was invisible, and the unsafe receipt executor remained optional. A separate actual admin-shell test then failed with one late `location.assign` after unmount. The identical three-file production partition passed 45/45 after symbol-graph, owner-completeness, mandatory-executor, and admin logout fixes.
+- Reviewer round 3 route-evidence characterization: the production session-editor fence already rejected late receipt publication; the first new harness run failed only because it called a nonexistent test inspection method (`inspect` instead of `getSnapshot`). After correcting the harness API, the actual route proof passed 1/1. Moving that proof under `features/host/ui/**` then deliberately triggered the existing UI-boundary suite, so the same actual test was placed in `host-session-editor-route.test.tsx`; the route/UI/boundary partition passed 4/4 files and 73/73 tests.
+- Round 3 final exact partition passed 54/54 files and 561/561 tests; the factory fence remained 17/17·118/118. The first full run's sole 1/3963 failure was the intentional architectural signal from the incorrectly located route test, not a product failure. After the test-layer correction, the fresh complete frontend suite passed 440/440·3964/3964.
 
 ## Exact round 2 commands
 
@@ -326,6 +345,23 @@ npx --yes corepack@0.35.0 pnpm --dir front exec playwright test \
 
 | Command | Exit | Result |
 |---|---:|---|
+| Round 3 initial inventory/action RED partition | 1 | expected RED: 5 failed, 12 passed |
+| Round 3 admin-shell mounted late-navigation RED | 1 | expected RED: `location.assign` called once after unmount |
+| Round 3 inventory/action/admin GREEN partition | 0 | 3 files, 45 tests passed |
+| Round 3 actual session-editor route + UI/boundary partition | 0 | 4 files, 73 tests passed |
+| Round 3 exact Task 2.4 focused command | 0 | 54 files, 561 tests passed |
+| Round 3 exact factory/publication fence | 0 | 17 files, 118 tests passed |
+| Round 3 `npx --yes corepack@0.35.0 pnpm --dir front test` | 0 | 440 files, 3964 tests passed |
+| Round 3 `npx --yes corepack@0.35.0 pnpm --dir front lint` | 0 | 0 errors; 2 existing Fast Refresh warnings |
+| Round 3 `npx --yes corepack@0.35.0 pnpm --dir front build` | 0 | 791 modules; chunk-size warning only |
+| Round 3 boundary/inventory gate | 0 | 2 files, 26 tests passed |
+| Round 3 final admin-shell owner proof | 0 | 1 file, 28 tests passed; pending disables duplicate command and unmounted late response navigates zero times |
+| Round 3 exact 15-query automatic-publication scan | 0 | no `onSuccess`/`onError` mutation handlers found |
+| Round 3 `./scripts/build-public-release-candidate.sh && ./scripts/public-release-check.sh .tmp/public-release-candidate` | 0 | candidate built; fallback public-release scan passed |
+| Round 3 `git diff --check` | 0 | no whitespace errors |
+| Round 3 changed-diff local-path/private-key/AWS/token-shape scan | 0 | no matches |
+| Round 3 dirty-tree preflight from `8fc1417` | 2 | expected sole stop: planned edit paths overlap the preserved dirty implementation |
+| Round 3 post-commit preflight from `8fc1417` | 0 | eight base paths classified; tracked tree clean; no stop reasons |
 | Round 2 eight-file RED command (`account-menu-controller`, inventory, shared owner, invitations, profile controller/dialog, workspace actions/route) | 1 | expected RED: 10 failed, 88 passed |
 | Identical round 2 eight-file GREEN command | 0 | 8 files, 98 tests passed |
 | Updated exact Task 2.4 focused Vitest command (brief list plus required account logout, shared owner, and profile-dialog proofs) | 0 | 54 files, 555 tests passed |
@@ -363,6 +399,9 @@ The exact focused and factory commands are the literal file lists in `task-2-4-b
 - Authenticated and guest-continuation logout both register before transport. Cache clear and the combined auth/navigation publication recheck the accepted generation; pending/unknown disables re-entry and unmount/authority loss publishes zero.
 - Accepted handles are retained only while explicit publication stages remain. Completion releases the retained handle, while owner unmount increments the local publication generation so delayed cache/receipt/UI stages reject without leaking a capsule.
 - Repository-wide write detection is symbol-level (`path#export`) and follows transitive production imports from `src/main.tsx`; a new write export in an already classified file, nested runtime chain, or mounted out-of-domain import fails the inventory automatically.
+- Direct, aliased, and resolvable star re-exports retain their facade symbol identity; direct exact verbs such as `logout` are write candidates without a capital suffix. Owner completeness derives every mounted registering consumer chain and reports each absent `path->owner` pair.
+- `wrapHostSessionEditorActionsForUndo` has no unfenced default: both session-editor and meeting-workspace routes must supply the receipt executor. The actual session-editor route proof delays `Response.clone().json()` through authority loss/unmount and observes one command plus zero receipt, undo, refetch, copy, record callback, and navigation publication.
+- Admin other-account logout begins its own L1 owner before transport, disables duplicate submission, and fences navigation/error copy; an unmounted late response publishes neither.
 - Profile obsolete results stay typed as obsolete through the real dialog, which remains open and emits no success state. Workspace response parsing remains observation-only; undo/refetch/record callbacks occur only inside receipt-fenced executors.
 - Invitation detached recovery lists without cache writes and never replays create/reissue/revoke. Accepted owners alone invoke refresh, and the actual host-members obsolete interleaving publishes neither rows nor success copy.
 - Nested UI imports no query, API, route, app, page, router, or direct fetch; the negative fixtures prove the scanner catches these imports at arbitrary UI nesting depth.
@@ -374,4 +413,5 @@ The exact focused and factory commands are the literal file lists in `task-2-4-b
 - `gitleaks` is not installed. The repository fallback path/content scanner passed, but it explicitly is not a professional complete secret scan.
 - The remaining lint warnings and the build chunk-size warning are non-blocking; the route-owner exports introduced here have narrowly documented Fast Refresh exemptions.
 - Live provider/CDN purge, deployment, production data, and billable side effects were intentionally not measured.
+- Round 3 did not rerun Playwright or server integration because no takedown, BFF, server contract, or server fixture changed relative to its clean base. The round-2 5/5 browser and focused server BUILD SUCCESSFUL evidence remains historical, not fresh round-3 evidence.
 - Repository-wide TypeScript build is not a configured completion gate and remains red on the pre-existing baseline. Round-2-owned diagnostics found by a changed-path filter were removed; the required lint, production build, focused tests, and full runtime suite are green.

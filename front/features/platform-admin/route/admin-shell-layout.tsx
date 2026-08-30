@@ -83,6 +83,7 @@ function AdminShellLayoutInner({
     isWizardDirty,
     "완료하지 않은 클럽 온보딩이 있습니다.",
   );
+  const accountLogoutOwner = useTransitionSafetyOwner("admin-other-account-logout");
   const commitOnboardingAccepted = async (request: Parameters<typeof commitOnboarding.mutateAsync>[0]) => {
     const operationId = `admin-onboarding:${request.idempotencyKey}`;
     const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
@@ -208,19 +209,34 @@ function AdminShellLayoutInner({
   }, [location.pathname, navigate, queryClient, searchParams]);
 
   async function otherAccountLogin() {
+    if (accountBusy) return;
+    const operationId = `admin-other-account-logout:${globalThis.crypto.randomUUID()}`;
+    const handle = accountLogoutOwner.begin(operationId, "L1", async () => ({
+      operationId,
+      outcome: "still-unknown",
+    }));
     setAccountBusy(true);
     setAccountError(null);
+    let settled = false;
     try {
       const response = await logoutCurrentSession();
-      if (response.ok || response.status === 401) {
-        window.location.assign(otherAccountLoginPath);
-        return;
+      const succeeded = response.ok || response.status === 401;
+      if (await handle.settle(succeeded ? "succeeded" : "failed") !== "accepted") return;
+      settled = true;
+      if (succeeded) {
+        await publishTransitionAction(handle, "navigation", () => window.location.assign(otherAccountLoginPath));
+      } else {
+        await publishTransitionAction(handle, "errorCopy", () => {
+          setAccountError("로그아웃에 실패했습니다. 다시 시도해 주세요.");
+          setAccountBusy(false);
+        });
       }
-      setAccountError("로그아웃에 실패했습니다. 다시 시도해 주세요.");
-    } catch {
-      setAccountError("로그아웃에 실패했습니다. 다시 시도해 주세요.");
+    } catch (error) {
+      if (error instanceof TransitionOwnerObsoleteError) return;
+      // A lost response may hide a committed logout. Keep this operation
+      // registered and disabled until owner unmount reconciliation.
     } finally {
-      setAccountBusy(false);
+      if (settled) handle.completePublication();
     }
   }
 

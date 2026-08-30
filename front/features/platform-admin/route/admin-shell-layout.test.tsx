@@ -30,6 +30,8 @@ import {
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { platformAdminOperationCasesQuery } from "@/features/platform-admin/queries/platform-admin-operations-queries";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
+import { createGlobalSpaceTransitionCoordinator } from "@/src/app/global-space-transition";
+import { SpaceTransitionSafetyProvider } from "@/shared/ui/space-transition-safety-context";
 
 vi.mock("@/shared/auth/session-api", () => ({
   logoutCurrentSession: vi.fn(),
@@ -132,6 +134,12 @@ const supportViewCapabilities: PlatformAdminCapabilities["capabilities"] = [
 
 const memberQueryKey = ["current-session", "me"] as const;
 const memberSnapshot = { userId: "member-1" };
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
 
 async function forbiddenError() {
   return apiErrorFromResponse(
@@ -289,12 +297,15 @@ function renderShell(
       initialIndex: opts.initialIndex,
     },
   );
+  const transitionCoordinator = createGlobalSpaceTransitionCoordinator();
   const view = render(
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <SpaceTransitionSafetyProvider port={transitionCoordinator}>
+        <RouterProvider router={router} />
+      </SpaceTransitionSafetyProvider>
     </QueryClientProvider>,
   );
-  return { ...view, queryClient, router };
+  return { ...view, queryClient, router, transitionCoordinator };
 }
 
 function SpaceControlProbe() {
@@ -510,6 +521,29 @@ describe("AdminShellLayout", () => {
         "/login?returnTo=%2Fadmin%2Fclubs%3Ffilter%3Dready%23top",
       );
     });
+  });
+
+  it("publishes no other-account navigation after the registered shell owner unmounts", async () => {
+    const pending = deferred<Response>();
+    vi.mocked(logoutCurrentSession).mockReturnValue(pending.promise);
+    const assign = vi.fn();
+    vi.stubGlobal("location", { assign });
+    const { unmount } = renderShell("/admin/today");
+
+    const accountLogin = screen.getByRole("button", { name: "다른 계정으로 로그인" });
+    fireEvent.click(accountLogin);
+    expect(logoutCurrentSession).toHaveBeenCalledTimes(1);
+    expect(accountLogin).toBeDisabled();
+    fireEvent.click(accountLogin);
+    expect(logoutCurrentSession).toHaveBeenCalledTimes(1);
+    unmount();
+    await act(async () => {
+      pending.resolve(new Response(null, { status: 204 }));
+      await pending.promise;
+      await Promise.resolve();
+    });
+
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it("keeps the operator in place and reports a logout failure outside the space control", async () => {

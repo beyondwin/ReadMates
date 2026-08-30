@@ -39,6 +39,7 @@ describe("space transition mutation-producer inventory", () => {
       unclassifiedExportedWrites: [],
       unreachableExportsWithMountedImports: [],
       modifyEntriesWithoutMountedOwner: [],
+      modifyEntriesWithMissingMountedOwners: [],
       verifiedLeavesWithForbiddenPublication: [],
     });
   });
@@ -143,6 +144,123 @@ describe("space transition mutation-producer inventory", () => {
 
     expect(detectExportedWriteSymbols(sources)).toEqual([
       "features/example/api/neutral-api.ts#acknowledgeCase",
+    ]);
+  });
+
+  it("reifies direct, aliased, and star re-exports as symbol-level write candidates", () => {
+    const sources = new Map([
+      ["features/auth/api/auth-api.ts", `
+        export function logout() {
+          return fetch("/api/logout", { method: "POST" });
+        }
+      `],
+      ["features/auth/actions/password-auth.ts", `
+        export { logout } from "../api/auth-api";
+      `],
+      ["features/auth/actions/aliased-auth.ts", `
+        export { logout as endSession } from "../api/auth-api";
+      `],
+      ["features/auth/actions/all-auth.ts", `
+        export * from "../api/auth-api";
+      `],
+    ]);
+
+    expect(detectExportedWriteSymbols(sources)).toEqual([
+      "features/auth/actions/aliased-auth.ts#endSession",
+      "features/auth/actions/all-auth.ts#logout",
+      "features/auth/actions/password-auth.ts#logout",
+      "features/auth/api/auth-api.ts#logout",
+    ]);
+  });
+
+  it("detects a mounted exact-verb facade caller even when another legitimate owner is mounted", () => {
+    const sources = new Map([
+      ["src/main.tsx", `
+        import "@/features/auth/route/logout-button";
+        import "@/features/example/route/rogue-route";
+      `],
+      ["features/auth/api/auth-api.ts", `export function logout() { return fetch("/logout", { method: "POST" }); }`],
+      ["features/auth/actions/password-auth.ts", `export { logout } from "../api/auth-api";`],
+      ["features/auth/route/logout-button.tsx", `
+        import { logout } from "../api/auth-api";
+        export function LogoutButton() { return logout(); }
+      `],
+      ["features/example/route/rogue-route.tsx", `
+        import { logout } from "@/features/auth/actions/password-auth";
+        export function RogueRoute() { return logout(); }
+      `],
+    ]);
+    const inventory: MutationProducerClassification[] = [
+      {
+        path: "features/auth/route/logout-button.tsx",
+        classification: "register",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["registered"],
+      },
+      {
+        path: "features/auth/api/auth-api.ts",
+        exportName: "logout",
+        classification: "modify",
+        ownerPaths: ["features/auth/route/logout-button.tsx"],
+        recoveryClass: "L1",
+        evidenceTokens: ["transport"],
+      },
+      {
+        path: "features/auth/actions/password-auth.ts",
+        exportName: "logout",
+        classification: "out-of-domain",
+        ownerPaths: [],
+        recoveryClass: "none",
+        evidenceTokens: ["mounted-import-count:0"],
+      },
+    ];
+
+    const mounted = buildMountedProductionPaths(sources, ["src/main.tsx"]);
+    expect(auditMutationProducerInventory(sources, mounted, inventory)).toMatchObject({
+      unclassifiedPaths: ["features/example/route/rogue-route.tsx"],
+      unreachableExportsWithMountedImports: ["features/auth/actions/password-auth.ts#logout"],
+    });
+  });
+
+  it("fails when one of two mounted registering owner chains is absent from a modify entry", () => {
+    const sources = new Map([
+      ["src/main.tsx", `import "@/features/example/route/owner-a"; import "@/features/example/route/owner-b";`],
+      ["features/example/route/owner-a.ts", `import { save } from "../queries/write-query"; export function OwnerA() { return save(); }`],
+      ["features/example/route/owner-b.ts", `import { save } from "../queries/write-query"; export function OwnerB() { return save(); }`],
+      ["features/example/queries/write-query.ts", `export function save() { return fetch("/write", { method: "POST" }); }`],
+    ]);
+    const inventory: MutationProducerClassification[] = [
+      {
+        path: "features/example/route/owner-a.ts",
+        classification: "register",
+        ownerPaths: ["features/example/route/owner-a.ts"],
+        recoveryClass: "L1",
+        evidenceTokens: ["registered"],
+      },
+      {
+        path: "features/example/route/owner-b.ts",
+        classification: "register",
+        ownerPaths: ["features/example/route/owner-b.ts"],
+        recoveryClass: "L1",
+        evidenceTokens: ["registered"],
+      },
+      {
+        path: "features/example/queries/write-query.ts",
+        exportName: "save",
+        classification: "modify",
+        ownerPaths: ["features/example/route/owner-a.ts"],
+        recoveryClass: "L1",
+        evidenceTokens: ["write"],
+      },
+    ];
+
+    expect(auditMutationProducerInventory(
+      sources,
+      buildMountedProductionPaths(sources, ["src/main.tsx"]),
+      inventory,
+    ).modifyEntriesWithMissingMountedOwners).toEqual([
+      "features/example/queries/write-query.ts->features/example/route/owner-b.ts",
     ]);
   });
 

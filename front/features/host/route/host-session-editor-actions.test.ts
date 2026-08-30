@@ -16,7 +16,29 @@ function actions(response: Response): HostSessionEditorActions {
   } as unknown as HostSessionEditorActions;
 }
 
+const acceptedExecutor = async <T,>(
+  _operationId: string,
+  request: () => Promise<T>,
+  prepareReceipt: (result: T) => (() => void | Promise<void>) | Promise<() => void | Promise<void>>,
+) => {
+  const result = await request();
+  const publishReceipt = await prepareReceipt(result);
+  await publishReceipt();
+  return result;
+};
+
 describe("host session editor receipt publication fence", () => {
+  it("requires a route-owned fenced executor instead of publishing through a default", () => {
+    const raw = actions(new Response(null, { status: 204 }));
+    const invokeWithoutExecutor = wrapHostSessionEditorActionsForUndo as unknown as (
+      actions: HostSessionEditorActions,
+      listener: () => void,
+    ) => HostSessionEditorActions;
+
+    expect(wrapHostSessionEditorActionsForUndo).toHaveLength(3);
+    expect(() => invokeWithoutExecutor(raw, vi.fn())).toThrow("HOST_SESSION_EDITOR_ACTION_EXECUTOR_REQUIRED");
+  });
+
   it("keeps raw execution observation-only and publishes a receipt explicitly", async () => {
     const receipt = { changeId: "change-1", kind: "BASIC_INFO", undoAvailable: true } as const;
     const response = new Response(JSON.stringify({ changeReceipt: receipt }), {
@@ -41,8 +63,8 @@ describe("host session editor receipt publication fence", () => {
     const acceptedListener = vi.fn();
     const failedListener = vi.fn();
 
-    await wrapHostSessionEditorActionsForUndo(accepted, acceptedListener).saveSession("session-1", {} as never);
-    await wrapHostSessionEditorActionsForUndo(failed, failedListener).saveSession("session-1", {} as never);
+    await wrapHostSessionEditorActionsForUndo(accepted, acceptedListener, acceptedExecutor).saveSession("session-1", {} as never);
+    await wrapHostSessionEditorActionsForUndo(failed, failedListener, acceptedExecutor).saveSession("session-1", {} as never);
 
     expect(acceptedListener).toHaveBeenCalledOnce();
     expect(failedListener).not.toHaveBeenCalled();
