@@ -12,6 +12,8 @@ Reviewer round 3 base: `8fc1417657187d74b684bc1ef885b51e082e6860`
 
 Reviewer round 4 base: `ae70c6007bea630d6120c0ec109cb24ba8ccbef6`
 
+Reviewer round 5 base: `4ea6c198f4a18c8555b415481eeb35c390d8cc88`
+
 Branch: `codex/admin-operations-product-redesign`
 
 ## Outcome
@@ -95,6 +97,12 @@ Ruling: path 단위 modify entry가 read와 write export를 함께 가진 다섯
 Ruling: mounted module의 실제 top-level execution statement도 write-consumer graph의 시작점이다 — alias import 뒤 `void terminate()`처럼 declaration 밖에서 실행되는 write는 unclassified path와 missing-owner pair를 모두 발생시킨다 — function/variable declaration은 기존 local-symbol chain으로 계속 다루므로, declaration-only helper에 synthetic consumer를 추가하지 않는다.
 
 Ruling: synthetic module-execution symbol은 실제 top-level execution statement가 있는 source에만 추가한다 — 이 범위는 declaration helper를 독립 owner로 오인하지 않고, production audit의 consumer walk를 불필요하게 확장하지 않으면서 module-evaluation write를 fail-closed로 만든다.
+
+## Reviewer round 5 remediation
+
+Ruling: mounted consumer와 declared owner의 graph 시작점은 실제 module-evaluation symbol 또는 locally exported boundary symbol이어야 한다 — non-exported function/const declaration은 helper traversal node로만 남고, exported component·handler·local export와 module-level invocation에서 도달할 때만 write consumer가 된다 — 모든 local declaration을 시작점으로 삼으면 실제로 호출되지 않는 read-route helper가 `unclassifiedPaths`와 missing-owner pair를 거짓으로 만들고, exported boundary를 빼면 실제 route/action callback chain이 숨는다.
+
+Ruling: executable root set은 기존 direct/aliased/namespace import, aliased re-export, star barrel, dynamic import, cycle, type-only exclusion graph edge를 대체하지 않는다 — 그 edge들은 exported/module root에서 helper, callback, and re-export chain을 따라가는 데 그대로 사용한다 — root 범위만 declaration-only source까지 넓히면 이전 closeout의 unnecessary graph expansion과 같은 audit cost가 다시 생긴다.
 
 ## Regenerated mutation producer and import-reachability inventory
 
@@ -251,6 +259,9 @@ Ruling: `tests/unit/host-invitations.test.tsx` and `tests/unit/host-members.test
 - Closeout RED: a mounted route with `import { logout as terminate }` followed by top-level `void terminate()` produced both audit arrays empty despite the registered legitimate owner. The exact 27-test inventory file failed only on that required assertion before the graph change.
 - Closeout GREEN: top-level execution is now a synthetic consumer only for source files that contain a real top-level execution statement. The 27-test inventory file and 40-test boundary/inventory partition pass; the current production audit remains all-empty and the exact 95-entry classification count is unchanged.
 - The first closeout full-suite run had one inventory test timeout after a synthetic symbol was added to every source path; no behavioral assertion failed. Restricting the symbol to actual top-level execution sources removed that unnecessary graph expansion, and the next complete frontend run passed 440/440·3978/3978.
+- Reviewer round 5 RED: the focused inventory file exited 1 with 30 passing tests and exactly two expected failures. A mounted read route that imported `logout as terminate` but kept the call inside either an uncalled `function dormant()` or an uncalled `const dormant = () => ...` incorrectly produced both `features/auth/api/auth-api.ts->features/example/route/read-route.tsx` and an unclassified read route.
+- Reviewer round 5 GREEN: the graph now roots owner/consumer walks at actual module execution and locally exported boundaries, while all local declarations remain reachable helper nodes. The 33-test inventory file passes with an all-empty production audit; the regressions prove dormant function and const helpers stay clean, while an exported component, exported const handler, JSX callback helper, and direct top-level alias invocation still fail closed.
+- Reviewer round 5 fresh scope evidence: the inventory/boundary gate passed 2/2 files and 46/46 tests; the literal Task 2.4 focused partition passed 54/54 files and 581/581 tests; the isolated prior `host-session-editor-authority-navigation` race suite passed 1/1 file and 3/3 tests; the complete frontend suite passed 440/440 files and 3984/3984 tests. Lint had 0 errors with two existing Fast Refresh warnings, and the production build transformed 791 modules with only the existing chunk-size warning.
 
 ## Exact round 2 commands
 
@@ -367,6 +378,14 @@ npx --yes corepack@0.35.0 pnpm --dir front exec playwright test \
 
 | Command | Exit | Result |
 |---|---:|---|
+| Round 5 dormant helper RED | 1 | 30 passed and 2 expected failures: dormant function and const alias helpers each created a false unclassified read-route and missing-owner pair |
+| Round 5 focused inventory GREEN | 0 | 1 file, 33 tests passed; production audit arrays empty; dormant helpers clean; exported component/handler/JSX and direct top-level chains fail closed |
+| Round 5 boundary/inventory gate | 0 | 2 files, 46 tests passed |
+| Round 5 exact Task 2.4 focused command | 0 | 54 files, 581 tests passed |
+| Round 5 isolated authority-navigation race | 0 | 1 file, 3 tests passed |
+| Round 5 `npx --yes corepack@0.35.0 pnpm --dir front test` | 0 | 440 files, 3984 tests passed |
+| Round 5 `npx --yes corepack@0.35.0 pnpm --dir front lint` | 0 | 0 errors; 2 existing Fast Refresh warnings |
+| Round 5 `npx --yes corepack@0.35.0 pnpm --dir front build` | 0 | 791 modules; existing chunk-size warning only |
 | Closeout top-level alias execution RED | 1 | 26 passed and 1 expected failure: a mounted top-level alias invocation was absent from both consumer audit arrays |
 | Closeout inventory file GREEN | 0 | 1 file, 27 tests passed; top-level alias invocation fails closed and the production audit remains empty |
 | Closeout boundary/inventory gate | 0 | 2 files, 40 tests passed |
@@ -444,7 +463,7 @@ The exact focused and factory commands are the literal file lists in `task-2-4-b
 - Authenticated and guest-continuation logout both register before transport. Cache clear and the combined auth/navigation publication recheck the accepted generation; pending/unknown disables re-entry and unmount/authority loss publishes zero.
 - Accepted handles are retained only while explicit publication stages remain. Completion releases the retained handle, while owner unmount increments the local publication generation so delayed cache/receipt/UI stages reject without leaking a capsule.
 - Repository-wide write detection is symbol-level (`path#export`) and follows transitive production imports from `src/main.tsx`; a new write export in an already classified file, nested runtime chain, or mounted out-of-domain import fails the inventory automatically.
-- Direct, aliased, namespace, aliased re-export, and resolvable star-barrel edges retain their symbol identity. Owner completeness starts from mounted register and absent-inventory execution boundaries for each exact classified write symbol, excludes type-only edges, terminates on cycles, and reports each absent `path->consumer` pair; dynamic route imports participate in mounted reachability.
+- Direct, aliased, namespace, aliased re-export, and resolvable star-barrel edges retain their symbol identity. Owner completeness starts from actual module-execution or locally exported mounted boundaries for each exact classified write symbol; non-exported declarations are traversed only from those roots. The walk excludes type-only edges, terminates on cycles, reports each absent `path->consumer` pair, and includes dynamic route imports in mounted reachability.
 - `wrapHostSessionEditorActionsForUndo` has no unfenced default: both session-editor and meeting-workspace routes must supply the receipt executor. The actual session-editor route proof delays `Response.clone().json()` through authority loss/unmount and observes one command plus zero receipt, undo, refetch, copy, record callback, and navigation publication.
 - Admin other-account logout begins its own L1 owner before transport, disables duplicate submission, and fences navigation/error copy; an unmounted late response publishes neither.
 - Profile obsolete results stay typed as obsolete through the real dialog, which remains open and emits no success state. Workspace response parsing remains observation-only; undo/refetch/record callbacks occur only inside receipt-fenced executors.
@@ -460,5 +479,6 @@ The exact focused and factory commands are the literal file lists in `task-2-4-b
 - Live provider/CDN purge, deployment, production data, and billable side effects were intentionally not measured.
 - The closeout correction did not rerun Playwright, server integration, or the public-release candidate because it changes only the frontend source-only inventory graph and its fixtures. The full frontend suite, lint, build, diff check, and changed-diff public-safety scan were rerun freshly.
 - Round 4 did not rerun Playwright or server integration because only the frontend inventory audit, its source-only fixtures, and this report changed; no route runtime, BFF, server contract, or server fixture changed. The exact frontend partition, full frontend suite, lint, build, and public-release safety checks were run freshly.
+- Round 5 did not rerun Playwright, server integration, or a public-release candidate because only the source-only frontend inventory graph, its unit fixtures, and this historical Task 2.4 report changed. Fresh round-5 evidence covers the focused inventory/boundary and Task 2.4 partitions, the documented race suite, full frontend test, lint, build, diff check, changed-diff public-safety scan, and preflight; no live, provider, deploy, or production action was invoked.
 - Round 3 did not rerun Playwright or server integration because no takedown, BFF, server contract, or server fixture changed relative to its clean base. The round-2 5/5 browser and focused server BUILD SUCCESSFUL evidence remains historical, not fresh round-3 evidence.
 - Repository-wide TypeScript build is not a configured completion gate and remains red on the pre-existing baseline. Round-2-owned diagnostics found by a changed-path filter were removed; the required lint, production build, focused tests, and full runtime suite are green.

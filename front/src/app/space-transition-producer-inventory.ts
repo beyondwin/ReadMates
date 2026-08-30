@@ -221,6 +221,7 @@ type ProductionSymbolGraph = {
   writeEdges: Map<string, Set<string>>;
   exportsByPath: Map<string, Set<string>>;
   localsByPath: Map<string, Set<string>>;
+  executableRootsByPath: Map<string, Set<string>>;
   baseWrites: Set<string>;
 };
 
@@ -257,6 +258,7 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
   const writeEdges = new Map<string, Set<string>>();
   const exportsByPath = new Map<string, Set<string>>();
   const localsByPath = new Map<string, Set<string>>();
+  const executableRootsByPath = new Map<string, Set<string>>();
   const baseWrites = new Set<string>();
   const starExports: Array<{ path: string; providerPath: string }> = [];
 
@@ -316,6 +318,8 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
     localsByPath.set(path, localNames);
     const pathExports = exportsByPath.get(path) ?? new Set<string>();
     exportsByPath.set(path, pathExports);
+    const executableRoots = executableRootsByPath.get(path) ?? new Set<string>();
+    executableRootsByPath.set(path, executableRoots);
 
     const addRuntimeReferences = (from: string, root: ts.Node, ownName?: string) => {
       const visit = (candidate: ts.Node) => {
@@ -350,6 +354,7 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
 
     if (moduleExecutionStatements.length > 0) {
       const moduleExecution = localSymbol(path, MODULE_EXECUTION_SYMBOL);
+      executableRoots.add(moduleExecution);
       for (const statement of moduleExecutionStatements) {
         addRuntimeReferences(moduleExecution, statement);
       }
@@ -359,14 +364,18 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
       if ((ts.isFunctionDeclaration(statement) || ts.isVariableStatement(statement)) && exportedModifier(statement)) {
         if (ts.isFunctionDeclaration(statement) && statement.name) {
           pathExports.add(statement.name.text);
-          addSymbolEdge(edges, exportedSymbol(path, statement.name.text), localSymbol(path, statement.name.text));
-          addSymbolEdge(writeEdges, exportedSymbol(path, statement.name.text), localSymbol(path, statement.name.text));
+          const exported = exportedSymbol(path, statement.name.text);
+          executableRoots.add(exported);
+          addSymbolEdge(edges, exported, localSymbol(path, statement.name.text));
+          addSymbolEdge(writeEdges, exported, localSymbol(path, statement.name.text));
         } else if (ts.isVariableStatement(statement)) {
           for (const declaration of statement.declarationList.declarations) {
             if (!ts.isIdentifier(declaration.name)) continue;
             pathExports.add(declaration.name.text);
-            addSymbolEdge(edges, exportedSymbol(path, declaration.name.text), localSymbol(path, declaration.name.text));
-            addSymbolEdge(writeEdges, exportedSymbol(path, declaration.name.text), localSymbol(path, declaration.name.text));
+            const exported = exportedSymbol(path, declaration.name.text);
+            executableRoots.add(exported);
+            addSymbolEdge(edges, exported, localSymbol(path, declaration.name.text));
+            addSymbolEdge(writeEdges, exported, localSymbol(path, declaration.name.text));
           }
         }
       }
@@ -386,8 +395,10 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
         const sourceName = element.propertyName?.text ?? exportedName;
         pathExports.add(exportedName);
         const target = providerPath ? exportedSymbol(providerPath, sourceName) : localSymbol(path, sourceName);
-        addSymbolEdge(edges, exportedSymbol(path, exportedName), target);
-        addSymbolEdge(writeEdges, exportedSymbol(path, exportedName), target);
+        const exported = exportedSymbol(path, exportedName);
+        if (!providerPath) executableRoots.add(exported);
+        addSymbolEdge(edges, exported, target);
+        addSymbolEdge(writeEdges, exported, target);
       }
     }
   }
@@ -409,7 +420,7 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
     }
   }
 
-  return { edges, writeEdges, exportsByPath, localsByPath, baseWrites };
+  return { edges, writeEdges, exportsByPath, localsByPath, executableRootsByPath, baseWrites };
 }
 
 function symbolReaches(
@@ -604,8 +615,7 @@ function detectMountedConsumerViolations(
       // boundary reaching the same write symbol is an independent consumer.
       for (const ownerPath of candidate.ownerPaths) {
         if (!mountedPaths.has(ownerPath) || !registeringPaths.has(ownerPath)) continue;
-        const ownerStarts = [...symbolGraph.localsByPath.get(ownerPath) ?? []]
-          .map((name) => localSymbol(ownerPath, name));
+        const ownerStarts = symbolGraph.executableRootsByPath.get(ownerPath) ?? [];
         if (!symbolReaches(
           symbolGraph,
           ownerStarts,
@@ -624,13 +634,12 @@ function detectMountedConsumerViolations(
         }
       }
 
-      for (const [consumerPath, localNames] of symbolGraph.localsByPath) {
+      for (const [consumerPath, consumerStarts] of symbolGraph.executableRootsByPath) {
         if (!mountedPaths.has(consumerPath) || consumerPath === candidate.path) continue;
         const isRegisteringBoundary = registeringPaths.has(consumerPath);
         const isUnclassifiedBoundary = !inventoryPaths.has(consumerPath);
         if (!isRegisteringBoundary && !isUnclassifiedBoundary) continue;
-        const hasUncoveredConsumer = [...localNames]
-          .map((name) => localSymbol(consumerPath, name))
+        const hasUncoveredConsumer = [...consumerStarts]
           .some((symbol) => !ownerCoveredSymbols.has(symbol) && symbolReaches(
             symbolGraph,
             [symbol],
