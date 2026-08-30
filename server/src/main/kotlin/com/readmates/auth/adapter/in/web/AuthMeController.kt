@@ -5,6 +5,7 @@ import com.readmates.auth.adapter.`in`.security.resolveAuthClubContext
 import com.readmates.auth.application.AuthApplicationError
 import com.readmates.auth.application.AuthApplicationException
 import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
+import com.readmates.auth.application.port.`in`.ResolveAuthAccessProjectionUseCase
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentUser
@@ -20,6 +21,7 @@ import java.util.UUID
 @RequestMapping("/api/auth/me")
 class AuthMeController(
     private val resolveCurrentMemberUseCase: ResolveCurrentMemberUseCase,
+    private val resolveAuthAccessProjectionUseCase: ResolveAuthAccessProjectionUseCase,
     private val resolveClubContextUseCase: ResolveClubContextUseCase,
 ) {
     @GetMapping
@@ -31,8 +33,7 @@ class AuthMeController(
         val sessionUser = authentication?.principal as? CurrentUser
         val requestedClubContext = request.resolveAuthClubContext(resolveClubContextUseCase)
         if (sessionProfileMember != null) {
-            val joinedClubs = resolveCurrentMemberUseCase.listJoinedClubs(sessionProfileMember.userId)
-            val platformAdmin = resolveCurrentMemberUseCase.findPlatformAdmin(sessionProfileMember.userId)
+            val accessProjection = resolveAuthAccessProjectionUseCase.resolve(sessionProfileMember.userId)
 
             // Explicit slug supplied but the club is not registered → 404.
             if (
@@ -55,8 +56,7 @@ class AuthMeController(
             ) {
                 return AuthMemberResponse.from(
                     sessionProfileMember,
-                    joinedClubs = joinedClubs,
-                    platformAdmin = platformAdmin,
+                    accessProjection = accessProjection,
                 )
             }
 
@@ -67,22 +67,19 @@ class AuthMeController(
                 return AuthMemberResponse.authenticatedUser(
                     userId = sessionProfileMember.userId,
                     email = sessionProfileMember.email,
-                    joinedClubs = joinedClubs,
-                    platformAdmin = platformAdmin,
+                    accessProjection = accessProjection,
                 )
             }
             return AuthMemberResponse.from(
                 requestedMember ?: sessionProfileMember,
-                joinedClubs = joinedClubs,
-                platformAdmin = platformAdmin,
+                accessProjection = accessProjection,
             )
         }
         if (sessionUser != null) {
             return AuthMemberResponse.authenticatedUser(
                 userId = sessionUser.userId,
                 email = sessionUser.email,
-                joinedClubs = resolveCurrentMemberUseCase.listJoinedClubs(sessionUser.userId),
-                platformAdmin = resolveCurrentMemberUseCase.findPlatformAdmin(sessionUser.userId),
+                accessProjection = resolveAuthAccessProjectionUseCase.resolve(sessionUser.userId),
             )
         }
 
@@ -99,8 +96,7 @@ class AuthMeController(
             }
             return AuthMemberResponse.from(
                 requestedMember,
-                joinedClubs = resolveCurrentMemberUseCase.listJoinedClubs(userId),
-                platformAdmin = resolveCurrentMemberUseCase.findPlatformAdmin(userId),
+                accessProjection = resolveAuthAccessProjectionUseCase.resolve(userId),
             )
         }
 
@@ -109,8 +105,7 @@ class AuthMeController(
                 ?: return authenticatedWithoutMembership(email)
         return AuthMemberResponse.from(
             member,
-            joinedClubs = resolveCurrentMemberUseCase.listJoinedClubs(member.userId),
-            platformAdmin = resolveCurrentMemberUseCase.findPlatformAdmin(member.userId),
+            accessProjection = resolveAuthAccessProjectionUseCase.resolve(member.userId),
         )
     }
 
@@ -125,8 +120,7 @@ class AuthMeController(
         return AuthMemberResponse.authenticatedUser(
             userId = userId,
             email = resolvedEmail,
-            joinedClubs = resolveCurrentMemberUseCase.listJoinedClubs(userId),
-            platformAdmin = resolveCurrentMemberUseCase.findPlatformAdmin(userId),
+            accessProjection = resolveAuthAccessProjectionUseCase.resolve(userId),
         )
     }
 }

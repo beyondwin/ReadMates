@@ -83,6 +83,12 @@ class AuthMeControllerTest(
                 jsonPath("$.role") { value(null) }
                 jsonPath("$.membershipStatus") { value(null) }
                 jsonPath("$.approvalState") { value("ANONYMOUS") }
+                jsonPath("$.joinedClubs.length()") { value(0) }
+                jsonPath("$.platformAdmin") { value(null) }
+                jsonPath("$.recommendedAppEntryUrl") { value("/login") }
+                jsonPath("$.availableSpaces.version") { value(1) }
+                jsonPath("$.availableSpaces.kinds.length()") { value(0) }
+                jsonPath("$.availableSpaces.clubs.length()") { value(0) }
             }
     }
 
@@ -106,6 +112,12 @@ class AuthMeControllerTest(
                 jsonPath("$.shortName") { doesNotExist() }
                 jsonPath("$.membershipStatus") { value("ACTIVE") }
                 jsonPath("$.approvalState") { value("ACTIVE") }
+                jsonPath("$.availableSpaces.version") { value(1) }
+                jsonPath("$.availableSpaces.kinds[0]") { value("CLUBS") }
+                jsonPath("$.availableSpaces.clubs[0].clubId") { value("00000000-0000-0000-0000-000000000001") }
+                jsonPath("$.availableSpaces.clubs[0].clubSlug") { value("reading-sai") }
+                jsonPath("$.availableSpaces.clubs[0].perspectives[0]") { value("MEMBER") }
+                jsonPath("$.recommendedAppEntryUrl") { value("/clubs/reading-sai/app") }
             }
     }
 
@@ -132,6 +144,10 @@ class AuthMeControllerTest(
                 jsonPath("$.approvalState") { value("ACTIVE") }
                 jsonPath("$.currentMembership.avatarKey") { value("mushroom-green-book") }
                 jsonPath("$.avatarKey") { value("mushroom-green-book") }
+                jsonPath("$.availableSpaces.version") { value(1) }
+                jsonPath("$.availableSpaces.kinds[0]") { value("CLUBS") }
+                jsonPath("$.availableSpaces.clubs.length()") { value(2) }
+                jsonPath("$.recommendedAppEntryUrl") { value(null) }
             }
     }
 
@@ -171,6 +187,10 @@ class AuthMeControllerTest(
                 jsonPath("$.platformAdmin.role") { value("OWNER") }
                 jsonPath("$.platformAdmin.email") { value(email) }
                 jsonPath("$.role") { value(null) }
+                jsonPath("$.availableSpaces.version") { value(1) }
+                jsonPath("$.availableSpaces.kinds[0]") { value("PLATFORM") }
+                jsonPath("$.availableSpaces.clubs.length()") { value(0) }
+                jsonPath("$.recommendedAppEntryUrl") { value("/admin") }
             }
     }
 
@@ -205,6 +225,10 @@ class AuthMeControllerTest(
                 jsonPath("$.joinedClubs[0].clubSlug") { value("reading-sai") }
                 jsonPath("$.clubId") { value(null) }
                 jsonPath("$.role") { value(null) }
+                jsonPath("$.availableSpaces.version") { value(1) }
+                jsonPath("$.availableSpaces.kinds[0]") { value("CLUBS") }
+                jsonPath("$.availableSpaces.clubs[0].clubSlug") { value("reading-sai") }
+                jsonPath("$.recommendedAppEntryUrl") { value("/clubs/reading-sai/app") }
             }
     }
 
@@ -244,6 +268,10 @@ class AuthMeControllerTest(
                 jsonPath("$.currentMembership.membershipStatus") { value("ACTIVE") }
                 jsonPath("$.membershipStatus") { value("ACTIVE") }
                 jsonPath("$.role") { value("MEMBER") }
+                jsonPath("$.availableSpaces.version") { value(1) }
+                jsonPath("$.availableSpaces.kinds[0]") { value("CLUBS") }
+                jsonPath("$.availableSpaces.clubs[0].clubSlug") { value("reading-sai") }
+                jsonPath("$.recommendedAppEntryUrl") { value("/clubs/reading-sai/app") }
             }
     }
 

@@ -1,6 +1,7 @@
 package com.readmates.auth.adapter.`in`.web
 
 import com.readmates.auth.application.port.`in`.DevLoginMemberUseCase
+import com.readmates.auth.application.port.`in`.ResolveAuthAccessProjectionUseCase
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentUser
@@ -26,6 +27,7 @@ import org.springframework.web.server.ResponseStatusException
 @ConditionalOnProperty(prefix = "readmates.dev", name = ["login-enabled"], havingValue = "true")
 class DevLoginController(
     private val devLoginMember: DevLoginMemberUseCase,
+    private val resolveAuthAccessProjectionUseCase: ResolveAuthAccessProjectionUseCase,
 ) {
     @PostMapping("/login")
     fun login(
@@ -59,12 +61,12 @@ class DevLoginController(
         )
 
         return if (member != null) {
-            AuthMemberResponse.from(member, platformAdmin = identity.platformAdmin)
+            AuthMemberResponse.from(member, resolveAuthAccessProjectionUseCase.resolve(identity.userId))
         } else {
             AuthMemberResponse.authenticatedUser(
                 userId = identity.userId,
                 email = identity.email,
-                platformAdmin = identity.platformAdmin,
+                accessProjection = resolveAuthAccessProjectionUseCase.resolve(identity.userId),
             )
         }
     }

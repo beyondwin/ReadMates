@@ -1,6 +1,11 @@
 package com.readmates.auth.adapter.`in`.web
 
+import com.readmates.auth.application.model.AuthAccessProjection
+import com.readmates.auth.application.model.AvailableClubSpace
+import com.readmates.auth.application.model.AvailableSpacesV1
+import com.readmates.auth.application.model.ClubPerspective
 import com.readmates.auth.application.model.JoinedClubSummary
+import com.readmates.auth.application.model.ProductSpaceKind
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.club.domain.PlatformAdminRole
@@ -28,6 +33,7 @@ data class AuthMemberResponse(
     val joinedClubs: List<AuthJoinedClub>,
     val platformAdmin: AuthPlatformAdmin?,
     val recommendedAppEntryUrl: String?,
+    val availableSpaces: AuthAvailableSpacesResponse,
     val membershipId: UUID? = currentMembership?.membershipId,
     val clubId: UUID? = currentMembership?.clubId,
     val displayName: String? = currentMembership?.displayName,
@@ -39,11 +45,10 @@ data class AuthMemberResponse(
     companion object {
         fun from(
             member: CurrentMember,
-            joinedClubs: List<JoinedClubSummary> = emptyList(),
-            platformAdmin: CurrentPlatformAdmin? = null,
+            accessProjection: AuthAccessProjection,
         ): AuthMemberResponse {
             val currentMembership = AuthCurrentMembership.from(member)
-            val joined = joinedClubs.map(AuthJoinedClub::from)
+            val joined = accessProjection.joinedClubs.map(AuthJoinedClub::from)
             return AuthMemberResponse(
                 authenticated = true,
                 userId = member.userId,
@@ -51,8 +56,9 @@ data class AuthMemberResponse(
                 accountName = member.accountName,
                 currentMembership = currentMembership,
                 joinedClubs = joined,
-                platformAdmin = platformAdmin?.let(AuthPlatformAdmin::from),
-                recommendedAppEntryUrl = recommendedAppEntryUrl(joined, platformAdmin),
+                platformAdmin = accessProjection.platformAdmin?.let(AuthPlatformAdmin::from),
+                recommendedAppEntryUrl = recommendedAppEntryUrl(accessProjection),
+                availableSpaces = AuthAvailableSpacesResponse.from(accessProjection.availableSpaces),
                 approvalState = currentMembership.approvalState,
             )
         }
@@ -67,16 +73,16 @@ data class AuthMemberResponse(
                 joinedClubs = emptyList(),
                 platformAdmin = null,
                 recommendedAppEntryUrl = "/login",
+                availableSpaces = AuthAvailableSpacesResponse.empty(),
                 approvalState = ApprovalState.ANONYMOUS,
             )
 
         fun authenticatedUser(
             userId: UUID,
             email: String,
-            joinedClubs: List<JoinedClubSummary> = emptyList(),
-            platformAdmin: CurrentPlatformAdmin?,
+            accessProjection: AuthAccessProjection,
         ): AuthMemberResponse {
-            val joined = joinedClubs.map(AuthJoinedClub::from)
+            val joined = accessProjection.joinedClubs.map(AuthJoinedClub::from)
             return AuthMemberResponse(
                 authenticated = true,
                 userId = userId,
@@ -84,25 +90,69 @@ data class AuthMemberResponse(
                 accountName = null,
                 currentMembership = null,
                 joinedClubs = joined,
-                platformAdmin = platformAdmin?.let(AuthPlatformAdmin::from),
-                recommendedAppEntryUrl = recommendedAppEntryUrl(joined, platformAdmin),
+                platformAdmin = accessProjection.platformAdmin?.let(AuthPlatformAdmin::from),
+                recommendedAppEntryUrl = recommendedAppEntryUrl(accessProjection),
+                availableSpaces = AuthAvailableSpacesResponse.from(accessProjection.availableSpaces),
                 approvalState = ApprovalState.INACTIVE,
             )
         }
 
-        private fun recommendedAppEntryUrl(
-            joinedClubs: List<AuthJoinedClub>,
-            platformAdmin: CurrentPlatformAdmin?,
-        ): String? {
-            if (platformAdmin != null) {
-                return "/admin"
-            }
-            val usable =
-                joinedClubs.filter {
-                    it.status in setOf(MembershipStatus.VIEWER, MembershipStatus.ACTIVE, MembershipStatus.SUSPENDED)
+        private fun recommendedAppEntryUrl(accessProjection: AuthAccessProjection): String? =
+            accessProjection.recommendedSpace?.let { recommended ->
+                when (recommended.kind) {
+                ProductSpaceKind.PLATFORM -> "/admin"
+                ProductSpaceKind.CLUBS -> {
+                    recommended
+                        .takeIf { it.perspective == ClubPerspective.MEMBER }
+                        ?.clubId
+                        ?.let { clubId ->
+                            accessProjection.availableSpaces.clubs
+                                .singleOrNull { it.clubId == clubId }
+                                ?.takeIf { ClubPerspective.MEMBER in it.perspectives }
+                                ?.let { "/clubs/${it.clubSlug}/app" }
+                        }
+                    }
                 }
-            return usable.singleOrNull()?.let { "/clubs/${it.clubSlug}/app" }
-        }
+            }
+    }
+}
+
+data class AuthAvailableSpacesResponse(
+    val version: Int,
+    val kinds: List<ProductSpaceKind>,
+    val clubs: List<AuthAvailableClubSpace>,
+) {
+    companion object {
+        fun from(availableSpaces: AvailableSpacesV1): AuthAvailableSpacesResponse =
+            AuthAvailableSpacesResponse(
+                version = availableSpaces.version,
+                kinds = availableSpaces.kinds,
+                clubs = availableSpaces.clubs.map(AuthAvailableClubSpace::from),
+            )
+
+        fun empty(): AuthAvailableSpacesResponse =
+            AuthAvailableSpacesResponse(
+                version = 1,
+                kinds = emptyList(),
+                clubs = emptyList(),
+            )
+    }
+}
+
+data class AuthAvailableClubSpace(
+    val clubId: UUID,
+    val clubSlug: String,
+    val clubName: String,
+    val perspectives: List<ClubPerspective>,
+) {
+    companion object {
+        fun from(club: AvailableClubSpace): AuthAvailableClubSpace =
+            AuthAvailableClubSpace(
+                clubId = club.clubId,
+                clubSlug = club.clubSlug,
+                clubName = club.clubName,
+                perspectives = club.perspectives,
+            )
     }
 }
 

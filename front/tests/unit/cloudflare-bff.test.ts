@@ -43,6 +43,48 @@ afterEach(() => {
 });
 
 describe("Cloudflare BFF function", () => {
+  it("forwards additive auth-me JSON unchanged while stripping existing internal response headers", async () => {
+    const upstreamBody = JSON.stringify({
+      authenticated: true,
+      availableSpaces: {
+        version: 1,
+        kinds: ["PLATFORM", "CLUBS"],
+        clubs: [
+          {
+            clubId: "00000000-0000-0000-0000-000000000001",
+            clubSlug: "sample-club",
+            clubName: "샘플 클럽",
+            perspectives: ["MEMBER", "HOST"],
+          },
+        ],
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(upstreamBody, {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "X-Readmates-Bff-Secret": "upstream-only",
+            "X-Readmates-Client-IP": "203.0.113.10",
+          },
+        }),
+      ),
+    );
+
+    const response = await onRequest(
+      context(new Request("https://readmates.pages.dev/api/bff/api/auth/me"), {
+        path: ["api", "auth", "me"],
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(JSON.parse(upstreamBody));
+    expect(response.headers.get("X-Readmates-Bff-Secret")).toBeNull();
+    expect(response.headers.get("X-Readmates-Client-IP")).toBeNull();
+  });
+
   it("forwards the host operating-room current GET generically", async () => {
     const upstreamBody = JSON.stringify({
       currentMeeting: {
