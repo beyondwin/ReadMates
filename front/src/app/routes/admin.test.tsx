@@ -148,6 +148,7 @@ describe("AdminTransitionBoundary", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "공간 전환, 현재 플랫폼 운영" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "내 클럽" }));
     expect(screen.getByRole("menuitemradio", { name: "다른 모임 멤버로 보기" })).toBeInTheDocument();
     expect(screen.getByRole("menuitemradio", { name: "다른 모임 호스트로 운영" })).toBeInTheDocument();
     expect(screen.queryByText(/HOST|MEMBER|ACTIVE/)).not.toBeInTheDocument();
@@ -184,7 +185,7 @@ describe("AdminTransitionBoundary", () => {
     );
 
     expect(screen.queryByRole("button", { name: /^공간 전환/ })).not.toBeInTheDocument();
-    expect(screen.getByText("현재 공간 플랫폼 운영")).toHaveClass("sr-only");
+    expect(screen.getByText("현재 공간 플랫폼 운영")).toHaveClass("rm-sr-only");
     expect(screen.queryByText("레거시 모임")).not.toBeInTheDocument();
   });
 

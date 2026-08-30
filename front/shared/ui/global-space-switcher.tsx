@@ -31,6 +31,8 @@ type ClubOptionGroup = {
   options: GlobalSpaceSwitcherOption[];
 };
 
+type MenuLevel = "root" | "clubs";
+
 const TARGET_STYLE = { minHeight: "44px" } as const;
 
 function currentSpaceLabel(
@@ -105,6 +107,7 @@ export function GlobalSpaceSwitcher({
   const productKinds = new Set(normalizedOptions.map((option) => option.identity.productSpace));
   const currentLabel = currentSpaceLabel(currentIdentity, normalizedOptions);
   const [open, setOpen] = useState(false);
+  const [level, setLevel] = useState<MenuLevel>("root");
   const [activeIndex, setActiveIndex] = useState(0);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -114,6 +117,9 @@ export function GlobalSpaceSwitcher({
   const focusReturnTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const menuId = useId();
   const groups = clubGroups(normalizedOptions);
+  const clubOptions = groups.flatMap((group) => group.options);
+  const platformOption = normalizedOptions.find((option) => option.identity.productSpace === "platform");
+  const rootItemCount = (platformOption ? 1 : 0) + (groups.length > 0 ? 1 : 0);
 
   useEffect(() => () => {
     if (focusReturnTimerRef.current !== null) {
@@ -123,7 +129,7 @@ export function GlobalSpaceSwitcher({
 
   useEffect(() => {
     if (open) itemRefs.current[activeIndex]?.focus();
-  }, [activeIndex, open]);
+  }, [activeIndex, level, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -146,34 +152,42 @@ export function GlobalSpaceSwitcher({
     const onPointerDown = (event: PointerEvent) => {
       if (event.target instanceof Node && !rootRef.current?.contains(event.target)) dismiss(true);
     };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      dismiss();
-    };
     document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
 
   if (productKinds.size <= 1) {
-    return <span className="sr-only">{currentLabel}</span>;
+    return <span className="rm-sr-only">{currentLabel}</span>;
   }
 
   const openMenu = () => {
-    const currentIndex = normalizedOptions.findIndex((option) => (
-      currentIdentity !== null && sameSpaceIdentity(option.identity, currentIdentity)
-    ));
-    setActiveIndex(currentIndex >= 0 ? currentIndex : 0);
+    setLevel("root");
+    setActiveIndex(currentIdentity?.productSpace === "clubs" && platformOption ? 1 : 0);
     setError(null);
     setOpen(true);
   };
 
-  const closeMenu = () => {
+  const closeMenu = (returnFocus = false) => {
     setOpen(false);
+    setLevel("root");
+    if (returnFocus) triggerRef.current?.focus();
+  };
+
+  const openClubLevel = () => {
+    const currentIndex = clubOptions.findIndex((option) => (
+      currentIdentity !== null && sameSpaceIdentity(option.identity, currentIdentity)
+    ));
+    setActiveIndex(currentIndex >= 0 ? currentIndex : 0);
+    setError(null);
+    setLevel("clubs");
+  };
+
+  const returnToRoot = () => {
+    setActiveIndex(platformOption ? 1 : 0);
+    setError(null);
+    setLevel("root");
   };
 
   const onTriggerKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
@@ -183,17 +197,30 @@ export function GlobalSpaceSwitcher({
   };
 
   const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      if (level === "clubs") returnToRoot();
+      else closeMenu(true);
+      return;
+    }
+    if (event.key === "ArrowLeft" && level === "clubs") {
+      event.preventDefault();
+      returnToRoot();
+      return;
+    }
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "Home" && event.key !== "End") {
       return;
     }
     event.preventDefault();
-    setActiveIndex((current) => nextMenuIndex(current, normalizedOptions.length, event.key));
+    const itemCount = level === "root" ? rootItemCount : clubOptions.length;
+    setActiveIndex((current) => nextMenuIndex(current, itemCount, event.key));
   };
 
   const select = async (option: GlobalSpaceSwitcherOption) => {
     if (busyKey !== null) return;
     if (currentIdentity && sameSpaceIdentity(option.identity, currentIdentity)) {
-      closeMenu();
+      closeMenu(true);
       return;
     }
     const key = spaceIdentityKey(option.identity);
@@ -241,7 +268,7 @@ export function GlobalSpaceSwitcher({
   };
 
   let optionIndex = 0;
-  const platformOption = normalizedOptions.find((option) => option.identity.productSpace === "platform");
+  const currentKind = currentIdentity?.productSpace;
 
   return (
     <div ref={rootRef} className="rm-global-space-switcher">
@@ -262,28 +289,93 @@ export function GlobalSpaceSwitcher({
       </button>
       {open ? (
         <div
-          id={menuId}
           className="rm-global-space-switcher__menu"
-          role="menu"
-          aria-label="ReadMates 공간 전환"
           onKeyDown={onMenuKeyDown}
         >
-          <p className="rm-global-space-switcher__section-label">현재 범위</p>
-          {platformOption ? renderOption(platformOption, optionIndex++, "플랫폼 운영") : null}
-          <div className="rm-global-space-switcher__club-section" role="group" aria-label="내 클럽">
-            <p className="rm-global-space-switcher__section-label">내 클럽</p>
-            {groups.map((group) => (
-              <div key={group.id} className="rm-global-space-switcher__club" role="group" aria-label={group.name}>
-                <p className="rm-global-space-switcher__club-name">{group.name}</p>
-                <div className="rm-global-space-switcher__perspectives">
-                  {group.options.map((option) => renderOption(
-                    option,
-                    optionIndex++,
-                    `${group.name} ${perspectiveLabel(option.identity)}`,
-                  ))}
+          {level === "clubs" ? (
+            <div className="rm-global-space-switcher__level-head">
+              <button
+                type="button"
+                className="rm-global-space-switcher__back"
+                style={TARGET_STYLE}
+                aria-label="범위 선택으로 돌아가기"
+                onClick={returnToRoot}
+              >
+                <SelectorChevron />
+                <span>범위 선택</span>
+              </button>
+              <h2>내 클럽</h2>
+            </div>
+          ) : null}
+          {level === "clubs" ? (
+            <p className="rm-global-space-switcher__level-copy">클럽과 이용 방식을 선택하세요.</p>
+          ) : null}
+          <div id={menuId} role="menu" aria-label="ReadMates 공간 전환">
+            {level === "root" ? (
+              <>
+                <p className="rm-global-space-switcher__section-label">현재 범위</p>
+                <div className="rm-global-space-switcher__root-list">
+                  {platformOption ? (
+                    <button
+                      ref={(node) => { itemRefs.current[0] = node; }}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={currentKind === "platform"}
+                      aria-label="플랫폼 운영"
+                      tabIndex={activeIndex === 0 ? 0 : -1}
+                      className="rm-global-space-switcher__item rm-global-space-switcher__root-item"
+                      style={TARGET_STYLE}
+                      disabled={busyKey !== null}
+                      onClick={() => void select(platformOption)}
+                    >
+                      <span className="rm-global-space-switcher__root-copy">
+                        <strong>플랫폼 운영</strong>
+                        <span>서비스 상태와 전체 클럽 운영</span>
+                      </span>
+                      {currentKind === "platform" ? <span className="rm-global-space-switcher__current">현재 범위</span> : null}
+                    </button>
+                  ) : null}
+                  {groups.length > 0 ? (
+                    <button
+                      ref={(node) => { itemRefs.current[platformOption ? 1 : 0] = node; }}
+                      type="button"
+                      role="menuitem"
+                      aria-label="내 클럽"
+                      aria-current={currentKind === "clubs" ? "true" : undefined}
+                      tabIndex={activeIndex === (platformOption ? 1 : 0) ? 0 : -1}
+                      className="rm-global-space-switcher__item rm-global-space-switcher__root-item"
+                      style={TARGET_STYLE}
+                      disabled={busyKey !== null}
+                      onClick={openClubLevel}
+                    >
+                      <span className="rm-global-space-switcher__root-copy">
+                        <strong>내 클럽</strong>
+                        <span>참여하거나 운영하는 클럽으로 이동</span>
+                      </span>
+                      <span className="rm-global-space-switcher__root-tail">
+                        {currentKind === "clubs" ? <span className="rm-global-space-switcher__current">현재 범위</span> : null}
+                        <SelectorChevron />
+                      </span>
+                    </button>
+                  ) : null}
                 </div>
+              </>
+            ) : (
+              <div className="rm-global-space-switcher__club-section" role="group" aria-label="내 클럽">
+                {groups.map((group) => (
+                  <div key={group.id} className="rm-global-space-switcher__club" role="group" aria-label={group.name}>
+                    <p className="rm-global-space-switcher__club-name">{group.name}</p>
+                    <div className="rm-global-space-switcher__perspectives">
+                      {group.options.map((option) => renderOption(
+                        option,
+                        optionIndex++,
+                        `${group.name} ${perspectiveLabel(option.identity)}`,
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
           {busyKey ? <p className="rm-global-space-switcher__status" role="status">공간을 여는 중</p> : null}
           {error ? <p className="rm-global-space-switcher__error" role="alert">{error}</p> : null}

@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { AppClubShell } from "./app-club-shell";
+import { GlobalSpaceSwitcher } from "./global-space-switcher";
 import type {
   ClubWorkspace,
   PrimaryNavigationItem,
@@ -134,5 +135,37 @@ describe("AppClubShell", () => {
     );
 
     expect(screen.getAllByRole("button", { name: "공통 공간 전환" })).toHaveLength(2);
+  });
+
+  it("hides a static one-kind label accessibly without reserving an empty mobile context strip", () => {
+    const platform = { productSpace: "platform" as const };
+    const staticSwitcher = (
+      <GlobalSpaceSwitcher
+        currentIdentity={platform}
+        options={[{ identity: platform }]}
+        onSelect={async () => ({ status: "selected" })}
+      />
+    );
+    const { container } = render(
+      <AppClubShell
+        workspace="member"
+        primaryItems={primaryItems("member")}
+        account={{ control: <button type="button">계정 메뉴</button> }}
+        brandHref="/clubs/reading-sai/app"
+        mobileTitle="읽는사이"
+        LinkComponent={LinkComponent}
+        spaceSwitcher={{ desktop: staticSwitcher, mobile: staticSwitcher }}
+      >
+        <main>member content</main>
+      </AppClubShell>,
+    );
+
+    const mobileContext = container.querySelector('[data-club-shell-region="mobile-context"]');
+    expect(mobileContext?.querySelector(":scope > .rm-club-shell-mobile-context__inner > .rm-sr-only:only-child"))
+      .toHaveTextContent("현재 공간 플랫폼 운영");
+    const mobileCss = readFileSync("shared/styles/mobile.css", "utf8");
+    expect(mobileCss).toMatch(
+      /\.rm-club-shell-mobile-context:has\(> \.rm-club-shell-mobile-context__inner > \.rm-sr-only:only-child\)[^{]*\{[^}]*display:\s*none/,
+    );
   });
 });

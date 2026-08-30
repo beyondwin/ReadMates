@@ -26,6 +26,26 @@ Ruling: 저장된 허용 return target이 없는 cross-club selection은 Task 2.
 
 Ruling: host shell의 기존 호스트 workflow와 utility actions는 복제하거나 platform-admin으로 옮기지 않고, 그 shell의 전역 context slot만 교체한다 — Task 2.3 범위는 product-space selection이고 host workflow는 기존 feature owner가 소유한다 — 틀렸을 때 비용은 기존 host utility에 남은 perspective shortcut과 전역 switcher 개념이 일시적으로 함께 보일 수 있는 것이며, host feature를 무단 재설계하는 비용을 피한다.
 
+## Review fix round 1
+
+Ruling: 첫 단계에는 동등한 product-space peer인 `플랫폼 운영`과 actionable `내 클럽`만 두고, `내 클럽`을 선택한 뒤 club별 `멤버로 보기` / `호스트로 운영` destination을 두 번째 단계에 렌더링한다 — 승인된 `05-space-switcher-desktop` 시안과 plan의 two-level 명세는 섹션 제목만 있는 단일 목록이 아니라 실제 drill-in interaction을 요구한다 — 틀렸을 때 비용은 운영자에게 과밀한 flat menu를 제공하고 승인 시안과 키보드 계층이 어긋나는 것이다.
+
+Ruling: 두 번째 단계의 Back 또는 Escape는 첫 단계 `내 클럽`으로 focus를 복귀하고, 첫 단계 Escape만 popover를 닫아 trigger로 focus를 복귀한다 — 계층을 한 단계씩 되짚는 예측 가능한 keyboard contract가 필요하다 — 틀렸을 때 비용은 keyboard 사용자가 전체 popover를 반복해서 열거나 focus 위치를 잃는 것이다.
+
+Ruling: product kind가 하나인 shell은 repository 표준 `.rm-sr-only`로 현재 공간을 남기고, mobile context가 그 static label 하나만 포함할 때에만 `:has(...:only-child)`로 strip을 숨긴다 — 접근 가능한 현재 label은 유지하면서 host utility sibling이 있는 실제 mobile context는 보존해야 한다 — 틀렸을 때 비용은 빈 57px 띠가 남거나 반대로 host utility가 함께 사라지는 것이다.
+
+Ruling: platform-admin header에서 raw `OWNER` / `SUPPORT` role badge를 제거하고 account identity만 유지한다 — exact capability는 navigation과 command authorization을 계속 통제하지만 raw enum은 운영자용 1차 정보가 아니다 — 틀렸을 때 비용은 권한을 설명하지 못하는 내부 enum이 제품 copy로 노출되는 것이다.
+
+Ruling: 새 trigger 및 방향 chevron의 transition은 `prefers-reduced-motion: reduce`에서 제거한다 — shared shell motion은 사용자 OS preference를 따라야 한다 — 틀렸을 때 비용은 motion-sensitive 사용자의 shell 전환 접근성이 저하되는 것이다.
+
+Round 1 RED command:
+
+| Command | Exit | Expected failure |
+| --- | ---: | --- |
+| `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run shared/ui/global-space-switcher.test.tsx shared/ui/app-club-shell.test.tsx features/platform-admin/route/admin-shell-layout.test.tsx src/app/routes/admin.test.tsx` | 1 | 18 assertions failed: 12 true two-level/focus/static-label cases, 1 empty mobile strip case, 4 raw role cases, and 1 real admin route class case. |
+
+The fix preserves the Task 2.2 app-owned controller/callback bridge. The shared component still accepts only projection-derived props; no feature imports `src/app`, and no new query/router/policy ownership was introduced.
+
 ## TDD and debugging evidence
 
 ### RED
@@ -43,9 +63,9 @@ The stale suite was not made green by restoring old selectors. Fixtures were giv
 
 | Command | Exit | Result |
 | --- | ---: | --- |
-| `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run shared/ui/global-space-switcher.test.tsx shared/ui/app-club-shell.test.tsx shared/ui/workspace-selector.test.tsx features/platform-admin/route/admin-shell-layout.test.tsx src/app/routes/admin.test.tsx src/app/layouts/app-route-layout.test.tsx tests/unit/spa-layout.test.tsx tests/unit/frontend-boundaries.test.ts` | 0 | Final run: 8 files / 106 tests passed. |
+| `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run shared/ui/global-space-switcher.test.tsx shared/ui/app-club-shell.test.tsx shared/ui/workspace-selector.test.tsx features/platform-admin/route/admin-shell-layout.test.tsx src/app/routes/admin.test.tsx src/app/layouts/app-route-layout.test.tsx tests/unit/spa-layout.test.tsx tests/unit/frontend-boundaries.test.ts` | 0 | Review-fix final run: 8 files / 109 tests passed. |
 | `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run src/app/routes/admin.test.tsx` | 0 | 1 file / 4 tests passed, including the final legacy-`joinedClubs` non-authority case. |
-| `npx --yes corepack@0.35.0 pnpm --dir front test` | 0 | Final run: 421 files / 3,912 tests passed. |
+| `npx --yes corepack@0.35.0 pnpm --dir front test` | 0 | Review-fix final run: 421 files / 3,915 tests passed. |
 | `npx --yes corepack@0.35.0 pnpm --dir front lint` | 0 | No errors; two pre-existing Fast Refresh warnings remain in unrelated host UI files. |
 | `npx --yes corepack@0.35.0 pnpm --dir front build` | 0 | 785 modules transformed and the production build completed; the existing chunk-size advisory remains. |
 | `git diff --check` | 0 | No whitespace errors. |
@@ -54,7 +74,7 @@ The stale suite was not made green by restoring old selectors. Fixtures were giv
 
 `python3 scripts/agent-preflight.py --intent change ... --json` was also run after implementation. Its pre-commit invocation correctly classified the surface as frontend and recommended lint/test/build, but exited `2` because every expected edit path was by then dirty from this task. The same scoped command was repeated after commit and exited `0` with no dirty paths or stop reasons.
 
-The Impeccable detector was run once over the new component, admin shell, and shared global stylesheet. It exited `2` only for four pre-existing side-tab warnings in untouched stylesheet lines (three from commit `40e274150`, one from `4d26255d5`). No finding pointed to the Task 2.3 component or new stylesheet hunk. The approved `05-space-switcher-desktop` asset was inspected before implementation.
+The Impeccable detector was repeated over the new component, admin shell, mobile stylesheet, and shared global stylesheet after review round 1. It exited `2` only for four pre-existing side-tab warnings in untouched stylesheet lines (three from commit `40e274150`, one from `4d26255d5`). No finding pointed to the Task 2.3 component or new stylesheet hunk. The approved `05-space-switcher-desktop` asset was inspected before implementation and again before the true two-level correction.
 
 ## Coverage preserved from deleted switcher
 
@@ -71,8 +91,8 @@ The Impeccable detector was run once over the new component, admin shell, and sh
 
 - Architecture: app owns auth/controller/router; shared owns props-only UI; platform-admin receives a `ReactNode` slot; boundary test and source scan are green. No feature-to-feature import was added.
 - Authority: options are the intersection expressed by controller identities and normalized projection club metadata. No `joinedClubs`, role, or status calculation exists in the bridge or shared UI.
-- Interaction/accessibility: all destinations use `menuitemradio`, current state uses `aria-checked`, names are Korean, focus is roving, target height is 44px, hidden menus leave no focusable residue, and account actions are outside the menu.
-- Visual craft: existing Pretendard and ReadMates paper/ink/accent tokens are reused; focus rings, hover, disabled/loading/error states, long Korean/English wrapping, mobile width, reduced-motion-compatible token durations, and compact club grouping are explicit. No new gradient text, blur decoration, eyebrow, emoji icon, or equal-card dashboard pattern was introduced.
+- Interaction/accessibility: destination actions use `menuitemradio`, the first-level `내 클럽` drill-in uses `menuitem`, current state uses `aria-checked`/`aria-current`, names are Korean, each level has independent roving focus, Back/Escape restore the correct parent/trigger focus, target height is 44px, hidden levels leave no focusable residue, and account actions are outside the menu.
+- Visual craft: existing Pretendard and ReadMates paper/ink/accent tokens are reused; focus rings, hover, disabled/loading/error states, long Korean/English wrapping, mobile width, explicit reduced-motion suppression, and compact club grouping are explicit. No new gradient text, blur decoration, eyebrow, emoji icon, or equal-card dashboard pattern was introduced.
 - Shell behavior: member and host share the same app composition slot; platform-admin receives the same shared UI. The old admin switcher CSS and source residue are removed.
 
 ## Files

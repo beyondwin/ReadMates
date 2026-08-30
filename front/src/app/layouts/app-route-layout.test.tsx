@@ -407,6 +407,7 @@ describe("AppRouteLayout host session navigation", () => {
     }));
 
     await user.click(screen.getAllByRole("button", { name: /^공간 전환, 현재 내 클럽/ })[0]);
+    await user.click(screen.getByRole("menuitem", { name: "내 클럽" }));
     await user.click(screen.getByRole("menuitemradio", { name: targetName }));
 
     await waitFor(() => {

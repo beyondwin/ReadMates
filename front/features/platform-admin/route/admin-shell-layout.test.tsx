@@ -323,7 +323,7 @@ describe("AdminShellLayout", () => {
 
   it("renders ledger navigation and breadcrumb without a shell-owned command status", () => {
     const { container } = renderShell("/admin/today");
-    expect(screen.getAllByText("OWNER").length).toBeGreaterThan(0);
+    expect(screen.queryByText("OWNER", { exact: true })).not.toBeInTheDocument();
     expect(container.querySelector(".admin-command-status")).toBeNull();
     expect(screen.queryByText("전체 신호 정상 · 8건 활성 · 19:00 기준")).not.toBeInTheDocument();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
@@ -419,12 +419,10 @@ describe("AdminShellLayout", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps the operating wordmark and role badge", () => {
+  it("keeps the operating wordmark without exposing a raw capability role badge", () => {
     renderShell("/admin/today");
     expect(screen.getByText("ReadMates · 운영")).toBeInTheDocument();
-    expect(
-      screen.getByText("OWNER", { selector: ".admin-shell__role-badge" }),
-    ).toBeInTheDocument();
+    expect(screen.queryByText("OWNER", { exact: true })).not.toBeInTheDocument();
   });
 
   it("shows the onboarding modal when ?onboarding=1 is present", () => {
@@ -549,9 +547,7 @@ describe("AdminShellLayout", () => {
       }),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(
-      screen.getByText("OWNER", { selector: ".admin-shell__role-badge" }),
-    ).toBeInTheDocument();
+    expect(screen.queryByText("OWNER", { exact: true })).not.toBeInTheDocument();
   });
 
   it("keeps onboarding reachable from the query param when CREATE_CLUB is present", () => {
@@ -570,9 +566,7 @@ describe("AdminShellLayout", () => {
       screen.queryByRole("link", { name: "새 클럽" }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(
-      screen.getByText("SUPPORT", { selector: ".admin-shell__role-badge" }),
-    ).toBeInTheDocument();
+    expect(screen.queryByText("SUPPORT", { exact: true })).not.toBeInTheDocument();
   });
 
   it("renders empty navigation when the capability list is empty", () => {

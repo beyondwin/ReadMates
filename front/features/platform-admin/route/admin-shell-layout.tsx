@@ -217,9 +217,6 @@ function AdminShellLayoutInner({
         <span className="admin-shell__wordmark">ReadMates · 운영</span>
         <AdminBreadcrumb routePath={routePath} extra={extra} />
         <div className="admin-shell__header-actions">
-          {capabilities ? (
-            <span className="admin-shell__role-badge">{capabilities.role}</span>
-          ) : null}
           <div key={spaceControlEpoch} className="admin-shell__space-control">
             {spaceSwitcher}
           </div>

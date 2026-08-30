@@ -231,10 +231,106 @@
 
 .rm-global-space-switcher__section-label,
 .rm-global-space-switcher__club-name,
+.rm-global-space-switcher__level-copy,
 .rm-global-space-switcher__status,
 .rm-global-space-switcher__error {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.rm-global-space-switcher__root-list {
+  display: grid;
+  gap: 8px;
+}
+
+.rm-global-space-switcher__item.rm-global-space-switcher__root-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  background: var(--bg-raised);
+}
+
+.rm-global-space-switcher__root-item[aria-checked="true"],
+.rm-global-space-switcher__root-item[aria-current="true"] {
+  border-color: var(--accent);
+  background: color-mix(in oklch, var(--accent-soft), var(--bg) 48%);
+}
+
+.rm-global-space-switcher__root-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.rm-global-space-switcher__root-copy strong {
+  color: var(--text);
+  font: 700 var(--type-size-body)/var(--type-leading-body) var(--f-sans);
+}
+
+.rm-global-space-switcher__root-copy > span {
+  color: var(--text-3);
+  font: 500 var(--type-size-label)/var(--type-leading-label) var(--f-sans);
+  overflow-wrap: anywhere;
+}
+
+.rm-global-space-switcher__root-tail {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.rm-global-space-switcher__root-tail .rm-context-selector__chevron {
+  transform: rotate(-90deg);
+}
+
+.rm-global-space-switcher__level-head {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.rm-global-space-switcher__level-head h2 {
+  margin: 0;
+  color: var(--text);
+  font: 700 var(--type-size-body)/var(--type-leading-body) var(--f-sans);
+}
+
+.rm-global-space-switcher__back {
+  min-width: 0;
+  padding: 8px 8px 8px 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  border-radius: var(--r-2);
+  color: var(--text-2);
+  background: transparent;
+  font: 650 var(--type-size-label)/var(--type-leading-label) var(--f-sans);
+  cursor: pointer;
+}
+
+.rm-global-space-switcher__back .rm-context-selector__chevron {
+  transform: rotate(90deg);
+}
+
+.rm-global-space-switcher__back:hover {
+  color: var(--text);
+  background: var(--bg-sub);
+}
+
+.rm-global-space-switcher__back:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.rm-global-space-switcher__level-copy {
+  padding: 1px 8px 8px;
+  color: var(--text-3);
+  font: 500 var(--type-size-label)/var(--type-leading-label) var(--f-sans);
 }
 
 .rm-global-space-switcher__section-label {
@@ -244,11 +340,8 @@
 }
 
 .rm-global-space-switcher__club-section {
-  margin-top: 8px;
-  padding-top: 10px;
   display: grid;
   gap: 8px;
-  border-top: 1px solid var(--line);
 }
 
 .rm-global-space-switcher__club {
@@ -316,6 +409,15 @@
 
 .rm-global-space-switcher__error {
   color: var(--danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rm-global-space-switcher__trigger,
+  .rm-global-space-switcher__trigger .rm-context-selector__chevron,
+  .rm-global-space-switcher__root-tail .rm-context-selector__chevron,
+  .rm-global-space-switcher__back .rm-context-selector__chevron {
+    transition: none;
+  }
 }
 
 @media (max-width: 520px) {
@@ -1430,14 +1532,6 @@ a.rm-recent-record__destination:hover {
   margin: 0;
   color: var(--danger);
   font: 600 var(--type-size-label)/var(--type-leading-label) var(--f-sans);
-}
-
-.admin-shell__role-badge {
-  border: 1px solid var(--line);
-  border-radius: var(--r-2);
-  background: var(--bg-raised);
-  padding: 7px 10px;
-  color: var(--text-2);
 }
 
 .admin-command-status {
@@ -5989,8 +6083,7 @@ a.rm-recent-record__destination:hover {
       grid-template-columns: 1fr;
     }
 
-    .admin-shell__header-actions .btn,
-    .admin-shell__role-badge {
+    .admin-shell__header-actions .btn {
       width: 100%;
       justify-content: center;
       text-align: center;
@@ -6872,7 +6965,6 @@ a.rm-recent-record__destination:hover {
   color: var(--muted);
 }
 
-.admin-shell__role-badge,
 .admin-layout-nav__pill,
 .platform-admin-domain-status,
 .admin-health-grid__stale,

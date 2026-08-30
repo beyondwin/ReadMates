@@ -459,6 +459,7 @@ describe("SPA AppRouteLayout", () => {
 
     expect(await screen.findByText(/archive child/)).toBeInTheDocument();
     await user.click((await screen.findAllByRole("button", { name: /^공간 전환, 현재 내 클럽/ }))[0]);
+    await user.click(screen.getByRole("menuitem", { name: "내 클럽" }));
     await user.click(screen.getByRole("menuitemradio", { name: "샘플 북클럽 호스트로 운영" }));
 
     expect(await screen.findByText("/clubs/sample-book-club/app/host")).toBeInTheDocument();

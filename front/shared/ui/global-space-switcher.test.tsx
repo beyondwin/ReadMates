@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -88,7 +89,7 @@ describe("GlobalSpaceSwitcher", () => {
     renderSwitcher({ currentIdentity: current, options });
 
     expect(screen.queryByRole("button", { name: /공간 전환/ })).not.toBeInTheDocument();
-    expect(screen.getByText(currentLabel)).toHaveClass("sr-only");
+    expect(screen.getByText(currentLabel)).toHaveClass("rm-sr-only");
   });
 
   it.each([
@@ -110,8 +111,9 @@ describe("GlobalSpaceSwitcher", () => {
     await user.click(trigger);
     const menu = screen.getByRole("menu", { name: "ReadMates 공간 전환" });
 
-    expect(within(menu).getByText("플랫폼 운영")).toBeInTheDocument();
-    expect(within(menu).getByText("내 클럽")).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitemradio", { name: "플랫폼 운영" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "내 클럽" })).toBeInTheDocument();
+    expect(within(menu).queryByRole("group", { name: "읽는사이" })).not.toBeInTheDocument();
     expect(within(menu).queryByText("PLATFORM")).not.toBeInTheDocument();
     expect(within(menu).queryByText("CLUBS")).not.toBeInTheDocument();
   });
@@ -121,6 +123,8 @@ describe("GlobalSpaceSwitcher", () => {
     renderSwitcher();
 
     await user.click(screen.getByRole("button", { name: "공간 전환, 현재 플랫폼 운영" }));
+    await user.click(screen.getByRole("menuitem", { name: "내 클럽" }));
+    expect(screen.queryByRole("menuitemradio", { name: "플랫폼 운영" })).not.toBeInTheDocument();
     const clubGroup = screen.getByRole("group", { name: "내 클럽" });
     const readingGroup = within(clubGroup).getByRole("group", { name: "읽는사이" });
     const longGroup = within(clubGroup).getByRole("group", {
@@ -143,6 +147,7 @@ describe("GlobalSpaceSwitcher", () => {
     renderSwitcher({ onSelect });
 
     await user.click(screen.getByRole("button", { name: /공간 전환/ }));
+    await user.click(screen.getByRole("menuitem", { name: "내 클럽" }));
     const target = screen.getByRole("menuitemradio", { name: "읽는사이 호스트로 운영" });
     await user.click(target);
 
@@ -163,13 +168,14 @@ describe("GlobalSpaceSwitcher", () => {
     renderSwitcher({ onSelect });
 
     await user.click(screen.getByRole("button", { name: /공간 전환/ }));
+    await user.click(screen.getByRole("menuitem", { name: "내 클럽" }));
     await user.click(screen.getByRole("menuitemradio", { name: "읽는사이 멤버로 보기" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("진행 중인 작업을 마친 뒤 공간을 전환해 주세요.");
     expect(screen.getByRole("menu", { name: "ReadMates 공간 전환" })).toBeInTheDocument();
   });
 
-  it("opens with Enter, Space, and ArrowDown and uses roving arrow, Home, and End focus", async () => {
+  it("uses separate first- and second-level roving focus and Escape returns one level before closing", async () => {
     const user = userEvent.setup();
     renderSwitcher();
     const trigger = screen.getByRole("button", { name: "공간 전환, 현재 플랫폼 운영" });
@@ -177,23 +183,31 @@ describe("GlobalSpaceSwitcher", () => {
     trigger.focus();
     await user.keyboard("{Enter}");
     const platformItem = screen.getByRole("menuitemradio", { name: "플랫폼 운영" });
+    const clubsItem = screen.getByRole("menuitem", { name: "내 클럽" });
+    expect(screen.queryByRole("menuitemradio", { name: "읽는사이 멤버로 보기" })).not.toBeInTheDocument();
+    expect(platformItem).toHaveFocus();
+    expect(platformItem).toHaveAttribute("tabindex", "0");
+    expect(clubsItem).toHaveAttribute("tabindex", "-1");
+
+    await user.keyboard("{ArrowDown}");
+    expect(clubsItem).toHaveFocus();
+    await user.keyboard("{Enter}");
     const memberItem = screen.getByRole("menuitemradio", { name: "읽는사이 멤버로 보기" });
     const lastItem = screen.getByRole("menuitemradio", {
       name: "아주 긴 한국어와 an intentionally long English club name 멤버로 보기",
     });
-    expect(platformItem).toHaveFocus();
-    expect(platformItem).toHaveAttribute("tabindex", "0");
-    expect(memberItem).toHaveAttribute("tabindex", "-1");
-
-    await user.keyboard("{ArrowDown}");
     expect(memberItem).toHaveFocus();
+    expect(screen.queryByRole("menuitemradio", { name: "플랫폼 운영" })).not.toBeInTheDocument();
     await user.keyboard("{End}");
     expect(lastItem).toHaveFocus();
     await user.keyboard("{Home}");
-    expect(platformItem).toHaveFocus();
+    expect(memberItem).toHaveFocus();
     await user.keyboard("{ArrowUp}");
     expect(lastItem).toHaveFocus();
 
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("menuitem", { name: "내 클럽" })).toHaveFocus();
+    expect(screen.queryByRole("menuitemradio", { name: "읽는사이 멤버로 보기" })).not.toBeInTheDocument();
     await user.keyboard("{Escape}");
     expect(trigger).toHaveFocus();
     await user.keyboard("{ }");
@@ -201,6 +215,22 @@ describe("GlobalSpaceSwitcher", () => {
     await user.keyboard("{Escape}");
     await user.keyboard("{ArrowDown}");
     expect(screen.getByRole("menuitemradio", { name: "플랫폼 운영" })).toHaveFocus();
+  });
+
+  it("returns from the club level with a 44px Korean Back action and restores first-level focus", async () => {
+    const user = userEvent.setup();
+    renderSwitcher();
+
+    await user.click(screen.getByRole("button", { name: /공간 전환/ }));
+    await user.click(screen.getByRole("menuitem", { name: "내 클럽" }));
+    const back = screen.getByRole("button", { name: "범위 선택으로 돌아가기" });
+    expect(back).toHaveStyle({ minHeight: "44px" });
+    expect(screen.getByRole("heading", { name: "내 클럽" })).toBeInTheDocument();
+
+    await user.click(back);
+
+    expect(screen.getByRole("menuitem", { name: "내 클럽" })).toHaveFocus();
+    expect(screen.queryByRole("heading", { name: "내 클럽" })).not.toBeInTheDocument();
   });
 
   it("closes on Escape or outside click, removes hidden items, and returns focus", async () => {
@@ -226,9 +256,16 @@ describe("GlobalSpaceSwitcher", () => {
     await user.click(screen.getByRole("button", { name: /공간 전환/ }));
 
     expect(container.querySelector(".rm-global-space-switcher__trigger")).toHaveStyle({ minHeight: "44px" });
-    for (const item of screen.getAllByRole("menuitemradio")) {
+    for (const item of [...screen.getAllByRole("menuitemradio"), screen.getByRole("menuitem", { name: "내 클럽" })]) {
       expect(item).toHaveStyle({ minHeight: "44px" });
     }
+  });
+
+  it("removes trigger and chevron transitions when reduced motion is requested", () => {
+    const css = readFileSync("src/styles/globals.css", "utf8");
+    expect(css).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.rm-global-space-switcher__trigger,[\s\S]*?\.rm-global-space-switcher__trigger \.rm-context-selector__chevron[\s\S]*?transition:\s*none/,
+    );
   });
 
   it("does not run a transition when the current destination is chosen", async () => {
