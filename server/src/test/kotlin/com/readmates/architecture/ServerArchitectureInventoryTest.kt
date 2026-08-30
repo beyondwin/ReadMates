@@ -12,6 +12,13 @@ import java.nio.file.Path
 @Tag("architecture")
 class ServerArchitectureInventoryTest {
     @Test
+    fun `host workspace is inventoried without an application feature edge`() {
+        val edges = applicationFeatureEdges(projectRoot().resolve("server/src/main/kotlin"))
+
+        assertThat(edges).noneMatch { edge -> edge.startsWith("hostworkspace|") }
+    }
+
+    @Test
     fun `emergency takedown authorization is capability based and evidence activation is fail closed`() {
         val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")
         val service =
@@ -231,6 +238,7 @@ class ServerArchitectureInventoryTest {
             "server/src/test/kotlin/com/readmates/auth/adapter/in/security/CurrentMemberArgumentResolverTest.kt",
             "server/src/test/kotlin/com/readmates/auth/adapter/in/security/CurrentPlatformAdminArgumentResolverTest.kt",
             "server/src/test/kotlin/com/readmates/auth/api/PlatformAdminBffSecurityTest.kt",
+            "server/src/test/kotlin/com/readmates/hostworkspace/api/HostOperatingRoomControllerTest.kt",
             "server/src/test/kotlin/com/readmates/notification/api/MemberNotificationControllerTest.kt",
             "server/src/test/kotlin/com/readmates/sessionclosing/adapter/in/web/HostSessionClosingControllerTest.kt",
         )

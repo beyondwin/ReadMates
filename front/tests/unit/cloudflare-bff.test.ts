@@ -43,6 +43,39 @@ afterEach(() => {
 });
 
 describe("Cloudflare BFF function", () => {
+  it("forwards the host operating-room current GET generically", async () => {
+    const upstreamBody = JSON.stringify({
+      currentMeeting: {
+        sessionId: "11111111-1111-1111-1111-111111111111",
+        selection: "OPEN",
+        scheduleSeenAvailability: "AVAILABLE",
+      },
+    });
+    const fetchMock = vi.fn(async () =>
+      new Response(upstreamBody, {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await onRequest(
+      context(
+        new Request(
+          "https://readmates.pages.dev/api/bff/api/host/operating-room/current",
+        ),
+        { path: ["api", "host", "operating-room", "current"] },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(JSON.parse(upstreamBody));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/api/host/operating-room/current",
+      expect.objectContaining({ method: "GET", redirect: "manual" }),
+    );
+  });
+
   it("forwards api requests with bff secret and Cloudflare client ip", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
