@@ -1,0 +1,371 @@
+.rm-operating-room-header,
+.rm-operating-room-phases {
+  min-width: 0;
+  color: var(--text);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.rm-operating-room-header {
+  --rm-operating-room-cover-width: clamp(92px, 9vw, 116px);
+  display: grid;
+  grid-template-columns: var(--rm-operating-room-cover-width) minmax(0, 1fr) minmax(300px, auto);
+  grid-template-areas:
+    "cover identity actions"
+    "cover facts actions";
+  gap: var(--space-md) var(--space-xl);
+  align-items: center;
+  padding: var(--space-lg) var(--space-xl);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.rm-operating-room-header__cover {
+  grid-area: cover;
+  align-self: start;
+}
+
+.rm-operating-room-header__cover .rm-book-cover {
+  height: auto;
+  box-shadow: 1px 1px 0 var(--line-soft), 2px 2px 0 var(--line-soft);
+}
+
+.rm-operating-room-header__identity {
+  grid-area: identity;
+  display: grid;
+  gap: var(--space-2xs);
+  min-width: 0;
+  align-self: end;
+}
+
+.rm-operating-room-header__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-xs) var(--space-md);
+  min-width: 0;
+}
+
+.rm-operating-room-header__title {
+  min-width: 0;
+  max-width: 24ch;
+  margin: 0;
+  font-weight: 720;
+}
+
+.rm-operating-room-header__dday {
+  flex: 0 0 auto;
+  color: var(--ok);
+  font-size: var(--type-size-body-emphasis);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.rm-operating-room-header__lifecycle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding-inline: 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: var(--bg-sub);
+  color: var(--text-2);
+  font-size: var(--type-size-supporting);
+  font-weight: 600;
+}
+
+.rm-operating-room-header__lifecycle-mark {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ok);
+}
+
+.rm-operating-room-header[data-lifecycle="DRAFT"] .rm-operating-room-header__lifecycle-mark {
+  background: var(--accent);
+}
+
+.rm-operating-room-header[data-lifecycle="CLOSED"] .rm-operating-room-header__lifecycle-mark {
+  background: var(--warn);
+}
+
+.rm-operating-room-header__book {
+  margin: 0;
+  max-width: 65ch;
+  color: var(--text-3);
+  font-size: var(--type-size-supporting);
+}
+
+.rm-operating-room-header__facts {
+  grid-area: facts;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-xs) var(--space-lg);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-2);
+  font-size: var(--type-size-supporting);
+}
+
+.rm-operating-room-header__facts li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rm-operating-room-header__fact-label {
+  color: var(--text-4);
+  font-size: var(--type-size-label);
+  font-weight: 600;
+}
+
+.rm-operating-room-header__actions {
+  grid-area: actions;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-content: center;
+  gap: var(--space-xs) var(--space-sm);
+  min-width: 0;
+}
+
+.rm-operating-room-header__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding-inline: var(--space-sm);
+  border-radius: var(--r-2);
+  color: var(--text-2);
+  font-size: var(--type-size-control);
+  font-weight: 550;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 4px;
+  transition:
+    color var(--motion-fast) var(--ease-standard-refined),
+    background-color var(--motion-fast) var(--ease-standard-refined),
+    text-decoration-color var(--motion-fast) var(--ease-standard-refined);
+}
+
+.rm-operating-room-header__action:hover {
+  color: var(--text);
+  background: var(--bg-sub);
+  text-decoration-color: currentColor;
+}
+
+.rm-operating-room-header__action:focus-visible,
+.rm-operating-room-phases__tab:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--focus-ring-soft);
+}
+
+.rm-operating-room-phases {
+  padding-inline: var(--space-xl);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.rm-operating-room-phases__list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: min(100%, 540px);
+  min-width: 0;
+}
+
+.rm-operating-room-phases__item {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  align-content: start;
+  min-width: 0;
+}
+
+.rm-operating-room-phases__tab {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px var(--space-xs);
+  min-width: 0;
+  min-height: 52px;
+  padding: 10px var(--space-sm);
+  color: var(--text-2);
+  text-align: center;
+  text-decoration: none;
+  transition:
+    color var(--motion-fast) var(--ease-standard-refined),
+    background-color var(--motion-fast) var(--ease-standard-refined);
+}
+
+.rm-operating-room-phases__tab::after {
+  position: absolute;
+  inset-inline: var(--space-sm);
+  inset-block-end: -1px;
+  height: 2px;
+  background: transparent;
+  content: "";
+}
+
+.rm-operating-room-phases__tab[aria-current="page"] {
+  color: var(--accent);
+}
+
+.rm-operating-room-phases__tab[aria-current="page"]::after {
+  background: var(--accent);
+}
+
+.rm-operating-room-phases__tab[href]:hover {
+  color: var(--text);
+  background: var(--bg-sub);
+}
+
+.rm-operating-room-phases__tab.is-blocked {
+  color: var(--disabled-text);
+  cursor: not-allowed;
+}
+
+.rm-operating-room-phases__label {
+  font-size: var(--type-size-body-emphasis);
+  font-weight: 650;
+}
+
+.rm-operating-room-phases__state {
+  color: var(--text-3);
+  font-size: var(--type-size-label);
+  font-weight: 600;
+}
+
+.rm-operating-room-phases__tab[aria-current="page"] .rm-operating-room-phases__state {
+  color: var(--accent);
+}
+
+.rm-operating-room-phases__reason {
+  margin: 0;
+  padding: var(--space-xs) var(--space-sm) var(--space-sm);
+  color: var(--text-3);
+  font-size: var(--type-size-label);
+  line-height: var(--type-leading-label);
+  text-align: center;
+}
+
+.rm-operating-room-ct-shell {
+  width: 100%;
+  min-width: 0;
+  background: var(--bg);
+}
+
+.rm-operating-room-ct-shell > [aria-label="선택한 운영 단계"] {
+  min-height: 160px;
+  padding: var(--space-xl);
+  color: var(--text-3);
+}
+
+@media (max-width: 1023px) {
+  .rm-operating-room-header {
+    grid-template-columns: var(--rm-operating-room-cover-width) minmax(0, 1fr);
+    grid-template-areas:
+      "cover identity"
+      "cover facts"
+      "actions actions";
+  }
+
+  .rm-operating-room-header__actions {
+    justify-content: flex-start;
+    padding-top: var(--space-xs);
+    border-top: 1px solid var(--line-soft);
+  }
+}
+
+@media (max-width: 640px) {
+  .rm-operating-room-header {
+    --rm-operating-room-cover-width: 84px;
+    gap: var(--space-sm) var(--space-md);
+    padding: var(--space-lg) var(--space-md) var(--space-md);
+  }
+
+  .rm-operating-room-header__title-row {
+    gap: 6px var(--space-xs);
+  }
+
+  .rm-operating-room-header__title {
+    max-width: 100%;
+    font-size: 1.625rem;
+  }
+
+  .rm-operating-room-header__lifecycle {
+    min-height: 24px;
+    padding-inline: 8px;
+    font-size: var(--type-size-label);
+  }
+
+  .rm-operating-room-header__book {
+    display: none;
+  }
+
+  .rm-operating-room-header__facts {
+    display: grid;
+    gap: 4px;
+  }
+
+  .rm-operating-room-header__actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .rm-operating-room-header__action {
+    justify-content: flex-start;
+    padding-inline: var(--space-xs);
+  }
+
+  .rm-operating-room-phases {
+    padding-inline: var(--space-md);
+  }
+
+  .rm-operating-room-phases__tab {
+    align-content: center;
+    padding-inline: 6px;
+  }
+
+  .rm-operating-room-phases__label {
+    font-size: var(--type-size-body);
+  }
+
+  .rm-operating-room-phases__reason {
+    padding-inline: 4px;
+  }
+}
+
+@media (max-width: 340px) {
+  .rm-operating-room-header {
+    --rm-operating-room-cover-width: 72px;
+    column-gap: var(--space-sm);
+  }
+
+  .rm-operating-room-header__title {
+    font-size: 1.375rem;
+  }
+
+  .rm-operating-room-phases {
+    padding-inline: var(--space-xs);
+  }
+
+  .rm-operating-room-phases__tab {
+    min-height: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rm-operating-room-header__action,
+  .rm-operating-room-phases__tab {
+    transition-duration: 0.001ms;
+  }
+}
