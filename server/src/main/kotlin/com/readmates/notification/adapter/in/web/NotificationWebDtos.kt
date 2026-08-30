@@ -36,9 +36,9 @@ import com.readmates.notification.application.model.NotificationDispatchSource
 import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.notification.application.model.NotificationTestMailAuditItem
 import com.readmates.notification.application.model.NotificationTestMailStatus
-import com.readmates.notification.application.model.sanitizeNotificationError
 import com.readmates.notification.application.model.defaultManualBody
 import com.readmates.notification.application.model.defaultManualSubject
+import com.readmates.notification.application.model.sanitizeNotificationError
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventOutboxStatus

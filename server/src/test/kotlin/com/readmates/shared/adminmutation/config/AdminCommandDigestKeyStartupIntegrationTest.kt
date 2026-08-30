@@ -78,7 +78,7 @@ class AdminCommandDigestKeyStartupIntegrationTest(
                 val migratedJdbc = JdbcTemplate(context.getBean(DataSource::class.java))
                 assertThat(context.getBean(AdminCommandDigestKeyStartupValidator::class.java)).isNotNull
                 assertThat(tableExists(migratedJdbc, "platform_admin_command_idempotency_keys")).isTrue()
-                assertThat(latestFlywayVersion(migratedJdbc)).isEqualTo("61")
+                assertThat(latestFlywayVersion(migratedJdbc)).isEqualTo("65")
             }
         }
     }
@@ -185,7 +185,7 @@ class AdminCommandDigestKeyStartupIntegrationTest(
                     """.trimIndent(),
                     String::class.java,
                 ),
-            ).isEqualTo("61")
+            ).isEqualTo("65")
         } else {
             assertThat(generateSequence(failure) { it.cause }.mapNotNull { it.message }.toList())
                 .contains("Admin command digest keys cannot safely replay or retire persisted command references")

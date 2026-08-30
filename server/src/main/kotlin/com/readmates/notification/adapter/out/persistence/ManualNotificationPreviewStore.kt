@@ -106,12 +106,17 @@ internal class ManualNotificationPreviewStore(
                         scheduleRevision = resultSet.getLong("schedule_revision"),
                         targetSnapshotRevision = resultSet.getString("target_snapshot_revision"),
                         targetMembershipIds =
-                            resultSet.getString("target_membership_ids_json")?.let {
-                                objectMapper.readValue<List<UUID>>(
-                                    it,
-                                    objectMapper.typeFactory.constructCollectionType(List::class.java, UUID::class.java),
-                                )
-                            }.orEmpty(),
+                            resultSet
+                                .getString("target_membership_ids_json")
+                                ?.let {
+                                    objectMapper.readValue<List<UUID>>(
+                                        it,
+                                        objectMapper.typeFactory.constructCollectionType(
+                                            List::class.java,
+                                            UUID::class.java,
+                                        ),
+                                    )
+                                }.orEmpty(),
                         eligibilityFingerprint = resultSet.getString("eligibility_fingerprint").orEmpty(),
                         subject = resultSet.getString("custom_subject").orEmpty(),
                         body = resultSet.getString("custom_body").orEmpty(),

@@ -25,8 +25,8 @@ import com.readmates.session.application.model.AttendanceEntryCommand
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.service.HostSessionAttendanceService
 import com.readmates.shared.paging.PageRequest
-import com.readmates.shared.security.Sha256
 import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.Sha256
 import com.readmates.shared.security.toClubActor
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
@@ -539,7 +539,14 @@ class JdbcManualNotificationDispatchAdapterTest(
         val snapshot = adapter.previewTargets(clubId, currentSelection)
         val context = requireNotNull(adapter.findSessionContext(clubId, sessionId))
         val contentHash = "d".repeat(64)
-        val previewId = insertSnapshotPreview(now.plusMinutes(10), currentSelection, snapshot, context.scheduleRevision, contentHash)
+        val previewId =
+            insertSnapshotPreview(
+                now.plusMinutes(10),
+                currentSelection,
+                snapshot,
+                context.scheduleRevision,
+                contentHash,
+            )
 
         val dispatch = confirmed(confirm(previewId, now, currentSelection))
         val payload =
@@ -562,7 +569,14 @@ class JdbcManualNotificationDispatchAdapterTest(
         val currentSelection = selection().copy(subject = "일정 고정 제목", body = "일정 고정 본문")
         val snapshot = adapter.previewTargets(clubId, currentSelection)
         val context = requireNotNull(adapter.findSessionContext(clubId, sessionId))
-        val previewId = insertSnapshotPreview(now.plusMinutes(10), currentSelection, snapshot, context.scheduleRevision, "e".repeat(64))
+        val previewId =
+            insertSnapshotPreview(
+                now.plusMinutes(10),
+                currentSelection,
+                snapshot,
+                context.scheduleRevision,
+                "e".repeat(64),
+            )
 
         jdbcTemplate.update(
             "update sessions set schedule_revision = schedule_revision + 1 where club_id = ? and id = ?",
@@ -1409,8 +1423,11 @@ class JdbcManualNotificationDispatchAdapterTest(
 
     private fun eligibilityFingerprint(snapshot: ManualNotificationTargetSnapshot): String =
         Sha256.hex(
-            listOf(snapshot.inAppMembershipIds.sorted(), snapshot.emailMembershipIds.sorted(), snapshot.audienceRevision)
-                .joinToString("|"),
+            listOf(
+                snapshot.inAppMembershipIds.sorted(),
+                snapshot.emailMembershipIds.sorted(),
+                snapshot.audienceRevision,
+            ).joinToString("|"),
         )
 
     private fun confirmed(

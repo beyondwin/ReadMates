@@ -202,7 +202,7 @@ class HostWorkboxCursorCodec(
 
     private fun uuid(value: String?): UUID = runCatching { UUID.fromString(value) }.getOrElse { invalid() }
 
-    private fun offset(value: String?): OffsetDateTime = runCatching { OffsetDateTime.parse(value) }.getOrElse { invalid() }
+    private fun offset(value: String?) = runCatching { OffsetDateTime.parse(value) }.getOrElse { invalid() }
 
     private fun invalid(): Nothing = throw HostWorkboxCursorRestartException()
 

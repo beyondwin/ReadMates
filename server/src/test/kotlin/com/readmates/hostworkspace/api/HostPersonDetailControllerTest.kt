@@ -70,8 +70,7 @@ class HostPersonDetailControllerTest {
                     jsonPath("$.currentSchedule.state") { value("OPEN") }
                     jsonPath("$.currentSchedule.scheduleRevision") { value(7) }
                     jsonPath("$.currentRsvp") { value("GOING") }
-                }
-                .andReturn()
+                }.andReturn()
                 .response
                 .contentAsString
 

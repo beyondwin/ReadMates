@@ -35,9 +35,12 @@ class HostClubSettingsService(
     private val store: HostClubSettingsStorePort,
     private val clock: Clock = Clock.systemUTC(),
 ) : ManageHostClubSettingsUseCase {
+    private val mapping = HostClubSettingsMapping()
+    private val guards = HostClubSettingsGuards(clock)
+
     override fun get(actor: ClubActor): HostClubSettings {
-        requireManager(actor)
-        return (store.load(actor.clubId, false) ?: notFound()).toPublic()
+        guards.requireManager(actor)
+        return mapping.toPublic(store.load(actor.clubId, false) ?: guards.notFound())
     }
 
     @Transactional
@@ -45,21 +48,26 @@ class HostClubSettingsService(
         actor: ClubActor,
         command: UpdateHostClubSettingsCommand,
     ): HostClubSettingsMutationResult {
-        requireManager(actor)
-        val normalized = normalize(command)
-        val keyHash = keyHash(normalized.idempotencyKey)
+        guards.requireManager(actor)
+        val normalized = mapping.normalize(command)
+        val keyHash = mapping.keyHash(normalized.idempotencyKey)
         val requestHash =
             TokenHashing.sha256(
-                "settings\u0000${normalized.expectedRevision}\u0000${normalized.name}\u0000${normalized.approvalPolicy}\u0000${normalized.defaultTimezone}\u0000${normalized.scheduleReminderEnabled}\u0000${normalized.recordPublicationDefault}",
+                "settings\u0000${normalized.expectedRevision}\u0000${normalized.name}\u0000" +
+                    "${normalized.approvalPolicy}\u0000${normalized.defaultTimezone}\u0000" +
+                    "${normalized.scheduleReminderEnabled}\u0000${normalized.recordPublicationDefault}",
             )
         store.findCommand(actor.clubId, actor.membershipId, keyHash)?.let { replay ->
-            requireReplay(replay, requestHash)
-            return HostClubSettingsMutationResult((store.load(actor.clubId, false) ?: notFound()).toPublic(), replay.receipt(true))
+            guards.requireReplay(replay, requestHash)
+            return HostClubSettingsMutationResult(
+                mapping.toPublic(store.load(actor.clubId, false) ?: guards.notFound()),
+                mapping.receipt(replay, replayed = true),
+            )
         }
-        val current = store.load(actor.clubId, true) ?: notFound()
-        requireActive(current)
-        requireRevision(current, normalized.expectedRevision)
-        val now = now()
+        val current = store.load(actor.clubId, true) ?: guards.notFound()
+        guards.requireActive(current)
+        guards.requireRevision(current, normalized.expectedRevision)
+        val now = guards.now()
         val next =
             current.copy(
                 name = normalized.name,
@@ -69,11 +77,22 @@ class HostClubSettingsService(
                 recordPublicationDefault = normalized.recordPublicationDefault.name,
                 hostSettingsRevision = current.hostSettingsRevision + 1,
             )
-        val history = history(current, next, "SETTINGS_UPDATED", actor.membershipId, null, now)
+        val history = mapping.history(current, next, "SETTINGS_UPDATED", actor.membershipId, null, now)
         val receipt =
-            command(actor, "SETTINGS_UPDATED", keyHash, requestHash, next.hostSettingsRevision, mapOf("status" to next.status), now)
+            mapping.command(
+                actor,
+                "SETTINGS_UPDATED",
+                keyHash,
+                requestHash,
+                next.hostSettingsRevision,
+                mapOf("status" to next.status),
+                now,
+            )
         store.updateSettings(next, current.hostSettingsRevision, history, receipt)
-        return HostClubSettingsMutationResult(next.toPublic(), receipt.receipt(false))
+        return HostClubSettingsMutationResult(
+            mapping.toPublic(next),
+            mapping.receipt(receipt, replayed = false),
+        )
     }
 
     @Transactional
@@ -99,26 +118,57 @@ class HostClubSettingsService(
         idempotencyKey: String,
         promote: Boolean,
     ): HostCoHostMutationResult {
-        requireManager(actor)
-        if (expectedRevision < 0) bad("INVALID_HOST_SETTINGS_REVISION", "Revision must be non-negative")
-        val normalizedKey = normalizeKey(idempotencyKey)
+        guards.requireManager(actor)
+        if (expectedRevision < 0) {
+            guards.bad("INVALID_HOST_SETTINGS_REVISION", "Revision must be non-negative")
+        }
+        val normalizedKey = mapping.normalizeKey(idempotencyKey)
         val action = if (promote) "CO_HOST_PROMOTED" else "CO_HOST_DEMOTED"
         val role = if (promote) "HOST" else "MEMBER"
-        val keyHash = keyHash(normalizedKey)
+        val keyHash = mapping.keyHash(normalizedKey)
         val requestHash = TokenHashing.sha256("$action\u0000$membershipId\u0000$expectedRevision")
         store.findCommand(actor.clubId, actor.membershipId, keyHash)?.let { replay ->
-            requireReplay(replay, requestHash)
-            return HostCoHostMutationResult(membershipId, role, replay.resultRevision, replay.receipt(true))
+            guards.requireReplay(replay, requestHash)
+            return HostCoHostMutationResult(
+                membershipId,
+                role,
+                replay.resultRevision,
+                mapping.receipt(replay, replayed = true),
+            )
         }
-        val current = store.load(actor.clubId, true) ?: notFound()
-        requireActive(current)
-        requireRevision(current, expectedRevision)
-        val beforeRole = store.membershipRole(actor.clubId, membershipId, true) ?: notFound("HOST_SETTINGS_MEMBER_NOT_FOUND")
+        val current = store.load(actor.clubId, true) ?: guards.notFound()
+        guards.requireActive(current)
+        guards.requireRevision(current, expectedRevision)
+        val beforeRole =
+            store.membershipRole(actor.clubId, membershipId, true)
+                ?: guards.notFound("HOST_SETTINGS_MEMBER_NOT_FOUND")
         if (!promote && beforeRole == "HOST" && store.activeHostCount(actor.clubId) <= 1) {
-            conflict("LAST_ACTIVE_HOST_REQUIRED", "At least one active host is required")
+            guards.conflict("LAST_ACTIVE_HOST_REQUIRED", "At least one active host is required")
         }
-        val now = now()
-        val nextRevision = current.hostSettingsRevision + 1
+        return applyCoHostChange(
+            actor,
+            membershipId,
+            action,
+            role,
+            keyHash,
+            requestHash,
+            current.hostSettingsRevision,
+            beforeRole,
+        )
+    }
+
+    private fun applyCoHostChange(
+        actor: ClubActor,
+        membershipId: UUID,
+        action: String,
+        role: String,
+        keyHash: String,
+        requestHash: String,
+        currentRevision: Long,
+        beforeRole: String,
+    ): HostCoHostMutationResult {
+        val now = guards.now()
+        val nextRevision = currentRevision + 1
         val history =
             StoredHostClubSettingsHistory(
                 UUID.randomUUID(),
@@ -132,7 +182,7 @@ class HostClubSettingsService(
                 now,
             )
         val receipt =
-            command(
+            mapping.command(
                 actor,
                 action,
                 keyHash,
@@ -146,14 +196,19 @@ class HostClubSettingsService(
             )
         store.updateMembershipRole(actor.clubId, membershipId, role)
         store.appendHistoryAndCommand(history, receipt)
-        return HostCoHostMutationResult(membershipId, role, nextRevision, receipt.receipt(false))
+        return HostCoHostMutationResult(
+            membershipId,
+            role,
+            nextRevision,
+            mapping.receipt(receipt, replayed = false),
+        )
     }
 
     override fun history(
         actor: ClubActor,
         pageRequest: PageRequest,
     ): CursorPage<HostClubSettingsHistoryItem> {
-        requireManager(actor)
+        guards.requireManager(actor)
         val page = store.history(actor.clubId, pageRequest)
         return CursorPage(
             page.items.map {
@@ -173,10 +228,10 @@ class HostClubSettingsService(
 
     @Transactional
     override fun previewClubEnd(actor: ClubActor): HostClubClosePreview {
-        requireManager(actor)
-        val current = store.load(actor.clubId, true) ?: notFound()
-        requireActive(current)
-        val now = now()
+        guards.requireManager(actor)
+        val current = store.load(actor.clubId, true) ?: guards.notFound()
+        guards.requireActive(current)
+        val now = guards.now()
         val effects =
             linkedMapOf(
                 "clubStatus" to "ARCHIVED",
@@ -186,7 +241,8 @@ class HostClubSettingsService(
         val effectHash =
             TokenHashing.sha256(
                 "club-end\u0000${actor.clubId}\u0000${actor.membershipId}\u0000" +
-                    "${current.hostSettingsRevision}\u0000${effects.entries.joinToString("|") { "${it.key}=${it.value}" }}",
+                    "${current.hostSettingsRevision}\u0000" +
+                    effects.entries.joinToString("|") { "${it.key}=${it.value}" },
             )
         val preview =
             StoredHostClubClosePreview(
@@ -196,7 +252,7 @@ class HostClubSettingsService(
                 current.hostSettingsRevision,
                 effectHash,
                 effects,
-                now.plusMinutes(15),
+                now.plusMinutes(CLOSE_PREVIEW_TTL_MINUTES),
                 null,
                 now,
             )
@@ -219,23 +275,26 @@ class HostClubSettingsService(
         effectHash: String,
         idempotencyKey: String,
     ): HostClubCloseResult {
-        requireManager(actor)
-        val keyHash = keyHash(normalizeKey(idempotencyKey))
+        guards.requireManager(actor)
+        val keyHash = mapping.keyHash(mapping.normalizeKey(idempotencyKey))
         val requestHash = TokenHashing.sha256("club-end-confirm\u0000$previewId\u0000$effectHash")
         store.findCommand(actor.clubId, actor.membershipId, keyHash)?.let { replay ->
-            requireReplay(replay, requestHash)
-            return HostClubCloseResult(replay.receiptId, replay.safeResult["status"] ?: "ARCHIVED", replay.resultRevision, true)
+            guards.requireReplay(replay, requestHash)
+            return HostClubCloseResult(
+                replay.receiptId,
+                replay.safeResult["status"] ?: "ARCHIVED",
+                replay.resultRevision,
+                true,
+            )
         }
-        val preview = store.loadClosePreview(previewId, true) ?: notFound("HOST_CLUB_CLOSE_PREVIEW_NOT_FOUND")
-        if (preview.clubId != actor.clubId || preview.actorMembershipId != actor.membershipId || preview.effectHash != effectHash) {
-            conflict("HOST_CLUB_CLOSE_PREVIEW_MISMATCH", "Club close preview does not match")
-        }
-        if (!preview.expiresAt.isAfter(now())) conflict("HOST_CLUB_CLOSE_PREVIEW_EXPIRED", "Club close preview expired")
-        if (preview.consumedReceiptId != null) conflict("HOST_CLUB_CLOSE_PREVIEW_CONSUMED", "Club close preview was consumed")
-        val current = store.load(actor.clubId, true) ?: notFound()
-        requireActive(current)
-        requireRevision(current, preview.clubRevision)
-        val now = now()
+        val preview =
+            store.loadClosePreview(previewId, true)
+                ?: guards.notFound("HOST_CLUB_CLOSE_PREVIEW_NOT_FOUND")
+        validateClosePreview(preview, actor, effectHash)
+        val current = store.load(actor.clubId, true) ?: guards.notFound()
+        guards.requireActive(current)
+        guards.requireRevision(current, preview.clubRevision)
+        val now = guards.now()
         val nextRevision = current.hostSettingsRevision + 1
         val history =
             StoredHostClubSettingsHistory(
@@ -249,14 +308,56 @@ class HostClubSettingsService(
                 mapOf("status" to "ARCHIVED"),
                 now,
             )
-        val receipt = command(actor, "CLUB_ENDED", keyHash, requestHash, nextRevision, mapOf("status" to "ARCHIVED"), now)
+        val receipt =
+            mapping.command(
+                actor,
+                "CLUB_ENDED",
+                keyHash,
+                requestHash,
+                nextRevision,
+                mapOf("status" to "ARCHIVED"),
+                now,
+            )
         store.archiveClub(actor.clubId, current.hostSettingsRevision, previewId, receipt, history)
         return HostClubCloseResult(receipt.receiptId, "ARCHIVED", nextRevision, false)
     }
 
-    private fun normalize(command: UpdateHostClubSettingsCommand): UpdateHostClubSettingsCommand {
-        if (command.expectedRevision < 0) bad("INVALID_HOST_SETTINGS_REVISION", "Revision must be non-negative")
-        val name = command.name.trim().takeIf { it.length in 1..120 } ?: bad("INVALID_CLUB_NAME", "Club name must be 1 to 120 characters")
+    private fun validateClosePreview(
+        preview: StoredHostClubClosePreview,
+        actor: ClubActor,
+        effectHash: String,
+    ) {
+        val previewMismatch =
+            preview.clubId != actor.clubId ||
+                preview.actorMembershipId != actor.membershipId ||
+                preview.effectHash != effectHash
+        if (previewMismatch) {
+            guards.conflict("HOST_CLUB_CLOSE_PREVIEW_MISMATCH", "Club close preview does not match")
+        }
+        if (!preview.expiresAt.isAfter(guards.now())) {
+            guards.conflict("HOST_CLUB_CLOSE_PREVIEW_EXPIRED", "Club close preview expired")
+        }
+        if (preview.consumedReceiptId != null) {
+            guards.conflict(
+                "HOST_CLUB_CLOSE_PREVIEW_CONSUMED",
+                "Club close preview was consumed",
+            )
+        }
+    }
+
+    private companion object {
+        const val CLOSE_PREVIEW_TTL_MINUTES = 15L
+    }
+}
+
+private class HostClubSettingsMapping {
+    fun normalize(command: UpdateHostClubSettingsCommand): UpdateHostClubSettingsCommand {
+        if (command.expectedRevision < 0) {
+            bad("INVALID_HOST_SETTINGS_REVISION", "Revision must be non-negative")
+        }
+        val name =
+            command.name.trim().takeIf { it.length in 1..MAX_CLUB_NAME_LENGTH }
+                ?: bad("INVALID_CLUB_NAME", "Club name must be 1 to 120 characters")
         val zone =
             command.defaultTimezone.trim().also {
                 if (it !in ZoneId.getAvailableZoneIds()) {
@@ -264,7 +365,11 @@ class HostClubSettingsService(
                 }
                 ZoneId.of(it)
             }
-        return command.copy(name = name, defaultTimezone = zone, idempotencyKey = normalizeKey(command.idempotencyKey))
+        return command.copy(
+            name = name,
+            defaultTimezone = zone,
+            idempotencyKey = normalizeKey(command.idempotencyKey),
+        )
     }
 
     private fun settings(value: StoredHostClubSettings): Map<String, String?> =
@@ -276,7 +381,7 @@ class HostClubSettingsService(
             "recordPublicationDefault" to value.recordPublicationDefault,
         )
 
-    private fun history(
+    fun history(
         before: StoredHostClubSettings,
         after: StoredHostClubSettings,
         action: String,
@@ -295,7 +400,7 @@ class HostClubSettingsService(
         now,
     )
 
-    private fun command(
+    fun command(
         actor: ClubActor,
         action: String,
         keyHash: String,
@@ -315,27 +420,49 @@ class HostClubSettingsService(
         now,
     )
 
-    private fun StoredHostClubSettings.toPublic() =
+    fun toPublic(value: StoredHostClubSettings) =
         HostClubSettings(
-            clubId,
-            clubSlug,
-            name,
-            HostClubApprovalPolicy.valueOf(approvalPolicy),
-            defaultTimezone,
-            scheduleReminderEnabled,
-            HostClubRecordPublicationDefault.valueOf(recordPublicationDefault),
-            hostSettingsRevision,
-            status,
+            value.clubId,
+            value.clubSlug,
+            value.name,
+            HostClubApprovalPolicy.valueOf(value.approvalPolicy),
+            value.defaultTimezone,
+            value.scheduleReminderEnabled,
+            HostClubRecordPublicationDefault.valueOf(value.recordPublicationDefault),
+            value.hostSettingsRevision,
+            value.status,
         )
 
-    private fun StoredHostClubSettingsCommand.receipt(replayed: Boolean) =
-        HostClubSettingsReceipt(receiptId, action, resultRevision, replayed)
+    fun receipt(
+        value: StoredHostClubSettingsCommand,
+        replayed: Boolean,
+    ) = HostClubSettingsReceipt(value.receiptId, value.action, value.resultRevision, replayed)
 
-    private fun requireManager(actor: ClubActor) {
+    fun normalizeKey(value: String) =
+        value.trim().takeIf { it.length in 1..MAX_IDEMPOTENCY_KEY_LENGTH }
+            ?: bad("INVALID_IDEMPOTENCY_KEY", "Idempotency key is required")
+
+    fun keyHash(value: String) = TokenHashing.sha256("host-club-settings\u0000$value")
+
+    private fun bad(
+        code: String,
+        message: String,
+    ): Nothing = throw HostClubSettingsException(code, HostClubSettingsError.BAD_REQUEST, message)
+
+    private companion object {
+        const val MAX_CLUB_NAME_LENGTH = 120
+        const val MAX_IDEMPOTENCY_KEY_LENGTH = 200
+    }
+}
+
+private class HostClubSettingsGuards(
+    private val clock: Clock,
+) {
+    fun requireManager(actor: ClubActor) {
         if (!actor.can(ClubCapability.MANAGE_MEMBERS)) forbidden("HOST_REQUIRED", "Host role required")
     }
 
-    private fun requireActive(settings: StoredHostClubSettings) {
+    fun requireActive(settings: StoredHostClubSettings) {
         if (settings.status !=
             "ACTIVE"
         ) {
@@ -343,7 +470,7 @@ class HostClubSettingsService(
         }
     }
 
-    private fun requireRevision(
+    fun requireRevision(
         settings: StoredHostClubSettings,
         expected: Long,
     ) {
@@ -354,7 +481,7 @@ class HostClubSettingsService(
         }
     }
 
-    private fun requireReplay(
+    fun requireReplay(
         replay: StoredHostClubSettingsCommand,
         requestHash: String,
     ) {
@@ -365,17 +492,12 @@ class HostClubSettingsService(
         }
     }
 
-    private fun normalizeKey(value: String) =
-        value.trim().takeIf { it.length in 1..200 } ?: bad("INVALID_IDEMPOTENCY_KEY", "Idempotency key is required")
+    fun now() = OffsetDateTime.now(clock)
 
-    private fun keyHash(value: String) = TokenHashing.sha256("host-club-settings\u0000$value")
-
-    private fun now() = OffsetDateTime.now(clock)
-
-    private fun notFound(code: String = "HOST_CLUB_SETTINGS_NOT_FOUND"): Nothing =
+    fun notFound(code: String = "HOST_CLUB_SETTINGS_NOT_FOUND"): Nothing =
         throw HostClubSettingsException(code, HostClubSettingsError.NOT_FOUND, "Host club settings not found")
 
-    private fun bad(
+    fun bad(
         code: String,
         message: String,
     ): Nothing = throw HostClubSettingsException(code, HostClubSettingsError.BAD_REQUEST, message)
@@ -385,7 +507,7 @@ class HostClubSettingsService(
         message: String,
     ): Nothing = throw HostClubSettingsException(code, HostClubSettingsError.FORBIDDEN, message)
 
-    private fun conflict(
+    fun conflict(
         code: String,
         message: String,
     ): Nothing = throw HostClubSettingsException(code, HostClubSettingsError.CONFLICT, message)

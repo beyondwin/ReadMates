@@ -25,13 +25,26 @@ class HostInvitationLinkServiceTest {
     private val clock = Clock.fixed(Instant.parse("2026-08-30T00:00:00Z"), ZoneOffset.UTC)
     private val clubId = UUID.randomUUID()
     private val hostId = UUID.randomUUID()
-    private val actor = ClubActor(UUID.randomUUID(), hostId, clubId, "reading-room", setOf(ClubCapability.MANAGE_INVITATIONS))
+    private val actor =
+        ClubActor(
+            UUID.randomUUID(),
+            hostId,
+            clubId,
+            "reading-room",
+            setOf(ClubCapability.MANAGE_INVITATIONS),
+        )
     private val store = FakeStore()
     private val service = HostInvitationLinkService(store, InvitationTokenService(), clock)
 
     @Test
     fun `create discloses one path once and replay returns receipt without secret`() {
-        val command = CreateHostInvitationLinkCommand("  가을 신규 멤버  ", 3, OffsetDateTime.parse("2026-09-30T00:00:00Z"), "command-1")
+        val command =
+            CreateHostInvitationLinkCommand(
+                "  가을 신규 멤버  ",
+                3,
+                OffsetDateTime.parse("2026-09-30T00:00:00Z"),
+                "command-1",
+            )
 
         val created = service.create(actor, command)
         val replayed = service.create(actor, command)
@@ -46,10 +59,26 @@ class HostInvitationLinkServiceTest {
 
     @Test
     fun `same idempotency key with a different canonical command conflicts`() {
-        service.create(actor, CreateHostInvitationLinkCommand("첫 이름", 2, OffsetDateTime.parse("2026-09-30T00:00:00Z"), "same-key"))
+        service.create(
+            actor,
+            CreateHostInvitationLinkCommand(
+                "첫 이름",
+                2,
+                OffsetDateTime.parse("2026-09-30T00:00:00Z"),
+                "same-key",
+            ),
+        )
 
         assertThatThrownBy {
-            service.create(actor, CreateHostInvitationLinkCommand("다른 이름", 2, OffsetDateTime.parse("2026-09-30T00:00:00Z"), "same-key"))
+            service.create(
+                actor,
+                CreateHostInvitationLinkCommand(
+                    "다른 이름",
+                    2,
+                    OffsetDateTime.parse("2026-09-30T00:00:00Z"),
+                    "same-key",
+                ),
+            )
         }.isInstanceOf(InvitationDomainException::class.java)
             .extracting("code")
             .isEqualTo("INVITATION_LINK_IDEMPOTENCY_CONFLICT")
@@ -135,7 +164,15 @@ class HostInvitationLinkServiceTest {
     fun `member without invitation capability is denied before store access`() {
         val member = actor.copy(capabilities = emptySet())
         assertThatThrownBy {
-            service.create(member, CreateHostInvitationLinkCommand("초대", 1, OffsetDateTime.parse("2026-09-30T00:00:00Z"), "denied"))
+            service.create(
+                member,
+                CreateHostInvitationLinkCommand(
+                    "초대",
+                    1,
+                    OffsetDateTime.parse("2026-09-30T00:00:00Z"),
+                    "denied",
+                ),
+            )
         }.isInstanceOf(InvitationDomainException::class.java)
             .extracting("code")
             .isEqualTo("HOST_REQUIRED")
@@ -193,7 +230,11 @@ class HostInvitationLinkServiceTest {
             clubId: UUID,
             linkId: UUID,
             pageRequest: PageRequest,
-        ): CursorPage<StoredHostInvitationLinkEvent> = CursorPage(events.filter { it.clubId == clubId && it.linkId == linkId }, null)
+        ): CursorPage<StoredHostInvitationLinkEvent> =
+            CursorPage(
+                events.filter { it.clubId == clubId && it.linkId == linkId },
+                null,
+            )
 
         override fun findByTokenHash(
             tokenHash: String,

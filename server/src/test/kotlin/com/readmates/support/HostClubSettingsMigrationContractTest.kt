@@ -10,7 +10,10 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.jdbc.Sql
 
 @SpringBootTest(properties = ["spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev"])
-@Sql(statements = [HostClubSettingsMigrationContractTest.CLEANUP], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
+@Sql(
+    statements = [HostClubSettingsMigrationContractTest.CLEANUP],
+    executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+)
 @Tag("integration")
 class HostClubSettingsMigrationContractTest(
     @param:Autowired private val jdbc: JdbcTemplate,

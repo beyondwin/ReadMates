@@ -208,15 +208,16 @@ internal class NotificationDeliveryRowMappers(
         clubName: String,
         displayName: String?,
     ): DeliveryCopy {
-        val rendered = copyFor(
-            eventType = eventType,
-            sessionId = payload.sessionId ?: aggregateId,
-            sessionNumber = payload.sessionNumber ?: 0,
-            bookTitle = payload.bookTitle ?: "선정 도서",
-            clubName = clubName,
-            clubSlug = clubSlug,
-            displayName = displayName,
-        )
+        val rendered =
+            copyFor(
+                eventType = eventType,
+                sessionId = payload.sessionId ?: aggregateId,
+                sessionNumber = payload.sessionNumber ?: 0,
+                bookTitle = payload.bookTitle ?: "선정 도서",
+                clubName = clubName,
+                clubSlug = clubSlug,
+                displayName = displayName,
+            )
         val customCopy = payload.manualDispatch?.customCopy ?: return rendered
         return rendered.copy(
             title = customCopy.subject,

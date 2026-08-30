@@ -27,6 +27,8 @@ class JdbcHostClubSettingsAdapter(
     private val jdbc: JdbcTemplate,
     private val objectMapper: ObjectMapper,
 ) : HostClubSettingsStorePort {
+    private val persistence = HostClubSettingsPersistence(jdbc, objectMapper)
+
     override fun load(
         clubId: UUID,
         forUpdate: Boolean,
@@ -38,7 +40,7 @@ class JdbcHostClubSettingsAdapter(
                        record_publication_default, host_settings_revision, status
                 from clubs where id = ? ${if (forUpdate) "for update" else ""}
                 """.trimIndent(),
-                { rs, _ -> rs.toSettings() },
+                { rs, _ -> persistence.toSettings(rs) },
                 clubId.dbString(),
             ).firstOrNull()
 
@@ -49,8 +51,11 @@ class JdbcHostClubSettingsAdapter(
     ): StoredHostClubSettingsCommand? =
         jdbc
             .query(
-                "select * from host_club_command_receipts where club_id = ? and actor_membership_id = ? and idempotency_key_hash = ?",
-                { rs, _ -> rs.toCommand() },
+                """
+                select * from host_club_command_receipts
+                where club_id = ? and actor_membership_id = ? and idempotency_key_hash = ?
+                """.trimIndent(),
+                { rs, _ -> persistence.toCommand(rs) },
                 clubId.dbString(),
                 actorMembershipId.dbString(),
                 keyHash,
@@ -78,9 +83,9 @@ class JdbcHostClubSettingsAdapter(
                 next.clubId.dbString(),
                 expectedRevision,
             )
-        requireChanged(changed)
-        insertHistory(history)
-        insertCommand(command)
+        persistence.requireChanged(changed)
+        persistence.insertHistory(history)
+        persistence.insertCommand(command)
     }
 
     override fun activeHostCount(clubId: UUID): Int =
@@ -98,7 +103,11 @@ class JdbcHostClubSettingsAdapter(
     ): String? =
         jdbc
             .query(
-                "select role from memberships where club_id = ? and id = ? and status = 'ACTIVE' ${if (forUpdate) "for update" else ""}",
+                """
+                select role from memberships
+                where club_id = ? and id = ? and status = 'ACTIVE'
+                ${if (forUpdate) "for update" else ""}
+                """.trimIndent(),
                 { rs, _ -> rs.getString("role") },
                 clubId.dbString(),
                 membershipId.dbString(),
@@ -110,14 +119,21 @@ class JdbcHostClubSettingsAdapter(
         role: String,
     ) {
         if (jdbc.update(
-                "update memberships set role = ?, updated_at = utc_timestamp(6) where club_id = ? and id = ? and status = 'ACTIVE'",
+                """
+                update memberships set role = ?, updated_at = utc_timestamp(6)
+                where club_id = ? and id = ? and status = 'ACTIVE'
+                """.trimIndent(),
                 role,
                 clubId.dbString(),
                 membershipId.dbString(),
             ) !=
             1
         ) {
-            throw HostClubSettingsException("HOST_SETTINGS_MEMBER_NOT_FOUND", HostClubSettingsError.NOT_FOUND, "Member not found")
+            throw HostClubSettingsException(
+                "HOST_SETTINGS_MEMBER_NOT_FOUND",
+                HostClubSettingsError.NOT_FOUND,
+                "Member not found",
+            )
         }
     }
 
@@ -127,14 +143,17 @@ class JdbcHostClubSettingsAdapter(
     ) {
         val changed =
             jdbc.update(
-                "update clubs set host_settings_revision = ?, updated_at = utc_timestamp(6) where id = ? and host_settings_revision = ? and status = 'ACTIVE'",
+                """
+                update clubs set host_settings_revision = ?, updated_at = utc_timestamp(6)
+                where id = ? and host_settings_revision = ? and status = 'ACTIVE'
+                """.trimIndent(),
                 history.revision,
                 history.clubId.dbString(),
                 history.revision - 1,
             )
-        requireChanged(changed)
-        insertHistory(history)
-        insertCommand(command)
+        persistence.requireChanged(changed)
+        persistence.insertHistory(history)
+        persistence.insertCommand(command)
     }
 
     override fun history(
@@ -149,7 +168,7 @@ class JdbcHostClubSettingsAdapter(
                 where club_id = ? and (? is null or occurred_at < ? or (occurred_at = ? and id < ?))
                 order by occurred_at desc, id desc limit ?
                 """.trimIndent(),
-                { rs, _ -> rs.toHistory() },
+                { rs, _ -> persistence.toHistory(rs) },
                 clubId.dbString(),
                 cursor?.occurredAt,
                 cursor?.occurredAt?.toUtcLocalDateTime(),
@@ -202,7 +221,7 @@ class JdbcHostClubSettingsAdapter(
         jdbc
             .query(
                 "select * from host_club_close_previews where id = ? ${if (forUpdate) "for update" else ""}",
-                { rs, _ -> rs.toPreview() },
+                { rs, _ -> persistence.toPreview(rs) },
                 previewId.dbString(),
             ).firstOrNull()
 
@@ -213,18 +232,24 @@ class JdbcHostClubSettingsAdapter(
         command: StoredHostClubSettingsCommand,
         history: StoredHostClubSettingsHistory,
     ) {
-        requireChanged(
+        persistence.requireChanged(
             jdbc.update(
-                "update clubs set status = 'ARCHIVED', host_settings_revision = ?, updated_at = utc_timestamp(6) where id = ? and host_settings_revision = ? and status = 'ACTIVE'",
+                """
+                update clubs set status = 'ARCHIVED', host_settings_revision = ?, updated_at = utc_timestamp(6)
+                where id = ? and host_settings_revision = ? and status = 'ACTIVE'
+                """.trimIndent(),
                 expectedRevision + 1,
                 clubId.dbString(),
                 expectedRevision,
             ),
         )
-        insertHistory(history)
-        insertCommand(command)
+        persistence.insertHistory(history)
+        persistence.insertCommand(command)
         if (jdbc.update(
-                "update host_club_close_previews set consumed_receipt_id = ? where id = ? and consumed_receipt_id is null",
+                """
+                update host_club_close_previews set consumed_receipt_id = ?
+                where id = ? and consumed_receipt_id is null
+                """.trimIndent(),
                 command.receiptId.dbString(),
                 previewId.dbString(),
             ) !=
@@ -237,8 +262,13 @@ class JdbcHostClubSettingsAdapter(
             )
         }
     }
+}
 
-    private fun insertHistory(value: StoredHostClubSettingsHistory) {
+private class HostClubSettingsPersistence(
+    private val jdbc: JdbcTemplate,
+    private val objectMapper: ObjectMapper,
+) {
+    fun insertHistory(value: StoredHostClubSettingsHistory) {
         jdbc.update(
             """
             insert into host_club_settings_history
@@ -257,7 +287,7 @@ class JdbcHostClubSettingsAdapter(
         )
     }
 
-    private fun insertCommand(value: StoredHostClubSettingsCommand) {
+    fun insertCommand(value: StoredHostClubSettingsCommand) {
         jdbc.update(
             """
             insert into host_club_command_receipts
@@ -276,65 +306,77 @@ class JdbcHostClubSettingsAdapter(
         )
     }
 
-    private fun requireChanged(changed: Int) {
+    fun requireChanged(changed: Int) {
         if (changed !=
             1
         ) {
-            throw HostClubSettingsException("HOST_SETTINGS_STALE", HostClubSettingsError.CONFLICT, "Club settings changed")
+            throw HostClubSettingsException(
+                "HOST_SETTINGS_STALE",
+                HostClubSettingsError.CONFLICT,
+                "Club settings changed",
+            )
         }
     }
 
-    private fun ResultSet.toSettings() =
-        StoredHostClubSettings(
-            uuid("id"),
-            getString("slug"),
-            getString("name"),
-            getString("approval_policy"),
-            getString("default_timezone"),
-            getBoolean("schedule_reminder_enabled"),
-            getString("record_publication_default"),
-            getLong("host_settings_revision"),
-            getString("status"),
-        )
+    fun toSettings(resultSet: ResultSet) =
+        resultSet.run {
+            StoredHostClubSettings(
+                uuid("id"),
+                getString("slug"),
+                getString("name"),
+                getString("approval_policy"),
+                getString("default_timezone"),
+                getBoolean("schedule_reminder_enabled"),
+                getString("record_publication_default"),
+                getLong("host_settings_revision"),
+                getString("status"),
+            )
+        }
 
-    private fun ResultSet.toCommand() =
-        StoredHostClubSettingsCommand(
-            uuid("id"),
-            uuid("club_id"),
-            uuid("actor_membership_id"),
-            getString("action"),
-            getString("idempotency_key_hash"),
-            getString("request_hash"),
-            getLong("result_revision"),
-            objectMapper.readValue(getString("safe_result_json"), nullableMapType),
-            utcOffsetDateTime("occurred_at"),
-        )
+    fun toCommand(resultSet: ResultSet) =
+        resultSet.run {
+            StoredHostClubSettingsCommand(
+                uuid("id"),
+                uuid("club_id"),
+                uuid("actor_membership_id"),
+                getString("action"),
+                getString("idempotency_key_hash"),
+                getString("request_hash"),
+                getLong("result_revision"),
+                objectMapper.readValue(getString("safe_result_json"), nullableMapType),
+                utcOffsetDateTime("occurred_at"),
+            )
+        }
 
-    private fun ResultSet.toHistory() =
-        StoredHostClubSettingsHistory(
-            uuid("id"),
-            uuid("club_id"),
-            getLong("revision"),
-            getString("action"),
-            uuid("actor_membership_id"),
-            getString("subject_membership_id")?.let(UUID::fromString),
-            objectMapper.readValue(getString("before_settings_json"), nullableMapType),
-            objectMapper.readValue(getString("after_settings_json"), nullableMapType),
-            utcOffsetDateTime("occurred_at"),
-        )
+    fun toHistory(resultSet: ResultSet) =
+        resultSet.run {
+            StoredHostClubSettingsHistory(
+                uuid("id"),
+                uuid("club_id"),
+                getLong("revision"),
+                getString("action"),
+                uuid("actor_membership_id"),
+                getString("subject_membership_id")?.let(UUID::fromString),
+                objectMapper.readValue(getString("before_settings_json"), nullableMapType),
+                objectMapper.readValue(getString("after_settings_json"), nullableMapType),
+                utcOffsetDateTime("occurred_at"),
+            )
+        }
 
-    private fun ResultSet.toPreview() =
-        StoredHostClubClosePreview(
-            uuid("id"),
-            uuid("club_id"),
-            uuid("actor_membership_id"),
-            getLong("club_revision"),
-            getString("effect_hash"),
-            objectMapper.readValue(getString("effects_json"), stringMapType),
-            utcOffsetDateTime("expires_at"),
-            getString("consumed_receipt_id")?.let(UUID::fromString),
-            utcOffsetDateTime("created_at"),
-        )
+    fun toPreview(resultSet: ResultSet) =
+        resultSet.run {
+            StoredHostClubClosePreview(
+                uuid("id"),
+                uuid("club_id"),
+                uuid("actor_membership_id"),
+                getLong("club_revision"),
+                getString("effect_hash"),
+                objectMapper.readValue(getString("effects_json"), stringMapType),
+                utcOffsetDateTime("expires_at"),
+                getString("consumed_receipt_id")?.let(UUID::fromString),
+                utcOffsetDateTime("created_at"),
+            )
+        }
 
     private companion object {
         val nullableMapType = object : TypeReference<Map<String, String?>>() {}
@@ -348,8 +390,9 @@ private data class SettingsCursor(
 ) {
     companion object {
         fun from(value: Map<String, String>): SettingsCursor? {
-            val at = value["occurredAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() } ?: return null
-            return SettingsCursor(at, value["id"]?.takeIf(String::isNotBlank) ?: return null)
+            val at = value["occurredAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
+            val id = value["id"]?.takeIf(String::isNotBlank) ?: return null
+            return at?.let { SettingsCursor(it, id) }
         }
     }
 }

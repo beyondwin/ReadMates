@@ -497,10 +497,10 @@ class JdbcHostWorkSourceAuthorityTest(
 
     private fun sessionId(suffix: String) = UUID.fromString("91000000-0000-0000-0000-${suffix.padStart(12, '0')}")
 
-    private fun closingSessionId(suffix: String) =
-        UUID.fromString("93000000-0000-0000-0000-${suffix.padStart(12, '0')}")
+    private fun closingSessionId(suffix: String) = UUID.fromString("$CLOSING_SESSION_PREFIX${suffix.padStart(12, '0')}")
 
     companion object {
+        private const val CLOSING_SESSION_PREFIX = "93000000-0000-0000-0000-"
         private val CLUB_ID = UUID.fromString("00000000-0000-0000-0000-000000000001")
         private val HOST_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000101")
         private val HOST_MEMBERSHIP_ID = UUID.fromString("00000000-0000-0000-0000-000000000201")

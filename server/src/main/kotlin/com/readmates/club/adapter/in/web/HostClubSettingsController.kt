@@ -55,21 +55,34 @@ class HostClubSettingsController(
         currentMember: CurrentMember,
         @PathVariable membershipId: UUID,
         @RequestBody request: HostClubRevisionCommandRequest,
-    ) = settings.promoteCoHost(currentMember.toClubActor(), membershipId, request.expectedRevision, request.idempotencyKey)
+    ) = settings.promoteCoHost(
+        currentMember.toClubActor(),
+        membershipId,
+        request.expectedRevision,
+        request.idempotencyKey,
+    )
 
     @PostMapping("/co-hosts/{membershipId}/demote")
     fun demote(
         currentMember: CurrentMember,
         @PathVariable membershipId: UUID,
         @RequestBody request: HostClubRevisionCommandRequest,
-    ) = settings.demoteCoHost(currentMember.toClubActor(), membershipId, request.expectedRevision, request.idempotencyKey)
+    ) = settings.demoteCoHost(
+        currentMember.toClubActor(),
+        membershipId,
+        request.expectedRevision,
+        request.idempotencyKey,
+    )
 
     @GetMapping("/history")
     fun history(
         currentMember: CurrentMember,
         @RequestParam(required = false) limit: Int?,
         @RequestParam(required = false) cursor: String?,
-    ) = settings.history(currentMember.toClubActor(), PageRequest.cursor(limit, cursor, 20, 100))
+    ) = settings.history(
+        currentMember.toClubActor(),
+        PageRequest.cursor(limit, cursor, DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT),
+    )
 
     @PostMapping("/end/preview")
     fun previewEnd(currentMember: CurrentMember) = settings.previewClubEnd(currentMember.toClubActor())
@@ -78,7 +91,12 @@ class HostClubSettingsController(
     fun confirmEnd(
         currentMember: CurrentMember,
         @RequestBody request: ConfirmHostClubEndRequest,
-    ) = settings.confirmClubEnd(currentMember.toClubActor(), request.previewId, request.effectHash, request.idempotencyKey)
+    ) = settings.confirmClubEnd(
+        currentMember.toClubActor(),
+        request.previewId,
+        request.effectHash,
+        request.idempotencyKey,
+    )
 
     private inline fun <reified T : Enum<T>> enumValue(value: String): T =
         runCatching { enumValueOf<T>(value.trim().uppercase()) }
@@ -89,6 +107,11 @@ class HostClubSettingsController(
                     "Invalid club setting",
                 )
             }
+
+    private companion object {
+        const val DEFAULT_PAGE_LIMIT = 20
+        const val MAX_PAGE_LIMIT = 100
+    }
 }
 
 data class UpdateHostClubSettingsRequest(

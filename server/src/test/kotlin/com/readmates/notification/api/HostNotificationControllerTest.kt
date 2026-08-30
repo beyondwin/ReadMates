@@ -570,7 +570,11 @@ class HostNotificationControllerTest(
             assertThat(reminder.get("defaultBody").asText()).isNotBlank()
             assertThat(reminder.get("allowedAudiences").toString()).contains("SELECTED_MEMBERS")
             assertThat(
-                tools.jackson.databind.ObjectMapper().readTree(response).at("/session/scheduleRevision").asLong(),
+                tools.jackson.databind
+                    .ObjectMapper()
+                    .readTree(response)
+                    .at("/session/scheduleRevision")
+                    .asLong(),
             ).isGreaterThanOrEqualTo(0)
         }
     }
@@ -1172,7 +1176,11 @@ class HostNotificationControllerTest(
             }.andReturn()
             .response.contentAsString
             .let {
-                tools.jackson.databind.ObjectMapper().readTree(it).get("previewId").asText()
+                tools.jackson.databind
+                    .ObjectMapper()
+                    .readTree(it)
+                    .get("previewId")
+                    .asText()
             }
 
     private fun currentScheduleRevision(): Long =

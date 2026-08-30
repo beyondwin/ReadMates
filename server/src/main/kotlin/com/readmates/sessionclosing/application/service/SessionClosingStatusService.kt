@@ -5,15 +5,13 @@ import com.readmates.sessionclosing.application.model.ClosingChecklistId
 import com.readmates.sessionclosing.application.model.ClosingChecklistItem
 import com.readmates.sessionclosing.application.model.ClosingChecklistState
 import com.readmates.sessionclosing.application.model.ClosingEvidence
-import com.readmates.sessionclosing.application.model.ClosingOverall
-import com.readmates.sessionclosing.application.model.ClosingOverallState
-import com.readmates.sessionclosing.application.model.ClosingPrimaryAction
 import com.readmates.sessionclosing.application.model.ClosingSessionSummary
 import com.readmates.sessionclosing.application.model.FeedbackDocumentClosingState
 import com.readmates.sessionclosing.application.model.HostSessionClosingStatus
 import com.readmates.sessionclosing.application.model.NotificationClosingStatus
 import com.readmates.sessionclosing.application.model.SessionClosingSnapshot
 import com.readmates.sessionclosing.application.model.SessionRecordReadinessPolicy
+import com.readmates.sessionclosing.application.model.closingDecision
 import com.readmates.sessionclosing.application.port.`in`.GetHostSessionClosingStatusUseCase
 import com.readmates.sessionclosing.application.port.out.LoadSessionClosingStatusPort
 import com.readmates.sessionrecord.application.model.SessionRecordVisibility
@@ -60,7 +58,7 @@ private fun SessionClosingSnapshot.toClosingStatus(): HostSessionClosingStatus {
                 participantSetRevision,
                 attendanceSnapshotId,
             ),
-        overall = closingDecision(signals),
+        overall = closingDecision(),
         checklist = checklistItems(signals),
         evidence = evidence(),
     )
@@ -86,36 +84,6 @@ private fun SessionClosingSnapshot.closingSignals() =
         publicApplicable = recordVisibility == SessionRecordVisibility.PUBLIC,
         publicReady = recordVisibility == SessionRecordVisibility.PUBLIC && publicVisible && publicRecordHref != null,
     )
-
-internal fun SessionClosingSnapshot.closingDecision(): ClosingOverall = closingDecision(closingSignals())
-
-private fun closingDecision(signals: ClosingSignals): ClosingOverall =
-    when {
-        signals.feedbackBlocked -> overall(ClosingOverallState.BLOCKED, ClosingPrimaryAction.IMPORT_RECORDS)
-        !signals.sessionClosed -> overall(ClosingOverallState.IN_PROGRESS, ClosingPrimaryAction.CLOSE_SESSION)
-        !signals.recordSaved -> overall(ClosingOverallState.IN_PROGRESS, ClosingPrimaryAction.IMPORT_RECORDS)
-        !signals.feedbackReady -> overall(ClosingOverallState.IN_PROGRESS, ClosingPrimaryAction.IMPORT_RECORDS)
-        !signals.notificationSent -> overall(ClosingOverallState.READY, ClosingPrimaryAction.SEND_NOTIFICATION)
-        signals.publicApplicable && !signals.publicReady ->
-            overall(ClosingOverallState.READY, ClosingPrimaryAction.PUBLISH_RECORDS)
-        signals.publicReady -> overall(ClosingOverallState.PUBLISHED, ClosingPrimaryAction.REVIEW_PUBLIC_PAGE)
-        else -> overall(ClosingOverallState.READY, ClosingPrimaryAction.NONE)
-    }
-
-private fun overall(
-    state: ClosingOverallState,
-    primaryAction: ClosingPrimaryAction,
-) = ClosingOverall(state, state.label, primaryAction)
-
-private val ClosingOverallState.label: String
-    get() =
-        when (this) {
-            ClosingOverallState.BLOCKED -> "Blocked"
-            ClosingOverallState.IN_PROGRESS -> "In progress"
-            ClosingOverallState.READY -> "Ready"
-            ClosingOverallState.PUBLISHED -> "Published"
-            ClosingOverallState.NOT_STARTED -> "Not started"
-        }
 
 private fun SessionClosingSnapshot.checklistItems(signals: ClosingSignals) =
     listOf(

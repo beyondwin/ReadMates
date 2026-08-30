@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useLoaderData,
   useLocation,
@@ -19,7 +19,7 @@ import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import type { HostSessionDetailResponse } from "@/features/host/api/host-contracts";
 import type { HostSessionChangeReceipt } from "@/features/host/api/host-session-recovery-contracts";
-import type { HostWorkboxState } from "@/features/host/api/host-workbox-contracts";
+import type { HostWorkboxPage, HostWorkboxState } from "@/features/host/api/host-workbox-contracts";
 import type { HostWorkboxItem } from "@/features/host/api/host-workbox-contracts";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import {
@@ -133,7 +133,7 @@ export function HostDashboardRoute({
   const revalidator = useRevalidator();
   const sessionId = loaderData.operatingRoom.currentMeeting?.sessionId ?? null;
   const [workboxState, setWorkboxState] = useState<HostWorkboxState>("NOW");
-  const [workboxCursor, setWorkboxCursor] = useState<string | null>(null);
+  const [workboxCursors, setWorkboxCursors] = useState<readonly (string | null)[]>([null]);
   const [workboxPendingKey, setWorkboxPendingKey] = useState<string | null>(null);
   const workboxMutationKeyRef = useRef<string | null>(null);
   const [workboxRowError, setWorkboxRowError] = useState<{ key: string; message: string } | null>(null);
@@ -142,9 +142,11 @@ export function HostDashboardRoute({
     ...hostWorkboxPageQuery({ state: "NOW", limit: 20 }, context),
     retry: false,
   });
-  const workboxQuery = useQuery({
-    ...hostWorkboxPageQuery({ state: workboxState, cursor: workboxCursor, limit: 20 }, context),
-    retry: false,
+  const workboxQueries = useQueries({
+    queries: workboxCursors.map((cursor) => ({
+      ...hostWorkboxPageQuery({ state: workboxState, cursor, limit: 20 }, context),
+      retry: false,
+    })),
   });
   const deferWorkboxMutation = useDeferHostWorkboxItemMutation(context);
   const removeWorkboxDeferralMutation = useRemoveHostWorkboxDeferralMutation(context);
@@ -495,7 +497,15 @@ export function HostDashboardRoute({
   const dDayLabel = view.meeting
     ? formatSessionKicker(view.meeting.sessionNumber, view.meeting.date).split(" · ")[1] ?? null
     : null;
-  const workboxView = workboxQuery.data ? buildHostWorkboxView(workboxQuery.data) : null;
+  const loadedWorkboxPage = useMemo(
+    () => mergeWorkboxPages(
+      workboxQueries.flatMap((query) => query.data?.state === workboxState ? [query.data] : []),
+    ),
+    [workboxQueries, workboxState],
+  );
+  const workboxView = loadedWorkboxPage ? buildHostWorkboxView(loadedWorkboxPage) : null;
+  const workboxLoading = workboxQueries.some((query) => query.isPending || query.isFetching);
+  const workboxError = workboxQueries.some((query) => query.isError);
 
   const deferWorkItem = useCallback(async (
     workItemKey: string,
@@ -547,18 +557,18 @@ export function HostDashboardRoute({
     <HostWorkbox
       state={workboxState}
       view={workboxView}
-      loading={workboxQuery.isPending || workboxQuery.isFetching}
-      error={workboxQuery.isError ? "작업함을 불러오지 못했습니다." : null}
+      loading={workboxLoading}
+      error={workboxError ? "작업함을 불러오지 못했습니다." : null}
       pendingKey={workboxPendingKey}
       rowError={workboxRowError}
       onStateChange={(nextState) => {
         setWorkboxState(nextState);
-        setWorkboxCursor(null);
+        setWorkboxCursors([null]);
         setWorkboxRowError(null);
       }}
-      onRetry={() => { void workboxQuery.refetch(); }}
+      onRetry={() => { void Promise.all(workboxQueries.map((query) => query.refetch())); }}
       onLoadMore={(cursor) => {
-        setWorkboxCursor(cursor);
+        setWorkboxCursors((current) => current.includes(cursor) ? current : [...current, cursor]);
         setWorkboxRowError(null);
       }}
       onDefer={(key, option) => { void deferWorkItem(key, option); }}
@@ -712,6 +722,22 @@ function hostRoutePaths(clubSlug: string): HostRoutePaths {
 
 function hostSessionHref(hostBasePath: string, sessionId: string, suffix = ""): string {
   return `${hostBasePath}/sessions/${encodeURIComponent(sessionId)}${suffix}`;
+}
+
+function mergeWorkboxPages(pages: readonly HostWorkboxPage[]): HostWorkboxPage | null {
+  const first = pages[0];
+  const last = pages.at(-1);
+  if (!first || !last) return null;
+  const seen = new Set<string>();
+  return {
+    ...last,
+    evaluatedAt: first.evaluatedAt,
+    items: pages.flatMap((page) => page.items.filter((item) => {
+      if (seen.has(item.key)) return false;
+      seen.add(item.key);
+      return true;
+    })),
+  };
 }
 
 function todayIsoDate(now = new Date()): string {

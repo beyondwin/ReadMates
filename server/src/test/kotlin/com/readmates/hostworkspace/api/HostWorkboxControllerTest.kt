@@ -229,7 +229,7 @@ private val HOST =
     )
 private val currentMemberResolver =
     object : HandlerMethodArgumentResolver {
-        override fun supportsParameter(parameter: MethodParameter) = parameter.parameterType == CurrentMember::class.java
+        override fun supportsParameter(parameter: MethodParameter): Boolean = parameter.parameterType == memberType
 
         override fun resolveArgument(
             _parameter: MethodParameter,
@@ -238,3 +238,5 @@ private val currentMemberResolver =
             _binderFactory: WebDataBinderFactory?,
         ): Any = HOST
     }
+
+private val memberType = CurrentMember::class.java

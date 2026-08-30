@@ -33,6 +33,17 @@ vi.mock("@tanstack/react-query", () => ({
       return { data: routeMocks.detailRefetchData ?? query.testData };
     },
   }),
+  useQueries: ({
+    queries,
+  }: {
+    queries: Array<{ testData?: unknown; enabled?: boolean }>;
+  }) =>
+    queries.map((query) => ({
+      data: query.enabled === false ? undefined : query.testData,
+      isError: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    })),
   useQueryClient: () => ({
     fetchQuery: (query: { queryFn?: () => unknown }) => query.queryFn?.(),
   }),

@@ -207,7 +207,7 @@ class JdbcHostPersonDetailAdapter(
               sp.participation_status,
               sp.attendance_status,
               sp.attendance_revision
-            from sessions s
+            from active_sessions s
             join session_participants sp on sp.club_id = s.club_id and sp.session_id = s.id
             where s.club_id = ?
               and sp.membership_id = ?

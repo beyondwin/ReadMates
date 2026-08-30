@@ -16,7 +16,7 @@ const fieldLabels: Record<string, string> = {
   approvalPolicy: "가입 승인",
   defaultTimezone: "기본 시간대",
   scheduleReminderEnabled: "일정 알림",
-  recordPublicationDefault: "기록 공개 범위",
+  recordPublicationDefault: "기록 기본 공개 범위",
   status: "클럽 상태",
   role: "멤버 역할",
 };

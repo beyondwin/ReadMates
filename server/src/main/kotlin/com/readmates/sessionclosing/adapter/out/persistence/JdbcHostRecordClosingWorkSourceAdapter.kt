@@ -10,12 +10,12 @@ import com.readmates.sessionclosing.application.model.FeedbackDocumentClosingSta
 import com.readmates.sessionclosing.application.model.NotificationClosingEvent
 import com.readmates.sessionclosing.application.model.NotificationClosingStatus
 import com.readmates.sessionclosing.application.model.SessionClosingSnapshot
+import com.readmates.sessionclosing.application.model.closingDecision
 import com.readmates.sessionclosing.application.port.out.HostRecordClosingVersionVector
 import com.readmates.sessionclosing.application.port.out.HostRecordClosingWorkSourceQuery
 import com.readmates.sessionclosing.application.port.out.HostRecordClosingWorkSourceQueryPort
 import com.readmates.sessionclosing.application.port.out.HostRecordClosingWorkSourceQueryResult
 import com.readmates.sessionclosing.application.port.out.HostRecordClosingWorkSourceRow
-import com.readmates.sessionclosing.application.service.closingDecision
 import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.toUtcLocalDateTime
@@ -123,7 +123,7 @@ private fun ResultSet.toCompletedRow(): HostRecordClosingWorkSourceRow {
         resolvedAt = utcOffsetDateTime("resolved_at"),
         receiptId = uuid("receipt_id"),
         receiptState = "PUBLISHED",
-        receiptSummary = "기록 공개 완료",
+        receiptSummary = "기록 발행 완료",
     )
 }
 

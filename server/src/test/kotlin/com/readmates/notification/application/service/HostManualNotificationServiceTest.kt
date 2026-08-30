@@ -555,8 +555,8 @@ class HostManualNotificationServiceTest {
         visibility = visibility,
         feedbackDocumentUploaded = feedbackDocumentUploaded,
         feedbackDocumentVersion = feedbackDocumentVersion,
-            sessionRecordContentRevision = sessionRecordContentRevision,
-            scheduleRevision = 7,
+        sessionRecordContentRevision = sessionRecordContentRevision,
+        scheduleRevision = 7,
     )
 
     private fun targetSnapshot(

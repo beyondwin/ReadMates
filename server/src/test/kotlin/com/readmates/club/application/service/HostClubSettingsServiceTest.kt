@@ -23,9 +23,20 @@ import java.util.UUID
 class HostClubSettingsServiceTest {
     private val clubId = UUID.randomUUID()
     private val hostId = UUID.randomUUID()
-    private val actor = ClubActor(UUID.randomUUID(), hostId, clubId, "reading-room", setOf(ClubCapability.MANAGE_MEMBERS))
+    private val actor =
+        ClubActor(
+            UUID.randomUUID(),
+            hostId,
+            clubId,
+            "reading-room",
+            setOf(ClubCapability.MANAGE_MEMBERS),
+        )
     private val store = FakeStore(clubId, hostId)
-    private val service = HostClubSettingsService(store, Clock.fixed(Instant.parse("2026-08-30T00:00:00Z"), ZoneOffset.UTC))
+    private val service =
+        HostClubSettingsService(
+            store,
+            Clock.fixed(Instant.parse("2026-08-30T00:00:00Z"), ZoneOffset.UTC),
+        )
 
     @Test
     fun `updates canonical settings with independent revision and append only history`() {
@@ -156,7 +167,18 @@ class HostClubSettingsServiceTest {
         clubId: UUID,
         hostId: UUID,
     ) : HostClubSettingsStorePort {
-        var settings = StoredHostClubSettings(clubId, "reading-room", "독서방", "HOST_APPROVAL", "Asia/Seoul", true, "HOST_ONLY", 0, "ACTIVE")
+        var settings =
+            StoredHostClubSettings(
+                clubId,
+                "reading-room",
+                "독서방",
+                "HOST_APPROVAL",
+                "Asia/Seoul",
+                true,
+                "HOST_ONLY",
+                0,
+                "ACTIVE",
+            )
         val roles = mutableMapOf(hostId to "HOST")
         val history = mutableListOf<StoredHostClubSettingsHistory>()
         val commands = mutableListOf<StoredHostClubSettingsCommand>()

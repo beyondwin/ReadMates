@@ -62,14 +62,16 @@ class JdbcHostPersonDetailAdapterTest(
             paged += visible
             if (page.size <= 2) break
             page =
-                adapter.load(
-                    query(
-                        target,
-                        limit = 2,
-                        after = visible.last().tuple,
-                        expectedHistoryFingerprint = first.attendanceHistoryFingerprint,
-                    ),
-                )!!.attendanceItems
+                adapter
+                    .load(
+                        query(
+                            target,
+                            limit = 2,
+                            after = visible.last().tuple,
+                            expectedHistoryFingerprint = first.attendanceHistoryFingerprint,
+                        ),
+                    )!!
+                    .attendanceItems
         }
         assertThat(paged).containsExactlyElementsOf(all)
         assertThat(paged.map { it.tuple }).doesNotHaveDuplicates()
@@ -173,7 +175,7 @@ class JdbcHostPersonDetailAdapterTest(
     ) = HostPersonDetailQuery(
         clubId = UUID.fromString(CLUB_ID),
         targetMembershipId = target,
-        evaluatedAt = Instant.parse("2026-08-30T09:00:00Z"),
+        evaluatedAt = Instant.parse("2099-01-01T00:00:00Z"),
         after = after,
         fetchLimit = limit + 1,
         expectedHistoryFingerprint = expectedHistoryFingerprint,

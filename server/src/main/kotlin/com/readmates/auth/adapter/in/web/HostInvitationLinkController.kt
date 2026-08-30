@@ -33,7 +33,10 @@ class HostInvitationLinkController(
         currentMember: CurrentMember,
         @RequestParam(required = false) limit: Int?,
         @RequestParam(required = false) cursor: String?,
-    ) = links.list(currentMember.toClubActor(), PageRequest.cursor(limit, cursor, 20, 100))
+    ) = links.list(
+        currentMember.toClubActor(),
+        PageRequest.cursor(limit, cursor, DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT),
+    )
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -42,7 +45,12 @@ class HostInvitationLinkController(
         @RequestBody request: CreateHostInvitationLinkRequest,
     ) = links.create(
         currentMember.toClubActor(),
-        CreateHostInvitationLinkCommand(request.name, request.maxUses, parseDateTime(request.expiresAt), request.idempotencyKey),
+        CreateHostInvitationLinkCommand(
+            request.name,
+            request.maxUses,
+            parseDateTime(request.expiresAt),
+            request.idempotencyKey,
+        ),
     )
 
     @PutMapping("/{linkId}")
@@ -69,7 +77,11 @@ class HostInvitationLinkController(
         @PathVariable linkId: String,
         @RequestParam(required = false) limit: Int?,
         @RequestParam(required = false) cursor: String?,
-    ) = links.history(currentMember.toClubActor(), parseLinkId(linkId), PageRequest.cursor(limit, cursor, 20, 100))
+    ) = links.history(
+        currentMember.toClubActor(),
+        parseLinkId(linkId),
+        PageRequest.cursor(limit, cursor, DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT),
+    )
 
     private fun parseLinkId(value: String): UUID =
         runCatching {
@@ -79,11 +91,19 @@ class HostInvitationLinkController(
         }.getOrElse { throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid invitation link id") }
 
     private fun parseDateTime(value: String): OffsetDateTime =
-        runCatching { OffsetDateTime.parse(value) }.getOrElse { throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid date time") }
+        runCatching { OffsetDateTime.parse(value) }
+            .getOrElse {
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid date time")
+            }
 
     private fun parseStatus(value: String): HostInvitationLinkStatus =
         runCatching { HostInvitationLinkStatus.valueOf(value.trim().uppercase()) }
             .getOrElse { throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid invitation link status") }
+
+    private companion object {
+        const val DEFAULT_PAGE_LIMIT = 20
+        const val MAX_PAGE_LIMIT = 100
+    }
 }
 
 data class CreateHostInvitationLinkRequest(

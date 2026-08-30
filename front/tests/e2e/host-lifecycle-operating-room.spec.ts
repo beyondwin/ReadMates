@@ -183,7 +183,7 @@ test("prep, live attendance receipt and undo, and closing stay on one scoped cur
   await expectOperatingRoomContext(page, "prep");
   await expect(page.getByRole("link", { name: "일정 확인 자세히 보기" })).toHaveAttribute(
     "href",
-    `${HOST_PATH}/sessions/${SESSION_ID}?section=responses&scheduleSeen=unseen`,
+    `${HOST_PATH}/sessions/${SESSION_ID}/schedule-review`,
   );
 
   await page.getByRole("tab", { name: /현장/ }).click();

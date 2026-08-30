@@ -7,6 +7,8 @@ import com.readmates.auth.application.model.HostInvitationLinkStatus
 import com.readmates.auth.application.port.`in`.AcceptGoogleInvitationUseCase
 import com.readmates.auth.application.port.`in`.ManageHostInvitationsUseCase
 import com.readmates.auth.application.port.`in`.PreviewInvitationUseCase
+import com.readmates.auth.application.port.out.ActiveMembershipUpsertResult
+import com.readmates.auth.application.port.out.AuthPublicProjectionLock
 import com.readmates.auth.application.port.out.AuthPublicProjectionMutation
 import com.readmates.auth.application.port.out.AuthPublicProjectionMutationPort
 import com.readmates.auth.application.port.out.CreateHostInvitationCommand
@@ -251,7 +253,9 @@ class InvitationService(
         rawToken: String,
         clubSlug: String?,
     ): InvitationPreviewResponse {
-        val link = hostInvitationLinkStore?.findByTokenHash(tokenService.hashToken(rawToken), false) ?: invitationNotFound()
+        val link =
+            hostInvitationLinkStore?.findByTokenHash(tokenService.hashToken(rawToken), false)
+                ?: invitationNotFound()
         if (clubSlug != null && link.clubSlug != clubSlug) invitationNotFound("INVITATION_CLUB_MISMATCH")
         val status = effectiveNamedStatus(link)
         return InvitationPreviewResponse(
@@ -279,7 +283,6 @@ class InvitationService(
         )
     }
 
-    @Suppress("LongMethod")
     private fun acceptNamedLink(
         rawToken: String,
         googleSubjectId: String,
@@ -288,49 +291,102 @@ class InvitationService(
         profileImageUrl: String?,
         expectedClubSlug: String?,
     ): CurrentMember {
+        val normalizedEmail = normalizeEmail(email)
+        val normalizedSubject =
+            googleSubjectId.trim().takeIf(String::isNotEmpty)
+                ?: throw GoogleLoginException("Google subject is required")
+        val context = lockNamedLink(rawToken, expectedClubSlug)
+        val existing = findExistingNamedMembership(context.link.clubId, normalizedSubject)
+        return existing ?: acceptNewNamedMembership(
+            context,
+            normalizedSubject,
+            normalizedEmail,
+            displayName,
+            profileImageUrl,
+        )
+    }
+
+    private fun lockNamedLink(
+        rawToken: String,
+        expectedClubSlug: String?,
+    ): LockedNamedLink {
         val linkStore = hostInvitationLinkStore ?: invitationNotFound()
         val tokenHash = tokenService.hashToken(rawToken)
         val unlocked = linkStore.findByTokenHash(tokenHash, false) ?: invitationNotFound()
         val projectionLock = publicProjection.lockPotentiallyAffectedSessions(unlocked.clubId)
         val link = linkStore.findByTokenHash(tokenHash, true) ?: invitationNotFound()
         if (link.id != unlocked.id || link.clubId != unlocked.clubId) invitationNotFound()
-        if (expectedClubSlug != null && link.clubSlug != expectedClubSlug) invitationNotFound("INVITATION_CLUB_MISMATCH")
-        val linkStatus = effectiveNamedStatus(link)
-        when (linkStatus) {
+        if (expectedClubSlug != null && link.clubSlug != expectedClubSlug) {
+            invitationNotFound("INVITATION_CLUB_MISMATCH")
+        }
+        when (effectiveNamedStatus(link)) {
             HostInvitationLinkStatus.PAUSED -> conflict("INVITATION_LINK_PAUSED", "Invitation link is paused")
             HostInvitationLinkStatus.EXPIRED -> conflict("INVITATION_LINK_EXPIRED", "Invitation link is expired")
             HostInvitationLinkStatus.EXHAUSTED,
             HostInvitationLinkStatus.ACTIVE,
             -> Unit
         }
+        return LockedNamedLink(linkStore, link, projectionLock)
+    }
 
-        val normalizedEmail = normalizeEmail(email)
-        val normalizedSubject =
-            googleSubjectId.trim().takeIf(String::isNotEmpty) ?: throw GoogleLoginException("Google subject is required")
-        googleAccountStore.findUserIdByGoogleSubject(normalizedSubject)?.let { existingUserId ->
-            invitationStore.findActiveMembership(link.clubId, existingUserId)?.let { existing ->
-                googleAccountStore.recordLastLogin(existingUserId)
-                return existing
-            }
-        }
-        if (linkStatus == HostInvitationLinkStatus.EXHAUSTED) {
+    private fun findExistingNamedMembership(
+        clubId: UUID,
+        googleSubjectId: String,
+    ): CurrentMember? {
+        val userId = googleAccountStore.findUserIdByGoogleSubject(googleSubjectId) ?: return null
+        val existing = invitationStore.findActiveMembership(clubId, userId)
+        if (existing != null) googleAccountStore.recordLastLogin(userId)
+        return existing
+    }
+
+    private fun acceptNewNamedMembership(
+        context: LockedNamedLink,
+        googleSubjectId: String,
+        email: String,
+        displayName: String?,
+        profileImageUrl: String?,
+    ): CurrentMember {
+        val link = context.link
+        if (effectiveNamedStatus(link) == HostInvitationLinkStatus.EXHAUSTED) {
             conflict("INVITATION_LINK_EXHAUSTED", "Invitation link is exhausted")
         }
-        val userId = connectOrCreateInvitedGoogleUser(normalizedSubject, normalizedEmail, displayName, profileImageUrl)
-        invitationStore.findActiveMembership(link.clubId, userId)?.let { existing ->
-            googleAccountStore.recordLastLogin(userId)
-            return existing
-        }
-
+        val userId = connectOrCreateInvitedGoogleUser(googleSubjectId, email, displayName, profileImageUrl)
+        findExistingMembershipForNamedLink(link.clubId, userId)?.let { return it }
         val avatarKey = avatarAllocation.allocate(link.clubId, userId)
-        val membership = invitationStore.upsertActiveMembership(link.clubId, userId, MembershipRole.MEMBER, avatarKey)
+        val membership =
+            invitationStore.upsertActiveMembership(
+                link.clubId,
+                userId,
+                MembershipRole.MEMBER,
+                avatarKey,
+            )
+        consumeNamedLink(context, membership)
+        googleAccountStore.recordLastLogin(userId)
+        return invitationStore.findCurrentMember(membership.membershipId)
+            ?: throw InvitationDomainException(
+                "MEMBERSHIP_NOT_FOUND",
+                InvitationDomainError.CONFLICT,
+                "Accepted membership not found",
+            )
+    }
+
+    private fun consumeNamedLink(
+        context: LockedNamedLink,
+        membership: ActiveMembershipUpsertResult,
+    ) {
+        val link = context.link
         val now = OffsetDateTime.now(clock)
         val nextUsed = link.usedCount + 1
-        val nextStatus = if (nextUsed >= link.maxUses) HostInvitationLinkStatus.EXHAUSTED else HostInvitationLinkStatus.ACTIVE
+        val nextStatus =
+            if (nextUsed >= link.maxUses) {
+                HostInvitationLinkStatus.EXHAUSTED
+            } else {
+                HostInvitationLinkStatus.ACTIVE
+            }
         val before = namedEventSettings(link)
         val after = before + mapOf("usedCount" to nextUsed.toString(), "status" to nextStatus.name)
         val operationId = UUID.randomUUID().toString()
-        linkStore.consume(
+        context.store.consume(
             link.id,
             link.revision,
             StoredHostInvitationLinkEvent(
@@ -347,15 +403,27 @@ class InvitationService(
                 occurredAt = now,
             ),
         )
-        googleAccountStore.recordLastLogin(userId)
         if (membership.becameActive) {
             publicProjection.record(
-                projectionLock,
-                AuthPublicProjectionMutation(link.clubId, null, membership.membershipId, "INVITATION_LINK_ACCEPTED", true),
+                context.projectionLock,
+                AuthPublicProjectionMutation(
+                    link.clubId,
+                    null,
+                    membership.membershipId,
+                    "INVITATION_LINK_ACCEPTED",
+                    true,
+                ),
             )
         }
-        return invitationStore.findCurrentMember(membership.membershipId)
-            ?: throw InvitationDomainException("MEMBERSHIP_NOT_FOUND", InvitationDomainError.CONFLICT, "Accepted membership not found")
+    }
+
+    private fun findExistingMembershipForNamedLink(
+        clubId: UUID,
+        userId: UUID,
+    ): CurrentMember? {
+        val existing = invitationStore.findActiveMembership(clubId, userId)
+        if (existing != null) googleAccountStore.recordLastLogin(userId)
+        return existing
     }
 
     private fun effectiveNamedStatus(link: StoredHostInvitationLink): HostInvitationLinkStatus =
@@ -570,3 +638,9 @@ class InvitationService(
         return HexFormat.of().formatHex(digest).take(16)
     }
 }
+
+private data class LockedNamedLink(
+    val store: HostInvitationLinkStorePort,
+    val link: StoredHostInvitationLink,
+    val projectionLock: AuthPublicProjectionLock,
+)

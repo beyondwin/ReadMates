@@ -7,8 +7,10 @@ import com.readmates.notification.application.port.out.ManualNotificationTargetS
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.uuid
-import com.readmates.shared.security.Sha256
 import org.springframework.jdbc.core.JdbcTemplate
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+import java.util.HexFormat
 import java.util.UUID
 
 @Suppress("TooManyFunctions")
@@ -236,21 +238,27 @@ private class ManualNotificationAudienceRevisionQueries(
     ): String {
         val attendanceRevisions =
             jdbcTemplate
-            .query(
-                """
-                select membership_id, attendance_revision
-                from session_participants
-                where club_id = ?
-                  and session_id = ?
-                  and participation_status = 'ACTIVE'
-                  and attendance_status = 'ATTENDED'
-                order by membership_id
-                """.trimIndent(),
-                { resultSet, _ -> "${resultSet.uuid("membership_id")}:${resultSet.getLong("attendance_revision")}" },
-                clubId.dbString(),
-                sessionId.dbString(),
-            ).joinToString(",")
-        return Sha256.hex("manual-notification-confirmed-attendance-revision-v1|$attendanceRevisions")
+                .query(
+                    """
+                    select membership_id, attendance_revision
+                    from session_participants
+                    where club_id = ?
+                      and session_id = ?
+                      and participation_status = 'ACTIVE'
+                      and attendance_status = 'ATTENDED'
+                    order by membership_id
+                    """.trimIndent(),
+                    { resultSet, _ ->
+                        "${resultSet.uuid("membership_id")}:" +
+                            resultSet.getLong("attendance_revision")
+                    },
+                    clubId.dbString(),
+                    sessionId.dbString(),
+                ).joinToString(",")
+        val source = "manual-notification-confirmed-attendance-revision-v1|$attendanceRevisions"
+        return HexFormat.of().formatHex(
+            MessageDigest.getInstance("SHA-256").digest(source.toByteArray(StandardCharsets.UTF_8)),
+        )
     }
 }
 
