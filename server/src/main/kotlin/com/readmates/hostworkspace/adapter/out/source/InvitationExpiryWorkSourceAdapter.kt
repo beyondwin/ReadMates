@@ -36,7 +36,7 @@ class InvitationExpiryWorkSourceAdapter(
                     item.remainingUses,
                     item.dueAt,
                     item.resolvedAt,
-                    "/app/host/settings/invitations/${item.linkId}",
+                    "/app/host/settings#invitations",
                     item.receiptAction?.let {
                         HostWorkboxReceiptSummary(
                             safeCode(it),

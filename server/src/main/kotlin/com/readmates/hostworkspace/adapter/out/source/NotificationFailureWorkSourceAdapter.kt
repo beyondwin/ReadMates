@@ -32,7 +32,7 @@ class NotificationFailureWorkSourceAdapter(
                     if (item.resolvedAt == null) 1 else 0,
                     item.dueAt,
                     item.resolvedAt,
-                    "/app/host/notifications/${item.deliveryId}",
+                    "/app/host/notifications",
                     HostWorkboxReceiptSummary(
                         safeCode(item.eventType),
                         safeCode(item.deliveryStatus),

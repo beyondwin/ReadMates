@@ -101,9 +101,14 @@ class HostWorkSourceAdaptersTest {
             .containsExactlyElementsOf(HostWorkItemType.entries)
         assertThat(results.map { it.records.single().sourceGeneration })
             .containsExactly("r7", "g1787994000", "a".repeat(64), "r9", "a2")
-        assertThat(results.flatMap { it.records }.map { it.destinationHref }).allMatch {
-            it.startsWith("/app/") && !it.contains("token")
-        }
+        assertThat(results.map { it.records.single().destinationHref })
+            .containsExactly(
+                "/app/host/sessions/00000000-0000-0000-0000-000000000001/schedule-review",
+                "/app/host/people/00000000-0000-0000-0000-000000000002",
+                "/app/host/sessions/00000000-0000-0000-0000-000000000003/closing",
+                "/app/host/settings#invitations",
+                "/app/host/notifications",
+            )
     }
 
     @Test
