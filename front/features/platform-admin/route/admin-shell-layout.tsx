@@ -29,6 +29,7 @@ import { useAdminAlarmSummary } from "@/features/platform-admin/queries/admin-al
 import { AdminAlarmBar } from "@/features/platform-admin/ui/admin-alarm-bar";
 import { AdminBreadcrumb } from "@/features/platform-admin/ui/admin-breadcrumb";
 import { AdminLayoutNav } from "@/features/platform-admin/ui/admin-layout-nav";
+import { AdminMobileNavigation } from "@/features/platform-admin/ui/admin-mobile-navigation";
 import { AdminOnboardingModal } from "@/features/platform-admin/ui/admin-onboarding-modal";
 import { PlatformAdminOnboardingWizard } from "@/features/platform-admin/ui/platform-admin-onboarding-wizard";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
@@ -283,6 +284,10 @@ function AdminShellLayoutInner({
           <Outlet />
         </main>
       </div>
+      <AdminMobileNavigation
+        capabilities={capabilities}
+        ariaLabel="Admin 모바일 메뉴"
+      />
       {onboardingOpen ? (
         <AdminOnboardingModal
           isDirty={isWizardDirty}

@@ -4,7 +4,8 @@ import {
   type PlatformAdminCapability,
 } from "@/features/platform-admin/model/platform-admin-capabilities";
 
-export type AdminRouteGroup = "today" | "clubs" | "pipeline" | "ledger";
+export type AdminRouteGroup = "today" | "clubs" | "service" | "records";
+export type AdminRouteOwner = AdminRouteGroup | "emergency";
 export type AdminRouteStatus = "ready" | "coming_soon";
 export type AdminRouteSlice =
   | "S1" | "S2" | "S3" | "S4" | "S5" | "S6" | "S7" | "S8" | "S9" | "S10" | "C4";
@@ -31,7 +32,7 @@ export type AdminRouteDescriptor = {
 export type AdminNavArea = {
   id: AdminRouteGroup;
   label: string;
-  href?: string;
+  href: string;
   children: ReadonlyArray<AdminRouteDescriptor>;
 };
 
@@ -40,11 +41,15 @@ export type VisibleAdminNav = {
   pinned: AdminRouteDescriptor[];
 };
 
-const PRIMARY_AREAS: ReadonlyArray<Pick<AdminNavArea, "id" | "label" | "href">> = [
-  { id: "today", label: "오늘", href: "/admin/today" },
-  { id: "clubs", label: "클럽", href: "/admin/clubs" },
-  { id: "pipeline", label: "파이프라인" },
-  { id: "ledger", label: "원장" },
+type AdminPrimaryAreaDefinition = Pick<AdminNavArea, "id" | "label"> & {
+  canonicalPath: string;
+};
+
+const PRIMARY_AREAS: ReadonlyArray<AdminPrimaryAreaDefinition> = [
+  { id: "today", label: "오늘 할 일", canonicalPath: "today" },
+  { id: "clubs", label: "클럽 관리", canonicalPath: "clubs" },
+  { id: "service", label: "서비스 상태", canonicalPath: "health" },
+  { id: "records", label: "처리 기록", canonicalPath: "audit" },
 ];
 
 export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
@@ -69,7 +74,7 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
   {
     path: "notifications",
     label: "배달 원장",
-    group: "pipeline",
+    group: "service",
     groupLabel: "파이프라인",
     slice: "S5",
     status: "ready",
@@ -78,7 +83,7 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
   {
     path: "ai-ops",
     label: "AI 작업",
-    group: "pipeline",
+    group: "service",
     groupLabel: "파이프라인",
     slice: "S1",
     status: "ready",
@@ -87,7 +92,7 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
   {
     path: "health",
     label: "서비스 건강",
-    group: "pipeline",
+    group: "service",
     groupLabel: "파이프라인",
     slice: "S2",
     status: "ready",
@@ -96,7 +101,7 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
   {
     path: "audit",
     label: "운영 기입",
-    group: "ledger",
+    group: "records",
     groupLabel: "원장",
     slice: "S7",
     status: "ready",
@@ -105,8 +110,8 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
   {
     path: "support",
     label: "접근 원장",
-    group: "ledger",
-    groupLabel: "원장",
+    group: "clubs",
+    groupLabel: "클럽",
     slice: "S1",
     status: "ready",
     requiredCapability: "VIEW_SUPPORT",
@@ -114,7 +119,7 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
   {
     path: "analytics",
     label: "분석 부록",
-    group: "ledger",
+    group: "records",
     groupLabel: "원장",
     slice: "S8",
     status: "ready",
@@ -153,17 +158,14 @@ export function visibleAdminNav(
     const routes = ADMIN_ROUTES.filter(
       (route) => route.group === area.id && canAdmin(capabilities, route.requiredCapability),
     );
-    if (area.href) {
-      if (!routes.some((route) => `/admin/${route.path}` === area.href)) {
-        continue;
-      }
-      areas.push({ ...area, children: [] });
-      continue;
-    }
-    if (routes.length === 0) {
-      continue;
-    }
-    areas.push({ ...area, children: routes });
+    if (routes.length === 0) continue;
+    const destination = routes.find((route) => route.path === area.canonicalPath) ?? routes[0];
+    areas.push({
+      id: area.id,
+      label: area.label,
+      href: `/admin/${destination.path}`,
+      children: routes,
+    });
   }
 
   const pinned = ADMIN_ROUTES.filter(
@@ -172,11 +174,27 @@ export function visibleAdminNav(
   return { areas, pinned };
 }
 
-export function isAdminAreaActive(pathname: string, area: AdminNavArea): boolean {
-  if (area.href) {
-    return pathname === area.href || pathname.startsWith(`${area.href}/`);
-  }
-  return area.children.some((route) => isAdminRouteActive(pathname, route.path));
+export function resolveAdminRouteOwner(location: {
+  pathname: string;
+  search?: string;
+}): AdminRouteOwner | null {
+  const search = new URLSearchParams(location.search ?? "");
+  if (search.getAll("onboarding").includes("1")) return "clubs";
+
+  const pathname = location.pathname.length > 1
+    ? location.pathname.replace(/\/+$/, "")
+    : location.pathname;
+  if (pathname === "/admin" || pathname === "/admin/today") return "today";
+  if (pathname.startsWith("/admin/clubs/")) return "clubs";
+  if (pathname === "/admin/public-takedown") return "emergency";
+  return ADMIN_ROUTES.find((route) => `/admin/${route.path}` === pathname)?.group ?? null;
+}
+
+export function isAdminAreaActive(
+  location: { pathname: string; search?: string },
+  area: AdminNavArea,
+): boolean {
+  return resolveAdminRouteOwner(location) === area.id;
 }
 
 export function isAdminRouteActive(pathname: string, routePath: string): boolean {

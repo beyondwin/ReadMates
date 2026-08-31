@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router";
 import {
   ADMIN_SHELL_LAYOUT_MEDIA_QUERY,
@@ -22,6 +22,8 @@ export function AdminLayoutNav({
   const compact = useAdminShellCompactLayout();
   const { areas, pinned } = useMemo(() => visibleAdminNav(capabilities), [capabilities]);
 
+  if (compact) return null;
+
   return (
     <nav
       className="admin-layout-nav"
@@ -31,46 +33,23 @@ export function AdminLayoutNav({
       {areas.length > 0 ? (
         <ul className="admin-layout-nav__areas">
           {areas.map((area) => {
-            const areaActive = isAdminAreaActive(location.pathname, area);
+            const areaActive = isAdminAreaActive(location, area);
             return (
               <li key={area.id}>
-                {area.href ? (
-                  <Link
-                    to={area.href}
-                    className={
-                      "admin-layout-nav__item" + (areaActive ? " admin-layout-nav__item--active" : "")
-                    }
-                    aria-current={areaActive ? "page" : undefined}
-                  >
-                    <span className="admin-layout-nav__item-label">{area.label}</span>
-                    {area.id === "today" && todayCount != null && todayCount > 0 ? (
-                      <span className="admin-layout-nav__count ledger-number" aria-hidden="true">
-                        {todayCount}
-                      </span>
-                    ) : null}
-                  </Link>
-                ) : (
-                  <>
-                    <span
-                      className={
-                        "admin-layout-nav__parent" + (areaActive ? " admin-layout-nav__parent--active" : "")
-                      }
-                      aria-current={areaActive ? "true" : undefined}
-                    >
-                      {area.label}
+                <Link
+                  to={area.href}
+                  className={
+                    "admin-layout-nav__item" + (areaActive ? " admin-layout-nav__item--active" : "")
+                  }
+                  aria-current={areaActive ? "page" : undefined}
+                >
+                  <span className="admin-layout-nav__item-label">{area.label}</span>
+                  {area.id === "today" && todayCount != null && todayCount > 0 ? (
+                    <span className="admin-layout-nav__count ledger-number" aria-hidden="true">
+                      {todayCount}
                     </span>
-                    <ul className="admin-layout-nav__items">
-                      {area.children.map((route) => (
-                        <li key={route.path}>
-                          <NavItem
-                            route={route}
-                            isActive={isAdminRouteActive(location.pathname, route.path)}
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                )}
+                  ) : null}
+                </Link>
               </li>
             );
           })}
@@ -105,6 +84,10 @@ function NavItem({ route, isActive }: { route: AdminRouteDescriptor; isActive: b
       ) : null}
     </Link>
   );
+}
+
+export function AdminShellCompactSlot({ children }: { children: ReactNode }) {
+  return useAdminShellCompactLayout() ? children : null;
 }
 
 function useAdminShellCompactLayout(): boolean {

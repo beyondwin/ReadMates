@@ -338,9 +338,10 @@ describe("AdminShellLayout", () => {
     expect(container.querySelector(".admin-command-status")).toBeNull();
     expect(screen.queryByText("전체 신호 정상 · 8건 활성 · 19:00 기준")).not.toBeInTheDocument();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "오늘" })).toBeInTheDocument();
-    expect(screen.getByText("파이프라인")).toBeInTheDocument();
-    expect(screen.getByText("원장")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "오늘 할 일" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "클럽 관리" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "서비스 상태" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "처리 기록" })).toBeInTheDocument();
     expect(screen.queryByText("서비스", { exact: true })).not.toBeInTheDocument();
     expect(screen.queryByText("검토")).not.toBeInTheDocument();
     expect(screen.queryByText("Command")).not.toBeInTheDocument();
@@ -350,11 +351,47 @@ describe("AdminShellLayout", () => {
     expect(screen.queryByText("도메인 조치")).not.toBeInTheDocument();
   });
 
+  it("keeps the account and space controls in the header while exposing four mobile operating jobs", () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes("768px"),
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    renderShell("/admin/today");
+
+    const mobileNav = screen.getByRole("navigation", { name: "Admin 모바일 메뉴" });
+    expect(within(mobileNav).getAllByRole("link")).toHaveLength(4);
+    expect(within(mobileNav).getByRole("link", { name: "오늘 할 일" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(within(mobileNav).getByRole("link", { name: "클럽 관리" })).toHaveAttribute(
+      "href",
+      "/admin/clubs",
+    );
+    expect(within(mobileNav).getByRole("link", { name: "서비스 상태" })).toHaveAttribute(
+      "href",
+      "/admin/health",
+    );
+    expect(within(mobileNav).getByRole("link", { name: "처리 기록" })).toHaveAttribute(
+      "href",
+      "/admin/audit",
+    );
+    expect(within(mobileNav).queryByRole("link", { name: "긴급 공개 회수" })).not.toBeInTheDocument();
+    expect(within(mobileNav).queryByText("플랫폼 운영")).not.toBeInTheDocument();
+    expect(within(mobileNav).queryByText("다른 계정으로 로그인")).not.toBeInTheDocument();
+    expect(screen.getAllByText("OWNER admin", { selector: ".admin-shell__account-label" })).toHaveLength(1);
+  });
+
   it("shows a mono attention count beside 오늘 from the alarm summary", () => {
     renderShell("/admin/today", { operations });
     const today = within(screen.getByRole("navigation", { name: "Admin 콘솔" })).getByRole(
       "link",
-      { name: "오늘" },
+      { name: "오늘 할 일" },
     );
     expect(today.querySelector(".admin-layout-nav__count")).toHaveTextContent("7");
     expect(today.querySelector(".admin-layout-nav__count")).toHaveClass("ledger-number");
@@ -395,7 +432,7 @@ describe("AdminShellLayout", () => {
     );
 
     expect(screen.getByText("today content")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "오늘" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "오늘 할 일" })).toBeInTheDocument();
     expect(document.querySelector(".admin-command-status")).toBeNull();
     await waitFor(() => {
       expect(screen.getByRole("status")).toHaveTextContent("신호 확인 불가");
