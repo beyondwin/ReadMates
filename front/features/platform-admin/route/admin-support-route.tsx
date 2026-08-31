@@ -32,7 +32,9 @@ import {
   useAdminSupportSearchMutation,
 } from "@/features/platform-admin/queries/platform-admin-support-queries";
 import { AdminSupportWorkbench } from "@/features/platform-admin/ui/admin-support-workbench";
+import { confirmAdminSupportGrant } from "@/features/platform-admin/api/platform-admin-support-api";
 import { publishTransitionAction, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import { createAdminSupportReceiptCapsule } from "./admin-support-receipt-capsule";
 
 const DEFAULT_REASON: SupportGrantReasonCategory = "MEMBER_ASSISTANCE";
 
@@ -204,14 +206,20 @@ export function AdminSupportRoute() {
     setCreateRecovery(null);
     setCreateOutcomeUnknown(true);
     const operationId = `admin-support-create:${createIntentKey}`;
-    const handle = transitionOwner.begin(operationId, "L3", async () => ({ operationId, outcome: "still-unknown" }));
+    const request = {
+      ...createSnapshot,
+      previewId: createPreview.previewId,
+      idempotencyKey: createIntentKey,
+      confirmed: true as const,
+    };
+    const capsule = createAdminSupportReceiptCapsule({
+      operationId,
+      request,
+      replayLookup: confirmAdminSupportGrant,
+    });
+    const handle = transitionOwner.beginReceipt(capsule);
     try {
-      const receipt = await createConfirmMutation.confirm({
-        ...createSnapshot,
-        previewId: createPreview.previewId,
-        idempotencyKey: createIntentKey,
-        confirmed: true,
-      });
+      const receipt = await createConfirmMutation.confirm(request);
       if (await handle.settle("succeeded") !== "accepted") return;
       await publishTransitionAction(handle, "cache", () => publishAdminSupportLedger(queryClient));
       await publishTransitionAction(handle, "ui", () => {

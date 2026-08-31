@@ -4,6 +4,7 @@ import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 import { AdminSupportWorkbench } from "./admin-support-workbench";
+import { parseAdminSupportGrantPreview } from "../api/platform-admin-support-contracts";
 
 const grant = {
   grantId: "grant-1",
@@ -33,19 +34,19 @@ const selected = {
   grantBlockedReason: null,
 };
 
-const createPreview = {
-  previewId: "preview-1",
+const createPreview = parseAdminSupportGrantPreview({
+  previewId: "00000000-0000-4000-8000-000000006011",
   commandType: "CREATE" as const,
   grantId: null,
-  clubId: "club-1",
+  clubId: "00000000-0000-4000-8000-000000006012",
   scope: "HOST_SUPPORT_READ" as const,
   grantExpiresAt: "2026-08-25T12:00:00Z",
   reasonCategory: "MEMBER_ASSISTANCE" as const,
   notePresent: false,
-  impactCodes: ["GRANT_SUPPORT_ACCESS"],
+  impactCodes: ["SUPPORT_ACCESS_WILL_BECOME_ACTIVE"],
   expiresAt: "2026-08-25T10:10:00Z",
   fingerprintPrefix: "00112233",
-};
+});
 
 function props(overrides: Partial<ComponentProps<typeof AdminSupportWorkbench>> = {}): ComponentProps<typeof AdminSupportWorkbench> {
   return {
@@ -124,7 +125,8 @@ describe("AdminSupportWorkbench", () => {
     expect(screen.queryByRole("button", { name: "발급 확정" })).not.toBeInTheDocument();
     const review = screen.getByRole("region", { name: "변경 검토" });
     expect(within(review).getByText("지원 접근 권한을 발급합니다.")).toBeInTheDocument();
-    expect(within(review).getByLabelText("기술 정보")).toHaveTextContent("GRANT_SUPPORT_ACCESS");
+    expect(within(review).getByLabelText("기술 정보")).toHaveTextContent("SUPPORT_ACCESS_WILL_BECOME_ACTIVE");
+    expect(within(review).queryByText("SUPPORT_ACCESS_WILL_BECOME_ACTIVE", { selector: "li" })).not.toBeInTheDocument();
   });
 
   it("keeps search accessible and has no unnamed controls", () => {
@@ -169,7 +171,7 @@ describe("AdminSupportWorkbench", () => {
       canManage: false,
       search: { ...props().search, selected },
       create: { ...props().create, preview: createPreview },
-      revoke: { ...props().revoke, target: grant, preview: { ...createPreview, commandType: "REVOKE", grantId: grant.grantId, impactCodes: ["REVOKE_SUPPORT_ACCESS"] } },
+      revoke: { ...props().revoke, target: grant, preview: { ...createPreview, commandType: "REVOKE", grantId: grant.grantId, impactCodes: ["SUPPORT_ACCESS_WILL_BE_REVOKED"] } },
     })} />);
 
     expect(screen.getByRole("button", { name: "지원 접근 발급" })).toBeDisabled();

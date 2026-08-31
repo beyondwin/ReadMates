@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PlatformAdminClubDetail } from "@/features/platform-admin/api/platform-admin-contracts";
@@ -294,6 +294,37 @@ describe("AdminClubDetailRoute", () => {
     );
   });
 
+  it("edits product fields with Korean primary labels while keeping raw field names out of the form", async () => {
+    vi.mocked(updatePlatformAdminClubMetadata).mockResolvedValue({
+      ...detail,
+      tagline: "새 소개 문구",
+      about: "새 공개 소개",
+      adminRevision: 8,
+    });
+    renderRoute();
+
+    fireEvent.click(screen.getByRole("button", { name: "편집" }));
+    expect(screen.queryByRole("textbox", { name: "Slug" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Tagline" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "About" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/revision 기준/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("기술 정보")).toHaveTextContent("관리 revision");
+    fireEvent.change(screen.getByRole("textbox", { name: "소개 문구" }), {
+      target: { value: "새 소개 문구" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "공개 소개" }), {
+      target: { value: "새 공개 소개" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "공개 정보 저장" }));
+
+    await waitFor(() => expect(updatePlatformAdminClubMetadata).toHaveBeenCalledWith("c-1", {
+      expectedAdminRevision: 7,
+      name: "Alpha",
+      tagline: "새 소개 문구",
+      about: "새 공개 소개",
+    }));
+  });
+
   it("locks metadata fields while a revision-guarded save is pending", async () => {
     let resolveSave: ((value: PlatformAdminClubDetail) => void) | undefined;
     vi.mocked(updatePlatformAdminClubMetadata).mockReturnValue(
@@ -310,8 +341,8 @@ describe("AdminClubDetailRoute", () => {
     await waitFor(() =>
       expect(screen.getByRole("textbox", { name: "클럽 이름" })).toBeDisabled(),
     );
-    expect(screen.getByRole("textbox", { name: "Tagline" })).toBeDisabled();
-    expect(screen.getByRole("textbox", { name: "About" })).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "소개 문구" })).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "공개 소개" })).toBeDisabled();
     resolveSave?.({ ...detail, name: "Alpha Books", adminRevision: 8 });
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "편집" })).toBeInTheDocument(),
@@ -411,6 +442,10 @@ describe("AdminClubDetailRoute", () => {
     expect(
       await screen.findByText("PUBLIC_DISCOVERY_ENABLED"),
     ).toBeInTheDocument();
+    const visibilityReview = screen.getByLabelText("공개 전환 영향");
+    expect(within(visibilityReview).getByText("클럽이 공개 검색과 탐색에 표시됩니다.")).toBeInTheDocument();
+    expect(within(visibilityReview).queryByText("PUBLIC_DISCOVERY_ENABLED", { selector: "li" })).not.toBeInTheDocument();
+    expect(within(visibilityReview).getByLabelText("기술 정보")).toHaveTextContent("PUBLIC_DISCOVERY_ENABLED");
     const confirm = screen.getByRole("button", { name: "공개 전환 확정" });
     expect(confirm).toBeDisabled();
     fireEvent.click(

@@ -274,6 +274,17 @@ function operationalBlockerLabel(code: string): string {
   }
 }
 
+function visibilityImpactLabel(code: string): string {
+  switch (code) {
+    case "PUBLIC_DISCOVERY_ENABLED":
+      return "클럽이 공개 검색과 탐색에 표시됩니다.";
+    case "PUBLIC_DISCOVERY_DISABLED":
+      return "클럽이 공개 검색과 탐색에서 숨겨집니다.";
+    default:
+      return "클럽의 공개 범위가 변경됩니다.";
+  }
+}
+
 function ClubBasicInformation({ club }: { club: PlatformAdminClubDetail }) {
   return (
     <section className="surface admin-club-detail__panel" aria-label="클럽 기본 정보">
@@ -446,16 +457,12 @@ function ClubMetadataPanel({
           </h3>
         </div>
         <span className="admin-club-detail__state">
-          {mutation.isPending ? "저장 중" : "최신 revision 기준"}
+          {mutation.isPending ? "저장 중" : "최신 변경 기준"}
         </span>
       </div>
       {editing ? (
         <>
           <div className="admin-club-detail__form">
-            <label className="field-group">
-              <span className="label">Slug</span>
-              <input className="input" value={club.slug} readOnly />
-            </label>
             <label className="field-group">
               <span className="label">클럽 이름</span>
               <input
@@ -468,7 +475,7 @@ function ClubMetadataPanel({
               />
             </label>
             <label className="field-group">
-              <span className="label">Tagline</span>
+              <span className="label">소개 문구</span>
               <input
                 className="input"
                 value={draft.tagline}
@@ -479,7 +486,7 @@ function ClubMetadataPanel({
               />
             </label>
             <label className="field-group admin-club-detail__wide">
-              <span className="label">About</span>
+              <span className="label">공개 소개</span>
               <textarea
                 className="input"
                 value={draft.about}
@@ -525,7 +532,7 @@ function ClubMetadataPanel({
         </>
       ) : (
         <>
-          <p className="muted">클럽 이름과 공개 소개를 revision 기준으로 변경합니다.</p>
+          <p className="muted">클럽 이름과 공개 소개를 최신 변경 기준으로 수정합니다.</p>
           <div className="admin-club-detail__actions">
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>
               편집
@@ -660,7 +667,7 @@ function VisibilityPanel({
         공개 전환은 영향을 미리 확인한 뒤 명시적으로 확정합니다.
       </p>
       {canManage && preview ? (
-        <div className="admin-club-detail__review" aria-live="polite">
+        <div className="admin-club-detail__review" aria-label="공개 전환 영향" aria-live="polite">
           <p>
             <strong>
               {clubVisibilityLabel(preview.currentVisibility)} → {clubVisibilityLabel(preview.targetVisibility)}
@@ -668,13 +675,16 @@ function VisibilityPanel({
           </p>
           <ul>
             {preview.impactCodes.map((code) => (
-              <li key={code}>{code}</li>
+              <li key={code}>{visibilityImpactLabel(code)}</li>
             ))}
           </ul>
           <p className="tiny muted">
             만료 {preview.expiresAt} · 확인 코드{" "}
             {preview.requestFingerprintPrefix}
           </p>
+          <AdminTechnicalDisclosure
+            items={preview.impactCodes.map((code) => ({ label: "영향 코드", value: code }))}
+          />
           <label className="checkbox-row">
             <input
               type="checkbox"

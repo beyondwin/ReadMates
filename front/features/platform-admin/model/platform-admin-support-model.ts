@@ -39,6 +39,9 @@ export type SupportGrantReasonCategory =
   | "MEMBER_ASSISTANCE"
   | "DATA_CORRECTION"
   | "SECURITY_REVIEW";
+export type SupportGrantImpactCode =
+  | "SUPPORT_ACCESS_WILL_BECOME_ACTIVE"
+  | "SUPPORT_ACCESS_WILL_BE_REVOKED";
 
 export type AdminSupportGrantLedgerPage = {
   items: AdminSupportGrantLedgerItem[];
@@ -68,7 +71,7 @@ export type AdminSupportGrantPreview = {
   grantExpiresAt: string;
   reasonCategory: SupportGrantReasonCategory;
   notePresent: boolean;
-  impactCodes: string[];
+  impactCodes: SupportGrantImpactCode[];
   expiresAt: string;
   fingerprintPrefix: string;
 };

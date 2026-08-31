@@ -360,9 +360,9 @@ function supportSearchResultLabel(result: AdminSupportSearchResult): string {
 
 function supportImpactLabel(code: string): string {
   switch (code) {
-    case "GRANT_SUPPORT_ACCESS":
+    case "SUPPORT_ACCESS_WILL_BECOME_ACTIVE":
       return "지원 접근 권한을 발급합니다.";
-    case "REVOKE_SUPPORT_ACCESS":
+    case "SUPPORT_ACCESS_WILL_BE_REVOKED":
       return "지원 접근 권한을 취소합니다.";
     default:
       return "지원 접근 범위가 변경됩니다.";
