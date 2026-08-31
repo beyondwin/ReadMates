@@ -4,7 +4,10 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AdminActionDock, AdminSafeActionDock } from "./admin-action-dock";
 
-const GLOBALS_CSS = readFileSync("src/styles/globals.css", "utf8");
+const PAGE_PATTERNS_CSS = readFileSync(
+  "features/platform-admin/ui/admin-page-patterns.css",
+  "utf8",
+);
 
 describe("AdminActionDock", () => {
   it("renders primary, secondary, and status slots", () => {
@@ -33,7 +36,9 @@ describe("AdminActionDock", () => {
   });
 
   it("pins the mobile dock to the 768px contract with a bottom safe area and 44px targets", () => {
-    const dockBlock = GLOBALS_CSS.slice(GLOBALS_CSS.indexOf(".admin-action-dock"));
+    const dockBlock = PAGE_PATTERNS_CSS.slice(
+      PAGE_PATTERNS_CSS.indexOf(".admin-action-dock"),
+    );
     expect(dockBlock).toContain("@media (max-width: 768px)");
     expect(dockBlock).toContain("env(safe-area-inset-bottom");
     expect(dockBlock).toMatch(/min-height:\s*44px/);

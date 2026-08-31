@@ -19,8 +19,10 @@ import {
 import { findNestedLiveRegions } from "@/shared/testing/accessibility-checks";
 import { AdminTodayLedger } from "./admin-today-ledger";
 
-const GLOBALS_CSS = readFileSync("src/styles/globals.css", "utf8");
 const LEDGER_CSS = readFileSync(path.resolve("features/platform-admin/ui/admin-editorial-ledger.css"), "utf8");
+const SCOPED_ADMIN_CSS =
+  readFileSync(path.resolve("features/platform-admin/ui/admin-page-patterns.css"), "utf8") +
+  LEDGER_CSS;
 
 const emptyView: AdminOperationsView = {
   generatedAt: "2026-08-04T10:00:00Z",
@@ -370,22 +372,22 @@ describe("AdminTodayLedger", () => {
   });
 
   it("pins Today CSS to the 768px contract without stacking columns at tablet width", () => {
-    expect(GLOBALS_CSS).toContain(".admin-today-ledger");
-    expect(GLOBALS_CSS).toMatch(/\.admin-today-ledger[\s\S]*overflow-x:\s*(clip|hidden)/);
-    expect(GLOBALS_CSS).toMatch(
+    expect(SCOPED_ADMIN_CSS).toContain(".admin-today-ledger");
+    expect(SCOPED_ADMIN_CSS).toMatch(/\.admin-today-ledger[\s\S]*overflow-x:\s*(clip|hidden)/);
+    expect(SCOPED_ADMIN_CSS).toMatch(
       /\.admin-today-ledger__columns\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*[^)]+\)\s+minmax\(0,\s*[^)]+\)/,
     );
-    const todayStackAt1120 = GLOBALS_CSS.match(
+    const todayStackAt1120 = SCOPED_ADMIN_CSS.match(
       /@media \(max-width: 1120px\)\s*\{[\s\S]*?\.admin-today-ledger__columns[\s\S]*?\}/,
     );
     expect(todayStackAt1120).toBeNull();
-    expect(GLOBALS_CSS).not.toMatch(
+    expect(SCOPED_ADMIN_CSS).not.toMatch(
       /@media \(max-width: 600px\)[\s\S]{0,400}\.admin-today-ledger__/,
     );
-    expect(GLOBALS_CSS).toMatch(
+    expect(SCOPED_ADMIN_CSS).toMatch(
       /@media \(max-width: 768px\)[\s\S]*\.admin-action-dock[\s\S]*env\(safe-area-inset-bottom/,
     );
-    expect(GLOBALS_CSS).toMatch(
+    expect(SCOPED_ADMIN_CSS).toMatch(
       /\.admin-today-ledger__filter select[\s\S]*min-height:\s*44px/,
     );
     expect(LEDGER_CSS).toMatch(/\.admin-today-ledger[\s\S]*min-height:\s*44px/);

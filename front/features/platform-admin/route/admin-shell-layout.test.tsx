@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import {
   act,
@@ -8,8 +8,8 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { createMemoryRouter, RouterProvider, useOutletContext } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useState, type ReactNode } from "react";
 import type {
@@ -82,7 +82,9 @@ import {
   previewPlatformAdminOnboarding,
 } from "@/features/platform-admin/api/platform-admin-api";
 import { platformAdminHealthSnapshotQuery } from "@/features/platform-admin/queries/platform-admin-health-queries";
-import { AdminShellLayout } from "./admin-shell-layout";
+import { AdminShellController } from "./admin-shell-controller";
+import { AdminOnboardingController } from "./admin-onboarding-controller";
+import type { AdminShellOutletContext } from "./admin-shell-layout";
 
 const summary: PlatformAdminSummaryResponse = {
   platformRole: "OWNER",
@@ -280,14 +282,14 @@ function renderShell(
       {
         path: "/admin",
         element: (
-          <AdminShellLayout
+          <AdminShellController
             auth={opts.auth === undefined ? auth : opts.auth}
             spaceSwitcher={opts.spaceSwitcher ?? <button type="button">주입된 공간 전환</button>}
           />
         ),
         children: [
           { path: "today", element: <div>today content</div> },
-          { path: "clubs", element: <div>clubs content</div> },
+          { path: "clubs", element: <AdminClubsControllerProbe /> },
           { path: "clubs/:clubId", element: <div>club detail</div> },
           { path: "public-takedown", element: <div>public takedown content</div> },
         ],
@@ -307,6 +309,20 @@ function renderShell(
     </QueryClientProvider>,
   );
   return { ...view, queryClient, router, transitionCoordinator };
+}
+
+function AdminClubsControllerProbe() {
+  const capabilities = useQuery(platformAdminCapabilitiesQuery()).data ?? null;
+  const shellContext = useOutletContext<AdminShellOutletContext>();
+  return (
+    <>
+      <div>clubs content</div>
+      <AdminOnboardingController
+        capabilities={capabilities}
+        authorityEpoch={shellContext.authorityEpoch}
+      />
+    </>
+  );
 }
 
 function SpaceControlProbe() {
@@ -452,7 +468,7 @@ describe("AdminShellLayout", () => {
       [
         {
           path: "/admin",
-          element: <AdminShellLayout auth={auth} />,
+          element: <AdminShellController auth={auth} />,
           children: [{ path: "today", element: <div>today content</div> }],
         },
       ],
@@ -481,14 +497,107 @@ describe("AdminShellLayout", () => {
       path.resolve("features/platform-admin/route/admin-shell-layout.tsx"),
       "utf8",
     );
+    const controller = readFileSync(
+      path.resolve("features/platform-admin/route/admin-shell-controller.tsx"),
+      "utf8",
+    );
     expect(source).toContain("admin-editorial-ledger.css");
     expect(source).not.toContain("AdminCommandStatus");
     expect(source).not.toContain("platformAdminSummaryQuery");
     expect(source).toContain("AdminAlarmBar");
-    expect(source).toContain("useAdminAlarmSummary");
+    expect(source).not.toContain("useAdminAlarmSummary");
+    expect(controller).toContain("useAdminAlarmSummary");
     expect(source).not.toContain("AdminWorkspaceSwitcher");
     expect(source).not.toContain("admin-workspace-switcher-model");
     expect(source).not.toContain("@/src/app");
+  });
+
+  it("keeps shell presentation free of query, mutation, and navigation ownership", () => {
+    const shellPath = path.resolve(
+      "features/platform-admin/route/admin-shell-layout.tsx",
+    );
+    const shellControllerPath = path.resolve(
+      "features/platform-admin/route/admin-shell-controller.tsx",
+    );
+    const onboardingControllerPath = path.resolve(
+      "features/platform-admin/route/admin-onboarding-controller.tsx",
+    );
+    const clubsRoutePath = path.resolve(
+      "features/platform-admin/route/admin-clubs-route.tsx",
+    );
+
+    expect(existsSync(shellControllerPath)).toBe(true);
+    expect(existsSync(onboardingControllerPath)).toBe(true);
+
+    const shell = readFileSync(shellPath, "utf8");
+    const shellController = existsSync(shellControllerPath)
+      ? readFileSync(shellControllerPath, "utf8")
+      : "";
+    const onboardingController = existsSync(onboardingControllerPath)
+      ? readFileSync(onboardingControllerPath, "utf8")
+      : "";
+    const clubsRoute = readFileSync(clubsRoutePath, "utf8");
+
+    expect(shell).not.toMatch(
+      /\b(?:useQuery|useQueryClient|useLocation|useNavigate|useSearchParams|useBlocker|useTransitionSafetyOwner)\b/,
+    );
+    expect(shell).not.toContain("platform-admin-queries");
+    expect(shell).not.toContain("queries/admin-alarm-summary");
+    expect(shell).not.toContain("session-api");
+    expect(shell).not.toContain("PlatformAdminOnboardingWizard");
+    expect(shell).not.toContain("AdminOnboardingModal");
+
+    expect(shellController).toContain("platformAdminCapabilitiesQuery");
+    expect(shellController).toContain("subscribePlatformAdminAuthorityLoss");
+    expect(shellController).toContain("useAdminAlarmSummary");
+    expect(onboardingController).toContain(
+      "usePreviewPlatformAdminOnboardingMutation",
+    );
+    expect(onboardingController).toContain(
+      "useCommitPlatformAdminOnboardingMutation",
+    );
+    expect(onboardingController).toContain("useTransitionSafetyOwner");
+    expect(clubsRoute).toContain("AdminOnboardingController");
+  });
+
+  it("loads shell, page-pattern, and editorial CSS from feature ownership only", () => {
+    const shellSource = readFileSync(
+      path.resolve("features/platform-admin/route/admin-shell-layout.tsx"),
+      "utf8",
+    );
+    const globals = readFileSync(path.resolve("src/styles/globals.css"), "utf8");
+    const shellCssPath = path.resolve(
+      "features/platform-admin/ui/admin-shell.css",
+    );
+    const pageCssPath = path.resolve(
+      "features/platform-admin/ui/admin-page-patterns.css",
+    );
+    const editorialCssPath = path.resolve(
+      "features/platform-admin/ui/admin-editorial-ledger.css",
+    );
+
+    expect(existsSync(shellCssPath)).toBe(true);
+    expect(existsSync(pageCssPath)).toBe(true);
+    expect(shellSource.indexOf("admin-shell.css")).toBeLessThan(
+      shellSource.indexOf("admin-page-patterns.css"),
+    );
+    expect(shellSource.indexOf("admin-page-patterns.css")).toBeLessThan(
+      shellSource.indexOf("admin-editorial-ledger.css"),
+    );
+    expect(globals).not.toMatch(/^\s*\.(?:admin|platform-admin)[-_\w]/m);
+
+    const shellCss = existsSync(shellCssPath)
+      ? readFileSync(shellCssPath, "utf8")
+      : "";
+    const pageCss = existsSync(pageCssPath)
+      ? readFileSync(pageCssPath, "utf8")
+      : "";
+    const editorialCss = readFileSync(editorialCssPath, "utf8");
+    expect(shellCss).toContain(".admin-shell");
+    expect(shellCss).toContain(".admin-layout-nav");
+    expect(pageCss).toContain(".admin-page-frame");
+    expect(pageCss).toContain(".admin-state-panel");
+    expect(editorialCss).not.toMatch(/^\s*\.admin-layout-nav(?:\W|$)/m);
   });
 
   it("does not render a global header 새 클럽 CTA", () => {
@@ -507,8 +616,13 @@ describe("AdminShellLayout", () => {
   });
 
   it("shows the onboarding modal when ?onboarding=1 is present", () => {
-    renderShell("/admin/today?onboarding=1");
+    renderShell("/admin/clubs?onboarding=1");
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("does not mount clubs onboarding from a shell-owned non-clubs route", () => {
+    renderShell("/admin/today?onboarding=1");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("does not show the onboarding modal without the query param", () => {
@@ -691,7 +805,7 @@ describe("AdminShellLayout", () => {
   });
 
   it("purges platform-admin state and closes onboarding and workspace menus on 401", async () => {
-    const { queryClient } = renderShell("/admin/today?onboarding=1", {
+    const { queryClient } = renderShell("/admin/clubs?onboarding=1", {
       spaceSwitcher: <SpaceControlProbe />,
     });
     fireEvent.click(screen.getByRole("button", { name: "테스트 공간 전환" }));
@@ -733,7 +847,7 @@ describe("AdminShellLayout", () => {
   });
 
   it("purges platform-admin state and closes onboarding and workspace menus on 403", async () => {
-    const { queryClient } = renderShell("/admin/today?onboarding=1", {
+    const { queryClient } = renderShell("/admin/clubs?onboarding=1", {
       spaceSwitcher: <SpaceControlProbe />,
     });
     fireEvent.click(screen.getByRole("button", { name: "테스트 공간 전환" }));

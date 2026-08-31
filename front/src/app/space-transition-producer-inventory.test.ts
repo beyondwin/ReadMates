@@ -34,7 +34,7 @@ const mountedOwners = buildMountedProductionPaths(productionSources(), ["src/mai
 
 describe("space transition mutation-producer inventory", () => {
   it("classifies every current mounted producer and exported out-of-domain write", () => {
-    expect(SPACE_TRANSITION_PRODUCER_INVENTORY).toHaveLength(95);
+    expect(SPACE_TRANSITION_PRODUCER_INVENTORY).toHaveLength(97);
     expect(SPACE_TRANSITION_PRODUCER_INVENTORY.reduce<Record<string, number>>(
       (counts, candidate) => ({
         ...counts,
@@ -42,9 +42,9 @@ describe("space transition mutation-producer inventory", () => {
       }),
       {},
     )).toEqual({
-      register: 27,
+      register: 28,
       modify: 36,
-      "verified-no-change": 23,
+      "verified-no-change": 24,
       "out-of-domain": 9,
     });
     expect(auditMutationProducerInventory(productionSources(), mountedOwners)).toEqual({

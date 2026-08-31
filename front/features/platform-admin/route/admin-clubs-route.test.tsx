@@ -1,9 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import {
-  MemoryRouter,
-  Route,
-  Routes,
+  createMemoryRouter,
+  RouterProvider,
   useLocation,
   useNavigate,
 } from "react-router";
@@ -103,26 +102,34 @@ function renderRoute(
     capabilities,
     generatedAt: "2026-08-24T00:00:00Z",
   });
+  const initialEntries = [
+    locationState
+      ? {
+          pathname: url.pathname,
+          search: url.search,
+          hash: url.hash,
+          state: locationState,
+        }
+      : initialEntry,
+  ];
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/admin/clubs",
+        element: (
+          <>
+            <LocationProbe />
+            <AdminClubsRoute />
+          </>
+        ),
+      },
+      { path: "/admin/clubs/:clubId", element: <div>club detail</div> },
+    ],
+    { initialEntries },
+  );
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter
-        initialEntries={[
-          locationState
-            ? {
-                pathname: url.pathname,
-                search: url.search,
-                hash: url.hash,
-                state: locationState,
-              }
-            : initialEntry,
-        ]}
-      >
-        <LocationProbe />
-        <Routes>
-          <Route path="/admin/clubs" element={<AdminClubsRoute />} />
-          <Route path="/admin/clubs/:clubId" element={<div>club detail</div>} />
-        </Routes>
-      </MemoryRouter>
+      <RouterProvider router={router} />
     </QueryClientProvider>,
   );
 }

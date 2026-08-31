@@ -5,7 +5,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdminModalDialog } from "./admin-modal-dialog";
 
-const GLOBALS_CSS = readFileSync("src/styles/globals.css", "utf8");
+const PAGE_PATTERNS_CSS = readFileSync(
+  "features/platform-admin/ui/admin-page-patterns.css",
+  "utf8",
+);
 
 function DialogHarness({
   onRequestClose,
@@ -157,7 +160,9 @@ describe("AdminModalDialog", () => {
   });
 
   it("uses the 768px overlay contract with internal scroll and reduced motion", () => {
-    const block = GLOBALS_CSS.slice(GLOBALS_CSS.indexOf(".admin-modal-dialog"));
+    const block = PAGE_PATTERNS_CSS.slice(
+      PAGE_PATTERNS_CSS.indexOf(".admin-modal-dialog"),
+    );
     expect(block).toContain("@media (max-width: 768px)");
     expect(block).toContain("env(safe-area-inset-bottom");
     expect(block).toContain("overflow: auto");
@@ -176,7 +181,9 @@ describe("AdminModalDialog", () => {
   });
 
   it("gives panel actions a 44px target and full width at 768px", () => {
-    const block = GLOBALS_CSS.slice(GLOBALS_CSS.indexOf(".admin-modal-dialog"));
+    const block = PAGE_PATTERNS_CSS.slice(
+      PAGE_PATTERNS_CSS.indexOf(".admin-modal-dialog"),
+    );
     expect(block).toMatch(
       /\.admin-modal-dialog__panel \.btn,\s*\n\s*\.admin-modal-dialog__panel button \{\s*\n\s*min-height:\s*44px;/,
     );

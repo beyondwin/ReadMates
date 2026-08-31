@@ -40,15 +40,15 @@ export function adminRoutes(queryClient: QueryClient): RouteObject[] {
       ),
       loader: adminShellLoaderFactory(queryClient),
       lazy: async () => {
-        const { AdminShellLayout } = await import(
-          "@/features/platform-admin/route/admin-shell-layout"
+        const { AdminShellController } = await import(
+          "@/features/platform-admin/route/admin-shell-controller"
         );
         function AdminShellElement() {
           const auth = useLoaderData() as AuthMeResponse;
           return (
             <RequirePlatformAdmin>
               <AdminTransitionBoundary auth={auth}>
-                <AdminShellLayout
+                <AdminShellController
                   auth={auth}
                   spaceSwitcher={<AppGlobalSpaceSwitcherBridge auth={auth} />}
                 />
