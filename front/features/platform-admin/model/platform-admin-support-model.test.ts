@@ -56,7 +56,7 @@ describe("buildSupportGrantRiskSummary", () => {
 
     expect(result.status).toBe("BLOCKED");
     expect(result.items.find((item) => item.id === "permission")?.detail).toBe(
-      "OWNER만 지원 접근 권한을 발급할 수 있습니다.",
+      "소유자만 지원 접근 권한을 발급할 수 있습니다.",
     );
   });
 
@@ -159,6 +159,8 @@ describe("support grant ledger", () => {
 
     expect(formatSupportGrantLedgerSentence(grant)).toMatch(/읽는사이에서 지원 대상에게 지원 접근을 발급함 · 사유: 회원 지원 · 활성/);
     expect(formatSupportGrantLedgerSentence(grant)).not.toMatch(/\bACTIVE\b/);
+    expect(formatSupportGrantLedgerSentence(grant)).toContain("처리 역할: 소유자");
+    expect(formatSupportGrantLedgerSentence(grant)).not.toMatch(/\bOWNER\b/);
     expect(formatSupportGrantLedgerSentence({ ...grant, status: "REVOKED" })).toMatch(/지원 접근을 취소함 · 사유: 회원 지원 · 취소됨/);
   });
 

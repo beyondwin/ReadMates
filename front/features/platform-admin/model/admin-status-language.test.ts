@@ -9,6 +9,7 @@ import {
   adminNavigationLanguage,
   adminPlatformRoleLanguage,
 } from "./admin-status-language";
+import { analyzeAdminPrimaryLanguageSource } from "./admin-primary-language-source-analyzer.test-support";
 
 describe("admin-status-language", () => {
   it("네 운영 축을 route나 영문 제품명이 아닌 운영자 언어로 고정한다", () => {
@@ -60,27 +61,36 @@ describe("admin-status-language", () => {
     expect(adminPlatformRoleLanguage("").technicalDisclosure).toBeNull();
   });
 
-  it("primary source에 금지된 영문 제품 라벨을 다시 넣지 않는다", () => {
-    const root = path.resolve("features/platform-admin");
-    const banned = /\b(?:Today|Club registry|Pipeline|Ledger|Job|Event)\b/;
-    const explicitTechnicalDisclosureLines = new Set([
-      "ui/admin-audit-ledger.tsx:{item.target.jobId ? <div><dt>Job</dt><dd>{item.target.jobId}</dd></div> : null}",
-      "ui/admin-audit-ledger.tsx:{item.target.eventId ? <div><dt>Event</dt><dd>{item.target.eventId}</dd></div> : null}",
-      "ui/platform-admin-ai-ops.tsx:<p className=\"eyebrow\">Job drill-down</p>",
-      "ui/platform-admin-ai-ops.tsx:<div><dt>Job ID</dt><dd>{job.jobId}</dd></div>",
-    ]);
+  it.each([
+    ["direct JSX text", "export const View = () => <h1>Today</h1>"],
+    ["concatenated copy", 'export const View = () => <h1>{"To" + "day"}</h1>'],
+    ["split template copy", 'export const View = () => <h1>{`Pi${"pe"}line`}</h1>'],
+    ["raw property", "export const View = ({ job }: any) => <p>{job.status}</p>"],
+    ["raw destructured alias", "export const View = ({ status: state }: any) => <p>{state}</p>"],
+    ["primary drill-down", "export const View = () => <p>Job drill-down</p>"],
+  ])("detects %s instead of relying on line allowlists", (_name, source) => {
+    expect(analyzeAdminPrimaryLanguageSource(source).violations).not.toEqual([]);
+  });
 
+  it("allows raw values only inside the structural technical disclosure boundary", () => {
+    const analysis = analyzeAdminPrimaryLanguageSource(
+      "export const View = ({ job }: any) => <AdminTechnicalDisclosure items={[{ label: '작업 상태', value: job.status }]} />",
+    );
+    expect(analysis).toEqual({ violations: [], technicalDisclosureCount: 1 });
+  });
+
+  it("primary source에 금지된 영문 제품 라벨과 raw role/status render를 다시 넣지 않는다", () => {
+    const root = path.resolve("features/platform-admin");
+    let disclosureCount = 0;
     const violations = productionSources(root).flatMap((absolutePath) => {
       const relativePath = path.relative(root, absolutePath);
-      return readFileSync(absolutePath, "utf8")
-        .split("\n")
-        .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
-        .filter(({ line }) => banned.test(line))
-        .filter(({ line }) => !explicitTechnicalDisclosureLines.has(`${relativePath}:${line}`))
-        .map(({ line, lineNumber }) => `${relativePath}:${lineNumber}:${line}`);
+      const analysis = analyzeAdminPrimaryLanguageSource(readFileSync(absolutePath, "utf8"), relativePath);
+      disclosureCount += analysis.technicalDisclosureCount;
+      return analysis.violations.map(({ line, reason }) => `${relativePath}:${line}:${reason}`);
     });
 
     expect(violations).toEqual([]);
+    expect(disclosureCount).toBeGreaterThan(0);
   });
 });
 
@@ -89,7 +99,7 @@ function productionSources(directory: string): string[] {
     const absolutePath = path.join(directory, entry.name);
     if (entry.isDirectory()) return productionSources(absolutePath);
     if (!/\.(?:ts|tsx)$/.test(entry.name)) return [];
-    if (/\.(?:test|ct|fixtures)\.(?:ts|tsx)$/.test(entry.name)) return [];
+    if (/\.(?:test|ct|fixtures|test-support)\.(?:ts|tsx)$/.test(entry.name)) return [];
     return [absolutePath];
   });
 }

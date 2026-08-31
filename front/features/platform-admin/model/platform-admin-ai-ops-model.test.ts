@@ -9,6 +9,8 @@ import {
   aiOpsWindowFromSearchParams,
   classifyAiOpsError,
   formatAiJobElapsedLabel,
+  aiOpsJobStageLanguage,
+  aiOpsJobStatusLanguage,
   mergeAiOpsJobPages,
   hasActiveAiOpsFilter,
 } from "./platform-admin-ai-ops-model";
@@ -138,6 +140,18 @@ describe("AI 작업 elapsed labels", () => {
         now,
       ),
     ).toBeNull();
+  });
+});
+
+describe("AI 작업 semantic language", () => {
+  it("maps status and stage while keeping unknown raw values out of primary copy", () => {
+    expect(aiOpsJobStatusLanguage("RUNNING").primaryText).toBe("진행 중");
+    expect(aiOpsJobStatusLanguage("FAILED").primaryText).toBe("실패");
+    expect(aiOpsJobStageLanguage("GENERATING_SUMMARY").primaryText).toBe("요약 생성 중");
+    expect(aiOpsJobStageLanguage("FUTURE_STAGE")).toEqual({
+      primaryText: "확인 필요",
+      technicalDisclosure: { label: "기술 값", value: "FUTURE_STAGE" },
+    });
   });
 });
 

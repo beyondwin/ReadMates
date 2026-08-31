@@ -3,8 +3,20 @@ import type { HealthCard } from "./platform-admin-health-model";
 import {
   formatHealthNarrative,
   healthCardEvidenceState,
+  healthFreshnessLabel,
   partitionHealthServiceCards,
 } from "./platform-admin-health-model";
+
+describe("healthFreshnessLabel", () => {
+  it("uses approved availability semantics without inventing normal or zero", () => {
+    expect((["FRESH", "REFRESHING", "STALE", "UNAVAILABLE"] as const).map(healthFreshnessLabel)).toEqual([
+      "최신",
+      "갱신 중",
+      "오래됨",
+      "확인 불가",
+    ]);
+  });
+});
 
 function card(overrides: Partial<HealthCard> & Pick<HealthCard, "id" | "title">): HealthCard {
   return {

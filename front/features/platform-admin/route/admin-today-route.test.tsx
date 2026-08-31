@@ -283,7 +283,7 @@ describe("AdminTodayRoute", () => {
 
     renderRoute(client, "/admin/today?case=case-notification");
 
-    expect(await screen.findAllByText("현재 상태 · 확인됨")).toHaveLength(2);
+    expect(await screen.findAllByText("현재 상태 · 확인함")).toHaveLength(2);
     expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
     expect(screen.getByRole("group", { name: "작업" }).closest("[data-state]")).toHaveAttribute(
       "data-state",

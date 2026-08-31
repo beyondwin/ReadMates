@@ -5,12 +5,17 @@ import type {
   PlatformAdminAiOpsCommandReceiptResponse,
 } from "@/features/platform-admin/model/platform-admin-domain-types";
 import { ADMIN_COPY, aiJobConfirmAction } from "@/features/platform-admin/model/admin-copy";
-import { formatAiJobElapsedLabel } from "@/features/platform-admin/model/platform-admin-ai-ops-model";
+import {
+  aiOpsJobStageLanguage,
+  aiOpsJobStatusLanguage,
+  formatAiJobElapsedLabel,
+} from "@/features/platform-admin/model/platform-admin-ai-ops-model";
 import { AdminSafeActionDock, type AdminSafeActionState } from "@/features/platform-admin/ui/admin-action-dock";
 import { AdminEvidenceLedger } from "@/features/platform-admin/ui/admin-evidence-ledger";
 import { AdminModalDialog } from "@/features/platform-admin/ui/admin-modal-dialog";
 import { AdminPageContext } from "@/features/platform-admin/ui/admin-page-context";
 import { AdminReceiptTimeline } from "@/features/platform-admin/ui/admin-receipt-timeline";
+import { AdminTechnicalDisclosure } from "@/features/platform-admin/ui/admin-technical-disclosure";
 
 export const ADMIN_AI_OPS_HEADING_ID = "admin-ai-ops-title";
 
@@ -239,13 +244,15 @@ export function PlatformAdminAiOps({
           <div className="platform-admin-ai-ops__jobs">
             {jobs.map((job) => {
               const elapsed = formatAiJobElapsedLabel(job, new Date());
+              const status = aiOpsJobStatusLanguage(job.status);
+              const stage = job.stage ? aiOpsJobStageLanguage(job.stage) : null;
               return (
               <article key={job.jobId} className="platform-admin-ai-ops__job">
                 <div className="platform-admin-ai-ops__job-main">
                   <div className="platform-admin-ai-ops__badges">
-                    <span className="platform-admin-domain-status">{job.status}</span>
-                    {job.stage ? <span className="platform-admin-domain-status">{job.stage}</span> : null}
-                    {job.staleCandidate ? <span className="platform-admin-domain-status">STALE</span> : null}
+                    <span className="platform-admin-domain-status">{status.primaryText}</span>
+                    {stage ? <span className="platform-admin-domain-status">{stage.primaryText}</span> : null}
+                    {job.staleCandidate ? <span className="platform-admin-domain-status">오래됨</span> : null}
                   </div>
                   <p className="platform-admin-ai-ops__job-title">
                     {job.club.name ?? job.club.slug ?? job.club.clubId} ·{" "}
@@ -528,16 +535,22 @@ function AiJobDetailDialog({
   const titleId = "platform-admin-ai-job-detail-title";
   return (
     <AdminModalDialog titleId={titleId} triggerRef={triggerRef} onRequestClose={() => onDismiss?.()}>
-      <p className="eyebrow">Job drill-down</p>
+      <p className="eyebrow">작업 상세</p>
       <h3 id={titleId} className="h3 editorial">AI 작업 상세</h3>
       <dl className="platform-admin-ai-job-detail">
-        <div><dt>Job ID</dt><dd>{job.jobId}</dd></div>
-        <div><dt>상태</dt><dd>{job.status}</dd></div>
+        <div><dt>상태</dt><dd>{aiOpsJobStatusLanguage(job.status).primaryText}</dd></div>
         <div><dt>Revision</dt><dd>revision {job.revision ?? "-"}</dd></div>
         <div><dt>Club</dt><dd>{job.club.name ?? job.club.slug ?? job.club.clubId}</dd></div>
         <div><dt>Session</dt><dd>{job.session.bookTitle ?? job.session.sessionId}</dd></div>
         <div><dt>최근 갱신</dt><dd>{formatTimestamp(job.lastUpdatedAt)}</dd></div>
       </dl>
+      <AdminTechnicalDisclosure
+        items={[
+          { label: "AI 작업 식별자", value: job.jobId },
+          { label: "상태 코드", value: job.status },
+          { label: "단계 코드", value: job.stage },
+        ]}
+      />
       <div className="admin-modal-dialog__actions">
         <button type="button" className="btn btn-primary" onClick={() => onDismiss?.()}>닫기</button>
       </div>

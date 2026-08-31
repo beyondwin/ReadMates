@@ -7,6 +7,7 @@ import {
   formatAdminAuditLedgerSentence,
   mergeAdminAuditLedgerPages,
   labelAdminAuditOutcome,
+  labelAdminAuditActorRole,
   shouldShowAdminAuditDetailValue,
 } from "./platform-admin-audit-model";
 import type { AdminAuditLedgerItem } from "./platform-admin-audit-model";
@@ -50,8 +51,21 @@ describe("platform-admin-audit-model", () => {
   });
 
   it("labels outcomes for ledger chips", () => {
-    expect(labelAdminAuditOutcome("SUCCESS")).toBe("성공");
-    expect(labelAdminAuditOutcome("PREPARED")).toBe("준비됨");
+    expect((["SUCCESS", "FAILED", "DENIED", "PREPARED", "UNKNOWN"] as const).map(labelAdminAuditOutcome)).toEqual([
+      "완료",
+      "실패",
+      "차단됨",
+      "실행 전 준비됨",
+      "결과 확인 필요",
+    ]);
+  });
+
+  it("translates platform roles in audit detail instead of exposing raw values", () => {
+    expect((["OWNER", "OPERATOR", "SUPPORT"] as const).map(labelAdminAuditActorRole)).toEqual([
+      "소유자",
+      "운영자",
+      "지원 담당",
+    ]);
   });
 
   it("reads a target query as the initial clubId filter without serializing target", () => {

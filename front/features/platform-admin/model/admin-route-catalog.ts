@@ -3,6 +3,7 @@ import {
   type PlatformAdminCapabilities,
   type PlatformAdminCapability,
 } from "@/features/platform-admin/model/platform-admin-capabilities";
+import { adminNavigationLanguage } from "@/features/platform-admin/model/admin-status-language";
 
 export type AdminRouteGroup = "today" | "clubs" | "service" | "records";
 export type AdminRouteOwner = AdminRouteGroup | "emergency";
@@ -46,10 +47,10 @@ type AdminPrimaryAreaDefinition = Pick<AdminNavArea, "id" | "label"> & {
 };
 
 const PRIMARY_AREAS: ReadonlyArray<AdminPrimaryAreaDefinition> = [
-  { id: "today", label: "오늘 할 일", canonicalPath: "today" },
-  { id: "clubs", label: "클럽 관리", canonicalPath: "clubs" },
-  { id: "service", label: "서비스 상태", canonicalPath: "health" },
-  { id: "records", label: "처리 기록", canonicalPath: "audit" },
+  { id: "today", label: adminNavigationLanguage("today").primaryText, canonicalPath: "today" },
+  { id: "clubs", label: adminNavigationLanguage("clubs").primaryText, canonicalPath: "clubs" },
+  { id: "service", label: adminNavigationLanguage("service").primaryText, canonicalPath: "health" },
+  { id: "records", label: adminNavigationLanguage("records").primaryText, canonicalPath: "audit" },
 ];
 
 export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
@@ -57,7 +58,7 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
     path: "today",
     label: "오늘",
     group: "today",
-    groupLabel: "오늘",
+    groupLabel: adminNavigationLanguage("today").primaryText,
     slice: "S1",
     status: "ready",
     requiredCapability: "VIEW_TODAY",
@@ -66,16 +67,16 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
     path: "clubs",
     label: "클럽",
     group: "clubs",
-    groupLabel: "클럽",
+    groupLabel: adminNavigationLanguage("clubs").primaryText,
     slice: "S1",
     status: "ready",
     requiredCapability: "VIEW_CLUBS",
   },
   {
     path: "notifications",
-    label: "배달 원장",
+    label: "알림 전달",
     group: "service",
-    groupLabel: "파이프라인",
+    groupLabel: adminNavigationLanguage("service").primaryText,
     slice: "S5",
     status: "ready",
     requiredCapability: "VIEW_NOTIFICATION_OPERATIONS",
@@ -84,34 +85,34 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
     path: "ai-ops",
     label: "AI 작업",
     group: "service",
-    groupLabel: "파이프라인",
+    groupLabel: adminNavigationLanguage("service").primaryText,
     slice: "S1",
     status: "ready",
     requiredCapability: "VIEW_AI_OPERATIONS",
   },
   {
     path: "health",
-    label: "서비스 건강",
+    label: "서비스 상태",
     group: "service",
-    groupLabel: "파이프라인",
+    groupLabel: adminNavigationLanguage("service").primaryText,
     slice: "S2",
     status: "ready",
     requiredCapability: "VIEW_SERVICE_HEALTH",
   },
   {
     path: "audit",
-    label: "운영 기입",
+    label: "처리 기록",
     group: "records",
-    groupLabel: "원장",
+    groupLabel: adminNavigationLanguage("records").primaryText,
     slice: "S7",
     status: "ready",
     requiredCapability: "VIEW_AUDIT",
   },
   {
     path: "support",
-    label: "접근 원장",
+    label: "지원 접근",
     group: "clubs",
-    groupLabel: "클럽",
+    groupLabel: adminNavigationLanguage("clubs").primaryText,
     slice: "S1",
     status: "ready",
     requiredCapability: "VIEW_SUPPORT",
@@ -120,7 +121,7 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
     path: "analytics",
     label: "분석 부록",
     group: "records",
-    groupLabel: "원장",
+    groupLabel: adminNavigationLanguage("records").primaryText,
     slice: "S8",
     status: "ready",
     requiredCapability: "VIEW_ANALYTICS",
@@ -140,7 +141,7 @@ export const ADMIN_CLUB_DETAIL_ROUTE: AdminRouteDescriptor = {
   path: "clubs/:clubId",
   label: "클럽 상세",
   group: "clubs",
-  groupLabel: "클럽",
+  groupLabel: adminNavigationLanguage("clubs").primaryText,
   slice: "S1",
   status: "ready",
   requiredCapability: "VIEW_CLUB_OPERATIONS",

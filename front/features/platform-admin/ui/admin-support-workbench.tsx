@@ -12,12 +12,14 @@ import {
   type SupportGrantReasonCategory,
   type SupportGrantStatus,
 } from "@/features/platform-admin/model/platform-admin-support-model";
+import { adminPlatformRoleLanguage } from "@/features/platform-admin/model/admin-status-language";
 import { AdminSafeActionDock, type AdminSafeActionState } from "./admin-action-dock";
 import { AdminEvidenceLedger } from "./admin-evidence-ledger";
 import { AdminPageContext } from "./admin-page-context";
 import { AdminReceiptTimeline } from "./admin-receipt-timeline";
 import type { AdminPageState } from "./admin-state-panel";
 import { AdminWorkViewBar } from "./admin-work-view-bar";
+import { AdminTechnicalDisclosure } from "./admin-technical-disclosure";
 
 export type AdminSupportWorkbenchClub = { clubId: string; name: string };
 
@@ -156,7 +158,7 @@ export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
           <div className="admin-support-workbench__results">
             {props.search.results.map((result) => (
               <button key={result.subjectId} type="button" disabled={effectLocked} onClick={() => props.search.onSelect(result)}>
-                <strong>{result.displayName}</strong><span>{result.maskedEmail}</span><em>{result.grantEligible ? result.platformAdminRole ?? result.kind : result.grantBlockedReason ?? "발급 불가"}</em>
+                <strong>{result.displayName}</strong><span>{result.maskedEmail}</span><em>{result.grantEligible ? result.platformAdminRole ? adminPlatformRoleLanguage(result.platformAdminRole).primaryText : result.kind : result.grantBlockedReason ?? "발급 불가"}</em>
               </button>
             ))}
           </div>
@@ -218,6 +220,7 @@ export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
               <div>
                 <p>{formatSupportGrantLedgerSentence(item)}</p>
                 <p className="small muted">{item.granteeMaskedEmail} · {notePresenceLabel(item.notePresent)}</p>
+                <AdminTechnicalDisclosure items={[{ label: "처리 역할 코드", value: item.createdByRole }]} />
               </div>
               {props.canManage && item.status === "ACTIVE" ? <button type="button" className="btn btn-ghost btn-sm" disabled={effectLocked} onClick={() => props.revoke.onStart(item)}>권한 취소 검토</button> : null}
             </article>

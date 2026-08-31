@@ -85,13 +85,6 @@ const EVIDENCE_LABEL: Record<HealthEvidenceState, string> = {
   empty: "없음",
 };
 
-const FRESHNESS_LABEL: Record<PlatformHealthRefreshState, string> = {
-  FRESH: "최신",
-  REFRESHING: "갱신 중",
-  STALE: "지연",
-  UNAVAILABLE: "이력 없음",
-};
-
 export function isDisabledHealthReason(reason: string | null): boolean {
   return reason != null && (reason === "disabled" || reason.endsWith("_disabled"));
 }
@@ -119,7 +112,7 @@ export function healthSourceLabel(source: HealthCardSource): string {
 }
 
 export function healthFreshnessLabel(refreshState: PlatformHealthRefreshState): string {
-  return FRESHNESS_LABEL[refreshState];
+  return adminHealthFreshnessLanguage(refreshState).primaryText;
 }
 
 export function healthPrimaryReading(card: HealthCard): string {
@@ -276,3 +269,4 @@ function formatAge(seconds: number): string {
   if (remainingSeconds === 0) return `${minutes}분`;
   return `${minutes}분 ${remainingSeconds}초`;
 }
+import { adminHealthFreshnessLanguage } from "@/features/platform-admin/model/admin-status-language";

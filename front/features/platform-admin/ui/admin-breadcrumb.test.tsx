@@ -21,26 +21,25 @@ describe("AdminBreadcrumb", () => {
     expect(screen.queryByText("Command")).not.toBeInTheDocument();
   });
 
-  it("nests club detail under 클럽 instead of a fifth primary item", () => {
+  it("nests club detail under 클럽 관리 instead of a fifth primary item", () => {
     render(<AdminBreadcrumb routePath="clubs/:clubId" extra="샘플 클럽" />);
-    expect(screen.getByText("클럽")).toBeInTheDocument();
+    expect(screen.getByText("클럽 관리")).toBeInTheDocument();
     expect(screen.getByText("클럽 상세")).toBeInTheDocument();
     expect(screen.getByText("샘플 클럽")).toBeInTheDocument();
     expect(screen.queryByText("Command")).not.toBeInTheDocument();
   });
 
-  it("nests service health under 파이프라인 with the unified Korean label", () => {
+  it("nests service health under the centralized service label", () => {
     render(<AdminBreadcrumb routePath="health" />);
-    expect(screen.getByText("파이프라인")).toBeInTheDocument();
-    expect(screen.getByText("서비스 건강")).toBeInTheDocument();
+    expect(screen.getAllByText("서비스 상태")).toHaveLength(2);
     expect(screen.queryByText("사건")).not.toBeInTheDocument();
     expect(screen.queryByText("Operations")).not.toBeInTheDocument();
     expect(screen.queryByText("서비스", { exact: true })).not.toBeInTheDocument();
   });
 
-  it("nests analytics under 원장", () => {
+  it("nests analytics under 처리 기록", () => {
     render(<AdminBreadcrumb routePath="analytics" />);
-    expect(screen.getByText("원장")).toBeInTheDocument();
+    expect(screen.getByText("처리 기록")).toBeInTheDocument();
     expect(screen.getByText("분석 부록")).toBeInTheDocument();
     expect(screen.queryByText("Review")).not.toBeInTheDocument();
     expect(screen.queryByText("검토")).not.toBeInTheDocument();

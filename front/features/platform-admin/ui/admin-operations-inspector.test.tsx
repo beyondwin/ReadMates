@@ -36,7 +36,7 @@ const selectedCase: AdminOperationCaseView = {
     description: "같은 원인의 실패를 확인하세요.",
   },
   severityLabel: "경고",
-  stateLabel: "미확인",
+  stateLabel: "확인 전",
   sourceLabel: "알림",
   impactLabel: "영향 2건",
   ageLabel: "2시간 전",
@@ -79,8 +79,8 @@ describe("AdminOperationsInspector", () => {
       "/admin/notifications?focus=delivery",
     );
     expect(screen.getByRole("heading", { name: "이 대상의 최근 처리 기록" })).toBeInTheDocument();
-    expect(screen.getByText("신호가 처음 감지됨 · 미확인")).toBeInTheDocument();
-    expect(screen.getByText("상태 변경 기록 · 확인됨")).toBeInTheDocument();
+    expect(screen.getByText("신호가 처음 감지됨 · 확인 전")).toBeInTheDocument();
+    expect(screen.getByText("상태 변경 기록 · 확인함")).toBeInTheDocument();
     expect(screen.queryByText("PRIVATE_HISTORY_CODE")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "전체 처리 기록 보기" })).toHaveAttribute(
       "href",
@@ -425,9 +425,9 @@ describe("AdminOperationsInspector", () => {
       "8.4 17:10",
     ]);
     expect(rows.map((row) => row.querySelector("span")?.textContent)).toEqual([
-      "신호 재감지로 다시 열림 · 미확인",
-      "운영자가 보류함 · 보류됨",
-      "운영자가 확인함 · 확인됨",
+      "신호 재감지로 다시 열림 · 확인 전",
+      "운영자가 보류함 · 잠시 미룸",
+      "운영자가 확인함 · 확인함",
     ]);
     expect(screen.queryByText("신호가 처음 감지됨 · 미확인")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "전체 처리 기록 보기" })).toHaveAttribute(

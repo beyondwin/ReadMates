@@ -143,7 +143,7 @@ describe("AdminHealthCard", () => {
       const article = articleNamed("Outbox backlog");
       expect(within(article).getByText("42 rows")).toBeInTheDocument();
       expect(within(article).getByText("정상")).toBeInTheDocument();
-      expect(within(article).getByText(refreshState === "STALE" ? "지연" : "이력 없음")).toBeInTheDocument();
+      expect(within(article).getByText(refreshState === "STALE" ? "오래됨" : "확인 불가")).toBeInTheDocument();
       expect(article.querySelector(".admin-health-card__pill--ok")).toBeNull();
       expect(article.querySelector(".admin-health-card__pill--last-known")).not.toBeNull();
     },

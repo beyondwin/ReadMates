@@ -1,4 +1,5 @@
 import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
+import { adminCaseLifecycleLanguage } from "@/features/platform-admin/model/admin-status-language";
 import type { AdminOperationWorkView } from "@/features/platform-admin/model/platform-admin-operations-model";
 import { AdminWorkViewBar } from "./admin-work-view-bar";
 
@@ -58,10 +59,10 @@ export function AdminTodayControls({
               onChange={(value) => onFilterChange("state", value)}
               options={[
                 ["", "모든 상태"],
-                ["open", "미확인"],
-                ["acknowledged", "확인됨"],
-                ["snoozed", "보류됨"],
-                ["resolved", "해결됨"],
+                ["open", adminCaseLifecycleLanguage("OPEN").primaryText],
+                ["acknowledged", adminCaseLifecycleLanguage("ACKNOWLEDGED").primaryText],
+                ["snoozed", adminCaseLifecycleLanguage("SNOOZED").primaryText],
+                ["resolved", adminCaseLifecycleLanguage("RESOLVED").primaryText],
               ]}
             />
             <FilterSelect

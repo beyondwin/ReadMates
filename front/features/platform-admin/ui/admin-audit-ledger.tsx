@@ -19,6 +19,7 @@ import { AdminEvidenceLedger } from "./admin-evidence-ledger";
 import { AdminPageContext } from "./admin-page-context";
 import type { AdminPageState } from "./admin-state-panel";
 import { AdminWorkViewBar } from "./admin-work-view-bar";
+import { AdminTechnicalDisclosure } from "./admin-technical-disclosure";
 
 export type AdminAuditLedgerProps = {
   page: AdminAuditLedgerPage | null;
@@ -279,12 +280,17 @@ function AuditDetail({ item, onBack }: { item: AdminAuditLedgerItem | null; onBa
       <h2 className="h3 editorial">{item.summary}</h2>
       <p className="tiny muted">{item.sourceTable} · {item.actionType}</p>
       <dl className="admin-audit__identity">
-        <div><dt>행위자</dt><dd>{item.actor.displayLabel} · {labelAdminAuditActorRole(item.actor.role)}</dd></div>
+        <div><dt>행위자</dt><dd>{auditActorPrimaryLabel(item)}</dd></div>
         <div><dt>대상</dt><dd>{item.target.label}</dd></div>
         {item.target.clubId ? <div><dt>클럽</dt><dd>{item.target.clubId}</dd></div> : null}
-        {item.target.jobId ? <div><dt>Job</dt><dd>{item.target.jobId}</dd></div> : null}
-        {item.target.eventId ? <div><dt>Event</dt><dd>{item.target.eventId}</dd></div> : null}
       </dl>
+      <AdminTechnicalDisclosure
+        items={[
+          { label: "행위자 역할 코드", value: item.actor.role },
+          { label: "AI 작업 식별자", value: item.target.jobId },
+          { label: "이벤트 식별자", value: item.target.eventId },
+        ]}
+      />
       <div className={`admin-audit__operation admin-audit__operation--${operationSummary.state.toLowerCase()}`}>
         <span className="admin-audit__operation-label">운영 판단</span>
         <strong>{operationSummary.label}</strong>
@@ -296,6 +302,13 @@ function AuditDetail({ item, onBack }: { item: AdminAuditLedgerItem | null; onBa
       {item.metadataState === "EMPTY" ? <p className="muted">안전하게 표시할 추가 세부 정보가 없습니다.</p> : null}
     </aside>
   );
+}
+
+function auditActorPrimaryLabel(item: AdminAuditLedgerItem): string {
+  const roleLabel = labelAdminAuditActorRole(item.actor.role);
+  return item.actor.displayLabel === item.actor.role
+    ? roleLabel
+    : `${item.actor.displayLabel} · ${roleLabel}`;
 }
 
 function toLocalDateTime(value: string | null | undefined) {

@@ -72,6 +72,12 @@ describe("AdminSupportWorkbench", () => {
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 
+  it("renders the grant creator role as Korean primary copy and raw only in technical disclosure", () => {
+    const { container } = render(<AdminSupportWorkbench {...props()} />);
+    expect(screen.getByText(/처리 역할: 소유자/)).toBeInTheDocument();
+    expect(container.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("OWNER");
+  });
+
   it("disables the issue button when reason or expiry is missing", () => {
     const { rerender } = render(<AdminSupportWorkbench {...props({
       search: { ...props().search, selected },

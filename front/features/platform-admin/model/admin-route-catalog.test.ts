@@ -9,6 +9,7 @@ import {
   visibleAdminNav,
 } from "./admin-route-catalog";
 import type { PlatformAdminCapabilities } from "./platform-admin-capabilities";
+import { adminNavigationLanguage } from "./admin-status-language";
 
 function projection(
   capabilities: PlatformAdminCapabilities["capabilities"],
@@ -52,10 +53,10 @@ describe("ADMIN_ROUTES catalog", () => {
       else labelByGroup.set(route.group, route.groupLabel);
     }
     expect([...labelByGroup.entries()]).toEqual([
-      ["today", "오늘"],
-      ["clubs", "클럽"],
-      ["service", "파이프라인"],
-      ["records", "원장"],
+      ["today", adminNavigationLanguage("today").primaryText],
+      ["clubs", adminNavigationLanguage("clubs").primaryText],
+      ["service", adminNavigationLanguage("service").primaryText],
+      ["records", adminNavigationLanguage("records").primaryText],
     ]);
   });
 
@@ -73,56 +74,56 @@ describe("ADMIN_ROUTES catalog", () => {
         path: "today",
         label: "오늘",
         group: "today",
-        groupLabel: "오늘",
+        groupLabel: "오늘 할 일",
         requiredCapability: "VIEW_TODAY",
       },
       {
         path: "clubs",
         label: "클럽",
         group: "clubs",
-        groupLabel: "클럽",
+        groupLabel: "클럽 관리",
         requiredCapability: "VIEW_CLUBS",
       },
       {
         path: "notifications",
-        label: "배달 원장",
+        label: "알림 전달",
         group: "service",
-        groupLabel: "파이프라인",
+        groupLabel: "서비스 상태",
         requiredCapability: "VIEW_NOTIFICATION_OPERATIONS",
       },
       {
         path: "ai-ops",
         label: "AI 작업",
         group: "service",
-        groupLabel: "파이프라인",
+        groupLabel: "서비스 상태",
         requiredCapability: "VIEW_AI_OPERATIONS",
       },
       {
         path: "health",
-        label: "서비스 건강",
+        label: "서비스 상태",
         group: "service",
-        groupLabel: "파이프라인",
+        groupLabel: "서비스 상태",
         requiredCapability: "VIEW_SERVICE_HEALTH",
       },
       {
         path: "audit",
-        label: "운영 기입",
+        label: "처리 기록",
         group: "records",
-        groupLabel: "원장",
+        groupLabel: "처리 기록",
         requiredCapability: "VIEW_AUDIT",
       },
       {
         path: "support",
-        label: "접근 원장",
+        label: "지원 접근",
         group: "clubs",
-        groupLabel: "클럽",
+        groupLabel: "클럽 관리",
         requiredCapability: "VIEW_SUPPORT",
       },
       {
         path: "analytics",
         label: "분석 부록",
         group: "records",
-        groupLabel: "원장",
+        groupLabel: "처리 기록",
         requiredCapability: "VIEW_ANALYTICS",
       },
       {
@@ -185,7 +186,7 @@ describe("ADMIN_ROUTES catalog", () => {
       path: "clubs/:clubId",
       label: "클럽 상세",
       group: "clubs",
-      groupLabel: "클럽",
+      groupLabel: "클럽 관리",
       status: "ready",
       requiredCapability: "VIEW_CLUB_OPERATIONS",
     });

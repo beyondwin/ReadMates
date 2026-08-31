@@ -88,10 +88,27 @@ describe("PlatformAdminAiOps", () => {
     expect(within(section).getByText("2")).toBeInTheDocument();
     expect(within(section).getByText("$0.2000")).toBeInTheDocument();
     expect(within(section).getByText(/읽는사이/)).toBeInTheDocument();
+    expect(within(section).getByText("진행 중")).toBeInTheDocument();
+    expect(within(section).getByText("요약 생성 중")).toBeInTheDocument();
+    expect(within(section).getByText("오래됨")).toBeInTheDocument();
+    expect(section.textContent).not.toContain("RUNNING");
+    expect(section.textContent).not.toContain("GENERATING_SUMMARY");
+    expect(section.textContent).not.toContain("STALE");
     expect(within(section).queryByRole("button", { name: "강제 취소 검토" })).not.toBeInTheDocument();
     expect(section.textContent).not.toContain("transcript");
     expect(section.textContent).not.toContain("feedbackDocumentMarkdown");
     expect(section.textContent).not.toContain("instructions");
+  });
+
+  it("keeps raw AI job values inside explicit technical disclosure in detail", () => {
+    render(
+      <PlatformAdminAiOps role="OWNER" summary={summary} jobs={[runningJob]} selectedJob={runningJob} />,
+    );
+    const dialog = screen.getByRole("dialog", { name: "AI 작업 상세" });
+    expect(within(dialog).getByText("진행 중")).toBeInTheDocument();
+    expect(within(dialog).queryByText("Job drill-down")).not.toBeInTheDocument();
+    expect(dialog.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("RUNNING");
+    expect(document.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("GENERATING_SUMMARY");
   });
 
   it("shows recovery revision and cleanup state without exposing generation content", () => {

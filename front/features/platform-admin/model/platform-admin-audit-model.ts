@@ -1,5 +1,9 @@
 import { auditOutcomeLabel } from "@/features/platform-admin/model/admin-copy";
 import {
+  adminAuditActorRoleLanguage,
+  adminAuditOutcomeLanguage,
+} from "@/features/platform-admin/model/admin-status-language";
+import {
   EMPTY_AI_OPS_FILTER,
   aiOpsPathFromFilter,
 } from "@/features/platform-admin/model/platform-admin-ai-ops-model";
@@ -172,13 +176,7 @@ export function formatAdminAuditLedgerSentence(item: AdminAuditLedgerItem): stri
 }
 
 export function labelAdminAuditOutcome(outcome: AdminAuditOutcome): string {
-  return {
-    SUCCESS: "성공",
-    FAILED: "실패",
-    DENIED: "거부",
-    PREPARED: "준비됨",
-    UNKNOWN: "알 수 없음",
-  }[outcome];
+  return adminAuditOutcomeLanguage(outcome).primaryText;
 }
 
 export function labelAdminAuditSourceSlice(sourceSlice: AdminAuditSourceSlice): string {
@@ -193,15 +191,7 @@ export function labelAdminAuditSourceSlice(sourceSlice: AdminAuditSourceSlice): 
 }
 
 export function labelAdminAuditActorRole(role: AdminAuditActorRole): string {
-  return {
-    OWNER: "OWNER",
-    OPERATOR: "OPERATOR",
-    SUPPORT: "SUPPORT",
-    HOST: "HOST",
-    MEMBER: "MEMBER",
-    SYSTEM: "SYSTEM",
-    UNKNOWN: "UNKNOWN",
-  }[role];
+  return adminAuditActorRoleLanguage(role).primaryText;
 }
 
 export function shouldShowAdminAuditDetailValue(label: string, value: string): boolean {

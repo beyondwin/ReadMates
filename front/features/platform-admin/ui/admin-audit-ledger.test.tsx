@@ -82,6 +82,11 @@ describe("AdminAuditLedger", () => {
     await user.click(notificationRow);
 
     const detail = screen.getByRole("region", { name: "감사 이벤트 상세" });
+    const identity = detail.querySelector(".admin-audit__identity");
+    expect(identity).toHaveTextContent("소유자");
+    expect(identity).not.toHaveTextContent("OWNER");
+    expect(detail.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("OWNER");
+    expect(detail.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("preview-1");
     expect(within(detail).getByText("selectionHashPrefix")).toBeInTheDocument();
     expect(detail.textContent).not.toContain("{");
     expect(within(detail).getByText("운영 판단")).toBeInTheDocument();

@@ -1,4 +1,8 @@
 import { aiJobInProgressLabel, aiJobStallLabel } from "@/features/platform-admin/model/admin-copy";
+import {
+  mapAdminSemanticLanguage,
+  type AdminSemanticLanguage,
+} from "@/features/platform-admin/model/admin-status-language";
 import type {
   PlatformAdminAiOpsFilters,
   PlatformAdminAiOpsJob,
@@ -12,6 +16,35 @@ export type AiOpsJobFilter = {
 };
 
 export const EMPTY_AI_OPS_FILTER: AiOpsJobFilter = { errorCode: null, clubId: null, jobId: null };
+
+const AI_OPS_JOB_STATUS_LABELS = {
+  PENDING: "대기 중",
+  RUNNING: "진행 중",
+  COMMITTING: "저장 중",
+  COMMIT_RETRY: "저장 재시도 중",
+  SUCCEEDED: "완료",
+  COMPLETED: "완료",
+  FAILED: "실패",
+  CANCELLED: "취소됨",
+  CANCELED: "취소됨",
+} as const;
+
+const AI_OPS_JOB_STAGE_LABELS = {
+  READY: "준비됨",
+  GENERATING: "생성 중",
+  GENERATING_RECORD: "기록 생성 중",
+  GENERATING_HIGHLIGHTS: "하이라이트 생성 중",
+  GENERATING_SUMMARY: "요약 생성 중",
+  VALIDATING_GROUNDING: "근거 확인 중",
+} as const;
+
+export function aiOpsJobStatusLanguage(value: string): AdminSemanticLanguage {
+  return mapAdminSemanticLanguage(value, AI_OPS_JOB_STATUS_LABELS);
+}
+
+export function aiOpsJobStageLanguage(value: string): AdminSemanticLanguage {
+  return mapAdminSemanticLanguage(value, AI_OPS_JOB_STAGE_LABELS);
+}
 
 export function aiOpsFilterFromSearchParams(params: URLSearchParams): AiOpsJobFilter {
   return {

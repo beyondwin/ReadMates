@@ -2,6 +2,10 @@ import { useLayoutEffect, type ReactNode } from "react";
 import { commitAdminEditorialLedgerCaseDocket } from "@/shared/observability/admin-editorial-ledger-performance";
 import { Link } from "react-router";
 import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
+import {
+  adminCaseLifecycleLanguage,
+  adminHealthAvailabilityLanguage,
+} from "@/features/platform-admin/model/admin-status-language";
 import type { AdminOperationCaseView } from "@/features/platform-admin/model/platform-admin-operations-model";
 import { AdminSafeActionDock, type AdminSafeActionState } from "./admin-action-dock";
 import { AdminCaseDocket } from "./admin-case-docket";
@@ -51,20 +55,6 @@ const SOURCE_DETAIL_LABELS: Record<string, string> = {
   CLOSING_RISK: "마감 운영에서 확인",
 };
 
-const SOURCE_STATUS_LABELS: Record<string, string> = {
-  AVAILABLE: "정상",
-  PARTIAL: "일부 확인 불가",
-  UNAVAILABLE: "확인 불가",
-  DISABLED: "비활성",
-};
-
-const CASE_STATE_LABELS: Record<string, string> = {
-  OPEN: "미확인",
-  ACKNOWLEDGED: "확인됨",
-  SNOOZED: "보류됨",
-  RESOLVED: "해결됨",
-};
-
 const KOREAN_TIME = new Intl.DateTimeFormat("ko-KR", {
   dateStyle: "medium",
   timeStyle: "short",
@@ -103,7 +93,7 @@ export function AdminOperationsInspector({
     );
   }
 
-  const sourceStatus = SOURCE_STATUS_LABELS[selectedCase.source.status] ?? "상태 확인 필요";
+  const sourceStatus = adminHealthAvailabilityLanguage(selectedCase.source.status).primaryText;
   const freshness = sourceFreshnessLabel(
     selectedCase.source.status,
     sourceStatus,
@@ -225,7 +215,7 @@ function targetLedgerEntries(history: readonly SafeHistoryEvent[]) {
     .slice(0, 3)
     .map((event) => ({
       at: formatLedgerTime(event.occurredAt),
-      sentence: `${HISTORY_LABELS[event.reasonCode] ?? "상태 변경 기록"} · ${CASE_STATE_LABELS[event.toState] ?? "상태 확인"}`,
+      sentence: `${HISTORY_LABELS[event.reasonCode] ?? "상태 변경 기록"} · ${adminCaseLifecycleLanguage(event.toState).primaryText}`,
     }));
 }
 

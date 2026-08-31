@@ -29,6 +29,14 @@ const PLATFORM_ROLE_LABELS = {
   SUPPORT: "지원 담당",
 } as const;
 
+const AUDIT_ACTOR_ROLE_LABELS = {
+  ...PLATFORM_ROLE_LABELS,
+  HOST: "호스트",
+  MEMBER: "멤버",
+  SYSTEM: "시스템",
+  UNKNOWN: ADMIN_UNKNOWN_PRIMARY_TEXT,
+} as const;
+
 const AUDIT_OUTCOME_LABELS = {
   SUCCESS: "완료",
   FAILED: "실패",
@@ -61,6 +69,10 @@ export function adminCaseLifecycleLanguage(value: string): AdminSemanticLanguage
 
 export function adminPlatformRoleLanguage(value: string): AdminSemanticLanguage {
   return mapAdminSemanticLanguage(value, PLATFORM_ROLE_LABELS);
+}
+
+export function adminAuditActorRoleLanguage(value: string): AdminSemanticLanguage {
+  return mapAdminSemanticLanguage(value, AUDIT_ACTOR_ROLE_LABELS);
 }
 
 export function adminAuditOutcomeLanguage(value: string): AdminSemanticLanguage {

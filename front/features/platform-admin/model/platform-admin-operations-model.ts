@@ -7,10 +7,13 @@ import type {
   AdminOperationCasesResponse,
   AdminOperationSeverity,
   AdminOperationSourceFreshness,
-  AdminOperationSourceStatus,
   AdminOperationSourceType,
   AdminOperationSummaryCode,
 } from "@/features/platform-admin/api/platform-admin-operations-contracts";
+import {
+  adminCaseLifecycleLanguage,
+  adminHealthAvailabilityLanguage,
+} from "@/features/platform-admin/model/admin-status-language";
 
 const CASE_STATES: readonly AdminOperationCaseState[] = [
   "OPEN",
@@ -76,25 +79,11 @@ const SEVERITY_LABELS: Record<AdminOperationSeverity, string> = {
   INFO: "정보",
 };
 
-const STATE_LABELS: Record<AdminOperationCaseState, string> = {
-  OPEN: "미확인",
-  ACKNOWLEDGED: "확인됨",
-  SNOOZED: "보류됨",
-  RESOLVED: "해결됨",
-};
-
 const SOURCE_LABELS: Record<AdminOperationSourceType, string> = {
   CLUB_READINESS: "클럽 준비",
   NOTIFICATION: "알림",
   AI_JOB: "AI 작업",
   CLOSING_RISK: "모임 마감",
-};
-
-const SOURCE_STATUS_LABELS: Record<AdminOperationSourceStatus, string> = {
-  AVAILABLE: "정상",
-  PARTIAL: "일부 확인 불가",
-  UNAVAILABLE: "확인 불가",
-  DISABLED: "비활성",
 };
 
 const SEOUL_TIME = new Intl.DateTimeFormat("ko-KR", {
@@ -336,7 +325,7 @@ function buildCaseView(
     scopeLabel: item.clubId ? clubNames.get(item.clubId) ?? "클럽 정보 확인 필요" : "플랫폼 전체",
     summary: adminOperationSummaryLabel(item.summaryCode),
     severityLabel: SEVERITY_LABELS[item.severity] ?? "상태 확인",
-    stateLabel: STATE_LABELS[item.state] ?? "상태 확인",
+    stateLabel: adminCaseLifecycleLanguage(item.state).primaryText,
     sourceLabel: SOURCE_LABELS[item.sourceType] ?? "운영 신호",
     impactLabel: `영향 ${item.impactCount}건`,
     ageLabel: formatAge(item.firstObservedAt, now),
@@ -361,7 +350,7 @@ function mergeOperationFilters(
 function buildSourceFreshnessView(
   source: AdminOperationSourceFreshness,
 ): AdminOperationSourceFreshnessView {
-  const statusLabel = SOURCE_STATUS_LABELS[source.status] ?? "상태 확인 필요";
+  const statusLabel = adminHealthAvailabilityLanguage(source.status).primaryText;
   let message = statusLabel;
   if (source.status === "AVAILABLE") {
     message = `${statusLabel} · ${formatTime(source.generatedAt)} 기준`;
