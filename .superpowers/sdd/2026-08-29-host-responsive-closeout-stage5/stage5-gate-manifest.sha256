@@ -3,4 +3,4 @@
 b43eee56d88deacd0b0163e8d8eb14822bb8ca07ede3e174c7a25606a2ad62da  scripts/public-release-check.sh
 17e187ca6a35e937fc00716b54d7fb8ae8677bfa89cc3dce9d0586a5de8eeed0  docs/development/adr/0048-host-lifecycle-operating-room-composition.md
 6a0e63034e06ac0e9bb10f270737771d781b533bbb50ffec5d8b59d6d5fb3c5f  docs/development/adr/0049-schedule-revision-seen-state.md
-0797369da837a7f2bab692fdcde2adeeae749534f4d50b298ece6d792539e835  .superpowers/sdd/2026-08-29-host-responsive-closeout-stage5/stage5-gate-report.md
+54b6ac6accdce4d8683b80f0d1561ffaead7da8f11ff57f4612b133c625e1fd3  .superpowers/sdd/2026-08-29-host-responsive-closeout-stage5/stage5-gate-report.md

@@ -3,7 +3,7 @@
 ## Authority and scope
 
 - Stage start: `9e90834c26496cb4af4b84f4ccda22c10be34fcf`.
-- Final gate source before this report: `7bbb4df8345473cddc7e9eb9d3883149dd9d7d8a`.
+- Final gate source after Stage-range finding closure: `3d366ed0c13bb1786c85adef46dd4bc606711150`.
 - Stage 5 plan SHA-256: `827c369f52ad002bda664c57d171d5c4fd8246f3b8637c85b929a507e1c5c3bb`.
 - Repository package manager source: `package.json` SHA-256 `1715ded81813d070d5125001609c6ba2fff43359156ce4af148302d37a06ff76`, pinned `pnpm@11.13.1`.
 - ADR impact: `update`. ADR-0048 and ADR-0049 are `Accepted` at this source after their named implementation and evidence gates closed.
@@ -23,8 +23,8 @@
 | E2E fix `66fe6fc25c02e416b30a7dbbfec0af0119514f5c`; manifest 17/17 | Focused affected Chromium union; admin host handoff; host browser smoke on Chromium/Firefox/WebKit; record preview; member reading; responsive Vitest | GREEN: changed lifecycle selection 21/21 on fresh review; admin host handoff 2/2; overflow representatives 4/4; 767/768 boundary 1/1; browser smoke 3/3; record preview 2/2; member reading 2/2; responsive Vitest 73/73. | Canonical host destinations, named invitation-link creation/redaction/OAuth acceptance, legacy redirects, schedule/access fixtures and 768px overflow are closed without a new skip. |
 | CT source `66fe6fc25c02e416b30a7dbbfec0af0119514f5c` | canonical Docker `PATH=<container-node>:$PATH pnpm --dir front test:ct` equivalent, pinned Playwright image and one worker | 121 executed: 118 passed, three screenshot comparisons failed. One was the intentional host CLOSED-768 height change; two were unrelated platform-admin one-pixel renderer deltas. | No overall CT pass is claimed. Host semantics passed before the screenshot assertion; only the reviewed host raster was updated. |
 | CT fix `e4117640c65df14c1e9124e4cbc8368110afba5b`; target SHA-256 `b16601d8f3e56acd6eb7e1d66b2b9d699537653fe51f664a18e67440a27c9491` | focused canonical Docker update once, then the same selector without update mode | GREEN: update 1/1 and verify-only 1/1; 24/24 non-target PNGs and all six admin PNGs byte-identical. | The 768x2427 image has no clipping or overlap and retains the recovery bar and final CTA. The unrelated admin one-pixel deltas were not rewritten. |
-| Public release scripts `18e630d9...` and `b43eee56...`; final docs source `7bbb4df8345473cddc7e9eb9d3883149dd9d7d8a` | `./scripts/build-public-release-candidate.sh` then `./scripts/public-release-check.sh .tmp/public-release-candidate` | GREEN: production runtime config contract OK; public-release check passed. `gitleaks` was unavailable, so the script used and disclosed fallback path/content checks. | The accepted ADR docs and current lifecycle source are safe under the repository public-release gate; a professional gitleaks result is not claimed. |
-| Branch source `7bbb4df8345473cddc7e9eb9d3883149dd9d7d8a` | `git diff --check origin/main..HEAD` | GREEN: exit `0`, no output. | The full branch delta has no whitespace errors. |
+| Public release scripts `18e630d9...` and `b43eee56...`; final docs source `3d366ed0c13bb1786c85adef46dd4bc606711150` | `./scripts/build-public-release-candidate.sh` then `./scripts/public-release-check.sh .tmp/public-release-candidate` | GREEN after the Stage-range docs fix: production runtime config contract OK; public-release check passed. `gitleaks` was unavailable, so the script used and disclosed fallback path/content checks. | The Accepted ADR status is aligned in active docs and included in the release candidate; a professional gitleaks result is not claimed. |
+| Branch source `3d366ed0c13bb1786c85adef46dd4bc606711150` | `git diff --check origin/main..HEAD` | GREEN: exit `0`, no output. | The full branch delta has no whitespace errors. |
 | Same branch source, excluding evidence reports that quote scanner patterns | Added-line scan over product, tests and docs for machine-local roots, private-key markers and common provider-token shapes | GREEN: zero matches. | No public-repository safety finding exists in the changed product/docs surface. The first meta-scan matched only scanner command text inside evidence reports and was classified, not suppressed as a product pass. |
 
 ## Requirement closure
@@ -48,4 +48,6 @@
 - The monolithic integration command was host-memory constrained; the exact disjoint union is the valid 1465/1465 server evidence.
 - `gitleaks` is unavailable; only the repository fallback and targeted scans passed.
 
-No branch-owned Stage 5 load-bearing claim remains open. Stage-range review and the single whole-branch review remain the next authority gates.
+The Stage-range reviewer found two evidence/docs consistency issues. Commit `3d366ed0c13bb1786c85adef46dd4bc606711150` aligned active docs to Accepted and made the existing Docker CT brief available in a clean checkout without changing its SHA-256. Focused manifest, stale-status, diff and safety checks passed; the public-release gate above was rerun against that docs source.
+
+No branch-owned Stage 5 load-bearing claim remains open. Focused Stage-range finding re-review and the single whole-branch review remain the next authority gates.
