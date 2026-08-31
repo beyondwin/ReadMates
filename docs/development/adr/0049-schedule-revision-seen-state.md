@@ -69,7 +69,7 @@ UI 라벨은 각각 `현재 일정 확인`, `변경 전 확인`, `미열람`이�
 - `UNSEEN → CURRENT → STALE → CURRENT`, DRAFT/INACTIVE/cross-club fail-closed, privacy projection은 [DB integration test](../../../server/src/test/kotlin/com/readmates/session/api/SessionScheduleSeenDbTest.kt)가 검증한다.
 - server 응답과 frontend Zod schema의 동일성은 [contract test](../../../server/src/test/kotlin/com/readmates/contract/FrontendZodSchemaContractTest.kt), 사용자 흐름은 [schedule-seen E2E](../../../front/tests/e2e/schedule-seen-lifecycle.spec.ts)가 검증한다.
 - V61–V65 순차 적용과 migration 불변식은 [MySQL Flyway migration test](../../../server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt) 및 [session invariant test](../../../server/src/test/kotlin/com/readmates/session/domain/SessionInvariantConstraintTest.kt)가 소유한다.
-- Stage 1 전체 gate는 `.superpowers/sdd/2026-08-29-host-lifecycle-operating-room-stage1/task-9-report.md` SHA-256 `f7c85e8a25052cfe6441d73b60cb8319dfc6ee72ac728ecc3fce910b10a7f36d`에 봉인되어 있다.
+- Stage 1 전체 gate는 `.superpowers/sdd/2026-08-29-host-schedule-seen-stage1/stage1-gate-report.md` SHA-256 `f7c85e8a25052cfe6441d73b60cb8319dfc6ee72ac728ecc3fce910b10a7f36d`에 봉인되어 있다.
 - Stage 5 acceptance는 V61–V65 clean/upgrade migration, schedule-seen policy·timing·privacy, parallel upsert와 role-loss cleanup, trusted BFF·authorization, 안정적인 Zod fixture digest, Chromium schedule lifecycle·cross-club·role evidence를 확인했다. Full server integration union은 1465/1465, server CI는 통과했다.
 
 ## 잔여 운영 검증
