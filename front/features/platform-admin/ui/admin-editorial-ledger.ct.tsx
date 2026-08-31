@@ -86,28 +86,44 @@ async function expectNoNestedLiveRegions(component: Locator): Promise<void> {
 }
 
 function todayNode(fixture: TodayLedgerFixture) {
+  const lifecycleControls = fixture.allowedActions.length > 0 ? (
+    <AdminOperationStateActions
+      allowedActions={fixture.allowedActions}
+      pending={false}
+      disabled={fixture.actionState !== "ready"}
+      message={
+        fixture.actionState === "unknown-outcome"
+          ? { kind: "unknown-outcome", text: fixture.actionReason ?? "결과를 확인하지 못했습니다." }
+          : null
+      }
+      onAcknowledge={noopEditorialLedgerHandler}
+      onSnooze={noopEditorialLedgerHandler}
+      onResolve={noopEditorialLedgerHandler}
+    />
+  ) : null;
+  const mobileLifecycleControls = fixture.allowedActions.length > 0 ? (
+    <AdminOperationStateActions
+      allowedActions={fixture.allowedActions}
+      pending={false}
+      disabled={fixture.actionState !== "ready"}
+      message={
+        fixture.actionState === "unknown-outcome"
+          ? { kind: "unknown-outcome", text: fixture.actionReason ?? "결과를 확인하지 못했습니다." }
+          : null
+      }
+      presentation="prioritized"
+      onAcknowledge={noopEditorialLedgerHandler}
+      onSnooze={noopEditorialLedgerHandler}
+      onResolve={noopEditorialLedgerHandler}
+    />
+  ) : null;
   return (
     <AdminTodayLedger
       view={fixture.view}
       filters={fixture.filters}
       history={fixture.history}
-      lifecycleControls={
-        fixture.allowedActions.length > 0 ? (
-          <AdminOperationStateActions
-            allowedActions={fixture.allowedActions}
-            pending={false}
-            disabled={fixture.actionState !== "ready"}
-            message={
-              fixture.actionState === "unknown-outcome"
-                ? { kind: "unknown-outcome", text: fixture.actionReason ?? "결과를 확인하지 못했습니다." }
-                : null
-            }
-            onAcknowledge={noopEditorialLedgerHandler}
-            onSnooze={noopEditorialLedgerHandler}
-            onResolve={noopEditorialLedgerHandler}
-          />
-        ) : null
-      }
+      lifecycleControls={lifecycleControls}
+      mobileLifecycleControls={mobileLifecycleControls}
       actionState={fixture.actionState}
       actionReason={fixture.actionReason}
       pendingCount={fixture.pendingCount}
@@ -287,6 +303,7 @@ test("Today case detail locks the 320 mobile composition", async ({ mount, page 
   await expect(component.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
   await expect(component.getByRole("button", { name: "목록으로" })).toBeVisible();
   await expect(component.getByRole("button", { name: "확인함" })).toBeEnabled();
+  await expect(component.getByText("다른 처리")).toBeVisible();
   await expect(component.locator(".admin-today-ledger__columns")).toHaveCount(0);
   await expect(component.locator(".admin-receipt-timeline")).toHaveCount(0);
   const back = component.getByRole("button", { name: "목록으로" });
@@ -295,6 +312,21 @@ test("Today case detail locks the 320 mobile composition", async ({ mount, page 
   await back.focus();
   await expectVisibleFocus(back);
 });
+
+for (const width of [390, 768, 900, 1024] as const) {
+  test(`Today follows observed content width without overflow at ${width}px`, async ({ mount, page }) => {
+    const component = await mountEditorial(
+      mount,
+      page,
+      todayNode({ ...todayDesktopLedger, mode: width < 960 ? "list" : undefined }),
+      { width, height: 900 },
+    );
+    await expect(component.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    const layout = component.locator(".admin-today-ledger");
+    await expect(layout).toHaveAttribute("data-content-layout", width >= 1024 ? "split" : "flow");
+  });
+}
 
 test("empty evidence, failed sources, pending-new, pagination failure and unknown-outcome stay inside the contract", async ({ mount, page }) => {
   const component = await mountEditorial(

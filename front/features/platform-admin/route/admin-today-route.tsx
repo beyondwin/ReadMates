@@ -73,13 +73,28 @@ export function AdminTodayRoute() {
   const currentCase = controller.view.selectedCase;
   const lifecycleControls = !controller.permissionDenied
     && currentCase
-    && currentCase.allowedActions.length > 0 ? (
+    && (currentCase.allowedActions.length > 0 || controller.actionMessage) ? (
       <AdminOperationStateActions
         allowedActions={currentCase.allowedActions}
         pending={controller.pending}
         disabled={controller.actionDisabled}
         message={controller.actionMessage}
         confirmationKey={controller.confirmationKey}
+        onAcknowledge={() => void controller.acknowledgeCurrent()}
+        onSnooze={(snoozedUntil) => void controller.snoozeCurrent(snoozedUntil)}
+        onResolve={() => void controller.resolveCurrent()}
+      />
+    ) : null;
+  const mobileLifecycleControls = !controller.permissionDenied
+    && currentCase
+    && (currentCase.allowedActions.length > 0 || controller.actionMessage) ? (
+      <AdminOperationStateActions
+        allowedActions={currentCase.allowedActions}
+        pending={controller.pending}
+        disabled={controller.actionDisabled}
+        message={controller.actionMessage}
+        confirmationKey={controller.confirmationKey}
+        presentation="prioritized"
         onAcknowledge={() => void controller.acknowledgeCurrent()}
         onSnooze={(snoozedUntil) => void controller.snoozeCurrent(snoozedUntil)}
         onResolve={() => void controller.resolveCurrent()}
@@ -92,6 +107,7 @@ export function AdminTodayRoute() {
       filters={controller.filters}
       history={controller.history}
       lifecycleControls={lifecycleControls}
+      mobileLifecycleControls={mobileLifecycleControls}
       detailLoading={controller.detailLoading}
       detailUnavailable={controller.detailUnavailable}
       permissionDenied={controller.permissionDenied}

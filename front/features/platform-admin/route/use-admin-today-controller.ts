@@ -15,7 +15,6 @@ import {
   createAdminTodayState,
   deriveAdminTodayCommandState,
   isAdminTodayPostMutationAuthoritative,
-  nextAdminTodayCaseId,
   type AdminTodayMutationTarget,
 } from "@/features/platform-admin/model/admin-today-state";
 import { canAdmin } from "@/features/platform-admin/model/platform-admin-capabilities";
@@ -159,11 +158,14 @@ export function useAdminTodayController() {
     });
   }, [combinedPages, listError, listObservationKey, pageCount, scopeKey]);
 
+  const pinnedMutationCaseId = state.mutationTarget?.caseId === searchState.caseId
+    ? state.mutationTarget.caseId
+    : null;
   const listView = useMemo(
     () => state.snapshot
-      ? buildAdminTodayView(state.snapshot, searchState)
+      ? buildAdminTodayView(state.snapshot, searchState, new Date(), pinnedMutationCaseId)
       : null,
-    [searchState, state.snapshot],
+    [pinnedMutationCaseId, searchState, state.snapshot],
   );
   const selectedCaseId = listView?.selectedCaseId ?? null;
   const detailQuery = useQuery({
@@ -192,8 +194,10 @@ export function useAdminTodayController() {
         },
       },
       searchState,
+      new Date(),
+      pinnedMutationCaseId,
     );
-  }, [detailQuery.data, listView, searchState, state.snapshot]);
+  }, [detailQuery.data, listView, pinnedMutationCaseId, searchState, state.snapshot]);
   const detailBehindList = Boolean(
     detailQuery.data
     && view?.selectedCase
@@ -362,7 +366,6 @@ export function useAdminTodayController() {
 
   const completeMutation = useCallback(async (
     accepted: AcceptedAdminTodayMutation | null,
-    queueExitSelectedId?: string,
   ): Promise<boolean> => {
     if (!accepted) return false;
     const { authorityGeneration, beforeDetailAt, beforeListAt, handle, target } = accepted;
@@ -397,19 +400,7 @@ export function useAdminTodayController() {
         dispatch({ type: "mutation-succeeded" });
         return true;
       });
-      if (!uiAccepted || queueExitSelectedId === undefined) return uiAccepted;
-      if (!isCurrentAuthority() || !view) return false;
-      return await publishTransitionAction(handle, "navigation", () => {
-        if (!isCurrentAuthority() || !isCurrentMutationTarget(target)) return false;
-        const visibleIds = view.items.map((item) => item.id);
-        const nextId = nextAdminTodayCaseId(visibleIds, queueExitSelectedId);
-        dispatch({ type: "queue-exit-completed", visibleIds, selectedId: queueExitSelectedId });
-        if (nextId) {
-          selectedIdRef.current = nextId;
-          writeSearch({ caseId: nextId, mode: searchState.mode });
-        }
-        return true;
-      });
+      return uiAccepted;
     } catch (error) {
       if (error instanceof TransitionOwnerObsoleteError) return false;
       throw error;
@@ -419,9 +410,6 @@ export function useAdminTodayController() {
     isCurrentMutationTarget,
     queryClient,
     reconcileAuthoritativeState,
-    searchState.mode,
-    view,
-    writeSearch,
   ]);
 
   const selectCase = useCallback((caseId: string, mode = searchState.mode) => {
@@ -442,7 +430,6 @@ export function useAdminTodayController() {
   }, [acknowledgeMutation, completeMutation, confirmationKey, currentCase, runMutation]);
   const snoozeCurrent = useCallback(async (snoozedUntil: string) => {
     if (!currentCase || !confirmationKey) return false;
-    const selectedId = currentCase.id;
     const accepted = await runMutation(
       { caseId: currentCase.id, version: currentCase.version, confirmationKey },
       () => snoozeMutation.mutateAsync({
@@ -451,11 +438,10 @@ export function useAdminTodayController() {
         snoozedUntil,
       }),
     );
-    return completeMutation(accepted, selectedId);
+    return completeMutation(accepted);
   }, [completeMutation, confirmationKey, currentCase, runMutation, snoozeMutation]);
   const resolveCurrent = useCallback(async () => {
     if (!currentCase || !confirmationKey) return false;
-    const selectedId = currentCase.id;
     const accepted = await runMutation(
       { caseId: currentCase.id, version: currentCase.version, confirmationKey },
       () => resolveMutation.mutateAsync({
@@ -463,7 +449,7 @@ export function useAdminTodayController() {
         expectedVersion: currentCase.version,
       }),
     );
-    return completeMutation(accepted, selectedId);
+    return completeMutation(accepted);
   }, [completeMutation, confirmationKey, currentCase, resolveMutation, runMutation]);
 
   const changeFilter = useCallback((key: keyof AdminTodayFilters, value: string) => {

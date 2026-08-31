@@ -570,7 +570,7 @@ describe("useAdminTodayController", () => {
   it.each([
     ["snooze", "snooze"],
     ["resolve", "resolve"],
-  ] as const)("advances to the next case after accepted %s completion", async (buttonName, kind) => {
+  ] as const)("keeps the current case after accepted %s completion", async (buttonName, kind) => {
     const user = userEvent.setup();
     const first = operationCase("case-a");
     const second = operationCase("case-b");
@@ -589,8 +589,8 @@ describe("useAdminTodayController", () => {
     await user.click(await screen.findByRole("button", { name: buttonName }));
 
     await waitFor(() => {
-      expect(screen.getByLabelText("location")).toHaveTextContent("case=case-b");
-      expect(screen.getByLabelText("selection")).toHaveTextContent("case-b");
+      expect(screen.getByLabelText("location")).toHaveTextContent("case=case-a");
+      expect(screen.getByLabelText("selection")).toHaveTextContent("case-a");
     });
     expect(operationsApi.snooze).toHaveBeenCalledTimes(kind === "snooze" ? 1 : 0);
     expect(operationsApi.resolve).toHaveBeenCalledTimes(kind === "resolve" ? 1 : 0);

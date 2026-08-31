@@ -205,7 +205,7 @@ function todayCase(input: {
     },
     summary: {
       title: input.title ?? EDITORIAL_LEDGER_LONG_TODAY_TITLE,
-      description: "같은 원인의 실패를 확인하세요.",
+      description: "같은 원인의 실패가 여러 지역에서 반복되고 있습니다. Review the delivery ledger, confirm the latest authoritative observation, and keep the current case open until the operator deliberately chooses the next item.",
     },
     severityLabel: "긴급",
     stateLabel: "미확인",

@@ -188,6 +188,7 @@ function LocationProbe() {
     <>
       <output aria-label="current location">{location.pathname}{location.search}</output>
       <button type="button" onClick={() => navigate(-1)}>뒤로</button>
+      <button type="button" onClick={() => navigate(1)}>앞으로</button>
     </>
   );
 }
@@ -897,11 +898,14 @@ describe("AdminTodayRoute", () => {
 
   it("uses a mobile list/detail URL and restores row focus after Back", async () => {
     const user = userEvent.setup();
-    vi.stubGlobal("matchMedia", vi.fn().mockImplementation(() => ({
-      matches: true,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    })));
+    let resize: ResizeObserverCallback | null = null;
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(callback: ResizeObserverCallback) { resize = callback; }
+      observe = (target: Element) => {
+        resize?.([{ target, contentRect: { width: 390 } } as ResizeObserverEntry], {} as ResizeObserver);
+      };
+      disconnect = vi.fn();
+    });
     renderRoute(seededClient(), "/admin/today?case=case-notification");
 
     expect(await screen.findByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
@@ -915,17 +919,21 @@ describe("AdminTodayRoute", () => {
     });
     expect(screen.getByRole("button", { name: "목록으로" })).toHaveFocus();
 
-    await user.click(screen.getByRole("button", { name: "목록으로" }));
+    await user.click(screen.getByRole("button", { name: "뒤로" }));
 
     await waitFor(() => {
       expect(screen.getByLabelText("current location")).not.toHaveTextContent("mode=detail");
     });
     expect(screen.getByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ })).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "앞으로" }));
+    await waitFor(() => expect(screen.getByLabelText("current location")).toHaveTextContent("mode=detail"));
+    expect(screen.getByRole("button", { name: "목록으로" })).toHaveFocus();
     vi.unstubAllGlobals();
   });
 
-  it("advances to the next case after a mocked resolve success", async () => {
+  it("keeps a resolve result in the current detail until the operator explicitly chooses next", async () => {
     const user = userEvent.setup();
     const cases = [
       operationCase({
@@ -977,13 +985,16 @@ describe("AdminTodayRoute", () => {
     await user.click(await screen.findByRole("button", { name: "처리함" }));
     await user.click(screen.getByRole("button", { name: "신호 재검증 후 해결" }));
 
+    expect(await screen.findByText("케이스 상태를 반영했습니다.")).toBeInTheDocument();
+    expect(screen.getByText("케이스 2 / 4")).toBeInTheDocument();
+    expect(screen.getByLabelText("current location")).toHaveTextContent("case=case-b");
+    await user.click(screen.getByRole("button", { name: "다음 ›" }));
     expect(await screen.findByText("케이스 3 / 4")).toBeInTheDocument();
     expect(screen.getByLabelText("current location")).toHaveTextContent("case=case-c");
-    expect(screen.getByRole("button", { name: /클럽 설정이 필요합니다/ })).toHaveAttribute("aria-pressed", "true");
     expect(operationsApi.resolve).toHaveBeenCalledWith("case-b", 3);
   });
 
-  it("sends the selected snooze timestamp without rendering an input the route would discard", async () => {
+  it("keeps a snooze result in the current detail and sends only the selected timestamp", async () => {
     const user = userEvent.setup();
     const cases = [
       operationCase({
@@ -1036,9 +1047,9 @@ describe("AdminTodayRoute", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "미루기" }));
 
-    expect(await screen.findByText("케이스 3 / 4")).toBeInTheDocument();
-    expect(screen.getByLabelText("current location")).toHaveTextContent("case=case-c");
-    expect(screen.getByRole("button", { name: /클럽 설정이 필요합니다/ })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByText("케이스 상태를 반영했습니다.")).toBeInTheDocument();
+    expect(screen.getByText("케이스 2 / 4")).toBeInTheDocument();
+    expect(screen.getByLabelText("current location")).toHaveTextContent("case=case-b");
     expect(operationsApi.snooze).toHaveBeenCalledWith(
       "case-b",
       3,
@@ -1046,7 +1057,7 @@ describe("AdminTodayRoute", () => {
     );
   });
 
-  it("returns focus to the queue summary after resolving the last case", async () => {
+  it("keeps the final resolve result on the current case", async () => {
     const user = userEvent.setup();
     const last = operationCase({ id: "case-last" });
     const resolved = operationCase({
@@ -1068,15 +1079,13 @@ describe("AdminTodayRoute", () => {
     await user.click(await screen.findByRole("button", { name: "처리함" }));
     await user.click(screen.getByRole("button", { name: "신호 재검증 후 해결" }));
 
-    await waitFor(() => {
-      expect(screen.getByLabelText("운영 케이스 요약")).toHaveFocus();
-    });
+    expect(await screen.findByText("케이스 상태를 반영했습니다.")).toBeInTheDocument();
     expect(screen.getByLabelText("current location")).toHaveTextContent("case=case-last");
     expect(screen.getByRole("button", { name: "다음 ›" })).toBeDisabled();
     expect(operationsApi.resolve).toHaveBeenCalledWith("case-last", 3);
   });
 
-  it("returns focus to the queue summary after snoozing the last case", async () => {
+  it("keeps the final snooze result on the current case", async () => {
     const user = userEvent.setup();
     const last = operationCase({ id: "case-last" });
     const snoozed = operationCase({
@@ -1098,9 +1107,7 @@ describe("AdminTodayRoute", () => {
     await user.click(await screen.findByRole("button", { name: "잠시 미룸" }));
     await user.click(screen.getByRole("button", { name: "미루기" }));
 
-    await waitFor(() => {
-      expect(screen.getByLabelText("운영 케이스 요약")).toHaveFocus();
-    });
+    expect(await screen.findByText("케이스 상태를 반영했습니다.")).toBeInTheDocument();
     expect(screen.getByLabelText("current location")).toHaveTextContent("case=case-last");
     expect(operationsApi.snooze).toHaveBeenCalledWith(
       "case-last",

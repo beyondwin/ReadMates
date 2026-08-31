@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { adminOperationActionLanguage } from "@/features/platform-admin/model/admin-status-language";
 import { AdminModalDialog } from "./admin-modal-dialog";
 
@@ -15,6 +15,7 @@ type Props = {
   disabled?: boolean;
   message: AdminOperationActionMessage | null;
   confirmationKey?: string;
+  presentation?: "standard" | "prioritized";
   now?: () => Date;
   onAcknowledge: () => void;
   onSnooze: (snoozedUntil: string) => void;
@@ -40,6 +41,7 @@ export function AdminOperationStateActions({
   disabled = false,
   message,
   confirmationKey,
+  presentation = "standard",
   now = () => new Date(),
   onAcknowledge,
   onSnooze,
@@ -65,64 +67,93 @@ export function AdminOperationStateActions({
     onResolve();
   }
 
-  return (
-    <div className="admin-operation-actions">
-      <div className="admin-operation-actions__controls">
-        {allowedActions.includes("ACKNOWLEDGE") ? (
-          <button type="button" className="btn btn-secondary" disabled={locked} onClick={onAcknowledge}>
-            {adminOperationActionLanguage("ACKNOWLEDGE").primaryText}
-          </button>
-        ) : null}
-        {allowedActions.includes("SNOOZE") ? (
-          <>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              disabled={locked}
-              aria-pressed={snoozeOpen}
-              onClick={() => setOpenSnoozeKey(snoozeOpen ? null : snoozeKey)}
-            >
-              {adminOperationActionLanguage("SNOOZE").primaryText}
-            </button>
-            {snoozeOpen ? (
-              <>
-                <label className="admin-operation-actions__duration">
-                  <span>{SNOOZE_CONTROL_COPY.snoozeDuration}</span>
-                  <select
-                    className="admin-operation-control--touch"
-                    aria-label={SNOOZE_CONTROL_COPY.snoozeDuration}
-                    value={holdHours}
-                    disabled={locked}
-                    onChange={(event) => setHoldHours(Number(event.currentTarget.value))}
-                  >
-                    {HOLD_DURATIONS.map((duration) => (
-                      <option key={duration.hours} value={duration.hours}>{duration.label}</option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  disabled={locked}
-                  onClick={() => submitSnooze(holdHours)}
-                >
-                  {SNOOZE_CONTROL_COPY.snoozeConfirm}
-                </button>
-              </>
-            ) : null}
-          </>
-        ) : null}
-        {allowedActions.includes("RESOLVE") ? (
+  function actionControl(action: LifecycleAction, primary: boolean) {
+    const buttonClass = `btn ${primary ? "btn-primary" : "btn-secondary"}`;
+    if (action === "ACKNOWLEDGE") {
+      return (
+        <button type="button" className={buttonClass} disabled={locked} onClick={onAcknowledge}>
+          {adminOperationActionLanguage(action).primaryText}
+        </button>
+      );
+    }
+    if (action === "SNOOZE") {
+      return (
+        <Fragment>
           <button
-            ref={resolveTriggerRef}
             type="button"
-            className="btn btn-secondary"
+            className={buttonClass}
             disabled={locked}
-            onClick={() => setOpenConfirmationKey(activeConfirmationKey)}
+            aria-pressed={snoozeOpen}
+            onClick={() => setOpenSnoozeKey(snoozeOpen ? null : snoozeKey)}
           >
-            {adminOperationActionLanguage("RESOLVE").primaryText}
+            {adminOperationActionLanguage(action).primaryText}
           </button>
-        ) : null}
+          {snoozeOpen ? (
+            <>
+              <label className="admin-operation-actions__duration">
+                <span>{SNOOZE_CONTROL_COPY.snoozeDuration}</span>
+                <select
+                  className="admin-operation-control--touch"
+                  aria-label={SNOOZE_CONTROL_COPY.snoozeDuration}
+                  value={holdHours}
+                  disabled={locked}
+                  onChange={(event) => setHoldHours(Number(event.currentTarget.value))}
+                >
+                  {HOLD_DURATIONS.map((duration) => (
+                    <option key={duration.hours} value={duration.hours}>{duration.label}</option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={locked}
+                onClick={() => submitSnooze(holdHours)}
+              >
+                {SNOOZE_CONTROL_COPY.snoozeConfirm}
+              </button>
+            </>
+          ) : null}
+        </Fragment>
+      );
+    }
+    return (
+      <button
+        ref={resolveTriggerRef}
+        type="button"
+        className={buttonClass}
+        disabled={locked}
+        onClick={() => setOpenConfirmationKey(activeConfirmationKey)}
+      >
+        {adminOperationActionLanguage(action).primaryText}
+      </button>
+    );
+  }
+
+  const priority: readonly LifecycleAction[] = ["ACKNOWLEDGE", "RESOLVE", "SNOOZE"];
+  const primaryAction = presentation === "prioritized"
+    ? priority.find((action) => allowedActions.includes(action)) ?? null
+    : null;
+  const secondaryActions = primaryAction
+    ? allowedActions.filter((action) => action !== primaryAction)
+    : allowedActions;
+
+  return (
+    <div className="admin-operation-actions" data-presentation={presentation}>
+      <div className="admin-operation-actions__controls">
+        {primaryAction ? <Fragment key={primaryAction}>{actionControl(primaryAction, true)}</Fragment> : null}
+        {presentation === "prioritized" && secondaryActions.length > 0 ? (
+          <details className="admin-operation-actions__other">
+            <summary>다른 처리</summary>
+            <div className="admin-operation-actions__other-controls">
+              {secondaryActions.map((action) => (
+                <Fragment key={action}>{actionControl(action, false)}</Fragment>
+              ))}
+            </div>
+          </details>
+        ) : presentation === "standard" ? secondaryActions.map((action) => (
+          <Fragment key={action}>{actionControl(action, false)}</Fragment>
+        )) : null}
       </div>
 
       {pending ? <p role="status">상태를 반영하고 있습니다.</p> : null}

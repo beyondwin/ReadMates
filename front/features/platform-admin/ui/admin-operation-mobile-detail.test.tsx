@@ -9,6 +9,7 @@ import type {
 } from "@/features/platform-admin/model/platform-admin-operations-model";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 import { AdminOperationMobileDetail } from "./admin-operation-mobile-detail";
+import { AdminOperationStateActions } from "./admin-operation-state-actions";
 
 function operationCase(overrides: Partial<AdminOperationCaseView> = {}): AdminOperationCaseView {
   return {
@@ -105,7 +106,7 @@ describe("AdminOperationMobileDetail", () => {
 
     expect(screen.queryByRole("region", { name: "운영 케이스 큐" })).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toBeInTheDocument();
-    expect(screen.getAllByText(selected.id).every((node) => node.classList.contains("admin-operation-wrap"))).toBe(true);
+    expect(document.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent(selected.id);
     expect(screen.getByRole("button", { name: "목록으로" })).toHaveFocus();
     expect(screen.getByRole("group", { name: "작업" })).toHaveClass("admin-action-dock");
 
@@ -191,7 +192,7 @@ describe("AdminOperationMobileDetail", () => {
 
     expect(screen.getByRole("button", { name: "목록으로" })).toHaveFocus();
     expect(screen.getByRole("button", { name: "목록으로" })).toHaveClass("admin-operation-control--touch");
-    expect(screen.getAllByText(selected.id).every((node) => node.classList.contains("admin-operation-wrap"))).toBe(true);
+    expect(document.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent(selected.id);
 
     await user.click(screen.getByRole("button", { name: "목록으로" }));
     expect(onBack).toHaveBeenCalledOnce();
@@ -211,6 +212,87 @@ describe("AdminOperationMobileDetail", () => {
     );
 
     expect(screen.getByRole("button", { name: /긴 한글 운영 케이스 제목/ })).toHaveFocus();
+  });
+
+  it("restores the selected row for browser Back and focuses the detail back control on Forward", () => {
+    const selected = operationCase();
+    const { rerender } = render(
+      <MemoryRouter>
+        <AdminOperationMobileDetail
+          view={operationsView(selected)}
+          history={[]}
+          lifecycleControls={null}
+          mode="detail"
+          onSelectCase={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("button", { name: "목록으로" })).toHaveFocus();
+    rerender(
+      <MemoryRouter>
+        <AdminOperationMobileDetail
+          view={operationsView(selected)}
+          history={[]}
+          lifecycleControls={null}
+          mode="list"
+          onSelectCase={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("button", { name: /긴 한글 운영 케이스 제목/ })).toHaveFocus();
+
+    rerender(
+      <MemoryRouter>
+        <AdminOperationMobileDetail
+          view={operationsView(selected)}
+          history={[]}
+          lifecycleControls={null}
+          mode="detail"
+          onSelectCase={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("button", { name: "목록으로" })).toHaveFocus();
+  });
+
+  it.each([
+    [["ACKNOWLEDGE", "SNOOZE", "RESOLVE"] as const, "확인함"],
+    [["SNOOZE", "RESOLVE"] as const, "처리함"],
+    [["SNOOZE"] as const, "잠시 미룸"],
+  ])("prioritizes one mobile action and places remaining allowed actions under 다른 처리", async (allowedActions, primaryLabel) => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <AdminOperationMobileDetail
+          view={operationsView(operationCase({ allowedActions: [...allowedActions] }))}
+          history={[]}
+          lifecycleControls={(
+            <AdminOperationStateActions
+              allowedActions={allowedActions}
+              pending={false}
+              message={null}
+              presentation="prioritized"
+              onAcknowledge={vi.fn()}
+              onSnooze={vi.fn()}
+              onResolve={vi.fn()}
+            />
+          )}
+          mode="detail"
+          onSelectCase={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    const primary = screen.getByRole("button", { name: primaryLabel });
+    expect(primary).toHaveClass("btn-primary");
+    const otherActionCount = allowedActions.length - 1;
+    if (otherActionCount > 0) {
+      await user.click(screen.getByText("다른 처리"));
+      expect(screen.getByText("다른 처리").closest("details")).toHaveAttribute("open");
+    } else {
+      expect(screen.queryByText("다른 처리")).not.toBeInTheDocument();
+    }
   });
 
   it("renders an honest empty queue without a disabled fake action", () => {

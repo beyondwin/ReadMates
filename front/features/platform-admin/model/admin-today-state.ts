@@ -268,6 +268,7 @@ export function buildAdminTodayView(
   snapshot: AdminOperationsSnapshot,
   searchState: AdminOperationsSearchState,
   now: Date = new Date(),
+  pinnedCaseId: string | null = null,
 ): AdminOperationsView {
   const built = buildAdminOperationsView(
     snapshot.displayed,
@@ -276,7 +277,10 @@ export function buildAdminTodayView(
     new Map(),
     "preserve",
   );
-  const items = filterAdminOperationItems(built.items, searchState, now);
+  const filteredItems = filterAdminOperationItems(built.items, searchState, now);
+  const items = pinnedCaseId === searchState.caseId
+    ? built.items.filter((item) => item.id === pinnedCaseId || filteredItems.includes(item))
+    : filteredItems;
   const requested = searchState.caseId
     ? items.find((item) => item.id === searchState.caseId) ?? null
     : null;

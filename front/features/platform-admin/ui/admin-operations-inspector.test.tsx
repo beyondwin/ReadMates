@@ -74,11 +74,13 @@ describe("AdminOperationsInspector", () => {
     expect(screen.getByText("영향 2건")).toBeInTheDocument();
     expect(screen.getByText(/일부 확인 불가/)).toBeInTheDocument();
     expect(screen.getByText("관측 출처")).toBeInTheDocument();
+    expect(screen.getByText("관측 시각")).toBeInTheDocument();
+    expect(screen.getByText("감지 기준")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "배달 원장에서 확인" })).toHaveAttribute(
       "href",
       "/admin/notifications?focus=delivery",
     );
-    expect(screen.getByRole("heading", { name: "이 대상의 최근 처리 기록" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "최근 처리 기록" })).toBeInTheDocument();
     expect(screen.getByText("신호가 처음 감지됨 · 확인 전")).toBeInTheDocument();
     expect(screen.getByText("상태 변경 기록 · 확인함")).toBeInTheDocument();
     expect(screen.queryByText("PRIVATE_HISTORY_CODE")).not.toBeInTheDocument();
@@ -90,14 +92,51 @@ describe("AdminOperationsInspector", () => {
     expect(screen.getByRole("button", { name: "확인 처리" })).toBeInTheDocument();
 
     const commands = screen.getByRole("group", { name: "작업" });
-    const ledgerHeading = screen.getByRole("heading", { name: "이 대상의 최근 처리 기록" });
+    const ledgerHeading = screen.getByRole("heading", { name: "최근 처리 기록" });
     expect(commands.closest(".admin-case-docket__actions")?.contains(ledgerHeading)).toBe(false);
     expect(
       Boolean(commands.compareDocumentPosition(ledgerHeading) & Node.DOCUMENT_POSITION_FOLLOWING),
     ).toBe(true);
   });
 
-  it("renders the case docket with a wrapping safe id, L1 dock, and no receipt timeline", () => {
+  it("uses the approved docket hierarchy and keeps exact identifiers inside technical disclosure", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <AdminOperationsInspector
+          selectedCase={{ ...selectedCase, clubId: "club-exact-identifier" }}
+          history={[]}
+          lifecycleControls={<button type="button">확인 처리</button>}
+        />
+      </MemoryRouter>,
+    );
+
+    const headings = [
+      screen.getByRole("heading", { name: selectedCase.summary.title }),
+      screen.getByRole("heading", { name: "무슨 일인가" }),
+      screen.getByRole("heading", { name: "왜 중요한가" }),
+      screen.getByRole("heading", { name: "확인한 근거" }),
+      screen.getByRole("heading", { name: "다음 행동" }),
+      screen.getByRole("heading", { name: "최근 처리 기록" }),
+    ];
+    for (let index = 0; index < headings.length - 1; index += 1) {
+      expect(
+        headings[index]!.compareDocumentPosition(headings[index + 1]!)
+          & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+
+    expect(container.querySelector(".admin-case-docket__identity")).toBeNull();
+    const disclosure = container.querySelector("details[data-admin-technical-disclosure]");
+    expect(disclosure).toHaveTextContent("case-notification");
+    expect(disclosure).toHaveTextContent("NOTIFICATION");
+    expect(disclosure).toHaveTextContent("club-exact-identifier");
+    expect(screen.getByRole("link", { name: "전체 처리 기록 보기" })).toHaveAttribute(
+      "href",
+      "/admin/audit?target=club-exact-identifier",
+    );
+  });
+
+  it("renders the case docket with an exact id only in disclosure, L1 dock, and no receipt timeline", () => {
     const { container } = render(
       <MemoryRouter>
         <AdminOperationsInspector
@@ -114,12 +153,9 @@ describe("AdminOperationsInspector", () => {
 
     const docket = screen.getByRole("region", { name: "운영 케이스 상세" });
     expect(docket).toHaveClass("admin-case-docket");
-    expect(screen.getAllByText("case-notification-opaque-identifier-that-wraps-safely").length).toBeGreaterThan(0);
-    expect(
-      screen.getAllByText("case-notification-opaque-identifier-that-wraps-safely").every(
-        (node) => node.classList.contains("admin-operation-wrap"),
-      ),
-    ).toBe(true);
+    expect(container.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent(
+      "case-notification-opaque-identifier-that-wraps-safely",
+    );
     expect(screen.getByRole("group", { name: "작업" }).closest("[data-level]")).toHaveAttribute(
       "data-level",
       "L1",
@@ -445,7 +481,7 @@ describe("AdminOperationsInspector", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { name: "이 대상의 최근 처리 기록" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "최근 처리 기록" })).toBeInTheDocument();
     expect(screen.getByText("표시할 처리 기록이 없습니다.")).toBeInTheDocument();
     expect(document.querySelectorAll(".ledger-inline .li")).toHaveLength(0);
     expect(screen.getByRole("link", { name: "전체 처리 기록 보기" })).toHaveAttribute(

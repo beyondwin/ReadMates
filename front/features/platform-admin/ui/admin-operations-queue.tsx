@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { AdminOperationCaseView } from "@/features/platform-admin/model/platform-admin-operations-model";
 
 type Props = {
@@ -7,6 +8,7 @@ type Props = {
   hasNextPage?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
+  controls?: ReactNode;
 };
 
 export function AdminOperationsQueue({
@@ -16,13 +18,16 @@ export function AdminOperationsQueue({
   hasNextPage = false,
   loadingMore = false,
   onLoadMore,
+  controls,
 }: Props) {
   return (
     <section className="admin-operations-queue" aria-label="운영 케이스 큐">
       <div className="admin-operations-queue__header">
-        <h2 className="h3">운영 케이스</h2>
+        <h2 className="h3">오늘 할 일</h2>
         <span>{items.length}건</span>
       </div>
+
+      {controls ? <div className="admin-operations-queue__controls">{controls}</div> : null}
 
       {items.length === 0 ? (
         <p className="admin-operations-queue__empty">현재 조건에 맞는 운영 케이스가 없습니다.</p>
@@ -36,8 +41,6 @@ export function AdminOperationsQueue({
               data-scroll-marker={item.id === selectedCaseId ? "selected" : undefined}
               key={item.id}
               aria-pressed={item.id === selectedCaseId}
-              aria-selected={item.id === selectedCaseId}
-              aria-current={item.id === selectedCaseId ? "true" : undefined}
               onClick={() => onSelectCase(item.id)}
             >
               <span className="admin-operations-queue__headline">
