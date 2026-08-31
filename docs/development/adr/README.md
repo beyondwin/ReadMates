@@ -75,6 +75,8 @@ Routine refactor, component-local layout, reversible implementation detail은 AD
 | [0048](0048-host-lifecycle-operating-room-composition.md) | 호스트 워크스페이스를 모임 생애주기 운영실 + 작업함으로 구성 | Proposed | 2026-08-29 | product, design, front |
 | [0049](0049-schedule-revision-seen-state.md) | 일정 revision 확인을 접속·참석 응답·실제 출석과 분리 | Proposed | 2026-08-29 | product, server, front, privacy |
 
+ADR-0048/0049의 구현 근거와 승격 전 잔여 gate는 각 ADR의 `검증` 및 `승격 전 잔여 검증` 절에서만 관리한다. 두 결정은 Stage 5 전체 gate와 최종 acceptance 전까지 `Proposed`다.
+
 ## 상태 범례
 
 - **Accepted** — 현재 코드/운영의 기준.

@@ -5,7 +5,7 @@
 - 작성자: product/server/front/privacy
 - 관련: ADR-0018, ADR-0021, ADR-0023, ADR-0024, ADR-0025, ADR-0028, ADR-0048, `docs/development/2026-08-29-readmates-host-lifecycle-operating-room-design.md`
 
-> 이 ADR은 승인된 product semantics다. 저장 모델, API, BFF, frontend와 privacy 검증이 아직 일치하지 않으므로 구현 전까지 `Proposed`다.
+> 이 ADR의 저장 모델, API/BFF/frontend 계약과 privacy 경계는 현재 구현 및 focused evidence와 일치한다. 다만 Stage 5 전체 gate와 최종 acceptance가 남아 있으므로 상태는 `Proposed`를 유지한다.
 
 ## 컨텍스트
 
@@ -65,18 +65,13 @@ UI 라벨은 각각 `현재 일정 확인`, `변경 전 확인`, `미열람`이�
 
 ## 검증
 
-- 최초 열람, 같은 revision 재열람, revision 증가 후 `STALE`, 최신 revision 재열람 후 `CURRENT`를 검증한다.
-- 참석 응답 변경, 실제 출석 기록, 알림 전달, host-only 필드 변경이 seen state를 바꾸지 않음을 검증한다.
-- 멤버 노출 일정 필드 변경만 revision을 증가시키는 allowlist/denylist 테스트를 둔다.
-- 다른 클럽·다른 모임의 revision이 섞이지 않는 authorization/club-context 테스트를 둔다.
-- 동시 일정 변경과 확인 write에서 revision guard와 idempotency가 잘못된 `CURRENT`를 만들지 않음을 검증한다.
-- DRAFT unavailable → OPEN UNSEEN → CURRENT → 일정 변경 STALE → CURRENT 전이를 검증한다.
-- membership INACTIVE/delete와 participant/session hard-delete/anonymize에서 access/seen lifecycle과 erase behavior를 migration/integration test로 검증한다.
-- API/BFF 응답에 이메일, 계정 ID, 상세 page history 같은 불필요한 개인정보가 포함되지 않는 forbidden-key 테스트를 둔다.
-- server focused test, migration integration, frontend model/route test, 영향 E2E와 active docs가 일치할 때만 `Accepted`로 승격한다.
+- 열람 write 시점, 같은 revision idempotency, RSVP와의 독립성은 [current-session route](../../../front/features/current-session/route/current-session-route.tsx)와 [route test](../../../front/features/current-session/route/current-session-route.test.tsx)가 고정한다.
+- `UNSEEN → CURRENT → STALE → CURRENT`, DRAFT/INACTIVE/cross-club fail-closed, privacy projection은 [DB integration test](../../../server/src/test/kotlin/com/readmates/session/api/SessionScheduleSeenDbTest.kt)가 검증한다.
+- server 응답과 frontend Zod schema의 동일성은 [contract test](../../../server/src/test/kotlin/com/readmates/contract/FrontendZodSchemaContractTest.kt), 사용자 흐름은 [schedule-seen E2E](../../../front/tests/e2e/schedule-seen-lifecycle.spec.ts)가 검증한다.
+- V61–V65 순차 적용과 migration 불변식은 [MySQL Flyway migration test](../../../server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt) 및 [session invariant test](../../../server/src/test/kotlin/com/readmates/session/domain/SessionInvariantConstraintTest.kt)가 소유한다.
+- Stage 1 전체 gate는 `.superpowers/sdd/2026-08-29-host-lifecycle-operating-room-stage1/task-9-report.md` SHA-256 `f7c85e8a25052cfe6441d73b60cb8319dfc6ee72ac728ecc3fce910b10a7f36d`에 봉인되어 있다.
 
-## 후속 작업
+## 승격 전 잔여 검증
 
-- migration/backfill 정책과 retention 기간을 구현 계획에서 확정.
-- 멤버 앱의 확인 write 시점과 offline retry UX를 별도 task로 구현.
-- 호스트 대상 선택 화면에서 CURRENT/STALE/UNSEEN 필터와 제외 사유를 제공.
+- Stage 5 전체 gate와 stage review가 끝나기 전에는 `Accepted`로 승격하지 않는다.
+- 실제 production migration 시간과 rollout은 측정·실행하지 않았다. 배포 시 backend가 Flyway V61–V65를 먼저 적용한 뒤 compatible frontend를 배포하며, rollback은 compatible image 또는 더 높은 버전의 forward-fix로 수행한다.

@@ -53,4 +53,6 @@ ReadMates의 durable product·technical·design·operational decision은 [ADR �
 | [ADR-0048](adr/0048-host-lifecycle-operating-room-composition.md) | 호스트 워크스페이스를 모임 생애주기 운영실 + 작업함으로 구성 | Proposed |
 | [ADR-0049](adr/0049-schedule-revision-seen-state.md) | 일정 revision 확인을 접속·참석 응답·실제 출석과 분리 | Proposed |
 
+ADR-0048/0049의 구현 근거와 승격 전 잔여 gate는 각 ADR의 `검증` 절에만 기록하며, 이 파생 인덱스는 두 상태를 Stage 5 전체 gate 전까지 `Proposed`로 유지한다.
+
 Active architecture는 [architecture.md](architecture.md), 검증 경로는 [test-guide.md](test-guide.md)와 각 ADR의 `검증` 절을 따른다. Server의 canonical PR gate는 `./scripts/server-ci-check.sh`다. 외부 서비스의 가격·한도·API 동작처럼 변할 수 있는 사실은 운영 판단 직전에 공식 source로 다시 확인한다.
