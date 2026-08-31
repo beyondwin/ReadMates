@@ -1,11 +1,11 @@
 # ADR-0049: 일정 revision 확인을 접속·참석 응답·실제 출석과 분리
 
-- 상태: Proposed
-- 결정일: 2026-08-29
+- 상태: Accepted
+- 결정일: 2026-09-01
 - 작성자: product/server/front/privacy
 - 관련: ADR-0018, ADR-0021, ADR-0023, ADR-0024, ADR-0025, ADR-0028, ADR-0048, `docs/development/2026-08-29-readmates-host-lifecycle-operating-room-design.md`
 
-> 이 ADR의 저장 모델, API/BFF/frontend 계약과 privacy 경계는 현재 구현 및 focused evidence와 일치한다. 다만 Stage 5 전체 gate와 최종 acceptance가 남아 있으므로 상태는 `Proposed`를 유지한다.
+> 이 ADR의 저장 모델, API/BFF/frontend 계약과 privacy 경계가 현재 구현 및 Stage 5 acceptance evidence와 일치해 `Accepted`로 승격했다. Production migration 시간과 rollout은 별도 미측정 운영 범위다.
 
 ## 컨텍스트
 
@@ -70,8 +70,8 @@ UI 라벨은 각각 `현재 일정 확인`, `변경 전 확인`, `미열람`이�
 - server 응답과 frontend Zod schema의 동일성은 [contract test](../../../server/src/test/kotlin/com/readmates/contract/FrontendZodSchemaContractTest.kt), 사용자 흐름은 [schedule-seen E2E](../../../front/tests/e2e/schedule-seen-lifecycle.spec.ts)가 검증한다.
 - V61–V65 순차 적용과 migration 불변식은 [MySQL Flyway migration test](../../../server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt) 및 [session invariant test](../../../server/src/test/kotlin/com/readmates/session/domain/SessionInvariantConstraintTest.kt)가 소유한다.
 - Stage 1 전체 gate는 `.superpowers/sdd/2026-08-29-host-lifecycle-operating-room-stage1/task-9-report.md` SHA-256 `f7c85e8a25052cfe6441d73b60cb8319dfc6ee72ac728ecc3fce910b10a7f36d`에 봉인되어 있다.
+- Stage 5 acceptance는 V61–V65 clean/upgrade migration, schedule-seen policy·timing·privacy, parallel upsert와 role-loss cleanup, trusted BFF·authorization, 안정적인 Zod fixture digest, Chromium schedule lifecycle·cross-club·role evidence를 확인했다. Full server integration union은 1465/1465, server CI는 통과했다.
 
-## 승격 전 잔여 검증
+## 잔여 운영 검증
 
-- Stage 5 전체 gate와 stage review가 끝나기 전에는 `Accepted`로 승격하지 않는다.
 - 실제 production migration 시간과 rollout은 측정·실행하지 않았다. 배포 시 backend가 Flyway V61–V65를 먼저 적용한 뒤 compatible frontend를 배포하며, rollback은 compatible image 또는 더 높은 버전의 forward-fix로 수행한다.

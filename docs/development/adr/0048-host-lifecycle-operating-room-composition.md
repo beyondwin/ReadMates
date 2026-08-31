@@ -1,11 +1,11 @@
 # ADR-0048: 호스트 워크스페이스를 모임 생애주기 운영실 + 작업함으로 구성
 
-- 상태: Proposed
-- 결정일: 2026-08-29
+- 상태: Accepted
+- 결정일: 2026-09-01
 - 작성자: product/design/front
 - 관련: ADR-0018, ADR-0019, ADR-0021, ADR-0026, ADR-0035, ADR-0038, ADR-0045, ADR-0046, ADR-0049, `docs/development/2026-08-29-readmates-host-lifecycle-operating-room-design.md`
 
-> 코드·focused test·`front/DESIGN.md`·active architecture는 이 결정을 구현한다. 다만 Stage 5 전체 gate와 acceptance task가 아직 남아 있어 상태는 `Proposed`를 유지한다.
+> 코드·focused test·`front/DESIGN.md`·active architecture가 이 결정을 구현하며, Stage 5 전체 gate와 acceptance evidence가 일치해 `Accepted`로 승격했다. 아래 미측정 운영 범위는 배포 증거가 아니며 이 결정의 구현 수락과 분리한다.
 
 ## 컨텍스트
 
@@ -65,9 +65,10 @@ ADR-0046은 호스트 워크스페이스를 `오늘` 트리아지, `모임` 다�
 - 403/409/partial/unknown recovery는 [`host-authority-loss.spec.ts`](../../../front/tests/e2e/host-authority-loss.spec.ts), [`host-workbox-stage4.spec.ts`](../../../front/tests/e2e/host-workbox-stage4.spec.ts)가 검증한다. Stage 5 Task 2 report SHA-256은 `48bb13f4130db085399d351fa896aa161ccc084b62f951d4539e2fd074bf3796`이다.
 - Responsive/keyboard/focus/44px/reduced-motion은 [`host-operating-room-responsive.ct.tsx`](../../../front/features/host/ui/operating-room/host-operating-room-responsive.ct.tsx), [`host-shell.ct.tsx`](../../../front/features/host/ui/shell/host-shell.ct.tsx)가 검증한다. Bounded custom DOM/ARIA evidence와 한계는 [`front/DESIGN.md`](../../../front/DESIGN.md#responsive-and-accessibility-evidence-index)에 기록했다. Stage 5 Task 1 report SHA-256은 `bf8cd34d1ccf0a3893449d66e1df623add66143c14a942bcb0550c377149a130`, Task 7 report는 `7338e31f0b578e415890ed05c6cd12427943d4f20ca5bd2563f54e0184216076`이다.
 - Named invitation link/settings는 [`NamedInvitationLinkOAuthDbTest.kt`](../../../server/src/test/kotlin/com/readmates/auth/api/NamedInvitationLinkOAuthDbTest.kt), [`HostClubSettingsConcurrencyDbTest.kt`](../../../server/src/test/kotlin/com/readmates/club/application/service/HostClubSettingsConcurrencyDbTest.kt)와 frontend Zod contract tests가 검증한다.
+- Stage 5 최종 gate는 네 destination/utility, 세 lifecycle phase, authoritative next action, immutable workbox/ledger, 403/409/partial/unknown recovery, 390–1440 responsive·keyboard, compatibility redirect와 active docs를 함께 확인했다. Canonical Docker CT는 121건을 실행해 118건이 처음 통과했고, 의도적으로 바뀐 CLOSED-768 baseline은 갱신 뒤 focused Docker 검증을 통과했다. 남은 admin 이미지 두 건의 1px renderer 차이는 host load-bearing surface와 무관하다.
 
-## 승격 전 잔여 검증
+## 잔여 리스크와 미측정 범위
 
-- Stage 5의 full frontend/server/CT/E2E/public-release matrix와 stage review가 아직 실행 전이다. 이 gate와 active-doc hash가 일치한 뒤 별도 acceptance task에서만 `Accepted`로 바꾼다.
-- Manual VoiceOver/NVDA, Firefox/WebKit/hardware assistive technology는 `not measured`다.
-- 외부 OAuth/provider, 실제 email delivery와 실제 club-end confirm은 `not measured`이며 repository evidence를 production rollout 증거로 사용하지 않는다.
+- Authority base에서 이미 존재하던 admin login-return E2E residual은 이 호스트 결정과 무관하게 남아 있으며 통과로 간주하지 않는다.
+- Manual VoiceOver/NVDA와 hardware assistive technology는 `not measured`다.
+- 외부 OAuth/provider, 실제 email delivery와 실제 club-end confirm, production deploy는 `not measured`이며 repository evidence를 production rollout 증거로 사용하지 않는다.
