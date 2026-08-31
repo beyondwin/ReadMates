@@ -11,13 +11,13 @@ test("AppClubShell uses only mobile chrome at the exact 767px boundary", async (
   await expect(shell.locator('[data-club-shell-region="mobile-context"]')).toBeVisible();
   await expect(shell.locator('[data-club-shell-region="mobile-primary"] .m-tabbar')).toBeVisible();
 
-  for (const selector of await shell.locator(".rm-club-shell-mobile-context .rm-context-selector__trigger").all()) {
+  for (const selector of await shell.locator(".rm-club-shell-mobile-context .rm-global-space-switcher__trigger").all()) {
     expect((await selector.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   }
-  await shell.locator(".rm-club-shell-mobile-context .rm-workspace-selector__trigger").click();
-  const currentWorkspace = shell.locator('.rm-club-shell-mobile-context [aria-current="page"]');
-  await expect(currentWorkspace).toHaveText("멤버 공간");
-  await expect(shell.locator('.rm-club-shell-mobile-context nav[aria-label="공간 선택"]').getByRole("link", { name: "멤버 공간" })).toHaveCount(0);
+  await shell.getByRole("button", { name: /공간 전환, 현재 내 클럽/ }).click();
+  const currentWorkspace = shell.getByRole("menuitem", { name: "내 클럽" });
+  await expect(currentWorkspace).toHaveAttribute("aria-current", "true");
+  await expect(shell.getByRole("menu", { name: "ReadMates 공간 전환" })).toBeVisible();
   expect((await currentWorkspace.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(767);
   await expect(shell.locator(".m-tabbar")).toHaveCSS("padding-bottom", "20px");
@@ -34,7 +34,6 @@ test("AppClubShell uses only horizontal desktop chrome at the exact 768px bounda
   await expect(shell.locator('[data-club-shell-region="mobile-context"]')).toBeHidden();
   await expect(shell.locator('[data-club-shell-region="mobile-primary"]')).toBeHidden();
   await expect(shell.getByRole("navigation", { name: "멤버 주 메뉴" })).toBeVisible();
-  await expect(shell.locator('nav[aria-label="클럽 선택"]').first()).toBeAttached();
-  await expect(shell.locator('nav[aria-label="공간 선택"]').first()).toBeAttached();
+  await expect(shell.getByRole("button", { name: /공간 전환, 현재 내 클럽/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(768);
 });

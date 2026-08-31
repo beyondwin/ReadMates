@@ -1,5 +1,7 @@
 import type { AdminAuditLedgerItem, AdminAuditLedgerPage } from "@/features/platform-admin/model/platform-admin-audit-model";
 import type { PlatformAdminCapability } from "@/features/platform-admin/model/platform-admin-capabilities";
+import type { PlatformAdminCapabilities } from "@/features/platform-admin/model/platform-admin-capabilities";
+import type { GlobalSpaceSwitcherOption } from "@/shared/ui/global-space-switcher";
 import type {
   HealthCard,
   PlatformHealthSnapshot,
@@ -41,6 +43,44 @@ export const NOTIFICATION_REPLAY_CAPABILITIES = [
 export const NOTIFICATION_VIEW_ONLY_CAPABILITIES = [
   "VIEW_NOTIFICATION_OPERATIONS",
 ] as const satisfies readonly PlatformAdminCapability[];
+
+export const ADMIN_SHELL_VISUAL_CAPABILITIES: PlatformAdminCapabilities = {
+  schemaVersion: 1,
+  role: "OPERATOR",
+  status: "ACTIVE",
+  capabilities: [
+    "VIEW_TODAY",
+    "VIEW_CLUBS",
+    "VIEW_SERVICE_HEALTH",
+    "VIEW_AUDIT",
+  ],
+  generatedAt: "2026-08-26T10:00:00Z",
+};
+
+export const ADMIN_SHELL_VISUAL_SPACE_OPTIONS: readonly GlobalSpaceSwitcherOption[] = [
+  { identity: { productSpace: "platform" } },
+  {
+    identity: {
+      productSpace: "clubs",
+      clubId: "club-editorial",
+      clubSlug: "editorial-room",
+      perspective: "member",
+    },
+    clubName: "읽는사이",
+  },
+  {
+    identity: {
+      productSpace: "clubs",
+      clubId: "club-editorial",
+      clubSlug: "editorial-room",
+      perspective: "host",
+    },
+    clubName: "읽는사이",
+  },
+];
+
+export const ADMIN_SHELL_LONG_COPY =
+  "운영자가 바로 판단할 수 있도록 긴 한국어 안내와 a deliberately long English operational summary를 한 줄도 잃지 않고 보여 줍니다";
 
 type TodayLifecycleAction = AdminOperationCaseView["allowedActions"][number];
 

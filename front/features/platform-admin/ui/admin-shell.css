@@ -166,6 +166,15 @@
   white-space: nowrap;
 }
 
+.admin-shell__account-control .btn {
+  min-height: 44px;
+}
+
+.admin-shell__space-control .rm-global-space-switcher__menu {
+  left: auto;
+  right: 0;
+}
+
 .admin-shell__account-control [role="alert"] {
   margin: 0;
   color: var(--danger);

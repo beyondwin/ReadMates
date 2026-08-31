@@ -207,9 +207,9 @@ test("Today L1 locks the 1440 wide editorial composition", async ({ mount, page 
   await expect(component.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
   await expect(component.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
   await expect(component.getByRole("heading", { name: EDITORIAL_LEDGER_LONG_TODAY_TITLE })).toBeVisible();
-  await expect(component.getByRole("button", { name: "확인 처리" })).toBeEnabled();
+  await expect(component.getByRole("button", { name: "확인함" })).toBeEnabled();
   await expect(component.locator(".admin-receipt-timeline")).toHaveCount(0);
-  const primary = component.getByRole("button", { name: "확인 처리" });
+  const primary = component.getByRole("button", { name: "확인함" });
   await expectMinimumTargetSize(primary);
   await expect(component).toHaveScreenshot("editorial-ledger-today-1440.png");
   await primary.focus();
@@ -226,7 +226,7 @@ test("Clubs locks the 900 tablet editorial composition", async ({ mount, page })
     VISUAL_AUTHORITY_VIEWPORTS.tablet,
   );
   await expect(component.getByRole("heading", { name: "클럽", exact: true })).toBeVisible();
-  await expect(component.getByRole("region", { name: "클럽 장부" })).toBeVisible();
+  await expect(component.getByRole("region", { name: "클럽 관리 목록" })).toBeVisible();
   await expect(component.getByRole("link", { name: EDITORIAL_LEDGER_LONG_CLUB_NAME })).toBeVisible();
   const create = component.getByRole("link", { name: "새 클럽" });
   await expect(create).toBeVisible();
@@ -265,7 +265,7 @@ test("Review audit locks the 390 mobile docket composition", async ({ mount, pag
     reviewNode(reviewAuditLedger),
     VISUAL_AUTHORITY_VIEWPORTS.mobile,
   );
-  await expect(component.getByRole("heading", { name: "운영 기입", exact: true })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "운영 처리 기록", exact: true })).toBeVisible();
   await expect(component.getByRole("heading", { name: EDITORIAL_LEDGER_LONG_AUDIT_SUMMARY })).toBeVisible();
   await expect(component.getByRole("region", { name: "감사 이벤트 상세" })).toBeVisible();
   const back = component.getByRole("button", { name: "목록으로" });
@@ -286,7 +286,7 @@ test("Today case detail locks the 320 mobile composition", async ({ mount, page 
   await expect(component.getByRole("heading", { name: "오늘의 운영 케이스" })).toBeVisible();
   await expect(component.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
   await expect(component.getByRole("button", { name: "목록으로" })).toBeVisible();
-  await expect(component.getByRole("button", { name: "확인 처리" })).toBeEnabled();
+  await expect(component.getByRole("button", { name: "확인함" })).toBeEnabled();
   await expect(component.locator(".admin-today-ledger__columns")).toHaveCount(0);
   await expect(component.locator(".admin-receipt-timeline")).toHaveCount(0);
   const back = component.getByRole("button", { name: "목록으로" });
@@ -330,7 +330,7 @@ test("empty evidence, failed sources, pending-new, pagination failure and unknow
   await expect(component.getByText("스냅샷을 불러오지 못했습니다")).toBeVisible();
   await expect(component.getByText("이어지는 페이지를 불러오지 못했습니다.")).toBeVisible();
   await expect(component.getByText("기록된 감사 이벤트가 없습니다.")).toBeVisible();
-  await expect(component.getByRole("button", { name: "확인 처리" })).toHaveCount(3);
-  await expect(component.getByRole("button", { name: "확인 처리", disabled: true })).toHaveCount(1);
+  await expect(component.getByRole("button", { name: "확인함" })).toHaveCount(3);
+  await expect(component.getByRole("button", { name: "확인함", disabled: true })).toHaveCount(1);
   await expectMinimumTargetSize(component.getByRole("button", { name: "AI 작업 다시 확인" }));
 });

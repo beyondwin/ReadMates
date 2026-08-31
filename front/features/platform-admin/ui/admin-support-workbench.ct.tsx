@@ -97,7 +97,7 @@ const selectedSupportProps: AdminSupportWorkbenchProps = {
 
 test("AdminSupportWorkbench remains operable at a narrow width", async ({ mount }) => {
   const component = await mount(<div style={{ width: 320 }}><AdminSupportWorkbench {...selectedSupportProps} /></div>);
-  await expect(component.getByRole("heading", { name: "접근 원장" })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "지원 접근", exact: true })).toBeVisible();
   await expect(component.getByRole("button", { name: "발급 검토" })).toBeVisible();
   await expect(component.getByRole("button", { name: "권한 취소 검토" })).toBeVisible();
   await expect(component).toHaveScreenshot("admin-support-workbench-selected.png");
