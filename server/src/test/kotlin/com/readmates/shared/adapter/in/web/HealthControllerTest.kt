@@ -1,6 +1,6 @@
 package com.readmates.shared.adapter.`in`.web
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import com.readmates.support.MySqlTestContainer
 import org.flywaydb.core.Flyway
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -10,6 +10,8 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.ApplicationContext
+import org.springframework.test.context.DynamicPropertyRegistry
+import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.request.RequestPostProcessor
@@ -25,7 +27,7 @@ import javax.sql.DataSource
 class HealthControllerTest(
     @param:Autowired private val applicationContext: ApplicationContext,
     @param:Autowired private val mockMvc: MockMvc,
-) : ReadmatesMySqlIntegrationTestSupport() {
+) {
     @Test
     fun `returns server health payload without authentication`() {
         mockMvc
@@ -63,6 +65,15 @@ class HealthControllerTest(
             .also { result ->
                 assertNotEquals(401, result.response.status)
             }
+    }
+
+    companion object {
+        @JvmStatic
+        @DynamicPropertySource
+        fun prepareDatabase(registry: DynamicPropertyRegistry) {
+            MySqlTestContainer.migrateSchema()
+            MySqlTestContainer.registerDatasourceProperties(registry)
+        }
     }
 }
 
