@@ -22,7 +22,18 @@ const memberAuth: AuthMeResponse = {
     membershipStatus: "ACTIVE",
     approvalState: "ACTIVE",
   },
-  joinedClubs: [],
+  joinedClubs: [
+    {
+      clubId: "club-one",
+      clubSlug: "club-one",
+      clubName: "클럽 원",
+      membershipId: "member-membership",
+      role: "MEMBER",
+      status: "ACTIVE",
+      approvalState: "ACTIVE",
+      primaryHost: null,
+    },
+  ],
   platformAdmin: null,
   recommendedAppEntryUrl: "/app",
 };
@@ -34,6 +45,9 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
 async function routeMemberShell(page: Page): Promise<void> {
   await page.route("**/api/bff/api/auth/me**", async (route) => {
     await json(route, 200, memberAuth);
+  });
+  await page.route("**/api/bff/api/me/club-access**", async (route) => {
+    await json(route, 200, { lastClubAccessAt: "2026-08-29T01:02:03Z" });
   });
 }
 
@@ -56,6 +70,9 @@ async function routeCurrentSession(page: Page): Promise<void> {
         meetingPasscode: null,
         questionDeadlineAt: "2026-05-19T14:59:00Z",
         myRsvpStatus: "NO_RESPONSE",
+        scheduleRevision: 1,
+        mySeenScheduleRevision: 1,
+        myScheduleSeenAt: "2026-08-29T01:02:03Z",
         myCheckin: null,
         myQuestions: [],
         myOneLineReview: null,
@@ -101,7 +118,7 @@ test("member current-session captures reading prep visual evidence", async ({ pa
   await routeCurrentSession(page);
 
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto("/app/session/current");
+  await page.goto("/clubs/club-one/app/session/current");
   const desktopSession = page.locator("main.rm-current-session-desktop");
   await expect(desktopSession.getByText("멤버 준비 필요")).toBeVisible();
   await expect(
@@ -115,7 +132,7 @@ test("member current-session captures reading prep visual evidence", async ({ pa
   expect(desktopScreenshot.byteLength).toBeGreaterThan(10_000);
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/app/session/current");
+  await page.goto("/clubs/club-one/app/session/current");
   const mobileSession = page.getByTestId("current-session-mobile");
   await expect(mobileSession.getByText("멤버 준비 필요")).toBeVisible();
   await expect(mobileSession.getByRole("button", { name: /참석/ })).toBeVisible();

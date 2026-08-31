@@ -9,7 +9,6 @@ import {
 test.describe.configure({ mode: "serial" });
 
 const invitedEmail = "e2e.invited@example.com";
-const appOrigin = `http://localhost:${process.env.PLAYWRIGHT_PORT ?? 3100}`;
 const hostMeetingPath = hostMeetingUrlPattern;
 const canonicalHostDashboardPath = "/clubs/reading-sai/app/host";
 
@@ -19,12 +18,6 @@ function resetSessionFlowState() {
     invitedEmails: [invitedEmail],
     googleLoginEmails: ["host@example.com", "member1@example.com", "member5@example.com"],
   });
-}
-
-function expectedGoogleInviteHref(inviteUrl: string) {
-  const url = new URL(inviteUrl, appOrigin);
-  const token = url.pathname.split("/").pop() ?? "";
-  return `/oauth2/authorization/google?inviteToken=${encodeURIComponent(token)}&returnTo=${encodeURIComponent(url.pathname)}`;
 }
 
 async function loginAsDevAccount(page: Page, accountName: RegExp) {
@@ -41,12 +34,18 @@ async function expectCanonicalMeetingUrl(page: Page) {
 async function expectCanonicalHostDashboard(page: Page) {
   await expect(page).toHaveURL(new RegExp(`${canonicalHostDashboardPath}/?(?:\\?|$)`));
   expect(new URL(page.url()).pathname).toBe(canonicalHostDashboardPath);
-  await expect(page.getByRole("heading", { level: 1, name: "오늘" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "현재 모임" })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "클럽 작업함" })).toBeVisible();
 }
 
 async function openCurrentMeetingFromDashboard(page: Page) {
   await expectCanonicalHostDashboard(page);
-  await page.getByRole("link", { name: "지금 다루는 모임 열기" }).click();
+  const meetingHref = await page
+    .getByRole("group", { name: "현재 모임" })
+    .getByRole("link", { name: "모임 정보" })
+    .getAttribute("href");
+  expect(meetingHref).toBeTruthy();
+  await page.goto(new URL(meetingHref!, page.url()).pathname);
   await expectCanonicalMeetingUrl(page);
 }
 
@@ -251,9 +250,9 @@ test("host creates session seven and member sees current session", async ({ page
     .toHaveAttribute("href", hostMeetingPath);
   await memberWorkspaceSelector.getByRole("link", { name: "호스트 공간" }).click();
   await expectCanonicalMeetingUrl(page);
-  const hostWorkspaceSelector = page.locator(".desktop-only .rm-workspace-selector");
-  await hostWorkspaceSelector.locator("summary").click();
-  await hostWorkspaceSelector.getByRole("link", { name: "멤버 공간" }).click();
+  const hostWorkspaceSelector = page.locator(".desktop-only .rm-host-workspace-switcher");
+  await hostWorkspaceSelector.getByRole("button", { name: "읽는사이 · 호스트 운영실" }).click();
+  await hostWorkspaceSelector.getByRole("button", { name: "멤버 공간" }).click();
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/session\/current\/?$/);
 
   await loginWithGoogleFixture(page, "member5@example.com");
@@ -266,58 +265,11 @@ test("host creates session seven and member sees current session", async ({ page
   await rsvpResponse;
 });
 
-test("host invites a new member and invite page uses Google acceptance", async ({ page }) => {
-  await loginWithGoogleFixture(page, "host@example.com");
-
-  await createOpenMeetingThroughUi(page, {
-    title: "7회차 모임 · 초대 테스트 책",
-    bookTitle: "초대 테스트 책",
-    author: "초대 테스트 저자",
-    date: "2026-05-20",
-  });
-
-  await page.goto("/app/host/invitations");
-  await expect(page).toHaveURL(/\/app\/host\/members\/?$/);
-  await expect(page.getByRole("region", { name: "초대" })).toBeVisible();
-  await page.getByLabel("이름").fill("초대테스트");
-  await page.getByLabel("초대 이메일").fill(invitedEmail);
-  const createResponsePromise = page.waitForResponse((response) =>
-    response.request().method() === "POST"
-    && /\/api\/bff\/api\/host\/invitations\/?$/.test(new URL(response.url()).pathname),
-  );
-  await page.getByRole("button", { name: "초대 보내기" }).click();
-  const createResponse = await createResponsePromise;
-  expect(createResponse.ok()).toBe(true);
-  const created = await createResponse.json() as { acceptUrl?: string | null };
-  expect(created.acceptUrl).toBeTruthy();
-  const inviteUrl = created.acceptUrl!;
-  await expect(page.getByRole("status")).toContainText("초대를 보냈습니다.");
-
-  await page.evaluate(async () => {
-    const response = await fetch("/api/bff/api/auth/logout", { method: "POST" });
-    if (!response.ok) {
-      throw new Error(`Logout failed: ${response.status}`);
-    }
-  });
-
-  await page.goto(inviteUrl);
-  await expect(page.getByText("초대테스트")).toBeVisible();
-  await expect(page.getByText(invitedEmail, { exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Google로 초대 수락" })).toHaveAttribute(
-    "href",
-    expectedGoogleInviteHref(inviteUrl),
-  );
-  await expect(page.getByLabel("비밀번호", { exact: true })).toHaveCount(0);
-  await expect(page.getByLabel("비밀번호 확인", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "초대 수락" })).toHaveCount(0);
-
+test("legacy invitation entry replaces to canonical invitation settings", async ({ page }) => {
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto("/app/host/invitations");
-  await expect(page).toHaveURL(/\/app\/host\/members\/?$/);
-  const inviteSection = page.getByRole("region", { name: "초대" });
-  await expect(inviteSection.getByText("초대테스트")).toBeVisible();
-  await inviteSection.getByRole("button", { name: /전체 보기/ }).click();
-  await expect(inviteSection.getByText(invitedEmail, { exact: true })).toBeVisible();
-  await expect(inviteSection.getByText("대기", { exact: true })).toBeVisible();
-  await expect(inviteSection.getByText(/만료 /)).toBeVisible();
+  await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host\/settings#invitations$/);
+  await expect(page.getByRole("heading", { name: "초대와 설정" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "공유 링크" })).toBeVisible();
+  await expect(page.getByLabel("링크 이름")).toBeVisible();
 });

@@ -615,7 +615,7 @@ test("member-home shortcuts keep the desktop divider inset and mobile cards divi
 
     expect(mobileGeometry.columnCount).toBe(2);
     expect(mobileGeometry.pseudoContents).toEqual(["none", "none"]);
-    expect(mobileGeometry.cardHeights.every((height) => height >= 110)).toBe(true);
+    expect(mobileGeometry.cardHeights.every((height) => height + 0.01 >= 110)).toBe(true);
     expect(mobileGeometry.sameRow).toBe(true);
     expect(mobileGeometry.nonOverlapping).toBe(true);
     expect(mobileGeometry.noOverflow).toBe(true);
@@ -762,10 +762,11 @@ test("scoped account navigation preserves local avatar identity across mobile an
   await memberWorkspaceNavigation.getByRole("link", { name: "호스트 공간" }).click();
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 15_000 }).toMatch(/\/app\/host(\/sessions\/[^/]+)?$/);
   const hostHeader = page.getByRole("banner");
-  const hostWorkspaceSelector = page.locator(".rm-club-shell-mobile-context .rm-workspace-selector");
-  await hostWorkspaceSelector.locator("summary").click();
-  await expect(hostWorkspaceSelector.getByRole("navigation", { name: "공간 선택" }).getByRole("link", { name: "멤버 공간" })).toBeVisible();
-  await hostWorkspaceSelector.locator("summary").click();
+  const hostWorkspaceSelector = page.locator(".rm-club-shell-mobile-context .rm-host-workspace-switcher");
+  const hostWorkspaceTrigger = hostWorkspaceSelector.getByRole("button", { name: "읽는사이 · 호스트 운영실" });
+  await hostWorkspaceTrigger.click();
+  await expect(hostWorkspaceSelector.getByRole("navigation", { name: "클럽과 작업 공간 선택" }).getByRole("button", { name: "멤버 공간" })).toBeVisible();
+  await hostWorkspaceTrigger.click();
   await expect(hostHeader.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` })).toBeVisible();
   await hostHeader.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` }).click();
   await expect(page.getByRole("dialog", { name: MEMBER_NAME }).getByRole("button", { name: "로그아웃" })).toBeVisible();

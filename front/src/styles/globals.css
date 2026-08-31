@@ -198,6 +198,10 @@
     max-width: 88px;
   }
 
+  .rm-account-menu__trigger-name {
+    display: none;
+  }
+
   .nav-links {
     gap: 0;
   }
@@ -358,6 +362,13 @@
   margin: 8px 8px 4px !important;
   text-align: left !important;
   overflow-wrap: anywhere;
+}
+
+@media (min-width: 768px) and (max-width: 1000px) {
+  .rm-account-menu__trigger {
+    padding-inline: 3px;
+    gap: 4px;
+  }
 }
 
 .rm-session-expiry {

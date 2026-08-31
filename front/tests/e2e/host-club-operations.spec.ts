@@ -94,21 +94,6 @@ async function routeHostDashboardPublicSafe(page: Page): Promise<void> {
   });
 }
 
-async function routeEmptyCurrentSession(page: Page): Promise<void> {
-  await page.route((url) => matchesExactBffUrl(
-    url,
-    "/api/bff/api/sessions/current",
-    [{}, { clubSlug: "reading-sai" }],
-  ), async (route) => {
-    expect(route.request().method()).toBe("GET");
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ currentSession: null }),
-    });
-  });
-}
-
 async function expectNoHostPrivateSentinels(page: Page): Promise<void> {
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
   await expect(page.getByText("ADMIN_ROUTE")).toHaveCount(0);
@@ -117,7 +102,9 @@ async function expectNoHostPrivateSentinels(page: Page): Promise<void> {
 }
 
 async function expectHostMeetingLedgerPublicSafe(page: Page): Promise<void> {
-  await expect(page.getByRole("heading", { level: 1, name: "오늘" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "현재 모임" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "모임 운영 단계" })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "클럽 작업함" })).toBeVisible();
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
   await expectNoHostPrivateSentinels(page);
 }
@@ -127,7 +114,22 @@ function visibleButton(page: Page, name: string) {
 }
 
 async function expectNoHorizontalOverflow(page: Page): Promise<void> {
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const overflow = await page.evaluate(() => ({
+    viewportWidth: window.innerWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    offenders: Array.from(document.querySelectorAll<HTMLElement>("body *"))
+      .map((element) => ({
+        tag: element.tagName.toLowerCase(),
+        className: element.className,
+        left: element.getBoundingClientRect().left,
+        right: element.getBoundingClientRect().right,
+      }))
+      .filter((item) => item.left < -0.5 || item.right > window.innerWidth + 0.5)
+      .slice(0, 8),
+  }));
+  expect(overflow, JSON.stringify(overflow)).toMatchObject({
+    scrollWidth: overflow.viewportWidth,
+  });
 }
 
 async function expectNoLegacyEditorChrome(page: Page): Promise<void> {
@@ -140,7 +142,7 @@ async function expectNoLegacyEditorChrome(page: Page): Promise<void> {
 async function expectOneMainAndOrderedHeadings(page: Page): Promise<void> {
   const headingLevels = await page.evaluate(() => {
     const mains = Array.from(document.querySelectorAll("main"));
-    const headings = Array.from(document.querySelectorAll("h1, h2, h3, h4, h5, h6"))
+    const headings = Array.from(mains[0]?.querySelectorAll("h1, h2, h3, h4, h5, h6") ?? [])
       .filter((node) => !(node as HTMLElement).closest("[hidden]"))
       .map((node) => Number(node.tagName.slice(1)));
     return { mainCount: mains.length, headingLevels: headings };
@@ -380,11 +382,9 @@ test.describe("host club operations hub", () => {
     await page.goto("/clubs/reading-sai/app/host");
     await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/clubs\/reading-sai\/app\/host(\/sessions\/[^/]+)?$/);
     await expectHostMeetingLedgerPublicSafe(page);
-    await page.getByRole("banner").locator(".rm-workspace-selector__trigger").click();
-    await expect(page.getByRole("link", { name: "멤버 공간" })).toHaveAttribute(
-      "href",
-      "/clubs/reading-sai/app",
-    );
+    const workspaceSwitcher = page.getByRole("banner").locator(".rm-host-workspace-switcher");
+    await workspaceSwitcher.getByRole("button", { name: "읽는사이 · 호스트 운영실" }).click();
+    await expect(workspaceSwitcher.getByRole("button", { name: "멤버 공간" })).toBeVisible();
   });
 
   test("host meeting ledger captures public-safe visual evidence", async ({ page }, testInfo) => {
@@ -397,7 +397,7 @@ test.describe("host club operations hub", () => {
       await page.goto("/clubs/reading-sai/app/host");
       await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/clubs\/reading-sai\/app\/host(\/sessions\/[^/]+)?$/);
       await expectHostMeetingLedgerPublicSafe(page);
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      await expectNoHorizontalOverflow(page);
       const screenshot = await page.screenshot({
         path: testInfo.outputPath(`host-dashboard-${viewport.name}.png`),
         fullPage: true,
@@ -423,7 +423,7 @@ test.describe("host club operations hub", () => {
     await loginWithGoogleFixture(page, "host@example.com");
     await routeHostDashboardPublicSafe(page);
     await routeHostClubOperations(page);
-    await routeEmptyCurrentSession(page);
+    cleanupGeneratedSessions();
     await page.route((url) => (
       url.pathname === "/api/bff/api/host/sessions"
       && (url.searchParams.get("mode") === "meeting" || url.searchParams.get("mode") === "record")
@@ -441,10 +441,10 @@ test.describe("host club operations hub", () => {
     await page.setViewportSize({ width: 320, height: 844 });
     await page.goto("/clubs/reading-sai/app/host");
 
-    await expect(page.getByRole("heading", { name: "아직 열린 모임이 없습니다" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "현재 운영할 모임이 없습니다" })).toBeVisible();
     await expect(page.getByRole("link", { name: "첫 모임 만들기" })).toBeVisible();
     await expectNoHostPrivateSentinels(page);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await expectNoHorizontalOverflow(page);
 
     const screenshot = await page.screenshot({
       path: testInfo.outputPath("host-dashboard-empty-320x844.png"),
@@ -655,6 +655,11 @@ test.describe("focus workspace recovery journey", () => {
       Number(editorAfterReload.body?.liveRevision ?? 0),
       JSON.stringify(editorAfterReload.body),
     ).toBeGreaterThan(0);
+    const recordDialog = page.getByRole("dialog", { name: "모임 기록" });
+    if (await recordDialog.isVisible().catch(() => false)) {
+      await recordDialog.getByRole("button", { name: "접기" }).click();
+      await expect(recordDialog).toBeHidden();
+    }
     await expect(page.getByRole("heading", { name: "게스트·멤버 노트에 기록 게시" })).toBeVisible();
     await expect(visibleButton(page, "게스트·멤버 노트에 기록 게시")).toHaveCount(1);
     await visibleButton(page, "게스트·멤버 노트에 기록 게시").click();

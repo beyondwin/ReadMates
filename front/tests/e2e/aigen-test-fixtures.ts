@@ -81,6 +81,11 @@ export async function expectRecordsSheetOpen(page: Page) {
 
 export async function routeHostEditorShell(page: Page, clubSlug: string): Promise<void> {
   await page.route("**/api/observability/frontend-events", (route) => route.fulfill({ status: 204 }));
+  await page.route("**/api/bff/api/me/club-access**", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ lastClubAccessAt: "2026-08-29T01:02:03Z" }),
+  }));
   await page.route("**/api/bff/api/host/sessions/*/publication/convergence**", (route) => {
     return route.fulfill({ status: 204 });
   });

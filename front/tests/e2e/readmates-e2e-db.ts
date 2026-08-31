@@ -214,7 +214,7 @@ where memberships.club_id = ${sqlString(secondClubId)}
 
 export function createSecondClubInviteFixture(email: string, invitedName = "샘플 초대 멤버") {
   const normalizedEmail = normalizeEmail(email);
-  const token = `sample-${randomBytes(18).toString("base64url")}`;
+  const token = randomBytes(32).toString("base64url");
   const tokenHash = sha256Hex(token);
   const invitationId = randomUUID();
 

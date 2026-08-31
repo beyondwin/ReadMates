@@ -437,13 +437,13 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   const mobileMemberSelector = await openMemberWorkspaceSelector(page, "mobile");
   await mobileMemberSelector.getByRole("link", { name: "호스트 공간" }).click();
   await expect(page).toHaveURL(hostLandingUrl);
-  await expect(page.getByRole("status")).toContainText("호스트 공간으로 전환했습니다");
+  await expect(page.locator('[data-app-route-security-controller] [role="status"]')).toHaveText("호스트 공간으로 전환했습니다");
   const mobileHostSwitcher = await openHostWorkspaceSwitcher(page, "mobile");
   const memberEntry = mobileHostSwitcher.menu.getByRole("button", { name: "멤버 공간" });
   await expectPracticalTapTarget(memberEntry);
   await memberEntry.click();
   await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}$`));
-  await expect(page.getByRole("status")).toContainText("멤버 공간으로 전환했습니다");
+  await expect(page.locator('[data-app-route-security-controller] [role="status"]')).toHaveText("멤버 공간으로 전환했습니다");
   await memberTabs.getByRole("link", { name: "기록" }).click();
   await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}/archive$`));
   const archiveWorkspaceSelector = await openMemberWorkspaceSelector(page, "mobile");
@@ -607,13 +607,13 @@ test("mobile app route continuity returns to archive tabs and host dashboard sou
 
   await page.goto("/app/host");
   await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/app\/host(\/sessions\/[^/]+)?$/);
-  await expect(page.getByRole("heading", { level: 1, name: "오늘" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "현재 운영할 모임이 없습니다" })).toBeVisible();
   const hostBack = page.getByRole("banner").getByRole("link", { name: "뒤로" });
   if (await hostBack.count()) {
     await expect(hostBack).toHaveAttribute("href", "/app/host");
     await hostBack.click();
     await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/app\/host(\/sessions\/[^/]+)?$/);
-    await expect(page.getByRole("heading", { level: 1, name: "오늘" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "현재 운영할 모임이 없습니다" })).toBeVisible();
   }
 });
 
