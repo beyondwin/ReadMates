@@ -2,11 +2,13 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  ADMIN_UNKNOWN_PRIMARY_TEXT,
   adminAuditOutcomeLanguage,
   adminCaseLifecycleLanguage,
   adminHealthAvailabilityLanguage,
   adminHealthFreshnessLanguage,
   adminNavigationLanguage,
+  adminOperationActionLanguage,
   adminPlatformRoleLanguage,
   adminSupportCommandOutcomeLanguage,
   adminSupportReceiptStatusLanguage,
@@ -27,6 +29,16 @@ describe("admin-status-language", () => {
     expect(adminCaseLifecycleLanguage("ACKNOWLEDGED").primaryText).toBe("확인함");
     expect(adminCaseLifecycleLanguage("SNOOZED").primaryText).toBe("잠시 미룸");
     expect(adminCaseLifecycleLanguage("RESOLVED").primaryText).toBe("처리함");
+  });
+
+  it("케이스 action은 lifecycle semantic model의 canonical verb만 사용한다", () => {
+    expect(["ACKNOWLEDGE", "SNOOZE", "RESOLVE"].map((action) => adminOperationActionLanguage(action).primaryText)).toEqual([
+      "확인함",
+      "잠시 미룸",
+      "처리함",
+    ]);
+    expect(adminOperationActionLanguage("MERGE").primaryText).toBe(ADMIN_UNKNOWN_PRIMARY_TEXT);
+    expect(adminOperationActionLanguage("toString").primaryText).toBe(ADMIN_UNKNOWN_PRIMARY_TEXT);
   });
 
   it("platform role은 권한 추론이 아닌 명시적 detail 라벨로만 번역한다", () => {

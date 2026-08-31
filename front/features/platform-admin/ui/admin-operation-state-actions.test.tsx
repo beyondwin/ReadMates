@@ -3,6 +3,15 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AdminOperationStateActions } from "./admin-operation-state-actions";
 
+const adminOperationActionLanguage = vi.hoisted(() => vi.fn((action: string) => ({
+  primaryText: `canonical:${action}`,
+  technicalDisclosure: null,
+})));
+
+vi.mock("@/features/platform-admin/model/admin-status-language", () => ({
+  adminOperationActionLanguage,
+}));
+
 function renderActions(overrides: Partial<React.ComponentProps<typeof AdminOperationStateActions>> = {}) {
   const props: React.ComponentProps<typeof AdminOperationStateActions> = {
     allowedActions: ["ACKNOWLEDGE", "SNOOZE", "RESOLVE"],
@@ -22,14 +31,14 @@ describe("AdminOperationStateActions", () => {
     const user = userEvent.setup();
     const { props } = renderActions();
 
-    expect(screen.getByRole("button", { name: "확인함" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "잠시 미룸" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "처리함" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "canonical:ACKNOWLEDGE" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "canonical:SNOOZE" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "canonical:RESOLVE" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "무시" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "병합" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "잠시 미룸" }));
+    await user.click(screen.getByRole("button", { name: "canonical:SNOOZE" }));
     await user.selectOptions(screen.getByRole("combobox", { name: "미룰 시간" }), "1시간");
     await user.click(screen.getByRole("button", { name: "미루기" }));
 
@@ -44,7 +53,7 @@ describe("AdminOperationStateActions", () => {
   ])("does not resolve when the confirmation is dismissed by %s", async (_label, dismiss) => {
     const user = userEvent.setup();
     const { props } = renderActions();
-    await user.click(screen.getByRole("button", { name: "처리함" }));
+    await user.click(screen.getByRole("button", { name: "canonical:RESOLVE" }));
     expect(screen.getByRole("dialog", { name: "해결 상태 확인" })).toBeInTheDocument();
 
     await dismiss(user);
@@ -57,7 +66,7 @@ describe("AdminOperationStateActions", () => {
     const user = userEvent.setup();
     const { props } = renderActions();
 
-    await user.click(screen.getByRole("button", { name: "처리함" }));
+    await user.click(screen.getByRole("button", { name: "canonical:RESOLVE" }));
     await user.click(screen.getByRole("button", { name: "신호 재검증 후 해결" }));
 
     expect(props.onResolve).toHaveBeenCalledOnce();
@@ -66,7 +75,7 @@ describe("AdminOperationStateActions", () => {
   it("opens the resolve confirm on the shared dialog with initial and restored focus", async () => {
     const user = userEvent.setup();
     const { props } = renderActions();
-    const trigger = screen.getByRole("button", { name: "처리함" });
+    const trigger = screen.getByRole("button", { name: "canonical:RESOLVE" });
 
     await user.click(trigger);
 
@@ -86,9 +95,9 @@ describe("AdminOperationStateActions", () => {
   it("disables every lifecycle control while a mutation is pending", () => {
     renderActions({ pending: true });
 
-    expect(screen.getByRole("button", { name: "확인함" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "잠시 미룸" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "처리함" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "canonical:ACKNOWLEDGE" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "canonical:SNOOZE" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "canonical:RESOLVE" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: "무시" })).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("상태를 반영하고 있습니다.");
   });
@@ -96,9 +105,9 @@ describe("AdminOperationStateActions", () => {
   it("disables controls without in-flight copy when locked and not pending", () => {
     renderActions({ pending: false, disabled: true });
 
-    expect(screen.getByRole("button", { name: "확인함" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "잠시 미룸" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "처리함" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "canonical:ACKNOWLEDGE" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "canonical:SNOOZE" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "canonical:RESOLVE" })).toBeDisabled();
     expect(screen.queryByText("상태를 반영하고 있습니다.")).not.toBeInTheDocument();
   });
 
@@ -116,7 +125,7 @@ describe("AdminOperationStateActions", () => {
       confirmationKey: "case-notification:3:ACKNOWLEDGE,SNOOZE,RESOLVE",
     });
 
-    await user.click(screen.getByRole("button", { name: "처리함" }));
+    await user.click(screen.getByRole("button", { name: "canonical:RESOLVE" }));
     expect(screen.getByRole("dialog", { name: "해결 상태 확인" })).toBeInTheDocument();
 
     rerender(

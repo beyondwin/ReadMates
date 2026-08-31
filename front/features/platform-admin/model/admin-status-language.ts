@@ -23,6 +23,12 @@ const CASE_LIFECYCLE_LABELS = {
   RESOLVED: "처리함",
 } as const;
 
+const CASE_ACTION_LIFECYCLE = {
+  ACKNOWLEDGE: "ACKNOWLEDGED",
+  SNOOZE: "SNOOZED",
+  RESOLVE: "RESOLVED",
+} as const;
+
 const PLATFORM_ROLE_LABELS = {
   OWNER: "소유자",
   OPERATOR: "운영자",
@@ -90,6 +96,15 @@ export function adminCaseLifecycleLanguage(value: string): AdminSemanticLanguage
   return mapAdminSemanticLanguage(value, CASE_LIFECYCLE_LABELS);
 }
 
+export function adminOperationActionLanguage(value: string): AdminSemanticLanguage {
+  const lifecycle = Object.prototype.hasOwnProperty.call(CASE_ACTION_LIFECYCLE, value)
+    ? CASE_ACTION_LIFECYCLE[value as keyof typeof CASE_ACTION_LIFECYCLE]
+    : undefined;
+  return lifecycle
+    ? adminCaseLifecycleLanguage(lifecycle)
+    : mapAdminSemanticLanguage(value, {});
+}
+
 export function adminPlatformRoleLanguage(value: string): AdminSemanticLanguage {
   return mapAdminSemanticLanguage(value, PLATFORM_ROLE_LABELS);
 }
@@ -128,7 +143,9 @@ export function mapAdminSemanticLanguage(
 ): AdminSemanticLanguage {
   const technicalValue = value.trim();
   return {
-    primaryText: labels[value] ?? ADMIN_UNKNOWN_PRIMARY_TEXT,
+    primaryText: Object.prototype.hasOwnProperty.call(labels, value)
+      ? labels[value] ?? ADMIN_UNKNOWN_PRIMARY_TEXT
+      : ADMIN_UNKNOWN_PRIMARY_TEXT,
     technicalDisclosure: technicalValue
       ? { label: "기술 값", value: technicalValue }
       : null,

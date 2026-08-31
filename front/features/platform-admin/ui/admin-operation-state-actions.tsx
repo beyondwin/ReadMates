@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { adminOperationActionLanguage } from "@/features/platform-admin/model/admin-status-language";
 import { AdminModalDialog } from "./admin-modal-dialog";
 
 type LifecycleAction = "ACKNOWLEDGE" | "SNOOZE" | "RESOLVE";
@@ -28,12 +29,9 @@ const HOLD_DURATIONS = [
   { hours: 168, label: "7일" },
 ] as const;
 
-const LIFECYCLE_COPY = {
-  acknowledge: "확인함",
-  snooze: "잠시 미룸",
+const SNOOZE_CONTROL_COPY = {
   snoozeDuration: "미룰 시간",
   snoozeConfirm: "미루기",
-  resolve: "처리함",
 } as const;
 
 export function AdminOperationStateActions({
@@ -72,7 +70,7 @@ export function AdminOperationStateActions({
       <div className="admin-operation-actions__controls">
         {allowedActions.includes("ACKNOWLEDGE") ? (
           <button type="button" className="btn btn-secondary" disabled={locked} onClick={onAcknowledge}>
-            {LIFECYCLE_COPY.acknowledge}
+            {adminOperationActionLanguage("ACKNOWLEDGE").primaryText}
           </button>
         ) : null}
         {allowedActions.includes("SNOOZE") ? (
@@ -84,15 +82,15 @@ export function AdminOperationStateActions({
               aria-pressed={snoozeOpen}
               onClick={() => setOpenSnoozeKey(snoozeOpen ? null : snoozeKey)}
             >
-              {LIFECYCLE_COPY.snooze}
+              {adminOperationActionLanguage("SNOOZE").primaryText}
             </button>
             {snoozeOpen ? (
               <>
                 <label className="admin-operation-actions__duration">
-                  <span>{LIFECYCLE_COPY.snoozeDuration}</span>
+                  <span>{SNOOZE_CONTROL_COPY.snoozeDuration}</span>
                   <select
                     className="admin-operation-control--touch"
-                    aria-label={LIFECYCLE_COPY.snoozeDuration}
+                    aria-label={SNOOZE_CONTROL_COPY.snoozeDuration}
                     value={holdHours}
                     disabled={locked}
                     onChange={(event) => setHoldHours(Number(event.currentTarget.value))}
@@ -108,7 +106,7 @@ export function AdminOperationStateActions({
                   disabled={locked}
                   onClick={() => submitSnooze(holdHours)}
                 >
-                  {LIFECYCLE_COPY.snoozeConfirm}
+                  {SNOOZE_CONTROL_COPY.snoozeConfirm}
                 </button>
               </>
             ) : null}
@@ -122,7 +120,7 @@ export function AdminOperationStateActions({
             disabled={locked}
             onClick={() => setOpenConfirmationKey(activeConfirmationKey)}
           >
-            {LIFECYCLE_COPY.resolve}
+            {adminOperationActionLanguage("RESOLVE").primaryText}
           </button>
         ) : null}
       </div>
