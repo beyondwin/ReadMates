@@ -122,8 +122,10 @@ export async function expectNoSeriousAccessibilityFindings(
       for (let current: HTMLElement | null = element; current; current = current.parentElement) {
         if (
           current.hidden
+          || current.hasAttribute("hidden")
           || current.inert
-          || current.getAttribute("aria-hidden") === "true"
+          || current.hasAttribute("inert")
+          || current.getAttribute("aria-hidden")?.toLowerCase() === "true"
         ) return false;
         const currentStyle = getComputedStyle(current);
         if (currentStyle.display === "none" || currentStyle.visibility === "hidden") return false;
@@ -149,16 +151,35 @@ export async function expectNoSeriousAccessibilityFindings(
         .filter(Boolean)
         .join(" ")
     );
-    const accessibleName = (element: Element) => {
-      const html = element as HTMLElement;
+    const authorProvidedName = (element: Element) => (
+      element.getAttribute("aria-label")?.trim()
+      || referencedText(element, "aria-labelledby")
+      || element.getAttribute("title")?.trim()
+      || ""
+    );
+    const interactiveName = (element: Element) => {
       const formControl = element as HTMLInputElement;
+      const tagName = element.tagName.toLowerCase();
+      const role = element.getAttribute("role");
+      const inputType = tagName === "input" ? formControl.type.toLowerCase() : "";
+      const textNamedRole = role && [
+        "button", "link", "checkbox", "radio", "tab", "menuitem", "option",
+      ].includes(role);
+      const contentName = tagName === "button" || tagName === "a" || textNamedRole
+        ? (element as HTMLElement).innerText?.trim()
+        : "";
+      const explicitInputValue = tagName === "input"
+        && ["button", "reset", "submit"].includes(inputType)
+        && element.hasAttribute("value")
+        ? formControl.value.trim()
+        : "";
       return element.getAttribute("aria-label")?.trim()
         || referencedText(element, "aria-labelledby")
         || Array.from(formControl.labels ?? []).map((label) => label.textContent?.trim() ?? "").filter(Boolean).join(" ")
         || element.getAttribute("alt")?.trim()
         || element.getAttribute("title")?.trim()
-        || html.innerText?.trim()
-        || formControl.value?.trim()
+        || contentName
+        || explicitInputValue
         || "";
     };
 
@@ -178,7 +199,7 @@ export async function expectNoSeriousAccessibilityFindings(
       "[role='tab']", "[role='menuitem']", "[role='option']",
     ].join(",");
     for (const element of Array.from(document.querySelectorAll(interactiveSelector)).filter(isVisible)) {
-      if (!accessibleName(element)) {
+      if (!interactiveName(element)) {
         result.push({
           impact: "critical",
           rule: "interactive-name",
@@ -220,7 +241,7 @@ export async function expectNoSeriousAccessibilityFindings(
     )).filter(isVisible)) {
       const role = landmark.getAttribute("role")
         ?? (landmark.tagName.toLowerCase() === "nav" ? "navigation" : "complementary");
-      const name = accessibleName(landmark);
+      const name = authorProvidedName(landmark);
       if (!name) {
         result.push({
           impact: "serious",

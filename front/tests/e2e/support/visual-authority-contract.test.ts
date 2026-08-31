@@ -6,6 +6,7 @@ import {
   VISUAL_AUTHORITY_VIEWPORTS,
   expectMinimumTargetSize,
   expectNoHorizontalOverflow,
+  expectNoSeriousAccessibilityFindings,
   expectReducedMotion,
   expectVisibleFocus,
 } from "./visual-authority-contract";
@@ -93,6 +94,28 @@ function locatorWithFocus(metrics: {
   return {
     evaluate: async () => metrics,
   } as unknown as Locator;
+}
+
+function installVisibleDom() {
+  const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
+  HTMLElement.prototype.getBoundingClientRect = () => ({
+    bottom: 44,
+    height: 44,
+    left: 0,
+    right: 100,
+    top: 0,
+    width: 100,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
+  restores.push(() => {
+    HTMLElement.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+  });
+  window.getComputedStyle = (() => ({
+    display: "block",
+    visibility: "visible",
+  })) as typeof getComputedStyle;
 }
 
 describe("visual authority contract", () => {
@@ -191,5 +214,79 @@ describe("visual authority contract", () => {
     const unmatched = createPage();
     installMotion({ matches: false });
     await expect(expectReducedMotion(unmatched.page)).rejects.toThrow(/reduced motion/i);
+  });
+
+  it("rejects anonymous navigation and complementary landmarks even when descendants have text", async () => {
+    installVisibleDom();
+    document.body.innerHTML = `
+      <main></main>
+      <nav><a href="/host" aria-label="Go">Go</a></nav>
+      <aside><p>Help</p></aside>
+    `;
+    Object.defineProperty(document.querySelector("nav"), "innerText", {
+      configurable: true,
+      value: "Go",
+    });
+    Object.defineProperty(document.querySelector("aside"), "innerText", {
+      configurable: true,
+      value: "Help",
+    });
+
+    await expect(expectNoSeriousAccessibilityFindings(createPage().page)).rejects.toThrow(
+      /landmark-name/,
+    );
+  });
+
+  it("rejects a filled text input without an accessible name", async () => {
+    installVisibleDom();
+    document.body.innerHTML = `
+      <main>
+        <input value="filled-but-unlabelled" />
+      </main>
+    `;
+
+    await expect(expectNoSeriousAccessibilityFindings(createPage().page)).rejects.toThrow(
+      /interactive-name/,
+    );
+  });
+
+  it("preserves author, label, content, alt, and explicit submit naming sources", async () => {
+    installVisibleDom();
+    document.body.innerHTML = `
+      <main>
+        <label for="query">Query</label>
+        <input id="query" />
+        <button type="button">Save</button>
+        <input type="submit" value="Send" />
+        <input type="image" alt="Upload cover" />
+      </main>
+      <nav aria-label="Primary"><a href="/host" aria-label="Host">Host</a></nav>
+      <span id="related-heading">Related</span>
+      <aside aria-labelledby="related-heading"></aside>
+    `;
+    Object.defineProperty(document.querySelector("button"), "innerText", {
+      configurable: true,
+      value: "Save",
+    });
+
+    await expect(expectNoSeriousAccessibilityFindings(createPage().page)).resolves.toEqual([]);
+  });
+
+  it("excludes hidden and inert ancestor subtrees without skipping visible ARIA references", async () => {
+    installVisibleDom();
+    document.body.innerHTML = `
+      <main>
+        <div hidden><nav></nav></div>
+        <div inert><aside></aside></div>
+        <button aria-label="Open" aria-controls="missing-panel"></button>
+      </main>
+    `;
+
+    const finding = await expectNoSeriousAccessibilityFindings(createPage().page).catch(
+      (error: unknown) => error,
+    );
+    expect(finding).toBeInstanceOf(Error);
+    expect((finding as Error).message).toContain("aria-valid-reference button");
+    expect((finding as Error).message).not.toContain("landmark-name");
   });
 });
