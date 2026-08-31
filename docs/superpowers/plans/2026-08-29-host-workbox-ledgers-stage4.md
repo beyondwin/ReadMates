@@ -10,7 +10,7 @@
 
 **Spec:** ADR-0048, design §3–7/9, approved 10–14/17.
 
-ADR impact: **ADR-0048 already updated during pre-SDD reconciliation** with stable work-item identity, derived completion, deferral expiry and 30-day completed retention. Re-open it only if repository reality contradicts that accepted program authority.
+ADR impact: update — ADR-0048
 
 ## Global Constraints
 

@@ -10,7 +10,7 @@
 
 **Spec:** `docs/development/2026-08-29-readmates-host-lifecycle-operating-room-design.md`, ADR-0048, ADR-0049, 승인 자산 `docs/development/host-redesign-mockups/07`–`17`.
 
-ADR impact: **update + accept after proof** — Proposed ADR-0048에 작업함 지속 상태를 명시하고 ADR-0049를 구현한다. 모든 코드·테스트·active docs가 일치하기 전에는 둘 다 Proposed로 유지한다.
+ADR impact: update — ADR-0048, ADR-0049
 
 ## Global Constraints
 

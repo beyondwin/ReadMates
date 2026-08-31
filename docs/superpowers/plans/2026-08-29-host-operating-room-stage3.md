@@ -10,7 +10,7 @@
 
 **Spec:** design §3.2–7/9/11, ADR-0048/0049, approved 07/08/09 and 15/16.
 
-ADR impact: none beyond implementing Proposed ADR-0048/0049.
+ADR impact: update — ADR-0048, ADR-0049
 
 ## Global Constraints
 

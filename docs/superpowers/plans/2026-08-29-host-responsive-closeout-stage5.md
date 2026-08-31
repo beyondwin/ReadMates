@@ -10,7 +10,7 @@
 
 **Spec:** design §4/7–13, ADR-0048/0049 verification, approved 07–17.
 
-ADR impact: `Accepted` only if every named gate is green; otherwise Proposed with explicit missing evidence.
+ADR impact: update — ADR-0048, ADR-0049
 
 ## Global Constraints
 
