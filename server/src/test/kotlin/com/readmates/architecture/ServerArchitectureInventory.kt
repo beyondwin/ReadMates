@@ -14,6 +14,7 @@ private val featurePackageRoots =
         "archive" to "com/readmates/archive",
         "browse" to "com/readmates/browse",
         "sessionclosing" to "com/readmates/sessionclosing",
+        "hostworkspace" to "com/readmates/hostworkspace",
         "feedback" to "com/readmates/feedback",
         "auth" to "com/readmates/auth",
         "notification" to "com/readmates/notification",

@@ -28,6 +28,7 @@ import com.readmates.session.application.model.HostSessionTrashExpiredException
 import com.readmates.session.application.model.InvalidHostSessionLifecycleReasonException
 import com.readmates.session.application.model.InvalidHostSessionListQueryException
 import com.readmates.session.application.model.MutationPendingException
+import com.readmates.session.application.model.SessionScheduleRevisionStaleException
 import com.readmates.shared.adapter.`in`.web.ApiErrorBlocker
 import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
 import com.readmates.shared.adapter.`in`.web.apiErrorResponse
@@ -46,6 +47,14 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 @RestControllerAdvice
 @Suppress("TooManyFunctions")
 class SessionApplicationErrorHandler {
+    @ExceptionHandler(SessionScheduleRevisionStaleException::class)
+    fun handleScheduleRevisionStale(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.CONFLICT,
+            code = "SESSION_SCHEDULE_REVISION_STALE",
+            message = "일정이 바뀌었습니다. 최신 일정을 확인한 뒤 다시 시도해 주세요.",
+        )
+
     @ExceptionHandler(HostSessionDeletionBlockedException::class)
     fun handleDeletionBlocked(ex: HostSessionDeletionBlockedException): ResponseEntity<ApiErrorResponse> =
         apiErrorResponse(

@@ -1,7 +1,5 @@
-import { Navigate, useLocation } from "react-router";
+import { HostCompatibilityRedirectElement } from "./host-compatibility-redirect-element";
 
 export function HostInvitationsRedirectElement() {
-  const location = useLocation();
-  const target = location.pathname.replace(/\/invitations$/, "/members");
-  return <Navigate replace to={`${target}${location.search}`} state={location.state} />;
+  return <HostCompatibilityRedirectElement />;
 }

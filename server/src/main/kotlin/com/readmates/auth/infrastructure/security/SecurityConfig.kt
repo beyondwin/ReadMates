@@ -63,8 +63,11 @@ class SecurityConfig(
                     "/api/sessions/current/one-line-reviews",
                     "/api/host/sessions",
                     "/api/host/invitations",
+                    "/api/host/invitation-links",
                 )
                 it.ignoringRequestMatchers(
+                    methodAndPath("PUT", Regex("^/api/me/club-access$")),
+                    methodAndPath("PUT", Regex("^/api/sessions/current/schedule-seen$")),
                     methodAndPath("PATCH", Regex("^/api/host/sessions/[^/]+$")),
                     methodAndPath("PATCH", Regex("^/api/host/sessions/[^/]+/visibility$")),
                     methodAndPath("PATCH", Regex("^/api/host/sessions/[^/]+/access-scope$")),
@@ -97,6 +100,10 @@ class SecurityConfig(
                     methodAndPath("DELETE", Regex("^/api/host/sessions/[^/]+/ai-generate/jobs/[^/]+$")),
                     methodAndPath("PUT", Regex("^/api/host/clubs/[^/]+/ai-defaults$")),
                     methodAndPath("POST", Regex("^/api/host/invitations/[^/]+/revoke$")),
+                    methodAndPath("PUT", Regex("^/api/host/invitation-links/[^/]+$")),
+                    methodAndPath("PUT", Regex("^/api/host/club-settings$")),
+                    methodAndPath("POST", Regex("^/api/host/club-settings/co-hosts/[^/]+/(promote|demote)$")),
+                    methodAndPath("POST", Regex("^/api/host/club-settings/end/(preview|confirm)$")),
                     methodAndPath("POST", Regex("^/api/host/members/[^/]+/(activate|deactivate-viewer)$")),
                     methodAndPath("POST", Regex("^/api/host/members/[^/]+/approve$")),
                     methodAndPath("POST", Regex("^/api/host/members/[^/]+/reject$")),
@@ -108,6 +115,8 @@ class SecurityConfig(
                     methodAndPath("POST", Regex("^/api/host/notifications/manual$")),
                     methodAndPath("PUT", Regex("^/api/host/notifications/policy$")),
                     methodAndPath("POST", Regex("^/api/host/notifications/items/[^/]+/(retry|restore)$")),
+                    methodAndPath("PUT", Regex("^/api/host/workbox/items/[^/]+/deferral$")),
+                    methodAndPath("DELETE", Regex("^/api/host/workbox/items/[^/]+/deferral$")),
                     methodAndPath("PUT", Regex("^/api/archive/sessions/[^/]+/my-long-review$")),
                     methodAndPath("POST", Regex("^/api/me/membership/leave$")),
                     methodAndPath("PUT", Regex("^/api/me/profile$")),
@@ -212,6 +221,8 @@ class SecurityConfig(
                     .hasRole("VIEWER")
                     .requestMatchers(HttpMethod.GET, "/api/app/pending", "/api/app/viewer")
                     .hasAuthority("ROLE_VIEWER")
+                    .requestMatchers(methodAndPath("PUT", Regex("^/api/me/club-access$")))
+                    .hasRole("VIEWER")
                     .requestMatchers(methodAndPath("PATCH", Regex("^/api/me/profile$")))
                     .authenticated()
                     .requestMatchers(methodAndPath("PUT", Regex("^/api/me/profile$")))

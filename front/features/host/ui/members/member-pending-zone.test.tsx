@@ -17,6 +17,7 @@ function viewer(overrides: Partial<HostMemberListItem> = {}): HostMemberListItem
     status: "VIEWER",
     joinedAt: null,
     createdAt: "2026-04-20T12:00:00Z",
+    lastClubAccessAt: null,
     currentSessionParticipationStatus: null,
     canSuspend: false,
     canRestore: false,
@@ -93,5 +94,25 @@ describe("MemberPendingZone", () => {
     const row = screen.getByText("둘").closest("article") as HTMLElement;
     expect(within(row).getByRole("button", { name: "승인" })).toBeDisabled();
     expect(within(row).getByRole("button", { name: "거절" })).toBeDisabled();
+  });
+
+  it("links the safe display identity without exposing pending account data", () => {
+    render(
+      <MemberPendingZone
+        viewers={[viewer()]}
+        isRowPending={() => false}
+        personHref={(membershipId) => `/app/host/people/${membershipId}`}
+        LinkComponent={({ to, children }) => <a href={to}>{children}</a>}
+        onActivate={vi.fn()}
+        onRelease={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "둘" })).toHaveAttribute(
+      "href",
+      "/app/host/people/membership-viewer",
+    );
+    expect(document.body).not.toHaveTextContent("viewer@example.com");
+    expect(document.body).not.toHaveTextContent("user-viewer");
   });
 });

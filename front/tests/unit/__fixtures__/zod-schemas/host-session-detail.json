@@ -18,16 +18,39 @@
   "siteVisibility": "PUBLIC_RECORD",
   "publication": null,
   "state": "PUBLISHED",
-  "versions": {
-    "sessionRevision": 0,
-    "exposureRevision": 0,
-    "participantSetRevision": 0,
-    "recordDraftRevision": null,
-    "liveRecordRevision": null,
-    "publicationRevision": 0
+  "scheduleRevision": 7,
+  "scheduleSeenAvailability": "UNAVAILABLE",
+  "scheduleSeenSummary": {
+    "currentCount": null,
+    "staleCount": null,
+    "unseenCount": null,
+    "eligibleCount": null
   },
-  "attendanceSnapshotId": "att:",
-  "attendees": [],
+  "versions": {
+    "sessionRevision": 3,
+    "scheduleRevision": 7,
+    "exposureRevision": 2,
+    "participantSetRevision": 4,
+    "recordDraftRevision": null,
+    "liveRecordRevision": 1,
+    "publicationRevision": 1
+  },
+  "attendanceSnapshotId": "att:membership-host:6",
+  "attendees": [
+    {
+      "membershipId": "00000000-0000-0000-0000-000000000201",
+      "avatarKey": "banana-green-book",
+      "displayName": "호스트",
+      "accountName": "김호스트",
+      "rsvpStatus": "GOING",
+      "attendanceStatus": "ATTENDED",
+      "participationStatus": "ACTIVE",
+      "attendanceRevision": 0,
+      "seenScheduleRevision": 7,
+      "scheduleSeenAt": "2026-08-29T00:00:00Z",
+      "scheduleSeenState": "CURRENT"
+    }
+  ],
   "feedbackDocument": {
     "uploaded": false,
     "fileName": null,

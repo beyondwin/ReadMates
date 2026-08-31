@@ -82,7 +82,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(18)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(23)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -94,7 +94,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("60")
+            assertThat(latestVersion).isEqualTo("65")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
@@ -105,6 +105,8 @@ class MySqlFlywayMigrationTest(
             assertV58PlatformAdminClubCommandEvidenceSchema(upgradeJdbc)
             assertV59PlatformAdminServiceCommandEvidenceSchema(upgradeJdbc)
             assertV60PlatformAdminSupportCommandEvidenceSchema(upgradeJdbc)
+            assertV61ScheduleRevisionSeenStateSchema(upgradeJdbc)
+            assertV62HostWorkboxSchema(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
             assertThat(
@@ -381,7 +383,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(16)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(21)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -393,7 +395,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("60")
+            assertThat(latestVersion).isEqualTo("65")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
@@ -404,6 +406,8 @@ class MySqlFlywayMigrationTest(
             assertV58PlatformAdminClubCommandEvidenceSchema(upgradeJdbc)
             assertV59PlatformAdminServiceCommandEvidenceSchema(upgradeJdbc)
             assertV60PlatformAdminSupportCommandEvidenceSchema(upgradeJdbc)
+            assertV61ScheduleRevisionSeenStateSchema(upgradeJdbc)
+            assertV62HostWorkboxSchema(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
 
@@ -1656,7 +1660,7 @@ class MySqlFlywayMigrationTest(
                     .migrate()
             val jdbc = JdbcTemplate(dataSource)
 
-            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("60")
+            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("65")
             assertV52RevisionSchema(jdbc)
             assertV53IdempotencySchema(jdbc)
             assertV54PublicProjectionConvergenceSchema(jdbc)
@@ -1666,6 +1670,8 @@ class MySqlFlywayMigrationTest(
             assertV58PlatformAdminClubCommandEvidenceSchema(jdbc)
             assertV59PlatformAdminServiceCommandEvidenceSchema(jdbc)
             assertV60PlatformAdminSupportCommandEvidenceSchema(jdbc)
+            assertV61ScheduleRevisionSeenStateSchema(jdbc)
+            assertV62HostWorkboxSchema(jdbc)
             assertThat(countRows(jdbc, "sessions")).isZero()
             assertThat(countRows(jdbc, "session_publication_versions")).isZero()
             assertThat(countRows(jdbc, "club_host_list_epochs")).isZero()
@@ -1715,6 +1721,11 @@ class MySqlFlywayMigrationTest(
                 ),
             )
         }
+    }
+
+    @Test
+    fun `v62 creates scoped host workbox deferrals and immutable snapshots`() {
+        assertV62HostWorkboxSchema(jdbcTemplate)
     }
 
     @Test
@@ -1856,8 +1867,8 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(9)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("60")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(14)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("65")
             assertV52RevisionSchema(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
             assertV54PublicProjectionConvergenceSchema(upgradeJdbc)
@@ -1867,6 +1878,8 @@ class MySqlFlywayMigrationTest(
             assertV58PlatformAdminClubCommandEvidenceSchema(upgradeJdbc)
             assertV59PlatformAdminServiceCommandEvidenceSchema(upgradeJdbc)
             assertV60PlatformAdminSupportCommandEvidenceSchema(upgradeJdbc)
+            assertV61ScheduleRevisionSeenStateSchema(upgradeJdbc)
+            assertV62HostWorkboxSchema(upgradeJdbc)
             assertThat(
                 upgradeJdbc.queryForMap(
                     """
@@ -1978,12 +1991,14 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(4)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("60")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(9)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("65")
             assertV57PlatformAdminCommandIdempotencySchema(upgradeJdbc)
             assertV58PlatformAdminClubCommandEvidenceSchema(upgradeJdbc)
             assertV59PlatformAdminServiceCommandEvidenceSchema(upgradeJdbc)
             assertV60PlatformAdminSupportCommandEvidenceSchema(upgradeJdbc)
+            assertV61ScheduleRevisionSeenStateSchema(upgradeJdbc)
+            assertV62HostWorkboxSchema(upgradeJdbc)
 
             val actorId = "aaaaaaaa-0000-4000-8000-000000057002"
             val claimId = "aaaaaaaa-0000-4000-8000-000000057003"
@@ -2246,11 +2261,13 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(3)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("60")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(8)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("65")
             assertV58PlatformAdminClubCommandEvidenceSchema(upgradeJdbc)
             assertV59PlatformAdminServiceCommandEvidenceSchema(upgradeJdbc)
             assertV60PlatformAdminSupportCommandEvidenceSchema(upgradeJdbc)
+            assertV61ScheduleRevisionSeenStateSchema(upgradeJdbc)
+            assertV62HostWorkboxSchema(upgradeJdbc)
             assertEquals(
                 0L,
                 upgradeJdbc.queryForObject(
@@ -2551,8 +2568,8 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(2)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("60")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(7)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("65")
             assertThat(
                 upgradeJdbc.queryForObject(
                     "select checksum from flyway_schema_history where version = '58' and success = true",
@@ -2561,6 +2578,8 @@ class MySqlFlywayMigrationTest(
             ).isEqualTo(v58Checksum)
             assertV59PlatformAdminServiceCommandEvidenceSchema(upgradeJdbc)
             assertV60PlatformAdminSupportCommandEvidenceSchema(upgradeJdbc)
+            assertV61ScheduleRevisionSeenStateSchema(upgradeJdbc)
+            assertV62HostWorkboxSchema(upgradeJdbc)
 
             val legacyReceipt =
                 upgradeJdbc.queryForMap(
@@ -2916,8 +2935,8 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(1)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("60")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(6)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("65")
             assertThat(
                 upgradeJdbc.queryForObject(
                     "select checksum from flyway_schema_history where version = '59' and success = true",
@@ -2925,6 +2944,8 @@ class MySqlFlywayMigrationTest(
                 ),
             ).isEqualTo(v59Checksum)
             assertV60PlatformAdminSupportCommandEvidenceSchema(upgradeJdbc)
+            assertV61ScheduleRevisionSeenStateSchema(upgradeJdbc)
+            assertV62HostWorkboxSchema(upgradeJdbc)
 
             assertEquals(
                 5,
@@ -3223,6 +3244,227 @@ class MySqlFlywayMigrationTest(
     }
 
     @Test
+    fun `mysql upgrades v60 schedule state without fabricating historical seen access`() {
+        FlywayUpgradeMySqlContainer().use { database ->
+            database.start()
+            val dataSource = DriverManagerDataSource(database.jdbcUrl, database.username, database.password)
+            val fixture = prepareV60ScheduleSeenFixture(dataSource)
+            val upgradeResult = migrateToV61(dataSource)
+
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(1)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("61")
+            assertV61ScheduleRevisionSeenStateSchema(fixture.jdbcTemplate)
+            assertV61ScheduleSeenBackfill(fixture)
+            assertV61ActiveSessionScheduleRevisionProjection(fixture)
+        }
+    }
+
+    @Test
+    fun `mysql upgrades v60 schedule state when schema default drifts from membership key collation`() {
+        FlywayUpgradeMySqlContainer().use { database ->
+            database.start()
+            val dataSource = DriverManagerDataSource(database.jdbcUrl, database.username, database.password)
+            val v60Flyway =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .target("60")
+                    .load()
+            assertThat(v60Flyway.migrate().targetSchemaVersion.toString()).isEqualTo("60")
+            val upgradeJdbc = JdbcTemplate(dataSource)
+            val membershipId = columnMetadata(upgradeJdbc, "memberships", "id")
+            val clubId = columnMetadata(upgradeJdbc, "memberships", "club_id")
+            val originalSchemaDefault =
+                upgradeJdbc.queryForObject(
+                    """
+                    select default_collation_name
+                    from information_schema.schemata
+                    where schema_name = database()
+                    """.trimIndent(),
+                    String::class.java,
+                ) ?: error("schema default collation must be present")
+            val mismatchedDefault =
+                if (membershipId["COLLATION_NAME"] == "utf8mb4_0900_ai_ci") {
+                    "utf8mb4_unicode_ci"
+                } else {
+                    "utf8mb4_0900_ai_ci"
+                }
+
+            try {
+                upgradeJdbc.execute(
+                    "alter database default character set utf8mb4 collate $mismatchedDefault",
+                )
+
+                val upgradeResult =
+                    Flyway
+                        .configure()
+                        .dataSource(dataSource)
+                        .locations("classpath:db/mysql/migration")
+                        .target("61")
+                        .load()
+                        .migrate()
+
+                assertThat(upgradeResult.migrationsExecuted).isEqualTo(1)
+                assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("61")
+                listOf("membership_id" to membershipId, "club_id" to clubId).forEach { (column, parent) ->
+                    val child = columnMetadata(upgradeJdbc, "membership_club_access", column)
+                    assertThat(child["CHARACTER_SET_NAME"]).isEqualTo(parent["CHARACTER_SET_NAME"])
+                    assertThat(child["COLLATION_NAME"]).isEqualTo(parent["COLLATION_NAME"])
+                }
+            } finally {
+                upgradeJdbc.execute(
+                    "alter database default character set utf8mb4 collate $originalSchemaDefault",
+                )
+            }
+        }
+    }
+
+    private fun prepareV60ScheduleSeenFixture(dataSource: DriverManagerDataSource): V61ScheduleSeenUpgradeFixture {
+        val v60Flyway =
+            Flyway
+                .configure()
+                .dataSource(dataSource)
+                .locations("classpath:db/mysql/migration")
+                .target("60")
+                .load()
+        assertThat(v60Flyway.migrate().targetSchemaVersion.toString()).isEqualTo("60")
+        val upgradeJdbc = JdbcTemplate(dataSource)
+        val fixture = V52LiveRevisionFixture()
+        insertV52RevisionClubGraph(
+            upgradeJdbc,
+            fixture.clubId,
+            "schedule-state-${fixture.suffix}",
+            hostUserId = fixture.hostUserId,
+            hostMembershipId = fixture.hostMembershipId,
+            memberUserId = fixture.memberUserId,
+            memberMembershipId = fixture.memberMembershipId,
+        )
+        insertV52RevisionSession(upgradeJdbc, fixture.sessionId, fixture.clubId, number = 1, state = "OPEN")
+        insertV52RevisionParticipant(upgradeJdbc, fixture)
+        insertLegacyScheduleSeenAuthSession(upgradeJdbc, fixture.memberUserId)
+        val receiptId = insertV60ScheduleSeenMutationReceipt(upgradeJdbc, fixture)
+        return V61ScheduleSeenUpgradeFixture(upgradeJdbc, fixture, receiptId)
+    }
+
+    private fun insertLegacyScheduleSeenAuthSession(
+        jdbcTemplate: JdbcTemplate,
+        userId: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into auth_sessions (
+              id, user_id, session_token_hash, created_at, last_seen_at, expires_at
+            ) values (?, ?, ?, '2026-08-01 09:00:00.000000', '2026-08-20 09:00:00.000000',
+                      '2026-09-01 09:00:00.000000')
+            """.trimIndent(),
+            UUID.randomUUID().toString(),
+            userId,
+            "a".repeat(64),
+        )
+    }
+
+    private fun insertV60ScheduleSeenMutationReceipt(
+        jdbcTemplate: JdbcTemplate,
+        fixture: V52LiveRevisionFixture,
+    ): String {
+        val receiptId = UUID.randomUUID().toString()
+        jdbcTemplate.update(
+            """
+            insert into host_session_mutation_receipts (
+              id, club_id, actor_membership_id, operation, resource_id,
+              session_revision, exposure_revision, participant_set_revision,
+              record_draft_revision, live_record_revision, publication_revision,
+              notification_decision, dispatch_receipt_id
+            ) values (?, ?, ?, 'SCHEDULE_UPDATE', ?, 0, 0, 0, null, null, 0, 'NOT_SENT', null)
+            """.trimIndent(),
+            receiptId,
+            fixture.clubId,
+            fixture.hostMembershipId,
+            fixture.sessionId,
+        )
+        return receiptId
+    }
+
+    private fun migrateToV61(dataSource: DriverManagerDataSource) =
+        Flyway
+            .configure()
+            .dataSource(dataSource)
+            .locations("classpath:db/mysql/migration")
+            .target("61")
+            .load()
+            .migrate()
+
+    private fun assertV61ScheduleSeenBackfill(fixture: V61ScheduleSeenUpgradeFixture) {
+        assertEquals(
+            1L,
+            fixture.jdbcTemplate.queryForObject(
+                "select schedule_revision from sessions where id = ?",
+                Long::class.java,
+                fixture.revisionFixture.sessionId,
+            ),
+        )
+        assertThat(
+            fixture.jdbcTemplate.queryForMap(
+                """
+                select seen_schedule_revision, seen_schedule_at
+                from session_participants where id = ?
+                """.trimIndent(),
+                fixture.revisionFixture.participantId,
+            ),
+        ).containsEntry("seen_schedule_revision", null)
+            .containsEntry("seen_schedule_at", null)
+        assertEquals(
+            1L,
+            fixture.jdbcTemplate.queryForObject(
+                "select schedule_revision from host_session_mutation_receipts where id = ?",
+                Long::class.java,
+                fixture.receiptId,
+            ),
+        )
+        assertEquals(
+            0,
+            fixture.jdbcTemplate.queryForObject(
+                "select count(*) from membership_club_access",
+                Int::class.java,
+            ),
+        )
+    }
+
+    private fun assertV61ActiveSessionScheduleRevisionProjection(fixture: V61ScheduleSeenUpgradeFixture) {
+        assertThat(
+            fixture.jdbcTemplate.queryForObject(
+                "select schedule_revision from active_sessions where id = ?",
+                Long::class.java,
+                fixture.revisionFixture.sessionId,
+            ),
+        ).isPositive()
+
+        assertEquals(
+            1,
+            fixture.jdbcTemplate.update(
+                """
+                update sessions
+                set deleted_at = utc_timestamp(6),
+                    deleted_by_membership_id = ?,
+                    purge_after = utc_timestamp(6) + interval 7 day
+                where id = ?
+                """.trimIndent(),
+                fixture.revisionFixture.hostMembershipId,
+                fixture.revisionFixture.sessionId,
+            ),
+        )
+        assertEquals(
+            0,
+            fixture.jdbcTemplate.queryForObject(
+                "select count(*) from active_sessions where id = ?",
+                Int::class.java,
+                fixture.revisionFixture.sessionId,
+            ),
+        )
+    }
+
+    @Test
     @Suppress("LongMethod")
     fun `mysql adds revision domains participant audit and application snapshot identity`() {
         assertV52RevisionSchema(jdbcTemplate)
@@ -3231,6 +3473,7 @@ class MySqlFlywayMigrationTest(
         assertV56PublicConvergenceWorkRetentionIndex(jdbcTemplate)
         assertV57PlatformAdminCommandIdempotencySchema(jdbcTemplate)
         assertV58PlatformAdminClubCommandEvidenceSchema(jdbcTemplate)
+        assertV61ScheduleRevisionSeenStateSchema(jdbcTemplate)
         val fixture = V52LiveRevisionFixture()
         try {
             insertV52RevisionClubGraph(
@@ -4916,6 +5159,7 @@ class MySqlFlywayMigrationTest(
             "operation",
             "resource_id",
             "session_revision",
+            "schedule_revision",
             "exposure_revision",
             "participant_set_revision",
             "record_draft_revision",
@@ -5342,6 +5586,182 @@ class MySqlFlywayMigrationTest(
             digestKeyVersion,
             idempotencyKeyHmac,
             requestHmac,
+        )
+    }
+
+    private fun assertV61ScheduleRevisionSeenStateSchema(jdbcTemplate: JdbcTemplate) {
+        assertThat(columns(jdbcTemplate, "sessions")).contains("schedule_revision")
+        assertThat(columns(jdbcTemplate, "session_participants"))
+            .contains("seen_schedule_revision", "seen_schedule_at")
+        assertThat(columns(jdbcTemplate, "host_session_mutation_receipts")).contains("schedule_revision")
+        assertV61RevisionColumnMetadata(jdbcTemplate)
+        assertV61SeenColumnMetadata(jdbcTemplate)
+        assertV61CheckConstraints(jdbcTemplate)
+        assertV61SessionParticipantIndex(jdbcTemplate)
+        assertV61MembershipAccessSchema(jdbcTemplate)
+    }
+
+    private fun assertV62HostWorkboxSchema(jdbcTemplate: JdbcTemplate) {
+        assertV62HostWorkboxColumns(jdbcTemplate)
+        assertV62HostWorkboxIndexes(jdbcTemplate)
+        assertV62HostWorkboxReferences(jdbcTemplate)
+        assertThat(checkConstraintClause(jdbcTemplate, "host_work_item_deferrals_key_check"))
+            .contains("char_length(`work_item_key`) between 1 and 255")
+    }
+
+    private fun assertV62HostWorkboxColumns(jdbcTemplate: JdbcTemplate) {
+        assertThat(columns(jdbcTemplate, "host_work_item_deferrals")).containsExactlyInAnyOrder(
+            "club_id",
+            "host_membership_id",
+            "work_item_key",
+            "deferred_until",
+            "created_at",
+            "updated_at",
+        )
+        assertThat(columns(jdbcTemplate, "host_workbox_snapshots")).containsExactlyInAnyOrder(
+            "id",
+            "club_id",
+            "host_membership_id",
+            "state",
+            "filter_fingerprint",
+            "schema_version",
+            "evaluated_at",
+            "source_availability_json",
+            "expires_at",
+            "created_at",
+        )
+        assertThat(columns(jdbcTemplate, "host_workbox_snapshot_items")).containsExactlyInAnyOrder(
+            "snapshot_id",
+            "ordinal",
+            "work_item_key",
+            "projection_json",
+        )
+    }
+
+    private fun assertV62HostWorkboxIndexes(jdbcTemplate: JdbcTemplate) {
+        assertEquals(
+            "club_id,host_membership_id,deferred_until",
+            indexColumns(
+                jdbcTemplate,
+                "host_work_item_deferrals",
+                "host_work_item_deferrals_expiry_idx",
+            ),
+        )
+    }
+
+    private fun assertV62HostWorkboxReferences(jdbcTemplate: JdbcTemplate) {
+        assertEquals(
+            "expires_at",
+            indexColumns(jdbcTemplate, "host_workbox_snapshots", "host_workbox_snapshots_expiry_idx"),
+        )
+        assertEquals(
+            "snapshot_id,work_item_key",
+            indexColumns(
+                jdbcTemplate,
+                "host_workbox_snapshot_items",
+                "host_workbox_snapshot_item_key",
+            ),
+        )
+        assertEquals(
+            "memberships:id,club_id",
+            foreignKeyReference(
+                jdbcTemplate,
+                "host_work_item_deferrals",
+                "host_work_item_deferrals_host_fk",
+            ),
+        )
+        assertEquals(
+            "memberships:id,club_id",
+            foreignKeyReference(
+                jdbcTemplate,
+                "host_workbox_snapshots",
+                "host_workbox_snapshots_host_fk",
+            ),
+        )
+        assertEquals(
+            "host_workbox_snapshots:id",
+            foreignKeyReference(
+                jdbcTemplate,
+                "host_workbox_snapshot_items",
+                "host_workbox_snapshot_items_snapshot_fk",
+            ),
+        )
+    }
+
+    private fun assertV61RevisionColumnMetadata(jdbcTemplate: JdbcTemplate) {
+        listOf(
+            "sessions" to "schedule_revision",
+            "host_session_mutation_receipts" to "schedule_revision",
+        ).forEach { (table, column) ->
+            val metadata = columnMetadata(jdbcTemplate, table, column)
+            assertThat(metadata["DATA_TYPE"]).isEqualTo("bigint")
+            assertThat(metadata["IS_NULLABLE"]).isEqualTo("NO")
+            assertThat(metadata["COLUMN_DEFAULT"].toString()).isEqualTo("1")
+        }
+    }
+
+    private fun assertV61SeenColumnMetadata(jdbcTemplate: JdbcTemplate) {
+        val seenScheduleRevision = columnMetadata(jdbcTemplate, "session_participants", "seen_schedule_revision")
+        assertThat(seenScheduleRevision["DATA_TYPE"]).isEqualTo("bigint")
+        assertThat(seenScheduleRevision["IS_NULLABLE"]).isEqualTo("YES")
+        val seenScheduleAt = columnMetadata(jdbcTemplate, "session_participants", "seen_schedule_at")
+        assertThat(seenScheduleAt["DATA_TYPE"]).isEqualTo("datetime")
+        assertThat(seenScheduleAt["DATETIME_PRECISION"]).isEqualTo(6L)
+        assertThat(seenScheduleAt["IS_NULLABLE"]).isEqualTo("YES")
+    }
+
+    private fun assertV61CheckConstraints(jdbcTemplate: JdbcTemplate) {
+        assertThat(checkConstraintClause(jdbcTemplate, "sessions_schedule_revision_check"))
+            .contains("schedule_revision", ">= 1")
+        assertThat(checkConstraintClause(jdbcTemplate, "session_participants_schedule_seen_pair_check"))
+            .contains("seen_schedule_revision", "seen_schedule_at", ">= 1")
+        assertThat(checkConstraintClause(jdbcTemplate, "host_session_mutation_receipts_schedule_revision_check"))
+            .contains("schedule_revision", ">= 1")
+    }
+
+    private fun assertV61SessionParticipantIndex(jdbcTemplate: JdbcTemplate) {
+        assertEquals(
+            "club_id,session_id,participation_status,seen_schedule_revision",
+            indexColumns(
+                jdbcTemplate,
+                "session_participants",
+                "session_participants_schedule_seen_idx",
+            ),
+        )
+    }
+
+    private fun assertV61MembershipAccessSchema(jdbcTemplate: JdbcTemplate) {
+        assertThat(columns(jdbcTemplate, "membership_club_access")).containsExactlyInAnyOrder(
+            "membership_id",
+            "club_id",
+            "last_access_at",
+        )
+        assertThat(columnMetadata(jdbcTemplate, "membership_club_access", "last_access_at")["DATETIME_PRECISION"])
+            .isEqualTo(6L)
+        assertEquals("membership_id,club_id", indexColumns(jdbcTemplate, "membership_club_access", "PRIMARY"))
+        assertEquals(
+            "membership_id,club_id",
+            foreignKeyColumns(
+                jdbcTemplate,
+                "membership_club_access",
+                "membership_club_access_membership_fk",
+            ),
+        )
+        assertEquals(
+            "memberships:id,club_id",
+            foreignKeyReference(
+                jdbcTemplate,
+                "membership_club_access",
+                "membership_club_access_membership_fk",
+            ),
+        )
+        assertEquals(
+            "CASCADE",
+            foreignKeyDeleteRule(
+                jdbcTemplate,
+                "membership_club_access",
+                "membership_club_access_membership_fk",
+            ),
         )
     }
 
@@ -6967,6 +7387,12 @@ class MySqlFlywayMigrationTest(
         )
         return fixtures
     }
+
+    private data class V61ScheduleSeenUpgradeFixture(
+        val jdbcTemplate: JdbcTemplate,
+        val revisionFixture: V52LiveRevisionFixture,
+        val receiptId: String,
+    )
 
     private data class V52LiveRevisionFixture(
         val suffix: String = UUID.randomUUID().toString().take(8),

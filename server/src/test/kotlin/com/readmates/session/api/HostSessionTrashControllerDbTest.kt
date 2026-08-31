@@ -20,7 +20,9 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import java.sql.Timestamp
 import java.time.Duration
+import java.time.Instant
 import java.time.OffsetDateTime
 
 @SpringBootTest(
@@ -182,6 +184,7 @@ class HostSessionTrashControllerDbTest(
     fun `purge removes children after expiry and restore then returns gone`() {
         val sessionId = createDraft("11회차 · 만료 휴지통")
         insertQuestion(sessionId)
+        insertScheduleSeenParticipant(sessionId)
         mockMvc
             .delete("/api/host/sessions/$sessionId") {
                 withHost()
@@ -202,10 +205,13 @@ class HostSessionTrashControllerDbTest(
             }
 
         assertThat(countRows("questions", "session_id = '$sessionId'")).isEqualTo(1)
+        assertThat(scheduleSeenRevision(sessionId)).isEqualTo(1L)
+        assertThat(scheduleSeenAt(sessionId)).isEqualTo(SCHEDULE_SEEN_AT)
         assertThat(purgeExpiredHostSessionTrash.purgeExpired(50)).isGreaterThanOrEqualTo(1)
         assertThat(purgeExpiredHostSessionTrash.purgeExpired(50)).isGreaterThanOrEqualTo(0)
         assertThat(countRows("sessions", "id = '$sessionId'")).isZero()
         assertThat(countRows("questions", "session_id = '$sessionId'")).isZero()
+        assertThat(countRows("session_participants", "session_id = '$sessionId'")).isZero()
         assertThat(
             countRows(
                 "host_session_lifecycle_audit",
@@ -267,6 +273,35 @@ class HostSessionTrashControllerDbTest(
         )
     }
 
+    private fun insertScheduleSeenParticipant(sessionId: String) {
+        jdbcTemplate.update(
+            """
+            insert into session_participants (
+              id, club_id, session_id, membership_id, rsvp_status, attendance_status,
+              participation_status, seen_schedule_revision, seen_schedule_at
+            ) values (uuid(), ?, ?, ?, 'NO_RESPONSE', 'UNKNOWN', 'ACTIVE', 1, ?)
+            """.trimIndent(),
+            CLUB_ID,
+            sessionId,
+            HOST_MEMBERSHIP_ID,
+            SCHEDULE_SEEN_AT,
+        )
+    }
+
+    private fun scheduleSeenRevision(sessionId: String): Long? =
+        jdbcTemplate.queryForObject(
+            "select seen_schedule_revision from session_participants where session_id = ?",
+            Long::class.java,
+            sessionId,
+        )
+
+    private fun scheduleSeenAt(sessionId: String): Timestamp? =
+        jdbcTemplate.queryForObject(
+            "select seen_schedule_at from session_participants where session_id = ?",
+            Timestamp::class.java,
+            sessionId,
+        )
+
     private fun countRows(
         tableName: String,
         whereClause: String,
@@ -296,6 +331,7 @@ class HostSessionTrashControllerDbTest(
     private companion object {
         const val CLUB_ID = "00000000-0000-0000-0000-000000000001"
         const val HOST_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000000201"
+        val SCHEDULE_SEEN_AT: Timestamp = Timestamp.from(Instant.parse("2026-08-29T01:02:03.123456Z"))
     }
 }
 

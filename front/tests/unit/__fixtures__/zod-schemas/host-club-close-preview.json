@@ -1,0 +1,13 @@
+{
+  "previewId": "00000000-0000-0000-0000-00000000e103",
+  "clubId": "00000000-0000-0000-0000-000000000101",
+  "actorMembershipId": "00000000-0000-0000-0000-000000000201",
+  "clubRevision": 0,
+  "effectHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "effects": {
+    "clubStatus": "ARCHIVED",
+    "memberAccess": "ENDED",
+    "publicRecords": "UNCHANGED"
+  },
+  "expiresAt": "2026-08-30T01:00:00Z"
+}

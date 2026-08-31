@@ -34,7 +34,7 @@ class JdbcManualNotificationDispatchAdapter(
     private val rows = ManualNotificationDispatchRows
     private val readQueries = ManualNotificationDispatchReadQueries(jdbcTemplate, rows)
     private val audienceQueries = ManualNotificationAudienceQueries(jdbcTemplate)
-    private val previewStore = ManualNotificationPreviewStore(jdbcTemplate)
+    private val previewStore = ManualNotificationPreviewStore(jdbcTemplate, objectMapper)
     private val confirmStore =
         ManualNotificationConfirmStore(
             jdbcTemplate = jdbcTemplate,
@@ -90,6 +90,36 @@ class JdbcManualNotificationDispatchAdapter(
         targetSnapshotHash: String,
         expiresAt: OffsetDateTime,
     ): UUID = previewStore.insertPreview(clubId, hostMembershipId, selectionHash, targetSnapshotHash, expiresAt)
+
+    @Suppress("LongParameterList")
+    override fun insertPreview(
+        clubId: UUID,
+        hostMembershipId: UUID,
+        selectionHash: String,
+        targetSnapshotHash: String,
+        scheduleRevision: Long,
+        targetSnapshotRevision: String,
+        targetMembershipIds: List<UUID>,
+        eligibilityFingerprint: String,
+        subject: String,
+        body: String,
+        contentHash: String,
+        expiresAt: OffsetDateTime,
+    ): UUID =
+        previewStore.insertPreview(
+            clubId,
+            hostMembershipId,
+            selectionHash,
+            targetSnapshotHash,
+            scheduleRevision,
+            targetSnapshotRevision,
+            targetMembershipIds,
+            eligibilityFingerprint,
+            subject,
+            body,
+            contentHash,
+            expiresAt,
+        )
 
     override fun findPreview(
         id: UUID,

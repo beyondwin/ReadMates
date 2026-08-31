@@ -20,21 +20,104 @@ const hostAuth: AuthMeResponse = {
   approvalState: "ACTIVE",
 };
 
-const emptyAttention = {
-  items: [],
-  nextCursor: null,
-  summary: {
-    needsAttentionCount: 0,
-    incompletePublishedCount: 0,
-    draftCount: 0,
+const selector = {
+  currentMeeting: {
+    sessionId: "session-7",
+    selection: "OPEN" as const,
+    scheduleSeenAvailability: "AVAILABLE" as const,
   },
 };
 
-const emptyMeetingPage = {
+const detail = {
+  sessionId: "session-7",
+  sessionNumber: 7,
+  title: "No.7 모임",
+  bookTitle: "테스트 책",
+  bookAuthor: "테스트 저자",
+  bookLink: null,
+  bookImageUrl: null,
+  locationLabel: "온라인",
+  meetingUrl: null,
+  meetingPasscode: null,
+  date: "2026-09-01",
+  startTime: "20:00",
+  endTime: "22:00",
+  questionDeadlineAt: "2026-08-31T14:59:00Z",
+  visibility: "MEMBER" as const,
+  publication: null,
+  state: "OPEN" as const,
+  scheduleRevision: 3,
+  scheduleSeenAvailability: "AVAILABLE" as const,
+  scheduleSeenSummary: { currentCount: 1, staleCount: 0, unseenCount: 1, eligibleCount: 2 },
+  versions: {
+    sessionRevision: 4,
+    scheduleRevision: 3,
+    exposureRevision: 2,
+    participantSetRevision: 2,
+    recordDraftRevision: null,
+    liveRecordRevision: null,
+    publicationRevision: 0,
+  },
+  attendanceSnapshotId: "attendance-snapshot-7",
+  attendees: [],
+  feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null },
+};
+
+const closingStatus = {
+  schema: "host.session_closing_status.v1" as const,
+  session: {
+    sessionId: "session-7",
+    sessionNumber: 7,
+    bookTitle: "테스트 책",
+    meetingDate: "2026-09-01",
+    state: "OPEN" as const,
+    recordVisibility: "MEMBER" as const,
+    sessionRevision: 4,
+    participantSetRevision: 2,
+    attendanceSnapshotId: "attendance-snapshot-7",
+  },
+  overall: { state: "NOT_STARTED" as const, label: "마감 전", primaryAction: "CLOSE_SESSION" as const },
+  checklist: [],
+  evidence: {
+    summaryPublished: false,
+    highlightCount: 0,
+    oneLinerCount: 0,
+    feedbackDocumentState: "MISSING" as const,
+    latestNotificationEvent: null,
+    publicRecordHref: null,
+    memberReflectionHref: null,
+  },
+};
+
+const recordAttention = {
   items: [],
   nextCursor: null,
-  summary: emptyAttention.summary,
+  summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
 };
+
+const clubOperations = {
+  schema: "host.club_operations_snapshot.v1" as const,
+  generatedAt: "2026-08-30T00:00:00Z",
+  club: { clubId: "club-1", slug: "reading-sai", name: "독서 사이" },
+  readiness: { state: "READY", blockingReasons: [], nextAction: null },
+  sessionProgress: {
+    upcomingCount: 1,
+    currentOpenCount: 1,
+    closedCount: 0,
+    publishedRecordCount: 0,
+    incompleteRecordCount: 0,
+  },
+  aiUsage: {
+    activeJobs: 0,
+    failedRecentJobs: 0,
+    staleCandidates: 0,
+    costEstimateUsd: "0.00",
+    state: "IDLE",
+    priorFailedJobs7d: 0,
+  },
+};
+
+const notificationHealth = { pending: 0, failed: 0, dead: 0, sentLast24h: 1, latestFailures: [] };
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -45,9 +128,7 @@ function jsonResponse(body: unknown, status = 200) {
 
 function createTestQueryClient() {
   return new QueryClient({
-    defaultOptions: {
-      queries: { retry: false, gcTime: 0, staleTime: 0 },
-    },
+    defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },
   });
 }
 
@@ -58,28 +139,12 @@ function loaderArgs(url = "https://readmates.test/clubs/reading-sai/app/host") {
   } as unknown as LoaderFunctionArgs;
 }
 
-function attentionItem(overrides: Record<string, unknown> = {}) {
-  return {
-    sessionId: "closed-1",
-    sessionNumber: 12,
-    title: "No.12",
-    bookTitle: "닫힌 책",
-    bookAuthor: "저자",
-    bookImageUrl: null,
-    date: "2026-04-15",
-    startTime: "20:00",
-    endTime: "22:00",
-    locationLabel: "온라인",
-    state: "CLOSED",
-    visibility: "MEMBER",
-    recordStatus: "INCOMPLETE",
-    needsAttention: true,
-    hasDraft: false,
-    liveRevision: 1,
-    draftRevision: null,
-    lastModifiedAt: "2026-04-16T00:00:00Z",
-    ...overrides,
-  };
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+  return { promise, resolve };
 }
 
 function fetchMockFor(handlers: Record<string, unknown>) {
@@ -87,17 +152,25 @@ function fetchMockFor(handlers: Record<string, unknown>) {
     const url = String(input);
     for (const [pattern, body] of Object.entries(handlers)) {
       if (url === pattern || url.includes(pattern)) {
-        if (body instanceof Error) {
-          return Promise.reject(body);
-        }
-        if (body instanceof Response) {
-          return Promise.resolve(body);
-        }
+        if (body instanceof Error) return Promise.reject(body);
+        if (body instanceof Response) return Promise.resolve(body);
         return Promise.resolve(jsonResponse(body));
       }
     }
     return Promise.reject(new Error(`Unexpected URL: ${url}`));
   });
+}
+
+function successHandlers() {
+  return {
+    "/api/bff/api/auth/me": hostAuth,
+    "/api/bff/api/host/operating-room/current": selector,
+    "/api/bff/api/host/sessions/session-7/closing-status": closingStatus,
+    "/api/bff/api/host/sessions/session-7": detail,
+    "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=7": recordAttention,
+    "/api/bff/api/host/club-operations": clubOperations,
+    "/api/bff/api/host/notifications/summary": notificationHealth,
+  };
 }
 
 afterEach(() => {
@@ -106,185 +179,133 @@ afterEach(() => {
 
 describe("preserveLocationSuffix", () => {
   it("appends the source search and hash to the destination", () => {
-    expect(
-      preserveLocationSuffix(
-        "https://readmates.test/app/host?from=mail#board",
-        "/app/host/sessions/open-1",
-      ),
-    ).toBe("/app/host/sessions/open-1?from=mail#board");
+    expect(preserveLocationSuffix(
+      "https://readmates.test/app/host?from=mail#board",
+      "/app/host/sessions/open-1",
+    )).toBe("/app/host/sessions/open-1?from=mail#board");
   });
 });
 
 describe("hostDashboardLoaderFactory", () => {
-  it("requests only auth, current, the session list, and attention limit 7", async () => {
-    const fetchMock = fetchMockFor({
-      "/api/bff/api/auth/me": hostAuth,
-      "/api/bff/api/sessions/current": { currentSession: null },
-      "/api/bff/api/host/sessions?mode=meeting&limit=50": emptyMeetingPage,
-      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=7": emptyAttention,
+  it("finishes scoped host auth before starting the operating-room selector", async () => {
+    const auth = deferred<Response>();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/auth/me")) return auth.promise;
+      const body = Object.entries(successHandlers()).find(([pattern]) => url.includes(pattern))?.[1];
+      return body === undefined
+        ? Promise.reject(new Error(`Unexpected URL: ${url}`))
+        : Promise.resolve(jsonResponse(body));
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await hostDashboardLoaderFactory(createTestQueryClient())(loaderArgs());
+    const loading = hostDashboardLoaderFactory(createTestQueryClient())(loaderArgs());
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe("/api/bff/api/auth/me?clubSlug=reading-sai");
 
-    const urls = fetchMock.mock.calls.map(([url]) => String(url));
-    expect(urls).toEqual(expect.arrayContaining([
-      "/api/bff/api/auth/me?clubSlug=reading-sai",
-      "/api/bff/api/sessions/current?clubSlug=reading-sai",
-      "/api/bff/api/host/sessions?mode=meeting&limit=50&clubSlug=reading-sai",
-      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=7&clubSlug=reading-sai",
-    ]));
-    expect(urls.some((url) => url.includes("/host/dashboard"))).toBe(false);
-    expect(urls.some((url) => url.includes("/host/notifications"))).toBe(false);
-    expect(urls.some((url) => url.includes("/host/club-operations"))).toBe(false);
-  });
-
-  it("keeps today as the owner when an active meeting exists", async () => {
-    const fetchMock = fetchMockFor({
-      "/api/bff/api/auth/me": hostAuth,
-      "/api/bff/api/sessions/current": { currentSession: null },
-      "/api/bff/api/host/sessions?mode=meeting&limit=50": {
-        items: [{
-          sessionId: "open-1",
-          sessionNumber: 8,
-          title: "No.8",
-          bookTitle: "열린 책",
-          bookAuthor: "저자",
-          bookImageUrl: null,
-          date: "2026-06-11",
-          startTime: "20:00",
-          endTime: "22:00",
-          locationLabel: "온라인",
-          state: "OPEN",
-          visibility: "MEMBER",
-          recordStatus: "NOT_STARTED",
-          needsAttention: false,
-          hasDraft: false,
-          liveRevision: 0,
-          draftRevision: null,
-          lastModifiedAt: null,
-        }],
-        nextCursor: null,
-        summary: emptyAttention.summary,
-      },
-      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=7": emptyAttention,
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    const result = await hostDashboardLoaderFactory(createTestQueryClient())(
-      loaderArgs("https://readmates.test/clubs/reading-sai/app/host?from=mail#board"),
+    auth.resolve(jsonResponse(hostAuth));
+    await loading;
+    expect(fetchMock.mock.calls.map(([input]) => String(input))).toContain(
+      "/api/bff/api/host/operating-room/current?clubSlug=reading-sai",
     );
-
-    expect(result).toMatchObject({
-      hostSessions: { items: [expect.objectContaining({ sessionId: "open-1", state: "OPEN" })] },
-    });
-    const urls = fetchMock.mock.calls.map(([url]) => String(url));
-    expect(urls.some((url) => url.includes("/host/dashboard"))).toBe(false);
-    expect(urls.some((url) => url.includes("/host/notifications"))).toBe(false);
-    expect(urls.some((url) => url.includes("/host/club-operations"))).toBe(false);
   });
 
-  it("keeps scoped today data without redirecting into a draft editor", async () => {
-    const fetchMock = fetchMockFor({
-      "/api/bff/api/auth/me?clubSlug=reading-sai": hostAuth,
-      "/api/bff/api/sessions/current?clubSlug=reading-sai": { currentSession: null },
-      "/api/bff/api/host/sessions?mode=meeting&limit=50&clubSlug=reading-sai": {
-        items: [{
-          sessionId: "draft-1",
-          sessionNumber: 9,
-          title: "No.9",
-          bookTitle: "다음 책",
-          bookAuthor: "저자",
-          bookImageUrl: null,
-          date: "2026-07-02",
-          startTime: "20:00",
-          endTime: "22:00",
-          locationLabel: "온라인",
-          state: "DRAFT",
-          visibility: "HOST_ONLY",
-          recordStatus: "NOT_STARTED",
-          needsAttention: false,
-          hasDraft: false,
-          liveRevision: 0,
-          draftRevision: null,
-          lastModifiedAt: null,
-        }],
-        nextCursor: null,
-        summary: emptyAttention.summary,
-      },
-      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=7&clubSlug=reading-sai": emptyAttention,
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    const result = await hostDashboardLoaderFactory(createTestQueryClient())({
-      params: { clubSlug: "reading-sai" },
-      request: new Request("https://readmates.test/clubs/reading-sai/app/host?tab=prep#top"),
-    } as unknown as LoaderFunctionArgs);
-
-    expect(result).toMatchObject({
-      hostSessions: { items: [expect.objectContaining({ sessionId: "draft-1", state: "DRAFT" })] },
-    });
-  });
-
-  it("returns empty-ledger attention data including PUBLISHED without starting discarded fetches", async () => {
-    const published = attentionItem({
-      sessionId: "published-1",
-      sessionNumber: 11,
-      bookTitle: "공개된 책",
-      state: "PUBLISHED",
-      recordStatus: "INCOMPLETE",
-    });
+  it("returns an explicit empty operating room without dependent requests", async () => {
     const fetchMock = fetchMockFor({
       "/api/bff/api/auth/me": hostAuth,
-      "/api/bff/api/sessions/current": { currentSession: null },
-      "/api/bff/api/host/sessions?mode=meeting&limit=50": emptyMeetingPage,
-      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=7": {
-        items: [published],
-        nextCursor: "more",
-        summary: {
-          needsAttentionCount: 4,
-          incompletePublishedCount: 1,
-          draftCount: 0,
-        },
-      },
+      "/api/bff/api/host/operating-room/current": { currentMeeting: null },
     });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await hostDashboardLoaderFactory(createTestQueryClient())(loaderArgs());
 
-    expect(result).toMatchObject({
-      current: { currentSession: null },
-      hostSessions: { items: [], nextCursor: null },
-      recordAttention: {
-        items: [expect.objectContaining({ sessionId: "published-1", state: "PUBLISHED" })],
-        summary: { needsAttentionCount: 4 },
-      },
+    expect(result).toEqual({
+      operatingRoom: { currentMeeting: null },
+      currentMeeting: null,
+      closingStatus: { state: "absent" },
+      recordAttention: { state: "absent" },
+      clubOperations: { state: "absent" },
+      notificationHealth: { state: "absent" },
     });
-    expect(result).not.toHaveProperty("data");
-    expect(result).not.toHaveProperty("notifications");
-    expect(result).not.toHaveProperty("clubOperations");
-    expect(result).toMatchObject({ attentionError: false });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("keeps empty-home data when attention fails instead of crashing the loader", async () => {
+  it("uses the server-owned selection and fetches its exact detail with URL club scope", async () => {
+    const fetchMock = fetchMockFor(successHandlers());
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await hostDashboardLoaderFactory(createTestQueryClient())(loaderArgs());
+
+    expect(result).toMatchObject({
+      operatingRoom: selector,
+      currentMeeting: { sessionId: "session-7", scheduleSeenAvailability: "AVAILABLE" },
+      closingStatus: { state: "ready", data: closingStatus },
+      recordAttention: { state: "ready", data: recordAttention },
+      clubOperations: { state: "ready", data: clubOperations },
+      notificationHealth: { state: "ready", data: notificationHealth },
+    });
+    const urls = fetchMock.mock.calls.map(([input]) => String(input));
+    expect(urls).toContain("/api/bff/api/host/sessions/session-7?clubSlug=reading-sai");
+    expect(urls.every((url) => url.includes("clubSlug=reading-sai"))).toBe(true);
+    expect(urls.some((url) => url.includes("mode=meeting"))).toBe(false);
+    expect(urls.some((url) => url.includes("/api/host/dashboard"))).toBe(false);
+  });
+
+  it("starts all optional sources in parallel once the server returns sessionId", async () => {
+    const optional = deferred<Response>();
+    const optionalPaths = ["/closing-status", "mode=record", "/club-operations", "/notifications/summary"];
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/auth/me")) return Promise.resolve(jsonResponse(hostAuth));
+      if (url.includes("/operating-room/current")) return Promise.resolve(jsonResponse(selector));
+      if (url.includes("/host/sessions/session-7?") && !url.includes("closing-status")) {
+        return Promise.resolve(jsonResponse(detail));
+      }
+      if (optionalPaths.some((path) => url.includes(path))) return optional.promise;
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const loading = hostDashboardLoaderFactory(createTestQueryClient())(loaderArgs());
+    await vi.waitFor(() => {
+      const urls = fetchMock.mock.calls.map(([input]) => String(input));
+      expect(optionalPaths.every((path) => urls.some((url) => url.includes(path)))).toBe(true);
+    });
+
+    optional.resolve(jsonResponse({}));
+    await loading;
+  });
+
+  it("captures one optional failure without blanking successful optional data", async () => {
     const fetchMock = fetchMockFor({
-      "/api/bff/api/auth/me": hostAuth,
-      "/api/bff/api/sessions/current": { currentSession: null },
-      "/api/bff/api/host/sessions?mode=meeting&limit=50": emptyMeetingPage,
-      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=7": new Response(
-        JSON.stringify({ message: "attention unavailable" }),
-        { status: 503, headers: { "Content-Type": "application/json" } },
+      ...successHandlers(),
+      "/api/bff/api/host/sessions/session-7/closing-status": jsonResponse(
+        { message: "closing unavailable" },
+        503,
       ),
     });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await hostDashboardLoaderFactory(createTestQueryClient())(loaderArgs());
 
-    expect(result).toMatchObject({
-      current: { currentSession: null },
-      hostSessions: { items: [], nextCursor: null },
-      recordAttention: null,
-      attentionError: true,
+    expect(result.closingStatus).toEqual({
+      state: "failed",
+      error: { message: "마감 상태를 불러오지 못했습니다.", retryable: true },
+    });
+    expect(result.recordAttention).toMatchObject({ state: "ready", data: recordAttention });
+    expect(result.clubOperations).toMatchObject({ state: "ready", data: clubOperations });
+    expect(result.notificationHealth).toMatchObject({ state: "ready", data: notificationHealth });
+  });
+
+  it("keeps selected-detail failure as a route error", async () => {
+    const fetchMock = fetchMockFor({
+      ...successHandlers(),
+      "/api/bff/api/host/sessions/session-7": jsonResponse({ message: "detail unavailable" }, 503),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(hostDashboardLoaderFactory(createTestQueryClient())(loaderArgs())).rejects.toMatchObject({
+      status: 503,
     });
   });
 });

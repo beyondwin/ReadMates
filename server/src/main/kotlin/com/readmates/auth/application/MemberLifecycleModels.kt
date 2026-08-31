@@ -37,6 +37,7 @@ data class HostMemberListItem(
     val canDeactivate: Boolean,
     val canAddToCurrentSession: Boolean,
     val canRemoveFromCurrentSession: Boolean,
+    val lastClubAccessAt: String? = null,
 )
 
 data class MemberLifecycleResponse(

@@ -253,7 +253,8 @@ class JdbcMemberProfileStoreAdapter(
                   memberships.joined_at,
                   memberships.created_at,
                   current_session.id as current_session_id,
-                  session_participants.participation_status
+                  session_participants.participation_status,
+                  membership_club_access.last_access_at as last_club_access_at
                 from memberships
                 join users on users.id = memberships.user_id
                 left join active_sessions current_session on current_session.club_id = memberships.club_id
@@ -269,6 +270,8 @@ class JdbcMemberProfileStoreAdapter(
                 left join session_participants on session_participants.session_id = current_session.id
                   and session_participants.club_id = memberships.club_id
                   and session_participants.membership_id = memberships.id
+                left join membership_club_access on membership_club_access.membership_id = memberships.id
+                  and membership_club_access.club_id = memberships.club_id
                 where memberships.id = ?
                   and memberships.club_id = ?
                 """.trimIndent(),
@@ -311,6 +314,7 @@ class JdbcMemberProfileStoreAdapter(
             createdAt = utcOffsetDateTime("created_at"),
             currentSessionId = currentSessionId,
             participationStatus = participationStatus,
+            lastClubAccessAt = utcOffsetDateTimeOrNull("last_club_access_at"),
         )
     }
 }

@@ -240,6 +240,51 @@ class HostManualNotificationServiceTest {
     }
 
     @Test
+    fun `preview normalizes and freezes exact editable copy with schedule and target evidence`() {
+        val port = FakeManualPort()
+        val service = service(port)
+        val editable =
+            selection().copy(
+                scheduleRevision = 7,
+                subject = "  일정 확인  ",
+                body = "  첫 줄\r\n둘째 줄  ",
+            )
+
+        val preview = service.preview(host(), ManualNotificationPreviewCommand(editable))
+
+        assertThat(preview.template.subject).isEqualTo("일정 확인")
+        assertThat(preview.template.bodyPreview).isEqualTo("첫 줄\n둘째 줄")
+        assertThat(preview.scheduleRevision).isEqualTo(7)
+        assertThat(preview.contentHash).matches("[0-9a-f]{64}")
+        assertThat(preview.targetSnapshotHash).matches("[0-9a-f]{64}")
+        assertThat(port.insertedPreviewRecords.single().subject).isEqualTo("일정 확인")
+        assertThat(port.insertedPreviewRecords.single().body).isEqualTo("첫 줄\n둘째 줄")
+        assertThat(port.insertedPreviewRecords.single().contentHash).isEqualTo(preview.contentHash)
+        assertThat(port.insertedPreviewRecords.single().targetMembershipIds)
+            .containsExactlyElementsOf(port.targetSnapshot.targetMembershipIds)
+    }
+
+    @Test
+    fun `preview rejects blank or oversized editable copy without persistence`() {
+        val port = FakeManualPort()
+        val service = service(port)
+
+        listOf(
+            selection().copy(subject = " ", body = "body", scheduleRevision = 7),
+            selection().copy(subject = "subject", body = " ", scheduleRevision = 7),
+            selection().copy(subject = "s".repeat(201), body = "body", scheduleRevision = 7),
+            selection().copy(subject = "subject", body = "b".repeat(4001), scheduleRevision = 7),
+        ).forEach { invalid ->
+            assertThatThrownBy { service.preview(host(), ManualNotificationPreviewCommand(invalid)) }
+                .isInstanceOf(NotificationApplicationException::class.java)
+                .extracting("error")
+                .isEqualTo(NotificationApplicationError.MANUAL_NOTIFICATION_COPY_INVALID)
+        }
+        assertThat(port.insertedPreviewRecords).isEmpty()
+        assertThat(port.insertedDispatches).isEmpty()
+    }
+
+    @Test
     fun `email only preview and confirm reject audience without eligible email recipient`() {
         val port = FakeManualPort()
         val service = service(port)
@@ -489,6 +534,9 @@ class HostManualNotificationServiceTest {
         excludedMembershipIds = excludedMembershipIds,
         includedMembershipIds = includedMembershipIds,
         sendMode = ManualNotificationSendMode.NOW,
+        scheduleRevision = 7,
+        subject = "모임 전날 리마인더",
+        body = "모임 전 질문과 읽은 분량, 참석 상태를 확인해 주세요.",
     )
 
     private fun sessionContext(
@@ -508,6 +556,7 @@ class HostManualNotificationServiceTest {
         feedbackDocumentUploaded = feedbackDocumentUploaded,
         feedbackDocumentVersion = feedbackDocumentVersion,
         sessionRecordContentRevision = sessionRecordContentRevision,
+        scheduleRevision = 7,
     )
 
     private fun targetSnapshot(
@@ -544,6 +593,7 @@ class HostManualNotificationServiceTest {
                 feedbackDocumentUploaded = true,
                 feedbackDocumentVersion = 1,
                 sessionRecordContentRevision = "c".repeat(64),
+                scheduleRevision = 7,
             ),
         private val recentDispatchCount: Int = 0,
         var membershipEditsAllowed: Boolean = true,
@@ -577,6 +627,7 @@ class HostManualNotificationServiceTest {
             ),
     ) : ManualNotificationDispatchPort {
         val insertedPreviewHashes = mutableListOf<String>()
+        val insertedPreviewRecords = mutableListOf<ManualNotificationPreviewRecord>()
         val insertedDispatches = mutableListOf<NotificationEventPayload>()
         private val previews = mutableMapOf<UUID, ManualNotificationPreviewRecord>()
         private val confirmedByPreview = mutableMapOf<UUID, ManualNotificationConfirmedDispatch>()
@@ -632,6 +683,21 @@ class HostManualNotificationServiceTest {
             selectionHash: String,
             targetSnapshotHash: String,
             expiresAt: OffsetDateTime,
+        ): UUID = error("Snapshot-bound overload expected")
+
+        override fun insertPreview(
+            clubId: UUID,
+            hostMembershipId: UUID,
+            selectionHash: String,
+            targetSnapshotHash: String,
+            scheduleRevision: Long,
+            targetSnapshotRevision: String,
+            targetMembershipIds: List<UUID>,
+            eligibilityFingerprint: String,
+            subject: String,
+            body: String,
+            contentHash: String,
+            expiresAt: OffsetDateTime,
         ): UUID {
             val id = UUID.nameUUIDFromBytes("preview-${insertedPreviewHashes.size}".toByteArray())
             insertedPreviewHashes += selectionHash
@@ -642,8 +708,16 @@ class HostManualNotificationServiceTest {
                     hostMembershipId,
                     selectionHash,
                     targetSnapshotHash,
+                    scheduleRevision,
+                    targetSnapshotRevision,
+                    targetMembershipIds,
+                    eligibilityFingerprint,
+                    subject,
+                    body,
+                    contentHash,
                     expiresAt,
                 )
+            insertedPreviewRecords += requireNotNull(previews[id])
             return id
         }
 

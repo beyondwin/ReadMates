@@ -5,6 +5,12 @@ import { logout } from "@/features/auth/api/auth-api";
 import { SessionExpiryRecovery } from "@/features/auth/ui/session-expiry-recovery";
 import { usableJoinedClubs } from "@/features/club-selection/model/club-entry";
 import { AccountMenuController } from "@/features/auth/route/account-menu-controller";
+import {
+  HostPrimaryNavigation,
+  type HostPrimaryDestination,
+} from "@/features/host/ui/shell/host-primary-navigation";
+import { HostUtilityActions } from "@/features/host/ui/shell/host-utility-actions";
+import { HostWorkspaceSwitcher } from "@/features/host/ui/shell/host-workspace-switcher";
 import { GuestNavigationLink } from "@/features/guest-browse/ui/guest-navigation-dialog";
 import type { ClubAppAudience } from "@/features/guest-browse/model/club-app-audience";
 import { guestNavigationCapability } from "@/features/guest-browse/model/club-app-audience";
@@ -42,6 +48,7 @@ import {
 } from "@/src/app/workspace-route-continuity";
 import { Link } from "@/src/app/router-link";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import { touchClubAccessOnce } from "@/shared/auth/club-access-query";
 import { canUseHostApp, canUseJoinedClubHostApp, canUseMemberApp } from "@/shared/auth/member-app-access";
 import { loginPathForReturnTo } from "@/shared/auth/login-return";
 import type {
@@ -193,6 +200,49 @@ function hostRecordOwnedRoute(appPath: string, state: unknown, pathname: string)
       && hasHostRecordsReturnState(state, pathname));
 }
 
+function hostPrimaryDestinations({
+  appPath,
+  pathname,
+  state,
+  basePath,
+}: {
+  appPath: string;
+  pathname: string;
+  state: unknown;
+  basePath: string;
+}): HostPrimaryDestination[] {
+  const recordOwned = hostRecordOwnedRoute(appPath, state, pathname);
+
+  return [
+    {
+      id: "operating-room",
+      href: scopedAppPath(basePath, HOST_ROUTE_HREFS.operatingRoom),
+      current: appPath === HOST_ROUTE_HREFS.operatingRoom || appPath === HOST_ROUTE_HREFS.operations,
+    },
+    {
+      id: "meetings",
+      href: scopedAppPath(basePath, HOST_ROUTE_HREFS.meetings),
+      current: !recordOwned && (
+        appPath === HOST_ROUTE_HREFS.meetings
+        || appPath === HOST_ROUTE_HREFS.newSession
+        || /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(appPath)
+      ),
+    },
+    {
+      id: "people",
+      href: scopedAppPath(basePath, HOST_ROUTE_HREFS.people),
+      current: appPath === HOST_ROUTE_HREFS.people
+        || appPath.startsWith(`${HOST_ROUTE_HREFS.people}/`)
+        || appPath === HOST_ROUTE_HREFS.members,
+    },
+    {
+      id: "records",
+      href: scopedAppPath(basePath, HOST_ROUTE_HREFS.records),
+      current: appPath === HOST_ROUTE_HREFS.records || recordOwned,
+    },
+  ];
+}
+
 function primaryNavigationItems({
   workspace,
   appPath,
@@ -206,9 +256,7 @@ function primaryNavigationItems({
   state: unknown;
   basePath: string;
 }): PrimaryNavigationItem[] {
-  const navigationPath = workspace === "host" && hostRecordOwnedRoute(appPath, state, pathname)
-    ? HOST_ROUTE_HREFS.meetings
-    : appPath;
+  const navigationPath = appPath;
 
   if (workspace === "member") {
     return [
@@ -245,49 +293,63 @@ function primaryNavigationItems({
     ];
   }
 
-  return [
-    {
-      id: "host-today",
-      label: READMATES_PRIMARY_NAV_LABELS.host.today,
-      href: scopedAppPath(basePath, HOST_ROUTE_HREFS.today),
-      icon: "host",
-      current: navigationPath === "/app/host" || navigationPath === "/app/host/notifications",
-    },
-    {
-      id: "host-meetings",
-      label: READMATES_PRIMARY_NAV_LABELS.host.session,
-      href: scopedAppPath(basePath, HOST_ROUTE_HREFS.meetings),
-      icon: "edit",
-      current: navigationPath === "/app/host/sessions"
-        || navigationPath === "/app/host/sessions/new"
-        || navigationPath === "/app/host/records"
-        || /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(navigationPath)
-        || /^\/app\/host\/sessions\/[^/]+\/(?:closing|feedback-document)$/.test(navigationPath),
-    },
-    {
-      id: "host-members",
-      label: READMATES_PRIMARY_NAV_LABELS.host.members,
-      href: scopedAppPath(basePath, HOST_ROUTE_HREFS.members),
-      icon: "approve",
-      current: navigationPath === "/app/host/members" || navigationPath === "/app/host/invitations",
-    },
-  ];
+  const icons = {
+    "operating-room": "host",
+    meetings: "session",
+    people: "approve",
+    records: "archive",
+  } as const;
+  const desktopLabels = {
+    "operating-room": READMATES_PRIMARY_NAV_LABELS.host.operatingRoom,
+    meetings: READMATES_PRIMARY_NAV_LABELS.host.meetings,
+    people: READMATES_PRIMARY_NAV_LABELS.host.people,
+    records: READMATES_PRIMARY_NAV_LABELS.host.records,
+  } as const;
+  const mobileLabels = {
+    "operating-room": READMATES_MOBILE_TAB_LABELS.hostOperatingRoom,
+    meetings: READMATES_MOBILE_TAB_LABELS.hostMeetings,
+    people: READMATES_MOBILE_TAB_LABELS.hostPeople,
+    records: READMATES_MOBILE_TAB_LABELS.hostRecords,
+  } as const;
+
+  return hostPrimaryDestinations({ appPath, pathname, state, basePath }).map((destination) => ({
+    ...destination,
+    id: `host-${destination.id}`,
+    label: desktopLabels[destination.id],
+    mobileLabel: mobileLabels[destination.id],
+    icon: icons[destination.id],
+  }));
+}
+
+function HostMobileUtilityMenu({ children }: { children: React.ReactNode }) {
+  return (
+    <details className="rm-host-mobile-utility">
+      <summary className="rm-host-mobile-utility__trigger" aria-label="호스트 도구">
+        <span aria-hidden="true">⋯</span>
+      </summary>
+      <div className="rm-host-mobile-utility__menu">{children}</div>
+    </details>
+  );
 }
 
 function appMobileTitle(workspace: ShellClubWorkspace, appPath: string, recordOwned: boolean) {
-  if (recordOwned || (workspace === "host" && appPath === "/app/host/records")) return "모임";
-  if (workspace === "host" && appPath === "/app/host/sessions") return "모임";
+  if (workspace === "host" && (recordOwned || appPath === HOST_ROUTE_HREFS.records)) return "기록";
+  if (workspace === "host" && appPath.startsWith(`${HOST_ROUTE_HREFS.people}/`)) return "사람";
+  if (workspace === "host" && (appPath === HOST_ROUTE_HREFS.people || appPath === HOST_ROUTE_HREFS.members)) return "사람";
+  if (workspace === "host" && (appPath === HOST_ROUTE_HREFS.settings || appPath === HOST_ROUTE_HREFS.invitations)) {
+    return "초대와 설정";
+  }
+  if (workspace === "host" && appPath === HOST_ROUTE_HREFS.meetings) return "모임";
   if (appPath.startsWith("/app/feedback/")) return "피드백 문서";
   if (appPath.startsWith("/app/host/sessions/")) return "모임";
   if (workspace === "host" && appPath === "/app/host/notifications") return READMATES_MOBILE_TAB_LABELS.hostNotifications;
-  if (workspace === "host" && (appPath === "/app/host/invitations" || appPath === "/app/host/members")) return "멤버";
-  if (appPath.startsWith("/app/host")) return "오늘";
+  if (appPath.startsWith("/app/host")) return workspace === "host" ? "운영실" : "오늘";
   if (appPath.startsWith("/app/sessions/")) return "지난 모임";
   if (appPath === "/app/session" || appPath.startsWith("/app/session/")) return READMATES_NAV_LABELS.member.currentSession;
   if (appPath === "/app/notes") return READMATES_NAV_LABELS.member.clubNotes;
   if (appPath.startsWith("/app/archive")) return READMATES_NAV_LABELS.member.archive;
   if (appPath.startsWith("/app/notifications") || appPath.startsWith("/app/me")) return READMATES_NAV_LABELS.member.mySpace;
-  return workspace === "host" ? "오늘" : "읽는사이";
+  return workspace === "host" ? "운영실" : "읽는사이";
 }
 
 function appMobileBackTarget({
@@ -311,8 +373,8 @@ function appMobileBackTarget({
   if (appPath === "/app/host/sessions" || appPath === "/app/host/records") return null;
   if (workspace === "host" && recordOwned) {
     const target = readHostRecordsReturnTarget(state, pathname) ?? {
-      href: scopedAppPath(basePath, HOST_ROUTE_HREFS.meetings),
-      label: "모임으로",
+      href: scopedAppPath(basePath, HOST_ROUTE_HREFS.records),
+      label: "기록으로",
     };
     return { href: scopeAppTarget(target.href, basePath), state: target.state, label: "뒤로", icon: "brand" };
   }
@@ -434,6 +496,15 @@ export function AppRouteLayout({
     status: "not-applicable" | "pending" | "available" | "unavailable";
   }>({ key: null, status: "not-applicable" });
   const latestGuestContinuationKey = useRef<string | null>(null);
+  const touchedClubSlugs = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (isGuestAudience || !auth || !clubSlug || !canUseMemberApp(auth)) {
+      return;
+    }
+
+    touchClubAccessOnce(touchedClubSlugs.current, clubSlug);
+  }, [auth, clubSlug, isGuestAudience]);
 
   useEffect(() => {
     const workspace = workspaceFromCanonicalPath(pathname);
@@ -650,6 +721,9 @@ export function AppRouteLayout({
     state: location.state,
     basePath,
   });
+  const hostDestinations = desktopVariant === "host"
+    ? hostPrimaryDestinations({ appPath, pathname, state: location.state, basePath })
+    : null;
   const mobileBackTarget = appMobileBackTarget({
     workspace: desktopVariant,
     appPath,
@@ -659,6 +733,18 @@ export function AppRouteLayout({
     recordOwned,
   });
   const brandHref = scopedAppPath(basePath, desktopVariant === "host" ? "/app/host" : "/app");
+  const currentShellClub = shellClubs.find((club) => club.slug === currentClubSlug) ?? shellClubs[0];
+  const hostUtilityActions = desktopVariant === "host" ? (
+    <HostUtilityActions
+      settingsHref={scopedAppPath(basePath, HOST_ROUTE_HREFS.settings)}
+      memberViewHref={roleSwitchAction?.href ?? scopedAppPath(basePath, "/app")}
+      notificationsHref={scopedAppPath(basePath, HOST_ROUTE_HREFS.notifications)}
+      newMeetingHref={scopedAppPath(basePath, HOST_ROUTE_HREFS.newSession)}
+      unreadNotifications={0}
+      permissionLimits={[]}
+      LinkComponent={AppLinkComponent}
+    />
+  ) : null;
 
   return (
     <AppClubShell
@@ -673,6 +759,34 @@ export function AppRouteLayout({
       mobileKicker={desktopVariant === "host" ? "호스트" : null}
       mobileBackTarget={mobileBackTarget}
       LinkComponent={AppLinkComponent}
+      contextSlot={desktopVariant === "host" && currentShellClub ? {
+        desktop: (
+          <HostWorkspaceSwitcher
+            club={{
+              name: currentShellClub.name,
+              slug: currentShellClub.slug,
+              avatarKey: auth?.currentMembership?.avatarKey ?? auth?.avatarKey ?? "cloud-green-book",
+            }}
+            clubs={shellClubs}
+            currentWorkspace="host"
+            workspaceItems={workspaceItems}
+            onSelectTarget={(href) => void navigate(href)}
+          />
+        ),
+      } : undefined}
+      primarySlot={hostDestinations ? {
+        desktop: (
+          <HostPrimaryNavigation
+            destinations={hostDestinations}
+            mode="desktop"
+            LinkComponent={AppLinkComponent}
+          />
+        ),
+      } : undefined}
+      utilitySlot={hostUtilityActions ? {
+        desktop: hostUtilityActions,
+        mobile: <HostMobileUtilityMenu>{hostUtilityActions}</HostMobileUtilityMenu>,
+      } : undefined}
       beforeContent={expiryRecovery}
       securityController={<AppRouteSecurityController workspace={desktopVariant} />}
       desktopFooter={(

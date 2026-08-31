@@ -1,0 +1,6 @@
+f42c7858fb19ea6c379896ff8642d90ee6351a6984d1c67051d29c93242a843f  .superpowers/sdd/2026-08-29-host-responsive-closeout-stage5/task-1-brief.md
+16c68db70e68d4500ee8145002c2555ffe97c24bdb3aa3cce74c7f359e7245aa  front/features/host/ui/workbox/host-workbox.tsx
+ec6cfb8d6095b48ea9fea1a778fb971a1c728a08a6833782133e8eeef59ac5c6  front/features/host/ui/workbox/host-workbox.test.tsx
+12b38cf541e4342bde44f471224ddbfeb31dcdc4f6a95bab228f3ae0ecc7d2dc  front/features/host/ui/shell/host-shell.ct.tsx
+6fc7ceb51dbbb0ef5c2b8a669d437c8332aea51942daefde08a1110cf36c2ce8  front/features/host/ui/operating-room/host-operating-room-responsive.ct.tsx
+22fa8da2dbf5a4da578ac6b364be748475e3319cdc3d97bc5f21d8ac4176533d  front/features/host/ui/meeting-workspace/host-lifecycle-responsive.ct.tsx

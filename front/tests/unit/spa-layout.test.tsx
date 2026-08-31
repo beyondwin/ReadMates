@@ -184,6 +184,7 @@ describe("SPA AppRouteLayout", () => {
   });
 
   it("keeps host users on member chrome while they are in the member workspace", async () => {
+    const user = userEvent.setup();
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
 
@@ -223,9 +224,34 @@ describe("SPA AppRouteLayout", () => {
     expect(screen.getAllByRole("link", { name: "호스트 공간" }).map((link) => link.textContent)).toEqual(["호스트 공간", "호스트 공간"]);
     const accountTriggers = screen.getAllByRole("button", { name: "김호스트 계정 메뉴" });
     expect(accountTriggers).toHaveLength(2);
-    expect(new Set(accountTriggers.map((trigger) => trigger.getAttribute("aria-controls"))).size).toBe(2);
-    expect(accountTriggers[0].closest(".desktop-only")).toBeInTheDocument();
-    expect(accountTriggers[1].closest(".mobile-only")).toBeInTheDocument();
+    const [desktopAccountTrigger, mobileAccountTrigger] = accountTriggers;
+    expect(desktopAccountTrigger.closest(".desktop-only")).toBeInTheDocument();
+    expect(mobileAccountTrigger.closest(".mobile-only")).toBeInTheDocument();
+    for (const trigger of accountTriggers) {
+      expect(trigger).toHaveAttribute("aria-expanded", "false");
+      expect(trigger).not.toHaveAttribute("aria-controls");
+    }
+    expect(screen.queryByRole("dialog", { name: "김호스트" })).not.toBeInTheDocument();
+
+    await user.click(desktopAccountTrigger);
+
+    const desktopDialog = screen.getByRole("dialog", { name: "김호스트" });
+    const desktopDialogId = desktopDialog.id;
+    expect(desktopDialogId).not.toBe("");
+    expect(desktopAccountTrigger).toHaveAttribute("aria-expanded", "true");
+    expect(desktopAccountTrigger).toHaveAttribute("aria-controls", desktopDialogId);
+    expect(mobileAccountTrigger).toHaveAttribute("aria-expanded", "false");
+    expect(mobileAccountTrigger).not.toHaveAttribute("aria-controls");
+
+    await user.click(mobileAccountTrigger);
+
+    const mobileDialog = screen.getByRole("dialog", { name: "김호스트" });
+    expect(mobileDialog.id).not.toBe("");
+    expect(mobileDialog.id).not.toBe(desktopDialogId);
+    expect(desktopAccountTrigger).toHaveAttribute("aria-expanded", "false");
+    expect(desktopAccountTrigger).not.toHaveAttribute("aria-controls");
+    expect(mobileAccountTrigger).toHaveAttribute("aria-expanded", "true");
+    expect(mobileAccountTrigger).toHaveAttribute("aria-controls", mobileDialog.id);
 
     const tabs = screen.getByRole("navigation", { name: "멤버 주 메뉴 모바일" });
     expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
@@ -374,7 +400,7 @@ describe("SPA AppRouteLayout", () => {
                 }
               />
               <Route
-                path="host/sessions"
+                path="host/records"
                 element={
                   <main>
                     host records child <CurrentLocationText />
@@ -390,7 +416,7 @@ describe("SPA AppRouteLayout", () => {
     expect(await screen.findByText(/archive child/)).toBeInTheDocument();
     await user.click((await screen.findAllByRole("link", { name: "샘플 북클럽" }))[0]);
 
-    expect(await screen.findByText("/clubs/sample-book-club/app/host/sessions")).toBeInTheDocument();
+    expect(await screen.findByText("/clubs/sample-book-club/app/host/records")).toBeInTheDocument();
   });
 
   it("keeps host users on member mobile chrome after opening archive from the member workspace", async () => {
@@ -433,8 +459,8 @@ describe("SPA AppRouteLayout", () => {
     ]);
     expect(within(tabs).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
     expect(screen.getAllByRole("link", { name: "호스트 공간" }).map((link) => link.getAttribute("href"))).toEqual([
-      "/app/host/sessions",
-      "/app/host/sessions",
+      "/app/host/records",
+      "/app/host/records",
     ]);
     expect(screen.queryByRole("link", { name: "멤버 공간" })).not.toBeInTheDocument();
     for (const navigation of screen.getAllByRole("navigation", { name: "공간 선택" })) {
@@ -481,8 +507,10 @@ describe("SPA AppRouteLayout", () => {
 
     const desktopNav = screen.getByRole("navigation", { name: "멤버 주 메뉴" });
     expect(within(desktopNav).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getAllByRole("link", { name: "호스트 공간" })).toHaveLength(2);
-    expect(screen.getAllByRole("link", { name: "호스트 공간" })[0]).toHaveAttribute("href", "/app/host/sessions");
+    expect(screen.getAllByRole("link", { name: "호스트 공간" }).map((link) => link.getAttribute("href"))).toEqual([
+      "/app/host/records",
+      "/app/host/records",
+    ]);
 
     expect(screen.getAllByText("기록")).toHaveLength(2);
     expect(screen.queryByRole("link", { name: "멤버 공간" })).not.toBeInTheDocument();

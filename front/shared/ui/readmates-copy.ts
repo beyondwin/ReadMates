@@ -31,11 +31,15 @@ export const READMATES_WORKSPACE_LABELS = {
 } as const;
 
 export const READMATES_MOBILE_TAB_LABELS = {
-  hostToday: "오늘",
+  hostOperatingRoom: "운영실",
+  hostMeetings: "모임",
+  hostPeople: "사람",
+  hostRecords: "기록",
+  hostToday: "운영실",
   hostSession: "모임",
   hostSessionPending: "확인 중",
   hostNotifications: "알림",
-  hostMembers: "멤버",
+  hostMembers: "사람",
 } as const;
 
 export const READMATES_PRIMARY_NAV_LABELS = {
@@ -46,8 +50,12 @@ export const READMATES_PRIMARY_NAV_LABELS = {
     mySpace: "내 공간",
   },
   host: {
-    today: "오늘",
-    session: "모임",
-    members: "멤버",
+    operatingRoom: "운영실",
+    meetings: "일정과 모임",
+    people: "사람",
+    records: "기록",
+    today: "운영실",
+    session: "일정과 모임",
+    members: "사람",
   },
 } as const;

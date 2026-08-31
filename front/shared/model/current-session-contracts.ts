@@ -4,6 +4,10 @@ export type RsvpStatus = "NO_RESPONSE" | "GOING" | "MAYBE" | "DECLINED";
 export type AttendanceStatus = "UNKNOWN" | "ATTENDED" | "ABSENT";
 export type SessionParticipationStatus = "ACTIVE" | "REMOVED";
 export type CurrentSessionMemberRole = "HOST" | "MEMBER";
+export type ScheduleSeenReceipt = {
+  scheduleRevision: number;
+  seenAt: string;
+};
 
 export type CurrentSessionResponse = {
   currentSession: null | {
@@ -22,6 +26,9 @@ export type CurrentSessionResponse = {
     meetingPasscode: string | null;
     questionDeadlineAt: string;
     myRsvpStatus: RsvpStatus;
+    scheduleRevision: number;
+    mySeenScheduleRevision: number | null;
+    myScheduleSeenAt: string | null;
     myCheckin: null | {
       readingProgress: number;
     };
@@ -35,9 +42,11 @@ export type CurrentSessionResponse = {
     }>;
     myOneLineReview: null | {
       text: string;
+      avatarKey?: string;
     };
     myLongReview: null | {
       body: string;
+      avatarKey?: string;
     };
     board: {
       questions: Array<{
@@ -68,8 +77,7 @@ export type CurrentSessionResponse = {
   };
 };
 
-export const CurrentSessionResponseSchema = import.meta.env.DEV
-  ? z.object({
+export const CurrentSessionResponseSchema = z.object({
       currentSession: z
         .object({
           sessionId: z.string(),
@@ -87,6 +95,9 @@ export const CurrentSessionResponseSchema = import.meta.env.DEV
           meetingPasscode: z.string().nullable(),
           questionDeadlineAt: z.string(),
           myRsvpStatus: z.enum(["NO_RESPONSE", "GOING", "MAYBE", "DECLINED"]),
+          scheduleRevision: z.number().int().positive(),
+          mySeenScheduleRevision: z.number().int().positive().nullable(),
+          myScheduleSeenAt: z.string().datetime({ offset: true }).nullable(),
           myCheckin: z
             .object({
               readingProgress: z.number(),
@@ -105,11 +116,13 @@ export const CurrentSessionResponseSchema = import.meta.env.DEV
           myOneLineReview: z
             .object({
               text: z.string(),
+              avatarKey: z.string().optional(),
             })
             .nullable(),
           myLongReview: z
             .object({
               body: z.string(),
+              avatarKey: z.string().optional(),
             })
             .nullable(),
           board: z.object({
@@ -146,8 +159,14 @@ export const CurrentSessionResponseSchema = import.meta.env.DEV
           ),
         })
         .nullable(),
-    })
-  : (null as never);
+    });
+
+export const ScheduleSeenReceiptSchema = z
+  .object({
+    scheduleRevision: z.number().int().positive(),
+    seenAt: z.string().datetime({ offset: true }),
+  })
+  .strict();
 
 export function parseCurrentSessionResponse(value: unknown): CurrentSessionResponse {
   if (import.meta.env.DEV) {
@@ -155,4 +174,8 @@ export function parseCurrentSessionResponse(value: unknown): CurrentSessionRespo
   }
 
   return value as CurrentSessionResponse;
+}
+
+export function parseScheduleSeenReceipt(value: unknown): ScheduleSeenReceipt {
+  return ScheduleSeenReceiptSchema.parse(value);
 }

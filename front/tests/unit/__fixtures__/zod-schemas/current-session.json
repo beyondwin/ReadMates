@@ -15,6 +15,9 @@
     "meetingPasscode": null,
     "questionDeadlineAt": "2025-11-25T14:59:00Z",
     "myRsvpStatus": "GOING",
+    "scheduleRevision": 3,
+    "mySeenScheduleRevision": 2,
+    "myScheduleSeenAt": "2026-05-18T12:00:00Z",
     "myCheckin": {
       "readingProgress": 100
     },
@@ -59,13 +62,13 @@
     "attendees": [
       {
         "membershipId": "00000000-0000-0000-0000-000000000201",
+        "avatarKey": "banana-green-book",
         "displayName": "호스트",
         "accountName": "김호스트",
         "role": "HOST",
         "rsvpStatus": "GOING",
         "attendanceStatus": "UNKNOWN",
-        "participationStatus": "ACTIVE",
-        "avatarKey": "banana-green-book"
+        "participationStatus": "ACTIVE"
       }
     ]
   }

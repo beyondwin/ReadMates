@@ -16,6 +16,8 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import java.sql.Timestamp
+import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -37,6 +39,7 @@ class HostMemberLifecycleControllerTest(
     @param:Autowired private val authSessionService: AuthSessionService,
     @param:Autowired private val dataSource: DataSource,
 ) : ReadmatesMySqlIntegrationTestSupport() {
+    private val scheduleSeenAtFixture = Timestamp.from(Instant.parse("2026-08-29T01:02:03.123456Z"))
     private val createdSessionTokenHashes = linkedSetOf<String>()
     private val createdMembershipIds = linkedSetOf<String>()
     private val createdUserIds = linkedSetOf<String>()
@@ -71,6 +74,7 @@ class HostMemberLifecycleControllerTest(
         val sessionId = createOpenSession()
         val activeMembershipId = insertLifecycleMember("active.list", "ACTIVE")
         addParticipant(sessionId, activeMembershipId, "ACTIVE")
+        insertClubAccess(activeMembershipId)
 
         mockMvc
             .get("/api/host/members") {
@@ -88,6 +92,7 @@ class HostMemberLifecycleControllerTest(
                 }
                 jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].canSuspend") { value(true) }
                 jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].canRemoveFromCurrentSession") { value(true) }
+                jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].lastClubAccessAt") { isNotEmpty() }
             }
     }
 
@@ -193,6 +198,8 @@ class HostMemberLifecycleControllerTest(
         val sessionId = createOpenSession()
         val membershipId = insertLifecycleMember("deactivate.now", "ACTIVE")
         addParticipant(sessionId, membershipId, "ACTIVE")
+        seedScheduleSeen(sessionId, membershipId)
+        insertClubAccess(membershipId)
 
         mockMvc
             .post("/api/host/members/$membershipId/deactivate") {
@@ -210,6 +217,9 @@ class HostMemberLifecycleControllerTest(
 
         assertEquals("LEFT", membershipStatus(membershipId))
         assertEquals("REMOVED", participationStatus(sessionId, membershipId))
+        assertEquals(1L, scheduleSeenRevision(sessionId, membershipId))
+        assertEquals(scheduleSeenAtFixture, scheduleSeenAt(sessionId, membershipId))
+        assertEquals(0, clubAccessCount(membershipId))
     }
 
     @Suppress("LongMethod")
@@ -794,6 +804,62 @@ class HostMemberLifecycleControllerTest(
             String::class.java,
             membershipId,
         ) ?: error("Expected membership status for $membershipId")
+
+    private fun insertClubAccess(membershipId: String) {
+        jdbcTemplate.update(
+            """
+            insert into membership_club_access (membership_id, club_id, last_access_at)
+            values (?, '00000000-0000-0000-0000-000000000001', utc_timestamp(6))
+            """.trimIndent(),
+            membershipId,
+        )
+    }
+
+    private fun seedScheduleSeen(
+        sessionId: String,
+        membershipId: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            update session_participants
+            set seen_schedule_revision = 1,
+                seen_schedule_at = ?
+            where session_id = ? and membership_id = ?
+            """.trimIndent(),
+            scheduleSeenAtFixture,
+            sessionId,
+            membershipId,
+        )
+    }
+
+    private fun scheduleSeenRevision(
+        sessionId: String,
+        membershipId: String,
+    ): Long? =
+        jdbcTemplate.queryForObject(
+            "select seen_schedule_revision from session_participants where session_id = ? and membership_id = ?",
+            Long::class.java,
+            sessionId,
+            membershipId,
+        )
+
+    private fun scheduleSeenAt(
+        sessionId: String,
+        membershipId: String,
+    ): Timestamp? =
+        jdbcTemplate.queryForObject(
+            "select seen_schedule_at from session_participants where session_id = ? and membership_id = ?",
+            Timestamp::class.java,
+            sessionId,
+            membershipId,
+        )
+
+    private fun clubAccessCount(membershipId: String): Int =
+        jdbcTemplate.queryForObject(
+            "select count(*) from membership_club_access where membership_id = ?",
+            Int::class.java,
+            membershipId,
+        ) ?: 0
 
     private fun suspendSeedHost() {
         jdbcTemplate.update(

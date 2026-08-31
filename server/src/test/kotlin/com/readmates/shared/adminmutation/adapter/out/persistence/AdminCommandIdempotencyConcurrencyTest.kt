@@ -531,20 +531,36 @@ class AdminCommandIdempotencyConcurrencyTest(
     }
 
     private fun claimCount(): Int =
-        jdbcTemplate.queryForObject("select count(*) from platform_admin_command_idempotency", Int::class.java) ?: 0
+        jdbcTemplate.queryForObject(
+            "select count(*) from platform_admin_command_idempotency where platform_admin_user_id = ?",
+            Int::class.java,
+            ADMIN_ID.toString(),
+        ) ?: 0
 
     private fun aliasVersions(): List<Int> =
         jdbcTemplate
             .queryForList(
-                "select digest_key_version from platform_admin_command_idempotency_keys order by digest_key_version",
+                """
+                select digest_key_version
+                from platform_admin_command_idempotency_keys
+                where platform_admin_user_id = ?
+                order by digest_key_version
+                """.trimIndent(),
                 Int::class.java,
+                ADMIN_ID.toString(),
             ).filterNotNull()
 
     private fun aliasClaimIds(): List<String> =
         jdbcTemplate
             .queryForList(
-                "select claim_id from platform_admin_command_idempotency_keys order by digest_key_version",
+                """
+                select claim_id
+                from platform_admin_command_idempotency_keys
+                where platform_admin_user_id = ?
+                order by digest_key_version
+                """.trimIndent(),
                 String::class.java,
+                ADMIN_ID.toString(),
             ).filterNotNull()
 
     private fun digestKeyStates(): Map<Int, DigestKeyState> =
@@ -553,16 +569,22 @@ class AdminCommandIdempotencyConcurrencyTest(
                 """
                 select digest_key_version, last_referenced_at, unreferenced_since
                 from platform_admin_command_digest_key_state
+                where digest_key_version in (?, ?, ?)
                 order by digest_key_version
                 """.trimIndent(),
-            ) { rs, _ ->
-                rs.getInt("digest_key_version") to
-                    DigestKeyState(
-                        lastReferencedAt = rs.getObject("last_referenced_at", LocalDateTime::class.java).toInstant(),
-                        unreferencedSince =
-                            rs.getObject("unreferenced_since", LocalDateTime::class.java)?.toInstant(),
-                    )
-            }.toMap()
+                { rs, _ ->
+                    rs.getInt("digest_key_version") to
+                        DigestKeyState(
+                            lastReferencedAt =
+                                rs.getObject("last_referenced_at", LocalDateTime::class.java).toInstant(),
+                            unreferencedSince =
+                                rs.getObject("unreferenced_since", LocalDateTime::class.java)?.toInstant(),
+                        )
+                },
+                V1,
+                V2,
+                V3,
+            ).toMap()
 
     private fun domainEvidenceCount(receiptId: String): Int =
         jdbcTemplate.queryForObject(
@@ -575,46 +597,52 @@ class AdminCommandIdempotencyConcurrencyTest(
     private fun claimState(): String =
         requireNotNull(
             jdbcTemplate.queryForObject(
-                "select state from platform_admin_command_idempotency",
+                "select state from platform_admin_command_idempotency where platform_admin_user_id = ?",
                 String::class.java,
+                ADMIN_ID.toString(),
             ),
         )
 
     private fun receiptId(): String? =
         jdbcTemplate.queryForObject(
-            "select receipt_id from platform_admin_command_idempotency",
+            "select receipt_id from platform_admin_command_idempotency where platform_admin_user_id = ?",
             String::class.java,
+            ADMIN_ID.toString(),
         )
 
     private fun expiresAt(): Instant =
         requireNotNull(
             jdbcTemplate.queryForObject(
-                "select expires_at from platform_admin_command_idempotency",
+                "select expires_at from platform_admin_command_idempotency where platform_admin_user_id = ?",
                 LocalDateTime::class.java,
+                ADMIN_ID.toString(),
             ),
         ).toInstant()
 
     private fun storedTargetId(): String =
         requireNotNull(
             jdbcTemplate.queryForObject(
-                "select target_id from platform_admin_command_idempotency",
+                "select target_id from platform_admin_command_idempotency where platform_admin_user_id = ?",
                 String::class.java,
+                ADMIN_ID.toString(),
             ),
         )
 
     private fun storedCommandType(): String =
         requireNotNull(
             jdbcTemplate.queryForObject(
-                "select command_type from platform_admin_command_idempotency",
+                "select command_type from platform_admin_command_idempotency where platform_admin_user_id = ?",
                 String::class.java,
+                ADMIN_ID.toString(),
             ),
         )
 
     private fun storedTargetType(): String =
         requireNotNull(
             jdbcTemplate.queryForObject(
-                "select target_type from platform_admin_command_idempotency",
+                "select target_type from platform_admin_command_idempotency where platform_admin_user_id = ?",
                 String::class.java,
+                ADMIN_ID.toString(),
             ),
         )
 

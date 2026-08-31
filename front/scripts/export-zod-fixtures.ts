@@ -12,11 +12,69 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  HostSessionDetailResponseSchema,
+  ManualNotificationConfirmResponseSchema,
+  ManualNotificationDispatchListResponseSchema,
+  ManualNotificationOptionsResponseSchema,
+  ManualNotificationPreviewResponseSchema,
+} from "../features/host/api/host-contracts";
+import { CurrentSessionResponseSchema } from "../shared/model/current-session-contracts";
+import { HostPersonDetailSchema } from "../features/host/api/host-person-contracts";
+import { HostInvitationLinkHistorySchema, HostInvitationLinkListSchema } from "../features/host/api/host-invitation-link-contracts";
+import { HostClubClosePreviewSchema, HostClubCloseResultSchema, HostClubSettingsSchema } from "../features/host/api/host-club-settings-contracts";
+import { InvitationPreviewResponseSchema } from "../features/auth/api/auth-contracts";
+import {
+  HostWorkboxDeferralReceiptSchema,
+  HostWorkboxPageSchema,
+} from "../features/host/api/host-workbox-contracts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, "../tests/unit/__fixtures__/zod-schemas");
+const topLevelFixturesDir = join(__dirname, "../tests/unit/__fixtures__");
 
 mkdirSync(fixturesDir, { recursive: true });
+
+const hostInvitationLinkList = HostInvitationLinkListSchema.parse({ items: [{ linkId: "00000000-0000-0000-0000-00000000e101", name: "Public fixture link", status: "ACTIVE", maxUses: 20, usedCount: 1, expiresAt: "2026-09-30T00:00:00Z", revision: 2, createdAt: "2026-08-30T00:00:00Z", updatedAt: "2026-08-30T00:00:00Z" }], nextCursor: null });
+const hostInvitationLinkHistory = HostInvitationLinkHistorySchema.parse({ items: [{ receiptId: "00000000-0000-0000-0000-00000000e102", revision: 2, action: "UPDATED", beforeSettings: { status: "ACTIVE" }, afterSettings: { status: "PAUSED" }, occurredAt: "2026-08-30T00:00:00Z" }], nextCursor: null });
+const hostClubSettings = HostClubSettingsSchema.parse({ clubId: "00000000-0000-0000-0000-000000000101", clubSlug: "reading-sai", name: "Public fixture club", approvalPolicy: "INVITE_ONLY", defaultTimezone: "Asia/Seoul", scheduleReminderEnabled: true, recordPublicationDefault: "MEMBER", revision: 0, status: "ACTIVE" });
+const hostClubClosePreview = HostClubClosePreviewSchema.parse({ previewId: "00000000-0000-0000-0000-00000000e103", clubId: hostClubSettings.clubId, actorMembershipId: "00000000-0000-0000-0000-000000000201", clubRevision: 0, effectHash: "a".repeat(64), effects: { clubStatus: "ARCHIVED", memberAccess: "ENDED", publicRecords: "UNCHANGED" }, expiresAt: "2026-08-30T01:00:00Z" });
+const hostClubCloseResult = HostClubCloseResultSchema.parse({ receiptId: "00000000-0000-0000-0000-00000000e104", status: "ARCHIVED", revision: 1, replayed: false });
+const invitationPreviewEmail = InvitationPreviewResponseSchema.parse({ invitationType: "EMAIL", clubSlug: "reading-sai", clubName: "Public fixture club", canonicalPath: `/clubs/reading-sai/invite/${"e".repeat(43)}`, email: "member@example.test", name: "Public fixture member", emailHint: "m***@example.test", status: "PENDING", expiresAt: "2026-09-30T00:00:00Z", canAccept: true });
+const invitationPreviewNamedLink = InvitationPreviewResponseSchema.parse({ invitationType: "NAMED_LINK", clubSlug: "reading-sai", clubName: "Public fixture club", canonicalPath: `/clubs/reading-sai/invite/lnk_${"n".repeat(43)}`, email: null, name: null, emailHint: null, status: "PENDING", expiresAt: "2026-09-30T00:00:00Z", canAccept: true });
+const hostWorkboxPage = HostWorkboxPageSchema.parse({
+  state: "NOW",
+  evaluatedAt: "2026-08-30T09:00:00Z",
+  sourceAvailability: [
+    { type: "SCHEDULE_UNSEEN", state: "AVAILABLE", failureCode: null },
+    { type: "MEMBER_APPROVAL", state: "AVAILABLE", failureCode: null },
+    { type: "RECORD_CLOSING", state: "AVAILABLE", failureCode: null },
+    { type: "INVITATION_EXPIRY", state: "AVAILABLE", failureCode: null },
+    { type: "NOTIFICATION_FAILURE", state: "AVAILABLE", failureCode: null },
+  ],
+  items: [{
+    key: "SCHEDULE_UNSEEN:session-1:r7",
+    type: "SCHEDULE_UNSEEN",
+    state: "NOW",
+    title: "일정 확인",
+    description: "확인이 필요한 멤버가 있어요.",
+    count: 1,
+    dueAt: "2026-08-31T09:00:00Z",
+    deferredUntil: null,
+    resolvedAt: null,
+    destinationHref: "/app/host/sessions/session-1/schedule-review",
+    receiptSummary: {
+      operation: "SCHEDULE_REMINDER",
+      outcome: "PENDING",
+      affectedCount: 1,
+    },
+  }],
+  nextCursor: null,
+});
+const hostWorkboxDeferralReceipt = HostWorkboxDeferralReceiptSchema.parse({
+  key: "SCHEDULE_UNSEEN:session-1:r7",
+  deferredUntil: "2026-08-31T09:00:00Z",
+});
 
 // ---------------------------------------------------------------------------
 // HostSessionDetailResponseSchema top-level keys
@@ -82,7 +140,7 @@ const hostSessionTrashPage = {
   nextCursor: null,
 };
 
-const hostSessionDetail = {
+const hostSessionDetail = HostSessionDetailResponseSchema.parse({
   sessionId: "00000000-0000-0000-0000-000000000301",
   sessionNumber: 1,
   title: "1회차 · 팩트풀니스",
@@ -102,8 +160,17 @@ const hostSessionDetail = {
   siteVisibility: "PUBLIC_RECORD",
   publication: null,
   state: "PUBLISHED",
+  scheduleRevision: 7,
+  scheduleSeenAvailability: "UNAVAILABLE",
+  scheduleSeenSummary: {
+    currentCount: null,
+    staleCount: null,
+    unseenCount: null,
+    eligibleCount: null,
+  },
   versions: {
     sessionRevision: 3,
+    scheduleRevision: 7,
     exposureRevision: 2,
     participantSetRevision: 4,
     recordDraftRevision: null,
@@ -111,23 +178,28 @@ const hostSessionDetail = {
     publicationRevision: 1,
   },
   attendanceSnapshotId: "att:membership-host:6",
-  attendees: [],
+  attendees: [
+    {
+      membershipId: "00000000-0000-0000-0000-000000000201",
+      displayName: "호스트",
+      accountName: "김호스트",
+      avatarKey: "banana-green-book",
+      rsvpStatus: "GOING",
+      attendanceStatus: "ATTENDED",
+      participationStatus: "ACTIVE",
+      attendanceRevision: 0,
+      seenScheduleRevision: 7,
+      scheduleSeenAt: "2026-08-29T00:00:00Z",
+      scheduleSeenState: "CURRENT",
+    },
+  ],
   feedbackDocument: {
     uploaded: false,
     fileName: null,
     uploadedAt: null,
   },
   changeReceipt: null,
-  versions: {
-    sessionRevision: 0,
-    exposureRevision: 0,
-    participantSetRevision: 0,
-    recordDraftRevision: null,
-    liveRecordRevision: null,
-    publicationRevision: 0,
-  },
-  attendanceSnapshotId: "att:",
-};
+});
 
 const hostSessionRecordEditor = {
   sessionId: "00000000-0000-0000-0000-000000000301",
@@ -160,6 +232,130 @@ const hostNotificationDeliveryList = {
   items: [],
   nextCursor: null,
 };
+
+const manualNotificationOptions = ManualNotificationOptionsResponseSchema.parse({
+  session: {
+    sessionId: "00000000-0000-0000-0000-000000000301",
+    sessionNumber: 1,
+    bookTitle: "공개 계약 도서",
+    date: "2026-08-30",
+    state: "OPEN",
+    visibility: "MEMBER",
+    feedbackDocumentUploaded: true,
+    scheduleRevision: 7,
+  },
+  templates: [{
+    eventType: "SESSION_REMINDER_DUE",
+    contentRevision: "a".repeat(64),
+    label: "모임 알림",
+    enabled: true,
+    disabledReason: null,
+    defaultAudience: "ALL_ACTIVE_MEMBERS",
+    allowedAudiences: ["ALL_ACTIVE_MEMBERS", "SESSION_PARTICIPANTS", "SELECTED_MEMBERS"],
+    defaultChannels: "BOTH",
+    defaultSubject: "모임을 안내합니다",
+    defaultBody: "예정된 모임 정보를 확인해 주세요.",
+  }],
+  members: {
+    items: [{
+      membershipId: "00000000-0000-0000-0000-000000000202",
+      displayName: "공개 계약 멤버",
+      maskedEmail: "m***@example.test",
+      role: "MEMBER",
+      membershipStatus: "ACTIVE",
+      sessionParticipationStatus: "ACTIVE",
+      attendanceStatus: "UNKNOWN",
+      emailEligibility: "ELIGIBLE",
+      inAppEligibility: "ELIGIBLE",
+    }],
+    nextCursor: null,
+  },
+  recentDispatches: [],
+});
+
+const manualNotificationPreview = ManualNotificationPreviewResponseSchema.parse({
+  previewId: "00000000-0000-0000-0000-00000000d101",
+  expiresAt: "2026-08-30T12:10:00Z",
+  scheduleRevision: 7,
+  targetSnapshotHash: "b".repeat(64),
+  contentHash: "c".repeat(64),
+  template: {
+    eventType: "SESSION_REMINDER_DUE",
+    label: "모임 알림",
+    subject: "호스트가 고친 제목",
+    bodyPreview: "호스트가 고친 본문",
+  },
+  audience: {
+    baseGroup: "ALL_ACTIVE_MEMBERS",
+    baseCount: 1,
+    excludedCount: 0,
+    includedCount: 0,
+    finalTargetCount: 1,
+  },
+  channels: {
+    requested: "BOTH",
+    inAppEligibleCount: 1,
+    emailEligibleCount: 1,
+    emailSkippedByPreferenceCount: 0,
+    emailMissingCount: 0,
+  },
+  duplicates: { requiresResendConfirmation: false, recentDispatches: [] },
+  warnings: [],
+});
+
+const hostPersonDetail = HostPersonDetailSchema.parse({
+  membershipId: "00000000-0000-0000-0000-000000000206",
+  displayName: "계약 멤버",
+  avatarKey: "apple-green-book",
+  status: "ACTIVE",
+  role: "MEMBER",
+  lastClubAccessAt: "2026-08-30T01:00:00Z",
+  currentSchedule: null,
+  currentRsvp: null,
+  attendanceHistory: {
+    items: [{
+      sessionNumber: 6,
+      scheduledAt: "2026-08-20T19:00:00",
+      attendanceStatus: "ATTENDED",
+    }],
+    nextCursor: null,
+  },
+});
+
+const manualNotificationConfirm = ManualNotificationConfirmResponseSchema.parse({
+  manualDispatchId: "00000000-0000-0000-0000-00000000d201",
+  eventId: "00000000-0000-0000-0000-00000000d202",
+  status: "PENDING",
+  createdAt: "2026-08-30T12:00:00Z",
+  summary: {
+    targetCount: 1,
+    requestedChannels: "BOTH",
+    expectedInAppCount: 1,
+    expectedEmailCount: 1,
+  },
+});
+
+const manualNotificationDispatchList = ManualNotificationDispatchListResponseSchema.parse({
+  items: [{
+    manualDispatchId: "00000000-0000-0000-0000-00000000d201",
+    eventId: "00000000-0000-0000-0000-00000000d202",
+    source: "MANUAL",
+    eventType: "SESSION_REMINDER_DUE",
+    sessionId: "00000000-0000-0000-0000-000000000301",
+    sessionNumber: 1,
+    bookTitle: "공개 계약 도서",
+    requestedChannels: "BOTH",
+    audience: "ALL_ACTIVE_MEMBERS",
+    resend: false,
+    requestedBy: "공개 계약 호스트",
+    targetCount: 1,
+    expectedInAppCount: 1,
+    expectedEmailCount: 1,
+    eventStatus: "PENDING",
+    createdAt: "2026-08-30T12:00:00Z",
+  }],
+  nextCursor: null,
+});
 
 // ---------------------------------------------------------------------------
 // HostInvitationListPageSchema top-level keys
@@ -218,7 +414,7 @@ const adminAnalyticsOverview = {
 // ---------------------------------------------------------------------------
 // CurrentSessionResponseSchema top-level keys
 // ---------------------------------------------------------------------------
-const currentSession = {
+const currentSession = CurrentSessionResponseSchema.parse({
   currentSession: {
     sessionId: "00000000-0000-0000-0000-000000000301",
     sessionNumber: 1,
@@ -235,6 +431,9 @@ const currentSession = {
     meetingPasscode: null,
     questionDeadlineAt: "2025-11-25T14:59:00Z",
     myRsvpStatus: "GOING",
+    scheduleRevision: 3,
+    mySeenScheduleRevision: 2,
+    myScheduleSeenAt: "2026-05-18T12:00:00Z",
     myCheckin: { readingProgress: 100 },
     myQuestions: [
       {
@@ -287,7 +486,7 @@ const currentSession = {
       },
     ],
   },
-};
+});
 
 const aigenJob = {
   jobId: "00000000-0000-0000-0000-000000000401",
@@ -509,6 +708,10 @@ function write(filename: string, data: unknown): void {
   writeFileSync(path, JSON.stringify(data, null, 2) + "\n", "utf-8");
 }
 
+function writeTopLevel(filename: string, data: unknown): void {
+  writeFileSync(join(topLevelFixturesDir, filename), JSON.stringify(data, null, 2) + "\n", "utf-8");
+}
+
 write("host-session-detail.json", hostSessionDetail);
 write("host-session-record-editor.json", hostSessionRecordEditor);
 write("host-session-change-receipt.json", hostSessionChangeReceipt);
@@ -517,6 +720,11 @@ write("host-session-history-recovery.json", hostSessionHistoryRecovery);
 write("host-session-trash-item.json", hostSessionTrashItem);
 write("host-session-trash-page.json", hostSessionTrashPage);
 write("host-notification-delivery-list.json", hostNotificationDeliveryList);
+write("manual-notification-options.json", manualNotificationOptions);
+write("manual-notification-preview.json", manualNotificationPreview);
+write("manual-notification-confirm.json", manualNotificationConfirm);
+write("manual-notification-dispatch-list.json", manualNotificationDispatchList);
+write("host-person-detail.json", hostPersonDetail);
 write("host-invitation-list.json", hostInvitationList);
 write("admin-analytics-overview.json", adminAnalyticsOverview);
 write("current-session.json", currentSession);
@@ -534,3 +742,15 @@ write("platform-admin-club-list.json", platformAdminClubList);
 write("platform-admin-club-detail.json", platformAdminClubDetail);
 write("platform-admin-onboarding-preview.json", platformAdminOnboardingPreview);
 write("platform-admin-onboarding-result.json", platformAdminOnboardingResult);
+write("host-invitation-link-list.json", hostInvitationLinkList);
+write("host-invitation-link-history.json", hostInvitationLinkHistory);
+write("host-club-settings.json", hostClubSettings);
+write("host-club-close-preview.json", hostClubClosePreview);
+write("host-club-close-result.json", hostClubCloseResult);
+write("invitation-preview-email.json", invitationPreviewEmail);
+write("invitation-preview-named-link.json", invitationPreviewNamedLink);
+write("host-workbox-page.json", hostWorkboxPage);
+write("host-workbox-deferral-receipt.json", hostWorkboxDeferralReceipt);
+writeTopLevel("host-invitation-links.json", { items: [], nextCursor: null });
+writeTopLevel("host-club-settings.json", hostClubSettings);
+writeTopLevel("host-workbox-page.json", hostWorkboxPage);

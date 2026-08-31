@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type {
@@ -34,6 +34,7 @@ const options: ManualNotificationOptionsResponse = {
     state: "OPEN",
     visibility: "MEMBER",
     feedbackDocumentUploaded: true,
+    scheduleRevision: 7,
   },
   templates: [{
     eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
@@ -44,6 +45,8 @@ const options: ManualNotificationOptionsResponse = {
     defaultAudience: "CONFIRMED_ATTENDEES",
     allowedAudiences: ["ALL_ACTIVE_MEMBERS", "CONFIRMED_ATTENDEES", "SELECTED_MEMBERS"],
     defaultChannels: "BOTH",
+    defaultSubject: "피드백 문서가 공개됐습니다",
+    defaultBody: "모임의 피드백 문서를 확인해 주세요.",
   }],
   members: { items: [member], nextCursor: null },
   recentDispatches: [],
@@ -53,6 +56,9 @@ const draft: HostNotificationComposerDraft = {
   sessionId: "session-1",
   eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
   contentRevision,
+  scheduleRevision: 7,
+  subject: "피드백 문서가 공개됐습니다",
+  body: "모임의 피드백 문서를 확인해 주세요.",
   recipientMode: "RECOMMENDED",
   requestedChannels: "BOTH",
   selectedMembershipIds: [],
@@ -61,6 +67,9 @@ const draft: HostNotificationComposerDraft = {
 const duplicatePreview: ManualNotificationPreviewResponse = {
   previewId: "preview-1",
   expiresAt: "2026-07-23T20:10:00+09:00",
+  scheduleRevision: 7,
+  targetSnapshotHash: "b".repeat(64),
+  contentHash: "c".repeat(64),
   template: {
     eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
     label: "피드백 문서 공개",
@@ -132,6 +141,56 @@ describe("HostNotificationComposer", () => {
     expect(screen.getByRole("radio", { name: "추천 대상 · 참석 확정자" })).toBeChecked();
     expect(screen.getByRole("radio", { name: "전체 활성 멤버" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "직접 선택" })).toBeInTheDocument();
+  });
+
+  it("edits exact subject and body and disables preview for blank copy", async () => {
+    const user = userEvent.setup();
+    const onDraftChange = vi.fn();
+    const { rerender } = render(
+      <HostNotificationComposer
+        options={options}
+        eventType={draft.eventType}
+        draft={draft}
+        preview={null}
+        busy={false}
+        error={null}
+        onDraftChange={onDraftChange}
+        onSearch={vi.fn()}
+        onLoadMore={vi.fn()}
+        onPreview={vi.fn()}
+        onConfirm={vi.fn()}
+        onSkip={vi.fn()}
+      />,
+    );
+
+    const subject = screen.getByRole("textbox", { name: "알림 제목" });
+    await user.clear(subject);
+    expect(onDraftChange).toHaveBeenLastCalledWith(expect.objectContaining({ subject: "" }));
+
+    rerender(
+      <HostNotificationComposer
+        options={options}
+        eventType={draft.eventType}
+        draft={{ ...draft, subject: "" }}
+        preview={null}
+        busy={false}
+        error={null}
+        onDraftChange={onDraftChange}
+        onSearch={vi.fn()}
+        onLoadMore={vi.fn()}
+        onPreview={vi.fn()}
+        onConfirm={vi.fn()}
+        onSkip={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "알림 미리보기" })).toBeDisabled();
+    fireEvent.change(screen.getByRole("textbox", { name: "알림 본문" }), {
+      target: { value: "모임의 피드백 문서를 확인해 주세요. 추가" },
+    });
+    expect(onDraftChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      body: "모임의 피드백 문서를 확인해 주세요. 추가",
+    }));
   });
 
   it("labels the next-book recommendation as all active members", () => {

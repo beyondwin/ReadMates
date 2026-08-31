@@ -417,6 +417,24 @@ class JdbcHostInvitationStoreAdapter(
                 membershipId.dbString(),
             ).firstOrNull()
 
+    override fun findActiveMembership(
+        clubId: UUID,
+        userId: UUID,
+    ): CurrentMember? =
+        jdbcTemplate
+            .query(
+                """
+                select memberships.id
+                from memberships
+                where memberships.club_id = ? and memberships.user_id = ? and memberships.status = 'ACTIVE'
+                limit 1
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.uuid("id") },
+                clubId.dbString(),
+                userId.dbString(),
+            ).firstOrNull()
+            ?.let(::findCurrentMember)
+
     private fun ResultSet.toHostInvitationListRow(): HostInvitationListRow =
         HostInvitationListRow(
             invitationId = uuid("id"),

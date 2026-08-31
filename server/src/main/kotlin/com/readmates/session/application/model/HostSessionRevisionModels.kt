@@ -13,6 +13,7 @@ data class SessionVersionVector(
     val recordDraftRevision: Long?,
     val liveRecordRevision: Long?,
     val publicationRevision: Long,
+    val scheduleRevision: Long = 1,
 ) {
     init {
         require(sessionRevision >= 0) { "sessionRevision must be non-negative" }
@@ -25,6 +26,7 @@ data class SessionVersionVector(
             "liveRecordRevision must be null or positive"
         }
         require(publicationRevision >= 0) { "publicationRevision must be non-negative" }
+        require(scheduleRevision > 0) { "scheduleRevision must be positive" }
     }
 
     fun snapshotIdentity(resourceId: UUID): ProjectionSnapshotIdentity =
@@ -42,6 +44,7 @@ data class SessionVersionVector(
                 recordDraftRevision = null,
                 liveRecordRevision = null,
                 publicationRevision = 0,
+                scheduleRevision = 1,
             )
     }
 }
@@ -131,7 +134,8 @@ data class ProjectionSnapshotIdentity(
             val liveToken = versions.liveRecordRevision?.toString() ?: "-"
             return ProjectionSnapshotIdentity(
                 snapshotId =
-                    "$resourceId:${versions.sessionRevision}:${versions.exposureRevision}:" +
+                    "$resourceId:${versions.sessionRevision}:${versions.scheduleRevision}:" +
+                        "${versions.exposureRevision}:" +
                         "${versions.participantSetRevision}:$draftToken:$liveToken:${versions.publicationRevision}",
             )
         }

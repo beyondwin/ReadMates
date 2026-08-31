@@ -43,6 +43,179 @@ afterEach(() => {
 });
 
 describe("Cloudflare BFF function", () => {
+  it.each([
+    {
+      name: "workbox page",
+      method: "GET",
+      path: ["api", "host", "workbox"],
+      requestUrl:
+        "https://readmates.pages.dev/api/bff/api/host/workbox?state=NOW&cursor=opaque%2Bcursor%2Fpage&limit=20&clubSlug=reading-sai",
+      upstreamUrl:
+        "https://api.example.com/api/host/workbox?state=NOW&cursor=opaque%2Bcursor%2Fpage&limit=20&clubSlug=reading-sai",
+      body: undefined,
+      upstreamStatus: 409,
+      upstreamBody: JSON.stringify({ code: "WORKBOX_CURSOR_STALE", status: 409 }),
+    },
+    {
+      name: "workbox deferral",
+      method: "PUT",
+      path: ["api", "host", "workbox", "items", "SCHEDULE_UNSEEN:session-1", "deferral"],
+      requestUrl:
+        "https://readmates.pages.dev/api/bff/api/host/workbox/items/SCHEDULE_UNSEEN%3Asession-1/deferral?clubSlug=reading-sai",
+      upstreamUrl:
+        "https://api.example.com/api/host/workbox/items/SCHEDULE_UNSEEN%3Asession-1/deferral?clubSlug=reading-sai",
+      body: JSON.stringify({ deferredUntil: "2030-01-02T03:04:05Z" }),
+      upstreamStatus: 422,
+      upstreamBody: JSON.stringify({ code: "INVALID_DEFERRAL", status: 422 }),
+    },
+    {
+      name: "workbox deferral removal",
+      method: "DELETE",
+      path: ["api", "host", "workbox", "items", "SCHEDULE_UNSEEN:session-1", "deferral"],
+      requestUrl:
+        "https://readmates.pages.dev/api/bff/api/host/workbox/items/SCHEDULE_UNSEEN%3Asession-1/deferral?clubSlug=reading-sai",
+      upstreamUrl:
+        "https://api.example.com/api/host/workbox/items/SCHEDULE_UNSEEN%3Asession-1/deferral?clubSlug=reading-sai",
+      body: undefined,
+      upstreamStatus: 204,
+      upstreamBody: "",
+    },
+  ])(
+    "forwards the $name generically while preserving opaque bytes and upstream outcome",
+    async ({ method, path, requestUrl, upstreamUrl, body, upstreamStatus, upstreamBody }) => {
+      let forwardedInit: RequestInit | undefined;
+      const fetchMock = vi.fn(async (_input, init) => {
+        forwardedInit = init;
+        return new Response(upstreamStatus === 204 ? null : upstreamBody, {
+          status: upstreamStatus,
+          headers: upstreamStatus === 204 ? undefined : { "Content-Type": "application/problem+json" },
+        });
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const response = await onRequest(
+        context(
+          new Request(requestUrl, {
+            method,
+            headers: {
+              Origin: "https://readmates.pages.dev",
+              "Content-Type": body ? "application/json" : "text/plain",
+              "X-Readmates-Client-Contract": "v3",
+              "X-Readmates-Bff-Secret": "browser-secret",
+              "X-Readmates-Club-Slug": "browser-club",
+              "X-Readmates-Client-IP": "browser-client",
+            },
+            body,
+          }),
+          { path },
+          {
+            READMATES_API_BASE_URL: "https://api.example.com",
+            READMATES_BFF_SECRET: "server-secret",
+            READMATES_HOST_CLIENT_CONTRACT_CAPABILITY: "V2_V3",
+          },
+        ),
+      );
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        upstreamUrl,
+        expect.objectContaining({ method, redirect: "manual" }),
+      );
+      const headers = forwardedInit?.headers as Headers;
+      expect(headers.get("X-Readmates-Bff-Secret")).toBe("server-secret");
+      expect(headers.get("X-Readmates-Club-Slug")).toBe("reading-sai");
+      expect(headers.get("X-Readmates-Client-IP")).toBeNull();
+      if (method === "GET") {
+        expect(forwardedInit?.body).toBeUndefined();
+        expect(headers.get("X-Readmates-Client-Contract")).toBeNull();
+      } else {
+        expect(headers.get("Origin")).toBe("https://readmates.pages.dev");
+        expect(headers.get("Referer")).toBe("https://readmates.pages.dev");
+        expect(headers.get("X-Readmates-Client-Contract")).toBe("v3");
+        expect(new TextDecoder().decode(forwardedInit?.body as ArrayBuffer)).toBe(body ?? "");
+      }
+      expect(response.status).toBe(upstreamStatus);
+      await expect(response.text()).resolves.toBe(upstreamBody);
+    },
+  );
+
+  it.each([
+    { method: "GET", path: ["api", "host", "invitation-links"], suffix: "/api/host/invitation-links?cursor=opaque%2Bcursor&limit=20&clubSlug=reading-sai", body: undefined },
+    { method: "PUT", path: ["api", "host", "club-settings"], suffix: "/api/host/club-settings?clubSlug=reading-sai", body: JSON.stringify({ expectedRevision: 3 }) },
+  ])("preserves named-link/settings $method path query club and strips browser trust headers", async ({ method, path, suffix, body }) => {
+    const problem = { code: "STALE_HOST_CLUB_SETTINGS", status: 409, message: "stale" };
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(problem), { status: 409, headers: { "Content-Type": "application/problem+json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const request = new Request(`https://readmates.pages.dev/api/bff${suffix}`, {
+      method,
+      headers: { Origin: "https://readmates.pages.dev", "Content-Type": "application/json", "X-Readmates-Client-Contract": "v3", "X-Readmates-Bff-Secret": "attacker", "X-Readmates-Club-Slug": "attacker", "X-Readmates-Client-IP": "attacker" },
+      body,
+    });
+    const response = await onRequest(context(request, { path }));
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual(problem);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(`https://api.example.com${suffix}`);
+    const headers = init.headers as Headers;
+    expect(headers.get("X-Readmates-Bff-Secret")).toBe("secret");
+    expect(headers.get("X-Readmates-Club-Slug")).toBe("reading-sai");
+    expect(headers.get("X-Readmates-Client-IP")).toBeNull();
+  });
+
+  it("forwards the host operating-room current GET generically", async () => {
+    const upstreamBody = JSON.stringify({
+      currentMeeting: {
+        sessionId: "11111111-1111-1111-1111-111111111111",
+        selection: "OPEN",
+        scheduleSeenAvailability: "AVAILABLE",
+      },
+    });
+    const fetchMock = vi.fn(async () =>
+      new Response(upstreamBody, {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await onRequest(
+      context(
+        new Request(
+          "https://readmates.pages.dev/api/bff/api/host/operating-room/current",
+        ),
+        { path: ["api", "host", "operating-room", "current"] },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(JSON.parse(upstreamBody));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/api/host/operating-room/current",
+      expect.objectContaining({ method: "GET", redirect: "manual" }),
+    );
+  });
+
+  it("forwards encoded host person detail GET query with trusted club context", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await onRequest(
+      context(
+        new Request(
+          "https://readmates.pages.dev/api/bff/api/host/people/00000000-0000-0000-0000-000000000202?attendanceCursor=opaque%2Bcursor&limit=20&clubSlug=reading-sai",
+          { headers: { "X-Readmates-Club-Slug": "attacker-club" } },
+        ),
+        { path: ["api", "host", "people", "00000000-0000-0000-0000-000000000202"] },
+      ),
+    );
+
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(
+      "https://api.example.com/api/host/people/00000000-0000-0000-0000-000000000202?attendanceCursor=opaque%2Bcursor&limit=20&clubSlug=reading-sai",
+    );
+    expect(init.method).toBe("GET");
+    expect((init.headers as Headers).get("X-Readmates-Club-Slug")).toBe("reading-sai");
+  });
+
   it("forwards api requests with bff secret and Cloudflare client ip", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
@@ -384,6 +557,97 @@ describe("Cloudflare BFF function", () => {
     expect(init.method).toBe("PUT");
     expect(new TextDecoder().decode(init.body as ArrayBuffer)).toBe(body);
     expect((init.headers as Headers).get("X-Readmates-Club-Slug")).toBe("reading-sai");
+  });
+
+  it("forwards the schedule-seen PUT generically and preserves an upstream 409", async () => {
+    const body = JSON.stringify({ scheduleRevision: 7 });
+    const conflict = JSON.stringify({
+      type: "about:blank",
+      title: "Conflict",
+      status: 409,
+      code: "SCHEDULE_REVISION_CONFLICT",
+    });
+    let forwardedInit: RequestInit | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input, init) => {
+        forwardedInit = init;
+        return new Response(conflict, {
+          status: 409,
+          headers: { "Content-Type": "application/problem+json" },
+        });
+      }),
+    );
+
+    const response = await onRequest(
+      context(
+        new Request(
+          "https://readmates.pages.dev/api/bff/api/sessions/current/schedule-seen?clubSlug=reading-sai",
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Origin: "https://readmates.pages.dev",
+              "X-Readmates-Club-Slug": "attacker-club",
+            },
+            body,
+          },
+        ),
+        { path: ["api", "sessions", "current", "schedule-seen"] },
+      ),
+    );
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://api.example.com/api/sessions/current/schedule-seen?clubSlug=reading-sai",
+      expect.objectContaining({ method: "PUT", redirect: "manual" }),
+    );
+    expect(new TextDecoder().decode(forwardedInit?.body as ArrayBuffer)).toBe(body);
+    const forwardedHeaders = forwardedInit?.headers as Headers;
+    expect(forwardedHeaders.get("Content-Type")).toBe("application/json");
+    expect(forwardedHeaders.get("Origin")).toBe("https://readmates.pages.dev");
+    expect(forwardedHeaders.get("Referer")).toBe("https://readmates.pages.dev");
+    expect(forwardedHeaders.get("X-Readmates-Club-Host")).toBe("readmates.pages.dev");
+    expect(forwardedHeaders.get("X-Readmates-Club-Slug")).toBe("reading-sai");
+    expect(response.status).toBe(409);
+    expect(response.headers.get("content-type")).toContain("application/problem+json");
+    await expect(response.text()).resolves.toBe(conflict);
+  });
+
+  it("forwards the bodyless club-access PUT with derived club scope and preserves upstream denial", async () => {
+    let forwardedInit: RequestInit | undefined;
+    const denial = JSON.stringify({ code: "MEMBERSHIP_NOT_ALLOWED", status: 403 });
+    vi.stubGlobal("fetch", vi.fn(async (_input, init) => {
+      forwardedInit = init;
+      return new Response(denial, {
+        status: 403,
+        headers: { "Content-Type": "application/problem+json" },
+      });
+    }));
+
+    const response = await onRequest(
+      context(
+        new Request("https://readmates.pages.dev/api/bff/api/me/club-access?clubSlug=reading-sai", {
+          method: "PUT",
+          headers: {
+            Origin: "https://readmates.pages.dev",
+            "X-Readmates-Club-Slug": "attacker-club",
+          },
+        }),
+        { path: ["api", "me", "club-access"] },
+      ),
+    );
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://api.example.com/api/me/club-access?clubSlug=reading-sai",
+      expect.objectContaining({ method: "PUT", redirect: "manual" }),
+    );
+    expect((forwardedInit?.body as ArrayBuffer).byteLength).toBe(0);
+    const forwardedHeaders = forwardedInit?.headers as Headers;
+    expect(forwardedHeaders.get("Origin")).toBe("https://readmates.pages.dev");
+    expect(forwardedHeaders.get("Referer")).toBe("https://readmates.pages.dev");
+    expect(forwardedHeaders.get("X-Readmates-Club-Slug")).toBe("reading-sai");
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toBe(denial);
   });
 
   it("normalizes a route-selected club slug before trusting it as server context", async () => {

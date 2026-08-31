@@ -7,6 +7,7 @@ import {
 } from "@/shared/api/client";
 import {
   parseCurrentSessionResponse,
+  parseScheduleSeenReceipt,
   type CheckinRequest,
   type CreateQuestionRequest,
   type RsvpStatus,
@@ -29,6 +30,18 @@ export async function getCurrentSession(
   return readmatesFetch<unknown>("/api/sessions/current", undefined, context, policy).then(
     parseCurrentSessionResponse,
   );
+}
+
+export async function markCurrentScheduleSeen(
+  scheduleRevision: number,
+  context?: ReadmatesApiContext,
+) {
+  return readmatesFetch<unknown>(
+    "/api/sessions/current/schedule-seen",
+    jsonRequest({ method: "PUT" }, { scheduleRevision }),
+    context,
+    RECOVER_WRITE_SESSION_EXPIRY,
+  ).then(parseScheduleSeenReceipt);
 }
 
 export async function updateCurrentSessionRsvp(status: RsvpStatus, context?: ReadmatesApiContext) {

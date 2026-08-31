@@ -2,6 +2,8 @@
 
 package com.readmates.session.adapter.out.persistence
 
+import com.readmates.session.application.HostSessionAttendee
+import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionFeedbackDocument
 import com.readmates.session.application.HostSessionListItem
 import com.readmates.session.application.HostSessionListPage
@@ -9,6 +11,9 @@ import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.HostSessionListSummary
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.HostSessionPublication
+import com.readmates.session.application.ScheduleSeenAvailability
+import com.readmates.session.application.ScheduleSeenState
+import com.readmates.session.application.ScheduleSeenSummary
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.CanonicalHostSessionListQuery
 import com.readmates.session.application.model.HostDashboardResult
@@ -16,6 +21,7 @@ import com.readmates.session.application.model.HostMeetingListMode
 import com.readmates.session.application.model.HostMeetingListTuple
 import com.readmates.session.application.port.out.HostMeetingListPageRead
 import com.readmates.session.application.requireHost
+import com.readmates.session.domain.SessionAccessScope
 import com.readmates.session.domain.SessionParticipationStatus
 import com.readmates.sessionclosing.application.model.SessionRecordReadinessPolicy
 import com.readmates.sessionrecord.application.model.SessionRecordStatus
@@ -25,13 +31,18 @@ import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.jdbc.core.JdbcTemplate
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.UUID
 
 internal class HostSessionQueries(
     private val attentionQueries: HostSessionAttentionQueries = HostSessionAttentionQueries(),
+    private val clock: Clock = Clock.systemUTC(),
 ) {
     @Suppress("LongMethod")
     fun list(
@@ -381,6 +392,7 @@ internal class HostSessionQueries(
               visibility,
               access_scope,
               session_revision,
+              schedule_revision,
               exposure_revision,
               participant_set_revision,
               draft.draft_revision,
@@ -414,7 +426,13 @@ internal class HostSessionQueries(
             member.clubId.dbString(),
         ).firstOrNull()
         ?.let { detail ->
-            val attendees = findHostSessionAttendees(jdbcTemplate, sessionId, member.clubId)
+            val attendees =
+                findHostSessionAttendees(
+                    jdbcTemplate,
+                    sessionId,
+                    member.clubId,
+                    detail.scheduleRevision,
+                )
             val attendanceRows =
                 attendees
                     .filter { attendee -> attendee.participationStatus == SessionParticipationStatus.ACTIVE }
@@ -422,11 +440,19 @@ internal class HostSessionQueries(
                     .joinToString(",") { attendee ->
                         "${attendee.membershipId}:${attendee.attendanceRevision}"
                     }
+            val scheduleSeenSummary = scheduleSeenSummary(detail, attendees)
             detail.copy(
                 attendees = attendees,
                 feedbackDocument = findHostSessionFeedbackDocument(jdbcTemplate, sessionId, member.clubId),
                 publication = findHostSessionPublication(jdbcTemplate, sessionId, member.clubId),
                 attendanceSnapshotId = "att:$attendanceRows",
+                scheduleSeenAvailability =
+                    if (scheduleSeenSummary.eligibleCount != null) {
+                        ScheduleSeenAvailability.AVAILABLE
+                    } else {
+                        ScheduleSeenAvailability.UNAVAILABLE
+                    },
+                scheduleSeenSummary = scheduleSeenSummary,
             )
         } ?: throw HostSessionNotFoundException()
 
@@ -462,8 +488,21 @@ internal class HostSessionQueries(
         jdbcTemplate
             .query(
                 """
-                select start_time, end_time, question_deadline_at
-                from active_sessions sessions
+                select
+                  title,
+                  book_title,
+                  book_author,
+                  book_link,
+                  book_image_url,
+                  session_date,
+                  start_time,
+                  end_time,
+                  location_label,
+                  meeting_url,
+                  meeting_passcode,
+                  question_deadline_at,
+                  schedule_revision
+                from active_sessions
                 where id = ?
                   and club_id = ?
                 for update
@@ -495,6 +534,7 @@ internal class HostSessionQueries(
         jdbcTemplate: JdbcTemplate,
         sessionId: UUID,
         clubId: UUID,
+        scheduleRevision: Long,
     ) = jdbcTemplate.query(
         """
         select
@@ -506,7 +546,9 @@ internal class HostSessionQueries(
           session_participants.rsvp_status,
           session_participants.attendance_status,
           session_participants.participation_status,
-          session_participants.attendance_revision
+          session_participants.attendance_revision,
+          session_participants.seen_schedule_revision,
+          session_participants.seen_schedule_at
         from session_participants
         join memberships on memberships.id = session_participants.membership_id
           and memberships.club_id = session_participants.club_id
@@ -517,10 +559,39 @@ internal class HostSessionQueries(
           case when memberships.role = 'HOST' then 0 else 1 end,
           users.name
         """.trimIndent(),
-        { resultSet, _ -> resultSet.toHostSessionAttendee() },
+        { resultSet, _ -> resultSet.toHostSessionAttendee(scheduleRevision) },
         sessionId.dbString(),
         clubId.dbString(),
     )
+
+    private fun scheduleSeenSummary(
+        detail: HostSessionDetailResponse,
+        attendees: List<HostSessionAttendee>,
+    ): ScheduleSeenSummary {
+        val eligible =
+            attendees.filter { attendee ->
+                attendee.participationStatus == SessionParticipationStatus.ACTIVE
+            }
+        if (!scheduleSeenAvailable(detail) || eligible.isEmpty()) return ScheduleSeenSummary.UNAVAILABLE
+        return ScheduleSeenSummary(
+            currentCount = eligible.count { attendee -> attendee.scheduleSeenState == ScheduleSeenState.CURRENT },
+            staleCount = eligible.count { attendee -> attendee.scheduleSeenState == ScheduleSeenState.STALE },
+            unseenCount = eligible.count { attendee -> attendee.scheduleSeenState == ScheduleSeenState.UNSEEN },
+            eligibleCount = eligible.size,
+        )
+    }
+
+    private fun scheduleSeenAvailable(detail: HostSessionDetailResponse): Boolean =
+        when (detail.state) {
+            "OPEN" -> true
+            "DRAFT" ->
+                detail.accessScope == SessionAccessScope.GUEST_READABLE &&
+                    detail.versions.participantSetRevision > 0 &&
+                    !LocalDateTime
+                        .of(LocalDate.parse(detail.date), LocalTime.parse(detail.startTime))
+                        .isBefore(LocalDateTime.now(clock.withZone(HOST_MEETING_ZONE)))
+            else -> false
+        }
 
     private fun findHostSessionFeedbackDocument(
         jdbcTemplate: JdbcTemplate,
@@ -687,6 +758,7 @@ private fun HostSessionListItem.toScanCursor() = HostSessionCursor(sessionNumber
 
 internal const val HOST_SESSION_LEDGER_SCAN_CHUNK_SIZE = 200
 internal const val HOST_SESSION_LEDGER_MAX_SCAN_CHUNKS = 10
+private val HOST_MEETING_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
 
 internal val HOST_SESSION_LEDGER_FACTS_SQL =
     """

@@ -26,8 +26,17 @@ const validHostSessionDetail = {
   visibility: "MEMBER" as const,
   publication: null,
   state: "OPEN" as const,
+  scheduleRevision: 7,
+  scheduleSeenAvailability: "AVAILABLE" as const,
+  scheduleSeenSummary: {
+    currentCount: 1,
+    staleCount: 0,
+    unseenCount: 0,
+    eligibleCount: 1,
+  },
   versions: {
     sessionRevision: 3,
+    scheduleRevision: 7,
     exposureRevision: 2,
     participantSetRevision: 4,
     recordDraftRevision: null,
@@ -44,6 +53,9 @@ const validHostSessionDetail = {
       rsvpStatus: "GOING" as const,
       attendanceStatus: "ATTENDED" as const,
       attendanceRevision: 6,
+      seenScheduleRevision: 7,
+      scheduleSeenAt: "2026-08-29T00:00:00Z",
+      scheduleSeenState: "CURRENT" as const,
     },
   ],
   feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null },
@@ -110,6 +122,110 @@ const validHostSessionListItem = {
 // ---- DEV mode tests -----------------------------------------------------------
 
 describe("host-contract zod validators (DEV mode)", () => {
+  it("strictly parses all manual notification responses and rejects extra copy history", async () => {
+    const {
+      ManualNotificationConfirmResponseSchema,
+      ManualNotificationDispatchListResponseSchema,
+      ManualNotificationOptionsResponseSchema,
+      ManualNotificationPreviewResponseSchema,
+    } = await import("@/features/host/api/host-contracts");
+    const options = {
+      session: {
+        sessionId: "session-1", sessionNumber: 1, bookTitle: "Book", date: null,
+        state: "OPEN", visibility: "MEMBER", feedbackDocumentUploaded: false, scheduleRevision: 7,
+      },
+      templates: [{
+        eventType: "SESSION_REMINDER_DUE", contentRevision: "a".repeat(64), label: "리마인더",
+        enabled: true, disabledReason: null, defaultAudience: "ALL_ACTIVE_MEMBERS",
+        allowedAudiences: ["ALL_ACTIVE_MEMBERS"], defaultChannels: "BOTH",
+        defaultSubject: "제목", defaultBody: "본문",
+      }],
+      members: { items: [], nextCursor: null },
+      recentDispatches: [],
+    };
+    const preview = {
+      previewId: "preview-1", expiresAt: "2026-08-30T00:00:00Z", scheduleRevision: 7,
+      targetSnapshotHash: "b".repeat(64), contentHash: "c".repeat(64),
+      template: { eventType: "SESSION_REMINDER_DUE", label: "리마인더", subject: "제목", bodyPreview: "본문" },
+      audience: { baseGroup: "ALL_ACTIVE_MEMBERS", baseCount: 1, excludedCount: 0, includedCount: 0, finalTargetCount: 1 },
+      channels: { requested: "BOTH", inAppEligibleCount: 1, emailEligibleCount: 1, emailSkippedByPreferenceCount: 0, emailMissingCount: 0 },
+      duplicates: { requiresResendConfirmation: false, recentDispatches: [] }, warnings: [],
+    };
+    const confirm = {
+      manualDispatchId: "dispatch-1", eventId: "event-1", status: "PENDING", createdAt: "2026-08-30T00:00:00Z",
+      summary: { targetCount: 1, requestedChannels: "BOTH", expectedInAppCount: 1, expectedEmailCount: 1 },
+    };
+    const dispatches = { items: [], nextCursor: null };
+
+    expect(ManualNotificationOptionsResponseSchema.parse(options).session?.scheduleRevision).toBe(7);
+    expect(ManualNotificationPreviewResponseSchema.parse(preview).template.subject).toBe("제목");
+    expect(ManualNotificationConfirmResponseSchema.parse(confirm).status).toBe("PENDING");
+    expect(ManualNotificationDispatchListResponseSchema.parse(dispatches).items).toEqual([]);
+    expect(ManualNotificationPreviewResponseSchema.safeParse({ ...preview, rawProviderBody: "금지" }).success).toBe(false);
+    expect(ManualNotificationDispatchListResponseSchema.safeParse({ items: [{ customCopy: "금지" }], nextCursor: null }).success).toBe(false);
+  });
+
+  it("parses a non-baseline schedule revision across host detail projection receipt and reconciliation", async () => {
+    const {
+      HostMutationReceiptSchema,
+      HostMutationReconciliationSchema,
+      HostProjectionSnapshotSchema,
+      HostSessionDetailResponseSchema,
+      HostVersionVectorSchema,
+    } = await import("@/features/host/api/host-contracts");
+    const versions = {
+      sessionRevision: 3,
+      scheduleRevision: 7,
+      exposureRevision: 2,
+      participantSetRevision: 4,
+      recordDraftRevision: null,
+      liveRecordRevision: null,
+      publicationRevision: 1,
+    };
+    const projection = {
+      snapshotId: "session-1:3:7:2:4:none:none:1",
+      sessionId: "session-1",
+      sessionNumber: 1,
+      title: "Session 1",
+      bookTitle: "The Book",
+      bookAuthor: "Author",
+      date: "2024-01-01",
+      startTime: "19:00",
+      endTime: "21:00",
+      locationLabel: "Seoul",
+      state: "OPEN" as const,
+      versions,
+      accessScope: "HOST_ONLY" as const,
+      siteVisibility: "HIDDEN" as const,
+      visibility: "HOST_ONLY" as const,
+    };
+    const receipt = {
+      receiptId: "receipt-1",
+      operation: "SESSION_BASIC_SAVE" as const,
+      resourceId: "session-1",
+      resultingVersions: versions,
+      notificationDecision: "NOT_SENT" as const,
+      projection,
+    };
+    const reconciliation = {
+      status: "COMMITTED" as const,
+      receipt,
+      current: projection,
+      attendanceVersions: null,
+      attendanceSnapshotId: null,
+    };
+
+    expect(HostVersionVectorSchema.parse(versions).scheduleRevision).toBe(7);
+    expect(HostSessionDetailResponseSchema.parse(validHostSessionDetail).scheduleRevision).toBe(7);
+    expect(HostProjectionSnapshotSchema.parse(projection).versions.scheduleRevision).toBe(7);
+    expect(HostMutationReceiptSchema.parse(receipt).resultingVersions.scheduleRevision).toBe(7);
+    expect(HostMutationReconciliationSchema.parse(reconciliation).current?.versions.scheduleRevision).toBe(7);
+    expect(HostVersionVectorSchema.safeParse({ ...versions, scheduleRevision: 0 }).success).toBe(false);
+    const withoutScheduleRevision: Partial<typeof versions> = { ...versions };
+    delete withoutScheduleRevision.scheduleRevision;
+    expect(HostVersionVectorSchema.safeParse(withoutScheduleRevision).success).toBe(false);
+  });
+
   it("enforces strict action-specific v3 expected revision schemas", async () => {
     const {
       CorrectionPublicationVersionVectorSchema,
@@ -227,6 +343,7 @@ describe("host-contract zod validators (DEV mode)", () => {
     const { HostMutationReceiptSchema } = await import("@/features/host/api/host-contracts");
     const versions = {
       sessionRevision: 3,
+      scheduleRevision: 9,
       exposureRevision: 4,
       participantSetRevision: 5,
       recordDraftRevision: 6,

@@ -79,7 +79,7 @@ class AcceptInvitationUseCaseTest {
                 membershipStatus = MembershipStatus.ACTIVE,
                 avatarKey = allocatedKey.wireValue,
             )
-        val rawToken = "accepted-avatar-token"
+        val rawToken = "A".repeat(43)
         `when`(
             invitationStore.findInvitationByTokenHash(tokenService.hashToken(rawToken), false),
         ).thenReturn(invitation)

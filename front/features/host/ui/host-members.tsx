@@ -58,6 +58,7 @@ export default function HostMembers({
   actions,
   initialInvitations,
   invitationActions,
+  LinkComponent,
 }: HostMembersProps) {
   const initialPage = useMemo(() => normalizeMemberPage(initialMembers), [initialMembers]);
   const initialMembersItems = initialPage.items;
@@ -387,6 +388,8 @@ export default function HostMembers({
             void submitViewerAction(member, "deactivate-viewer");
           }
         }}
+        personHref={(membershipId) => `/app/host/people/${encodeURIComponent(membershipId)}`}
+        LinkComponent={LinkComponent}
       />
 
       <MemberStatusFilter activeTab={activeTab} onTabChange={setActiveTab} />
@@ -413,6 +416,8 @@ export default function HostMembers({
         onOpenDialog={openDialog}
         onSubmitLifecycle={submitLifecycle}
         onLoadMore={loadMoreMembers}
+        personHref={(membershipId) => `/app/host/people/${encodeURIComponent(membershipId)}`}
+        LinkComponent={LinkComponent}
       />
 
       <MemberInvitationsSection

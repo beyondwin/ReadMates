@@ -7,25 +7,27 @@ import type { HostMeetingTocRow, HostMeetingTocSections } from "@/features/host/
 import { findNestedLiveRegions } from "@/shared/testing/accessibility-checks";
 import { HostMeetingList } from "./host-meeting-list";
 
-const upcomingRow: HostMeetingTocRow = {
+const upcomingRow = {
   id: "open-1",
   ordinalFolio: "No.7",
   title: "지구 끝의 온실",
   lifecycleLabel: "준비 중",
   attentionLabel: null,
   summary: "08-30 예정일",
+  date: "2026-08-30",
   href: "/app/host/sessions/open-1",
-};
+} satisfies HostMeetingTocRow & { date: string };
 
-const pastRow: HostMeetingTocRow = {
+const pastRow = {
   id: "closed-1",
   ordinalFolio: "No.6",
   title: "소년이 온다",
   lifecycleLabel: "기록 정리 중",
   attentionLabel: "기록 확인 필요",
   summary: "08-15",
+  date: "2026-08-15",
   href: "/app/host/sessions/closed-1",
-};
+} satisfies HostMeetingTocRow & { date: string };
 
 const emptySections: HostMeetingTocSections = {
   upcoming: { rows: [], nextCursor: null },
@@ -186,14 +188,52 @@ describe("HostMeetingList", () => {
     expect(onLoadMorePast).toHaveBeenCalledOnce();
   });
 
-  it("keeps list browse on one heading, one create action, and no page tabs", () => {
+  it("switches to a calendar made only from loaded rows and discloses incomplete server pages", async () => {
+    const user = userEvent.setup();
+    renderList({
+      sections: {
+        upcoming: { rows: [upcomingRow], nextCursor: "opaque-upcoming" },
+        past: { rows: [pastRow], nextCursor: "opaque-past" },
+      },
+    });
+
+    await user.click(screen.getByRole("tab", { name: "달력" }));
+
+    expect(screen.getByRole("tabpanel", { name: "달력" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "2026년 8월" })).toBeVisible();
+    expect(screen.getByText("2026-08-30")).toBeVisible();
+    expect(screen.getByRole("link", { name: "지구 끝의 온실" })).toHaveAttribute(
+      "href",
+      "/app/host/sessions/open-1",
+    );
+    expect(screen.getByText(/현재 불러온 모임만 표시/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "다가오는 모임 더 보기" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "지난 모임 더 보기" })).toBeVisible();
+  });
+
+  it("keeps loading, error, and empty states in list view instead of presenting an invented calendar", async () => {
+    const user = userEvent.setup();
+    renderList({
+      sections: emptySections,
+      errorMessage: "모임을 불러오지 못했습니다.",
+      onRetry: vi.fn(),
+    });
+
+    await user.click(screen.getByRole("tab", { name: "달력" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("모임을 불러오지 못했습니다.");
+    expect(screen.queryByText(/2026년/)).not.toBeInTheDocument();
+  });
+
+  it("keeps list browse on one heading, one create action, and an accessible view toggle", () => {
     renderList();
 
     const root = document.querySelector(".rm-meeting-toc") as HTMLElement | null;
     expect(root).not.toBeNull();
     expect(within(root!).getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(within(root!).getByRole("heading", { level: 1, name: "모임" })).toBeInTheDocument();
-    expect(root!.querySelector("[role='tablist']")).toBeNull();
+    expect(within(root!).getByRole("tablist", { name: "모임 보기 방식" })).toBeInTheDocument();
+    expect(within(root!).getByRole("tab", { name: "목록" })).toHaveAttribute("aria-selected", "true");
     expect(root!.querySelectorAll("[style]")).toHaveLength(0);
     expect(findNestedLiveRegions(root!)).toEqual([]);
     expect(within(root!).getAllByRole("link", { name: "새 모임 만들기" })).toHaveLength(1);

@@ -110,6 +110,9 @@ export const currentSessionContractFixture = {
     meetingPasscode: "currentpass",
     questionDeadlineAt: "2026-05-19T14:59:00Z",
     myRsvpStatus: "NO_RESPONSE",
+    scheduleRevision: 7,
+    mySeenScheduleRevision: 6,
+    myScheduleSeenAt: "2026-08-29T00:00:00Z",
     myCheckin: {
       readingProgress: 72,
     },
@@ -389,6 +392,14 @@ export const hostSessionDetailContractFixture = {
   visibility: "PUBLIC",
   publication: hostSessionPublicationContractFixture,
   state: "CLOSED",
+  scheduleRevision: 7,
+  scheduleSeenAvailability: "UNAVAILABLE",
+  scheduleSeenSummary: {
+    currentCount: null,
+    staleCount: null,
+    unseenCount: null,
+    eligibleCount: null,
+  },
   attendees: [
     {
       membershipId: "membership-host",
@@ -398,6 +409,9 @@ export const hostSessionDetailContractFixture = {
       rsvpStatus: "GOING",
       attendanceStatus: "ATTENDED",
       participationStatus: "ACTIVE",
+      seenScheduleRevision: 7,
+      scheduleSeenAt: "2026-08-29T00:00:00Z",
+      scheduleSeenState: "CURRENT",
     },
     {
       membershipId: "membership-suhan",
@@ -407,6 +421,9 @@ export const hostSessionDetailContractFixture = {
       rsvpStatus: "GOING",
       attendanceStatus: "ATTENDED",
       participationStatus: "ACTIVE",
+      seenScheduleRevision: null,
+      scheduleSeenAt: null,
+      scheduleSeenState: "UNSEEN",
     },
   ],
   feedbackDocument: {

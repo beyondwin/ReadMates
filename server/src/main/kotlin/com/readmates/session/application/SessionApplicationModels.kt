@@ -35,6 +35,9 @@ data class CurrentSessionDetail(
     val meetingPasscode: String?,
     val questionDeadlineAt: String,
     val myRsvpStatus: String,
+    val scheduleRevision: Long = 1,
+    val mySeenScheduleRevision: Long? = null,
+    val myScheduleSeenAt: String? = null,
     val attendees: List<SessionAttendee>,
     val myCheckin: CurrentSessionCheckin?,
     val myQuestions: List<CurrentSessionQuestion>,
@@ -147,7 +150,38 @@ data class HostSessionDetailResponse(
     val changeReceipt: HostSessionChangeReceipt? = null,
     val versions: SessionVersionVector = SessionVersionVector.INITIAL,
     val attendanceSnapshotId: String = "att:",
+    val scheduleRevision: Long = versions.scheduleRevision,
+    val scheduleSeenAvailability: ScheduleSeenAvailability = ScheduleSeenAvailability.UNAVAILABLE,
+    val scheduleSeenSummary: ScheduleSeenSummary = ScheduleSeenSummary.UNAVAILABLE,
 )
+
+enum class ScheduleSeenAvailability {
+    AVAILABLE,
+    UNAVAILABLE,
+}
+
+enum class ScheduleSeenState {
+    CURRENT,
+    STALE,
+    UNSEEN,
+}
+
+data class ScheduleSeenSummary(
+    val currentCount: Int?,
+    val staleCount: Int?,
+    val unseenCount: Int?,
+    val eligibleCount: Int?,
+) {
+    companion object {
+        val UNAVAILABLE =
+            ScheduleSeenSummary(
+                currentCount = null,
+                staleCount = null,
+                unseenCount = null,
+                eligibleCount = null,
+            )
+    }
+}
 
 data class HostSessionAttendee(
     val membershipId: String,
@@ -158,6 +192,9 @@ data class HostSessionAttendee(
     val attendanceStatus: String,
     val participationStatus: SessionParticipationStatus = SessionParticipationStatus.ACTIVE,
     val attendanceRevision: Long = 0,
+    val seenScheduleRevision: Long? = null,
+    val scheduleSeenAt: String? = null,
+    val scheduleSeenState: ScheduleSeenState = ScheduleSeenState.UNSEEN,
 )
 
 data class HostSessionFeedbackDocument(

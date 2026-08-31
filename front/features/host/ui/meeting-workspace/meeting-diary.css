@@ -1,6 +1,7 @@
 /* Meeting diary spread — reassembled Focus Deck (ADR-0046 §4.2). */
 .rm-meeting-diary {
   --rm-diary-gap: clamp(16px, 2vw, 24px);
+  --rm-diary-mobile-nav-offset: 0px;
   width: min(100% - 32px, 1120px);
   margin-inline: auto;
   padding: clamp(24px, 4vw, 48px) 0 calc(56px + env(safe-area-inset-bottom, 0px));
@@ -330,7 +331,7 @@
   .rm-meeting-diary {
     width: min(100% - 24px, 720px);
     padding-top: 20px;
-    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px) + var(--m-nav-h, 0px));
+    padding-bottom: calc(96px + var(--m-safe-bottom, env(safe-area-inset-bottom, 0px)) + var(--rm-diary-mobile-nav-offset));
   }
 
   /* Align with diary single-column band (not globals' 767px) so 768–899 keeps one CTA. */
@@ -353,7 +354,7 @@
     right: 0;
     bottom: 0;
     z-index: 30;
-    padding: 12px var(--rm-workspace-gap, 16px) calc(12px + env(safe-area-inset-bottom, 0px) + var(--m-nav-h, 0px));
+    padding: 12px var(--rm-workspace-gap, 16px) calc(12px + var(--m-safe-bottom, env(safe-area-inset-bottom, 0px)) + var(--rm-diary-mobile-nav-offset));
     background: color-mix(in oklch, var(--bg) 92%, transparent);
   }
 
@@ -374,6 +375,12 @@
 
   .rm-meeting-diary .rm-host-session-workspace__main {
     order: 1;
+  }
+}
+
+@media (max-width: 767px) {
+  .rm-meeting-diary {
+    --rm-diary-mobile-nav-offset: var(--m-nav-h, 0px);
   }
 }
 

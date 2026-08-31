@@ -6,9 +6,11 @@ import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionFeedbackDocument
 import com.readmates.session.application.HostSessionListItem
 import com.readmates.session.application.HostSessionPublication
+import com.readmates.session.application.ScheduleSeenState
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.HostDashboardMissingMemberResult
 import com.readmates.session.application.model.SessionVersionVector
+import com.readmates.session.domain.MemberVisibleSchedule
 import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.session.domain.SessionParticipationStatus
@@ -16,6 +18,7 @@ import com.readmates.sessionclosing.application.model.SessionRecordReadinessPoli
 import com.readmates.sessionrecord.application.model.SessionRecordStatus
 import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.db.utcOffsetDateTime
+import com.readmates.shared.db.utcOffsetDateTimeOrNull
 import com.readmates.shared.db.uuid
 import java.sql.ResultSet
 import java.time.LocalDate
@@ -28,10 +31,36 @@ internal data class HostDashboardOpenMetrics(
 )
 
 internal data class ExistingHostSessionSchedule(
+    val title: String,
+    val bookTitle: String,
+    val bookAuthor: String,
+    val bookLink: String?,
+    val bookImageUrl: String?,
+    val date: LocalDate,
     val startTime: LocalTime,
     val endTime: LocalTime,
+    val locationLabel: String,
+    val meetingUrl: String?,
+    val meetingPasscode: String?,
     val questionDeadlineAt: LocalDateTime,
+    val scheduleRevision: Long,
 )
+
+internal fun ExistingHostSessionSchedule.memberVisibleSchedule() =
+    MemberVisibleSchedule(
+        title = title,
+        bookTitle = bookTitle,
+        bookAuthor = bookAuthor,
+        bookLink = bookLink,
+        bookImageUrl = bookImageUrl,
+        date = date,
+        startTime = startTime,
+        endTime = endTime,
+        locationLabel = locationLabel,
+        meetingUrl = meetingUrl,
+        meetingPasscode = meetingPasscode,
+        questionDeadlineAt = questionDeadlineAt,
+    )
 
 internal fun ResultSet.toHostDashboardOpenMetrics() =
     HostDashboardOpenMetrics(
@@ -48,9 +77,19 @@ internal fun ResultSet.toHostDashboardMissingMemberResult() =
 
 internal fun ResultSet.toExistingHostSessionSchedule() =
     ExistingHostSessionSchedule(
+        title = getString("title"),
+        bookTitle = getString("book_title"),
+        bookAuthor = getString("book_author"),
+        bookLink = getString("book_link"),
+        bookImageUrl = getString("book_image_url"),
+        date = getObject("session_date", LocalDate::class.java),
         startTime = getObject("start_time", LocalTime::class.java),
         endTime = getObject("end_time", LocalTime::class.java),
+        locationLabel = getString("location_label"),
+        meetingUrl = getString("meeting_url"),
+        meetingPasscode = getString("meeting_passcode"),
         questionDeadlineAt = getObject("question_deadline_at", LocalDateTime::class.java),
+        scheduleRevision = getLong("schedule_revision"),
     )
 
 internal fun ResultSet.toHostSessionDetailBase() =
@@ -71,6 +110,7 @@ internal fun ResultSet.toHostSessionDetailBase() =
         meetingPasscode = getString("meeting_passcode"),
         publication = null,
         state = getString("state"),
+        scheduleRevision = getLong("schedule_revision"),
         visibility = SessionRecordVisibility.valueOf(getString("visibility")),
         accessScope = SessionAccessScope.valueOf(getString("access_scope")),
         siteVisibility = PublicSiteVisibility.valueOf(getString("site_visibility")),
@@ -89,10 +129,11 @@ internal fun ResultSet.toHostSessionDetailBase() =
                 recordDraftRevision = getLong("draft_revision").takeUnless { wasNull() },
                 liveRecordRevision = getLong("live_revision").takeIf { it > 0 },
                 publicationRevision = getLong("publication_revision"),
+                scheduleRevision = getLong("schedule_revision"),
             ),
     )
 
-internal fun ResultSet.toHostSessionAttendee() =
+internal fun ResultSet.toHostSessionAttendee(scheduleRevision: Long) =
     HostSessionAttendee(
         membershipId = uuid("membership_id").toString(),
         displayName = getString("display_name"),
@@ -102,6 +143,9 @@ internal fun ResultSet.toHostSessionAttendee() =
         attendanceStatus = getString("attendance_status"),
         participationStatus = SessionParticipationStatus.valueOf(getString("participation_status")),
         attendanceRevision = getLong("attendance_revision"),
+        seenScheduleRevision = getLong("seen_schedule_revision").takeUnless { wasNull() },
+        scheduleSeenAt = utcOffsetDateTimeOrNull("seen_schedule_at")?.toString(),
+        scheduleSeenState = toScheduleSeenState(scheduleRevision),
     )
 
 internal fun ResultSet.toHostSessionFeedbackDocument() =

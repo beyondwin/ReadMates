@@ -1,4 +1,5 @@
 import type { HostSecurityPurgeCode } from "./host-authority-loss";
+import { normalizedClubSlug } from "@/shared/security/club-slug";
 
 export const HOST_AUTHORITY_LOSS_HANDOFF_STATE_KEY = "readmatesHostAuthorityLossHandoffId";
 
@@ -15,9 +16,25 @@ type PendingHostAuthorityNavigation = {
 
 let pendingNavigation: PendingHostAuthorityNavigation | null = null;
 
+function isCanonicalMemberRoot(pathname: string): boolean {
+  const encodedClubSlug = /^\/clubs\/([^/]+)\/app$/.exec(pathname)?.[1];
+  if (!encodedClubSlug) return false;
+  try {
+    const clubSlug = decodeURIComponent(encodedClubSlug);
+    return normalizedClubSlug(clubSlug) === clubSlug
+      && pathname === `/clubs/${encodeURIComponent(clubSlug)}/app`;
+  } catch {
+    return false;
+  }
+}
+
 export function stageHostAuthorityNavigation(
   navigation: PendingHostAuthorityNavigation,
 ): void {
+  if (!isCanonicalMemberRoot(navigation.targetPathname)) {
+    pendingNavigation = null;
+    return;
+  }
   pendingNavigation = navigation;
 }
 

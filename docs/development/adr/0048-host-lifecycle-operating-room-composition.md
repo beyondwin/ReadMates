@@ -1,11 +1,11 @@
 # ADR-0048: 호스트 워크스페이스를 모임 생애주기 운영실 + 작업함으로 구성
 
-- 상태: Proposed
-- 결정일: 2026-08-29
+- 상태: Accepted
+- 결정일: 2026-09-01
 - 작성자: product/design/front
 - 관련: ADR-0018, ADR-0019, ADR-0021, ADR-0026, ADR-0035, ADR-0038, ADR-0045, ADR-0046, ADR-0049, `docs/development/2026-08-29-readmates-host-lifecycle-operating-room-design.md`
 
-> 시각 방향은 승인됐지만 코드·테스트·`front/DESIGN.md`·active architecture는 아직 ADR-0046을 구현한다. 이 ADR은 구현 정합 전까지 `Proposed`다.
+> 코드·focused test·`front/DESIGN.md`·active architecture가 이 결정을 구현하며, Stage 5 전체 gate와 acceptance evidence가 일치해 `Accepted`로 승격했다. 아래 미측정 운영 범위는 배포 증거가 아니며 이 결정의 구현 수락과 분리한다.
 
 ## 컨텍스트
 
@@ -60,18 +60,15 @@ ADR-0046은 호스트 워크스페이스를 `오늘` 트리아지, `모임` 다�
 
 ## 검증
 
-- HOST와 authority-loss 상태에서 전역 navigation, cache purge, 안전한 전환을 검증한다.
-- current meeting 없음/하나/복수 후보, 준비실/현장/마감실, blocked lifecycle action을 검증한다.
-- 다음 행동 none/actionable/deferred/conflict/unknown outcome과 작업함 지금/보류/완료/partial failure를 검증한다.
-- five-source identity, signed cursor cross-club/cross-host/tamper/expiry/key-rotation/concurrent-mutation/no-gap/no-duplicate와 deferral 만료를 검증한다.
-- named invitation link와 club settings 권한·revision·history를 검증하고, 클럽 운영 종료는 fixture/local-safe confirm만 검증한다.
-- 390/768/1024/1440px, 200% zoom, keyboard/focus, reduced motion, 긴 한국어 wrapping을 CT/E2E로 검증한다.
-- 전역·현재 모임·작업함의 기능 완전성 목록을 semantic query로 잠근다.
-- frontend lint/test/build와 영향 host E2E를 통과하고 `front/DESIGN.md`·active architecture가 구현과 일치할 때만 `Accepted`로 승격한다.
+- Canonical route, 네 영역과 compatibility replace는 [`route-continuity.ts`](../../../front/src/app/route-continuity.ts), [`host.test.tsx`](../../../front/src/app/routes/host.test.tsx), [`host-lifecycle-route-continuity.spec.ts`](../../../front/tests/e2e/host-lifecycle-route-continuity.spec.ts)가 검증한다. Stage 5 Task 3 report SHA-256은 `6c2894be75d1991cb8b2943f52ce3fd157e36a5860b36fe43c224df8bdd4e988`이다.
+- 현재 모임 selection, 준비실/현장/마감실, 다음 행동과 five-source 작업함의 immutable snapshot/source-derived completion은 [`HostOperatingRoomCurrentServiceTest.kt`](../../../server/src/test/kotlin/com/readmates/hostworkspace/application/service/HostOperatingRoomCurrentServiceTest.kt), [`HostWorkboxServiceTest.kt`](../../../server/src/test/kotlin/com/readmates/hostworkspace/application/service/HostWorkboxServiceTest.kt), [`JdbcHostWorkSourceAuthorityTest.kt`](../../../server/src/test/kotlin/com/readmates/hostworkspace/adapter/out/source/JdbcHostWorkSourceAuthorityTest.kt)가 검증한다. Stage 4 gate report SHA-256은 `d502dd76a1493cecce93c988f66fcbebb5c8a0997d448b16be418d3caec586d4`, range-fix report는 `e5f6474080e23e90772cc633522123cf5e0c359741ae9e080f685c98e3f509ed`이다.
+- 403/409/partial/unknown recovery는 [`host-authority-loss.spec.ts`](../../../front/tests/e2e/host-authority-loss.spec.ts), [`host-workbox-stage4.spec.ts`](../../../front/tests/e2e/host-workbox-stage4.spec.ts)가 검증한다. Stage 5 Task 2 report SHA-256은 `48bb13f4130db085399d351fa896aa161ccc084b62f951d4539e2fd074bf3796`이다.
+- Responsive/keyboard/focus/44px/reduced-motion은 [`host-operating-room-responsive.ct.tsx`](../../../front/features/host/ui/operating-room/host-operating-room-responsive.ct.tsx), [`host-shell.ct.tsx`](../../../front/features/host/ui/shell/host-shell.ct.tsx)가 검증한다. Bounded custom DOM/ARIA evidence와 한계는 [`front/DESIGN.md`](../../../front/DESIGN.md#responsive-and-accessibility-evidence-index)에 기록했다. Stage 5 Task 1 report SHA-256은 `bf8cd34d1ccf0a3893449d66e1df623add66143c14a942bcb0550c377149a130`, Task 7 report는 `7338e31f0b578e415890ed05c6cd12427943d4f20ca5bd2563f54e0184216076`이다.
+- Named invitation link/settings는 [`NamedInvitationLinkOAuthDbTest.kt`](../../../server/src/test/kotlin/com/readmates/auth/api/NamedInvitationLinkOAuthDbTest.kt), [`HostClubSettingsConcurrencyDbTest.kt`](../../../server/src/test/kotlin/com/readmates/club/application/service/HostClubSettingsConcurrencyDbTest.kt)와 frontend Zod contract tests가 검증한다.
+- Stage 5 최종 gate는 네 destination/utility, 세 lifecycle phase, authoritative next action, immutable workbox/ledger, 403/409/partial/unknown recovery, 390–1440 responsive·keyboard, compatibility redirect와 active docs를 함께 확인했다. Canonical Docker CT는 121건을 실행해 118건이 처음 통과했고, 의도적으로 바뀐 CLOSED-768 baseline은 갱신 뒤 focused Docker 검증을 통과했다. 남은 admin 이미지 두 건의 1px renderer 차이는 host load-bearing surface와 무관하다.
 
-## 후속 작업
+## 잔여 리스크와 미측정 범위
 
-- ADR-0049 일정 revision 확인 상태의 server/BFF/front vertical slice.
-- 승인된 모바일 15–17을 기준으로 390px 당일 출석 완료 흐름과 `AvatarChip` role별 크기 검증.
-- route redirect와 deep-link 호환 정책을 구현 계획에서 확정.
-- 구현 완료 후 ADR-0046 supersession, ADR index, `front/DESIGN.md`, architecture를 함께 closeout.
+- Authority base에서 이미 존재하던 admin login-return E2E residual은 이 호스트 결정과 무관하게 남아 있으며 통과로 간주하지 않는다.
+- Manual VoiceOver/NVDA와 hardware assistive technology는 `not measured`다.
+- 외부 OAuth/provider, 실제 email delivery와 실제 club-end confirm, production deploy는 `not measured`이며 repository evidence를 production rollout 증거로 사용하지 않는다.

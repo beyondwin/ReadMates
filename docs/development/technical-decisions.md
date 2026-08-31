@@ -50,8 +50,10 @@ ReadMates의 durable product·technical·design·operational decision은 [ADR �
 | [ADR-0045](adr/0045-host-admin-focus-deck-editorial-ledger-composition.md) | 호스트·플랫폼 관리자 composition을 Focus Deck·Editorial Operations Ledger로 고정 | Accepted |
 | [ADR-0046](adr/0046-host-triage-home-meeting-diary-composition.md) | 호스트 워크스페이스를 오늘 트리아지 + 모임 다이어리로 재구성 | Superseded by ADR-0048 |
 | [ADR-0047](adr/0047-admin-case-desk-narrative-composition.md) | 플랫폼 어드민을 케이스 데스크 + 운영 서사로 재구성 | Accepted |
-| [ADR-0048](adr/0048-host-lifecycle-operating-room-composition.md) | 호스트 워크스페이스를 모임 생애주기 운영실 + 작업함으로 구성 | Proposed |
-| [ADR-0049](adr/0049-schedule-revision-seen-state.md) | 일정 revision 확인을 접속·참석 응답·실제 출석과 분리 | Proposed |
+| [ADR-0048](adr/0048-host-lifecycle-operating-room-composition.md) | 호스트 워크스페이스를 모임 생애주기 운영실 + 작업함으로 구성 | Accepted |
+| [ADR-0049](adr/0049-schedule-revision-seen-state.md) | 일정 revision 확인을 접속·참석 응답·실제 출석과 분리 | Accepted |
 | [ADR-0050](adr/0050-oci-capacity-and-recovery-guardrails.md) | OCI 용량과 복구 guardrail | Proposed |
+
+ADR-0048/0049는 Stage 5 전체 gate와 최종 acceptance evidence가 named criteria를 충족해 `Accepted`다. 구현 근거와 미측정 운영 범위는 각 ADR의 `검증` 및 잔여 검증 절에만 기록한다.
 
 Active architecture는 [architecture.md](architecture.md), 검증 경로는 [test-guide.md](test-guide.md)와 각 ADR의 `검증` 절을 따른다. Server의 canonical PR gate는 `./scripts/server-ci-check.sh`다. 외부 서비스의 가격·한도·API 동작처럼 변할 수 있는 사실은 운영 판단 직전에 공식 source로 다시 확인한다.

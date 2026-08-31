@@ -2,12 +2,14 @@ package com.readmates.session.application.service
 
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
+import com.readmates.session.application.model.MarkScheduleSeenCommand
 import com.readmates.session.application.model.ReplaceQuestionCommandItem
 import com.readmates.session.application.model.ReplaceQuestionsCommand
 import com.readmates.session.application.model.ReplaceQuestionsResult
 import com.readmates.session.application.model.SaveCheckinCommand
 import com.readmates.session.application.model.SaveOneLineReviewCommand
 import com.readmates.session.application.model.SaveQuestionCommand
+import com.readmates.session.application.model.ScheduleSeenResult
 import com.readmates.session.application.model.UpdateRsvpCommand
 import com.readmates.session.application.port.out.SessionParticipationWritePort
 import com.readmates.shared.cache.ReadCacheInvalidationPort
@@ -15,6 +17,7 @@ import com.readmates.shared.security.CurrentMember
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
+import java.time.OffsetDateTime
 import java.util.UUID
 
 class SessionMemberWriteServiceTest {
@@ -54,6 +57,22 @@ class SessionMemberWriteServiceTest {
 
         assertEquals(80, result.readingProgress)
         assertEquals(listOf("lockOpenSession", "saveCheckin:80"), port.calls)
+        assertEquals(emptyList<UUID>(), invalidation.clubs)
+    }
+
+    @Test
+    fun `schedule seen locks the current session without invalidating content`() {
+        val port = RecordingSessionParticipationWritePort()
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val service = SessionMemberWriteService(port, invalidation)
+
+        val result = service.markSeen(MarkScheduleSeenCommand(member, 3))
+
+        assertEquals(3, result.scheduleRevision)
+        assertEquals(
+            listOf("lockOpenSession", "markScheduleSeen:3:${member.clubId}"),
+            port.calls,
+        )
         assertEquals(emptyList<UUID>(), invalidation.clubs)
     }
 
@@ -128,6 +147,16 @@ class SessionMemberWriteServiceTest {
             com.readmates.session.application.model
                 .RsvpResult(command.status)
                 .also { calls += "updateRsvp:${command.status}" }
+
+        override fun markScheduleSeen(
+            command: MarkScheduleSeenCommand,
+            sessionId: UUID,
+        ) = ScheduleSeenResult(
+            scheduleRevision = command.scheduleRevision,
+            seenAt = OffsetDateTime.parse("2026-08-29T01:02:03Z"),
+        ).also {
+            calls += "markScheduleSeen:${command.scheduleRevision}:$sessionId"
+        }
 
         override fun saveCheckin(command: SaveCheckinCommand) =
             com.readmates.session.application.model

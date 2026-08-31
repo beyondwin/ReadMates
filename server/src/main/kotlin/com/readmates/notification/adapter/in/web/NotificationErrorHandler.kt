@@ -54,6 +54,8 @@ class NotificationErrorHandler {
             NotificationApplicationError.MANUAL_NOTIFICATION_RECIPIENTS_CHANGED -> HttpStatus.CONFLICT
             NotificationApplicationError.MANUAL_NOTIFICATION_CONTENT_STALE -> HttpStatus.CONFLICT
             NotificationApplicationError.MANUAL_NOTIFICATION_STATE_INVALID -> HttpStatus.CONFLICT
+            NotificationApplicationError.MANUAL_NOTIFICATION_COPY_INVALID -> HttpStatus.UNPROCESSABLE_CONTENT
+            NotificationApplicationError.MANUAL_NOTIFICATION_PREVIEW_STALE -> HttpStatus.CONFLICT
             NotificationApplicationError.MEMBERSHIP_NOT_ALLOWED -> HttpStatus.FORBIDDEN
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_REASON_REQUIRED -> HttpStatus.BAD_REQUEST
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_REASON_TOO_LONG -> HttpStatus.BAD_REQUEST
@@ -98,6 +100,10 @@ class NotificationErrorHandler {
                 "알림 내용이 변경되었습니다. 최신 내용으로 다시 미리보기를 생성해 주세요."
             NotificationApplicationError.MANUAL_NOTIFICATION_STATE_INVALID ->
                 "모임 상태가 변경되어 이 알림을 보낼 수 없습니다."
+            NotificationApplicationError.MANUAL_NOTIFICATION_COPY_INVALID ->
+                "알림 제목과 본문을 허용된 길이로 입력해 주세요."
+            NotificationApplicationError.MANUAL_NOTIFICATION_PREVIEW_STALE ->
+                "일정 또는 수신 대상이 변경되었습니다. 새 미리보기를 생성해 주세요."
             NotificationApplicationError.MEMBERSHIP_NOT_ALLOWED -> "선택한 멤버를 알림 대상에 사용할 수 없습니다."
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_REASON_REQUIRED ->
                 "재처리 사유를 입력해 주세요."

@@ -82,25 +82,32 @@ const manualOptionsFixture: ManualNotificationOptionsResponse = {
     state: "OPEN",
     visibility: "MEMBER",
     feedbackDocumentUploaded: true,
+    scheduleRevision: 7,
   },
   templates: [
     {
       eventType: "SESSION_REMINDER_DUE",
+      contentRevision: "a".repeat(64),
       label: "모임 전날 리마인더",
       enabled: true,
       disabledReason: null,
       defaultAudience: "ALL_ACTIVE_MEMBERS",
       allowedAudiences: ["ALL_ACTIVE_MEMBERS", "SESSION_PARTICIPANTS"],
       defaultChannels: "BOTH",
+      defaultSubject: "모임 전날 리마인더",
+      defaultBody: "모임 전 준비를 확인해 주세요.",
     },
     {
       eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
+      contentRevision: "b".repeat(64),
       label: "피드백 문서 등록",
       enabled: false,
       disabledReason: "닫힌 모임의 피드백 문서가 등록된 뒤 발송할 수 있습니다.",
       defaultAudience: "CONFIRMED_ATTENDEES",
       allowedAudiences: ["CONFIRMED_ATTENDEES", "SESSION_PARTICIPANTS"],
       defaultChannels: "BOTH",
+      defaultSubject: "피드백 문서 등록",
+      defaultBody: "피드백 문서를 확인해 주세요.",
     },
   ],
   members: { items: [], nextCursor: null },
@@ -940,6 +947,9 @@ describe("HostNotificationsPage", () => {
     const preview: ManualNotificationPreviewResponse = {
       previewId: "preview-sensitive",
       expiresAt: "2026-08-25T02:00:00+09:00",
+      scheduleRevision: 7,
+      targetSnapshotHash: "b".repeat(64),
+      contentHash: "c".repeat(64),
       template: {
         eventType: "SESSION_REMINDER_DUE",
         label: "모임 전날 리마인더",
@@ -1320,6 +1330,9 @@ describe("HostNotificationsPage", () => {
     const onPreviewManual = vi.fn<[ManualNotificationPreviewRequest], Promise<ManualNotificationPreviewResponse>>().mockResolvedValue({
       previewId: "preview-1",
       expiresAt: "2026-05-13T09:10:00Z",
+      scheduleRevision: 7,
+      targetSnapshotHash: "b".repeat(64),
+      contentHash: "c".repeat(64),
       template: {
         eventType: "SESSION_REMINDER_DUE",
         label: "모임 전날 리마인더",
@@ -1603,6 +1616,9 @@ describe("HostNotificationsPage", () => {
     const preview: ManualNotificationPreviewResponse = {
       previewId: "preview-keep",
       expiresAt: "2026-05-13T09:10:00Z",
+      scheduleRevision: 7,
+      targetSnapshotHash: "b".repeat(64),
+      contentHash: "c".repeat(64),
       template: {
         eventType: "SESSION_REMINDER_DUE",
         label: "모임 전날 리마인더",
@@ -1679,7 +1695,8 @@ describe("HostNotificationsPage", () => {
     );
 
     expect(screen.getByRole("heading", { name: "발송 전 확인" })).toBeInTheDocument();
-    expect(screen.getByText("모임 전 준비를 확인해 주세요.")).toBeInTheDocument();
+    expect(within(screen.getByRole("dialog", { name: "발송 전 확인" }))
+      .getByText("모임 전 준비를 확인해 주세요.")).toBeInTheDocument();
   });
 
   it("blocks confirm until resend confirmation is selected when preview reports duplicates", async () => {

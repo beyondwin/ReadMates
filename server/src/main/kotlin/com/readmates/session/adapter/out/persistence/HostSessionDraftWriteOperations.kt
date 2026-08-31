@@ -8,9 +8,11 @@ import com.readmates.session.application.model.UpdateHostSessionVisibilityComman
 import com.readmates.session.application.port.out.HostSessionDraftUpdateResult
 import com.readmates.session.application.port.out.HostSessionVisibilityUpdateResult
 import com.readmates.session.application.requireHost
+import com.readmates.session.domain.MemberVisibleSchedule
 import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.session.domain.SessionExposure
+import com.readmates.session.domain.SessionScheduleRevisionPolicy
 import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.toUtcOffsetDateTime
@@ -41,9 +43,26 @@ internal class HostSessionDraftWriteOperations(
         with(command) {
             requireHost(host)
             val before = queries.detail(host, sessionId)
-            val values = policy.normalizeUpdate(session, queries.existingSchedule(host, sessionId))
+            val existingSchedule = queries.existingSchedule(host, sessionId)
+            val values = policy.normalizeUpdate(session, existingSchedule)
             val updated =
-                updateDraft(host, sessionId, session, values, queries.expectedRevision(expectedSessionRevision))
+                updateDraft(
+                    host,
+                    sessionId,
+                    session,
+                    values,
+                    if (
+                        SessionScheduleRevisionPolicy.changed(
+                            existingSchedule.memberVisibleSchedule(),
+                            updatedMemberVisibleSchedule(session, values, existingSchedule),
+                        )
+                    ) {
+                        1
+                    } else {
+                        0
+                    },
+                    queries.expectedRevision(expectedSessionRevision),
+                )
             queries.throwIfStale(updated, host, sessionId)
             val detail = queries.detail(host, sessionId)
             HostSessionDraftUpdateResult(
@@ -244,6 +263,7 @@ internal class HostSessionDraftWriteOperations(
         sessionId: UUID,
         request: HostSessionCommand,
         values: NormalizedHostSessionWrite,
+        scheduleRevisionDelta: Int,
         expectedRevision: Long,
     ): Int =
         jdbcTemplate.update(
@@ -258,6 +278,7 @@ internal class HostSessionDraftWriteOperations(
                 meeting_passcode = case when ? then ? else meeting_passcode end,
                 question_deadline_at = ?,
                 session_revision = session_revision + 1,
+                schedule_revision = schedule_revision + ?,
                 updated_at = greatest(utc_timestamp(6), timestampadd(microsecond, 1, updated_at))
             where id = ? and club_id = ? and deleted_at is null and session_revision = ?
             """.trimIndent(),
@@ -278,9 +299,30 @@ internal class HostSessionDraftWriteOperations(
             request.meetingPasscode != null,
             values.meetingPasscode,
             values.questionDeadlineAt,
+            scheduleRevisionDelta,
             sessionId.dbString(),
             host.clubId.dbString(),
             expectedRevision,
+        )
+
+    private fun updatedMemberVisibleSchedule(
+        request: HostSessionCommand,
+        values: NormalizedHostSessionWrite,
+        existing: ExistingHostSessionSchedule,
+    ): MemberVisibleSchedule =
+        MemberVisibleSchedule(
+            title = request.title,
+            bookTitle = request.bookTitle,
+            bookAuthor = request.bookAuthor,
+            bookLink = if (request.bookLink != null) values.bookLink else existing.bookLink,
+            bookImageUrl = if (request.bookImageUrl != null) values.bookImageUrl else existing.bookImageUrl,
+            date = values.sessionDate,
+            startTime = values.startTime,
+            endTime = values.endTime,
+            locationLabel = if (request.locationLabel != null) values.locationLabel else existing.locationLabel,
+            meetingUrl = if (request.meetingUrl != null) values.meetingUrl else existing.meetingUrl,
+            meetingPasscode = if (request.meetingPasscode != null) values.meetingPasscode else existing.meetingPasscode,
+            questionDeadlineAt = values.questionDeadlineAt,
         )
 
     private fun createdResponse(

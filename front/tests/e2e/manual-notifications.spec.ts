@@ -38,11 +38,14 @@ test.beforeEach(resetManualNotificationState);
 test.afterEach(resetManualNotificationState);
 
 type ManualOptions = {
+  session: { scheduleRevision: number } | null;
   templates: Array<{
     eventType: string;
     contentRevision: string;
     defaultAudience: string;
     defaultChannels: string;
+    defaultSubject: string;
+    defaultBody: string;
   }>;
   members: {
     items: Array<{ membershipId: string; displayName: string }>;
@@ -59,6 +62,9 @@ type ManualSelection = {
   excludedMembershipIds: string[];
   includedMembershipIds: string[];
   sendMode: string;
+  scheduleRevision?: number;
+  subject?: string;
+  body?: string;
 };
 
 async function readManualOptions(
@@ -139,6 +145,45 @@ test("host can preview a manual reminder from the notifications tab without typi
   await expect(previewDialog.getByText("최종 대상", { exact: true })).toBeVisible();
   expect(manualDispatchCount(sessionId, "SESSION_REMINDER_DUE")).toBe(0);
   expect(notificationEventCount(sessionId, "SESSION_REMINDER_DUE")).toBe(0);
+  expect(hostActionDecisionCount(sessionId)).toBe(0);
+});
+
+test("host edits exact copy, previews it without sending, and explicitly confirms only the frozen preview", async ({ page }) => {
+  const sessionId = createOpenSessionFixture();
+  const subject = "호스트가 고친 E2E 제목";
+  const body = "호스트가 고친 첫 줄\n호스트가 고친 둘째 줄";
+
+  await loginWithGoogleFixture(page, "host@example.com");
+  await page.goto(`/clubs/${CLUB_SLUG}/app/host/notifications?sessionId=${sessionId}&eventType=SESSION_REMINDER_DUE`);
+  await page.getByLabel("알림 제목").fill(subject);
+  await page.getByLabel("알림 본문").fill(body);
+
+  const previewRequest = page.waitForRequest((request) =>
+    request.method() === "POST" && request.url().includes("/host/notifications/manual/preview"));
+  await page.getByRole("button", { name: "미리보기 열기" }).click();
+  const previewPayload = (await previewRequest).postDataJSON();
+  expect(previewPayload).toMatchObject({ subject, body });
+
+  const previewDialog = page.getByRole("dialog", { name: "발송 전 확인" });
+  await expect(previewDialog.getByText(subject)).toBeVisible();
+  await expect(previewDialog.getByText("호스트가 고친 첫 줄")).toBeVisible();
+  expect(manualDispatchCount(sessionId, "SESSION_REMINDER_DUE")).toBe(0);
+  expect(notificationEventCount(sessionId, "SESSION_REMINDER_DUE")).toBe(0);
+
+  const confirmRequest = page.waitForRequest((request) =>
+    request.method() === "POST"
+    && request.url().includes("/host/notifications/manual?")
+    && !request.url().includes("/preview"));
+  await previewDialog.getByRole("button", { name: /명에게 알림 발송/ }).click();
+  const confirmPayload = (await confirmRequest).postDataJSON();
+  expect(confirmPayload).toMatchObject({
+    previewId: expect.any(String),
+    subject,
+    body,
+  });
+  await expect(page.getByText("수동 알림 발송을 요청했습니다.")).toBeVisible();
+  expect(manualDispatchCount(sessionId, "SESSION_REMINDER_DUE")).toBe(1);
+  expect(notificationEventCount(sessionId, "SESSION_REMINDER_DUE")).toBe(1);
   expect(hostActionDecisionCount(sessionId)).toBe(0);
 });
 

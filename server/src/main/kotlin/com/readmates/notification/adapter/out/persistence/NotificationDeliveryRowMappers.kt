@@ -207,16 +207,26 @@ internal class NotificationDeliveryRowMappers(
         clubSlug: String,
         clubName: String,
         displayName: String?,
-    ): DeliveryCopy =
-        copyFor(
-            eventType = eventType,
-            sessionId = payload.sessionId ?: aggregateId,
-            sessionNumber = payload.sessionNumber ?: 0,
-            bookTitle = payload.bookTitle ?: "선정 도서",
-            clubName = clubName,
-            clubSlug = clubSlug,
-            displayName = displayName,
+    ): DeliveryCopy {
+        val rendered =
+            copyFor(
+                eventType = eventType,
+                sessionId = payload.sessionId ?: aggregateId,
+                sessionNumber = payload.sessionNumber ?: 0,
+                bookTitle = payload.bookTitle ?: "선정 도서",
+                clubName = clubName,
+                clubSlug = clubSlug,
+                displayName = displayName,
+            )
+        val customCopy = payload.manualDispatch?.customCopy ?: return rendered
+        return rendered.copy(
+            title = customCopy.subject,
+            body = customCopy.body,
+            emailSubject = customCopy.subject,
+            emailBodyText = customCopy.body,
+            emailBodyHtml = customCopy.body.toSafeHtmlParagraph(),
         )
+    }
 
     private fun copyFor(
         eventType: NotificationEventType,
@@ -251,6 +261,15 @@ internal class NotificationDeliveryRowMappers(
     fun sessionId(message: NotificationEventMessage): UUID = message.payload.sessionId ?: message.aggregateId
 
     fun parsePayload(rawPayload: String): NotificationEventPayload = objectMapper.readValue(rawPayload, payloadType)
+
+    private fun String.toSafeHtmlParagraph(): String =
+        replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#39;")
+            .replace("\n", "<br>")
+            .let { "<p>$it</p>" }
 
     private fun NotificationDeliveryStatus.toOutboxStatus(): NotificationOutboxStatus =
         when (this) {

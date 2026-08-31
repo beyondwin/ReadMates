@@ -1,0 +1,11 @@
+4cdd550f9c58c72fdcaf50d02382212a8906973f8be57146b024d0ed07c3f057  .superpowers/sdd/2026-08-29-host-responsive-closeout-stage5/task-2-brief.md
+40c32a6afbba709ce9f5025676d07fc646d1322a889fd2b18e25ad5add8a1d19  front/features/host/route/host-dashboard-route.test.tsx
+449cc95aa61c52b2cd56ee8c1d84e2a8c155c08924091df20d0457826e5de268  front/features/host/route/host-dashboard-route.tsx
+25a1f3b485442a654fe89f5be13ad059380d47c1ee751355dea6a3c606650026  front/features/host/route/host-meeting-workspace-actions.ts
+d994d201b077ac63060eab0900c2d7a5678637bec589bf7e86e80c95e0f2102d  front/features/host/route/host-session-editor-actions.ts
+6e16130a059c5c40afc481c9985cf5e3a0ed1133a544f833533818e435c219e1  front/features/host/ui/host-session-editor.tsx
+1e47ecdc70493c18a65cd29d1110b8b5b248ffc2faa4f4eebee2bf653cef5cab  front/features/host/ui/operating-room/host-operating-room-page.tsx
+f1d0e731369cfc2e99e7e12e45ff412bfe29ede85753d65b0eef313a482d3a99  front/features/host/ui/session-editor/session-editor-actions.ts
+c4560f948eb32b81c4b8b2540b41f2c900b8b00685e873a4d7a5bd61518faeb8  front/tests/e2e/host-authority-loss.spec.ts
+711040b358bd43c72ef94297d2eccbd9a95da8ef8cb337a2d764db38df2bc089  front/tests/e2e/host-workbox-stage4.spec.ts
+e4c6db47f4c41cff827d74f642a70011864ef1fa8a644707aeba396428519ab9  front/tests/unit/host-session-editor.test.tsx

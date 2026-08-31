@@ -16,6 +16,7 @@ import com.readmates.session.application.SessionAttendee
 import com.readmates.session.application.port.out.LoadCurrentSessionPort
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTime
+import com.readmates.shared.db.utcOffsetDateTimeOrNull
 import com.readmates.shared.db.uuid
 import com.readmates.shared.security.CurrentMember
 import org.springframework.jdbc.core.JdbcTemplate
@@ -48,8 +49,9 @@ class JdbcCurrentSessionAdapter(
                       location_label,
                       meeting_url,
                       meeting_passcode,
-                      question_deadline_at
-                    from active_sessions sessions
+                      question_deadline_at,
+                      schedule_revision
+                    from active_sessions
                     where club_id = ?
                       and state = 'OPEN'
                     order by number desc
@@ -415,22 +417,31 @@ class JdbcCurrentSessionAdapter(
         jdbcTemplate: JdbcTemplate,
     ): CurrentSessionDetail {
         val sessionId = uuid("id")
-        val myRsvpStatus =
+        val myParticipation =
             jdbcTemplate
                 .query(
                     """
-                    select rsvp_status
+                    select rsvp_status, seen_schedule_revision, seen_schedule_at
                     from session_participants
                     where session_id = ?
                       and membership_id = ?
                       and club_id = ?
                       and participation_status = 'ACTIVE'
                     """.trimIndent(),
-                    { resultSet, _ -> resultSet.getString("rsvp_status") },
+                    { resultSet, _ ->
+                        CurrentSessionParticipation(
+                            rsvpStatus = resultSet.getString("rsvp_status"),
+                            seenScheduleRevision =
+                                resultSet
+                                    .getLong("seen_schedule_revision")
+                                    .takeUnless { resultSet.wasNull() },
+                            scheduleSeenAt = resultSet.utcOffsetDateTimeOrNull("seen_schedule_at")?.toString(),
+                        )
+                    },
                     sessionId.dbString(),
                     member.membershipId.dbString(),
                     member.clubId.dbString(),
-                ).firstOrNull() ?: "NO_RESPONSE"
+                ).firstOrNull()
 
         return CurrentSessionDetail(
             sessionId = sessionId.toString(),
@@ -447,7 +458,10 @@ class JdbcCurrentSessionAdapter(
             meetingUrl = getString("meeting_url"),
             meetingPasscode = getString("meeting_passcode"),
             questionDeadlineAt = utcOffsetDateTime("question_deadline_at").toString(),
-            myRsvpStatus = myRsvpStatus,
+            myRsvpStatus = myParticipation?.rsvpStatus ?: "NO_RESPONSE",
+            scheduleRevision = getLong("schedule_revision"),
+            mySeenScheduleRevision = myParticipation?.seenScheduleRevision,
+            myScheduleSeenAt = myParticipation?.scheduleSeenAt,
             attendees = emptyList(),
             myCheckin = findMyCheckin(jdbcTemplate, sessionId, member),
             myQuestions = findQuestions(jdbcTemplate, sessionId, member.clubId, member.membershipId),
@@ -461,6 +475,12 @@ class JdbcCurrentSessionAdapter(
         )
     }
 }
+
+private data class CurrentSessionParticipation(
+    val rsvpStatus: String,
+    val seenScheduleRevision: Long?,
+    val scheduleSeenAt: String?,
+)
 
 private fun ResultSet.presentationAvatarKey(
     avatarKeyColumn: String,

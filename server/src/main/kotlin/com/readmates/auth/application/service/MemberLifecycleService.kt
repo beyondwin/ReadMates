@@ -141,6 +141,7 @@ class MemberLifecycleService(
         if (!memberLifecycleStore.markMemberLeftByHost(host.clubId, membershipId)) {
             throw lifecycleConflict("Member could not be deactivated")
         }
+        memberLifecycleStore.deleteClubAccess(host.clubId, membershipId)
 
         val policy =
             applyCurrentSessionPolicy(host.membershipId, host.clubId, membershipId, request.currentSessionPolicy)
@@ -268,6 +269,7 @@ class MemberLifecycleService(
         }
 
         memberLifecycleStore.markMembershipLeft(actor.clubId, actor.membershipId)
+        memberLifecycleStore.deleteClubAccess(actor.clubId, actor.membershipId)
 
         val policy =
             applyCurrentSessionPolicy(

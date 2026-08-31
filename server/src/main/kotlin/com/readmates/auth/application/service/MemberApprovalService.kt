@@ -78,6 +78,8 @@ class MemberApprovalService(
         if (!memberApprovalStore.deactivateViewer(host.clubId, membershipId)) {
             throw viewerMemberNotFound()
         }
+        memberApprovalStore.recordViewerRejection(host.clubId, host.membershipId, membershipId)
+        memberApprovalStore.deleteClubAccess(host.clubId, membershipId)
 
         return findForHost(host.clubId, membershipId)
     }

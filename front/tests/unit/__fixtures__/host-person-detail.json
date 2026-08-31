@@ -1,0 +1,20 @@
+{
+  "membershipId": "00000000-0000-0000-0000-000000000206",
+  "displayName": "계약 멤버",
+  "avatarKey": "apple-green-book",
+  "status": "ACTIVE",
+  "role": "MEMBER",
+  "lastClubAccessAt": "2026-08-30T01:00:00Z",
+  "currentSchedule": null,
+  "currentRsvp": null,
+  "attendanceHistory": {
+    "items": [
+      {
+        "sessionNumber": 6,
+        "scheduledAt": "2026-08-20T19:00:00",
+        "attendanceStatus": "ATTENDED"
+      }
+    ],
+    "nextCursor": null
+  }
+}

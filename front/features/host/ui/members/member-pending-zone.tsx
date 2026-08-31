@@ -6,17 +6,22 @@ import {
   disabledViewerDeactivateReason,
 } from "./member-action-rules";
 import { requestMeta } from "./member-list-helpers";
+import type { HostMembersLinkComponent } from "./types";
 
 export function MemberPendingZone({
   viewers,
   isRowPending,
   onActivate,
   onRelease,
+  personHref,
+  LinkComponent,
 }: {
   viewers: readonly HostMemberListItem[];
   isRowPending: (membershipId: string) => boolean;
   onActivate: (membershipId: string) => void;
   onRelease: (membershipId: string) => void;
+  personHref?: (membershipId: string) => string;
+  LinkComponent?: HostMembersLinkComponent;
 }): ReactElement | null {
   if (viewers.length === 0) {
     return null;
@@ -55,7 +60,14 @@ export function MemberPendingZone({
                   <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <AvatarChip avatarKey={member.avatarKey} name={member.displayName} label="" sizeRole="member" />
                     <span className="h4 editorial" style={{ margin: 0 }}>
-                      {member.displayName}
+                      {personHref && LinkComponent ? (
+                        <LinkComponent
+                          to={personHref(member.membershipId)}
+                          className="rm-host-member-ledger__person-link"
+                        >
+                          {member.displayName}
+                        </LinkComponent>
+                      ) : member.displayName}
                     </span>
                   </div>
                   <p className="small" style={{ margin: "4px 0 0", color: "var(--text-2)" }}>

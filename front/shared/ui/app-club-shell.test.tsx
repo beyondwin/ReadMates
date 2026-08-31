@@ -209,4 +209,31 @@ describe("AppClubShell", () => {
     ]);
     expect(screen.queryByRole("navigation", { name: "플랫폼 운영" })).not.toBeInTheDocument();
   });
+
+  it("renders one generic responsive context slot instead of the legacy selector pair", () => {
+    render(
+      <AppClubShell
+        clubs={clubs}
+        currentClubSlug="reading-sai"
+        workspace="host"
+        workspaceItems={workspaceItems}
+        primaryItems={primaryItems("host")}
+        account={{ control: <button type="button">계정 메뉴</button> }}
+        brandHref="/clubs/reading-sai/app/host"
+        mobileTitle="운영실"
+        LinkComponent={LinkComponent}
+        contextSlot={{
+          desktop: <button type="button">데스크톱 문맥 전환</button>,
+          mobile: <button type="button">모바일 문맥 전환</button>,
+        }}
+      >
+        <main><h1>host content</h1></main>
+      </AppClubShell>,
+    );
+
+    expect(screen.getByRole("button", { name: "데스크톱 문맥 전환" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "모바일 문맥 전환" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "클럽 선택" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "공간 선택" })).not.toBeInTheDocument();
+  });
 });

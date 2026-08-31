@@ -36,6 +36,9 @@ function meeting(): HostSessionDetailResponse {
       attendanceStatus: index % 3 === 0 ? "UNKNOWN" as const : "ATTENDED" as const,
       participationStatus: "ACTIVE" as const,
       attendanceRevision: 1,
+      seenScheduleRevision: index % 2 === 0 ? 1 : null,
+      scheduleSeenAt: index % 2 === 0 ? "2026-08-29T01:02:03Z" : null,
+      scheduleSeenState: index % 2 === 0 ? "CURRENT" as const : "UNSEEN" as const,
     })),
   };
 }

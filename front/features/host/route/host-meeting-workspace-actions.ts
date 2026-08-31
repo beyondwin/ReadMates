@@ -9,6 +9,7 @@ import { hostSessionLifecycleResultFromResponse } from "./host-session-lifecycle
 import { hostSessionEditorPreviewActions } from "./host-session-editor-data";
 import {
   hostSessionDeletionPreviewQuery,
+  hostSessionDetailQuery,
   useCloseHostSessionMutation,
   useCommitHostSessionImportMutation,
   useCreateHostSessionMutation,
@@ -75,6 +76,11 @@ export function useHostMeetingWorkspaceActions(
       sessionId === null
         ? createSession(request)
         : updateSession({ sessionId, request }),
+    reloadSession: async (sessionId) => {
+      const query = hostSessionDetailQuery(sessionId, context);
+      await queryClient.invalidateQueries({ queryKey: query.queryKey, exact: true });
+      return queryClient.fetchQuery(query);
+    },
     readCreatedSessionId: readCreatedHostSessionId,
     updateAttendance: (sessionId, attendance) =>
       updateAttendance({ sessionId, attendance }),

@@ -14,7 +14,7 @@ import {
   MemberOverflowMenu,
 } from "./member-list";
 import { preservedRecordBadge } from "./member-list-helpers";
-import type { HostMemberLifecyclePath, LifecycleDialog, MemberTab } from "./types";
+import type { HostMemberLifecyclePath, HostMembersLinkComponent, LifecycleDialog, MemberTab } from "./types";
 
 export function MemberTabPanel({
   activeTab,
@@ -28,6 +28,8 @@ export function MemberTabPanel({
   onOpenDialog,
   onSubmitLifecycle,
   onLoadMore,
+  personHref,
+  LinkComponent,
 }: {
   activeTab: MemberTab;
   activeMembers: HostMemberListItem[];
@@ -40,6 +42,8 @@ export function MemberTabPanel({
   onOpenDialog: (dialog: Exclude<LifecycleDialog, null>, trigger: HTMLElement) => void;
   onSubmitLifecycle: (member: HostMemberListItem, path: HostMemberLifecyclePath) => Promise<void>;
   onLoadMore: () => Promise<void>;
+  personHref: (membershipId: string) => string;
+  LinkComponent?: HostMembersLinkComponent;
 }) {
   return (
     <section
@@ -53,6 +57,8 @@ export function MemberTabPanel({
           emptyText="활성 멤버가 없습니다."
           sectionDescription="정식 멤버입니다. 이번 모임 참여 여부와 정지/탈퇴 처리를 함께 관리합니다."
           renderProfileAction={renderProfileAction}
+          personHref={personHref}
+          LinkComponent={LinkComponent}
           renderActions={(member) => (
             <CurrentSessionAction member={member} pendingActions={pendingActions} onSubmit={onSubmitLifecycle} />
           )}
@@ -91,6 +97,8 @@ export function MemberTabPanel({
           emptyText="쉬는 멤버가 없습니다."
           sectionDescription="쉬는 멤버는 기록은 보존되지만 새 참석 응답, 질문, 체크인, 리뷰 작성이 제한됩니다."
           renderProfileAction={renderProfileAction}
+          personHref={personHref}
+          LinkComponent={LinkComponent}
           renderActions={(member) => {
             const rowPending = isMembershipPending(member.membershipId, pendingActions);
             const restoreReason = disabledRestoreReason(member, rowPending);
@@ -135,6 +143,8 @@ export function MemberTabPanel({
           emptyText="탈퇴 또는 비활성 멤버가 없습니다."
           sectionDescription="탈퇴/비활성 멤버의 과거 기록은 보존되고 새 참여는 열리지 않습니다."
           renderProfileAction={renderProfileAction}
+          personHref={personHref}
+          LinkComponent={LinkComponent}
           renderCurrentSessionBadge={preservedRecordBadge}
           renderActions={() => null}
         />

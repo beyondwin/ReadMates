@@ -1,0 +1,23 @@
+{
+  "items": [
+    {
+      "manualDispatchId": "00000000-0000-0000-0000-00000000d201",
+      "eventId": "00000000-0000-0000-0000-00000000d202",
+      "source": "MANUAL",
+      "eventType": "SESSION_REMINDER_DUE",
+      "sessionId": "00000000-0000-0000-0000-000000000301",
+      "sessionNumber": 1,
+      "bookTitle": "공개 계약 도서",
+      "requestedChannels": "BOTH",
+      "audience": "ALL_ACTIVE_MEMBERS",
+      "resend": false,
+      "requestedBy": "공개 계약 호스트",
+      "targetCount": 1,
+      "expectedInAppCount": 1,
+      "expectedEmailCount": 1,
+      "eventStatus": "PENDING",
+      "createdAt": "2026-08-30T12:00:00Z"
+    }
+  ],
+  "nextCursor": null
+}

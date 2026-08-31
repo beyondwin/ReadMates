@@ -103,6 +103,7 @@ const options: ManualNotificationOptionsResponse = {
     state: "OPEN",
     visibility: "MEMBER",
     feedbackDocumentUploaded: false,
+    scheduleRevision: 7,
   },
   templates: [{
     eventType: "SESSION_REMINDER_DUE",
@@ -113,6 +114,8 @@ const options: ManualNotificationOptionsResponse = {
     defaultAudience: "SELECTED_MEMBERS",
     allowedAudiences: ["ALL_ACTIVE_MEMBERS", "CONFIRMED_ATTENDEES", "SELECTED_MEMBERS"],
     defaultChannels: "BOTH",
+    defaultSubject: "모임 리마인더",
+    defaultBody: "모임 일정을 확인해 주세요.",
   }],
   members: {
     items: rows.map((row) => ({

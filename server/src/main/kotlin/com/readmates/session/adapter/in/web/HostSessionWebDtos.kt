@@ -124,6 +124,7 @@ data class HostListCursorStaleResponse(
 
 data class SessionVersionVectorBody(
     val sessionRevision: Long,
+    val scheduleRevision: Long = 1,
     val exposureRevision: Long,
     val participantSetRevision: Long,
     val recordDraftRevision: Long?,
@@ -133,6 +134,7 @@ data class SessionVersionVectorBody(
     fun toModel() =
         SessionVersionVector(
             sessionRevision = sessionRevision,
+            scheduleRevision = scheduleRevision,
             exposureRevision = exposureRevision,
             participantSetRevision = participantSetRevision,
             recordDraftRevision = recordDraftRevision,
@@ -144,6 +146,7 @@ data class SessionVersionVectorBody(
 fun SessionVersionVector.toBody() =
     SessionVersionVectorBody(
         sessionRevision = sessionRevision,
+        scheduleRevision = scheduleRevision,
         exposureRevision = exposureRevision,
         participantSetRevision = participantSetRevision,
         recordDraftRevision = recordDraftRevision,

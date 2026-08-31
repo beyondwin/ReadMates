@@ -1,0 +1,12 @@
+{
+  "manualDispatchId": "00000000-0000-0000-0000-00000000d201",
+  "eventId": "00000000-0000-0000-0000-00000000d202",
+  "status": "PENDING",
+  "createdAt": "2026-08-30T12:00:00Z",
+  "summary": {
+    "targetCount": 1,
+    "requestedChannels": "BOTH",
+    "expectedInAppCount": 1,
+    "expectedEmailCount": 1
+  }
+}

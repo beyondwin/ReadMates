@@ -5,6 +5,15 @@ import {
   hostMutationKey,
   purgeClubHostState,
 } from "./host-state-purge";
+import { aiClubKeys, aiJobKeys } from "@/features/host/aigen/queries/aigen-job-queries";
+import { hostClubOperationsKeys } from "./host-club-operations-queries";
+import { hostInvitationKeys } from "./host-invitation-queries";
+import { hostMemberKeys } from "./host-members-queries";
+import { hostNotificationKeys } from "./host-notification-queries";
+import { hostSessionKeys } from "./host-session-queries";
+import { hostSessionRecordKeys } from "./host-session-record-query-keys";
+import { hostSessionRecoveryKeys } from "./host-session-recovery-queries";
+import { hostWorkboxKeys } from "./host-workbox-queries";
 import { registerHostRequest } from "@/shared/api/host-authority-event";
 import { readmatesFetch } from "@/shared/api/client";
 
@@ -34,9 +43,46 @@ describe("purgeClubHostState", () => {
     expect(storage.clearClub).toHaveBeenCalledWith("reading-sai");
   });
 
+  it("removes every current host family while retaining member and other-club state", async () => {
+    const client = queryClient();
+    const exactContext = { clubSlug: "reading-sai" };
+    const otherContext = { clubSlug: "other-club" };
+    const exactHostKeys = [
+      hostSessionKeys.detail("session-7", exactContext),
+      hostSessionRecordKeys.editor("session-7", exactContext),
+      hostSessionRecoveryKeys.restorePreview("session-7", "change-3", exactContext),
+      hostMemberKeys.list(undefined, exactContext),
+      hostInvitationKeys.list(undefined, exactContext),
+      hostNotificationKeys.summary(exactContext),
+      hostClubOperationsKeys.snapshot(exactContext),
+      hostWorkboxKeys.page({ state: "DEFERRED", cursor: "next-1", limit: 20 }, exactContext),
+      aiJobKeys.detail("session-7", "job-2", exactContext),
+      aiClubKeys.capabilities(exactContext),
+    ];
+    const otherHostKey = hostSessionKeys.detail("session-7", otherContext);
+    const safeMemberKey = ["current-session", "scope", exactContext.clubSlug, "current"] as const;
+
+    for (const key of exactHostKeys) client.setQueryData(key, { sensitive: true });
+    client.setQueryData(otherHostKey, { otherClub: true });
+    client.setQueryData(safeMemberKey, { memberSafe: true });
+
+    await purgeClubHostState({
+      clubSlug: exactContext.clubSlug,
+      queryClient: client,
+      storage: { clearClub: vi.fn().mockResolvedValue(undefined) },
+    });
+
+    for (const key of exactHostKeys) expect(client.getQueryData(key)).toBeUndefined();
+    expect(client.getQueryData(otherHostKey)).toEqual({ otherClub: true });
+    expect(client.getQueryData(safeMemberKey)).toEqual({ memberSafe: true });
+  });
+
   it("does not let an in-flight response resurrect a purged club query", async () => {
     const client = queryClient();
-    const key = [...hostClubQueryPrefix("reading-sai"), "session", "session-1"] as const;
+    const key = hostWorkboxKeys.page(
+      { state: "NOW", cursor: "opaque-next", limit: 20 },
+      { clubSlug: "reading-sai" },
+    );
     let resolve!: (value: { secret: string }) => void;
     const pending = new Promise<{ secret: string }>((done) => {
       resolve = done;

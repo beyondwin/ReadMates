@@ -104,6 +104,7 @@ export type HostMemberListItem = {
   status: MembershipStatus;
   joinedAt: string | null;
   createdAt: string;
+  lastClubAccessAt: string | null;
   currentSessionParticipationStatus: SessionParticipationStatus | null;
   canSuspend: boolean;
   canRestore: boolean;
@@ -175,6 +176,8 @@ export type ManualNotificationTemplateOption = {
   defaultAudience: ManualNotificationAudience;
   allowedAudiences: ManualNotificationAudience[];
   defaultChannels: ManualNotificationRequestedChannels;
+  defaultSubject: string;
+  defaultBody: string;
 };
 
 export type ManualNotificationMemberOption = {
@@ -184,7 +187,7 @@ export type ManualNotificationMemberOption = {
   role: MemberRole;
   membershipStatus: MembershipStatus;
   sessionParticipationStatus: SessionParticipationStatus | null;
-  attendanceStatus: AttendanceStatus | null;
+  attendanceStatus: AttendanceStatus | "CONFIRMED" | null;
   emailEligibility: ManualNotificationEligibility;
   inAppEligibility: ManualNotificationEligibility;
 };
@@ -204,6 +207,7 @@ export type ManualNotificationSessionSummary = {
   state: string;
   visibility: string;
   feedbackDocumentUploaded: boolean;
+  scheduleRevision: number;
 };
 
 export type ManualNotificationDispatchListItem = {
@@ -235,6 +239,9 @@ export type ManualNotificationSelectionRequest = {
   excludedMembershipIds: string[];
   includedMembershipIds: string[];
   sendMode: ManualNotificationSendMode;
+  scheduleRevision: number;
+  subject: string;
+  body: string;
 };
 
 export type HostNotificationPolicyResponse = {
@@ -251,6 +258,9 @@ export type ManualNotificationPreviewRequest = ManualNotificationSelectionReques
 export type ManualNotificationPreviewResponse = {
   previewId: string;
   expiresAt: string;
+  scheduleRevision: number;
+  targetSnapshotHash: string;
+  contentHash: string;
   template: {
     eventType: HostNotificationEventType;
     label: string;
@@ -410,6 +420,14 @@ export type HostSessionDetailResponse = {
   siteVisibility?: PublicSiteVisibility;
   publication: HostSessionPublication | null;
   state: SessionState;
+  scheduleRevision: number;
+  scheduleSeenAvailability: "AVAILABLE" | "UNAVAILABLE";
+  scheduleSeenSummary: {
+    currentCount: number | null;
+    staleCount: number | null;
+    unseenCount: number | null;
+    eligibleCount: number | null;
+  };
   attendees: Array<{
     membershipId: string;
     avatarKey: string;
@@ -418,6 +436,9 @@ export type HostSessionDetailResponse = {
     rsvpStatus: RsvpStatus;
     attendanceStatus: AttendanceStatus;
     participationStatus?: SessionParticipationStatus;
+    seenScheduleRevision: number | null;
+    scheduleSeenAt: string | null;
+    scheduleSeenState: "CURRENT" | "STALE" | "UNSEEN";
   }>;
   feedbackDocument: FeedbackDocumentStatus;
   changeReceipt?: HostSessionChangeReceipt | null;

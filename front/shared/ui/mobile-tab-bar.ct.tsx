@@ -86,3 +86,28 @@ test("MobileTabBar wraps deliberately long Korean and English labels at a narrow
     expect(metric.height).toBeGreaterThanOrEqual(44);
   }
 });
+
+test("MobileTabBar keeps the four scoped host destinations operable at 390px", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  const tabBar = await mount(
+    <MemoryRouter initialEntries={["/clubs/reading-sai/app/host"]}>
+      <MobileTabBar variant="host" appBasePath="/clubs/reading-sai/app" />
+    </MemoryRouter>,
+  );
+
+  const links = tabBar.getByRole("link");
+  await expect(links).toHaveText(["운영실", "모임", "사람", "기록"]);
+  expect(await links.evaluateAll((elements) => elements.map((element) => element.getAttribute("href")))).toEqual([
+    "/clubs/reading-sai/app/host",
+    "/clubs/reading-sai/app/host/sessions",
+    "/clubs/reading-sai/app/host/people",
+    "/clubs/reading-sai/app/host/records",
+  ]);
+  for (const link of await links.all()) {
+    const box = await link.boundingBox();
+    expect(box?.width).toBeGreaterThanOrEqual(44);
+    expect(box?.height).toBeGreaterThanOrEqual(44);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});

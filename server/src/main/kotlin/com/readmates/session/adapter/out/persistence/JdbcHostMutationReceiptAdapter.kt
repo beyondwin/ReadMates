@@ -26,9 +26,9 @@ class JdbcHostMutationReceiptAdapter(
             insert into host_session_mutation_receipts (
               id, club_id, actor_membership_id, operation, resource_id,
               session_revision, exposure_revision, participant_set_revision,
-              record_draft_revision, live_record_revision, publication_revision,
+              record_draft_revision, live_record_revision, publication_revision, schedule_revision,
               notification_decision, dispatch_receipt_id, created_at
-            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
             record.receiptId.dbString(),
             record.clubId.dbString(),
@@ -41,6 +41,7 @@ class JdbcHostMutationReceiptAdapter(
             record.resultingVersions.recordDraftRevision,
             record.resultingVersions.liveRecordRevision,
             record.resultingVersions.publicationRevision,
+            record.resultingVersions.scheduleRevision,
             record.notificationDecision.name,
             record.dispatchReceiptId?.dbString(),
             createdAt.atOffset(ZoneOffset.UTC).toUtcLocalDateTime(),
@@ -77,7 +78,7 @@ class JdbcHostMutationReceiptAdapter(
                 """
                 select id, club_id, actor_membership_id, operation, resource_id,
                        session_revision, exposure_revision, participant_set_revision,
-                       record_draft_revision, live_record_revision, publication_revision,
+                       record_draft_revision, live_record_revision, publication_revision, schedule_revision,
                        notification_decision, dispatch_receipt_id, created_at
                 from host_session_mutation_receipts
                 where club_id = ? and id = ?
@@ -102,6 +103,7 @@ class JdbcHostMutationReceiptAdapter(
                     recordDraftRevision = getLongOrNull("record_draft_revision"),
                     liveRecordRevision = getLongOrNull("live_record_revision"),
                     publicationRevision = getLong("publication_revision"),
+                    scheduleRevision = getLong("schedule_revision"),
                 ),
             notificationDecision = NotificationDecision.valueOf(getString("notification_decision")),
             dispatchReceiptId = uuidOrNull("dispatch_receipt_id"),

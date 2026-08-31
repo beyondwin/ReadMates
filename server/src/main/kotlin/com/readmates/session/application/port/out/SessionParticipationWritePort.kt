@@ -2,6 +2,7 @@ package com.readmates.session.application.port.out
 
 import com.readmates.session.application.model.CheckinResult
 import com.readmates.session.application.model.LongReviewResult
+import com.readmates.session.application.model.MarkScheduleSeenCommand
 import com.readmates.session.application.model.OneLineReviewResult
 import com.readmates.session.application.model.QuestionResult
 import com.readmates.session.application.model.ReplaceQuestionsCommand
@@ -11,6 +12,7 @@ import com.readmates.session.application.model.SaveCheckinCommand
 import com.readmates.session.application.model.SaveLongReviewCommand
 import com.readmates.session.application.model.SaveOneLineReviewCommand
 import com.readmates.session.application.model.SaveQuestionCommand
+import com.readmates.session.application.model.ScheduleSeenResult
 import com.readmates.session.application.model.UpdateRsvpCommand
 import com.readmates.shared.security.CurrentMember
 import java.util.UUID
@@ -19,6 +21,11 @@ interface SessionParticipationWritePort {
     fun lockOpenSession(member: CurrentMember): UUID
 
     fun updateRsvp(command: UpdateRsvpCommand): RsvpResult
+
+    fun markScheduleSeen(
+        command: MarkScheduleSeenCommand,
+        sessionId: UUID,
+    ): ScheduleSeenResult
 
     fun saveCheckin(command: SaveCheckinCommand): CheckinResult
 

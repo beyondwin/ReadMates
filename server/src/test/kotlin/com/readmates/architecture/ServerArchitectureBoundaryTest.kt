@@ -99,6 +99,12 @@ private val serverSlices =
             applicationPackages = listOf("com.readmates.sessionclosing.application.."),
         ),
         ServerSlice(
+            name = "hostworkspace",
+            type = ServerSliceType.WORKFLOW,
+            inboundAdapterPackages = listOf("com.readmates.hostworkspace.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.hostworkspace.application.."),
+        ),
+        ServerSlice(
             name = "feedback",
             type = ServerSliceType.WORKFLOW,
             inboundAdapterPackages = listOf("com.readmates.feedback.adapter.in.web.."),
@@ -421,6 +427,7 @@ class ServerArchitectureBoundaryTest {
                     "admin.takedown",
                     "aigen",
                     "browse",
+                    "hostworkspace",
                     "sessionclosing",
                     "sessionimport",
                     "sessionrecord",
@@ -836,6 +843,40 @@ class ServerAdapterArchitectureBoundaryTest {
             .dependOnClassesThat()
             .resideInAnyPackage("com.readmates.session..")
             .check(importedClasses)
+    }
+
+    @Test
+    fun `host workspace composition keeps foreign features behind outbound input-port adapters`() {
+        assertNoForbiddenKotlinImports(
+            "com/readmates/hostworkspace/application",
+            "Host-workspace application must not import any foreign ReadMates feature",
+        ) { reference ->
+            reference.startsWith("com.readmates.") &&
+                !reference.startsWith("com.readmates.hostworkspace.")
+        }
+        assertNoForbiddenKotlinImports(
+            "com/readmates/hostworkspace/domain",
+            "Host-workspace domain must not import any foreign ReadMates feature",
+        ) { reference ->
+            reference.startsWith("com.readmates.") &&
+                !reference.startsWith("com.readmates.hostworkspace.")
+        }
+        assertNoForbiddenKotlinImports(
+            "com/readmates/hostworkspace/adapter/out/source",
+            "Host-workspace source adapters may use foreign input ports but never foreign adapters",
+        ) { reference ->
+            reference.startsWith("com.readmates.") &&
+                !reference.startsWith("com.readmates.hostworkspace.") &&
+                ".adapter." in reference
+        }
+        assertNoForbiddenKotlinImports(
+            "com/readmates/hostworkspace",
+            "Host-workspace must never import a foreign persistence adapter",
+        ) { reference ->
+            reference.startsWith("com.readmates.") &&
+                !reference.startsWith("com.readmates.hostworkspace.") &&
+                ".adapter.out.persistence." in reference
+        }
     }
 
     @Test

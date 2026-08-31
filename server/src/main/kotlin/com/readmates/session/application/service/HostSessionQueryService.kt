@@ -7,12 +7,15 @@ import com.readmates.session.application.InvalidHostSessionCursorException
 import com.readmates.session.application.model.HOST_MEETING_LIST_ORDERING_VERSION
 import com.readmates.session.application.model.HostListCursorStaleException
 import com.readmates.session.application.model.HostMeetingListCursor
+import com.readmates.session.application.model.HostOperatingRoomCandidate
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.canonicalize
 import com.readmates.session.application.model.usesSignedCursor
 import com.readmates.session.application.port.`in`.GetHostDashboardUseCase
 import com.readmates.session.application.port.`in`.HostSessionQueryUseCase
+import com.readmates.session.application.port.`in`.ListHostOperatingRoomCandidatesUseCase
 import com.readmates.session.application.port.`in`.ListUpcomingSessionsUseCase
+import com.readmates.session.application.port.out.HostOperatingRoomCandidateQueryPort
 import com.readmates.session.application.port.out.HostSessionQueryPort
 import com.readmates.session.application.requireHost
 import com.readmates.shared.listing.application.port.out.HostListEpochPort
@@ -25,7 +28,10 @@ import org.springframework.beans.factory.ObjectProvider
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
 import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
 
 @Service
 class HostSessionQueryService(
@@ -36,9 +42,12 @@ class HostSessionQueryService(
     private val cursorSigningProperties: HostListCursorSigningProperties =
         HostListCursorSigningProperties(allowEmptySecret = true),
     private val listReadProbe: ObjectProvider<HostSessionListReadProbe>? = null,
+    private val operatingRoomCandidateQueryPort: HostOperatingRoomCandidateQueryPort? = null,
+    private val clock: Clock = Clock.systemUTC(),
 ) : HostSessionQueryUseCase,
     ListUpcomingSessionsUseCase,
-    GetHostDashboardUseCase {
+    GetHostDashboardUseCase,
+    ListHostOperatingRoomCandidatesUseCase {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     @Suppress("ComplexCondition")
     override fun list(
@@ -110,6 +119,15 @@ class HostSessionQueryService(
         return queryPort.scheduleDefaults(host)
     }
 
+    override fun listHostOperatingRoomCandidates(host: CurrentMember): List<HostOperatingRoomCandidate> {
+        requireHost(host)
+        return checkNotNull(operatingRoomCandidateQueryPort) { "Host operating-room candidate query is unavailable" }
+            .loadHostOperatingRoomCandidates(
+                clubId = host.clubId,
+                evaluatedAt = LocalDateTime.now(clock.withZone(HOST_MEETING_ZONE)),
+            )
+    }
+
     @Suppress("ThrowsCount")
     private fun decodeCursor(
         raw: String,
@@ -145,3 +163,5 @@ class HostSessionQueryService(
         return cursor
     }
 }
+
+private val HOST_MEETING_ZONE: ZoneId = ZoneId.of("Asia/Seoul")

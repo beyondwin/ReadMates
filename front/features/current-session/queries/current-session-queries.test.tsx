@@ -3,9 +3,11 @@ import { act, renderHook } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RECOVER_READ_SESSION_EXPIRY } from "@/shared/api/client";
+import { ReadmatesApiError } from "@/shared/api/errors";
 
 vi.mock("@/features/current-session/api/current-session-api", () => ({
   getCurrentSession: vi.fn(),
+  markCurrentScheduleSeen: vi.fn(),
   saveCurrentSessionCheckin: vi.fn(),
   saveCurrentSessionLongReview: vi.fn(),
   saveCurrentSessionOneLineReview: vi.fn(),
@@ -15,6 +17,7 @@ vi.mock("@/features/current-session/api/current-session-api", () => ({
 
 import {
   getCurrentSession,
+  markCurrentScheduleSeen,
   saveCurrentSessionCheckin,
   saveCurrentSessionLongReview,
   saveCurrentSessionOneLineReview,
@@ -25,6 +28,7 @@ import {
   currentSessionKeys,
   currentSessionQuery,
   invalidateCurrentSession,
+  useMarkCurrentScheduleSeenMutation,
   useSaveCurrentSessionCheckinMutation,
   useSaveCurrentSessionLongReviewMutation,
   useSaveCurrentSessionOneLineReviewMutation,
@@ -55,6 +59,7 @@ function cacheState(client: QueryClient) {
 
 beforeEach(() => {
   vi.mocked(getCurrentSession).mockReset();
+  vi.mocked(markCurrentScheduleSeen).mockReset();
   vi.mocked(updateCurrentSessionRsvp).mockReset();
   vi.mocked(saveCurrentSessionCheckin).mockReset();
   vi.mocked(saveCurrentSessionQuestions).mockReset();
@@ -120,6 +125,63 @@ describe("current session query keys", () => {
 });
 
 describe("current session mutation hooks", () => {
+  it("patches requester-only seen facts in the selected club cache after acknowledgement", async () => {
+    const { client, Wrapper } = createWrapper();
+    const selectedKey = currentSessionKeys.current({ clubSlug: "reading-sai" });
+    const otherKey = currentSessionKeys.current({ clubSlug: "other-club" });
+    client.setQueryData(selectedKey, {
+      currentSession: { scheduleRevision: 7, mySeenScheduleRevision: 6, myScheduleSeenAt: null },
+    });
+    client.setQueryData(otherKey, {
+      currentSession: { scheduleRevision: 4, mySeenScheduleRevision: 3, myScheduleSeenAt: null },
+    });
+    vi.mocked(markCurrentScheduleSeen).mockResolvedValue({
+      scheduleRevision: 7,
+      seenAt: "2026-08-29T00:00:00Z",
+    });
+    const { result } = renderHook(
+      () => useMarkCurrentScheduleSeenMutation({ clubSlug: "reading-sai" }),
+      { wrapper: Wrapper },
+    );
+
+    await act(async () => result.current.mutateAsync(7));
+
+    expect(markCurrentScheduleSeen).toHaveBeenCalledWith(7, { clubSlug: "reading-sai" });
+    expect(client.getQueryData(selectedKey)).toEqual({
+      currentSession: {
+        scheduleRevision: 7,
+        mySeenScheduleRevision: 7,
+        myScheduleSeenAt: "2026-08-29T00:00:00Z",
+      },
+    });
+    expect(client.getQueryData(otherKey)).toEqual({
+      currentSession: { scheduleRevision: 4, mySeenScheduleRevision: 3, myScheduleSeenAt: null },
+    });
+  });
+
+  it("invalidates a conflicted current session without patching its stale revision", async () => {
+    const { client, Wrapper } = createWrapper();
+    const selectedKey = currentSessionKeys.current({ clubSlug: "reading-sai" });
+    const cached = {
+      currentSession: { scheduleRevision: 7, mySeenScheduleRevision: 6, myScheduleSeenAt: null },
+    };
+    client.setQueryData(selectedKey, cached);
+    vi.mocked(markCurrentScheduleSeen).mockRejectedValue(new ReadmatesApiError(
+      { code: "SCHEDULE_REVISION_CONFLICT", message: "revision changed", status: 409, fallback: false },
+      new Response(null, { status: 409 }),
+    ));
+    const { result } = renderHook(
+      () => useMarkCurrentScheduleSeenMutation({ clubSlug: "reading-sai" }),
+      { wrapper: Wrapper },
+    );
+
+    await expect(result.current.mutateAsync(7)).rejects.toMatchObject({ status: 409 });
+
+    expect(markCurrentScheduleSeen).toHaveBeenCalledTimes(1);
+    expect(client.getQueryData(selectedKey)).toEqual(cached);
+    expect(client.getQueryState(selectedKey)?.isInvalidated).toBe(true);
+  });
+
   it.each([
     [
       "rsvp",

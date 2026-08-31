@@ -16,6 +16,7 @@ import {
   fetchHostNotificationPolicy,
   fetchHostNotificationSummary,
   fetchHostNotificationTestMailAudit,
+  fetchHostOperatingRoomCurrent,
   fetchHostPublicConvergence,
   fetchHostSessions,
   fetchHostSessionList,
@@ -24,6 +25,8 @@ import {
   fetchManualNotificationOptions,
   openHostSession,
   processHostNotifications,
+  previewManualNotification,
+  confirmManualNotification,
   parseHostInvitationListResponse,
   parseHostInvitationResponse,
   publishHostSession,
@@ -65,8 +68,17 @@ function hostSessionDetail() {
     meetingPasscode: null,
     publication: null,
     state: "OPEN" as const,
+    scheduleRevision: 7,
+    scheduleSeenAvailability: "AVAILABLE" as const,
+    scheduleSeenSummary: {
+      currentCount: 1,
+      staleCount: 0,
+      unseenCount: 0,
+      eligibleCount: 1,
+    },
     versions: {
       sessionRevision: 3,
+      scheduleRevision: 7,
       exposureRevision: 2,
       participantSetRevision: 1,
       recordDraftRevision: null,
@@ -74,7 +86,21 @@ function hostSessionDetail() {
       publicationRevision: 0,
     },
     attendanceSnapshotId: "attendance-snapshot-1",
-    attendees: [],
+    attendees: [
+      {
+        membershipId: "membership-1",
+        avatarKey: "banana-green-book",
+        displayName: "멤버1",
+        accountName: "안멤버1",
+        rsvpStatus: "GOING" as const,
+        attendanceStatus: "UNKNOWN" as const,
+        participationStatus: "ACTIVE" as const,
+        attendanceRevision: 2,
+        seenScheduleRevision: 7,
+        scheduleSeenAt: "2026-07-22T12:00:00Z",
+        scheduleSeenState: "CURRENT" as const,
+      },
+    ],
     feedbackDocument: {
       uploaded: false,
       fileName: null,
@@ -97,6 +123,7 @@ function hostMemberListItem(avatarKey: unknown = "banana-green-book") {
     status: "ACTIVE",
     joinedAt: "2026-04-18T12:00:00Z",
     createdAt: "2026-04-17T12:00:00Z",
+    lastClubAccessAt: "2026-08-29T01:02:03Z",
     currentSessionParticipationStatus: "ACTIVE",
     canSuspend: true,
     canRestore: false,
@@ -114,7 +141,13 @@ function stubFetch() {
           supportedHostClientContracts: ["v2", "v3"],
         }), { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } })
       : jsonResponse(
-      url.includes("/visibility") || url.includes("/access-scope")
+      url.includes("/operating-room/current")
+        ? { currentMeeting: null }
+        : url.includes("/notifications/manual/options")
+          ? { session: null, templates: [], members: { items: [], nextCursor: null }, recentDispatches: [] }
+        : url.includes("/notifications/manual/dispatches")
+          ? { items: [], nextCursor: null }
+        : url.includes("/visibility") || url.includes("/access-scope")
         ? { session: hostSessionDetail(), composer: null }
         : url.includes("/attendance")
           ? { sessionId: "session-7", count: 0 }
@@ -156,6 +189,86 @@ afterEach(() => {
 });
 
 describe("host api wrappers", () => {
+  it("sends exact editable copy and strictly parses preview and confirm responses", async () => {
+    const preview = {
+      previewId: "preview-1",
+      expiresAt: "2026-08-30T00:10:00Z",
+      scheduleRevision: 7,
+      targetSnapshotHash: "b".repeat(64),
+      contentHash: "c".repeat(64),
+      template: {
+        eventType: "SESSION_REMINDER_DUE",
+        label: "리마인더",
+        subject: "고친 제목",
+        bodyPreview: "고친 본문",
+      },
+      audience: {
+        baseGroup: "ALL_ACTIVE_MEMBERS",
+        baseCount: 1,
+        excludedCount: 0,
+        includedCount: 0,
+        finalTargetCount: 1,
+      },
+      channels: {
+        requested: "BOTH",
+        inAppEligibleCount: 1,
+        emailEligibleCount: 1,
+        emailSkippedByPreferenceCount: 0,
+        emailMissingCount: 0,
+      },
+      duplicates: { requiresResendConfirmation: false, recentDispatches: [] },
+      warnings: [],
+    };
+    const confirm = {
+      manualDispatchId: "dispatch-1",
+      eventId: "event-1",
+      status: "PENDING",
+      createdAt: "2026-08-30T00:00:00Z",
+      summary: {
+        targetCount: 1,
+        requestedChannels: "BOTH",
+        expectedInAppCount: 1,
+        expectedEmailCount: 1,
+      },
+    };
+    const fetchMock = vi.fn().mockImplementation((url: string) => Promise.resolve(
+      url.includes("/__internal/client-contract-status")
+        ? new Response(JSON.stringify({ schemaVersion: 1, supportedHostClientContracts: ["v3"] }), {
+            headers: { "Cache-Control": "no-store", "Content-Type": "application/json" },
+          })
+        : jsonResponse(url.includes("/manual/preview") ? preview : confirm),
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+    const context = { clubSlug: "reading-sai" };
+    const selection = {
+      sessionId: "session-1",
+      eventType: "SESSION_REMINDER_DUE" as const,
+      contentRevision: "a".repeat(64),
+      audience: "ALL_ACTIVE_MEMBERS" as const,
+      requestedChannels: "BOTH" as const,
+      selectedMembershipIds: [],
+      excludedMembershipIds: [],
+      includedMembershipIds: [],
+      sendMode: "NOW" as const,
+      scheduleRevision: 7,
+      subject: "고친 제목",
+      body: "고친 본문",
+    };
+
+    await expect(previewManualNotification(selection, context)).resolves.toEqual(preview);
+    await expect(confirmManualNotification({
+      ...selection,
+      previewId: preview.previewId,
+      resendConfirmed: false,
+    }, context)).resolves.toEqual(confirm);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/manual"))
+      .map(([, init]) => JSON.parse(String((init as RequestInit).body))))
+      .toEqual([selection, { ...selection, previewId: preview.previewId, resendConfirmed: false }]);
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ...preview, providerPayload: "금지" }));
+    await expect(previewManualNotification(selection, context)).rejects.toThrow();
+  });
+
   it.each([
     "HOST_AUTHORITY_REVOKED",
     "MEMBERSHIP_SUSPENDED",
@@ -240,6 +353,7 @@ describe("host api wrappers", () => {
       resourceId: "session-7",
       resultingVersions: {
         sessionRevision: 4,
+        scheduleRevision: 7,
         exposureRevision: 1,
         participantSetRevision: 2,
         recordDraftRevision: null,
@@ -261,6 +375,7 @@ describe("host api wrappers", () => {
         state: "OPEN",
         versions: {
           sessionRevision: 4,
+          scheduleRevision: 7,
           exposureRevision: 1,
           participantSetRevision: 2,
           recordDraftRevision: null,
@@ -553,6 +668,7 @@ describe("host api wrappers", () => {
     const context = { clubSlug: "reading-sai" };
 
     await fetchHostCurrentSession(context);
+    await fetchHostOperatingRoomCurrent(context);
     await fetchHostClubOperations(context);
     await fetchHostNotificationSummary(context);
     await fetchHostNotificationPolicy(context);
@@ -576,6 +692,7 @@ describe("host api wrappers", () => {
     const urls = fetchMock.mock.calls.map(([url]) => url);
     expect(urls).toEqual([
       "/api/bff/api/sessions/current?clubSlug=reading-sai",
+      "/api/bff/api/host/operating-room/current?clubSlug=reading-sai",
       "/api/bff/api/host/club-operations?clubSlug=reading-sai",
       "/api/bff/api/host/notifications/summary?clubSlug=reading-sai",
       "/api/bff/api/host/notifications/policy?clubSlug=reading-sai",
@@ -588,6 +705,18 @@ describe("host api wrappers", () => {
       "/api/bff/api/host/sessions/schedule-defaults?clubSlug=reading-sai",
       "/api/bff/api/host/members?limit=25&cursor=m2&clubSlug=reading-sai",
     ]);
+  });
+
+  it("rejects a malformed operating-room selector at the API boundary", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
+      currentMeeting: {
+        sessionId: "session-7",
+        selection: "CLIENT_GUESSED",
+        scheduleSeenAvailability: "AVAILABLE",
+      },
+    })));
+
+    await expect(fetchHostOperatingRoomCurrent({ clubSlug: "reading-sai" })).rejects.toThrow();
   });
 
   it("parses the bounded convergence view and treats no linked work as absent", async () => {
@@ -677,6 +806,21 @@ describe("host api wrappers", () => {
 
     await expect(fetchHostMembers({ clubSlug: "reading-sai" })).resolves.toMatchObject({
       items: [{ avatarKey: "future-avatar" }],
+    });
+    await expect(fetchHostMembers({ clubSlug: "reading-sai" })).rejects.toThrow();
+  });
+
+  it("accepts only the coarse member access timestamp in the host contract", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ items: [hostMemberListItem()], nextCursor: null }))
+      .mockResolvedValueOnce(jsonResponse({
+        items: [{ ...hostMemberListItem(), lastVisitedPath: "/app/notes" }],
+        nextCursor: null,
+      }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchHostMembers({ clubSlug: "reading-sai" })).resolves.toMatchObject({
+      items: [{ lastClubAccessAt: "2026-08-29T01:02:03Z" }],
     });
     await expect(fetchHostMembers({ clubSlug: "reading-sai" })).rejects.toThrow();
   });
