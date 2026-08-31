@@ -371,6 +371,23 @@ test.describe("admin clubs registry", () => {
 
     // The decision sequence starts with the club name, then state/action/signal.
     const criticalRow = rows.first();
+    const primarySequence = await criticalRow
+      .locator(":scope > :not(details) :is(a, dt, dd)")
+      .evaluateAll((elements) =>
+        elements.map((element) => ({
+          role: element instanceof HTMLAnchorElement ? "link" : element.tagName.toLowerCase(),
+          text: element.textContent?.trim(),
+        })),
+      );
+    expect(primarySequence).toEqual([
+      { role: "link", text: "Broken Club" },
+      { role: "dt", text: "현재 상태" },
+      { role: "dd", text: "활성 · 비공개" },
+      { role: "dt", text: "필요한 조치" },
+      { role: "dd", text: "실패 신호 확인" },
+      { role: "dt", text: "최근 신호" },
+      { role: "dd", text: "알림 실패 2건 · 도메인 조치 필요" },
+    ]);
     await expect(criticalRow.getByRole("link", { name: "Broken Club" })).toBeVisible();
     await expect(criticalRow.getByText("현재 상태")).toBeVisible();
     await expect(criticalRow.getByText("필요한 조치")).toBeVisible();
@@ -385,12 +402,31 @@ test.describe("admin clubs registry", () => {
     await expect(quietRow.getByText("현재 상태")).toBeVisible();
     await expect(quietRow.getByText("필요한 조치")).toHaveCount(0);
     await expect(quietRow.getByText("최근 신호")).toHaveCount(0);
-    await expect(quietRow.getByText("마지막 확인")).toHaveCount(0);
 
+    const timestampLikeText =
+      /마지막\s*확인|\b20\d{2}[-./]\d{1,2}[-./]\d{1,2}\b|\b\d{1,2}:\d{2}\b|(?:오전|오후)\s*\d{1,2}시/;
+    for (let index = 0; index < await rows.count(); index += 1) {
+      await expect(rows.nth(index)).not.toContainText(timestampLikeText);
+    }
+
+    const primaryContent = criticalRow.locator(":scope > :not(details)");
+    for (const rawValue of ["crit-club", "broken", "ACTIVE", "PRIVATE", "1", "2"]) {
+      await expect(primaryContent.getByText(rawValue, { exact: true })).toHaveCount(0);
+    }
     const technicalDisclosure = criticalRow.getByLabel("기술 정보");
     await technicalDisclosure.getByText("기술 정보", { exact: true }).click();
+    await expect(technicalDisclosure.getByText("클럽 ID")).toBeVisible();
+    await expect(technicalDisclosure.getByText("crit-club")).toBeVisible();
     await expect(technicalDisclosure.getByText("Slug")).toBeVisible();
     await expect(technicalDisclosure.getByText("broken")).toBeVisible();
+    await expect(technicalDisclosure.getByText("수명주기 값")).toBeVisible();
+    await expect(technicalDisclosure.getByText("ACTIVE")).toBeVisible();
+    await expect(technicalDisclosure.getByText("공개 상태 값")).toBeVisible();
+    await expect(technicalDisclosure.getByText("PRIVATE")).toBeVisible();
+    await expect(technicalDisclosure.getByText("도메인 수")).toBeVisible();
+    await expect(technicalDisclosure.getByText("1", { exact: true })).toBeVisible();
+    await expect(technicalDisclosure.getByText("도메인 조치 수")).toBeVisible();
+    await expect(technicalDisclosure.getByText("2", { exact: true })).toBeVisible();
 
     await page
       .getByRole("combobox", { name: "공개 상태" })
