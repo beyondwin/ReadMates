@@ -332,9 +332,9 @@ describe("AdminHealthGrid", () => {
     expect(screen.getByTestId("admin-health-grid")).toHaveAttribute("data-page-state", "ready");
     expect(screen.queryByText("일부만 확인됨")).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(within(screen.getByRole("article", { name: "Redis" })).getByText("비활성")).toBeInTheDocument();
-    expect(within(screen.getByRole("article", { name: "Kafka consumer lag" })).getByText("비활성")).toBeInTheDocument();
-    expect(within(screen.getByRole("article", { name: "AI provider availability" })).getByText("비활성")).toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "Redis" })).getAllByText("사용 안 함")).toHaveLength(2);
+    expect(within(screen.getByRole("article", { name: "Kafka consumer lag" })).getAllByText("사용 안 함")).toHaveLength(2);
+    expect(within(screen.getByRole("article", { name: "AI provider availability" })).getAllByText("사용 안 함")).toHaveLength(2);
     expect(within(screen.getByRole("article", { name: "Redis" })).queryByText("확인 불가")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Redis 다시 확인" })).not.toBeInTheDocument();
   });
@@ -351,7 +351,7 @@ describe("AdminHealthGrid", () => {
     });
 
     expect(screen.getByTestId("admin-health-grid")).toHaveAttribute("data-page-state", "disabled");
-    expect(screen.getByText("비활성 구성")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "사용 안 함" })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(document.querySelector(".admin-health-card__pill--ok")).toBeNull();
     expect(screen.getByRole("heading", { name: "Outbox backlog" })).toBeInTheDocument();

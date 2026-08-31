@@ -1,3 +1,8 @@
+import {
+  adminHealthAvailabilityLanguage,
+  adminHealthFreshnessLanguage,
+} from "@/features/platform-admin/model/admin-status-language";
+
 export type HealthCardStatus = "OK" | "WARN" | "CRIT" | "UNKNOWN";
 export type HealthCardSource = "IN_PROCESS" | "PROMETHEUS" | "FILE";
 export type DeployAttemptFinalStatus = "SUCCEEDED" | "FAILED" | "RUNNING";
@@ -81,7 +86,7 @@ const EVIDENCE_LABEL: Record<HealthEvidenceState, string> = {
   warn: "주의",
   crit: "위험",
   unavailable: "확인 불가",
-  disabled: "비활성",
+  disabled: adminHealthAvailabilityLanguage("DISABLED").primaryText,
   empty: "없음",
 };
 
@@ -117,7 +122,7 @@ export function healthFreshnessLabel(refreshState: PlatformHealthRefreshState): 
 
 export function healthPrimaryReading(card: HealthCard): string {
   const evidence = healthCardEvidenceState(card);
-  if (evidence === "disabled") return "구성되지 않음";
+  if (evidence === "disabled") return adminHealthAvailabilityLanguage("DISABLED").primaryText;
   if (evidence === "unavailable") return "—";
   if (evidence === "empty") {
     return card.id === DEPLOY_ATTEMPTS_CARD_ID ? "기록 없음" : "없음";
@@ -269,4 +274,3 @@ function formatAge(seconds: number): string {
   if (remainingSeconds === 0) return `${minutes}분`;
   return `${minutes}분 ${remainingSeconds}초`;
 }
-import { adminHealthFreshnessLanguage } from "@/features/platform-admin/model/admin-status-language";

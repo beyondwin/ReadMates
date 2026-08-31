@@ -12,14 +12,18 @@ import {
   type SupportGrantReasonCategory,
   type SupportGrantStatus,
 } from "@/features/platform-admin/model/platform-admin-support-model";
-import { adminPlatformRoleLanguage } from "@/features/platform-admin/model/admin-status-language";
+import {
+  adminPlatformRoleLanguage,
+  adminSupportCommandOutcomeLanguage,
+  adminSupportReceiptStatusLanguage,
+} from "@/features/platform-admin/model/admin-status-language";
 import { AdminSafeActionDock, type AdminSafeActionState } from "./admin-action-dock";
 import { AdminEvidenceLedger } from "./admin-evidence-ledger";
 import { AdminPageContext } from "./admin-page-context";
 import { AdminReceiptTimeline } from "./admin-receipt-timeline";
 import type { AdminPageState } from "./admin-state-panel";
 import { AdminWorkViewBar } from "./admin-work-view-bar";
-import { AdminTechnicalDisclosure } from "./admin-technical-disclosure";
+import { AdminTechnicalDisclosure } from "@/features/platform-admin/ui/admin-technical-disclosure";
 
 export type AdminSupportWorkbenchClub = { clubId: string; name: string };
 
@@ -278,10 +282,29 @@ function PreviewSummary({ preview }: { preview: AdminSupportGrantPreview }) {
 }
 
 function ReceiptSummary({ receipt }: { receipt: AdminSupportGrantReceipt }) {
-  return <section className="admin-support-workbench__receipt" aria-label="명령 영수증"><p><strong>{ADMIN_COPY.receipt}</strong> · {receipt.outcome}</p><p className="small muted">영수증 {receipt.receiptId} · {receipt.beforeStatus} → {receipt.afterStatus}</p><p className="small muted">{supportGrantReasonLabel(receipt.reasonCategory)} · {notePresenceLabel(receipt.notePresent)}</p></section>;
+  const outcome = adminSupportCommandOutcomeLanguage(receipt.outcome).primaryText;
+  const beforeStatus = adminSupportReceiptStatusLanguage(receipt.beforeStatus).primaryText;
+  const afterStatus = adminSupportReceiptStatusLanguage(receipt.afterStatus).primaryText;
+  return (
+    <section className="admin-support-workbench__receipt" aria-label="명령 영수증">
+      <p><strong>{ADMIN_COPY.receipt}</strong> · {outcome}</p>
+      <p className="small muted">영수증 {receipt.receiptId} · {beforeStatus} → {afterStatus}</p>
+      <p className="small muted">{supportGrantReasonLabel(receipt.reasonCategory)} · {notePresenceLabel(receipt.notePresent)}</p>
+      <AdminTechnicalDisclosure
+        items={[
+          { label: "명령 결과 코드", value: receipt.outcome },
+          { label: "이전 상태 코드", value: receipt.beforeStatus },
+          { label: "이후 상태 코드", value: receipt.afterStatus },
+        ]}
+      />
+    </section>
+  );
 }
 
 function SupportReceiptTimeline({ receipt }: { receipt: AdminSupportGrantReceipt }) {
+  const outcome = adminSupportCommandOutcomeLanguage(receipt.outcome).primaryText;
+  const beforeStatus = adminSupportReceiptStatusLanguage(receipt.beforeStatus).primaryText;
+  const afterStatus = adminSupportReceiptStatusLanguage(receipt.afterStatus).primaryText;
   return (
     <AdminReceiptTimeline
       level="L2"
@@ -289,10 +312,10 @@ function SupportReceiptTimeline({ receipt }: { receipt: AdminSupportGrantReceipt
       entries={[
         {
           key: "command",
-          label: `${receipt.commandType === "CREATE" ? "발급" : "취소"} ${receipt.outcome}`,
+          label: `${receipt.commandType === "CREATE" ? "발급" : "취소"} ${outcome}`,
           state: receipt.outcome === "SUCCEEDED" ? "succeeded" : "failed",
           occurredAt: receipt.createdAt,
-          detail: `${receipt.beforeStatus} → ${receipt.afterStatus} · ${supportGrantReasonLabel(receipt.reasonCategory)} · ${notePresenceLabel(receipt.notePresent)}`,
+          detail: `${beforeStatus} → ${afterStatus} · ${supportGrantReasonLabel(receipt.reasonCategory)} · ${notePresenceLabel(receipt.notePresent)}`,
         },
       ]}
     />

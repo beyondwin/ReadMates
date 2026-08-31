@@ -3,9 +3,9 @@ import { Link } from "react-router";
 import { ADMIN_COPY, auditOutcomeLabel } from "@/features/platform-admin/model/admin-copy";
 import {
   buildAdminAuditOperationSummary,
+  adminAuditActorPrimaryLabel,
   formatAdminAuditOccurredAt,
   formatAdminAuditLedgerSentenceBody,
-  labelAdminAuditActorRole,
   shouldShowAdminAuditDetailValue,
   type AdminAuditActionCategory,
   type AdminAuditActorRole,
@@ -19,7 +19,7 @@ import { AdminEvidenceLedger } from "./admin-evidence-ledger";
 import { AdminPageContext } from "./admin-page-context";
 import type { AdminPageState } from "./admin-state-panel";
 import { AdminWorkViewBar } from "./admin-work-view-bar";
-import { AdminTechnicalDisclosure } from "./admin-technical-disclosure";
+import { AdminTechnicalDisclosure } from "@/features/platform-admin/ui/admin-technical-disclosure";
 
 export type AdminAuditLedgerProps = {
   page: AdminAuditLedgerPage | null;
@@ -280,7 +280,7 @@ function AuditDetail({ item, onBack }: { item: AdminAuditLedgerItem | null; onBa
       <h2 className="h3 editorial">{item.summary}</h2>
       <p className="tiny muted">{item.sourceTable} · {item.actionType}</p>
       <dl className="admin-audit__identity">
-        <div><dt>행위자</dt><dd>{auditActorPrimaryLabel(item)}</dd></div>
+        <div><dt>행위자</dt><dd>{adminAuditActorPrimaryLabel(item.actor)}</dd></div>
         <div><dt>대상</dt><dd>{item.target.label}</dd></div>
         {item.target.clubId ? <div><dt>클럽</dt><dd>{item.target.clubId}</dd></div> : null}
       </dl>
@@ -302,13 +302,6 @@ function AuditDetail({ item, onBack }: { item: AdminAuditLedgerItem | null; onBa
       {item.metadataState === "EMPTY" ? <p className="muted">안전하게 표시할 추가 세부 정보가 없습니다.</p> : null}
     </aside>
   );
-}
-
-function auditActorPrimaryLabel(item: AdminAuditLedgerItem): string {
-  const roleLabel = labelAdminAuditActorRole(item.actor.role);
-  return item.actor.displayLabel === item.actor.role
-    ? roleLabel
-    : `${item.actor.displayLabel} · ${roleLabel}`;
 }
 
 function toLocalDateTime(value: string | null | undefined) {

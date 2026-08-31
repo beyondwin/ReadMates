@@ -26,6 +26,7 @@ import {
   type HealthCard,
   type PlatformHealthSnapshot,
 } from "@/features/platform-admin/model/platform-admin-health-model";
+import { adminHealthAvailabilityLanguage } from "@/features/platform-admin/model/admin-status-language";
 import { AdminEvidenceLedger } from "./admin-evidence-ledger";
 import { AdminHealthCard } from "./admin-health-card";
 import { AdminHealthDeployStrip } from "./admin-health-deploy-strip";
@@ -155,8 +156,8 @@ export function AdminHealthGrid({
         >
           {pageState === "disabled" ? (
             <div className="admin-health-grid__notice" role="status">
-              <h2 className="admin-health-grid__notice-title">비활성 구성</h2>
-              <p>설정된 원천이 꺼져 있습니다. 장애가 아닙니다.</p>
+              <h2 className="admin-health-grid__notice-title">{adminHealthAvailabilityLanguage("DISABLED").primaryText}</h2>
+              <p>설정된 원천을 사용하지 않습니다. 장애가 아닙니다.</p>
             </div>
           ) : null}
           {deviations.length > 0 ? (

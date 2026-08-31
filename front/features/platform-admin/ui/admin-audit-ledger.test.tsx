@@ -54,6 +54,20 @@ const page: AdminAuditLedgerPage = {
 };
 
 describe("AdminAuditLedger", () => {
+  it.each(["OWNER", "OPERATOR", "SUPPORT"] as const)("never renders raw %s as primary row actor copy", (role) => {
+    render(
+      <AdminAuditLedger
+        page={{ ...page, items: [{ ...page.items[0], actor: { userId: "admin-1", role, displayLabel: role } }] }}
+        filters={{ range: "7d" }} loading={false} error={null} nextPageError={false} loadingMore={false}
+        sensitiveSearch={defaultSearch} selectedId={null} detailOpen={false} onSelect={vi.fn()} onCloseDetail={vi.fn()}
+        onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()}
+      />,
+    );
+    const row = screen.getByRole("button", { name: /알림 재처리가 확정되었습니다/ });
+    expect(row).toHaveTextContent(role === "OWNER" ? "소유자" : role === "OPERATOR" ? "운영자" : "지원 담당");
+    expect(row).not.toHaveTextContent(role);
+  });
+
   it("renders ledger rows and safe metadata detail", async () => {
     const user = userEvent.setup();
     render(
@@ -314,7 +328,7 @@ describe("AdminAuditLedger", () => {
     );
 
     expect(screen.getByRole("heading", { name: "운영 처리 기록" })).toBeInTheDocument();
-    const row = screen.getByRole("button", { name: /OWNER가 Replay preview에 알림 재처리가 확정되었습니다/ });
+    const row = screen.getByRole("button", { name: /소유자가 Replay preview에 알림 재처리가 확정되었습니다/ });
     expect(row).toHaveTextContent("사유: 사유 없음");
     expect(row).toHaveTextContent("완료");
     expect(row.querySelector("time")).toHaveAttribute("datetime", "2026-05-27T00:01:00Z");
@@ -346,7 +360,7 @@ describe("AdminAuditLedger", () => {
       />,
     );
 
-    const row = screen.getByRole("button", { name: /OWNER가 Replay preview에/ });
+    const row = screen.getByRole("button", { name: /소유자가 Replay preview에/ });
     expect(row).toHaveTextContent("차단");
     expect(row).not.toHaveTextContent("거부");
   });
@@ -372,7 +386,7 @@ describe("AdminAuditLedger", () => {
       />,
     );
 
-    const row = screen.getByRole("button", { name: /OWNER가 Replay preview에 알림 재처리가 확정되었습니다/ });
+    const row = screen.getByRole("button", { name: /소유자가 Replay preview에 알림 재처리가 확정되었습니다/ });
     expect(row).not.toHaveTextContent("preview-1");
     await user.click(row);
 

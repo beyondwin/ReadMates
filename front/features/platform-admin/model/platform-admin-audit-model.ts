@@ -168,7 +168,7 @@ export function formatAdminAuditOccurredAt(value: string): string {
 }
 
 export function formatAdminAuditLedgerSentenceBody(item: AdminAuditLedgerItem): string {
-  return `${item.actor.displayLabel}가 ${item.target.label}에 ${item.summary} · 사유: ${adminAuditReasonLabel(item)} · ${auditOutcomeLabel(item.outcome)}`;
+  return `${adminAuditActorPrimaryLabel(item.actor)}가 ${item.target.label}에 ${item.summary} · 사유: ${adminAuditReasonLabel(item)} · ${auditOutcomeLabel(item.outcome)}`;
 }
 
 export function formatAdminAuditLedgerSentence(item: AdminAuditLedgerItem): string {
@@ -192,6 +192,22 @@ export function labelAdminAuditSourceSlice(sourceSlice: AdminAuditSourceSlice): 
 
 export function labelAdminAuditActorRole(role: AdminAuditActorRole): string {
   return adminAuditActorRoleLanguage(role).primaryText;
+}
+
+export function adminAuditActorPrimaryLabel(actor: {
+  role: string;
+  displayLabel: string;
+}): string {
+  const roleLabel = adminAuditActorRoleLanguage(actor.role).primaryText;
+  const displayLabel = actor.displayLabel.trim();
+  if (!displayLabel || displayLabel === actor.role || isMachineRoleFallback(displayLabel)) {
+    return roleLabel;
+  }
+  return `${displayLabel} · ${roleLabel}`;
+}
+
+function isMachineRoleFallback(value: string): boolean {
+  return /^[A-Z][A-Z0-9_:-]*$/.test(value);
 }
 
 export function shouldShowAdminAuditDetailValue(label: string, value: string): boolean {

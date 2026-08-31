@@ -165,11 +165,25 @@ describe("AdminSupportWorkbench", () => {
     } })} />);
     const receipt = screen.getByLabelText("명령 영수증");
     expect(receipt).toHaveTextContent("receipt-1");
+    expect(receipt).toHaveTextContent("완료");
+    expect(receipt).toHaveTextContent("없음 → 활성");
+    const primaryReceiptText = Array.from(receipt.querySelectorAll(":scope > p")).map((node) => node.textContent).join(" ");
+    expect(primaryReceiptText).not.toContain("SUCCEEDED");
+    expect(primaryReceiptText).not.toContain("ABSENT");
+    expect(primaryReceiptText).not.toContain("ACTIVE");
+    const disclosure = receipt.querySelector("[data-admin-technical-disclosure]");
+    expect(disclosure).toHaveAttribute("aria-label", "기술 정보");
+    expect(disclosure).toHaveTextContent("SUCCEEDED");
+    expect(disclosure).toHaveTextContent("ABSENT");
+    expect(disclosure).toHaveTextContent("ACTIVE");
     expect(receipt).toHaveTextContent("검토 시 사유 메모 사용");
     expect(receipt).not.toHaveTextContent("raw private note");
     expect(screen.queryByText(/내부 메모/)).not.toBeInTheDocument();
     const timeline = screen.getByRole("region", { name: "명령 기록" });
     expect(timeline).toHaveTextContent("receipt-1");
+    expect(timeline).toHaveTextContent("발급 완료");
+    expect(timeline).toHaveTextContent("없음 → 활성");
+    expect(timeline).not.toHaveTextContent("SUCCEEDED");
     expect(timeline.querySelector(".admin-receipt-timeline__convergence")).toBeNull();
   });
 

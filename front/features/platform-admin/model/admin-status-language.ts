@@ -59,6 +59,29 @@ const HEALTH_FRESHNESS_LABELS = {
   UNAVAILABLE: "확인 불가",
 } as const;
 
+const SUPPORT_COMMAND_OUTCOME_LABELS = {
+  SUCCEEDED: "완료",
+  PARTIAL: "일부 처리됨",
+  FAILED: "실패",
+} as const;
+
+const SUPPORT_RECEIPT_STATUS_LABELS = {
+  ABSENT: "없음",
+  ACTIVE: "활성",
+  EXPIRING: "만료 임박",
+  EXPIRED: "만료됨",
+  REVOKED: "취소됨",
+} as const;
+
+const DOMAIN_STATUS_LABELS = {
+  REQUESTED: "요청됨",
+  ACTION_REQUIRED: "조치 필요",
+  PROVISIONING: "준비 중",
+  ACTIVE: "활성",
+  FAILED: "실패",
+  DISABLED: "사용 안 함",
+} as const;
+
 export function adminNavigationLanguage(value: string): AdminSemanticLanguage {
   return mapAdminSemanticLanguage(value, NAVIGATION_LABELS);
 }
@@ -85,6 +108,18 @@ export function adminHealthAvailabilityLanguage(value: string): AdminSemanticLan
 
 export function adminHealthFreshnessLanguage(value: string): AdminSemanticLanguage {
   return mapAdminSemanticLanguage(value, HEALTH_FRESHNESS_LABELS);
+}
+
+export function adminSupportCommandOutcomeLanguage(value: string): AdminSemanticLanguage {
+  return mapAdminSemanticLanguage(value, SUPPORT_COMMAND_OUTCOME_LABELS);
+}
+
+export function adminSupportReceiptStatusLanguage(value: string): AdminSemanticLanguage {
+  return mapAdminSemanticLanguage(value, SUPPORT_RECEIPT_STATUS_LABELS);
+}
+
+export function adminDomainStatusLanguage(value: string): AdminSemanticLanguage {
+  return mapAdminSemanticLanguage(value, DOMAIN_STATUS_LABELS);
 }
 
 export function mapAdminSemanticLanguage(

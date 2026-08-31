@@ -5,6 +5,7 @@ import {
   aiOpsDrilldownForAuditItem,
   buildAdminAuditOperationSummary,
   formatAdminAuditLedgerSentence,
+  adminAuditActorPrimaryLabel,
   mergeAdminAuditLedgerPages,
   labelAdminAuditOutcome,
   labelAdminAuditActorRole,
@@ -68,6 +69,13 @@ describe("platform-admin-audit-model", () => {
     ]);
   });
 
+  it("preserves human actor names but rejects enum and future machine fallback labels", () => {
+    expect(adminAuditActorPrimaryLabel({ role: "OWNER", displayLabel: "OWNER" })).toBe("소유자");
+    expect(adminAuditActorPrimaryLabel({ role: "OPERATOR", displayLabel: "운영 담당자" })).toBe("운영 담당자 · 운영자");
+    expect(adminAuditActorPrimaryLabel({ role: "SUPPORT", displayLabel: "SUPPORT" })).toBe("지원 담당");
+    expect(adminAuditActorPrimaryLabel({ role: "FUTURE_ROLE" as never, displayLabel: "FUTURE_ROLE" })).toBe("확인 필요");
+  });
+
   it("reads a target query as the initial clubId filter without serializing target", () => {
     expect(adminAuditFiltersFromSearchParams(new URLSearchParams("target=club-reading-sai"))).toEqual({
       range: "7d",
@@ -119,7 +127,8 @@ describe("formatAdminAuditLedgerSentence", () => {
       safeMetadata: [{ label: "selectionHashPrefix", value: "aaaaaaaa", kind: "fingerprint" }],
     }));
 
-    expect(sentence).toContain("OWNER가 Replay preview에 알림 재처리가 확정되었습니다.");
+    expect(sentence).toContain("소유자가 Replay preview에 알림 재처리가 확정되었습니다.");
+    expect(sentence).not.toContain("OWNER");
     expect(sentence).toContain("사유: 사유 없음");
     expect(sentence).toContain("완료");
     expect(sentence).not.toContain("preview-1");

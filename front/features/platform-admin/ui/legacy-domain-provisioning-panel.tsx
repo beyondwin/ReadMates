@@ -2,6 +2,7 @@ import type {
   PlatformAdminDomainStatus,
   PlatformAdminWorkbenchDomain,
 } from "@/features/platform-admin/model/platform-admin-workbench-model";
+import { adminDomainStatusLanguage } from "@/features/platform-admin/model/admin-status-language";
 
 type Props = {
   domains: PlatformAdminWorkbenchDomain[];
@@ -81,7 +82,7 @@ function DomainProvisioningRow({
         </p>
       </div>
       <div className="platform-admin-domain-row__status">
-        <span className="platform-admin-domain-status">{domain.status}</span>
+        <span className="platform-admin-domain-status">{adminDomainStatusLanguage(domain.status).primaryText}</span>
         {domain.errorCode ? (
           <span className="tiny danger">{domain.errorCode}</span>
         ) : null}

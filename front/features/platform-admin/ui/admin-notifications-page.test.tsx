@@ -178,7 +178,7 @@ describe("AdminNotificationsPage", () => {
 
     expect(screen.getByText(/^만료 /)).toHaveClass("small");
     expect(screen.getByText("MAIL_AMBIGUOUS")).toBeInTheDocument();
-    expect(screen.getByText(/DEAD 2/)).toBeInTheDocument();
+    expect(screen.getByText(/실패 2/)).toBeInTheDocument();
   });
 
   it("shows immutable receipt counts and disabled pending convergence separately", () => {

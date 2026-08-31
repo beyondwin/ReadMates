@@ -4,6 +4,7 @@ import {
   type AdminCommandRecovery,
 } from "@/features/platform-admin/model/platform-admin-command-recovery";
 import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
+import { adminDomainStatusLanguage } from "@/features/platform-admin/model/admin-status-language";
 import {
   AdminSafeActionDock,
   type AdminSafeActionState,
@@ -257,7 +258,7 @@ function AdminClubDomainCommandPanelInner({
               </div>
               <div>
                 <span className="platform-admin-domain-status">
-                  {domain.status}
+                  {adminDomainStatusLanguage(domain.status).primaryText}
                 </span>
                 {domain.errorCode ? (
                   <p className="tiny danger">{domain.errorCode}</p>

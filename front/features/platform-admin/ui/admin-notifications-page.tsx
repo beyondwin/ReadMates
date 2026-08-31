@@ -119,7 +119,7 @@ export function AdminNotificationsPage({
                 </p>
                 <p className="small muted">만료 {formatTimestamp(replayPreview.expiresAt)}</p>
                 {Object.entries(replayPreview.estimatedByStatus).map(([status, count]) => (
-                  <span key={status} className="platform-admin-domain-status">{status} {count}</span>
+                  <span key={status} className="platform-admin-domain-status">{deliveryLedgerStatusLabel(status)} {count}</span>
                 ))}
                 {replayPreview.warnings.map((warning) => (
                   <span key={warning} className="admin-notifications__safe-code">{warning}</span>

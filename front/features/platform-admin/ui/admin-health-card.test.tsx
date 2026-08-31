@@ -95,7 +95,7 @@ describe("AdminHealthCard", () => {
     );
 
     const article = articleNamed("Redis");
-    expect(within(article).getByText("비활성")).toBeInTheDocument();
+    expect(within(article).getAllByText("사용 안 함")).toHaveLength(2);
     expect(within(article).queryByText("확인 불가")).not.toBeInTheDocument();
     expect(within(article).queryByText("정상")).not.toBeInTheDocument();
     expect(within(article).queryByRole("alert")).not.toBeInTheDocument();

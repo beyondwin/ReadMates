@@ -2,6 +2,7 @@ import type {
   DeployAttemptStripEntry,
   HealthEvidenceState,
 } from "@/features/platform-admin/model/platform-admin-health-model";
+import { adminHealthAvailabilityLanguage } from "@/features/platform-admin/model/admin-status-language";
 
 const STATUS_LABEL: Record<DeployAttemptStripEntry["finalStatus"], string> = {
   SUCCEEDED: "성공",
@@ -30,7 +31,7 @@ export function AdminHealthDeployStrip({
     return <p className="admin-health-deploy-strip__empty">배포 원장을 확인할 수 없습니다.</p>;
   }
   if (evidenceState === "disabled") {
-    return <p className="admin-health-deploy-strip__empty">배포 원장이 비활성입니다.</p>;
+    return <p className="admin-health-deploy-strip__empty">배포 기록을 {adminHealthAvailabilityLanguage("DISABLED").primaryText} 상태입니다.</p>;
   }
   if (!entries || entries.length === 0 || evidenceState === "empty") {
     return <p className="admin-health-deploy-strip__empty">아직 기록된 배포가 없습니다.</p>;

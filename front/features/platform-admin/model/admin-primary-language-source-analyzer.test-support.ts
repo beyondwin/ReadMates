@@ -18,7 +18,7 @@ export function analyzeAdminPrimaryLanguageSource(
   fileName = "source.tsx",
 ): AdminPrimaryLanguageAnalysis {
   const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  const checksRawPrimaryExpressions = !fileName.includes("/") || /ui\/(?:platform-admin-ai-ops|admin-audit-ledger)\.tsx$/.test(fileName);
+  const technicalDisclosureBindings = collectTechnicalDisclosureBindings(sourceFile);
   const staticBindings = collectStaticBindings(sourceFile);
   const rawBindings = collectRawBindings(sourceFile);
   const violations: AdminPrimaryLanguageViolation[] = [];
@@ -36,31 +36,48 @@ export function analyzeAdminPrimaryLanguageSource(
     if (term) report(node, `primary copy contains ${term}`);
   };
 
-  const visit = (node: ts.Node, insideTechnicalDisclosure = false) => {
+  const visit = (node: ts.Node) => {
     if (ts.isJsxSelfClosingElement(node) || ts.isJsxElement(node)) {
       const tagName = ts.isJsxSelfClosingElement(node)
         ? node.tagName.getText(sourceFile)
         : node.openingElement.tagName.getText(sourceFile);
-      if (tagName === "AdminTechnicalDisclosure") {
+      if (technicalDisclosureBindings.has(tagName)) {
         technicalDisclosureCount += 1;
         return;
       }
     }
 
-    if (!insideTechnicalDisclosure && ts.isJsxText(node)) inspectStatic(node);
-    if (!insideTechnicalDisclosure && ts.isJsxAttribute(node) && node.initializer) inspectStatic(node.initializer);
-    if (!insideTechnicalDisclosure && ts.isJsxExpression(node) && node.expression) {
+    if (ts.isJsxText(node)) inspectStatic(node);
+    if (ts.isJsxAttribute(node) && node.initializer) inspectStatic(node.initializer);
+    if (ts.isJsxExpression(node) && node.expression) {
       inspectStatic(node.expression);
-      if (checksRawPrimaryExpressions && !ts.isJsxAttribute(node.parent) && isRawPrimaryExpression(node.expression, rawBindings)) {
+      if (!ts.isJsxAttribute(node.parent) && isRawPrimaryExpression(node.expression, rawBindings)) {
         report(node.expression, "raw role/status value rendered in primary UI");
       }
     }
 
-    ts.forEachChild(node, (child) => visit(child, insideTechnicalDisclosure));
+    ts.forEachChild(node, visit);
   };
 
   visit(sourceFile);
   return { violations, technicalDisclosureCount };
+}
+
+function collectTechnicalDisclosureBindings(sourceFile: ts.SourceFile): Set<string> {
+  const bindings = new Set<string>();
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement)) continue;
+    if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
+    if (statement.moduleSpecifier.text !== "@/features/platform-admin/ui/admin-technical-disclosure") continue;
+    const namedBindings = statement.importClause?.namedBindings;
+    if (!namedBindings || !ts.isNamedImports(namedBindings)) continue;
+    for (const element of namedBindings.elements) {
+      if ((element.propertyName ?? element.name).text === "AdminTechnicalDisclosure") {
+        bindings.add(element.name.text);
+      }
+    }
+  }
+  return bindings;
 }
 
 function collectStaticBindings(sourceFile: ts.SourceFile): Map<string, ts.Expression> {
@@ -129,6 +146,12 @@ function isRawPrimaryExpression(node: ts.Expression, rawBindings: ReadonlySet<st
   }
   if (ts.isConditionalExpression(node)) {
     return isRawPrimaryExpression(node.whenTrue, rawBindings) || isRawPrimaryExpression(node.whenFalse, rawBindings);
+  }
+  if (ts.isBinaryExpression(node)) {
+    return isRawPrimaryExpression(node.left, rawBindings) || isRawPrimaryExpression(node.right, rawBindings);
+  }
+  if (ts.isTemplateExpression(node)) {
+    return node.templateSpans.some((span) => isRawPrimaryExpression(span.expression, rawBindings));
   }
   return false;
 }

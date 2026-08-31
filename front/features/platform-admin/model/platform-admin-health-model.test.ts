@@ -3,7 +3,9 @@ import type { HealthCard } from "./platform-admin-health-model";
 import {
   formatHealthNarrative,
   healthCardEvidenceState,
+  healthEvidenceLabel,
   healthFreshnessLabel,
+  healthPrimaryReading,
   partitionHealthServiceCards,
 } from "./platform-admin-health-model";
 
@@ -15,6 +17,17 @@ describe("healthFreshnessLabel", () => {
       "오래됨",
       "확인 불가",
     ]);
+  });
+});
+
+describe("disabled health semantics", () => {
+  it("uses the central 사용 안 함 label without collapsing unavailable or empty", () => {
+    const disabled = card({ id: "redis", title: "Redis", status: "UNKNOWN", metric: null, reason: "redis_disabled" });
+    expect(healthCardEvidenceState(disabled)).toBe("disabled");
+    expect(healthEvidenceLabel("disabled")).toBe("사용 안 함");
+    expect(healthPrimaryReading(disabled)).toBe("사용 안 함");
+    expect(healthEvidenceLabel("unavailable")).toBe("확인 불가");
+    expect(healthEvidenceLabel("empty")).toBe("없음");
   });
 });
 

@@ -8,6 +8,8 @@ import {
   adminHealthFreshnessLanguage,
   adminNavigationLanguage,
   adminPlatformRoleLanguage,
+  adminSupportCommandOutcomeLanguage,
+  adminSupportReceiptStatusLanguage,
 } from "./admin-status-language";
 import { analyzeAdminPrimaryLanguageSource } from "./admin-primary-language-source-analyzer.test-support";
 
@@ -61,6 +63,23 @@ describe("admin-status-language", () => {
     expect(adminPlatformRoleLanguage("").technicalDisclosure).toBeNull();
   });
 
+  it("support receipt outcome과 status도 unknown-safe 중앙 의미를 사용한다", () => {
+    expect((["SUCCEEDED", "PARTIAL", "FAILED"] as const).map((value) => adminSupportCommandOutcomeLanguage(value).primaryText)).toEqual([
+      "완료",
+      "일부 처리됨",
+      "실패",
+    ]);
+    expect((["ABSENT", "ACTIVE", "EXPIRING", "EXPIRED", "REVOKED"] as const).map((value) => adminSupportReceiptStatusLanguage(value).primaryText)).toEqual([
+      "없음",
+      "활성",
+      "만료 임박",
+      "만료됨",
+      "취소됨",
+    ]);
+    expect(adminSupportCommandOutcomeLanguage("FUTURE_OUTCOME").primaryText).toBe("확인 필요");
+    expect(adminSupportReceiptStatusLanguage("FUTURE_STATUS").primaryText).toBe("확인 필요");
+  });
+
   it.each([
     ["direct JSX text", "export const View = () => <h1>Today</h1>"],
     ["concatenated copy", 'export const View = () => <h1>{"To" + "day"}</h1>'],
@@ -74,9 +93,21 @@ describe("admin-status-language", () => {
 
   it("allows raw values only inside the structural technical disclosure boundary", () => {
     const analysis = analyzeAdminPrimaryLanguageSource(
-      "export const View = ({ job }: any) => <AdminTechnicalDisclosure items={[{ label: '작업 상태', value: job.status }]} />",
+      `import { AdminTechnicalDisclosure as Tech } from "@/features/platform-admin/ui/admin-technical-disclosure";
+       export const View = ({ job }: any) => <Tech items={[{ label: '작업 상태', value: job.status }]} />`,
     );
     expect(analysis).toEqual({ violations: [], technicalDisclosureCount: 1 });
+  });
+
+  it.each([
+    ["local fake", "const AdminTechnicalDisclosure = (props: any) => <div />; export const View = ({ status }: any) => <AdminTechnicalDisclosure>{status}</AdminTechnicalDisclosure>"],
+    ["wrong import", "import { AdminTechnicalDisclosure } from './fake'; export const View = ({ status }: any) => <AdminTechnicalDisclosure>{status}</AdminTechnicalDisclosure>"],
+    ["support raw status", "export const View = ({ receipt }: any) => <section>{receipt.outcome} · {receipt.status}</section>"],
+    ["domain raw role", "export const View = ({ domain }: any) => <section>{domain.role}</section>"],
+  ])("does not exempt %s from raw primary analysis", (_name, source) => {
+    const analysis = analyzeAdminPrimaryLanguageSource(source, "ui/arbitrary-production.tsx");
+    expect(analysis.violations).not.toEqual([]);
+    expect(analysis.technicalDisclosureCount).toBe(0);
   });
 
   it("primary source에 금지된 영문 제품 라벨과 raw role/status render를 다시 넣지 않는다", () => {
