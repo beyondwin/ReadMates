@@ -184,6 +184,7 @@ describe("SPA AppRouteLayout", () => {
   });
 
   it("keeps host users on member chrome while they are in the member workspace", async () => {
+    const user = userEvent.setup();
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
 
@@ -223,9 +224,34 @@ describe("SPA AppRouteLayout", () => {
     expect(screen.getAllByRole("link", { name: "호스트 공간" }).map((link) => link.textContent)).toEqual(["호스트 공간", "호스트 공간"]);
     const accountTriggers = screen.getAllByRole("button", { name: "김호스트 계정 메뉴" });
     expect(accountTriggers).toHaveLength(2);
-    expect(new Set(accountTriggers.map((trigger) => trigger.getAttribute("aria-controls"))).size).toBe(2);
-    expect(accountTriggers[0].closest(".desktop-only")).toBeInTheDocument();
-    expect(accountTriggers[1].closest(".mobile-only")).toBeInTheDocument();
+    const [desktopAccountTrigger, mobileAccountTrigger] = accountTriggers;
+    expect(desktopAccountTrigger.closest(".desktop-only")).toBeInTheDocument();
+    expect(mobileAccountTrigger.closest(".mobile-only")).toBeInTheDocument();
+    for (const trigger of accountTriggers) {
+      expect(trigger).toHaveAttribute("aria-expanded", "false");
+      expect(trigger).not.toHaveAttribute("aria-controls");
+    }
+    expect(screen.queryByRole("dialog", { name: "김호스트" })).not.toBeInTheDocument();
+
+    await user.click(desktopAccountTrigger);
+
+    const desktopDialog = screen.getByRole("dialog", { name: "김호스트" });
+    const desktopDialogId = desktopDialog.id;
+    expect(desktopDialogId).not.toBe("");
+    expect(desktopAccountTrigger).toHaveAttribute("aria-expanded", "true");
+    expect(desktopAccountTrigger).toHaveAttribute("aria-controls", desktopDialogId);
+    expect(mobileAccountTrigger).toHaveAttribute("aria-expanded", "false");
+    expect(mobileAccountTrigger).not.toHaveAttribute("aria-controls");
+
+    await user.click(mobileAccountTrigger);
+
+    const mobileDialog = screen.getByRole("dialog", { name: "김호스트" });
+    expect(mobileDialog.id).not.toBe("");
+    expect(mobileDialog.id).not.toBe(desktopDialogId);
+    expect(desktopAccountTrigger).toHaveAttribute("aria-expanded", "false");
+    expect(desktopAccountTrigger).not.toHaveAttribute("aria-controls");
+    expect(mobileAccountTrigger).toHaveAttribute("aria-expanded", "true");
+    expect(mobileAccountTrigger).toHaveAttribute("aria-controls", mobileDialog.id);
 
     const tabs = screen.getByRole("navigation", { name: "멤버 주 메뉴 모바일" });
     expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
