@@ -111,7 +111,7 @@ describe("platform admin operations API", () => {
     });
   });
 
-  it("posts the snooze timestamp as an ISO string beside expectedVersion", async () => {
+  it("posts exactly expectedVersion and snoozedUntil for snooze", async () => {
     const fetchSpy = successfulFetch({ schema: "admin.operation_cases.v1", ...caseCore });
 
     await snoozeAdminOperationCase(caseCore.id, 3, "2026-08-05T09:30:00+09:00");
@@ -120,10 +120,11 @@ describe("platform admin operations API", () => {
     expect(fetchSpy.mock.calls[0]?.[0]).toBe(
       `/api/bff/api/admin/operations/cases/${caseCore.id}/snooze`,
     );
-    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({
-      method: "POST",
-      body: JSON.stringify({ expectedVersion: 3, snoozedUntil: "2026-08-05T09:30:00+09:00" }),
-      cache: "no-store",
+    const init = fetchSpy.mock.calls[0]?.[1];
+    expect(init).toMatchObject({ method: "POST", cache: "no-store" });
+    expect(JSON.parse(String(init?.body))).toEqual({
+      expectedVersion: 3,
+      snoozedUntil: "2026-08-05T09:30:00+09:00",
     });
   });
 

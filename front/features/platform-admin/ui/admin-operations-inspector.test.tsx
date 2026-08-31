@@ -175,8 +175,8 @@ describe("AdminOperationsInspector", () => {
     );
 
     expect(screen.getByText("현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "해결 확인" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "확인함" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "처리함" })).not.toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "작업" })).not.toBeInTheDocument();
   });
 
@@ -273,40 +273,7 @@ describe("AdminOperationsInspector", () => {
     expect(onNext).toHaveBeenCalledTimes(1);
   });
 
-  it("cannot confirm 무시 without a one-line reason", async () => {
-    const user = userEvent.setup();
-    const onSnooze = vi.fn();
-    render(
-      <MemoryRouter>
-        <AdminOperationsInspector
-          selectedCase={selectedCase}
-          history={[]}
-          lifecycleControls={
-            <AdminOperationStateActions
-              allowedActions={["ACKNOWLEDGE", "SNOOZE", "RESOLVE"]}
-              pending={false}
-              message={null}
-              now={() => new Date("2026-08-04T10:00:00.000Z")}
-              onAcknowledge={vi.fn()}
-              onSnooze={onSnooze}
-              onResolve={vi.fn()}
-            />
-          }
-        />
-      </MemoryRouter>,
-    );
-
-    await user.click(screen.getByRole("button", { name: "무시" }));
-    const confirm = screen.getByRole("button", { name: "무시 확정" });
-    expect(confirm).toBeDisabled();
-    await user.click(confirm);
-    expect(onSnooze).not.toHaveBeenCalled();
-
-    await user.type(screen.getByLabelText("무시 사유"), "   ");
-    expect(confirm).toBeDisabled();
-  });
-
-  it("exposes a duration select instead of stacked individual snooze buttons", () => {
+  it("does not expose unsupported actions or an untransmitted reason input", () => {
     render(
       <MemoryRouter>
         <AdminOperationsInspector
@@ -327,7 +294,39 @@ describe("AdminOperationsInspector", () => {
       </MemoryRouter>,
     );
 
-    const duration = screen.getByRole("combobox", { name: "보류 기간" });
+    expect(screen.getByRole("button", { name: "확인함" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "잠시 미룸" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "처리함" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "무시" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "병합" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it("asks for one duration instead of stacked individual snooze buttons", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <AdminOperationsInspector
+          selectedCase={selectedCase}
+          history={[]}
+          lifecycleControls={
+            <AdminOperationStateActions
+              allowedActions={["ACKNOWLEDGE", "SNOOZE", "RESOLVE"]}
+              pending={false}
+              message={null}
+              now={() => new Date("2026-08-04T10:00:00.000Z")}
+              onAcknowledge={vi.fn()}
+              onSnooze={vi.fn()}
+              onResolve={vi.fn()}
+            />
+          }
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "잠시 미룸" }));
+
+    const duration = screen.getByRole("combobox", { name: "미룰 시간" });
     expect(duration).toBeInTheDocument();
     expect(Array.from(duration.querySelectorAll("option")).map((option) => option.textContent)).toEqual([
       "1시간",
@@ -335,14 +334,14 @@ describe("AdminOperationsInspector", () => {
       "24시간",
       "7일",
     ]);
-    expect(screen.getByRole("button", { name: "보류" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "1시간 보류" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "4시간 보류" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "24시간 보류" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "7일 보류" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "잠시 미룸" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "1시간 미루기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "4시간 미루기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "24시간 미루기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "7일 미루기" })).not.toBeInTheDocument();
   });
 
-  it("includes the ignore reason in the snooze command args", async () => {
+  it("submits snooze from the selected duration only", async () => {
     const user = userEvent.setup();
     const onSnooze = vi.fn();
     render(
@@ -365,12 +364,11 @@ describe("AdminOperationsInspector", () => {
       </MemoryRouter>,
     );
 
-    await user.click(screen.getByRole("button", { name: "무시" }));
-    await user.type(screen.getByLabelText("무시 사유"), "중복 신호로 판단");
-    await user.click(screen.getByRole("button", { name: "무시 확정" }));
+    await user.click(screen.getByRole("button", { name: "잠시 미룸" }));
+    await user.click(screen.getByRole("button", { name: "미루기" }));
 
     expect(onSnooze).toHaveBeenCalledOnce();
-    expect(onSnooze).toHaveBeenCalledWith("2026-08-11T10:00:00.000Z", "중복 신호로 판단");
+    expect(onSnooze).toHaveBeenCalledWith("2026-08-04T14:00:00.000Z");
   });
 
   it("renders at most three recent case-history sentences and the audit prefilter href", () => {
