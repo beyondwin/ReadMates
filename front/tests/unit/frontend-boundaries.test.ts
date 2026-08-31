@@ -30,7 +30,6 @@ const legacyFeatureUiRouterPaths = [
   "features/notifications/ui/member-notifications-page.tsx",
   "features/platform-admin/ui/admin-alarm-bar.tsx",
   "features/platform-admin/ui/admin-audit-ledger.tsx",
-  "features/platform-admin/ui/admin-club-operations-page.tsx",
   "features/platform-admin/ui/admin-clubs-ledger.tsx",
   "features/platform-admin/ui/admin-health-card.tsx",
   "features/platform-admin/ui/admin-health-grid.tsx",

@@ -4,6 +4,32 @@
   border-top: 1px solid var(--line);
 }
 
+.admin-club-detail__workflow-section,
+.admin-support-workbench__workflow-section {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding-block: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.admin-club-detail__workflow-section > .h2,
+.admin-support-workbench__workflow-section > .h2 {
+  margin: 0;
+}
+
+.admin-club-detail__workflow-section[data-admin-club-section="actions"],
+.admin-support-workbench__workflow-section[data-admin-support-section="actions"] {
+  gap: 18px;
+}
+
+.admin-support-workbench__workflow-section > .admin-support-workbench__panel,
+.admin-support-workbench__workflow-section > .admin-evidence-ledger,
+.admin-club-detail__workflow-section > .admin-club-detail__panel,
+.admin-club-detail__workflow-section > .admin-club-operations {
+  min-width: 0;
+}
+
 .admin-club-management__list {
   display: grid;
   margin: 0;

@@ -226,15 +226,38 @@ beforeEach(() => {
 });
 
 describe("AdminClubDetailRoute", () => {
+  it("orders the club detail by operator judgement from facts through recent records", () => {
+    const { container } = renderRoute(
+      detail,
+      [
+        "VIEW_CLUBS",
+        "VIEW_CLUB_OPERATIONS",
+        "VIEW_SUPPORT",
+        "VIEW_AUDIT",
+        "MANAGE_CLUBS",
+        "MANAGE_CLUB_DOMAINS",
+      ],
+    );
+
+    expect(
+      [...container.querySelectorAll<HTMLElement>("[data-admin-club-section]")]
+        .map((section) => section.dataset.adminClubSection),
+    ).toEqual(["basic", "state", "impact", "actions", "history"]);
+    expect(
+      [...container.querySelectorAll<HTMLElement>("[data-admin-club-section] > h2")]
+        .map((heading) => heading.textContent),
+    ).toEqual(["기본 정보", "현재 상태", "영향", "가능한 조치", "최근 처리 기록"]);
+  });
+
   it("renders authoritative detail with a read-only slug and independent domain panel", () => {
     const { container } = renderRoute();
     expect(screen.getByText("운영 · 클럽 상세")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Alpha" })).toBeInTheDocument();
-    expect(screen.getByText("revision 7 · 활성 · 비공개")).toBeInTheDocument();
+    expect(screen.getByText("활성 · 비공개")).toBeInTheDocument();
     expect(screen.getByText("현재 비공개")).toBeInTheDocument();
     expect(screen.getByText("식별")).toBeInTheDocument();
     expect(screen.getByText("공개 설정")).toBeInTheDocument();
-    expect(screen.getByText("도메인 준비")).toBeInTheDocument();
+    expect(screen.getAllByText("도메인 준비")).toHaveLength(2);
     expect(screen.queryByText("Identity")).toBeNull();
     expect(screen.queryByText("Visibility")).toBeNull();
     expect(screen.queryByText("Domain provisioning")).toBeNull();
@@ -242,7 +265,8 @@ describe("AdminClubDetailRoute", () => {
     expect(screen.queryByText(/\bPRIVATE\b/)).toBeNull();
     expect(screen.getByText("alpha.example.test")).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Slug" })).not.toBeInTheDocument();
-    expect(container.querySelector(".admin-club-detail__facts")).toHaveTextContent("alpha");
+    expect(container.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("alpha");
+    expect(container.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("관리 revision7");
     expect(screen.getByRole("button", { name: "편집" })).toBeInTheDocument();
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });
@@ -299,7 +323,7 @@ describe("AdminClubDetailRoute", () => {
 
   it("hides the support grant metric without VIEW_SUPPORT", () => {
     renderRoute(detail, ["VIEW_CLUBS", "VIEW_CLUB_OPERATIONS"]);
-    expect(screen.getByText("Alpha 운영 스냅샷")).toBeInTheDocument();
+    expect(screen.getByText("운영 영향 요약")).toBeInTheDocument();
     expect(screen.queryByText("접근 발급")).not.toBeInTheDocument();
   });
 
@@ -354,9 +378,7 @@ describe("AdminClubDetailRoute", () => {
 
   it("renders the club recent-ledger link onto the shared audit prefilter", () => {
     renderRoute();
-    expect(
-      screen.getByRole("heading", { name: "이 클럽의 최근 처리 기록" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "최근 처리 기록" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "전체 처리 기록 보기" })).toHaveAttribute(
       "href",
       "/admin/audit?target=c-1",

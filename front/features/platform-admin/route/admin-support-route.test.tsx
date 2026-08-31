@@ -191,8 +191,17 @@ describe("AdminSupportRoute", () => {
     fireEvent.click(await screen.findByRole("button", { name: /지원 대상/ }));
     fireEvent.change(screen.getByLabelText("선택 사유"), { target: { value: "MEMBER_ASSISTANCE" } });
     fireEvent.change(screen.getByLabelText("검토 시에만 확인하는 사유 메모 (저장되지 않음)"), { target: { value: "raw private note" } });
+    fireEvent.change(screen.getByLabelText("만료 시각"), { target: { value: "2026-08-25T12:00" } });
     fireEvent.click(screen.getByRole("button", { name: "발급 검토" }));
     expect(await screen.findByText(/GRANT_SUPPORT_ACCESS/)).toBeInTheDocument();
+    expect(previewAdminSupportGrant).toHaveBeenCalledWith({
+      clubId: "club-1",
+      granteeSubjectId: target.subjectId,
+      scope: "HOST_SUPPORT_READ",
+      expiresAt: "2026-08-25T03:00:00.000Z",
+      reasonCategory: "MEMBER_ASSISTANCE",
+      note: "raw private note",
+    });
     expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "지원 접근 발급" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("같은 요청");
@@ -204,6 +213,17 @@ describe("AdminSupportRoute", () => {
     const calls = vi.mocked(confirmAdminSupportGrant).mock.calls;
     expect(calls).toHaveLength(2);
     expect(calls[0]?.[0].idempotencyKey).toBe(calls[1]?.[0].idempotencyKey);
+    expect(calls[0]?.[0]).toEqual({
+      clubId: "club-1",
+      granteeSubjectId: target.subjectId,
+      scope: "HOST_SUPPORT_READ",
+      expiresAt: "2026-08-25T03:00:00.000Z",
+      reasonCategory: "MEMBER_ASSISTANCE",
+      note: "raw private note",
+      previewId: "preview-1",
+      idempotencyKey: expect.any(String),
+      confirmed: true,
+    });
     const receipt = screen.getByLabelText("명령 영수증");
     expect(within(receipt).getByText(/회원 지원/)).toBeInTheDocument();
     expect(within(receipt).getByText(/검토 시 사유 메모 사용/)).toBeInTheDocument();

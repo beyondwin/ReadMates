@@ -42,6 +42,8 @@ import {
   mergeAdminAuditLedgerPages,
 } from "@/features/platform-admin/model/platform-admin-audit-model";
 import { AdminClubOperationsPage } from "@/features/platform-admin/ui/admin-club-operations-page";
+import type { AdminClubOperationsNavigation } from "@/features/platform-admin/ui/admin-club-operations-page";
+import { blockerNextAction, type AdminClubOperationsSnapshot } from "@/features/platform-admin/model/platform-admin-club-operations-model";
 import { AdminClubDomainCommandPanel } from "@/features/platform-admin/ui/domain-provisioning-panel";
 import {
   AdminSafeActionDock,
@@ -50,6 +52,7 @@ import {
 import { publishTransitionAction, TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 import { AdminReceiptTimeline } from "@/features/platform-admin/ui/admin-receipt-timeline";
 import { AdminTargetLedgerInline } from "@/features/platform-admin/ui/admin-target-ledger-inline";
+import { AdminTechnicalDisclosure } from "@/features/platform-admin/ui/admin-technical-disclosure";
 import { useAdminBreadcrumbExtra } from "./admin-breadcrumb-hook";
 
 const CLUBS_ALLOWED = { fallback: "/admin/clubs", allowedPath: "/admin/clubs" };
@@ -129,36 +132,23 @@ export function AdminClubDetailRoute() {
       <AdminPageContext
         eyebrow={ADMIN_COPY.eyebrow.clubDetail}
         heading={club.name}
-        description={`revision ${club.adminRevision} · ${clubLifecycleLabel(club.status)} · ${clubVisibilityLabel(club.publicVisibility)}`}
+        description={`${clubLifecycleLabel(club.status)} · ${clubVisibilityLabel(club.publicVisibility)}`}
         action={<ClubsReturnLink returnState={returnState} />}
       />
-      <ClubMetadataPanel
-        key={`${club.adminRevision}-${canManageClub ? "manage" : "view"}`}
-        club={club}
-        canManage={canManageClub}
-        onRefresh={() => void detailQuery.refetch()}
-      />
-      <VisibilityPanel
-        key={`visibility-${club.adminRevision}-${club.publicVisibility}-${canManageClub ? "manage" : "view"}`}
-        clubId={clubId}
-        revision={club.adminRevision}
-        current={club.publicVisibility}
-        canManage={canManageClub}
-        onRefresh={() => void detailQuery.refetch()}
-      />
-      <ClubDomainPanel
-        key={`domains-${club.adminRevision}-${canManageDomains ? "manage" : "view"}-${club.domains.map((domain) => `${domain.id}:${domain.status}`).join("|")}`}
-        clubId={clubId}
-        revision={club.adminRevision}
-        domains={club.domains}
-        canManageDomains={canManageDomains}
-        onRefresh={() => void detailQuery.refetch()}
-      />
+      <section className="admin-club-detail__workflow-section" data-admin-club-section="basic">
+        <h2 className="h2 editorial">기본 정보</h2>
+        <ClubBasicInformation club={club} />
+      </section>
+      <section className="admin-club-detail__workflow-section" data-admin-club-section="state">
+        <h2 className="h2 editorial">현재 상태</h2>
+        <ClubCurrentState club={club} />
+      </section>
       {canViewOperations ? (
         <section
-          className="admin-club-detail__panel"
-          aria-labelledby="admin-club-operations-title"
+          className="admin-club-detail__workflow-section"
+          data-admin-club-section="impact"
         >
+          <h2 className="h2 editorial">영향</h2>
           {operationsQuery.isError ? (
             <PanelError
               label="운영 스냅샷"
@@ -167,6 +157,12 @@ export function AdminClubDetailRoute() {
           ) : operationsQuery.data ? (
             <AdminClubOperationsPage
               snapshot={operationsQuery.data}
+              navigation={clubOperationsNavigation(operationsQuery.data)}
+              renderLink={(link) => (
+                <Link key={link.id} to={link.href} className={link.className}>
+                  {link.label}
+                </Link>
+              )}
               supportGrantCount={
                 canViewSupport && !supportGrantsQuery.isError && !supportGrantsQuery.hasNextPage
                   ? flattenSupportGrantLedgerPages(supportGrantsQuery.data?.pages ?? []).length
@@ -181,21 +177,129 @@ export function AdminClubDetailRoute() {
             <p className="muted">운영 스냅샷을 불러오는 중입니다.</p>
           )}
         </section>
-      ) : null}
-      <section
-        className="surface admin-club-detail__panel"
-        aria-labelledby="admin-club-recent-ledger-title"
-      >
-        <div className="sec-h">
-          <h2 id="admin-club-recent-ledger-title" className="h3 editorial">
-            {ADMIN_COPY.targetLedger.clubHeading}
-          </h2>
-        </div>
-        <AdminTargetLedgerInline
-          entries={clubTargetLedgerEntries(auditQuery.data?.pages ?? [])}
-          moreHref={`/admin/audit?target=${encodeURIComponent(clubId)}`}
+      ) : (
+        <section className="admin-club-detail__workflow-section" data-admin-club-section="impact">
+          <h2 className="h2 editorial">영향</h2>
+          <p className="muted">현재 권한으로는 운영 영향을 확인할 수 없습니다.</p>
+        </section>
+      )}
+      <section className="admin-club-detail__workflow-section" data-admin-club-section="actions">
+        <h2 className="h2 editorial">가능한 조치</h2>
+        <ClubMetadataPanel
+          key={`${club.adminRevision}-${canManageClub ? "manage" : "view"}`}
+          club={club}
+          canManage={canManageClub}
+          onRefresh={() => void detailQuery.refetch()}
+        />
+        <VisibilityPanel
+          key={`visibility-${club.adminRevision}-${club.publicVisibility}-${canManageClub ? "manage" : "view"}`}
+          clubId={clubId}
+          revision={club.adminRevision}
+          current={club.publicVisibility}
+          canManage={canManageClub}
+          onRefresh={() => void detailQuery.refetch()}
+        />
+        <ClubDomainPanel
+          key={`domains-${club.adminRevision}-${canManageDomains ? "manage" : "view"}-${club.domains.map((domain) => `${domain.id}:${domain.status}`).join("|")}`}
+          clubId={clubId}
+          revision={club.adminRevision}
+          domains={club.domains}
+          canManageDomains={canManageDomains}
+          onRefresh={() => void detailQuery.refetch()}
         />
       </section>
+      <section className="admin-club-detail__workflow-section" data-admin-club-section="history">
+        <h2 className="h2 editorial">최근 처리 기록</h2>
+        <div className="surface admin-club-detail__panel" aria-label={ADMIN_COPY.targetLedger.clubHeading}>
+          <AdminTargetLedgerInline
+            entries={clubTargetLedgerEntries(auditQuery.data?.pages ?? [])}
+            moreHref={`/admin/audit?target=${encodeURIComponent(clubId)}`}
+          />
+        </div>
+      </section>
+    </section>
+  );
+}
+
+function clubOperationsNavigation(
+  snapshot: AdminClubOperationsSnapshot,
+): AdminClubOperationsNavigation {
+  return {
+    blockers: snapshot.readiness.blockingReasons.map((code) => {
+      const action = blockerNextAction(code, snapshot.club.slug);
+      return {
+        code,
+        label: operationalBlockerLabel(code),
+        action: action
+          ? {
+              id: `blocker-${code}`,
+              href: action.href,
+              label: action.label,
+              className: "btn btn-ghost btn-sm",
+            }
+          : null,
+      };
+    }),
+    notifications: {
+      id: "notifications",
+      href: `/admin/notifications?clubId=${encodeURIComponent(snapshot.club.clubId)}`,
+      label: "알림 상태 확인",
+      className: "btn btn-ghost btn-sm",
+    },
+    aiOps: {
+      id: "ai-ops",
+      href: `/admin/ai-ops?clubId=${encodeURIComponent(snapshot.club.clubId)}`,
+      label: "AI 작업",
+      className: "btn btn-ghost btn-sm",
+    },
+    safeLinks: snapshot.safeLinks.map((link, index) => ({
+      id: `safe-${link.kind}-${index}`,
+      href: link.href,
+      label: link.kind === "HOST_ROUTE" ? "클럽 운영 화면에서 확인" : "관련 운영 화면에서 확인",
+      className: "admin-club-operations__link",
+    })),
+  };
+}
+
+function operationalBlockerLabel(code: string): string {
+  switch (code) {
+    case "HOST_REQUIRED":
+      return "호스트 지정 필요";
+    case "DOMAIN_ACTION_REQUIRED":
+      return "도메인 조치 필요";
+    case "CLUB_NOT_ACTIVE":
+      return "클럽 운영 상태 확인 필요";
+    default:
+      return "추가 운영 확인 필요";
+  }
+}
+
+function ClubBasicInformation({ club }: { club: PlatformAdminClubDetail }) {
+  return (
+    <section className="surface admin-club-detail__panel" aria-label="클럽 기본 정보">
+      <dl className="admin-club-detail__facts">
+        <div><dt>클럽 이름</dt><dd>{club.name}</dd></div>
+        <div><dt>소개 문구</dt><dd>{club.tagline || "등록되지 않음"}</dd></div>
+        <div><dt>공개 소개</dt><dd>{club.about || "등록되지 않음"}</dd></div>
+      </dl>
+      <AdminTechnicalDisclosure
+        items={[
+          { label: "클럽 주소 코드", value: club.slug },
+          { label: "관리 revision", value: String(club.adminRevision) },
+        ]}
+      />
+    </section>
+  );
+}
+
+function ClubCurrentState({ club }: { club: PlatformAdminClubDetail }) {
+  return (
+    <section className="surface admin-club-detail__panel" aria-label="클럽 현재 상태">
+      <dl className="admin-club-detail__facts">
+        <div><dt>운영 상태</dt><dd>{clubLifecycleLabel(club.status)}</dd></div>
+        <div><dt>공개 상태</dt><dd>{clubVisibilityLabel(club.publicVisibility)}</dd></div>
+        <div><dt>도메인 준비</dt><dd>{club.domainActionRequiredCount > 0 ? `확인 필요 ${club.domainActionRequiredCount}건` : "확인 필요 없음"}</dd></div>
+      </dl>
     </section>
   );
 }
@@ -305,6 +409,8 @@ function ClubMetadataPanel({
     mutation.reset();
   }, [canManage, mutation]);
 
+  if (!canManage) return null;
+
   function cancelEdit() {
     setEditing(false);
     setDraft({ name: club.name, tagline: club.tagline, about: club.about });
@@ -335,15 +441,15 @@ function ClubMetadataPanel({
       <div className="admin-club-detail__panel-heading">
         <div>
           <p className="eyebrow">{ADMIN_COPY.eyebrow.identity}</p>
-          <h2 id="club-metadata-title" className="h3 editorial">
+          <h3 id="club-metadata-title" className="h3 editorial">
             공개 정보
-          </h2>
+          </h3>
         </div>
         <span className="admin-club-detail__state">
           {mutation.isPending ? "저장 중" : "최신 revision 기준"}
         </span>
       </div>
-      {canManage && editing ? (
+      {editing ? (
         <>
           <div className="admin-club-detail__form">
             <label className="field-group">
@@ -419,35 +525,12 @@ function ClubMetadataPanel({
         </>
       ) : (
         <>
-          <dl className="admin-club-detail__facts">
-            <div>
-              <dt>Slug</dt>
-              <dd>{club.slug}</dd>
-            </div>
-            <div>
-              <dt>클럽 이름</dt>
-              <dd>{club.name}</dd>
-            </div>
-            <div>
-              <dt>Tagline</dt>
-              <dd>{club.tagline}</dd>
-            </div>
-            <div>
-              <dt>About</dt>
-              <dd>{club.about}</dd>
-            </div>
-          </dl>
-          {canManage ? (
-            <div className="admin-club-detail__actions">
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => setEditing(true)}
-              >
-                편집
-              </button>
-            </div>
-          ) : null}
+          <p className="muted">클럽 이름과 공개 소개를 revision 기준으로 변경합니다.</p>
+          <div className="admin-club-detail__actions">
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>
+              편집
+            </button>
+          </div>
         </>
       )}
     </section>
@@ -567,9 +650,9 @@ function VisibilityPanel({
       <div className="admin-club-detail__panel-heading">
         <div>
           <p className="eyebrow">{ADMIN_COPY.eyebrow.visibility}</p>
-          <h2 id="visibility-title" className="h3 editorial">
+          <h3 id="visibility-title" className="h3 editorial">
             공개 상태
-          </h2>
+          </h3>
         </div>
         <span className="admin-club-detail__state">현재 {clubVisibilityLabel(current)}</span>
       </div>

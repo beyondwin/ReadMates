@@ -65,10 +65,24 @@ function props(overrides: Partial<ComponentProps<typeof AdminSupportWorkbench>> 
 }
 
 describe("AdminSupportWorkbench", () => {
+  it("uses the club-management hierarchy for current state, actions, and records", () => {
+    const { container } = render(<AdminSupportWorkbench {...props()} />);
+
+    expect(screen.getByText("클럽 관리", { selector: ".admin-page-context__eyebrow" })).toBeInTheDocument();
+    expect(
+      [...container.querySelectorAll<HTMLElement>("[data-admin-support-section]")]
+        .map((section) => section.dataset.adminSupportSection),
+    ).toEqual(["state", "actions", "history"]);
+    expect(
+      [...container.querySelectorAll<HTMLElement>("[data-admin-support-section] > h2")]
+        .map((heading) => heading.textContent),
+    ).toEqual(["현재 상태", "가능한 조치", "최근 처리 기록"]);
+  });
+
   it("renders the page-context heading 지원 접근", () => {
     render(<AdminSupportWorkbench {...props()} />);
     expect(screen.getByRole("heading", { level: 1, name: "지원 접근" })).toBeInTheDocument();
-    expect(screen.getByText("처리 기록")).toBeInTheDocument();
+    expect(screen.getByText("클럽 관리", { selector: ".admin-page-context__eyebrow" })).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 
@@ -108,6 +122,9 @@ describe("AdminSupportWorkbench", () => {
     expect(dock.closest("[data-level]")).toHaveAttribute("data-level", "L2");
     expect(within(dock).getByRole("button", { name: "지원 접근 발급" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "발급 확정" })).not.toBeInTheDocument();
+    const review = screen.getByRole("region", { name: "변경 검토" });
+    expect(within(review).getByText("지원 접근 권한을 발급합니다.")).toBeInTheDocument();
+    expect(within(review).getByLabelText("기술 정보")).toHaveTextContent("GRANT_SUPPORT_ACCESS");
   });
 
   it("keeps search accessible and has no unnamed controls", () => {
