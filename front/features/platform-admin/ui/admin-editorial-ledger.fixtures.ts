@@ -415,32 +415,36 @@ function clubsFixture(input: {
 function criticalClub(): AdminClubsLedgerClub {
   return {
     clubId: "club-1",
-    slug: "broken",
     name: EDITORIAL_LEDGER_LONG_CLUB_NAME,
-    status: "ACTIVE",
-    publicVisibility: "PRIVATE",
-    domainCount: 1,
-    domainActionRequiredCount: 2,
-    firstHostOnboardingState: "ASSIGNED",
     href: "/admin/clubs/club-1?returnTo=%2Fadmin%2Fclubs&focusId=club-1&scrollTop=0",
-    severity: "critical",
-    reasons: ["알림 실패 2건", "도메인 조치 2건"],
+    currentState: "활성 · 비공개",
+    requiredAction: "실패 신호 확인",
+    recentSignal: "알림 실패 2건 · 도메인 조치 필요",
+    emphasis: "actionable",
+    technicalDisclosure: [
+      { label: "클럽 ID", value: "club-1" },
+      { label: "Slug", value: "broken" },
+      { label: "수명주기 값", value: "ACTIVE" },
+      { label: "공개 상태 값", value: "PRIVATE" },
+    ],
   };
 }
 
 function healthyClub(): AdminClubsLedgerClub {
   return {
     clubId: "club-2",
-    slug: "healthy",
     name: "읽는사이 Healthy Club",
-    status: "ACTIVE",
-    publicVisibility: "PUBLIC",
-    domainCount: 1,
-    domainActionRequiredCount: 0,
-    firstHostOnboardingState: "ASSIGNED",
     href: "/admin/clubs/club-2?returnTo=%2Fadmin%2Fclubs&focusId=club-2&scrollTop=0",
-    severity: "ok",
-    reasons: [],
+    currentState: "활성 · 공개",
+    requiredAction: null,
+    recentSignal: null,
+    emphasis: "quiet",
+    technicalDisclosure: [
+      { label: "클럽 ID", value: "club-2" },
+      { label: "Slug", value: "healthy" },
+      { label: "수명주기 값", value: "ACTIVE" },
+      { label: "공개 상태 값", value: "PUBLIC" },
+    ],
   };
 }
 

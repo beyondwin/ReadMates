@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PlatformAdminClub } from "@/features/platform-admin/model/platform-admin-domain-types";
 import {
+  buildClubManagementRow,
   CLUB_TRIAGE_LABEL,
   clubTriageReasons,
   clubTriageSeverity,
@@ -107,5 +108,53 @@ describe("filterClubsBySeverity", () => {
 describe("CLUB_TRIAGE_LABEL", () => {
   it("maps every severity to a Korean label", () => {
     expect(CLUB_TRIAGE_LABEL).toEqual({ critical: "긴급", attention: "주의", ok: "정상" });
+  });
+});
+
+describe("buildClubManagementRow", () => {
+  it("puts the translated state before a required action and recent signal", () => {
+    expect(
+      buildClubManagementRow(
+        club({
+          notificationFailureCount: 2,
+          publicVisibility: "PUBLIC",
+        }),
+      ),
+    ).toMatchObject({
+      name: "Alpha",
+      currentState: "활성 · 공개",
+      requiredAction: "실패 신호 확인",
+      recentSignal: "알림 실패 2건",
+      emphasis: "actionable",
+    });
+  });
+
+  it("keeps a normal club quiet without inventing a last-checked timestamp", () => {
+    const row = buildClubManagementRow(club({}));
+
+    expect(row).toMatchObject({
+      name: "Alpha",
+      currentState: "활성 · 비공개",
+      requiredAction: null,
+      recentSignal: null,
+      emphasis: "quiet",
+    });
+    expect(JSON.stringify(row)).not.toContain("마지막 확인");
+  });
+
+  it("uses the centralized unknown language while preserving raw values for technical disclosure", () => {
+    const row = buildClubManagementRow(
+      club({ status: "FUTURE_STATUS" as PlatformAdminClub["status"] }),
+    );
+
+    expect(row.currentState).toContain("확인 필요");
+    expect(row.requiredAction).toBe("상태 확인");
+    expect(row.technicalDisclosure).toEqual(
+      expect.arrayContaining([
+        { label: "클럽 ID", value: "c-1" },
+        { label: "Slug", value: "alpha" },
+        { label: "수명주기 값", value: "FUTURE_STATUS" },
+      ]),
+    );
   });
 });

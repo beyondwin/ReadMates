@@ -7,8 +7,7 @@ import {
   useSearchParams,
 } from "react-router";
 import {
-  clubTriageReasons,
-  clubTriageSeverity,
+  buildClubManagementRow,
 } from "@/features/platform-admin/model/platform-admin-club-triage-model";
 import {
   platformAdminClubListFiltersFromSearch,
@@ -110,21 +109,13 @@ export function AdminClubsRoute() {
   const ledgerClubs = useMemo(
     () =>
       clubs.map((club) => ({
+        ...buildClubManagementRow(club),
         clubId: club.clubId,
-        slug: club.slug,
-        name: club.name,
-        status: club.status,
-        publicVisibility: club.publicVisibility,
-        domainCount: club.domainCount,
-        domainActionRequiredCount: club.domainActionRequiredCount,
-        firstHostOnboardingState: club.firstHostOnboardingState,
         href: buildAdminDetailHref(`/admin/clubs/${club.clubId}`, {
           returnTo,
           focusId: club.clubId,
           scrollTop,
         }),
-        severity: clubTriageSeverity(club),
-        reasons: clubTriageReasons(club),
       })),
     [clubs, returnTo, scrollTop],
   );

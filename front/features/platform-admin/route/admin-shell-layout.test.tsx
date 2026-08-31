@@ -553,7 +553,7 @@ describe("AdminShellLayout", () => {
     expect(onboardingController).toContain("useTransitionSafetyOwner");
   });
 
-  it("loads shell, page-pattern, and editorial CSS from feature ownership only", () => {
+  it("loads shell, page-pattern, editorial, and club-management CSS from feature ownership only", () => {
     const shellSource = readFileSync(
       path.resolve("features/platform-admin/route/admin-shell-layout.tsx"),
       "utf8",
@@ -568,14 +568,21 @@ describe("AdminShellLayout", () => {
     const editorialCssPath = path.resolve(
       "features/platform-admin/ui/admin-editorial-ledger.css",
     );
+    const clubManagementCssPath = path.resolve(
+      "features/platform-admin/ui/admin-club-management.css",
+    );
 
     expect(existsSync(shellCssPath)).toBe(true);
     expect(existsSync(pageCssPath)).toBe(true);
+    expect(existsSync(clubManagementCssPath)).toBe(true);
     expect(shellSource.indexOf("admin-shell.css")).toBeLessThan(
       shellSource.indexOf("admin-page-patterns.css"),
     );
     expect(shellSource.indexOf("admin-page-patterns.css")).toBeLessThan(
       shellSource.indexOf("admin-editorial-ledger.css"),
+    );
+    expect(shellSource.indexOf("admin-editorial-ledger.css")).toBeLessThan(
+      shellSource.indexOf("admin-club-management.css"),
     );
     expect(globals).not.toMatch(/^\s*\.(?:admin|platform-admin)[-_\w]/m);
 
@@ -586,11 +593,15 @@ describe("AdminShellLayout", () => {
       ? readFileSync(pageCssPath, "utf8")
       : "";
     const editorialCss = readFileSync(editorialCssPath, "utf8");
+    const clubManagementCss = existsSync(clubManagementCssPath)
+      ? readFileSync(clubManagementCssPath, "utf8")
+      : "";
     expect(shellCss).toContain(".admin-shell");
     expect(shellCss).toContain(".admin-layout-nav");
     expect(pageCss).toContain(".admin-page-frame");
     expect(pageCss).toContain(".admin-state-panel");
     expect(editorialCss).not.toMatch(/^\s*\.admin-layout-nav(?:\W|$)/m);
+    expect(clubManagementCss).toContain(".admin-club-management");
   });
 
   it("does not render a global header 새 클럽 CTA", () => {

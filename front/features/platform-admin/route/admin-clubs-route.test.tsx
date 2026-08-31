@@ -151,12 +151,13 @@ describe("AdminClubsRoute", () => {
     expect(screen.getByTestId("location-search")).toHaveTextContent("onboarding=1");
   });
 
-  it("renders server-ordered registry rows with accessible controls", () => {
+  it("renders server-ordered registry rows as operator judgment records with accessible controls", () => {
     const { container } = renderRoute();
     expect(screen.getByRole("heading", { name: "클럽" })).toBeInTheDocument();
     expect(
       screen.getByRole("searchbox", { name: "클럽 검색" }),
     ).toBeInTheDocument();
+    expect(screen.getByText("활성 · 비공개")).toBeInTheDocument();
     expect(screen.getByText("alpha")).toBeInTheDocument();
     const href = screen.getByRole("link", { name: "Alpha" }).getAttribute("href");
     expect(href).toContain("/admin/clubs/c-1");
