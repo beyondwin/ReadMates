@@ -184,7 +184,7 @@ describe("AdminHealthGrid", () => {
 
     expect(screen.getByRole("heading", { level: 1, name: "서비스 건강" })).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(screen.getByText("파이프라인")).toBeInTheDocument();
+    expect(screen.getByText("서비스 상태")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "서비스 건강" })).toHaveClass("admin-page-frame");
     expect(screen.getByRole("region", { name: "서비스 신호" })).toHaveClass("admin-evidence-ledger");
     expect(screen.getByText("정상 갱신 완료")).toBeInTheDocument();

@@ -355,9 +355,9 @@ describe("AdminClubDetailRoute", () => {
   it("renders the club recent-ledger link onto the shared audit prefilter", () => {
     renderRoute();
     expect(
-      screen.getByRole("heading", { name: "이 클럽의 최근 기입" }),
+      screen.getByRole("heading", { name: "이 클럽의 최근 처리 기록" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "전체 기입 보기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "전체 처리 기록 보기" })).toHaveAttribute(
       "href",
       "/admin/audit?target=c-1",
     );

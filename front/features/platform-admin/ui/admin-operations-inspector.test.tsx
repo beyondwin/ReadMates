@@ -78,11 +78,11 @@ describe("AdminOperationsInspector", () => {
       "href",
       "/admin/notifications?focus=delivery",
     );
-    expect(screen.getByRole("heading", { name: "이 대상의 최근 기입" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "이 대상의 최근 처리 기록" })).toBeInTheDocument();
     expect(screen.getByText("신호가 처음 감지됨 · 미확인")).toBeInTheDocument();
     expect(screen.getByText("상태 변경 기록 · 확인됨")).toBeInTheDocument();
     expect(screen.queryByText("PRIVATE_HISTORY_CODE")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "전체 기입 보기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "전체 처리 기록 보기" })).toHaveAttribute(
       "href",
       "/admin/audit?target=case-notification",
     );
@@ -90,7 +90,7 @@ describe("AdminOperationsInspector", () => {
     expect(screen.getByRole("button", { name: "확인 처리" })).toBeInTheDocument();
 
     const commands = screen.getByRole("group", { name: "작업" });
-    const ledgerHeading = screen.getByRole("heading", { name: "이 대상의 최근 기입" });
+    const ledgerHeading = screen.getByRole("heading", { name: "이 대상의 최근 처리 기록" });
     expect(commands.closest(".admin-case-docket__actions")?.contains(ledgerHeading)).toBe(false);
     expect(
       Boolean(commands.compareDocumentPosition(ledgerHeading) & Node.DOCUMENT_POSITION_FOLLOWING),
@@ -430,7 +430,7 @@ describe("AdminOperationsInspector", () => {
       "운영자가 확인함 · 확인됨",
     ]);
     expect(screen.queryByText("신호가 처음 감지됨 · 미확인")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "전체 기입 보기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "전체 처리 기록 보기" })).toHaveAttribute(
       "href",
       "/admin/audit?target=club-reading-sai",
     );
@@ -447,10 +447,10 @@ describe("AdminOperationsInspector", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { name: "이 대상의 최근 기입" })).toBeInTheDocument();
-    expect(screen.getByText("표시할 기입이 없습니다.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "이 대상의 최근 처리 기록" })).toBeInTheDocument();
+    expect(screen.getByText("표시할 처리 기록이 없습니다.")).toBeInTheDocument();
     expect(document.querySelectorAll(".ledger-inline .li")).toHaveLength(0);
-    expect(screen.getByRole("link", { name: "전체 기입 보기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "전체 처리 기록 보기" })).toHaveAttribute(
       "href",
       "/admin/audit?target=case-notification",
     );

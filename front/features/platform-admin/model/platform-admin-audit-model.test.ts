@@ -107,7 +107,7 @@ describe("formatAdminAuditLedgerSentence", () => {
 
     expect(sentence).toContain("OWNER가 Replay preview에 알림 재처리가 확정되었습니다.");
     expect(sentence).toContain("사유: 사유 없음");
-    expect(sentence).toContain("성공");
+    expect(sentence).toContain("완료");
     expect(sentence).not.toContain("preview-1");
     expect(sentence).not.toContain("ADMIN_AI_OPS_RETRY_COMMIT");
   });

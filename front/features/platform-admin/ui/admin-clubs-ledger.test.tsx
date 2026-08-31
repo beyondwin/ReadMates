@@ -73,7 +73,7 @@ describe("AdminClubsLedger", () => {
       "href",
       club.href,
     );
-    expect(screen.getByRole("region", { name: "클럽 장부" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "클럽 관리 목록" })).toBeInTheDocument();
     const row = container.querySelector(
       '[data-club-id="c-1"]',
     ) as HTMLElement;

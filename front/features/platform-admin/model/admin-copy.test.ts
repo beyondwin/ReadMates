@@ -25,28 +25,32 @@ describe("admin-copy", () => {
     expect(ADMIN_COPY.eyebrow.visibility).toBe("공개 설정");
     expect(ADMIN_COPY.eyebrow.domainProvisioning).toBe("도메인 준비");
     expect(ADMIN_COPY.eyebrow.operationsSnapshot).toBe("운영 스냅샷");
-    expect(ADMIN_COPY.eyebrow.pipeline).toBe("파이프라인");
-    expect(ADMIN_COPY.eyebrow.ledger).toBe("원장");
+    expect(ADMIN_COPY.eyebrow.pipeline).toBe("서비스 상태");
+    expect(ADMIN_COPY.eyebrow.ledger).toBe("처리 기록");
+    expect(ADMIN_COPY.navigation.today).toBe("오늘 할 일");
+    expect(ADMIN_COPY.navigation.clubs).toBe("클럽 관리");
+    expect(ADMIN_COPY.navigation.service).toBe("서비스 상태");
+    expect(ADMIN_COPY.navigation.records).toBe("처리 기록");
     expect(ADMIN_COPY.search.loadedCases).toBe("이미 불러온 케이스 검색");
     expect(ADMIN_COPY.heading.aiOps).toBe("AI 작업");
     expect(ADMIN_COPY.heading.failureClusters).toBe("실패 클러스터");
     expect(ADMIN_COPY.heading.replay).toBe("재발송");
-    expect(ADMIN_COPY.heading.clubsLedger).toBe("클럽 장부");
-    expect(ADMIN_COPY.heading.delivery).toBe("배달 원장");
+    expect(ADMIN_COPY.heading.clubsLedger).toBe("클럽 관리 목록");
+    expect(ADMIN_COPY.heading.delivery).toBe("알림 전달 상태");
     expect(ADMIN_COPY.heading.recentChanges).toBe("최근에 바뀐 것");
-    expect(ADMIN_COPY.heading.audit).toBe("운영 기입");
-    expect(ADMIN_COPY.heading.auditLedger).toBe("기입 목록");
-    expect(ADMIN_COPY.heading.access).toBe("접근 원장");
-    expect(ADMIN_COPY.heading.accessLedger).toBe("발급 목록");
+    expect(ADMIN_COPY.heading.audit).toBe("운영 처리 기록");
+    expect(ADMIN_COPY.heading.auditLedger).toBe("처리 목록");
+    expect(ADMIN_COPY.heading.access).toBe("지원 접근");
+    expect(ADMIN_COPY.heading.accessLedger).toBe("접근 발급 기록");
     expect(ADMIN_COPY.heading.analytics).toBe("분석 부록");
     expect(ADMIN_COPY.support.issue).toBe("지원 접근 발급");
     expect(ADMIN_COPY.support.count).toBe("접근 발급");
     expect(ADMIN_COPY.support.unavailable).toBe("접근 발급 확인 불가");
     expect(ADMIN_COPY.support.retry).toBe("접근 발급 다시 시도");
-    expect(ADMIN_COPY.targetLedger.heading).toBe("이 대상의 최근 기입");
-    expect(ADMIN_COPY.targetLedger.clubHeading).toBe("이 클럽의 최근 기입");
-    expect(ADMIN_COPY.targetLedger.more).toBe("전체 기입 보기");
-    expect(ADMIN_COPY.targetLedger.empty).toBe("표시할 기입이 없습니다.");
+    expect(ADMIN_COPY.targetLedger.heading).toBe("이 대상의 최근 처리 기록");
+    expect(ADMIN_COPY.targetLedger.clubHeading).toBe("이 클럽의 최근 처리 기록");
+    expect(ADMIN_COPY.targetLedger.more).toBe("전체 처리 기록 보기");
+    expect(ADMIN_COPY.targetLedger.empty).toBe("표시할 처리 기록이 없습니다.");
     expect(ADMIN_COPY.metric.outboxPending).toBe("발송 대기");
     expect(ADMIN_COPY.metric.outboxFailed).toBe("발송 실패");
     expect(ADMIN_COPY.metric.deliveryPending).toBe("배달 대기");
@@ -95,18 +99,18 @@ describe("admin-copy", () => {
     expect(supportGrantReasonLabel("SECURITY_REVIEW")).toBe("보안 검토");
   });
 
-  it("모르는 값은 원문을 그대로 반환한다 (fail-open 라벨, 숨기지 않음)", () => {
-    expect(clubLifecycleLabel("UNKNOWN_X")).toBe("UNKNOWN_X");
-    expect(supportGrantStatusLabel("")).toBe("");
-    expect(auditOutcomeLabel("WEIRD")).toBe("WEIRD");
+  it("primary label helper는 모르는 raw 값을 화면에 fail-open하지 않는다", () => {
+    expect(clubLifecycleLabel("UNKNOWN_X")).toBe("확인 필요");
+    expect(supportGrantStatusLabel("")).toBe("확인 필요");
+    expect(auditOutcomeLabel("WEIRD")).toBe("확인 필요");
   });
 
-  it("감사 결과를 성공/실패/차단/진행으로 바꾼다", () => {
-    expect(auditOutcomeLabel("SUCCESS")).toBe("성공");
+  it("감사 결과를 승인된 운영자 문장으로 정확히 바꾼다", () => {
+    expect(auditOutcomeLabel("SUCCESS")).toBe("완료");
     expect(auditOutcomeLabel("FAILED")).toBe("실패");
-    expect(auditOutcomeLabel("DENIED")).toBe("차단");
-    expect(auditOutcomeLabel("PREPARED")).toBe("진행");
-    expect(auditOutcomeLabel("UNKNOWN")).toBe("UNKNOWN");
+    expect(auditOutcomeLabel("DENIED")).toBe("차단됨");
+    expect(auditOutcomeLabel("PREPARED")).toBe("실행 전 준비됨");
+    expect(auditOutcomeLabel("UNKNOWN")).toBe("결과 확인 필요");
   });
 
   it("배달 원장 상태를 발송됨/대기/실패로 바꾼다", () => {
@@ -117,7 +121,7 @@ describe("admin-copy", () => {
     expect(deliveryLedgerStatusLabel("SENDING")).toBe("대기");
     expect(deliveryLedgerStatusLabel("FAILED")).toBe("실패");
     expect(deliveryLedgerStatusLabel("DEAD")).toBe("실패");
-    expect(deliveryLedgerStatusLabel("SKIPPED")).toBe("SKIPPED");
+    expect(deliveryLedgerStatusLabel("SKIPPED")).toBe("확인 필요");
     expect(deliveryAttemptBadge(2)).toBe("2차 시도");
   });
 

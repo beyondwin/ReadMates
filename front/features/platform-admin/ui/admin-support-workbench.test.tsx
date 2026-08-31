@@ -65,10 +65,10 @@ function props(overrides: Partial<ComponentProps<typeof AdminSupportWorkbench>> 
 }
 
 describe("AdminSupportWorkbench", () => {
-  it("renders the page-context heading 접근 원장", () => {
+  it("renders the page-context heading 지원 접근", () => {
     render(<AdminSupportWorkbench {...props()} />);
-    expect(screen.getByRole("heading", { level: 1, name: "접근 원장" })).toBeInTheDocument();
-    expect(screen.getByText("원장")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "지원 접근" })).toBeInTheDocument();
+    expect(screen.getByText("처리 기록")).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 

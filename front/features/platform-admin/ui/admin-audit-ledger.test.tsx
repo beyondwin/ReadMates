@@ -75,8 +75,8 @@ describe("AdminAuditLedger", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "운영 기입" })).toBeInTheDocument();
-    expect(screen.getByText("원장")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "운영 처리 기록" })).toBeInTheDocument();
+    expect(screen.getByText("처리 기록")).toBeInTheDocument();
     const notificationRow = screen.getByRole("button", { name: /알림 재처리가 확정되었습니다/ });
     expect(notificationRow).toBeInTheDocument();
     await user.click(notificationRow);
@@ -308,10 +308,10 @@ describe("AdminAuditLedger", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "운영 기입" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "운영 처리 기록" })).toBeInTheDocument();
     const row = screen.getByRole("button", { name: /OWNER가 Replay preview에 알림 재처리가 확정되었습니다/ });
     expect(row).toHaveTextContent("사유: 사유 없음");
-    expect(row).toHaveTextContent("성공");
+    expect(row).toHaveTextContent("완료");
     expect(row.querySelector("time")).toHaveAttribute("datetime", "2026-05-27T00:01:00Z");
     expect(row).not.toHaveTextContent("preview-1");
     expect(row).not.toHaveTextContent("ADMIN_NOTIFICATION_REPLAY_CONFIRMED");
