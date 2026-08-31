@@ -1,11 +1,24 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import type { AdminOperationCaseView } from "@/features/platform-admin/model/platform-admin-operations-model";
 import { findNestedLiveRegions } from "@/shared/testing/accessibility-checks";
 import { AdminOperationStateActions } from "./admin-operation-state-actions";
-import { AdminOperationsInspector } from "./admin-operations-inspector";
+import { AdminOperationsInspector as ProductionAdminOperationsInspector } from "./admin-operations-inspector";
+
+type AdminOperationsInspectorProps = Omit<
+  ComponentProps<typeof ProductionAdminOperationsInspector>,
+  "auditHref"
+> & { auditHref?: string };
+
+function AdminOperationsInspector({
+  auditHref = "/admin/audit",
+  ...props
+}: AdminOperationsInspectorProps) {
+  return <ProductionAdminOperationsInspector auditHref={auditHref} {...props} />;
+}
 
 const selectedCase: AdminOperationCaseView = {
   id: "case-notification",
@@ -47,6 +60,7 @@ describe("AdminOperationsInspector", () => {
     render(
       <MemoryRouter>
         <AdminOperationsInspector
+          {...{ auditHref: "/admin/audit?target=route-owned-target" }}
           selectedCase={selectedCase}
           history={[
             {
@@ -86,7 +100,7 @@ describe("AdminOperationsInspector", () => {
     expect(screen.queryByText("PRIVATE_HISTORY_CODE")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "전체 처리 기록 보기" })).toHaveAttribute(
       "href",
-      "/admin/audit?target=case-notification",
+      "/admin/audit?target=route-owned-target",
     );
     expect(screen.getByRole("group", { name: "작업" })).toHaveClass("admin-action-dock");
     expect(screen.getByRole("button", { name: "확인 처리" })).toBeInTheDocument();
@@ -103,6 +117,7 @@ describe("AdminOperationsInspector", () => {
     const { container } = render(
       <MemoryRouter>
         <AdminOperationsInspector
+          {...{ auditHref: "/admin/audit?target=club-exact-identifier" }}
           selectedCase={{ ...selectedCase, clubId: "club-exact-identifier" }}
           history={[]}
           lifecycleControls={<button type="button">확인 처리</button>}
@@ -411,6 +426,7 @@ describe("AdminOperationsInspector", () => {
     const { container } = render(
       <MemoryRouter>
         <AdminOperationsInspector
+          {...{ auditHref: "/admin/audit?target=club-reading-sai" }}
           selectedCase={{ ...selectedCase, clubId: "club-reading-sai" }}
           history={[
             {
@@ -474,6 +490,7 @@ describe("AdminOperationsInspector", () => {
     render(
       <MemoryRouter>
         <AdminOperationsInspector
+          {...{ auditHref: "/admin/audit" }}
           selectedCase={selectedCase}
           history={[]}
           lifecycleControls={null}
@@ -486,7 +503,7 @@ describe("AdminOperationsInspector", () => {
     expect(document.querySelectorAll(".ledger-inline .li")).toHaveLength(0);
     expect(screen.getByRole("link", { name: "전체 처리 기록 보기" })).toHaveAttribute(
       "href",
-      "/admin/audit?target=case-notification",
+      "/admin/audit",
     );
   });
 });

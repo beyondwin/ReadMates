@@ -24,6 +24,6 @@ export function useAdminContentWidth<ElementType extends HTMLElement>() {
   return {
     ref,
     width: width ?? 0,
-    layout: (width == null || width >= ADMIN_TODAY_SPLIT_MIN_WIDTH ? "split" : "flow") as AdminContentLayout,
+    layout: (width != null && width >= ADMIN_TODAY_SPLIT_MIN_WIDTH ? "split" : "flow") as AdminContentLayout,
   };
 }

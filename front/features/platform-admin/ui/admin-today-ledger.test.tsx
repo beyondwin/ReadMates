@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   AdminOperationCaseView,
   AdminOperationSourceFreshnessView,
@@ -16,7 +16,19 @@ import {
   resetAdminEditorialLedgerPerformanceStateForTests,
 } from "@/shared/observability/admin-editorial-ledger-performance";
 import { findNestedLiveRegions } from "@/shared/testing/accessibility-checks";
-import { AdminTodayLedger } from "./admin-today-ledger";
+import { AdminTodayLedger as ProductionAdminTodayLedger } from "./admin-today-ledger";
+
+type AdminTodayLedgerProps = Omit<
+  ComponentProps<typeof ProductionAdminTodayLedger>,
+  "auditHref"
+> & { auditHref?: string };
+
+function AdminTodayLedger({
+  auditHref = "/admin/audit",
+  ...props
+}: AdminTodayLedgerProps) {
+  return <ProductionAdminTodayLedger auditHref={auditHref} {...props} />;
+}
 
 const LEDGER_CSS = readFileSync(path.resolve("features/platform-admin/ui/admin-editorial-ledger.css"), "utf8");
 const SCOPED_ADMIN_CSS =
@@ -175,6 +187,19 @@ function stubContentResizeObserver() {
 }
 
 describe("AdminTodayLedger", () => {
+  beforeEach(() => {
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(private readonly callback: ResizeObserverCallback) {}
+      observe = (target: Element) => {
+        this.callback(
+          [{ target, contentRect: { width: 1200 } } as ResizeObserverEntry],
+          this as unknown as ResizeObserver,
+        );
+      };
+      disconnect = vi.fn();
+    });
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
     resetAdminEditorialLedgerPerformanceStateForTests();

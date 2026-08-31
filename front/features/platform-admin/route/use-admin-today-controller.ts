@@ -414,7 +414,7 @@ export function useAdminTodayController() {
 
   const selectCase = useCallback((caseId: string, mode = searchState.mode) => {
     selectedIdRef.current = caseId;
-    dispatch({ type: "selection-changed", caseId });
+    dispatch({ type: "selection-changed", caseId, explicit: true });
     writeSearch({ caseId, mode });
   }, [searchState.mode, writeSearch]);
   const acknowledgeCurrent = useCallback(async () => {

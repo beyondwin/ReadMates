@@ -193,6 +193,45 @@ describe("adminTodayReducer", () => {
     expect(selected.mutationTarget).toEqual(target("case-a"));
   });
 
+  it("releases a completed pin and pending-removal snapshot on explicit selection", () => {
+    const observed = observe(
+      createAdminTodayState("case-a"),
+      response([operationCase("case-a"), operationCase("case-b")]),
+    );
+    const pendingRemoval = adminTodayReducer(observed, {
+      type: "list-observed",
+      response: response([
+        operationCase("case-b"),
+        operationCase("case-new"),
+      ], { generatedAt: "2026-08-04T10:10:00Z" }),
+      scopeKey,
+      pageCount: 1,
+      failed: false,
+    });
+    const complete = adminTodayReducer(
+      adminTodayReducer(pendingRemoval, {
+        type: "mutation-started",
+        target: target("case-a"),
+      }),
+      { type: "mutation-succeeded" },
+    );
+    const explicitSelection = {
+      type: "selection-changed" as const,
+      caseId: "case-b",
+      explicit: true,
+    };
+
+    const selected = adminTodayReducer(complete, explicitSelection);
+
+    expect(selected.selectedCaseId).toBe("case-b");
+    expect(selected.snapshot?.displayed.items.map((item) => item.id)).toEqual(["case-b"]);
+    expect(selected.snapshot?.pendingNewIds).toEqual(["case-new"]);
+    expect(selected.snapshot?.pendingRemovalIds).toEqual([]);
+    expect(selected.mutationTarget).toBeNull();
+    expect(selected.actionState).toBe("ready");
+    expect(selected.actionMessage).toBeNull();
+  });
+
   it("models pending, conflict, unknown outcome, recovery, and a changed confirmation", () => {
     const started = adminTodayReducer(createAdminTodayState("case-a"), {
       type: "mutation-started",

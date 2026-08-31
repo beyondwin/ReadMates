@@ -15,6 +15,7 @@ type HistoryEvent = {
 
 type Props = {
   view: AdminOperationsView;
+  auditHref: string;
   history: readonly HistoryEvent[];
   lifecycleControls: ReactNode;
   queueControls?: ReactNode;
@@ -34,6 +35,7 @@ type Props = {
 
 export function AdminOperationMobileDetail({
   view,
+  auditHref,
   history,
   lifecycleControls,
   queueControls,
@@ -101,6 +103,7 @@ export function AdminOperationMobileDetail({
         </button>
         <AdminOperationsInspector
           selectedCase={view.selectedCase}
+          auditHref={auditHref}
           history={history}
           lifecycleControls={lifecycleControls}
           detailLoading={detailLoading}

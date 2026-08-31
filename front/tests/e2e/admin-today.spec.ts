@@ -161,6 +161,12 @@ test("owner sees the durable operations queue inside the admin shell", async ({ 
     "/admin/notifications",
   );
   await expect(page.getByText("페이지를 불러오지 못했습니다.")).toHaveCount(0);
+
+  await page.getByRole("link", { name: "전체 처리 기록 보기" }).click();
+  await expect(page).toHaveURL((url) => (
+    url.pathname === "/admin/audit"
+    && url.searchParams.get("target") === null
+  ));
 });
 
 test("support can inspect a case without lifecycle controls", async ({ page }) => {

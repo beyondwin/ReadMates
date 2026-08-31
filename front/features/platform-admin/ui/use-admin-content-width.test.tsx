@@ -12,7 +12,7 @@ function Harness() {
 describe("useAdminContentWidth", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("switches at the observed 960px content boundary without consulting viewport width", () => {
+  it("stays in safe flow until observation, switches at 960px, and disconnects on cleanup", () => {
     let callback: ObserverCallback | null = null;
     const observe = vi.fn();
     const disconnect = vi.fn();
@@ -25,9 +25,11 @@ describe("useAdminContentWidth", () => {
     });
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
 
-    render(<Harness />);
+    const rendered = render(<Harness />);
     const surface = screen.getByTestId("surface");
     expect(observe).toHaveBeenCalledWith(surface);
+    expect(surface).toHaveAttribute("data-layout", "flow");
+    expect(surface).toHaveAttribute("data-width", "0");
 
     act(() => callback?.([{ target: surface, contentRect: { width: 959 } } as ResizeObserverEntry]));
     expect(surface).toHaveAttribute("data-layout", "flow");
@@ -38,5 +40,18 @@ describe("useAdminContentWidth", () => {
     expect(surface).toHaveAttribute("data-layout", "split");
     expect(surface).toHaveAttribute("data-width", "960");
     expect(disconnect).not.toHaveBeenCalled();
+
+    rendered.unmount();
+    expect(disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the permanent safe flow fallback when ResizeObserver is unavailable", () => {
+    vi.stubGlobal("ResizeObserver", undefined);
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
+
+    render(<Harness />);
+
+    expect(screen.getByTestId("surface")).toHaveAttribute("data-layout", "flow");
+    expect(screen.getByTestId("surface")).toHaveAttribute("data-width", "0");
   });
 });

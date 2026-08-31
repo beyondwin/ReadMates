@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import type {
@@ -8,8 +8,20 @@ import type {
   AdminOperationsView,
 } from "@/features/platform-admin/model/platform-admin-operations-model";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
-import { AdminOperationMobileDetail } from "./admin-operation-mobile-detail";
+import { AdminOperationMobileDetail as ProductionAdminOperationMobileDetail } from "./admin-operation-mobile-detail";
 import { AdminOperationStateActions } from "./admin-operation-state-actions";
+
+type AdminOperationMobileDetailProps = Omit<
+  ComponentProps<typeof ProductionAdminOperationMobileDetail>,
+  "auditHref"
+> & { auditHref?: string };
+
+function AdminOperationMobileDetail({
+  auditHref = "/admin/audit",
+  ...props
+}: AdminOperationMobileDetailProps) {
+  return <ProductionAdminOperationMobileDetail auditHref={auditHref} {...props} />;
+}
 
 function operationCase(overrides: Partial<AdminOperationCaseView> = {}): AdminOperationCaseView {
   return {

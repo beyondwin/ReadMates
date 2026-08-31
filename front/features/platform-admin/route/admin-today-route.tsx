@@ -100,10 +100,14 @@ export function AdminTodayRoute() {
         onResolve={() => void controller.resolveCurrent()}
       />
     ) : null;
+  const auditHref = currentCase?.clubId
+    ? `/admin/audit?target=${encodeURIComponent(currentCase.clubId)}`
+    : "/admin/audit";
 
   return (
     <AdminTodayLedger
       view={controller.view}
+      auditHref={auditHref}
       filters={controller.filters}
       history={controller.history}
       lifecycleControls={lifecycleControls}

@@ -174,7 +174,7 @@ function Probe({ location, onCompletion, onObservation }: ProbeProps) {
   const controller = useAdminTodayController();
   const navigate = useNavigate();
   onObservation?.({
-    actionMessage: controller.actionMessage,
+    actionMessage: controller.actionMessage?.text ?? null,
     actionState: controller.actionState,
     location,
     mutationTarget: controller.mutationTarget?.caseId ?? null,
@@ -191,9 +191,11 @@ function Probe({ location, onCompletion, onObservation }: ProbeProps) {
       <output aria-label="rows">{controller.view?.items.map((item) => item.id).join(",") ?? ""}</output>
       <output aria-label="pending-new">{controller.pendingCount}</output>
       <output aria-label="action-state">{controller.actionState}</output>
+      <output aria-label="action-message">{controller.actionMessage?.text ?? "none"}</output>
       <output aria-label="mutation-target">{controller.mutationTarget?.caseId ?? "none"}</output>
       <button type="button" onClick={() => controller.selectCase("case-b")}>select-b</button>
       <button type="button" onClick={() => navigate(-1)}>back</button>
+      <button type="button" onClick={() => navigate(1)}>forward</button>
       <button type="button" onClick={controller.acceptPending}>apply-pending</button>
       <button type="button" onClick={() => track(controller.acknowledgeCurrent())}>ack</button>
       <button
@@ -267,7 +269,7 @@ function renderController(
       };
     },
   };
-  let unmountOwner = () => undefined;
+  let unmountOwner: () => void = () => undefined;
   const rendered = render(
     <QueryClientProvider client={client}>
       <SpaceTransitionSafetyProvider port={port}>
@@ -594,5 +596,59 @@ describe("useAdminTodayController", () => {
     });
     expect(operationsApi.snooze).toHaveBeenCalledTimes(kind === "snooze" ? 1 : 0);
     expect(operationsApi.resolve).toHaveBeenCalledTimes(kind === "resolve" ? 1 : 0);
+  });
+
+  it.each([
+    ["snooze", "SNOOZED"],
+    ["resolve", "RESOLVED"],
+  ] as const)("releases a completed %s pin after explicit movement and does not restore it on Back", async (
+    buttonName,
+    state,
+  ) => {
+    const user = userEvent.setup();
+    const first = operationCase("case-a");
+    const second = operationCase("case-b");
+    const completed = operationCase("case-a", {
+      state,
+      snoozedUntil: state === "SNOOZED" ? "2026-08-05T10:00:00Z" : null,
+      resolvedAt: state === "RESOLVED" ? "2026-08-04T10:05:00Z" : null,
+      version: 4,
+      allowedActions: [],
+    });
+    const result = { schema: "admin.operation_cases.v1" as const, ...completed };
+    if (buttonName === "snooze") operationsApi.snooze.mockResolvedValue(result);
+    else operationsApi.resolve.mockResolvedValue(result);
+    operationsApi.fetchList.mockResolvedValue(listResponse([second], "2026-08-04T10:10:00Z"));
+    operationsApi.fetchDetail.mockResolvedValue(detailResponse(completed));
+    renderController(seededClient([first, second]), "/admin/today?case=case-a");
+
+    await user.click(await screen.findByRole("button", { name: buttonName }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("mutation-target")).toHaveTextContent("case-a");
+      expect(screen.getByLabelText("action-message")).toHaveTextContent("케이스 상태를 반영했습니다.");
+    });
+
+    await user.click(screen.getByRole("button", { name: "select-b" }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("location")).toHaveTextContent("case=case-b");
+      expect(screen.getByLabelText("rows")).toHaveTextContent("case-b");
+      expect(screen.getByLabelText("mutation-target")).toHaveTextContent("none");
+      expect(screen.getByLabelText("action-message")).toHaveTextContent("none");
+    });
+
+    await user.click(screen.getByRole("button", { name: "back" }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("location")).toHaveTextContent("case=case-a");
+      expect(screen.getByLabelText("selection")).toHaveTextContent("none");
+      expect(screen.getByLabelText("rows")).toHaveTextContent("case-b");
+      expect(screen.getByLabelText("mutation-target")).toHaveTextContent("none");
+      expect(screen.getByLabelText("action-message")).toHaveTextContent("none");
+    });
+
+    await user.click(screen.getByRole("button", { name: "forward" }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("location")).toHaveTextContent("case=case-b");
+      expect(screen.getByLabelText("selection")).toHaveTextContent("case-b");
+    });
   });
 });

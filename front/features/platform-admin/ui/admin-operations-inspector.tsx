@@ -29,6 +29,7 @@ export type AdminCaseTraversal = {
 
 type Props = {
   selectedCase: AdminOperationCaseView | null;
+  auditHref: string;
   history: readonly SafeHistoryEvent[];
   lifecycleControls: ReactNode;
   detailLoading?: boolean;
@@ -72,6 +73,7 @@ const LEDGER_TIME = new Intl.DateTimeFormat("ko-KR", {
 
 export function AdminOperationsInspector({
   selectedCase,
+  auditHref,
   history,
   lifecycleControls,
   detailLoading = false,
@@ -162,7 +164,7 @@ export function AdminOperationsInspector({
           </div>
           <AdminTargetLedgerInline
             entries={targetLedgerEntries(history)}
-            moreHref={targetLedgerHref(selectedCase)}
+            moreHref={auditHref}
           />
         </div>
       }
@@ -240,10 +242,6 @@ function targetLedgerEntries(history: readonly SafeHistoryEvent[]) {
       at: formatLedgerTime(event.occurredAt),
       sentence: `${HISTORY_LABELS[event.reasonCode] ?? "상태 변경 기록"} · ${adminCaseLifecycleLanguage(event.toState).primaryText}`,
     }));
-}
-
-function targetLedgerHref(selectedCase: AdminOperationCaseView): string {
-  return `/admin/audit?target=${encodeURIComponent(selectedCase.clubId ?? selectedCase.id)}`;
 }
 
 function DocketNav({ traversal }: { traversal: AdminCaseTraversal }) {

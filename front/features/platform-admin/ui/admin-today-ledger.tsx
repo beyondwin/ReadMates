@@ -39,6 +39,7 @@ type HistoryEvent = {
 
 type Props = {
   view: AdminOperationsView;
+  auditHref: string;
   filters: AdminTodayFilters;
   history: readonly HistoryEvent[];
   lifecycleControls: ReactNode;
@@ -70,6 +71,7 @@ type Props = {
 
 export function AdminTodayLedger({
   view,
+  auditHref,
   filters,
   history,
   lifecycleControls,
@@ -144,6 +146,7 @@ export function AdminTodayLedger({
   const inspector = (
     <AdminOperationsInspector
       selectedCase={view.selectedCase}
+      auditHref={auditHref}
       history={history}
       lifecycleControls={lifecycleControls}
       detailLoading={detailLoading}
@@ -208,6 +211,7 @@ export function AdminTodayLedger({
   const workSurface = view.items.length === 0 ? null : flowLayout ? (
     <AdminOperationMobileDetail
       view={view}
+      auditHref={auditHref}
       history={history}
       lifecycleControls={mobileLifecycleControls ?? lifecycleControls}
       queueControls={queueControls}

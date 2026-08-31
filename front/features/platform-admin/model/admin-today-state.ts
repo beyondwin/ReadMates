@@ -57,7 +57,7 @@ export type AdminTodayAction =
       pageCount: number;
       failed: boolean;
     }
-  | { type: "selection-changed"; caseId: string | null }
+  | { type: "selection-changed"; caseId: string | null; explicit?: boolean }
   | { type: "pending-accepted" }
   | { type: "urgent-announcement-cleared" }
   | { type: "mutation-started"; target: AdminTodayMutationTarget }
@@ -130,10 +130,21 @@ export function adminTodayReducer(
       };
     }
     case "selection-changed": {
-      if (state.selectedCaseId === action.caseId) return state;
+      const releasesCompletedPin = Boolean(
+        action.explicit
+        && state.mutationTarget
+        && state.mutationTarget.caseId !== action.caseId
+        && state.actionMessage?.kind === "success",
+      );
+      if (state.selectedCaseId === action.caseId && !releasesCompletedPin) return state;
+      const releasedSnapshot = releasesCompletedPin && state.snapshot && state.mutationTarget
+        ? releaseCompletedMutationSnapshot(state.snapshot, state.mutationTarget.caseId)
+        : null;
       return {
         ...state,
+        snapshot: releasedSnapshot ?? state.snapshot,
         selectedCaseId: action.caseId,
+        mutationTarget: releasesCompletedPin ? null : state.mutationTarget,
         actionState: "ready",
         actionMessage: null,
         focusQueueSummary: false,
@@ -254,6 +265,35 @@ export function adminTodayReducer(
         actionState: "forbidden",
       };
   }
+}
+
+function releaseCompletedMutationSnapshot(
+  snapshot: AdminOperationsSnapshot,
+  mutationCaseId: string,
+): AdminOperationsSnapshot {
+  const latestMutationCase = snapshot.latest.items.find(
+    (item) => item.id === mutationCaseId,
+  );
+  const displayedItems = snapshot.displayed.items.flatMap((item) => {
+    if (item.id !== mutationCaseId) return [item];
+    if (!latestMutationCase) return [];
+    return [{
+      ...latestMutationCase,
+      allowedActions: [...latestMutationCase.allowedActions],
+      source: { ...latestMutationCase.source },
+    }];
+  });
+
+  return {
+    ...snapshot,
+    displayed: {
+      ...snapshot.displayed,
+      items: displayedItems,
+    },
+    pendingRemovalIds: snapshot.pendingRemovalIds.filter(
+      (id) => id !== mutationCaseId,
+    ),
+  };
 }
 
 export function nextAdminTodayCaseId(

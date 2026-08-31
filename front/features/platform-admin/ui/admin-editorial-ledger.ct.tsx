@@ -120,6 +120,7 @@ function todayNode(fixture: TodayLedgerFixture) {
   return (
     <AdminTodayLedger
       view={fixture.view}
+      auditHref="/admin/audit"
       filters={fixture.filters}
       history={fixture.history}
       lifecycleControls={lifecycleControls}
@@ -311,6 +312,32 @@ test("Today case detail locks the 320 mobile composition", async ({ mount, page 
   await expect(component).toHaveScreenshot("editorial-ledger-case-detail-320.png");
   await back.focus();
   await expectVisibleFocus(back);
+});
+
+test("Today keeps the 320 queue locator intact without horizontal overflow", async ({ mount, page }) => {
+  const fixture = {
+    ...todayDesktopLedger,
+    mode: "list" as const,
+    view: {
+      ...todayDesktopLedger.view,
+      items: todayDesktopLedger.view.items.map((item, index) => ({
+        ...item,
+        locatorLabel: String(index + 1).padStart(2, "0"),
+      })),
+    },
+  };
+  const component = await mountEditorial(
+    mount,
+    page,
+    todayNode(fixture),
+    VISUAL_AUTHORITY_VIEWPORTS.mobileNarrow,
+  );
+  const locator = component.locator(".admin-operations-queue__locator").first();
+  await expect(locator).toBeVisible();
+  await expect(locator).toHaveCSS("white-space", "nowrap");
+  await expect(locator).toHaveCSS("flex-shrink", "0");
+  await expect(locator).toHaveCSS("overflow-wrap", "normal");
+  await expectNoHorizontalOverflow(page);
 });
 
 for (const width of [390, 768, 900, 1024] as const) {

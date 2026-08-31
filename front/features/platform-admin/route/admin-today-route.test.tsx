@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter, useLocation, useNavigate } from "react-router";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ReadmatesTransportError } from "@/shared/api/errors";
 import type {
@@ -204,8 +204,31 @@ function renderRoute(client: QueryClient, initialEntry = "/admin/today") {
   );
 }
 
+function renderNavigableRoute(client: QueryClient, initialEntry = "/admin/today") {
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <Routes>
+          <Route path="/admin/today" element={<><AdminTodayRoute /><LocationProbe /></>} />
+          <Route path="/admin/audit" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(private readonly callback: ResizeObserverCallback) {}
+    observe = (target: Element) => {
+      this.callback(
+        [{ target, contentRect: { width: 1200 } } as ResizeObserverEntry],
+        this as unknown as ResizeObserver,
+      );
+    };
+    disconnect = vi.fn();
+  });
   operationsApi.fetchList.mockResolvedValue(listResponse());
   operationsApi.fetchDetail.mockResolvedValue(detailResponse());
   vi.mocked(fetchPlatformAdminCapabilities).mockResolvedValue(ownerCapabilities);
@@ -222,6 +245,27 @@ describe("AdminTodayRoute", () => {
     expect(screen.getByRole("group", { name: "작업" })).toHaveClass("admin-action-dock");
     expect(screen.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ })).toHaveAttribute("aria-pressed", "true");
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
+  });
+
+  it.each([
+    [null, "/admin/audit"],
+    ["club-reading-sai", "/admin/audit?target=club-reading-sai"],
+  ] as const)("follows the route-owned audit destination for club id %s", async (clubId, destination) => {
+    const user = userEvent.setup();
+    const item = operationCase({ clubId });
+    renderNavigableRoute(seededClient([item]), "/admin/today?case=case-notification");
+
+    await user.click(await screen.findByRole("link", { name: "전체 처리 기록 보기" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("current location")).toHaveTextContent(destination);
+    });
+    const location = screen.getByLabelText("current location").textContent ?? "";
+    const parsed = new URL(location, "https://readmates.example");
+    expect(parsed.pathname).toBe("/admin/audit");
+    expect(parsed.searchParams.get("target")).toBe(clubId);
+    expect(parsed.searchParams.get("target")).not.toBe("case-notification");
+    expect(parsed.searchParams.get("target")).not.toBe("NOTIFICATION");
   });
 
   it("preserves a visible selected case when a filter changes", async () => {
