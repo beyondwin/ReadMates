@@ -7,8 +7,8 @@
 - ADR-0045: Accepted — 공유 paper/ink; host composition은 ADR-0048, admin composition은 ADR-0047
 - ADR-0046: Superseded by ADR-0048
 - ADR-0047: Accepted — admin case desk + 운영 서사 + 오늘·클럽·파이프라인·원장 4축 내비
-- ADR-0048: Proposed — lifecycle operating room 구현과 active 문서는 정렬됐으며 Stage 5 전체 gate 전까지 상태 유지
-- ADR-0049: Proposed — schedule-seen vertical slice 구현과 active 문서는 정렬됐으며 Stage 5 전체 gate 전까지 상태 유지
+- ADR-0048: Accepted — lifecycle operating room과 host 4축 내비게이션의 현재 권위
+- ADR-0049: Accepted — 독립 schedule-seen revision과 명시적 검토·발송 흐름의 현재 권위
 - Token source: `design/system/src/styles/tokens.css`
 - Viewport contract: `front/tests/e2e/support/visual-authority-contract.ts`
 
