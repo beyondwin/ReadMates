@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -17,7 +18,10 @@ import {
   platformAdminOperationCasePagesQuery,
   platformAdminOperationCaseQuery,
 } from "@/features/platform-admin/queries/platform-admin-operations-queries";
-import { createGlobalSpaceTransitionCoordinator } from "@/src/app/global-space-transition";
+import {
+  createGlobalSpaceTransitionCoordinator,
+  createRetiredReceiptCapsuleRegistry,
+} from "@/src/app/global-space-transition";
 import { ReadmatesTransportError } from "@/shared/api/errors";
 import type {
   TransitionPublicationSurface,
@@ -25,6 +29,24 @@ import type {
 } from "@/shared/model/global-space";
 import { SpaceTransitionSafetyProvider } from "@/shared/ui/space-transition-safety-context";
 import { useAdminTodayController } from "./use-admin-today-controller";
+
+const transitionTestControl = vi.hoisted(() => ({
+  afterAcceptedUi: null as (() => Promise<void>) | null,
+}));
+
+vi.mock("@/shared/ui/use-transition-safety-owner", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/shared/ui/use-transition-safety-owner")>();
+  return {
+    ...actual,
+    async publishTransitionAction(
+      ...args: Parameters<typeof actual.publishTransitionAction>
+    ) {
+      const result = await actual.publishTransitionAction(...args);
+      if (args[1] === "ui") await transitionTestControl.afterAcceptedUi?.();
+      return result;
+    },
+  };
+});
 
 const operationsApi = vi.hoisted(() => ({
   fetchList: vi.fn(),
@@ -134,14 +156,37 @@ function seededClient(items: AdminOperationCase[]) {
   return client;
 }
 
-function Probe() {
+type ControllerObservation = {
+  actionMessage: string | null;
+  actionState: string;
+  location: string;
+  mutationTarget: string | null;
+  selectedCaseId: string | null;
+};
+
+type ProbeProps = {
+  location: string;
+  onCompletion?: (completion: Promise<boolean>) => void;
+  onObservation?: (observation: ControllerObservation) => void;
+};
+
+function Probe({ location, onCompletion, onObservation }: ProbeProps) {
   const controller = useAdminTodayController();
-  const location = useLocation();
   const navigate = useNavigate();
+  onObservation?.({
+    actionMessage: controller.actionMessage,
+    actionState: controller.actionState,
+    location,
+    mutationTarget: controller.mutationTarget?.caseId ?? null,
+    selectedCaseId: controller.view?.selectedCaseId ?? null,
+  });
+  const track = (completion: Promise<boolean>) => {
+    onCompletion?.(completion);
+    void completion;
+  };
   return (
     <div>
       <output aria-label="status">{controller.status}</output>
-      <output aria-label="location">{location.pathname}{location.search}</output>
       <output aria-label="selection">{controller.view?.selectedCaseId ?? "none"}</output>
       <output aria-label="rows">{controller.view?.items.map((item) => item.id).join(",") ?? ""}</output>
       <output aria-label="pending-new">{controller.pendingCount}</output>
@@ -150,13 +195,30 @@ function Probe() {
       <button type="button" onClick={() => controller.selectCase("case-b")}>select-b</button>
       <button type="button" onClick={() => navigate(-1)}>back</button>
       <button type="button" onClick={controller.acceptPending}>apply-pending</button>
-      <button type="button" onClick={() => void controller.acknowledgeCurrent()}>ack</button>
+      <button type="button" onClick={() => track(controller.acknowledgeCurrent())}>ack</button>
       <button
         type="button"
-        onClick={() => void controller.snoozeCurrent("2026-08-05T10:00:00Z")}
+        onClick={() => track(controller.snoozeCurrent("2026-08-05T10:00:00Z"))}
       >snooze</button>
-      <button type="button" onClick={() => void controller.resolveCurrent()}>resolve</button>
+      <button type="button" onClick={() => track(controller.resolveCurrent())}>resolve</button>
     </div>
+  );
+}
+
+type ControllerHarnessProps = Omit<ProbeProps, "location"> & {
+  registerOwnerUnmount: (unmount: () => void) => void;
+};
+
+function ControllerHarness({ registerOwnerUnmount, ...probeProps }: ControllerHarnessProps) {
+  const [ownerMounted, setOwnerMounted] = useState(true);
+  const location = useLocation();
+  registerOwnerUnmount(() => setOwnerMounted(false));
+  const locationValue = `${location.pathname}${location.search}`;
+  return (
+    <>
+      <output aria-label="location">{locationValue}</output>
+      {ownerMounted ? <Probe {...probeProps} location={locationValue} /> : null}
+    </>
   );
 }
 
@@ -165,45 +227,82 @@ function renderController(
   initialEntry: string,
   options: {
     afterAcceptedUi?: () => void;
+    onCompletion?: (completion: Promise<boolean>) => void;
+    onObservation?: (observation: ControllerObservation) => void;
     onAcceptedPublication?: (surface: TransitionPublicationSurface) => void;
   } = {},
 ) {
-  const coordinator = createGlobalSpaceTransitionCoordinator();
-  const port: TransitionSafetyRegistrationPort = options.afterAcceptedUi
-    ? {
-        registerDirty: coordinator.registerDirty,
-        beginPending(registration) {
-          const handle = coordinator.beginPending(registration);
-          return {
-            ...handle,
-            publishAccepted(action) {
-              return handle.publishAccepted({
-                ...action,
-                publish(observation) {
-                  options.onAcceptedPublication?.(action.surface);
-                  action.publish(observation);
-                  if (action.surface === "ui") options.afterAcceptedUi?.();
-                },
-              });
+  const registry = createRetiredReceiptCapsuleRegistry();
+  const coordinator = createGlobalSpaceTransitionCoordinator({ registry });
+  let replayCount = 0;
+  const port: TransitionSafetyRegistrationPort = {
+    registerDirty: coordinator.registerDirty,
+    beginPending(registration) {
+      const recovery = registration.recovery;
+      const instrumentedRegistration = recovery.kind === "authoritative-history"
+        ? {
+            ...registration,
+            recovery: {
+              ...recovery,
+              async reconcile() {
+                replayCount += 1;
+                return recovery.reconcile();
+              },
             },
-          };
+          }
+        : registration;
+      const handle = coordinator.beginPending(instrumentedRegistration);
+      return {
+        ...handle,
+        publishAccepted(action) {
+          return handle.publishAccepted({
+            ...action,
+            publish(observation) {
+              options.onAcceptedPublication?.(action.surface);
+              action.publish(observation);
+              if (action.surface === "ui") options.afterAcceptedUi?.();
+            },
+          });
         },
-      }
-    : coordinator;
+      };
+    },
+  };
+  let unmountOwner = () => undefined;
   const rendered = render(
     <QueryClientProvider client={client}>
       <SpaceTransitionSafetyProvider port={port}>
         <MemoryRouter initialEntries={[initialEntry]}>
-          <Probe />
+          <ControllerHarness
+            onCompletion={options.onCompletion}
+            onObservation={options.onObservation}
+            registerOwnerUnmount={(unmount) => { unmountOwner = unmount; }}
+          />
         </MemoryRouter>
       </SpaceTransitionSafetyProvider>
     </QueryClientProvider>,
   );
-  return { ...rendered, coordinator };
+  return {
+    ...rendered,
+    coordinator,
+    registry,
+    replayCount: () => replayCount,
+    unmountOwner: () => act(() => unmountOwner()),
+  };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, reject, resolve };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  transitionTestControl.afterAcceptedUi = null;
   const item = operationCase("case-a");
   operationsApi.fetchList.mockResolvedValue(listResponse([item]));
   operationsApi.fetchDetail.mockResolvedValue(detailResponse(item));
@@ -368,6 +467,104 @@ describe("useAdminTodayController", () => {
     expect(operationsApi.snooze).toHaveBeenCalledTimes(kind === "snooze" ? 1 : 0);
     expect(operationsApi.resolve).toHaveBeenCalledTimes(kind === "resolve" ? 1 : 0);
     expect(rendered.coordinator.getSnapshot()).toEqual({ kind: "clean" });
+  });
+
+  it.each([
+    ["snooze", "SNOOZED"],
+    ["resolve", "RESOLVED"],
+  ] as const)("publishes nothing after accepted %s UI when its owner unmounts before queue exit", async (
+    kind,
+    state,
+  ) => {
+    const user = userEvent.setup();
+    const reachedContinuation = deferred<void>();
+    const releaseContinuation = deferred<void>();
+    transitionTestControl.afterAcceptedUi = async () => {
+      reachedContinuation.resolve();
+      await releaseContinuation.promise;
+    };
+    const first = operationCase("case-a");
+    const second = operationCase("case-b");
+    const completed = operationCase("case-a", {
+      state,
+      snoozedUntil: state === "SNOOZED" ? "2026-08-05T10:00:00Z" : null,
+      resolvedAt: state === "RESOLVED" ? "2026-08-04T10:05:00Z" : null,
+      version: 4,
+      allowedActions: [],
+    });
+    const mutationResult = { schema: "admin.operation_cases.v1" as const, ...completed };
+    if (kind === "snooze") operationsApi.snooze.mockResolvedValue(mutationResult);
+    else operationsApi.resolve.mockResolvedValue(mutationResult);
+    operationsApi.fetchList.mockResolvedValue(listResponse([completed, second]));
+    operationsApi.fetchDetail.mockResolvedValue(detailResponse(completed));
+    const client = seededClient([first, second]);
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const refetch = vi.spyOn(client, "refetchQueries");
+    const remove = vi.spyOn(client, "removeQueries");
+    const surfaces: TransitionPublicationSurface[] = [];
+    const observations: ControllerObservation[] = [];
+    let completion: Promise<boolean> | undefined;
+    let completionSettled = false;
+    let ownerUnmounted = false;
+    const lateSurfaces: TransitionPublicationSurface[] = [];
+    const rendered = renderController(client, "/admin/today?case=case-a", {
+      onAcceptedPublication(surface) {
+        surfaces.push(surface);
+        if (ownerUnmounted) lateSurfaces.push(surface);
+      },
+      onCompletion(value) {
+        completion = value;
+        void value.finally(() => { completionSettled = true; });
+      },
+      onObservation(observation) {
+        observations.push(observation);
+      },
+    });
+
+    await user.click(await screen.findByRole("button", { name: kind }));
+    await act(async () => reachedContinuation.promise);
+
+    expect(completion).toBeDefined();
+    expect(completionSettled).toBe(false);
+    expect(surfaces).toEqual(["cache", "ui"]);
+    expect(observations.at(-1)).toMatchObject({
+      location: "/admin/today?case=case-a",
+      selectedCaseId: "case-a",
+    });
+    const observationCountAtUnmount = observations.length;
+    const invalidateCountAtUnmount = invalidate.mock.calls.length;
+    const refetchCountAtUnmount = refetch.mock.calls.length;
+    const removeCountAtUnmount = remove.mock.calls.length;
+
+    ownerUnmounted = true;
+    rendered.unmountOwner();
+    expect(rendered.coordinator.getSnapshot()).toEqual({ kind: "clean" });
+    expect(rendered.registry.size()).toBe(0);
+    expect(screen.getByLabelText("location")).toHaveTextContent("case=case-a");
+
+    await act(async () => {
+      releaseContinuation.resolve();
+      await completion;
+    });
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
+
+    expect(completionSettled).toBe(true);
+    expect(operationsApi.snooze).toHaveBeenCalledTimes(kind === "snooze" ? 1 : 0);
+    expect(operationsApi.resolve).toHaveBeenCalledTimes(kind === "resolve" ? 1 : 0);
+    expect(rendered.replayCount()).toBe(0);
+    expect(lateSurfaces).toEqual([]);
+    expect(surfaces).toEqual(["cache", "ui"]);
+    expect(surfaces).not.toContain("receiptCallback");
+    expect(surfaces).not.toContain("successCopy");
+    expect(surfaces).not.toContain("navigation");
+    expect(surfaces).not.toContain("returnTarget");
+    expect(invalidate).toHaveBeenCalledTimes(invalidateCountAtUnmount);
+    expect(refetch).toHaveBeenCalledTimes(refetchCountAtUnmount);
+    expect(remove).toHaveBeenCalledTimes(removeCountAtUnmount);
+    expect(observations).toHaveLength(observationCountAtUnmount);
+    expect(screen.getByLabelText("location")).toHaveTextContent("case=case-a");
+    expect(rendered.coordinator.getSnapshot()).toEqual({ kind: "clean" });
+    expect(rendered.registry.size()).toBe(0);
   });
 
   it.each([
