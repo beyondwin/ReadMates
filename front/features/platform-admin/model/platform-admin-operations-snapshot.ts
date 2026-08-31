@@ -21,6 +21,14 @@ export type AdminOperationsApplyResult = AdminOperationsRestoreTarget & {
   snapshot: AdminOperationsSnapshot;
 };
 
+export type AdminOperationsSnapshotObservation = {
+  response: AdminOperationCasesResponse;
+  scopeKey: string;
+  pageCount: number;
+  previousPageCount: number;
+  failed: boolean;
+};
+
 export function createAdminOperationsSnapshot(
   response: AdminOperationCasesResponse,
   scopeKey: string,
@@ -106,6 +114,36 @@ export function applyPendingAdminOperationsSnapshot(
     selectedId: target.selectedId && displayedIds.has(target.selectedId) ? target.selectedId : null,
     focusId: target.focusId && displayedIds.has(target.focusId) ? target.focusId : null,
   };
+}
+
+export function advanceAdminOperationsSnapshot(
+  current: AdminOperationsSnapshot | null,
+  observation: AdminOperationsSnapshotObservation,
+): AdminOperationsSnapshot {
+  if (!current || current.scopeKey !== observation.scopeKey) {
+    return createAdminOperationsSnapshot(observation.response, observation.scopeKey);
+  }
+  if (observation.failed) {
+    return retryAdminOperationsSnapshot(current, observation.response);
+  }
+  if (observation.pageCount > observation.previousPageCount) {
+    const displayedIds = new Set(current.displayed.items.map((item) => item.id));
+    const pendingIds = new Set(current.pendingNewIds);
+    const continuationIds = observation.response.items
+      .map((item) => item.id)
+      .filter((id) => !displayedIds.has(id) && !pendingIds.has(id));
+    return paginateAdminOperationsSnapshot(
+      current,
+      observation.response,
+      continuationIds,
+      observation.scopeKey,
+    );
+  }
+  return receiveAdminOperationsSnapshot(
+    current,
+    observation.response,
+    observation.scopeKey,
+  );
 }
 
 function projectSnapshot(
