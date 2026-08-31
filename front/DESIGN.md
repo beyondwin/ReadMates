@@ -16,7 +16,7 @@
 
 호스트 1차 내비게이션은 네 영역이다: **운영실** · **일정과 모임** · **사람** · **기록**.
 데스크톱 top nav와 모바일 tab bar는 같은 canonical 목적지(`HOST_ROUTE_HREFS.operatingRoom` / `.meetings` / `.people` / `.records`)와 순서를 쓴다. `초대와 설정`, `멤버 시야`, 알림, 계정, `새 모임`은 utility/action이며 1차 영역을 늘리지 않는다.
-호환 경로는 query/hash와 검증된 same-club return state를 보존해 replace한다: `/members`→`/people`, `/invitations`→`/settings#invitations`, `/operations`→운영실. `/records`는 canonical 기록 원장이고 `/sessions/:sessionId/edit`·`/closing`은 기존 deep link 문맥을 보존한다.
+`/members`와 `/operations`는 query·허용된 incoming fragment·검증된 same-club return state를 보존해 각각 `/people`과 운영실로 replace한다. `/invitations`는 query와 검증된 same-club return state를 보존하되 incoming fragment를 canonical `#invitations`로 교체해 `/settings#invitations`로 replace한다. `/records`는 canonical 기록 원장이고 `/sessions/:sessionId/edit`·`/closing`은 기존 deep link 문맥을 보존한다.
 
 ## Shared tokens
 
