@@ -107,6 +107,14 @@ describe("admin-status-language", () => {
     expect(analysis).toEqual({ violations: [], technicalDisclosureCount: 1 });
   });
 
+  it("recognizes the exact canonical disclosure export through a namespace import", () => {
+    const analysis = analyzeAdminPrimaryLanguageSource(
+      `import * as UI from "@/features/platform-admin/ui/admin-technical-disclosure";
+       export const View = ({ job }: any) => <UI.AdminTechnicalDisclosure items={[{ label: '작업 상태', value: job.status }]} />`,
+    );
+    expect(analysis).toEqual({ violations: [], technicalDisclosureCount: 1 });
+  });
+
   it.each([
     [
       "function parameter",
@@ -122,6 +130,25 @@ describe("admin-status-language", () => {
     const analysis = analyzeAdminPrimaryLanguageSource(source);
     expect(analysis.violations).toHaveLength(1);
     expect(analysis.violations[0]?.reason).toBe("raw role/status value rendered in primary UI");
+    expect(analysis.technicalDisclosureCount).toBe(0);
+  });
+
+  it.each([
+    [
+      "function parameter",
+      `import * as UI from "@/features/platform-admin/ui/admin-technical-disclosure";
+       export const View = ({ job, UI }: any) => <UI.AdminTechnicalDisclosure items={[{ value: job.status }]} />`,
+    ],
+    [
+      "local declaration",
+      `import * as UI from "@/features/platform-admin/ui/admin-technical-disclosure";
+       export const View = ({ job }: any) => { const UI = { AdminTechnicalDisclosure: (props: any) => <div /> }; return <UI.AdminTechnicalDisclosure items={[{ value: job.status }]} />; }`,
+    ],
+  ])("does not exempt a canonical namespace import shadowed by a %s", (_name, source) => {
+    const analysis = analyzeAdminPrimaryLanguageSource(source);
+    expect(analysis.violations).toEqual([
+      expect.objectContaining({ reason: "raw role/status value rendered in primary UI" }),
+    ]);
     expect(analysis.technicalDisclosureCount).toBe(0);
   });
 
@@ -142,6 +169,23 @@ describe("admin-status-language", () => {
   ])("does not exempt a disclosure-looking %s from raw attribute analysis", (_name, source) => {
     const analysis = analyzeAdminPrimaryLanguageSource(source, "ui/arbitrary-production.tsx");
     expect(analysis.violations).toHaveLength(1);
+    expect(analysis.technicalDisclosureCount).toBe(0);
+  });
+
+  it.each([
+    [
+      "local object fake",
+      "const UI = { AdminTechnicalDisclosure: (props: any) => <div /> }; export const View = ({ job }: any) => <UI.AdminTechnicalDisclosure items={[{ value: job.status }]} />",
+    ],
+    [
+      "wrong-source namespace",
+      "import * as UI from './fake'; export const View = ({ job }: any) => <UI.AdminTechnicalDisclosure items={[{ value: job.status }]} />",
+    ],
+  ])("does not exempt a disclosure-looking qualified %s from raw attribute analysis", (_name, source) => {
+    const analysis = analyzeAdminPrimaryLanguageSource(source, "ui/arbitrary-production.tsx");
+    expect(analysis.violations).toEqual([
+      expect.objectContaining({ reason: "raw role/status value rendered in primary UI" }),
+    ]);
     expect(analysis.technicalDisclosureCount).toBe(0);
   });
 
@@ -169,6 +213,71 @@ describe("admin-status-language", () => {
        function SemanticView({ job }: any) { const state = adminHealthFreshnessLanguage(job.status).primaryText; return <p>{state}</p>; }`,
     );
     expect(analysis).toEqual({ violations: [], technicalDisclosureCount: 0 });
+  });
+
+  it.each([
+    [
+      "unsafe binding declared first",
+      "function Unsafe() { const label = 'Today'; return <p>{label}</p>; }\nfunction Safe() { const label = '운영 현황'; return <p>{label}</p>; }",
+      1,
+    ],
+    [
+      "unsafe binding declared last",
+      "function Safe() { const label = '운영 현황'; return <p>{label}</p>; }\nfunction Unsafe() { const label = 'Today'; return <p>{label}</p>; }",
+      2,
+    ],
+  ])("resolves same-name static bindings by lexical symbol with %s", (_name, source, unsafeLine) => {
+    expect(analyzeAdminPrimaryLanguageSource(source).violations).toEqual([
+      { line: unsafeLine, reason: "primary copy contains Today" },
+    ]);
+  });
+
+  it.each([
+    ["transitive alias", "export const View = () => { const seed = 'Today'; const first = seed; const label = first; return <p>{label}</p>; }", "Today"],
+    ["concatenated alias", "export const View = () => { const first = 'To'; const label = first + 'day'; return <p>{label}</p>; }", "Today"],
+    ["template alias", "export const View = () => { const middle = 'pe'; const label = `Pi${middle}line`; return <p>{label}</p>; }", "Pipeline"],
+  ])("detects banned copy through a lexical %s", (_name, source, term) => {
+    expect(analyzeAdminPrimaryLanguageSource(source).violations).toEqual([
+      expect.objectContaining({ reason: `primary copy contains ${term}` }),
+    ]);
+  });
+
+  it("keeps block-shadowed safe and unsafe static bindings separate", () => {
+    const analysis = analyzeAdminPrimaryLanguageSource(
+      `export function View(flag: boolean) {
+         const label = '운영 현황';
+         const safe = <p>{label}</p>;
+         if (flag) {
+           const label = 'Today';
+           return <p>{label}</p>;
+         }
+         return safe;
+       }`,
+    );
+    expect(analysis.violations).toEqual([
+      { line: 6, reason: "primary copy contains Today" },
+    ]);
+  });
+
+  it("finds a banned static seed reachable through an alias cycle", () => {
+    const analysis = analyzeAdminPrimaryLanguageSource(
+      "export const View = () => { const first = second; const second = first + 'Today'; return <p>{first}</p>; }",
+    );
+    expect(analysis.violations).toEqual([
+      expect.objectContaining({ reason: "primary copy contains Today" }),
+    ]);
+  });
+
+  it.each([
+    ["direct approved value", "export const View = () => { const label = '운영 현황'; return <p>{label}</p>; }"],
+    ["approved concatenation", "export const View = () => { const label = '오늘 ' + '운영'; return <p>{label}</p>; }"],
+    ["approved template", "export const View = () => { const detail = '현황'; const label = `운영 ${detail}`; return <p>{label}</p>; }"],
+    ["unseeded cycle", "export const View = () => { const first = second; const second = first; return <p>{first}</p>; }"],
+  ])("does not invent banned copy for an %s", (_name, source) => {
+    expect(analyzeAdminPrimaryLanguageSource(source)).toEqual({
+      violations: [],
+      technicalDisclosureCount: 0,
+    });
   });
 
   it("terminates on an alias cycle without inventing raw taint", () => {
