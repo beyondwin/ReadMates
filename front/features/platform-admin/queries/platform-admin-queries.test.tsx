@@ -62,6 +62,7 @@ import {
   publishPlatformAdminOnboarding,
   publishUpdatedPlatformAdminClub,
   purgePlatformAdminState,
+  subscribePlatformAdminAuthorityLoss,
   useCheckPlatformAdminDomainProvisioningMutation,
   useCommitPlatformAdminOnboardingMutation,
   useConfirmPlatformAdminClubVisibilityMutation,
@@ -425,6 +426,42 @@ describe("platform admin mutation cache behavior", () => {
 });
 
 describe("platform admin authority-loss purge", () => {
+  it("invalidates authority listeners synchronously before cache cancellation and removal", () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    const events: string[] = [];
+    const cancel = vi.spyOn(client, "cancelQueries").mockImplementation(() => {
+      events.push("cancel-cache");
+      return Promise.resolve();
+    });
+    const remove = vi.spyOn(client, "removeQueries").mockImplementation(() => {
+      events.push("remove-cache");
+    });
+    const unsubscribeCapsule = subscribePlatformAdminAuthorityLoss(() => {
+      events.push("invalidate-capsule");
+    });
+    const unsubscribeGeneration = subscribePlatformAdminAuthorityLoss(() => {
+      events.push("invalidate-generation");
+    });
+
+    try {
+      purgePlatformAdminState(client);
+    } finally {
+      unsubscribeGeneration();
+      unsubscribeCapsule();
+    }
+
+    expect(events).toEqual([
+      "invalidate-capsule",
+      "invalidate-generation",
+      "cancel-cache",
+      "remove-cache",
+    ]);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(remove).toHaveBeenCalledOnce();
+  });
+
   it("removes the entire platform-admin prefix without touching member or public queries", () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: 0 } },

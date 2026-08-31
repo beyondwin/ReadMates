@@ -4,7 +4,16 @@ import {
   applyPendingAdminOperationsSnapshot,
   type AdminOperationsSnapshot,
 } from "./platform-admin-operations-snapshot";
-import type { AdminOperationCasesResponse } from "../api/platform-admin-operations-contracts";
+import type {
+  AdminOperationCaseFilter,
+  AdminOperationCasesResponse,
+} from "../api/platform-admin-operations-contracts";
+import {
+  buildAdminOperationsView,
+  filterAdminOperationItems,
+  type AdminOperationsSearchState,
+  type AdminOperationsView,
+} from "./platform-admin-operations-model";
 
 export type AdminTodayActionState =
   | "ready"
@@ -226,8 +235,7 @@ export function adminTodayReducer(
         actionState: "ready",
       };
     case "queue-exit-completed": {
-      const index = action.visibleIds.indexOf(action.selectedId);
-      const nextId = index >= 0 ? action.visibleIds[index + 1] ?? null : null;
+      const nextId = nextAdminTodayCaseId(action.visibleIds, action.selectedId);
       return {
         ...state,
         selectedCaseId: nextId ?? action.selectedId,
@@ -246,6 +254,97 @@ export function adminTodayReducer(
         actionState: "forbidden",
       };
   }
+}
+
+export function nextAdminTodayCaseId(
+  visibleIds: readonly string[],
+  selectedId: string,
+): string | null {
+  const index = visibleIds.indexOf(selectedId);
+  return index >= 0 ? visibleIds[index + 1] ?? null : null;
+}
+
+export function buildAdminTodayView(
+  snapshot: AdminOperationsSnapshot,
+  searchState: AdminOperationsSearchState,
+  now: Date = new Date(),
+): AdminOperationsView {
+  const built = buildAdminOperationsView(
+    snapshot.displayed,
+    searchState.caseId,
+    now,
+    new Map(),
+    "preserve",
+  );
+  const items = filterAdminOperationItems(built.items, searchState, now);
+  const requested = searchState.caseId
+    ? items.find((item) => item.id === searchState.caseId) ?? null
+    : null;
+  const selectionExcluded = searchState.caseId !== null && requested === null;
+  const selectedCase = searchState.caseId === null ? items[0] ?? null : requested;
+  return {
+    ...built,
+    items,
+    selectedCase,
+    selectedCaseId: selectedCase?.id ?? null,
+    selectionExcluded,
+    selectionFellBack: selectionExcluded,
+    workViews: built.workViews,
+  };
+}
+
+export function isAdminTodayPostMutationAuthoritative(input: {
+  detail: { status: string; dataUpdatedAt: number; data?: unknown } | undefined;
+  list: { status: string; dataUpdatedAt: number } | undefined;
+  beforeDetailAt: number;
+  beforeListAt: number;
+  expectedMinVersion: number;
+}): boolean {
+  if (!input.detail || input.detail.status !== "success") return false;
+  if (!input.list || input.list.status !== "success") return false;
+  if (input.detail.dataUpdatedAt <= input.beforeDetailAt) return false;
+  if (input.list.dataUpdatedAt <= input.beforeListAt) return false;
+  const version = (input.detail.data as { item?: { version?: number } } | undefined)?.item?.version;
+  return typeof version === "number" && version > input.expectedMinVersion;
+}
+
+export function deriveAdminTodayCommandState(input: {
+  permissionDenied: boolean;
+  actionState: AdminTodayActionState;
+  mutationPending: boolean;
+  detailBehindList: boolean;
+  pendingRemoval: boolean;
+  nonAuthoritative: boolean;
+}): AdminTodayActionState {
+  if (input.permissionDenied) return "forbidden";
+  if (input.actionState === "unknown-outcome") return "unknown-outcome";
+  if (input.actionState === "conflict") return "conflict";
+  if (input.actionState === "complete") return "complete";
+  if (input.mutationPending || input.actionState === "pending") return "pending";
+  if (input.detailBehindList || input.pendingRemoval || input.nonAuthoritative) return "stale";
+  return "ready";
+}
+
+export function adminTodayCommandReasonCopy(
+  state: AdminTodayActionState,
+): string | undefined {
+  if (state === "stale") return "최신 상태가 아닙니다. 다시 확인한 뒤 작업을 이어가세요.";
+  if (state === "unknown-outcome") {
+    return "명령 응답을 확인하지 못했습니다. 최신 상태를 확인한 뒤 다시 시도해 주세요.";
+  }
+  if (state === "conflict") {
+    return "최신 상태를 다시 불러왔습니다. 내용을 확인한 뒤 다시 시도해 주세요.";
+  }
+  return undefined;
+}
+
+export function adminTodayFiltersFrom(filter: AdminOperationCaseFilter) {
+  return {
+    state: filter.states?.[0]?.toLowerCase() ?? "",
+    severity: filter.severities?.[0]?.toLowerCase() ?? "",
+    source: filter.sources?.[0]?.toLowerCase() ?? "",
+    assignee: filter.assignee?.toLowerCase() ?? "",
+  };
 }
 
 const resetActionState: Pick<

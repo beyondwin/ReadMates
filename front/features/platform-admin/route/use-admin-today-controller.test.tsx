@@ -19,6 +19,10 @@ import {
 } from "@/features/platform-admin/queries/platform-admin-operations-queries";
 import { createGlobalSpaceTransitionCoordinator } from "@/src/app/global-space-transition";
 import { ReadmatesTransportError } from "@/shared/api/errors";
+import type {
+  TransitionPublicationSurface,
+  TransitionSafetyRegistrationPort,
+} from "@/shared/model/global-space";
 import { SpaceTransitionSafetyProvider } from "@/shared/ui/space-transition-safety-context";
 import { useAdminTodayController } from "./use-admin-today-controller";
 
@@ -119,9 +123,13 @@ function seededClient(items: AdminOperationCase[]) {
   }).queryKey, {
     pages: [listResponse(items)],
     pageParams: [null],
-  });
+  }, { updatedAt: 1 });
   for (const item of items) {
-    client.setQueryData(platformAdminOperationCaseQuery(item.id).queryKey, detailResponse(item));
+    client.setQueryData(
+      platformAdminOperationCaseQuery(item.id).queryKey,
+      detailResponse(item),
+      { updatedAt: 1 },
+    );
   }
   return client;
 }
@@ -143,15 +151,48 @@ function Probe() {
       <button type="button" onClick={() => navigate(-1)}>back</button>
       <button type="button" onClick={controller.acceptPending}>apply-pending</button>
       <button type="button" onClick={() => void controller.acknowledgeCurrent()}>ack</button>
+      <button
+        type="button"
+        onClick={() => void controller.snoozeCurrent("2026-08-05T10:00:00Z")}
+      >snooze</button>
+      <button type="button" onClick={() => void controller.resolveCurrent()}>resolve</button>
     </div>
   );
 }
 
-function renderController(client: QueryClient, initialEntry: string) {
+function renderController(
+  client: QueryClient,
+  initialEntry: string,
+  options: {
+    afterAcceptedUi?: () => void;
+    onAcceptedPublication?: (surface: TransitionPublicationSurface) => void;
+  } = {},
+) {
   const coordinator = createGlobalSpaceTransitionCoordinator();
+  const port: TransitionSafetyRegistrationPort = options.afterAcceptedUi
+    ? {
+        registerDirty: coordinator.registerDirty,
+        beginPending(registration) {
+          const handle = coordinator.beginPending(registration);
+          return {
+            ...handle,
+            publishAccepted(action) {
+              return handle.publishAccepted({
+                ...action,
+                publish(observation) {
+                  options.onAcceptedPublication?.(action.surface);
+                  action.publish(observation);
+                  if (action.surface === "ui") options.afterAcceptedUi?.();
+                },
+              });
+            },
+          };
+        },
+      }
+    : coordinator;
   const rendered = render(
     <QueryClientProvider client={client}>
-      <SpaceTransitionSafetyProvider port={coordinator}>
+      <SpaceTransitionSafetyProvider port={port}>
         <MemoryRouter initialEntries={[initialEntry]}>
           <Probe />
         </MemoryRouter>
@@ -273,5 +314,88 @@ describe("useAdminTodayController", () => {
     expect(operationsApi.fetchList).toHaveBeenCalled();
     expect(operationsApi.fetchDetail).toHaveBeenCalledWith("case-a");
     expect(operationsApi.acknowledge).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["snooze", "SNOOZED"],
+    ["resolve", "RESOLVED"],
+  ] as const)("blocks %s queue-exit publication when authority changes after accepted UI publication", async (
+    kind,
+    state,
+  ) => {
+    const user = userEvent.setup();
+    const first = operationCase("case-a");
+    const second = operationCase("case-b");
+    const completed = operationCase("case-a", {
+      state,
+      snoozedUntil: state === "SNOOZED" ? "2026-08-05T10:00:00Z" : null,
+      resolvedAt: state === "RESOLVED" ? "2026-08-04T10:05:00Z" : null,
+      version: 4,
+      allowedActions: state === "SNOOZED" ? ["RESOLVE"] : [],
+    });
+    const mutationResult = {
+      schema: "admin.operation_cases.v1",
+      ...completed,
+    };
+    if (kind === "snooze") operationsApi.snooze.mockResolvedValue(mutationResult);
+    else operationsApi.resolve.mockResolvedValue(mutationResult);
+    operationsApi.fetchList.mockResolvedValue(listResponse([completed, second]));
+    operationsApi.fetchDetail.mockResolvedValue(detailResponse(completed));
+    const client = seededClient([first, second]);
+    const latePublications: TransitionPublicationSurface[] = [];
+    let authorityInvalidated = false;
+    const rendered = renderController(
+      client,
+      "/admin/today?case=case-a",
+      {
+        afterAcceptedUi() {
+          authorityInvalidated = true;
+          purgePlatformAdminState(client);
+        },
+        onAcceptedPublication(surface) {
+          if (authorityInvalidated) latePublications.push(surface);
+        },
+      },
+    );
+
+    await user.click(await screen.findByRole("button", { name: kind }));
+    await waitFor(() => expect(screen.getByLabelText("status")).toHaveTextContent("forbidden"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.getByLabelText("location")).toHaveTextContent("case=case-a");
+    expect(screen.getByLabelText("mutation-target")).toHaveTextContent("none");
+    expect(latePublications).toEqual([]);
+    expect(operationsApi.snooze).toHaveBeenCalledTimes(kind === "snooze" ? 1 : 0);
+    expect(operationsApi.resolve).toHaveBeenCalledTimes(kind === "resolve" ? 1 : 0);
+    expect(rendered.coordinator.getSnapshot()).toEqual({ kind: "clean" });
+  });
+
+  it.each([
+    ["snooze", "snooze"],
+    ["resolve", "resolve"],
+  ] as const)("advances to the next case after accepted %s completion", async (buttonName, kind) => {
+    const user = userEvent.setup();
+    const first = operationCase("case-a");
+    const second = operationCase("case-b");
+    const completed = operationCase("case-a", {
+      state: kind === "snooze" ? "SNOOZED" : "RESOLVED",
+      version: 4,
+      allowedActions: [],
+    });
+    const result = { schema: "admin.operation_cases.v1" as const, ...completed };
+    if (kind === "snooze") operationsApi.snooze.mockResolvedValue(result);
+    else operationsApi.resolve.mockResolvedValue(result);
+    operationsApi.fetchList.mockResolvedValue(listResponse([completed, second]));
+    operationsApi.fetchDetail.mockResolvedValue(detailResponse(completed));
+    renderController(seededClient([first, second]), "/admin/today?case=case-a");
+
+    await user.click(await screen.findByRole("button", { name: buttonName }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("location")).toHaveTextContent("case=case-b");
+      expect(screen.getByLabelText("selection")).toHaveTextContent("case-b");
+    });
+    expect(operationsApi.snooze).toHaveBeenCalledTimes(kind === "snooze" ? 1 : 0);
+    expect(operationsApi.resolve).toHaveBeenCalledTimes(kind === "resolve" ? 1 : 0);
   });
 });

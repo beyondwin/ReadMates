@@ -83,11 +83,11 @@ export function subscribePlatformAdminAuthorityLoss(
 }
 
 export function purgePlatformAdminState(queryClient: QueryClient): void {
-  void queryClient.cancelQueries({ queryKey: platformAdminKeys.all });
-  queryClient.removeQueries({ queryKey: platformAdminKeys.all });
   for (const listener of authorityLossListeners) {
     listener();
   }
+  void queryClient.cancelQueries({ queryKey: platformAdminKeys.all });
+  queryClient.removeQueries({ queryKey: platformAdminKeys.all });
 }
 
 export function installPlatformAdminAuthorityLossHandler(

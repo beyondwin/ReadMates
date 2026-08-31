@@ -9,20 +9,23 @@ import type {
 } from "@/features/platform-admin/api/platform-admin-operations-contracts";
 import {
   adminTodayReducer,
+  adminTodayCommandReasonCopy,
+  adminTodayFiltersFrom,
+  buildAdminTodayView,
   createAdminTodayState,
+  deriveAdminTodayCommandState,
+  isAdminTodayPostMutationAuthoritative,
+  nextAdminTodayCaseId,
   type AdminTodayMutationTarget,
 } from "@/features/platform-admin/model/admin-today-state";
 import { canAdmin } from "@/features/platform-admin/model/platform-admin-capabilities";
 import { adminCommandRecovery } from "@/features/platform-admin/model/platform-admin-command-recovery";
 import {
   adminOperationsScopeKey,
-  buildAdminOperationsView,
   effectiveAdminOperationsFilter,
-  filterAdminOperationItems,
   parseAdminOperationsSearch,
   serializeAdminOperationsSearch,
   type AdminOperationsSearchState,
-  type AdminOperationsView,
   type AdminOperationsWorkViewId,
 } from "@/features/platform-admin/model/platform-admin-operations-model";
 import {
@@ -39,7 +42,6 @@ import {
   platformAdminCapabilitiesQuery,
   subscribePlatformAdminAuthorityLoss,
 } from "@/features/platform-admin/queries/platform-admin-queries";
-import type { AdminSafeActionState } from "@/features/platform-admin/ui/admin-action-dock";
 import type { AdminTodayFilters } from "@/features/platform-admin/ui/admin-today-ledger";
 import { isReadmatesTransportError } from "@/shared/api/errors";
 import {
@@ -49,6 +51,7 @@ import {
 import {
   publishTransitionAction,
   TransitionOwnerObsoleteError,
+  type TransitionOwnerHandle,
   useTransitionSafetyOwner,
 } from "@/shared/ui/use-transition-safety-owner";
 import { combineAdminOperationCasePages } from "./admin-today-data";
@@ -59,6 +62,14 @@ export type AdminTodayControllerStatus =
   | "forbidden"
   | "capabilities-unavailable"
   | "list-unavailable";
+
+type AcceptedAdminTodayMutation = {
+  authorityGeneration: number;
+  beforeDetailAt: number;
+  beforeListAt: number;
+  handle: TransitionOwnerHandle;
+  target: AdminTodayMutationTarget;
+};
 
 export function useAdminTodayController() {
   const queryClient = useQueryClient();
@@ -150,7 +161,7 @@ export function useAdminTodayController() {
 
   const listView = useMemo(
     () => state.snapshot
-      ? viewFromSnapshot(state.snapshot, searchState)
+      ? buildAdminTodayView(state.snapshot, searchState)
       : null,
     [searchState, state.snapshot],
   );
@@ -171,7 +182,7 @@ export function useAdminTodayController() {
     );
     if (listedCase && listedCase.version > detailQuery.data.item.version) return listView;
     const selectedItem = detailQuery.data.item;
-    return viewFromSnapshot(
+    return buildAdminTodayView(
       {
         ...state.snapshot,
         displayed: {
@@ -274,7 +285,7 @@ export function useAdminTodayController() {
   const runMutation = useCallback(async (
     target: AdminTodayMutationTarget,
     operation: () => Promise<unknown>,
-  ): Promise<boolean> => {
+  ): Promise<AcceptedAdminTodayMutation | null> => {
     const authorityGeneration = authorityGenerationRef.current;
     const operationId = `admin-case:${target.caseId}:${target.version}`;
     const handle = transitionOwner.begin(operationId, "L1", async () => {
@@ -290,17 +301,85 @@ export function useAdminTodayController() {
       await operation();
       if (authorityGenerationRef.current !== authorityGeneration) {
         handle.unregister();
-        return false;
+        return null;
       }
       if (await handle.settle("succeeded") !== "accepted") {
-        throw new TransitionOwnerObsoleteError();
+        return null;
       }
-      await publishTransitionAction(handle, "cache", () =>
-        publishAdminOperationCase(queryClient, target.caseId),
-      );
-      return await publishTransitionAction(handle, "ui", async () => {
-        if (!isCurrentMutationTarget(target)) return false;
-        if (!isPostMutationAuthoritative({
+      if (
+        authorityGenerationRef.current !== authorityGeneration
+        || !handle.isPublicationCurrent()
+      ) {
+        handle.unregister();
+        return null;
+      }
+      return { authorityGeneration, beforeDetailAt, beforeListAt, handle, target };
+    } catch (error) {
+      if (error instanceof TransitionOwnerObsoleteError) return null;
+      if (authorityGenerationRef.current !== authorityGeneration) {
+        handle.unregister();
+        return null;
+      }
+      if (await handle.settle("failed") !== "accepted") return null;
+      return await publishTransitionAction(handle, "errorCopy", async () => {
+        if (!isCurrentMutationTarget(target)) return null;
+        if (hasHttpStatus(error, 403)) {
+          dispatch({ type: "mutation-permission-lost" });
+          return null;
+        }
+        if (hasAdminOperationErrorCode(error, "CASE_VERSION_CONFLICT")) {
+          dispatch({ type: "mutation-conflict" });
+          await reconcileAuthoritativeState(target.caseId);
+          return null;
+        }
+        if (hasAdminOperationErrorCode(error, "CASE_STILL_ACTIVE")) {
+          dispatch({
+            type: "mutation-error",
+            message: "신호가 아직 활성 상태입니다. 운영 상세에서 원인을 해소한 뒤 다시 확인해 주세요.",
+          });
+          return null;
+        }
+        if (isUnknownOutcomeError(error)) {
+          dispatch({ type: "mutation-unknown", message: adminCommandRecovery(error).message });
+          await reconcileAuthoritativeState(target.caseId);
+          dispatch({ type: "authoritative-recovery-completed", outcome: "still-unknown" });
+          return null;
+        }
+        dispatch({
+          type: "mutation-error",
+          message: "상태를 변경하지 못했습니다. 잠시 뒤 다시 시도해 주세요.",
+        });
+        return null;
+      });
+    }
+  }, [
+    effectiveFilter,
+    isCurrentMutationTarget,
+    queryClient,
+    reconcileAuthoritativeState,
+    transitionOwner,
+  ]);
+
+  const completeMutation = useCallback(async (
+    accepted: AcceptedAdminTodayMutation | null,
+    queueExitSelectedId?: string,
+  ): Promise<boolean> => {
+    if (!accepted) return false;
+    const { authorityGeneration, beforeDetailAt, beforeListAt, handle, target } = accepted;
+    const isCurrentAuthority = () => authorityGenerationRef.current === authorityGeneration;
+    const detailKey = adminOperationsKeys.detail(target.caseId);
+    const listKey = adminOperationsKeys.pages(effectiveFilter);
+    try {
+      if (!isCurrentAuthority() || !handle.isPublicationCurrent()) return false;
+      await publishTransitionAction(handle, "cache", async () => {
+        if (!isCurrentAuthority()) throw new TransitionOwnerObsoleteError();
+        await publishAdminOperationCase(queryClient, target.caseId);
+        if (!isCurrentAuthority()) throw new TransitionOwnerObsoleteError();
+      });
+      if (!isCurrentAuthority()) return false;
+      const uiAccepted = await publishTransitionAction(handle, "ui", async () => {
+        if (!isCurrentAuthority() || !isCurrentMutationTarget(target)) return false;
+        if (!isAdminTodayPostMutationAuthoritative({
           detail: queryClient.getQueryState(detailKey),
           list: queryClient.getQueryState(listKey),
           beforeDetailAt,
@@ -318,50 +397,31 @@ export function useAdminTodayController() {
         dispatch({ type: "mutation-succeeded" });
         return true;
       });
+      if (!uiAccepted || queueExitSelectedId === undefined) return uiAccepted;
+      if (!isCurrentAuthority() || !view) return false;
+      return await publishTransitionAction(handle, "navigation", () => {
+        if (!isCurrentAuthority() || !isCurrentMutationTarget(target)) return false;
+        const visibleIds = view.items.map((item) => item.id);
+        const nextId = nextAdminTodayCaseId(visibleIds, queueExitSelectedId);
+        dispatch({ type: "queue-exit-completed", visibleIds, selectedId: queueExitSelectedId });
+        if (nextId) {
+          selectedIdRef.current = nextId;
+          writeSearch({ caseId: nextId, mode: searchState.mode });
+        }
+        return true;
+      });
     } catch (error) {
       if (error instanceof TransitionOwnerObsoleteError) return false;
-      if (authorityGenerationRef.current !== authorityGeneration) {
-        handle.unregister();
-        return false;
-      }
-      if (await handle.settle("failed") !== "accepted") return false;
-      return await publishTransitionAction(handle, "errorCopy", async () => {
-        if (!isCurrentMutationTarget(target)) return false;
-        if (hasHttpStatus(error, 403)) {
-          dispatch({ type: "mutation-permission-lost" });
-          return false;
-        }
-        if (hasAdminOperationErrorCode(error, "CASE_VERSION_CONFLICT")) {
-          dispatch({ type: "mutation-conflict" });
-          await reconcileAuthoritativeState(target.caseId);
-          return false;
-        }
-        if (hasAdminOperationErrorCode(error, "CASE_STILL_ACTIVE")) {
-          dispatch({
-            type: "mutation-error",
-            message: "신호가 아직 활성 상태입니다. 운영 상세에서 원인을 해소한 뒤 다시 확인해 주세요.",
-          });
-          return false;
-        }
-        if (isUnknownOutcomeError(error)) {
-          dispatch({ type: "mutation-unknown", message: adminCommandRecovery(error).message });
-          await reconcileAuthoritativeState(target.caseId);
-          dispatch({ type: "authoritative-recovery-completed", outcome: "still-unknown" });
-          return false;
-        }
-        dispatch({
-          type: "mutation-error",
-          message: "상태를 변경하지 못했습니다. 잠시 뒤 다시 시도해 주세요.",
-        });
-        return false;
-      });
+      throw error;
     }
   }, [
     effectiveFilter,
     isCurrentMutationTarget,
     queryClient,
     reconcileAuthoritativeState,
-    transitionOwner,
+    searchState.mode,
+    view,
+    writeSearch,
   ]);
 
   const selectCase = useCallback((caseId: string, mode = searchState.mode) => {
@@ -369,32 +429,21 @@ export function useAdminTodayController() {
     dispatch({ type: "selection-changed", caseId });
     writeSearch({ caseId, mode });
   }, [searchState.mode, writeSearch]);
-  const advanceAfterQueueExit = useCallback((selectedId: string, ok: boolean) => {
-    if (!ok || !view) return;
-    const visibleIds = view.items.map((item) => item.id);
-    const index = visibleIds.indexOf(selectedId);
-    const nextId = index >= 0 ? visibleIds[index + 1] ?? null : null;
-    dispatch({ type: "queue-exit-completed", visibleIds, selectedId });
-    if (nextId) {
-      selectedIdRef.current = nextId;
-      writeSearch({ caseId: nextId, mode: searchState.mode });
-    }
-  }, [searchState.mode, view, writeSearch]);
-
   const acknowledgeCurrent = useCallback(async () => {
     if (!currentCase || !confirmationKey) return false;
-    return runMutation(
+    const accepted = await runMutation(
       { caseId: currentCase.id, version: currentCase.version, confirmationKey },
       () => acknowledgeMutation.mutateAsync({
         caseId: currentCase.id,
         expectedVersion: currentCase.version,
       }),
     );
-  }, [acknowledgeMutation, confirmationKey, currentCase, runMutation]);
+    return completeMutation(accepted);
+  }, [acknowledgeMutation, completeMutation, confirmationKey, currentCase, runMutation]);
   const snoozeCurrent = useCallback(async (snoozedUntil: string) => {
     if (!currentCase || !confirmationKey) return false;
     const selectedId = currentCase.id;
-    const ok = await runMutation(
+    const accepted = await runMutation(
       { caseId: currentCase.id, version: currentCase.version, confirmationKey },
       () => snoozeMutation.mutateAsync({
         caseId: currentCase.id,
@@ -402,22 +451,20 @@ export function useAdminTodayController() {
         snoozedUntil,
       }),
     );
-    advanceAfterQueueExit(selectedId, ok);
-    return ok;
-  }, [advanceAfterQueueExit, confirmationKey, currentCase, runMutation, snoozeMutation]);
+    return completeMutation(accepted, selectedId);
+  }, [completeMutation, confirmationKey, currentCase, runMutation, snoozeMutation]);
   const resolveCurrent = useCallback(async () => {
     if (!currentCase || !confirmationKey) return false;
     const selectedId = currentCase.id;
-    const ok = await runMutation(
+    const accepted = await runMutation(
       { caseId: currentCase.id, version: currentCase.version, confirmationKey },
       () => resolveMutation.mutateAsync({
         caseId: currentCase.id,
         expectedVersion: currentCase.version,
       }),
     );
-    advanceAfterQueueExit(selectedId, ok);
-    return ok;
-  }, [advanceAfterQueueExit, confirmationKey, currentCase, resolveMutation, runMutation]);
+    return completeMutation(accepted, selectedId);
+  }, [completeMutation, confirmationKey, currentCase, resolveMutation, runMutation]);
 
   const changeFilter = useCallback((key: keyof AdminTodayFilters, value: string) => {
     const filter: AdminOperationCaseFilter = { ...searchState.filter };
@@ -473,7 +520,7 @@ export function useAdminTodayController() {
     && state.mutationTarget.caseId === currentCase?.id
     && (acknowledgeMutation.isPending || snoozeMutation.isPending || resolveMutation.isPending),
   );
-  const actionState = deriveCommandState({
+  const actionState = deriveAdminTodayCommandState({
     permissionDenied,
     actionState: state.actionState,
     mutationPending,
@@ -487,7 +534,7 @@ export function useAdminTodayController() {
     view,
     searchState,
     snapshot: state.snapshot,
-    filters: filtersFrom(searchState.filter),
+    filters: adminTodayFiltersFrom(searchState.filter),
     history: !detailBehindList
       && detailQuery.data != null
       && detailQuery.data.item.id === view?.selectedCaseId
@@ -501,7 +548,7 @@ export function useAdminTodayController() {
     urgentCount: state.snapshot?.urgentNewCriticalIds.length ?? 0,
     urgentAnnouncement: state.urgentAnnouncement,
     actionState,
-    actionReason: commandReasonCopy(actionState),
+    actionReason: adminTodayCommandReasonCopy(actionState),
     actionMessage: state.mutationTarget?.caseId === currentCase?.id ? state.actionMessage : null,
     mutationTarget: state.mutationTarget,
     confirmationKey,
@@ -532,87 +579,6 @@ export function useAdminTodayController() {
       filter: {},
       query: "",
     }),
-  };
-}
-
-function viewFromSnapshot(
-  snapshot: NonNullable<ReturnType<typeof createAdminTodayState>["snapshot"]>,
-  searchState: AdminOperationsSearchState,
-  now: Date = new Date(),
-): AdminOperationsView {
-  const built = buildAdminOperationsView(
-    snapshot.displayed,
-    searchState.caseId,
-    now,
-    new Map(),
-    "preserve",
-  );
-  const items = filterAdminOperationItems(built.items, searchState, now);
-  const requested = searchState.caseId
-    ? items.find((item) => item.id === searchState.caseId) ?? null
-    : null;
-  const selectionExcluded = searchState.caseId !== null && requested === null;
-  const selectedCase = searchState.caseId === null ? items[0] ?? null : requested;
-  return {
-    ...built,
-    items,
-    selectedCase,
-    selectedCaseId: selectedCase?.id ?? null,
-    selectionExcluded,
-    selectionFellBack: selectionExcluded,
-    workViews: built.workViews,
-  };
-}
-
-function isPostMutationAuthoritative(input: {
-  detail: { status: string; dataUpdatedAt: number; data?: unknown } | undefined;
-  list: { status: string; dataUpdatedAt: number } | undefined;
-  beforeDetailAt: number;
-  beforeListAt: number;
-  expectedMinVersion: number;
-}): boolean {
-  if (!input.detail || input.detail.status !== "success") return false;
-  if (!input.list || input.list.status !== "success") return false;
-  if (input.detail.dataUpdatedAt <= input.beforeDetailAt) return false;
-  if (input.list.dataUpdatedAt <= input.beforeListAt) return false;
-  const version = (input.detail.data as { item?: { version?: number } } | undefined)?.item?.version;
-  return typeof version === "number" && version > input.expectedMinVersion;
-}
-
-function deriveCommandState(input: {
-  permissionDenied: boolean;
-  actionState: AdminSafeActionState;
-  mutationPending: boolean;
-  detailBehindList: boolean;
-  pendingRemoval: boolean;
-  nonAuthoritative: boolean;
-}): AdminSafeActionState {
-  if (input.permissionDenied) return "forbidden";
-  if (input.actionState === "unknown-outcome") return "unknown-outcome";
-  if (input.actionState === "conflict") return "conflict";
-  if (input.actionState === "complete") return "complete";
-  if (input.mutationPending || input.actionState === "pending") return "pending";
-  if (input.detailBehindList || input.pendingRemoval || input.nonAuthoritative) return "stale";
-  return "ready";
-}
-
-function commandReasonCopy(state: AdminSafeActionState): string | undefined {
-  if (state === "stale") return "최신 상태가 아닙니다. 다시 확인한 뒤 작업을 이어가세요.";
-  if (state === "unknown-outcome") {
-    return "명령 응답을 확인하지 못했습니다. 최신 상태를 확인한 뒤 다시 시도해 주세요.";
-  }
-  if (state === "conflict") {
-    return "최신 상태를 다시 불러왔습니다. 내용을 확인한 뒤 다시 시도해 주세요.";
-  }
-  return undefined;
-}
-
-function filtersFrom(filter: AdminOperationCaseFilter): AdminTodayFilters {
-  return {
-    state: filter.states?.[0]?.toLowerCase() ?? "",
-    severity: filter.severities?.[0]?.toLowerCase() ?? "",
-    source: filter.sources?.[0]?.toLowerCase() ?? "",
-    assignee: filter.assignee?.toLowerCase() ?? "",
   };
 }
 
