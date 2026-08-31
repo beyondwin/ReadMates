@@ -11,10 +11,26 @@ import { signalHostAuthorityLoss } from "@/shared/api/host-authority-event";
 import { hostSensitiveStorage } from "@/features/host/storage/host-sensitive-storage";
 import { hostClubQueryPrefix } from "@/features/host/queries/host-state-purge";
 import { fetchAdminOperationCases } from "@/features/platform-admin/api/platform-admin-operations-api";
+import { AdminClubsRoute } from "@/features/platform-admin/route/admin-clubs-route";
+import { AdminShellController } from "@/features/platform-admin/route/admin-shell-controller";
+import {
+  platformAdminCapabilitiesQuery,
+  platformAdminClubsInfiniteQuery,
+  platformAdminKeys,
+} from "@/features/platform-admin/queries/platform-admin-queries";
+import { ReadMatesSessionExpiredError } from "@/shared/api/client";
+import { logoutCurrentSession } from "@/shared/auth/session-api";
 import { globalSpaceReturnTargetStorageKey } from "../global-space-continuity";
 import { useGlobalSpaceTransitionController } from "../global-space-transition-controller";
 import { AppGlobalSpaceSwitcherBridge } from "../global-space-switcher-bridge";
-import { AdminTransitionBoundary } from "./admin";
+import {
+  AdminPlatformAuthorityInvalidationBridge,
+  AdminTransitionBoundary,
+} from "./admin";
+
+vi.mock("@/shared/auth/session-api", () => ({
+  logoutCurrentSession: vi.fn(),
+}));
 
 vi.mock("@/features/platform-admin/api/platform-admin-operations-api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/platform-admin/api/platform-admin-operations-api")>()),
@@ -94,6 +110,12 @@ function LocationProbe() {
   return <output aria-label="current-location">{location.pathname}</output>;
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
 let queryClient: QueryClient;
 
 beforeEach(() => {
@@ -123,6 +145,124 @@ describe("AdminTransitionBoundary", () => {
 
     expect(result.current.registerDirty).toEqual(expect.any(Function));
     expect(result.current.beginPending).toEqual(expect.any(Function));
+  });
+
+  it("invalidates a registered shell logout before platform authority-loss UI cleanup", async () => {
+    const pendingLogout = deferred<Response>();
+    vi.mocked(logoutCurrentSession).mockReturnValue(pendingLogout.promise);
+    vi.mocked(fetchAdminOperationCases).mockResolvedValue({
+      schema: "admin.operation_cases.v1",
+      generatedAt: "2026-08-24T00:00:00Z",
+      counts: { open: 0, critical: 0, assignedToMe: 0, snoozed: 0 },
+      sources: [],
+      items: [],
+      nextCursor: null,
+    });
+    const assign = vi.fn();
+    vi.stubGlobal("location", { assign });
+    queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, {
+      schemaVersion: 1,
+      role: "OWNER",
+      status: "ACTIVE",
+      capabilities: ["VIEW_CLUBS", "CREATE_CLUB"],
+      generatedAt: "2026-08-24T00:00:00Z",
+    });
+    queryClient.setQueryData(platformAdminClubsInfiniteQuery({}).queryKey, {
+      pages: [{ items: [], nextCursor: null }],
+      pageParams: [undefined],
+    });
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
+    let controller!: ReturnType<typeof useGlobalSpaceTransitionController>;
+
+    function ControllerCapture() {
+      const captured = useGlobalSpaceTransitionController();
+      useEffect(() => {
+        controller = captured;
+      }, [captured]);
+      return null;
+    }
+
+    const router = createMemoryRouter([
+      {
+        path: "/admin",
+        element: (
+          <AdminTransitionBoundary auth={auth}>
+            <ControllerCapture />
+            <AdminPlatformAuthorityInvalidationBridge>
+              {(invalidateForPlatformAuthorityLoss) => (
+                <AdminShellController
+                  auth={auth}
+                  onPlatformAuthorityLoss={invalidateForPlatformAuthorityLoss}
+                />
+              )}
+            </AdminPlatformAuthorityInvalidationBridge>
+          </AdminTransitionBoundary>
+        ),
+        children: [{ path: "clubs", element: <AdminClubsRoute /> }],
+      },
+    ], { initialEntries: ["/admin/clubs?search=alpha&onboarding=1"] });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    await waitFor(() => expect(controller).toBeDefined());
+    const beginPending = vi.spyOn(controller.registrationPort, "beginPending");
+    fireEvent.click(screen.getByRole("button", { name: "다른 계정으로 로그인" }));
+    expect(logoutCurrentSession).toHaveBeenCalledTimes(1);
+    expect(beginPending).toHaveBeenCalledTimes(1);
+    const shellHandle = beginPending.mock.results[0]?.value;
+    expect(shellHandle).toBeDefined();
+    const settle = vi.spyOn(shellHandle, "settle");
+
+    await act(async () => {
+      await queryClient.fetchQuery({
+        queryKey: [...platformAdminKeys.all, "separate-authority-probe"],
+        queryFn: async () => {
+          throw new ReadMatesSessionExpiredError();
+        },
+      }).catch(() => undefined);
+    });
+
+    await expect(shellHandle.reconcile()).resolves.toEqual({
+      operationId: expect.stringMatching(/^admin-other-account-logout:/),
+      outcome: "authority-lost",
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(router.state.location.search).toBe("?search=alpha");
+
+    await act(async () => {
+      pendingLogout.resolve(new Response(null, { status: 204 }));
+      await pendingLogout.promise;
+      await Promise.resolve();
+    });
+
+    expect(settle).toHaveBeenCalledWith("succeeded");
+    await expect(settle.mock.results[0]?.value).resolves.toBe("obsolete");
+    const latePublicationSurfaces = [
+      "cache",
+      "ui",
+      "receipt",
+      "navigation",
+      "returnTarget",
+    ] as const;
+    const latePublications = latePublicationSurfaces.map((surface) => ({
+      surface,
+      publish: vi.fn(),
+    }));
+    for (const publication of latePublications) {
+      expect(shellHandle.publishAccepted(publication)).toBe("rejected");
+      expect(publication.publish).not.toHaveBeenCalled();
+    }
+    expect(logoutCurrentSession).toHaveBeenCalledTimes(1);
+    expect(assign).not.toHaveBeenCalled();
+    expect(invalidateQueries).not.toHaveBeenCalled();
+    expect(
+      screen.queryByText("로그아웃에 실패했습니다. 다시 시도해 주세요."),
+    ).not.toBeInTheDocument();
+    expect(queryClient.getQueryData(platformAdminKeys.capabilities())).toBeUndefined();
   });
 
   it("renders the shared projection-owned switcher and executes selection through the app controller", async () => {

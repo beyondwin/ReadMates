@@ -61,9 +61,6 @@
   .admin-action-dock {
     display: grid;
     width: 100%;
-  }
-
-  .admin-action-dock {
     position: sticky;
     bottom: 0;
     z-index: 8;
@@ -98,12 +95,7 @@
 
 .admin-state-panel--stale .admin-state-panel__notice {
   padding: var(--space-panel-tight);
-  border: 1px solid var(--line);
-  background: var(--paper-50);
-}
-
-.admin-state-panel--stale .admin-state-panel__notice {
-  border-color: var(--stale-line);
+  border: 1px solid var(--stale-line);
   background: var(--stale-soft);
 }
 

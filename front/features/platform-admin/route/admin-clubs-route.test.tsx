@@ -136,6 +136,21 @@ function renderRoute(
 
 describe("AdminClubsRoute", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("opens real clubs onboarding without consuming registry query filters", () => {
+    renderRoute(
+      [club],
+      "/admin/clubs?search=alpha&visibility=PRIVATE&onboarding=1",
+    );
+
+    expect(screen.getByRole("dialog", { name: "새 클럽" })).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "클럽 검색" })).toHaveValue("alpha");
+    expect(screen.getByRole("combobox", { name: "공개 상태" })).toHaveValue("PRIVATE");
+    expect(screen.getByTestId("location-search")).toHaveTextContent("search=alpha");
+    expect(screen.getByTestId("location-search")).toHaveTextContent("visibility=PRIVATE");
+    expect(screen.getByTestId("location-search")).toHaveTextContent("onboarding=1");
+  });
+
   it("renders server-ordered registry rows with accessible controls", () => {
     const { container } = renderRoute();
     expect(screen.getByRole("heading", { name: "클럽" })).toBeInTheDocument();

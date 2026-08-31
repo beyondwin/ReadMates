@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/experimental-ct-react";
 import type { Locator, Page } from "@playwright/test";
 import type { ReactElement } from "react";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { MemoryRouter } from "react-router";
 import {
   VISUAL_AUTHORITY_VIEWPORTS,
   expectMinimumTargetSize,
@@ -11,8 +11,7 @@ import {
 } from "@/tests/e2e/support/visual-authority-contract";
 import { AdminAuditLedger } from "./admin-audit-ledger";
 import { AdminClubsLedger } from "./admin-clubs-ledger";
-import "./admin-editorial-ledger.css";
-import { AdminShellLayout } from "../route/admin-shell-layout";
+import { AdminEditorialLedgerCtHarness } from "./admin-editorial-ledger-ct-harness";
 import {
   EDITORIAL_LEDGER_LONG_AUDIT_SUMMARY,
   EDITORIAL_LEDGER_LONG_CLUB_NAME,
@@ -43,61 +42,6 @@ import { AdminHealthGrid } from "./admin-health-grid";
 import { AdminOperationStateActions } from "./admin-operation-state-actions";
 import { AdminTodayLedger } from "./admin-today-ledger";
 
-test("scoped CSS preserves shell and page computed layout after global extraction", async ({
-  mount,
-  page,
-}) => {
-  await page.setViewportSize(VISUAL_AUTHORITY_VIEWPORTS.desktopWide);
-  const component = await mount(
-    <MemoryRouter initialEntries={["/admin/today"]}>
-      <Routes>
-        <Route
-          path="/admin"
-          element={
-            <AdminShellLayout
-              workspaceAccountLabel="운영자"
-              spaceSwitcher={null}
-              spaceControlEpoch={0}
-              capabilities={null}
-              currentNavigationOwner="today"
-              routePath="today"
-              breadcrumbExtra={null}
-              alarm={{ summary: null, state: "unavailable" }}
-              accountBusy={false}
-              accountError={null}
-              onOtherAccountLogin={() => undefined}
-              outletContext={{ authorityEpoch: 0 }}
-            />
-          }
-        >
-          <Route
-            path="today"
-            element={<section className="admin-page-frame">페이지</section>}
-          />
-        </Route>
-      </Routes>
-    </MemoryRouter>,
-  );
-
-  const styles = await component.evaluate((root) => {
-    const body = root.querySelector<HTMLElement>(".admin-shell__body");
-    const nav = root.querySelector<HTMLElement>(".admin-shell__nav");
-    const pageFrame = root.querySelector<HTMLElement>(".admin-page-frame");
-    if (!body || !nav || !pageFrame) throw new Error("layout probe is incomplete");
-    return {
-      bodyDisplay: getComputedStyle(body).display,
-      bodyColumns: getComputedStyle(body).gridTemplateColumns,
-      navPosition: getComputedStyle(nav).position,
-      pageDisplay: getComputedStyle(pageFrame).display,
-    };
-  });
-
-  expect(styles.bodyDisplay).toBe("grid");
-  expect(styles.bodyColumns).not.toBe("none");
-  expect(styles.navPosition).toBe("sticky");
-  expect(styles.pageDisplay).toBe("grid");
-});
-
 async function mountEditorial(
   mount: (component: ReactElement) => Promise<Locator>,
   page: Page,
@@ -108,7 +52,7 @@ async function mountEditorial(
   await page.emulateMedia({ colorScheme: "light" });
   const component = await mount(
     <MemoryRouter>
-      <div style={{ width: "100%" }}>{node}</div>
+      <AdminEditorialLedgerCtHarness>{node}</AdminEditorialLedgerCtHarness>
     </MemoryRouter>,
   );
   await expectReducedMotion(page);

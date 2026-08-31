@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- route modules intentionally export components and factories */
 import type { QueryClient } from "@tanstack/react-query";
 import { Navigate, type RouteObject, useLoaderData } from "react-router";
-import type { PropsWithChildren } from "react";
+import type { PropsWithChildren, ReactNode } from "react";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequirePlatformAdmin } from "@/src/app/route-guards";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
@@ -12,7 +12,10 @@ import {
   type AdminRouteDescriptor,
 } from "@/features/platform-admin/model/admin-route-catalog";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
-import { GlobalSpaceTransitionController } from "@/src/app/global-space-transition-controller";
+import {
+  GlobalSpaceTransitionController,
+  useGlobalSpaceTransitionController,
+} from "@/src/app/global-space-transition-controller";
 import { AppGlobalSpaceSwitcherBridge } from "@/src/app/global-space-switcher-bridge";
 import { AppHostAuthorityLossBridge } from "@/src/app/app-route-security-controller";
 
@@ -24,6 +27,15 @@ export function AdminTransitionBoundary({ auth, children }: PropsWithChildren<{ 
       {children}
     </GlobalSpaceTransitionController>
   );
+}
+
+export function AdminPlatformAuthorityInvalidationBridge({
+  children,
+}: {
+  children: (invalidateForPlatformAuthorityLoss: () => void) => ReactNode;
+}) {
+  const controller = useGlobalSpaceTransitionController();
+  return children(controller.invalidateForPlatformAuthorityLoss);
 }
 
 export function adminRoutes(queryClient: QueryClient): RouteObject[] {
@@ -48,10 +60,15 @@ export function adminRoutes(queryClient: QueryClient): RouteObject[] {
           return (
             <RequirePlatformAdmin>
               <AdminTransitionBoundary auth={auth}>
-                <AdminShellController
-                  auth={auth}
-                  spaceSwitcher={<AppGlobalSpaceSwitcherBridge auth={auth} />}
-                />
+                <AdminPlatformAuthorityInvalidationBridge>
+                  {(invalidateForPlatformAuthorityLoss) => (
+                    <AdminShellController
+                      auth={auth}
+                      spaceSwitcher={<AppGlobalSpaceSwitcherBridge auth={auth} />}
+                      onPlatformAuthorityLoss={invalidateForPlatformAuthorityLoss}
+                    />
+                  )}
+                </AdminPlatformAuthorityInvalidationBridge>
               </AdminTransitionBoundary>
             </RequirePlatformAdmin>
           );

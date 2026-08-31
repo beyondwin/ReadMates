@@ -23,13 +23,19 @@ import { AdminShellLayout, type AdminShellOutletContext } from "./admin-shell-la
 export function AdminShellController({
   auth = null,
   spaceSwitcher = null,
+  onPlatformAuthorityLoss,
 }: {
   auth?: AuthMeResponse | null;
   spaceSwitcher?: ReactNode;
+  onPlatformAuthorityLoss: () => void;
 }) {
   return (
     <AdminBreadcrumbProvider>
-      <AdminShellControllerInner auth={auth} spaceSwitcher={spaceSwitcher} />
+      <AdminShellControllerInner
+        auth={auth}
+        spaceSwitcher={spaceSwitcher}
+        onPlatformAuthorityLoss={onPlatformAuthorityLoss}
+      />
     </AdminBreadcrumbProvider>
   );
 }
@@ -37,9 +43,11 @@ export function AdminShellController({
 function AdminShellControllerInner({
   auth,
   spaceSwitcher,
+  onPlatformAuthorityLoss,
 }: {
   auth: AuthMeResponse | null;
   spaceSwitcher: ReactNode;
+  onPlatformAuthorityLoss: () => void;
 }) {
   const queryClient = useQueryClient();
   const location = useLocation();
@@ -68,11 +76,12 @@ function AdminShellControllerInner({
   useEffect(() => {
     installPlatformAdminAuthorityLossHandler(queryClient);
     return subscribePlatformAdminAuthorityLoss(() => {
+      onPlatformAuthorityLoss();
       setAuthorityLost(true);
       setAuthorityEpoch((epoch) => epoch + 1);
       setSpaceControlEpoch((epoch) => epoch + 1);
     });
-  }, [queryClient]);
+  }, [onPlatformAuthorityLoss, queryClient]);
 
   async function otherAccountLogin() {
     if (accountBusy) return;

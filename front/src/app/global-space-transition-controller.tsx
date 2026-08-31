@@ -76,6 +76,7 @@ export type GlobalSpaceTransitionControllerValue = {
   currentIdentity: SpaceIdentity | null;
   retainedRecoveryCount: number;
   requestTransition: (target: SpaceIdentity) => Promise<SpaceTransitionRequestResult>;
+  invalidateForPlatformAuthorityLoss: () => void;
   invalidateForHostAuthorityLoss: (event: HostAuthorityLossEvent) => void;
   resolveHostAuthorityLossTarget: (event: HostAuthorityLossEvent) => Promise<string>;
 };
@@ -432,6 +433,15 @@ export function GlobalSpaceTransitionController({
     continuity.purgeUnavailable(stillAvailable);
   }, [cancelPendingRouterNavigation, continuity, coordinator, normalizedAuth, syncRetainedRecoveryCount]);
 
+  const invalidateForPlatformAuthorityLoss = useCallback(() => {
+    transitionIntentRef.current += 1;
+    transitionAbortRef.current?.abort();
+    coordinator.invalidateForAuthorityLoss();
+    handles.current.clear();
+    handleHostClubScopes.current.clear();
+    syncRetainedRecoveryCount();
+  }, [coordinator, syncRetainedRecoveryCount]);
+
   const resolveHostAuthorityLossTarget = useCallback(async (event: HostAuthorityLossEvent) => {
     const routerCancellation = routerCancellationRef.current;
     if (routerCancellation?.clubSlug === event.clubSlug) await routerCancellation.promise;
@@ -490,11 +500,13 @@ export function GlobalSpaceTransitionController({
     currentIdentity: identityFromLocation(location.pathname, normalizedAuth),
     retainedRecoveryCount,
     requestTransition,
+    invalidateForPlatformAuthorityLoss,
     invalidateForHostAuthorityLoss,
     resolveHostAuthorityLossTarget,
   }), [
     availableIdentities,
     invalidateForHostAuthorityLoss,
+    invalidateForPlatformAuthorityLoss,
     location.pathname,
     normalizedAuth,
     registrationPort,
