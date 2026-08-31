@@ -86,15 +86,20 @@ describe("admin-status-language", () => {
     ["split template copy", 'export const View = () => <h1>{`Pi${"pe"}line`}</h1>'],
     ["raw property", "export const View = ({ job }: any) => <p>{job.status}</p>"],
     ["raw destructured alias", "export const View = ({ status: state }: any) => <p>{state}</p>"],
+    ["raw direct local alias", "export const View = ({ job }: any) => { const state = job.status; return <p>{state}</p>; }"],
     ["raw transitive local alias", "export const View = ({ job }: any) => { const status = job.status; const state = status; return <p>{state}</p>; }"],
-    ["raw String wrapper", "export const View = ({ job }: any) => <p>{String(job.status)}</p>"],
-    ["raw toString wrapper", "export const View = ({ job }: any) => <p>{job.status.toString()}</p>"],
+    ["raw String wrapper", "export const View = ({ job }: any) => { const state = String(job.status); return <p>{state}</p>; }"],
+    ["raw toString wrapper", "export const View = ({ job }: any) => { const state = job.status.toString(); return <p>{state}</p>; }"],
+    ["raw conditional alias", "export const View = ({ job }: any) => { const state = job.ready ? job.status : '확인 필요'; return <p>{state}</p>; }"],
+    ["raw template alias", "export const View = ({ job }: any) => { const state = `상태 ${job.status}`; return <p>{state}</p>; }"],
+    ["raw binary alias", "export const View = ({ job }: any) => { const state = '상태 ' + job.status; return <p>{state}</p>; }"],
+    ["raw cyclic alias branch", "export const View = ({ job }: any) => { const first = job.ready ? second : job.status; const second = first; return <p>{second}</p>; }"],
     ["primary drill-down", "export const View = () => <p>Job drill-down</p>"],
   ])("detects %s instead of relying on line allowlists", (_name, source) => {
     expect(analyzeAdminPrimaryLanguageSource(source).violations).not.toEqual([]);
   });
 
-  it("allows raw values only inside the structural technical disclosure boundary", () => {
+  it("recognizes an unshadowed canonical disclosure import alias", () => {
     const analysis = analyzeAdminPrimaryLanguageSource(
       `import { AdminTechnicalDisclosure as Tech } from "@/features/platform-admin/ui/admin-technical-disclosure";
        export const View = ({ job }: any) => <Tech items={[{ label: '작업 상태', value: job.status }]} />`,
@@ -106,36 +111,71 @@ describe("admin-status-language", () => {
     [
       "function parameter",
       `import { AdminTechnicalDisclosure as Tech } from "@/features/platform-admin/ui/admin-technical-disclosure";
-       export const View = ({ job, Tech }: any) => <Tech>{job.status}</Tech>`,
+       export const View = ({ job, Tech }: any) => <Tech items={[{ label: '작업 상태', value: job.status }]} />`,
     ],
     [
       "local declaration",
       `import { AdminTechnicalDisclosure as Tech } from "@/features/platform-admin/ui/admin-technical-disclosure";
-       export const View = ({ job }: any) => { const Tech = (props: any) => <div />; return <Tech>{job.status}</Tech>; }`,
+       export const View = ({ job }: any) => { const Tech = (props: any) => <div />; return <Tech items={[{ label: '작업 상태', value: job.status }]} />; }`,
     ],
   ])("does not exempt a canonical disclosure import shadowed by a %s", (_name, source) => {
     const analysis = analyzeAdminPrimaryLanguageSource(source);
-    expect(analysis.violations).not.toEqual([]);
+    expect(analysis.violations).toHaveLength(1);
+    expect(analysis.violations[0]?.reason).toBe("raw role/status value rendered in primary UI");
     expect(analysis.technicalDisclosureCount).toBe(0);
   });
 
-  it("does not taint values returned from the approved semantic mapper", () => {
+  it("keeps canonical disclosure provenance outside a narrower shadowing scope", () => {
     const analysis = analyzeAdminPrimaryLanguageSource(
-      `import { adminHealthFreshnessLanguage } from './admin-status-language';
-       export const View = ({ job }: any) => { const state = adminHealthFreshnessLanguage(job.status).primaryText; return <p>{state}</p>; }`,
+      `import { AdminTechnicalDisclosure as Tech } from "@/features/platform-admin/ui/admin-technical-disclosure";
+       export const Canonical = ({ job }: any) => <Tech items={[{ label: '작업 상태', value: job.status }]} />;
+       export const Shadowed = ({ job, Tech }: any) => <Tech items={[{ label: '작업 상태', value: job.status }]} />;`,
     );
-    expect(analysis.violations).toEqual([]);
+    expect(analysis.technicalDisclosureCount).toBe(1);
+    expect(analysis.violations).toHaveLength(1);
+    expect(analysis.violations[0]?.reason).toBe("raw role/status value rendered in primary UI");
   });
 
   it.each([
-    ["local fake", "const AdminTechnicalDisclosure = (props: any) => <div />; export const View = ({ status }: any) => <AdminTechnicalDisclosure>{status}</AdminTechnicalDisclosure>"],
-    ["wrong import", "import { AdminTechnicalDisclosure } from './fake'; export const View = ({ status }: any) => <AdminTechnicalDisclosure>{status}</AdminTechnicalDisclosure>"],
+    ["local fake", "const AdminTechnicalDisclosure = (props: any) => <div />; export const View = ({ job }: any) => <AdminTechnicalDisclosure items={[{ value: job.status }]} />"],
+    ["wrong-source import alias", "import { AdminTechnicalDisclosure as Tech } from './fake'; export const View = ({ job }: any) => <Tech items={[{ value: job.status }]} />"],
+  ])("does not exempt a disclosure-looking %s from raw attribute analysis", (_name, source) => {
+    const analysis = analyzeAdminPrimaryLanguageSource(source, "ui/arbitrary-production.tsx");
+    expect(analysis.violations).toHaveLength(1);
+    expect(analysis.technicalDisclosureCount).toBe(0);
+  });
+
+  it.each([
     ["support raw status", "export const View = ({ receipt }: any) => <section>{receipt.outcome} · {receipt.status}</section>"],
     ["domain raw role", "export const View = ({ domain }: any) => <section>{domain.role}</section>"],
   ])("does not exempt %s from raw primary analysis", (_name, source) => {
     const analysis = analyzeAdminPrimaryLanguageSource(source, "ui/arbitrary-production.tsx");
     expect(analysis.violations).not.toEqual([]);
     expect(analysis.technicalDisclosureCount).toBe(0);
+  });
+
+  it("does not treat raw data passed to an ordinary component as primary copy", () => {
+    const analysis = analyzeAdminPrimaryLanguageSource(
+      `const StatusPanel = (props: any) => <section />;
+       export const View = ({ job }: any) => <StatusPanel items={[{ value: job.status }]} />;`,
+    );
+    expect(analysis).toEqual({ violations: [], technicalDisclosureCount: 0 });
+  });
+
+  it("resolves raw taint by lexical binding instead of identifier spelling", () => {
+    const analysis = analyzeAdminPrimaryLanguageSource(
+      `import { adminHealthFreshnessLanguage } from './admin-status-language';
+       function RawButNotRendered({ job }: any) { const state = job.status; return null; }
+       function SemanticView({ job }: any) { const state = adminHealthFreshnessLanguage(job.status).primaryText; return <p>{state}</p>; }`,
+    );
+    expect(analysis).toEqual({ violations: [], technicalDisclosureCount: 0 });
+  });
+
+  it("terminates on an alias cycle without inventing raw taint", () => {
+    const analysis = analyzeAdminPrimaryLanguageSource(
+      "export const View = () => { const first = second; const second = first; return <p>{first}</p>; }",
+    );
+    expect(analysis).toEqual({ violations: [], technicalDisclosureCount: 0 });
   });
 
   it("primary source에 금지된 영문 제품 라벨과 raw role/status render를 다시 넣지 않는다", () => {

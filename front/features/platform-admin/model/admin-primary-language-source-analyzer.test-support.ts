@@ -2,6 +2,8 @@ import ts from "typescript";
 
 const BANNED_PRIMARY_TERMS = ["Today", "Club registry", "Pipeline", "Ledger", "Job", "Event"] as const;
 const RAW_PRIMARY_FIELDS = new Set(["role", "status", "outcome", "refreshState", "stage"]);
+const TECHNICAL_DISCLOSURE_NAME = "AdminTechnicalDisclosure";
+const TECHNICAL_DISCLOSURE_MODULE = "@/features/platform-admin/ui/admin-technical-disclosure";
 
 export type AdminPrimaryLanguageViolation = Readonly<{
   line: number;
@@ -17,10 +19,9 @@ export function analyzeAdminPrimaryLanguageSource(
   source: string,
   fileName = "source.tsx",
 ): AdminPrimaryLanguageAnalysis {
-  const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  const technicalDisclosureBindings = collectTechnicalDisclosureBindings(sourceFile);
+  const { sourceFile, checker } = createSourceContext(source, fileName);
+  const technicalDisclosureProvenance = collectTechnicalDisclosureProvenance(sourceFile, checker);
   const staticBindings = collectStaticBindings(sourceFile);
-  const rawBindings = collectRawBindings(sourceFile);
   const violations: AdminPrimaryLanguageViolation[] = [];
   let technicalDisclosureCount = 0;
 
@@ -36,22 +37,46 @@ export function analyzeAdminPrimaryLanguageSource(
     if (term) report(node, `primary copy contains ${term}`);
   };
 
+  const inspectDisclosureCandidateAttributes = (attributes: ts.JsxAttributes) => {
+    for (const attribute of attributes.properties) {
+      if (ts.isJsxAttribute(attribute)) {
+        const initializer = attribute.initializer;
+        if (
+          initializer
+          && ts.isJsxExpression(initializer)
+          && initializer.expression
+          && isRawPrimaryExpression(initializer.expression, checker)
+        ) {
+          report(initializer.expression, "raw role/status value rendered in primary UI");
+        }
+        continue;
+      }
+      if (isRawPrimaryExpression(attribute.expression, checker)) {
+        report(attribute.expression, "raw role/status value rendered in primary UI");
+      }
+    }
+  };
+
   const visit = (node: ts.Node) => {
     if (ts.isJsxSelfClosingElement(node) || ts.isJsxElement(node)) {
-      const tagName = ts.isJsxSelfClosingElement(node)
-        ? node.tagName.getText(sourceFile)
-        : node.openingElement.tagName.getText(sourceFile);
-      if (technicalDisclosureBindings.has(tagName)) {
+      const opening = ts.isJsxSelfClosingElement(node) ? node : node.openingElement;
+      const provenance = classifyTechnicalDisclosureTag(
+        opening.tagName,
+        checker,
+        technicalDisclosureProvenance,
+      );
+      if (provenance === "canonical") {
         technicalDisclosureCount += 1;
         return;
       }
+      if (provenance === "candidate") inspectDisclosureCandidateAttributes(opening.attributes);
     }
 
     if (ts.isJsxText(node)) inspectStatic(node);
     if (ts.isJsxAttribute(node) && node.initializer) inspectStatic(node.initializer);
     if (ts.isJsxExpression(node) && node.expression) {
       inspectStatic(node.expression);
-      if (!ts.isJsxAttribute(node.parent) && isRawPrimaryExpression(node.expression, rawBindings)) {
+      if (!ts.isJsxAttribute(node.parent) && isRawPrimaryExpression(node.expression, checker)) {
         report(node.expression, "raw role/status value rendered in primary UI");
       }
     }
@@ -63,55 +88,64 @@ export function analyzeAdminPrimaryLanguageSource(
   return { violations, technicalDisclosureCount };
 }
 
-function collectTechnicalDisclosureBindings(sourceFile: ts.SourceFile): Set<string> {
-  const bindings = new Set<string>();
+function createSourceContext(source: string, fileName: string): {
+  sourceFile: ts.SourceFile;
+  checker: ts.TypeChecker;
+} {
+  const options: ts.CompilerOptions = {
+    jsx: ts.JsxEmit.Preserve,
+    noLib: true,
+    noResolve: true,
+    target: ts.ScriptTarget.Latest,
+  };
+  const sourceFile = ts.createSourceFile(fileName, source, options.target!, true, ts.ScriptKind.TSX);
+  const host = ts.createCompilerHost(options, true);
+  host.fileExists = (requestedFileName) => requestedFileName === fileName;
+  host.readFile = (requestedFileName) => requestedFileName === fileName ? source : undefined;
+  host.getSourceFile = (requestedFileName) => requestedFileName === fileName ? sourceFile : undefined;
+  host.writeFile = () => undefined;
+  const program = ts.createProgram({ rootNames: [fileName], options, host });
+  const boundSourceFile = program.getSourceFile(fileName);
+  if (!boundSourceFile) throw new Error(`Unable to bind source file: ${fileName}`);
+  return { sourceFile: boundSourceFile, checker: program.getTypeChecker() };
+}
+
+type TechnicalDisclosureProvenance = Readonly<{
+  canonicalBindings: ReadonlySet<ts.Symbol>;
+  candidateNames: ReadonlySet<string>;
+}>;
+
+function collectTechnicalDisclosureProvenance(
+  sourceFile: ts.SourceFile,
+  checker: ts.TypeChecker,
+): TechnicalDisclosureProvenance {
+  const canonicalBindings = new Set<ts.Symbol>();
+  const candidateNames = new Set<string>([TECHNICAL_DISCLOSURE_NAME]);
   for (const statement of sourceFile.statements) {
     if (!ts.isImportDeclaration(statement)) continue;
     if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
-    if (statement.moduleSpecifier.text !== "@/features/platform-admin/ui/admin-technical-disclosure") continue;
     const namedBindings = statement.importClause?.namedBindings;
     if (!namedBindings || !ts.isNamedImports(namedBindings)) continue;
     for (const element of namedBindings.elements) {
-      if ((element.propertyName ?? element.name).text === "AdminTechnicalDisclosure") {
-        const localName = element.name.text;
-        if (!hasNonImportBinding(sourceFile, localName)) bindings.add(localName);
-      }
+      if ((element.propertyName ?? element.name).text !== TECHNICAL_DISCLOSURE_NAME) continue;
+      candidateNames.add(element.name.text);
+      if (statement.moduleSpecifier.text !== TECHNICAL_DISCLOSURE_MODULE) continue;
+      const symbol = checker.getSymbolAtLocation(element.name);
+      if (symbol) canonicalBindings.add(symbol);
     }
   }
-  return bindings;
+  return { canonicalBindings, candidateNames };
 }
 
-function hasNonImportBinding(sourceFile: ts.SourceFile, target: string): boolean {
-  let found = false;
-  const visit = (node: ts.Node) => {
-    if (found || ts.isImportDeclaration(node)) return;
-    if (
-      (ts.isParameter(node) || ts.isVariableDeclaration(node))
-      && bindingNameContains(node.name, target)
-    ) {
-      found = true;
-      return;
-    }
-    if (
-      (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node))
-      && node.name?.text === target
-    ) {
-      found = true;
-      return;
-    }
-    if (ts.isCatchClause(node) && node.variableDeclaration && bindingNameContains(node.variableDeclaration.name, target)) {
-      found = true;
-      return;
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
-  return found;
-}
-
-function bindingNameContains(name: ts.BindingName, target: string): boolean {
-  if (ts.isIdentifier(name)) return name.text === target;
-  return name.elements.some((element) => !ts.isOmittedExpression(element) && bindingNameContains(element.name, target));
+function classifyTechnicalDisclosureTag(
+  tagName: ts.JsxTagNameExpression,
+  checker: ts.TypeChecker,
+  provenance: TechnicalDisclosureProvenance,
+): "canonical" | "candidate" | "other" {
+  if (!ts.isIdentifier(tagName)) return "other";
+  const binding = checker.getSymbolAtLocation(tagName);
+  if (binding && provenance.canonicalBindings.has(binding)) return "canonical";
+  return provenance.candidateNames.has(tagName.text) ? "candidate" : "other";
 }
 
 function collectStaticBindings(sourceFile: ts.SourceFile): Map<string, ts.Expression> {
@@ -123,34 +157,6 @@ function collectStaticBindings(sourceFile: ts.SourceFile): Map<string, ts.Expres
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
-  return bindings;
-}
-
-function collectRawBindings(sourceFile: ts.SourceFile): Set<string> {
-  const bindings = new Set<string>();
-  const variableDeclarations: ts.VariableDeclaration[] = [];
-  const visit = (node: ts.Node) => {
-    if (ts.isBindingElement(node) && ts.isIdentifier(node.name)) {
-      const property = node.propertyName ?? node.name;
-      if (ts.isIdentifier(property) && RAW_PRIMARY_FIELDS.has(property.text)) bindings.add(node.name.text);
-    }
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
-      variableDeclarations.push(node);
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
-
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const declaration of variableDeclarations) {
-      if (bindings.has(declaration.name.text)) continue;
-      if (!isRawPrimaryExpression(declaration.initializer!, bindings)) continue;
-      bindings.add(declaration.name.text);
-      changed = true;
-    }
-  }
   return bindings;
 }
 
@@ -187,35 +193,102 @@ function evaluateStaticString(
   return null;
 }
 
-function isRawPrimaryExpression(node: ts.Expression, rawBindings: ReadonlySet<string>): boolean {
-  if (ts.isIdentifier(node)) return rawBindings.has(node.text);
-  if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node)) {
-    return isRawPrimaryExpression(node.expression, rawBindings);
+function isRawPrimaryExpression(
+  node: ts.Expression,
+  checker: ts.TypeChecker,
+  seenBindings = new Set<ts.Symbol>(),
+): boolean {
+  if (ts.isIdentifier(node)) {
+    const binding = checker.getSymbolAtLocation(node);
+    if (!binding || seenBindings.has(binding)) return false;
+    const nextSeen = new Set(seenBindings).add(binding);
+    return binding.declarations?.some((declaration) => isRawBindingDeclaration(declaration, checker, nextSeen)) ?? false;
+  }
+  if (
+    ts.isParenthesizedExpression(node)
+    || ts.isAsExpression(node)
+    || ts.isTypeAssertionExpression(node)
+    || ts.isNonNullExpression(node)
+    || ts.isSatisfiesExpression(node)
+  ) {
+    return isRawPrimaryExpression(node.expression, checker, seenBindings);
   }
   if (ts.isPropertyAccessExpression(node)) return RAW_PRIMARY_FIELDS.has(node.name.text);
   if (ts.isElementAccessExpression(node) && node.argumentExpression && ts.isStringLiteral(node.argumentExpression)) {
     return RAW_PRIMARY_FIELDS.has(node.argumentExpression.text);
   }
   if (ts.isConditionalExpression(node)) {
-    return isRawPrimaryExpression(node.whenTrue, rawBindings) || isRawPrimaryExpression(node.whenFalse, rawBindings);
+    return isRawPrimaryExpression(node.whenTrue, checker, seenBindings)
+      || isRawPrimaryExpression(node.whenFalse, checker, seenBindings);
   }
   if (ts.isBinaryExpression(node)) {
-    return isRawPrimaryExpression(node.left, rawBindings) || isRawPrimaryExpression(node.right, rawBindings);
+    return isRawPrimaryExpression(node.left, checker, seenBindings)
+      || isRawPrimaryExpression(node.right, checker, seenBindings);
   }
   if (ts.isTemplateExpression(node)) {
-    return node.templateSpans.some((span) => isRawPrimaryExpression(span.expression, rawBindings));
+    return node.templateSpans.some((span) => isRawPrimaryExpression(span.expression, checker, seenBindings));
+  }
+  if (ts.isArrayLiteralExpression(node)) {
+    return node.elements.some((element) => {
+      if (ts.isOmittedExpression(element)) return false;
+      if (ts.isSpreadElement(element)) return isRawPrimaryExpression(element.expression, checker, seenBindings);
+      return isRawPrimaryExpression(element, checker, seenBindings);
+    });
+  }
+  if (ts.isObjectLiteralExpression(node)) {
+    return node.properties.some((property) => {
+      if (ts.isPropertyAssignment(property)) {
+        return isRawPrimaryExpression(property.initializer, checker, seenBindings);
+      }
+      if (ts.isShorthandPropertyAssignment(property)) {
+        return isRawPrimaryExpression(property.name, checker, seenBindings)
+          || Boolean(property.objectAssignmentInitializer
+            && isRawPrimaryExpression(property.objectAssignmentInitializer, checker, seenBindings));
+      }
+      if (ts.isSpreadAssignment(property)) {
+        return isRawPrimaryExpression(property.expression, checker, seenBindings);
+      }
+      return false;
+    });
   }
   if (ts.isCallExpression(node)) {
     if (ts.isIdentifier(node.expression) && node.expression.text === "String") {
-      return node.arguments.some((argument) => isRawPrimaryExpression(argument, rawBindings));
+      return node.arguments.some((argument) => isRawPrimaryExpression(argument, checker, seenBindings));
     }
     if (
       ts.isPropertyAccessExpression(node.expression)
       && node.expression.name.text === "toString"
       && node.arguments.length === 0
     ) {
-      return isRawPrimaryExpression(node.expression.expression, rawBindings);
+      return isRawPrimaryExpression(node.expression.expression, checker, seenBindings);
     }
+  }
+  return false;
+}
+
+function isRawBindingDeclaration(
+  declaration: ts.Declaration,
+  checker: ts.TypeChecker,
+  seenBindings: ReadonlySet<ts.Symbol>,
+): boolean {
+  if (ts.isBindingElement(declaration)) {
+    const propertyName = declaration.propertyName ?? declaration.name;
+    if (
+      (ts.isIdentifier(propertyName) || ts.isStringLiteralLike(propertyName))
+      && RAW_PRIMARY_FIELDS.has(propertyName.text)
+    ) {
+      return true;
+    }
+    return Boolean(
+      declaration.initializer
+      && isRawPrimaryExpression(declaration.initializer, checker, new Set(seenBindings)),
+    );
+  }
+  if (ts.isVariableDeclaration(declaration) || ts.isParameter(declaration)) {
+    return Boolean(
+      declaration.initializer
+      && isRawPrimaryExpression(declaration.initializer, checker, new Set(seenBindings)),
+    );
   }
   return false;
 }
