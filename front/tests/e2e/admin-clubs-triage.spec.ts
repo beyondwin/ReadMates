@@ -66,6 +66,7 @@ async function routeAdminClubs(
       capabilities: [
         "VIEW_TODAY",
         "VIEW_CLUBS",
+        "VIEW_CLUB_OPERATIONS",
         "CREATE_CLUB",
         "MANAGE_CLUBS",
         "MANAGE_CLUB_DOMAINS",
@@ -363,21 +364,40 @@ test.describe("admin clubs registry", () => {
       page.getByRole("combobox", { name: "수명주기" }),
     ).toBeVisible();
 
-    // Critical club sorts above the healthy one.
-    const rows = page.locator(".admin-clubs__table tbody tr");
-    await expect(rows.first()).toContainText("Broken Club");
+    const judgementList = page.getByRole("list", {
+      name: "클럽 운영 판단 목록",
+    });
+    const rows = judgementList.getByRole("listitem");
 
-    // Recent notification failures surface as the leading triage reason.
-    await expect(page.getByText("알림 실패 2건")).toBeVisible();
+    // The decision sequence starts with the club name, then state/action/signal.
+    const criticalRow = rows.first();
+    await expect(criticalRow.getByRole("link", { name: "Broken Club" })).toBeVisible();
+    await expect(criticalRow.getByText("현재 상태")).toBeVisible();
+    await expect(criticalRow.getByText("필요한 조치")).toBeVisible();
+    await expect(criticalRow.getByText("실패 신호 확인")).toBeVisible();
+    await expect(criticalRow.getByText("최근 신호")).toBeVisible();
+    await expect(criticalRow.getByText("알림 실패 2건")).toBeVisible();
+
+    const quietRow = rows.filter({
+      has: page.getByRole("link", { name: "Healthy Club" }),
+    });
+    await expect(quietRow).toHaveCount(1);
+    await expect(quietRow.getByText("현재 상태")).toBeVisible();
+    await expect(quietRow.getByText("필요한 조치")).toHaveCount(0);
+    await expect(quietRow.getByText("최근 신호")).toHaveCount(0);
+    await expect(quietRow.getByText("마지막 확인")).toHaveCount(0);
+
+    const technicalDisclosure = criticalRow.getByLabel("기술 정보");
+    await technicalDisclosure.getByText("기술 정보", { exact: true }).click();
+    await expect(technicalDisclosure.getByText("Slug")).toBeVisible();
+    await expect(technicalDisclosure.getByText("broken")).toBeVisible();
 
     await page
       .getByRole("combobox", { name: "공개 상태" })
       .selectOption("PRIVATE");
     await expect(page).toHaveURL(/visibility=PRIVATE/);
 
-    const firstClubLink = page
-      .locator(".admin-clubs__table tbody tr td a")
-      .first();
+    const firstClubLink = criticalRow.getByRole("link", { name: "Broken Club" });
     await firstClubLink.click();
     await expect(page).toHaveURL(/\/admin\/clubs\/.+/);
     await expect(page).toHaveURL(/returnTo=/);
