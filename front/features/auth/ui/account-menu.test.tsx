@@ -69,6 +69,7 @@ describe("AccountMenu", () => {
 
     expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
     expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).not.toHaveAttribute("aria-controls");
     expect(trigger).toHaveTextContent("멤버1");
     expect(trigger).toHaveTextContent("계정");
     expect(trigger).toHaveTextContent("▾");
@@ -89,6 +90,7 @@ describe("AccountMenu", () => {
 
     expect(trigger).toHaveAccessibleName("멤버1 계정 메뉴");
     expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(trigger).toHaveAttribute("aria-controls", screen.getByRole("dialog", { name: "멤버1" }).id);
     expect(trigger).toHaveTextContent("▴");
   });
 

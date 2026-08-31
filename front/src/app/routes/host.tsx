@@ -3,13 +3,12 @@ import type { QueryClient } from "@tanstack/react-query";
 import { redirect, type LoaderFunction, type LoaderFunctionArgs, type RouteObject } from "react-router";
 import { requireHostLoaderAuth } from "@/features/host/route/host-loader-auth";
 import { HostRouteError } from "@/features/host/route/host-route-error";
-import { AppRouteLayout } from "@/src/app/layouts/app-route-layout";
+import { CanonicalHostCompatibilityRoute } from "@/src/app/host-routes/canonical-host-compatibility-route";
 import { memoizeRouteModule } from "@/src/app/routes/route-module-loader";
 import { ClubHostAppRouteLayout } from "@/src/app/layouts/club-app-route-layout";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
-import { RequireHost } from "@/src/app/route-guards";
-import { hostCompatibilityRedirectTarget } from "@/src/app/route-continuity";
-import { canonicalizeCompatibilityEntry, resolveUnavailableDetailTarget } from "@/src/app/workspace-route-model";
+import type { HostCompatibilityLoaderData } from "@/src/app/route-continuity";
+import { resolveUnavailableDetailTarget } from "@/src/app/workspace-route-model";
 import { readLastSafeWorkspaceTarget } from "@/src/app/workspace-route-continuity";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
 import { HOST_ROUTE_PATHS } from "@/shared/routing/host-route-destinations";
@@ -26,24 +25,7 @@ async function canonicalHostCompatibilityLoader(args: LoaderFunctionArgs) {
   if (!clubSlug) {
     throw redirect("/app");
   }
-
-  const url = new URL(args.request.url);
-  const hostCompatibilityTarget = hostCompatibilityRedirectTarget({
-    pathname: url.pathname,
-    search: url.search,
-    currentClubSlug: clubSlug,
-  });
-  if (hostCompatibilityTarget) {
-    return { hostCompatibilityClubSlug: clubSlug };
-  }
-  throw redirect(
-    canonicalizeCompatibilityEntry({
-      pathname: url.pathname,
-      search: url.search,
-      hash: url.hash,
-      currentClubSlug: clubSlug,
-    }),
-  );
+  return { hostCompatibilityClubSlug: clubSlug } satisfies HostCompatibilityLoaderData;
 }
 
 function scopedHostRoute({
@@ -452,11 +434,7 @@ export function hostRoutes(queryClient: QueryClient): RouteObject[] {
     {
       id: "app-host",
       path: "/app/host",
-      element: (
-        <RequireHost>
-          <AppRouteLayout />
-        </RequireHost>
-      ),
+      element: <CanonicalHostCompatibilityRoute />,
       loader: canonicalHostCompatibilityLoader,
       errorElement: <RouteErrorBoundary variant="host" />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="모임 운영 권한을 확인하는 중" variant="host" />,

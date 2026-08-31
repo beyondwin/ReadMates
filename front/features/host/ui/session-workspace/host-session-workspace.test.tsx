@@ -255,9 +255,10 @@ describe("HostSessionWorkspace", () => {
 
     const info = screen.getByRole("button", { name: "모임 정보" });
     expect(info).toHaveAttribute("aria-expanded", "false");
-    expect(info).toHaveAttribute("aria-controls", "workspace-panel-basic");
+    expect(info).not.toHaveAttribute("aria-controls");
     await user.click(info);
     expect(info).toHaveAttribute("aria-expanded", "true");
+    expect(info).toHaveAttribute("aria-controls", "workspace-panel-basic");
     expect(screen.getByText("기본 정보 편집")).toBeVisible();
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "모임 정보" })).toBeVisible();
@@ -269,8 +270,10 @@ describe("HostSessionWorkspace", () => {
 
     const history = screen.getByRole("button", { name: "변경 내역" });
     expect(history).toHaveAttribute("aria-expanded", "false");
+    expect(history).not.toHaveAttribute("aria-controls");
     await user.click(history);
     expect(history).toHaveAttribute("aria-expanded", "true");
+    expect(history).toHaveAttribute("aria-controls", "workspace-panel-history");
     expect(screen.getByText("변경 내역 목록")).toBeVisible();
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
   });

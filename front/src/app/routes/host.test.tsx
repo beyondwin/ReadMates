@@ -42,7 +42,7 @@ afterEach(() => {
 });
 
 describe("host compatibility routes", () => {
-  it("replaces an unscoped host entry with its current-club canonical URL", async () => {
+  it("authorizes an unscoped host entry and returns only the loader-owned current club", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(() =>
@@ -64,28 +64,13 @@ describe("host compatibility routes", () => {
     const compatibilityRoute = hostRoutes(new QueryClient()).find((route) => route.id === "app-host") as RouteObject;
     const loader = compatibilityRoute.loader! as (args: LoaderFunctionArgs) => Promise<unknown>;
 
-    await expect(
-      loader({
-        request: new Request("https://readmates.local/app/host/sessions?cursor=old#draft"),
-        params: {},
-        context: undefined,
-      } as unknown as LoaderFunctionArgs),
-    ).rejects.toMatchObject({
-      status: 302,
-      headers: expect.objectContaining({ get: expect.any(Function) }),
+    await expect(loader({
+      request: new Request("https://readmates.local/app/host/sessions?cursor=old"),
+      params: {},
+      context: undefined,
+    } as unknown as LoaderFunctionArgs)).resolves.toEqual({
+      hostCompatibilityClubSlug: "reading-sai",
     });
-
-    try {
-      await loader({
-        request: new Request("https://readmates.local/app/host/sessions?cursor=old#draft"),
-        params: {},
-        context: undefined,
-      } as unknown as LoaderFunctionArgs);
-    } catch (response) {
-      expect((response as Response).headers.get("Location")).toBe(
-        "/clubs/reading-sai/app/host/sessions?cursor=old#draft",
-      );
-    }
   });
 
   it.each([

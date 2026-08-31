@@ -77,10 +77,11 @@ describe("TopNav responsive variants", () => {
     expect(screen.getByRole("navigation", { name: "멤버 주 메뉴" })).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "멤버 주 메뉴 모바일" })).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "오늘" })).toHaveLength(2);
-    expect(screen.getByRole("link", { name: "읽는사이 홈" })).toHaveAttribute(
-      "href",
-      "/clubs/reading-sai/app",
-    );
+    const brandLinks = screen.getAllByRole("link", { name: "읽는사이 홈" });
+    expect(brandLinks).toHaveLength(2);
+    for (const brandLink of brandLinks) {
+      expect(brandLink).toHaveAttribute("href", "/clubs/reading-sai/app");
+    }
   });
 
   it("renders an account control after the desktop workspace action", () => {
@@ -318,6 +319,7 @@ describe("TopNav responsive variants", () => {
     const desktop = renderAt("/app", <TopNav variant="member" memberName="이멤버5" />);
 
     expect(desktop.container.querySelector(".topnav .rm-brand-mark")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "읽는사이 홈" })).toBeInTheDocument();
 
     cleanup();
 

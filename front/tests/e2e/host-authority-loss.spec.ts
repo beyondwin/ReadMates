@@ -8,6 +8,10 @@ import {
   resetSeedGoogleLogins,
   runMysql,
 } from "./readmates-e2e-db";
+import {
+  expectNoHorizontalOverflow,
+  expectNoSeriousAccessibilityFindings,
+} from "./support/visual-authority-contract";
 
 test.describe.configure({ mode: "serial" });
 
@@ -342,6 +346,7 @@ test.afterEach(() => {
 });
 
 test("revoked authority cancels in-flight host work and cannot resurrect a meeting form", async ({ page, context }) => {
+  await page.setViewportSize({ width: 768, height: 900 });
   const secret = "D5-owning-club-private-passcode";
   const originalHostUrl = `${HOST_PATH}/sessions/new`;
   const seenSessionId = createHostParticipantSeenFact();
@@ -382,6 +387,8 @@ test("revoked authority cancels in-flight host work and cannot resurrect a meeti
   const failure = await triggerSecurityFailure(page);
   expect(failure).toMatchObject({ code: "HOST_AUTHORITY_REVOKED", name: "ReadmatesApiError" });
   await expectSafeReplacement(page, /호스트 권한이 해제/);
+  await expectNoHorizontalOverflow(page);
+  expect(await expectNoSeriousAccessibilityFindings(page)).toEqual([]);
   expect(participantSeenFact(seenSessionId)).toBe(seenFactBeforeDowngrade);
   releasePending();
   await expect.poll(() => page.evaluate(() => (
@@ -472,6 +479,7 @@ test("cross-club scope purges the requested club without touching an open other-
 });
 
 test("revision conflict preserves the local meeting form draft, compares latest schedule, and retries explicitly", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 900 });
   const { sessionId } = createDraftSession();
   const draftTitle = "리비전 충돌 뒤에도 남아야 하는 제목";
   await loginWithGoogleFixture(page, "host@example.com");
@@ -509,6 +517,8 @@ where id = ${sqlString(sessionId)} and club_id = ${sqlString(CLUB_ID)};
   await expect(conflict).toContainText("최신 서버 합성 장소");
   await expect(title).toHaveValue(draftTitle);
   expect(attempts).toBe(1);
+  await expectNoHorizontalOverflow(page);
+  expect(await expectNoSeriousAccessibilityFindings(page)).toEqual([]);
 
   await conflict.getByRole("button", { name: "내 일정으로 다시 저장" }).click();
   await expect(page.locator("#host-session-basic-save-state")).toHaveText("저장되었습니다.");

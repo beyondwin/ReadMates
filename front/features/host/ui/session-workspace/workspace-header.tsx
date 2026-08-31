@@ -65,7 +65,7 @@ export function WorkspaceHeader({
           type="button"
           className="btn btn-quiet btn-sm"
           aria-expanded={basicOpen}
-          aria-controls="workspace-panel-basic"
+          aria-controls={basicOpen ? "workspace-panel-basic" : undefined}
           onClick={onOpenBasic}
         >
           모임 정보
@@ -74,7 +74,7 @@ export function WorkspaceHeader({
           type="button"
           className="btn btn-quiet btn-sm"
           aria-expanded={historyOpen}
-          aria-controls="workspace-panel-history"
+          aria-controls={historyOpen ? "workspace-panel-history" : undefined}
           onClick={onOpenHistory}
         >
           변경 내역

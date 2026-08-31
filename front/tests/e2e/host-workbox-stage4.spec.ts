@@ -5,6 +5,10 @@ import {
   resetSeedGoogleLogins,
   runMysql,
 } from "./readmates-e2e-db";
+import {
+  expectNoHorizontalOverflow,
+  expectNoSeriousAccessibilityFindings,
+} from "./support/visual-authority-contract";
 
 test.describe.configure({ mode: "serial" });
 
@@ -311,6 +315,7 @@ where club_id = ${sqlString(CLUB_ID)}
 });
 
 test("schedule review fails closed for drafts, requires preview, and keeps an unknown receipt without resend", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 960 });
   ({ sessionId: authSessionId } = await loginWithGoogleFixture(page, "host@example.com"));
 
   await page.goto(`${HOST_PATH}/sessions/${DRAFT_SESSION_ID}/schedule-review`);
@@ -385,6 +390,8 @@ where id = ${sqlString(OPEN_SESSION_ID)} and club_id = ${sqlString(CLUB_ID)};
   await expect(unknownReceipt).toContainText("같은 알림을 다시 보내지 말고");
   const ledgerLink = unknownReceipt.getByRole("link", { name: "알림 장부에서 결과 확인" });
   await expect(ledgerLink).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  expect(await expectNoSeriousAccessibilityFindings(page)).toEqual([]);
   expect(confirmRequests).toBe(2);
   expect(runMysql(`
 select concat(
@@ -464,6 +471,7 @@ where club_id = ${sqlString(CLUB_ID)} and session_id = ${sqlString(OPEN_SESSION_
 });
 
 test("partial workbox and notification failures retry only their failed source", async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 900 });
   ({ sessionId: authSessionId } = await loginWithGoogleFixture(page, "host@example.com"));
   let workboxRequests = 0;
   let notificationRequests = 0;
@@ -507,6 +515,8 @@ test("partial workbox and notification failures retry only their failed source",
   const notificationBaseline = notificationRequests;
   expect(workboxBaseline).toBeGreaterThanOrEqual(1);
   expect(notificationBaseline).toBeGreaterThanOrEqual(1);
+  await expectNoHorizontalOverflow(page);
+  expect(await expectNoSeriousAccessibilityFindings(page)).toEqual([]);
 
   allowNotificationRecovery = true;
   await page.getByRole("button", { name: "알림 상태 다시 불러오기" }).click();

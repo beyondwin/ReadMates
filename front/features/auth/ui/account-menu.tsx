@@ -109,7 +109,7 @@ export function AccountMenu({
         aria-label={`${memberName} 계정 메뉴`}
         aria-expanded={open}
         aria-haspopup="dialog"
-        aria-controls={dialogId}
+        aria-controls={open ? dialogId : undefined}
         onClick={() => setOpen((current) => !current)}
       >
         <span className="rm-account-menu__trigger-avatar" aria-hidden="true">
