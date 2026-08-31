@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import type { CSSProperties, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { AdminRouteOwner } from "@/features/platform-admin/model/admin-route-catalog";
 import type { PlatformAdminCapabilities } from "@/features/platform-admin/model/platform-admin-capabilities";
 import { AdminLayoutNav } from "./admin-layout-nav";
 
@@ -31,7 +32,7 @@ function projection(
 
 function renderNav(opts: {
   capabilities?: PlatformAdminCapabilities | null;
-  activePath?: string;
+  currentOwner?: AdminRouteOwner | null;
   compact?: boolean;
   todayCount?: number | null;
 } = {}) {
@@ -47,12 +48,32 @@ function renderNav(opts: {
     );
   }
   return render(
-    <MemoryRouter initialEntries={[opts.activePath ?? "/admin/today"]}>
-      <AdminLayoutNav
-        capabilities={opts.capabilities === undefined ? ownerCapabilities : opts.capabilities}
-        todayCount={opts.todayCount}
-      />
-    </MemoryRouter>,
+    <AdminLayoutNav
+      capabilities={opts.capabilities === undefined ? ownerCapabilities : opts.capabilities}
+      currentOwner={opts.currentOwner === undefined ? "today" : opts.currentOwner}
+      renderLink={renderTestLink}
+      todayCount={opts.todayCount}
+    />,
+  );
+}
+
+function renderTestLink({
+  href,
+  className,
+  ariaCurrent,
+  style,
+  children,
+}: {
+  href: string;
+  className: string;
+  ariaCurrent?: "page";
+  style?: CSSProperties;
+  children: ReactNode;
+}) {
+  return (
+    <a href={href} className={className} aria-current={ariaCurrent} style={style}>
+      {children}
+    </a>
   );
 }
 
@@ -117,43 +138,44 @@ describe("AdminLayoutNav", () => {
   });
 
   it("marks the active route with aria-current=page", () => {
-    renderNav({ activePath: "/admin/clubs" });
+    renderNav({ currentOwner: "clubs" });
     expect(screen.getByRole("link", { name: "클럽 관리" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "오늘 할 일" })).not.toHaveAttribute("aria-current");
   });
 
   it("marks club detail as nested under 클럽 rather than a fifth primary item", () => {
-    renderNav({ activePath: "/admin/clubs/club-1" });
+    renderNav({ currentOwner: "clubs" });
     expect(screen.getByRole("link", { name: "클럽 관리" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("link", { name: "클럽 상세" })).not.toBeInTheDocument();
     expect(screen.getByRole("navigation").querySelectorAll(".admin-layout-nav__areas > li")).toHaveLength(4);
   });
 
   it("marks 서비스 상태 current for a nested health deep link", () => {
-    renderNav({ activePath: "/admin/health" });
+    renderNav({ currentOwner: "service" });
     expect(screen.getByRole("link", { name: "서비스 상태" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "오늘 할 일" })).not.toHaveAttribute("aria-current");
   });
 
-  it("maps support to 클럽 관리 and analytics to 처리 기록", () => {
-    const { unmount } = renderNav({ activePath: "/admin/support?clubId=club-1" });
+  it("renders clubs and records current from the route-owned projection", () => {
+    const { unmount } = renderNav({ currentOwner: "clubs" });
     expect(screen.getByRole("link", { name: "클럽 관리" })).toHaveAttribute("aria-current", "page");
     unmount();
-    renderNav({ activePath: "/admin/analytics" });
+    renderNav({ currentOwner: "records" });
     expect(screen.getByRole("link", { name: "처리 기록" })).toHaveAttribute("aria-current", "page");
   });
 
-  it("maps the onboarding query to 클럽 관리 without changing the destination query", () => {
-    renderNav({ activePath: "/admin/today?onboarding=1" });
+  it("renders the route-owned onboarding projection as 클럽 관리", () => {
+    renderNav({ currentOwner: "clubs" });
     expect(screen.getByRole("link", { name: "클럽 관리" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "오늘 할 일" })).not.toHaveAttribute("aria-current");
   });
 
   it("marks pinned emergency current without activating a primary parent", () => {
-    renderNav({ activePath: "/admin/public-takedown" });
+    renderNav({ currentOwner: "emergency" });
     expect(screen.getByRole("link", { name: "긴급 공개 회수" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "서비스 상태" })).not.toHaveAttribute("aria-current");
     expect(screen.getByRole("link", { name: "처리 기록" })).not.toHaveAttribute("aria-current");
+    expect(screen.getAllByRole("link", { current: "page" })).toHaveLength(1);
   });
 
   it("hides items the capability projection does not allow", () => {

@@ -306,13 +306,15 @@ describe("resolveAdminRouteOwner", () => {
     [{ pathname: "/admin/clubs", search: "" }, "clubs"],
     [{ pathname: "/admin/clubs/club-1", search: "?returnTo=%2Fadmin%2Fclubs" }, "clubs"],
     [{ pathname: "/admin/support", search: "?clubId=club-1" }, "clubs"],
-    [{ pathname: "/admin/today", search: "?onboarding=1" }, "clubs"],
+    [{ pathname: "/admin/today", search: "?onboarding=1" }, "today"],
+    [{ pathname: "/admin/clubs", search: "?onboarding=1" }, "clubs"],
     [{ pathname: "/admin/health", search: "" }, "service"],
     [{ pathname: "/admin/notifications", search: "?focus=failed" }, "service"],
     [{ pathname: "/admin/ai-ops", search: "?window=30d" }, "service"],
     [{ pathname: "/admin/audit", search: "?range=24h" }, "records"],
     [{ pathname: "/admin/analytics", search: "?window=30d" }, "records"],
     [{ pathname: "/admin/public-takedown", search: "" }, "emergency"],
+    [{ pathname: "/admin/public-takedown", search: "?onboarding=1" }, "emergency"],
   ] as const)("maps %o to exactly one explicit owner", (location, expected) => {
     expect(resolveAdminRouteOwner(location)).toBe(expected);
   });

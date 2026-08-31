@@ -22,7 +22,31 @@ type BoundaryRuleId =
   | "readmates-api-compat"
   | "feature-components-public";
 
-const legacyBoundaryExceptions = [] satisfies Array<{
+const legacyFeatureUiRouterPaths = [
+  "features/archive/ui/archive-link.tsx",
+  "features/auth/ui/auth-link.tsx",
+  "features/feedback/ui/feedback-link.tsx",
+  "features/host/ui/session-editor/session-editor-links.tsx",
+  "features/notifications/ui/member-notifications-page.tsx",
+  "features/platform-admin/ui/admin-alarm-bar.tsx",
+  "features/platform-admin/ui/admin-audit-ledger.tsx",
+  "features/platform-admin/ui/admin-club-operations-page.tsx",
+  "features/platform-admin/ui/admin-clubs-ledger.tsx",
+  "features/platform-admin/ui/admin-health-card.tsx",
+  "features/platform-admin/ui/admin-health-grid.tsx",
+  "features/platform-admin/ui/admin-operations-inspector.tsx",
+  "features/platform-admin/ui/admin-target-ledger-inline.tsx",
+  "features/platform-admin/ui/support-access-grants-panel.tsx",
+  "features/public/ui/public-link.tsx",
+] as const;
+
+const legacyBoundaryExceptions = legacyFeatureUiRouterPaths.map((sourcePath) => ({
+  sourcePath,
+  importPath: routerPackage,
+  ruleId: "feature-ui" as const,
+  reason: "Existing router-coupled presentation predates the route-supplied link boundary.",
+  removeWhen: "The owning route supplies current location and navigation rendering.",
+})) satisfies Array<{
   sourcePath: string;
   importPath: string;
   ruleId: BoundaryRuleId;
@@ -291,10 +315,6 @@ function isFeatureUiFile(relativePath: string) {
   return /^features\/(?:[^/]+\/)+ui\//.test(relativePath);
 }
 
-function isNestedFeatureUiFile(relativePath: string) {
-  return /^features\/[^/]+\/(?:[^/]+\/)+ui\//.test(relativePath);
-}
-
 function isFeatureRouteFile(relativePath: string) {
   return /^features\/[^/]+\/route\//.test(relativePath);
 }
@@ -340,15 +360,14 @@ function addImportViolation(
   ruleId: BoundaryRuleId,
   reason: string,
 ) {
-  if (importSpecifier.projectPath !== null) {
-    const legacyException = findLegacyBoundaryException(sourceFile, importSpecifier.projectPath, ruleId);
+  const exceptionImportPath = importSpecifier.projectPath ?? importSpecifier.rawSpecifier;
+  const legacyException = findLegacyBoundaryException(sourceFile, exceptionImportPath, ruleId);
 
-    if (legacyException !== undefined) {
-      consumedLegacyExceptions.add(
-        legacyExceptionKey(legacyException.sourcePath, legacyException.importPath, legacyException.ruleId),
-      );
-      return;
-    }
+  if (legacyException !== undefined) {
+    consumedLegacyExceptions.add(
+      legacyExceptionKey(legacyException.sourcePath, legacyException.importPath, legacyException.ruleId),
+    );
+    return;
   }
 
   violations.push(`${sourceFile.displayPath} imports ${formatImportSpecifier(importSpecifier)}: ${reason}`);
@@ -439,7 +458,7 @@ function isFeatureUiBoundaryImport(sourceFile: SourceFile, projectPath: string |
 }
 
 function isFeatureUiRouterImport(sourceFile: SourceFile, rawSpecifier: string) {
-  return isNestedFeatureUiFile(sourceFile.relativePath) && (
+  return isFeatureUiFile(sourceFile.relativePath) && (
     rawSpecifier === routerPackage || rawSpecifier.startsWith(`${routerPackage}/`) ||
     rawSpecifier === legacyRouterPackage || rawSpecifier.startsWith(`${legacyRouterPackage}/`)
   );
@@ -642,6 +661,21 @@ describe("frontend architecture boundaries", () => {
     }
     expect(isFeatureUiRouterImport(sourceFile, "react-router")).toBe(true);
     expect(/\bfetch\s*\(/.test("export const run = () => fetch('/api/unsafe');")).toBe(true);
+  });
+
+  it.each([
+    "features/platform-admin/ui/admin-layout-nav.tsx",
+    "features/host/aigen/ui/defaults/unsafe-panel.tsx",
+  ])("rejects router imports from top-level and nested feature UI: %s", (relativePath) => {
+    const sourceFile: SourceFile = {
+      absolutePath: `/unused/${relativePath}`,
+      displayPath: `front/${relativePath}`,
+      relativePath,
+    };
+
+    expect(isFeatureUiRouterImport(sourceFile, "react-router")).toBe(true);
+    expect(isFeatureUiRouterImport(sourceFile, "react-router/dom")).toBe(true);
+    expect(isFeatureUiRouterImport(sourceFile, legacyRouterPackage)).toBe(true);
   });
 
   it("allows deeply nested feature UI to remain callback-only presentation", () => {

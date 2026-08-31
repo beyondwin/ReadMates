@@ -8,12 +8,16 @@ import {
 } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Link,
   Outlet,
   useBlocker,
   useLocation,
   useNavigate,
   useSearchParams,
 } from "react-router";
+import {
+  resolveAdminRouteOwner,
+} from "@/features/platform-admin/model/admin-route-catalog";
 import { buildAdminDetailHref } from "@/features/platform-admin/model/admin-route-state";
 import { platformAdminClubListHref } from "@/features/platform-admin/model/platform-admin-club-list-filters";
 import { canAdmin } from "@/features/platform-admin/model/platform-admin-capabilities";
@@ -28,7 +32,10 @@ import {
 import { useAdminAlarmSummary } from "@/features/platform-admin/queries/admin-alarm-summary";
 import { AdminAlarmBar } from "@/features/platform-admin/ui/admin-alarm-bar";
 import { AdminBreadcrumb } from "@/features/platform-admin/ui/admin-breadcrumb";
-import { AdminLayoutNav } from "@/features/platform-admin/ui/admin-layout-nav";
+import {
+  AdminLayoutNav,
+  type AdminNavigationLinkRenderProps,
+} from "@/features/platform-admin/ui/admin-layout-nav";
 import { AdminMobileNavigation } from "@/features/platform-admin/ui/admin-mobile-navigation";
 import { AdminOnboardingModal } from "@/features/platform-admin/ui/admin-onboarding-modal";
 import { PlatformAdminOnboardingWizard } from "@/features/platform-admin/ui/platform-admin-onboarding-wizard";
@@ -104,6 +111,7 @@ function AdminShellLayoutInner({
     location.search,
     location.hash,
   );
+  const currentNavigationOwner = resolveAdminRouteOwner(location);
 
   const capabilities = capabilitiesQuery.data ?? null;
   const alarm = useAdminAlarmSummary();
@@ -275,6 +283,8 @@ function AdminShellLayoutInner({
         <aside className="admin-shell__nav">
           <AdminLayoutNav
             capabilities={capabilities}
+            currentOwner={currentNavigationOwner}
+            renderLink={renderAdminNavigationLink}
             ariaLabel="Admin 콘솔"
             todayCount={alarm.summary?.attention.count ?? null}
           />
@@ -286,6 +296,8 @@ function AdminShellLayoutInner({
       </div>
       <AdminMobileNavigation
         capabilities={capabilities}
+        currentOwner={currentNavigationOwner}
+        renderLink={renderAdminNavigationLink}
         ariaLabel="Admin 모바일 메뉴"
       />
       {onboardingOpen ? (
@@ -315,6 +327,25 @@ function AdminShellLayoutInner({
         </AdminOnboardingModal>
       ) : null}
     </div>
+  );
+}
+
+function renderAdminNavigationLink({
+  href,
+  className,
+  ariaCurrent,
+  style,
+  children,
+}: AdminNavigationLinkRenderProps) {
+  return (
+    <Link
+      to={href}
+      className={className}
+      aria-current={ariaCurrent}
+      style={style}
+    >
+      {children}
+    </Link>
   );
 }
 

@@ -289,6 +289,7 @@ function renderShell(
           { path: "today", element: <div>today content</div> },
           { path: "clubs", element: <div>clubs content</div> },
           { path: "clubs/:clubId", element: <div>club detail</div> },
+          { path: "public-takedown", element: <div>public takedown content</div> },
         ],
       },
     ],
@@ -385,6 +386,38 @@ describe("AdminShellLayout", () => {
     expect(within(mobileNav).queryByText("플랫폼 운영")).not.toBeInTheDocument();
     expect(within(mobileNav).queryByText("다른 계정으로 로그인")).not.toBeInTheDocument();
     expect(screen.getAllByText("OWNER admin", { selector: ".admin-shell__account-label" })).toHaveLength(1);
+  });
+
+  it("uses one pathname-owned current state for emergency even when onboarding is present", () => {
+    renderShell("/admin/public-takedown?onboarding=1", {
+      capabilities: {
+        ...ownerCapabilities,
+        capabilities: [
+          ...ownerCapabilities.capabilities,
+          "EMERGENCY_PUBLIC_TAKEDOWN",
+        ],
+      },
+    });
+
+    const nav = screen.getByRole("navigation", { name: "Admin 콘솔" });
+    expect(within(nav).getAllByRole("link", { current: "page" })).toHaveLength(1);
+    expect(within(nav).getByRole("link", { name: "긴급 공개 회수" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(within(nav).getByRole("link", { name: "클럽 관리" })).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
+
+  it("keeps clubs onboarding under the club owner", () => {
+    renderShell("/admin/clubs?onboarding=1");
+    const nav = screen.getByRole("navigation", { name: "Admin 콘솔" });
+    expect(within(nav).getAllByRole("link", { current: "page" })).toHaveLength(1);
+    expect(within(nav).getByRole("link", { name: "클럽 관리" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
   });
 
   it("shows a mono attention count beside 오늘 from the alarm summary", () => {

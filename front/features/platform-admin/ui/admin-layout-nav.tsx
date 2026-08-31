@@ -1,24 +1,37 @@
-import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router";
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   ADMIN_SHELL_LAYOUT_MEDIA_QUERY,
-  isAdminAreaActive,
-  isAdminRouteActive,
   visibleAdminNav,
+  type AdminRouteOwner,
   type AdminRouteDescriptor,
 } from "@/features/platform-admin/model/admin-route-catalog";
 import type { PlatformAdminCapabilities } from "@/features/platform-admin/model/platform-admin-capabilities";
 
+export type AdminNavigationLinkRenderProps = {
+  href: string;
+  className: string;
+  ariaCurrent?: "page";
+  style?: CSSProperties;
+  children: ReactNode;
+};
+
+export type AdminNavigationLinkRenderer = (
+  props: AdminNavigationLinkRenderProps,
+) => ReactNode;
+
 export function AdminLayoutNav({
   capabilities,
+  currentOwner,
+  renderLink,
   ariaLabel = "플랫폼 관리 메뉴",
   todayCount = null,
 }: {
   capabilities: PlatformAdminCapabilities | null | undefined;
+  currentOwner: AdminRouteOwner | null;
+  renderLink: AdminNavigationLinkRenderer;
   ariaLabel?: string;
   todayCount?: number | null;
 }) {
-  const location = useLocation();
   const compact = useAdminShellCompactLayout();
   const { areas, pinned } = useMemo(() => visibleAdminNav(capabilities), [capabilities]);
 
@@ -33,23 +46,25 @@ export function AdminLayoutNav({
       {areas.length > 0 ? (
         <ul className="admin-layout-nav__areas">
           {areas.map((area) => {
-            const areaActive = isAdminAreaActive(location, area);
+            const areaActive = currentOwner === area.id;
             return (
               <li key={area.id}>
-                <Link
-                  to={area.href}
-                  className={
-                    "admin-layout-nav__item" + (areaActive ? " admin-layout-nav__item--active" : "")
-                  }
-                  aria-current={areaActive ? "page" : undefined}
-                >
-                  <span className="admin-layout-nav__item-label">{area.label}</span>
-                  {area.id === "today" && todayCount != null && todayCount > 0 ? (
-                    <span className="admin-layout-nav__count ledger-number" aria-hidden="true">
-                      {todayCount}
-                    </span>
-                  ) : null}
-                </Link>
+                {renderLink({
+                  href: area.href,
+                  className:
+                    "admin-layout-nav__item" + (areaActive ? " admin-layout-nav__item--active" : ""),
+                  ariaCurrent: areaActive ? "page" : undefined,
+                  children: (
+                    <>
+                      <span className="admin-layout-nav__item-label">{area.label}</span>
+                      {area.id === "today" && todayCount != null && todayCount > 0 ? (
+                        <span className="admin-layout-nav__count ledger-number" aria-hidden="true">
+                          {todayCount}
+                        </span>
+                      ) : null}
+                    </>
+                  ),
+                })}
               </li>
             );
           })}
@@ -61,7 +76,8 @@ export function AdminLayoutNav({
             <li key={route.path}>
               <NavItem
                 route={route}
-                isActive={isAdminRouteActive(location.pathname, route.path)}
+                isActive={currentOwner === "emergency"}
+                renderLink={renderLink}
               />
             </li>
           ))}
@@ -71,19 +87,28 @@ export function AdminLayoutNav({
   );
 }
 
-function NavItem({ route, isActive }: { route: AdminRouteDescriptor; isActive: boolean }) {
-  return (
-    <Link
-      to={`/admin/${route.path}`}
-      className={"admin-layout-nav__item" + (isActive ? " admin-layout-nav__item--active" : "")}
-      aria-current={isActive ? "page" : undefined}
-    >
-      <span className="admin-layout-nav__item-label">{route.label}</span>
-      {route.status === "coming_soon" ? (
-        <span className="admin-layout-nav__pill">준비 중 · {route.slice}</span>
-      ) : null}
-    </Link>
-  );
+function NavItem({
+  route,
+  isActive,
+  renderLink,
+}: {
+  route: AdminRouteDescriptor;
+  isActive: boolean;
+  renderLink: AdminNavigationLinkRenderer;
+}) {
+  return renderLink({
+    href: `/admin/${route.path}`,
+    className: "admin-layout-nav__item" + (isActive ? " admin-layout-nav__item--active" : ""),
+    ariaCurrent: isActive ? "page" : undefined,
+    children: (
+      <>
+        <span className="admin-layout-nav__item-label">{route.label}</span>
+        {route.status === "coming_soon" ? (
+          <span className="admin-layout-nav__pill">준비 중 · {route.slice}</span>
+        ) : null}
+      </>
+    ),
+  });
 }
 
 export function AdminShellCompactSlot({ children }: { children: ReactNode }) {

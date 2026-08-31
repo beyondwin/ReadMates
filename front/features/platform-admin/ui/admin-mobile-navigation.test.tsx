@@ -1,8 +1,20 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import type { CSSProperties, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { AdminRouteOwner } from "@/features/platform-admin/model/admin-route-catalog";
 import type { PlatformAdminCapabilities } from "@/features/platform-admin/model/platform-admin-capabilities";
 import { AdminMobileNavigation } from "./admin-mobile-navigation";
+
+const designTokens = readFileSync(
+  path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "../../../../design/system/src/styles/tokens.css",
+  ),
+  "utf8",
+);
 
 const allCapabilities: PlatformAdminCapabilities = {
   schemaVersion: 1,
@@ -30,7 +42,7 @@ function projection(
 }
 
 function renderMobileNavigation(
-  initialEntry: string,
+  currentOwner: AdminRouteOwner | null,
   capabilities: PlatformAdminCapabilities = allCapabilities,
 ) {
   vi.stubGlobal(
@@ -43,12 +55,32 @@ function renderMobileNavigation(
     })),
   );
   return render(
-    <MemoryRouter initialEntries={[initialEntry]}>
-      <AdminMobileNavigation
-        capabilities={capabilities}
-        ariaLabel="Admin 모바일 메뉴"
-      />
-    </MemoryRouter>,
+    <AdminMobileNavigation
+      capabilities={capabilities}
+      currentOwner={currentOwner}
+      renderLink={renderTestLink}
+      ariaLabel="Admin 모바일 메뉴"
+    />,
+  );
+}
+
+function renderTestLink({
+  href,
+  className,
+  ariaCurrent,
+  style,
+  children,
+}: {
+  href: string;
+  className: string;
+  ariaCurrent?: "page";
+  style?: CSSProperties;
+  children: ReactNode;
+}) {
+  return (
+    <a href={href} className={className} aria-current={ariaCurrent} style={style}>
+      {children}
+    </a>
   );
 }
 
@@ -58,7 +90,7 @@ afterEach(() => {
 
 describe("AdminMobileNavigation", () => {
   it("renders four native-link tabs with 44px targets and wrapping-safe labels", () => {
-    renderMobileNavigation("/admin/today");
+    renderMobileNavigation("today");
     const nav = screen.getByRole("navigation", { name: "Admin 모바일 메뉴" });
     const links = within(nav).getAllByRole("link");
 
@@ -94,20 +126,34 @@ describe("AdminMobileNavigation", () => {
     });
   });
 
-  it.each([
-    ["/admin/today", "오늘 할 일"],
-    ["/admin/clubs/club-1", "클럽 관리"],
-    ["/admin/support?clubId=club-1", "클럽 관리"],
-    ["/admin/notifications?focus=failed", "서비스 상태"],
-    ["/admin/ai-ops?window=30d", "서비스 상태"],
-    ["/admin/analytics?window=30d", "처리 기록"],
-  ])("marks %s through the shared route owner as %s", (entry, label) => {
-    renderMobileNavigation(entry);
-    expect(screen.getByRole("link", { name: label })).toHaveAttribute("aria-current", "page");
+  it("uses the defined design-system raised surface token", () => {
+    const stylesheet = document.createElement("style");
+    stylesheet.textContent = designTokens;
+    document.head.append(stylesheet);
+    try {
+      renderMobileNavigation("today");
+      expect(getComputedStyle(document.documentElement).getPropertyValue("--bg-raised").trim()).not.toBe("");
+      expect(screen.getByRole("navigation", { name: "Admin 모바일 메뉴" })).toHaveStyle({
+        background: "var(--bg-raised)",
+      });
+    } finally {
+      stylesheet.remove();
+    }
   });
 
-  it("maps onboarding to club management without duplicating the space or account controls", () => {
-    renderMobileNavigation("/admin/today?onboarding=1");
+  it.each([
+    ["today", "오늘 할 일"],
+    ["clubs", "클럽 관리"],
+    ["service", "서비스 상태"],
+    ["records", "처리 기록"],
+  ] as const)("marks the route-owned %s projection as %s", (owner, label) => {
+    renderMobileNavigation(owner);
+    expect(screen.getByRole("link", { name: label })).toHaveAttribute("aria-current", "page");
+    expect(screen.getAllByRole("link", { current: "page" })).toHaveLength(1);
+  });
+
+  it("renders the club-owned onboarding state without duplicating the space or account controls", () => {
+    renderMobileNavigation("clubs");
     const nav = screen.getByRole("navigation", { name: "Admin 모바일 메뉴" });
     expect(within(nav).getByRole("link", { name: "클럽 관리" })).toHaveAttribute(
       "aria-current",
@@ -119,7 +165,7 @@ describe("AdminMobileNavigation", () => {
 
   it("keeps nested-only capabilities as existing axes and leaves emergency outside the tab bar", () => {
     renderMobileNavigation(
-      "/admin/public-takedown",
+      "emergency",
       projection(["VIEW_SUPPORT", "VIEW_ANALYTICS", "EMERGENCY_PUBLIC_TAKEDOWN"]),
     );
     const nav = screen.getByRole("navigation", { name: "Admin 모바일 메뉴" });
@@ -150,9 +196,11 @@ describe("AdminMobileNavigation", () => {
       })),
     );
     render(
-      <MemoryRouter initialEntries={["/admin/today"]}>
-        <AdminMobileNavigation capabilities={allCapabilities} />
-      </MemoryRouter>,
+      <AdminMobileNavigation
+        capabilities={allCapabilities}
+        currentOwner="today"
+        renderLink={renderTestLink}
+      />,
     );
     expect(screen.queryByRole("navigation", { name: "플랫폼 관리 모바일 메뉴" })).not.toBeInTheDocument();
   });

@@ -178,9 +178,6 @@ export function resolveAdminRouteOwner(location: {
   pathname: string;
   search?: string;
 }): AdminRouteOwner | null {
-  const search = new URLSearchParams(location.search ?? "");
-  if (search.getAll("onboarding").includes("1")) return "clubs";
-
   const pathname = location.pathname.length > 1
     ? location.pathname.replace(/\/+$/, "")
     : location.pathname;
@@ -188,15 +185,4 @@ export function resolveAdminRouteOwner(location: {
   if (pathname.startsWith("/admin/clubs/")) return "clubs";
   if (pathname === "/admin/public-takedown") return "emergency";
   return ADMIN_ROUTES.find((route) => `/admin/${route.path}` === pathname)?.group ?? null;
-}
-
-export function isAdminAreaActive(
-  location: { pathname: string; search?: string },
-  area: AdminNavArea,
-): boolean {
-  return resolveAdminRouteOwner(location) === area.id;
-}
-
-export function isAdminRouteActive(pathname: string, routePath: string): boolean {
-  return pathname === `/admin/${routePath}` || pathname.startsWith(`/admin/${routePath}/`);
 }
