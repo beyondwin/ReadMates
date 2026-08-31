@@ -73,11 +73,45 @@ function collectTechnicalDisclosureBindings(sourceFile: ts.SourceFile): Set<stri
     if (!namedBindings || !ts.isNamedImports(namedBindings)) continue;
     for (const element of namedBindings.elements) {
       if ((element.propertyName ?? element.name).text === "AdminTechnicalDisclosure") {
-        bindings.add(element.name.text);
+        const localName = element.name.text;
+        if (!hasNonImportBinding(sourceFile, localName)) bindings.add(localName);
       }
     }
   }
   return bindings;
+}
+
+function hasNonImportBinding(sourceFile: ts.SourceFile, target: string): boolean {
+  let found = false;
+  const visit = (node: ts.Node) => {
+    if (found || ts.isImportDeclaration(node)) return;
+    if (
+      (ts.isParameter(node) || ts.isVariableDeclaration(node))
+      && bindingNameContains(node.name, target)
+    ) {
+      found = true;
+      return;
+    }
+    if (
+      (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node))
+      && node.name?.text === target
+    ) {
+      found = true;
+      return;
+    }
+    if (ts.isCatchClause(node) && node.variableDeclaration && bindingNameContains(node.variableDeclaration.name, target)) {
+      found = true;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return found;
+}
+
+function bindingNameContains(name: ts.BindingName, target: string): boolean {
+  if (ts.isIdentifier(name)) return name.text === target;
+  return name.elements.some((element) => !ts.isOmittedExpression(element) && bindingNameContains(element.name, target));
 }
 
 function collectStaticBindings(sourceFile: ts.SourceFile): Map<string, ts.Expression> {
@@ -94,14 +128,29 @@ function collectStaticBindings(sourceFile: ts.SourceFile): Map<string, ts.Expres
 
 function collectRawBindings(sourceFile: ts.SourceFile): Set<string> {
   const bindings = new Set<string>();
+  const variableDeclarations: ts.VariableDeclaration[] = [];
   const visit = (node: ts.Node) => {
     if (ts.isBindingElement(node) && ts.isIdentifier(node.name)) {
       const property = node.propertyName ?? node.name;
       if (ts.isIdentifier(property) && RAW_PRIMARY_FIELDS.has(property.text)) bindings.add(node.name.text);
     }
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+      variableDeclarations.push(node);
+    }
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const declaration of variableDeclarations) {
+      if (bindings.has(declaration.name.text)) continue;
+      if (!isRawPrimaryExpression(declaration.initializer!, bindings)) continue;
+      bindings.add(declaration.name.text);
+      changed = true;
+    }
+  }
   return bindings;
 }
 
@@ -140,6 +189,9 @@ function evaluateStaticString(
 
 function isRawPrimaryExpression(node: ts.Expression, rawBindings: ReadonlySet<string>): boolean {
   if (ts.isIdentifier(node)) return rawBindings.has(node.text);
+  if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node)) {
+    return isRawPrimaryExpression(node.expression, rawBindings);
+  }
   if (ts.isPropertyAccessExpression(node)) return RAW_PRIMARY_FIELDS.has(node.name.text);
   if (ts.isElementAccessExpression(node) && node.argumentExpression && ts.isStringLiteral(node.argumentExpression)) {
     return RAW_PRIMARY_FIELDS.has(node.argumentExpression.text);
@@ -152,6 +204,18 @@ function isRawPrimaryExpression(node: ts.Expression, rawBindings: ReadonlySet<st
   }
   if (ts.isTemplateExpression(node)) {
     return node.templateSpans.some((span) => isRawPrimaryExpression(span.expression, rawBindings));
+  }
+  if (ts.isCallExpression(node)) {
+    if (ts.isIdentifier(node.expression) && node.expression.text === "String") {
+      return node.arguments.some((argument) => isRawPrimaryExpression(argument, rawBindings));
+    }
+    if (
+      ts.isPropertyAccessExpression(node.expression)
+      && node.expression.name.text === "toString"
+      && node.arguments.length === 0
+    ) {
+      return isRawPrimaryExpression(node.expression.expression, rawBindings);
+    }
   }
   return false;
 }

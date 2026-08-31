@@ -31,7 +31,7 @@ export function AdminHealthDeployStrip({
     return <p className="admin-health-deploy-strip__empty">배포 원장을 확인할 수 없습니다.</p>;
   }
   if (evidenceState === "disabled") {
-    return <p className="admin-health-deploy-strip__empty">배포 기록을 {adminHealthAvailabilityLanguage("DISABLED").primaryText} 상태입니다.</p>;
+    return <p className="admin-health-deploy-strip__empty">배포 기록은 {adminHealthAvailabilityLanguage("DISABLED").primaryText} 상태입니다.</p>;
   }
   if (!entries || entries.length === 0 || evidenceState === "empty") {
     return <p className="admin-health-deploy-strip__empty">아직 기록된 배포가 없습니다.</p>;

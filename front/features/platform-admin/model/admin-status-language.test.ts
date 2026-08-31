@@ -86,6 +86,9 @@ describe("admin-status-language", () => {
     ["split template copy", 'export const View = () => <h1>{`Pi${"pe"}line`}</h1>'],
     ["raw property", "export const View = ({ job }: any) => <p>{job.status}</p>"],
     ["raw destructured alias", "export const View = ({ status: state }: any) => <p>{state}</p>"],
+    ["raw transitive local alias", "export const View = ({ job }: any) => { const status = job.status; const state = status; return <p>{state}</p>; }"],
+    ["raw String wrapper", "export const View = ({ job }: any) => <p>{String(job.status)}</p>"],
+    ["raw toString wrapper", "export const View = ({ job }: any) => <p>{job.status.toString()}</p>"],
     ["primary drill-down", "export const View = () => <p>Job drill-down</p>"],
   ])("detects %s instead of relying on line allowlists", (_name, source) => {
     expect(analyzeAdminPrimaryLanguageSource(source).violations).not.toEqual([]);
@@ -97,6 +100,31 @@ describe("admin-status-language", () => {
        export const View = ({ job }: any) => <Tech items={[{ label: '작업 상태', value: job.status }]} />`,
     );
     expect(analysis).toEqual({ violations: [], technicalDisclosureCount: 1 });
+  });
+
+  it.each([
+    [
+      "function parameter",
+      `import { AdminTechnicalDisclosure as Tech } from "@/features/platform-admin/ui/admin-technical-disclosure";
+       export const View = ({ job, Tech }: any) => <Tech>{job.status}</Tech>`,
+    ],
+    [
+      "local declaration",
+      `import { AdminTechnicalDisclosure as Tech } from "@/features/platform-admin/ui/admin-technical-disclosure";
+       export const View = ({ job }: any) => { const Tech = (props: any) => <div />; return <Tech>{job.status}</Tech>; }`,
+    ],
+  ])("does not exempt a canonical disclosure import shadowed by a %s", (_name, source) => {
+    const analysis = analyzeAdminPrimaryLanguageSource(source);
+    expect(analysis.violations).not.toEqual([]);
+    expect(analysis.technicalDisclosureCount).toBe(0);
+  });
+
+  it("does not taint values returned from the approved semantic mapper", () => {
+    const analysis = analyzeAdminPrimaryLanguageSource(
+      `import { adminHealthFreshnessLanguage } from './admin-status-language';
+       export const View = ({ job }: any) => { const state = adminHealthFreshnessLanguage(job.status).primaryText; return <p>{state}</p>; }`,
+    );
+    expect(analysis.violations).toEqual([]);
   });
 
   it.each([

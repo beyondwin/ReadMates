@@ -200,14 +200,10 @@ export function adminAuditActorPrimaryLabel(actor: {
 }): string {
   const roleLabel = adminAuditActorRoleLanguage(actor.role).primaryText;
   const displayLabel = actor.displayLabel.trim();
-  if (!displayLabel || displayLabel === actor.role || isMachineRoleFallback(displayLabel)) {
+  if (!displayLabel || displayLabel === actor.role) {
     return roleLabel;
   }
   return `${displayLabel} · ${roleLabel}`;
-}
-
-function isMachineRoleFallback(value: string): boolean {
-  return /^[A-Z][A-Z0-9_:-]*$/.test(value);
 }
 
 export function shouldShowAdminAuditDetailValue(label: string, value: string): boolean {

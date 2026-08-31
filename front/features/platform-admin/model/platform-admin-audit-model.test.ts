@@ -69,11 +69,15 @@ describe("platform-admin-audit-model", () => {
     ]);
   });
 
-  it("preserves human actor names but rejects enum and future machine fallback labels", () => {
+  it("preserves every nonempty human actor label and translates only exact role fallbacks", () => {
     expect(adminAuditActorPrimaryLabel({ role: "OWNER", displayLabel: "OWNER" })).toBe("소유자");
     expect(adminAuditActorPrimaryLabel({ role: "OPERATOR", displayLabel: "운영 담당자" })).toBe("운영 담당자 · 운영자");
+    expect(adminAuditActorPrimaryLabel({ role: "OPERATOR", displayLabel: "KIM" })).toBe("KIM · 운영자");
+    expect(adminAuditActorPrimaryLabel({ role: "SUPPORT", displayLabel: "JANE_DOE" })).toBe("JANE_DOE · 지원 담당");
     expect(adminAuditActorPrimaryLabel({ role: "SUPPORT", displayLabel: "SUPPORT" })).toBe("지원 담당");
     expect(adminAuditActorPrimaryLabel({ role: "FUTURE_ROLE" as never, displayLabel: "FUTURE_ROLE" })).toBe("확인 필요");
+    expect(adminAuditActorPrimaryLabel({ role: "FUTURE_ROLE" as never, displayLabel: "KIM" })).toBe("KIM · 확인 필요");
+    expect(adminAuditActorPrimaryLabel({ role: "FUTURE_ROLE" as never, displayLabel: "" })).toBe("확인 필요");
   });
 
   it("reads a target query as the initial clubId filter without serializing target", () => {

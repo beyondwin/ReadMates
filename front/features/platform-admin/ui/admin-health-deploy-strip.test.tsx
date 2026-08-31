@@ -36,7 +36,7 @@ describe("AdminHealthDeployStrip", () => {
   it("treats a disabled ledger as configured absence", () => {
     render(<AdminHealthDeployStrip entries={null} evidenceState="disabled" />);
 
-    expect(screen.getByText("배포 기록을 사용 안 함 상태입니다.")).toBeInTheDocument();
+    expect(screen.getByText("배포 기록은 사용 안 함 상태입니다.")).toBeInTheDocument();
     expect(screen.queryByText("배포 원장을 확인할 수 없습니다.")).not.toBeInTheDocument();
     expect(screen.queryByText("성공")).not.toBeInTheDocument();
   });
