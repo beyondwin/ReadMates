@@ -296,6 +296,8 @@ test("space menu keeps platform and club choices inside the production shell", a
   await expect(menu.getByText("현재 범위", { exact: true }).first()).toBeVisible();
   await expect(menu.getByText("이동할 범위")).toBeVisible();
   await expect(component.getByText("김운영")).toBeVisible();
+  await expect(component.locator(".admin-shell__account-action-short")).toHaveText("계정");
+  await expect(component.locator(".admin-shell__account-control")).toBeVisible();
   await expectMinimumTargetSize(platform);
   await expectMinimumTargetSize(clubs);
   await expectNoHorizontalOverflow(page);
@@ -305,6 +307,7 @@ test("space menu keeps platform and club choices inside the production shell", a
     await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4),
     await regionFromLocator(component.locator(".rm-global-space-switcher__trigger"), "switcher", { x: 188, y: 19, width: 160, height: 48 }, 2),
     await regionFromLocator(component.locator(".rm-global-space-switcher__menu"), "menu", { x: 188, y: 75, width: 360, height: 244 }, 4),
+    await regionFromLocator(component.locator(".admin-shell__account-control"), "account", { x: 1555, y: 21, width: 83, height: 44 }, 4),
   ];
   await captureApprovedComparison({
     entry: approvedMockup("admin-space-switcher-desktop"),

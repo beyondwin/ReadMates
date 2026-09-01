@@ -3671,8 +3671,25 @@
   height: auto;
 }
 
-.admin-shell:has(.rm-global-space-switcher__trigger[aria-expanded="true"]) .admin-shell__account-label {
+.admin-shell:has(.admin-today-ledger) .admin-shell__header-actions {
+  z-index: 22;
+}
+
+.admin-shell:has(.rm-global-space-switcher__trigger[aria-expanded="true"]) .admin-shell__account-control {
   display: grid;
+  grid-template-columns: auto 32px;
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  row-gap: 0;
+  align-items: center;
+}
+
+.admin-shell:has(.admin-today-ledger):has(.rm-global-space-switcher__trigger[aria-expanded="true"]) .admin-shell__account-label {
+  display: block;
+  grid-column: 1;
+  grid-row: 1;
+  max-width: none;
+  overflow: visible;
   color: var(--text);
   font: 650 var(--type-size-body)/var(--type-leading-body) var(--f-sans);
 }
@@ -3691,6 +3708,7 @@
   height: auto;
   overflow: visible;
   clip: auto;
+  color: var(--text-3);
 }
 
 .admin-shell:has(.admin-today-ledger) .admin-shell__account-control .btn::before {
@@ -3700,6 +3718,30 @@
   border-radius: 50%;
   border: 1px solid var(--line);
   background: var(--bg-sub);
+}
+
+.admin-shell:has(.rm-global-space-switcher__trigger[aria-expanded="true"]) .admin-shell__account-control .btn {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  display: grid;
+  grid-template-columns: auto 32px;
+  grid-template-rows: auto auto;
+  justify-items: start;
+  align-items: center;
+  column-gap: 10px;
+  min-width: 0;
+  padding: 0;
+}
+
+.admin-shell:has(.rm-global-space-switcher__trigger[aria-expanded="true"]) .admin-shell__account-control .btn::before {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  justify-self: end;
+}
+
+.admin-shell:has(.rm-global-space-switcher__trigger[aria-expanded="true"]) .admin-shell__account-action-short {
+  grid-column: 1;
+  grid-row: 2;
 }
 
 .admin-shell__account-action-short {

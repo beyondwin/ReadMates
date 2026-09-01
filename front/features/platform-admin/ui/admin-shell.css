@@ -141,6 +141,7 @@
 
 .admin-shell__header-actions {
   display: flex;
+  grid-column: -1;
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
