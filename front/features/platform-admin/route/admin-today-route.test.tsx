@@ -193,6 +193,13 @@ function LocationProbe() {
   );
 }
 
+async function openSecondaryControls(user: ReturnType<typeof userEvent.setup>) {
+  const summary = await screen.findByText("필터와 신호 상태");
+  if (!summary.closest("details")?.open) {
+    await user.click(summary);
+  }
+}
+
 function renderRoute(client: QueryClient, initialEntry = "/admin/today") {
   return render(
     <QueryClientProvider client={client}>
@@ -238,8 +245,8 @@ describe("AdminTodayRoute", () => {
   it("restores a seeded case selection and renders the queue and inspector", async () => {
     const { container } = renderRoute(seededClient(), "/admin/today?case=case-notification");
 
-    expect(await screen.findByRole("heading", { name: "오늘의 운영 케이스" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "오늘의 운영 케이스" })).toHaveClass("admin-page-frame");
+    expect(await screen.findByRole("heading", { level: 1, name: "오늘 할 일" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "오늘 할 일" })).toHaveClass("admin-page-frame");
     expect(screen.getByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "작업" })).toHaveClass("admin-action-dock");
@@ -272,6 +279,7 @@ describe("AdminTodayRoute", () => {
     const user = userEvent.setup();
     renderRoute(seededClient(), "/admin/today?case=case-notification");
 
+    await openSecondaryControls(user);
     await user.selectOptions(await screen.findByRole("combobox", { name: "상태 필터" }), "open");
 
     await waitFor(() => {
@@ -399,6 +407,7 @@ describe("AdminTodayRoute", () => {
     const user = userEvent.setup();
     renderRoute(seededClient(), "/admin/today?case=case-notification");
 
+    await openSecondaryControls(user);
     const filter = await screen.findByRole("combobox", { name: "상태 필터" });
     await user.selectOptions(filter, "open");
     await waitFor(() => expect(filter).toHaveValue("open"));
@@ -428,6 +437,7 @@ describe("AdminTodayRoute", () => {
     operationsApi.fetchList.mockResolvedValue(response);
     renderRoute(client, "/admin/today?case=case-notification");
 
+    await openSecondaryControls(user);
     await user.click(await screen.findByRole("button", { name: "AI 작업 다시 확인" }));
 
     await waitFor(() => expect(operationsApi.fetchList).toHaveBeenCalledTimes(1));
@@ -493,7 +503,7 @@ describe("AdminTodayRoute", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "현재 역할로 운영 케이스를 확인할 수 없습니다. 권한을 확인해 주세요.",
     );
-    expect(screen.getByRole("region", { name: "오늘의 운영 케이스" })).toHaveClass("admin-page-frame");
+    expect(screen.getByRole("region", { name: "오늘 할 일" })).toHaveClass("admin-page-frame");
     expect(screen.queryByRole("region", { name: "운영 케이스 큐" })).not.toBeInTheDocument();
     expect(operationsApi.fetchList).not.toHaveBeenCalled();
     expect(operationsApi.fetchDetail).not.toHaveBeenCalled();
@@ -766,6 +776,7 @@ describe("AdminTodayRoute", () => {
 
     expect(screen.queryByRole("button", { name: /모임 마감이 완료되지 않았습니다/ })).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /알림 전달 실패/ })).toHaveLength(2);
+    await openSecondaryControls(user);
     expect(await screen.findByRole("button", { name: "새 항목 2개 적용" })).toBeInTheDocument();
     expect(screen.getByText("긴급 1건")).toBeInTheDocument();
     expect(await screen.findByText("새 긴급 신호 1건")).toHaveAttribute("aria-live", "polite");

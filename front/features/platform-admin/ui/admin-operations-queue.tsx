@@ -8,7 +8,7 @@ type Props = {
   hasNextPage?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
-  controls?: ReactNode;
+  secondaryControls?: ReactNode;
 };
 
 export function AdminOperationsQueue({
@@ -18,7 +18,7 @@ export function AdminOperationsQueue({
   hasNextPage = false,
   loadingMore = false,
   onLoadMore,
-  controls,
+  secondaryControls,
 }: Props) {
   return (
     <section className="admin-operations-queue" aria-label="운영 케이스 큐">
@@ -26,8 +26,6 @@ export function AdminOperationsQueue({
         <h2 className="h3">오늘 할 일</h2>
         <span>{items.length}건</span>
       </div>
-
-      {controls ? <div className="admin-operations-queue__controls">{controls}</div> : null}
 
       {items.length === 0 ? (
         <p className="admin-operations-queue__empty">현재 조건에 맞는 운영 케이스가 없습니다.</p>
@@ -71,6 +69,8 @@ export function AdminOperationsQueue({
           ) : null}
         </div>
       )}
+
+      {secondaryControls ? <div className="admin-operations-queue__controls">{secondaryControls}</div> : null}
     </section>
   );
 }

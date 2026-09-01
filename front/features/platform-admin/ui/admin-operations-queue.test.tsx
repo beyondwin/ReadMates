@@ -73,7 +73,7 @@ describe("AdminOperationsQueue", () => {
       <AdminOperationsQueue
         items={[queueItem()]}
         selectedCaseId="case-notification"
-        controls={<div data-testid="queue-controls">필터</div>}
+        secondaryControls={<div data-testid="queue-controls">필터</div>}
         onSelectCase={vi.fn()}
       />,
     );
@@ -81,8 +81,8 @@ describe("AdminOperationsQueue", () => {
     const header = container.querySelector(".admin-operations-queue__header");
     const controls = screen.getByTestId("queue-controls");
     const list = container.querySelector(".admin-operations-queue__list");
-    expect(header?.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(controls.compareDocumentPosition(list!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(header?.compareDocumentPosition(list!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(list?.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("keeps locators stable and wraps a long safe identifier", () => {

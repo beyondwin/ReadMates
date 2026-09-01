@@ -22,7 +22,7 @@ import { AdminStatePanel } from "./admin-state-panel";
 import { AdminTodayControls, type AdminTodayFilters } from "./admin-today-controls";
 import { useAdminContentWidth } from "./use-admin-content-width";
 
-export const ADMIN_TODAY_HEADING = "오늘의 운영 케이스";
+export const ADMIN_TODAY_HEADING = "오늘 할 일";
 export const ADMIN_TODAY_DESCRIPTION =
   "감지된 운영 신호를 영향과 최신성에 따라 확인하고 상태를 기록합니다.";
 
@@ -159,25 +159,24 @@ export function AdminTodayLedger({
   );
 
   const queueControls = (
-    <>
-      <AdminTodayControls
-        workViews={view.workViews}
-        activeView={workView}
-        query={query}
-        filters={filters}
-        pendingCount={pendingCount}
-        urgentCount={urgentCount}
-        refreshing={refreshing}
-        urgentAnnouncement={urgentAnnouncement}
-        onViewChange={onViewChange ?? (() => undefined)}
-        onQueryChange={(value) => {
-          beginAdminEditorialLedgerFilterCommit();
-          onQueryChange?.(value);
-        }}
-        onFilterChange={onFilterChange}
-        onApplyPending={onApplyPending}
-      />
-
+    <AdminTodayControls
+      defaultOpen={view.items.length === 0 && filtered}
+      workViews={view.workViews}
+      activeView={workView}
+      query={query}
+      filters={filters}
+      pendingCount={pendingCount}
+      urgentCount={urgentCount}
+      refreshing={refreshing}
+      urgentAnnouncement={urgentAnnouncement}
+      onViewChange={onViewChange ?? (() => undefined)}
+      onQueryChange={(value) => {
+        beginAdminEditorialLedgerFilterCommit();
+        onQueryChange?.(value);
+      }}
+      onFilterChange={onFilterChange}
+      onApplyPending={onApplyPending}
+    >
       {view.sources.length > 0 ? (
         <section className="admin-operation-sources" aria-labelledby="admin-operation-sources-title">
           <header className="admin-operation-sources__header">
@@ -205,7 +204,7 @@ export function AdminTodayLedger({
           </ul>
         </section>
       ) : null}
-    </>
+    </AdminTodayControls>
   );
 
   const workSurface = view.items.length === 0 ? null : flowLayout ? (
@@ -243,7 +242,7 @@ export function AdminTodayLedger({
         hasNextPage={hasNextPage}
         loadingMore={loadingMore}
         onLoadMore={onLoadMore}
-        controls={queueControls}
+        secondaryControls={queueControls}
       />
       {inspector}
     </div>

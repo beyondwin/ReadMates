@@ -130,7 +130,7 @@ export function AdminOperationMobileDetail({
         hasNextPage={hasNextPage}
         loadingMore={loadingMore}
         onLoadMore={onLoadMore}
-        controls={queueControls}
+        secondaryControls={queueControls}
       />
     </div>
   );
