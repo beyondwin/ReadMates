@@ -29,6 +29,7 @@ const HOST_MOBILE_VIEWPORT = { width: 390, height: 832 } as const;
 
 const TYPOGRAPHY_TOKEN_PATHS = [
   "src/styles/globals.css",
+  "design/system/src/styles/tokens.css",
 ] as const;
 
 const ADMIN_SHARED_DEPENDENCIES = [
@@ -115,6 +116,8 @@ const HOST_SETTINGS_DEPENDENCIES = [
   "features/host/ui/settings/host-club-settings.tsx",
   "features/host/ui/settings/host-invitation-links.tsx",
   "features/host/ui/host-invitations.tsx",
+  "features/host/route/host-settings-route.tsx",
+  "features/host/route/host-invitations-route.tsx",
 ] as const;
 
 const HOST_SCHEDULE_REVIEW_DEPENDENCIES = [

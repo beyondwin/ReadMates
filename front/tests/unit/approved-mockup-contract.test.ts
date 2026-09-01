@@ -24,4 +24,19 @@ describe("approved mockup contract", () => {
     expect(approvedMockupsAffectedBy(["features/platform-admin/ui/admin-shell.css"]))
       .toHaveLength(7);
   });
+
+  it("maps host settings and invites route files to host-settings-desktop", () => {
+    for (const path of [
+      "features/host/route/host-settings-route.tsx",
+      "features/host/route/host-invitations-route.tsx",
+    ]) {
+      expect(approvedMockupsAffectedBy([path]).map((entry) => entry.id))
+        .toEqual(["host-settings-desktop"]);
+    }
+  });
+
+  it("maps design-system token changes to every approved authority", () => {
+    expect(approvedMockupsAffectedBy(["design/system/src/styles/tokens.css"]))
+      .toHaveLength(18);
+  });
 });
