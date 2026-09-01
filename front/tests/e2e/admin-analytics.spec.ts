@@ -151,8 +151,8 @@ test("owner reviews admin analytics overview and switches window", async ({ page
   await expect(page.getByRole("heading", { name: "분석 부록" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await expect(page.getByText("80%")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "KPI 추세" })).toBeVisible();
-  const trendTable = page.getByRole("table", { name: "KPI 추세" });
+  await expect(page.getByRole("heading", { name: "기간별 변화" })).toBeVisible();
+  const trendTable = page.getByRole("table", { name: "기간별 변화" });
   await expect(trendTable).toBeVisible();
   await expect(trendTable.getByText("2026-05-01")).toBeVisible();
   await expect(trendTable.getByText("75%")).toBeVisible();
@@ -181,7 +181,7 @@ test("owner captures public-safe analytics visual evidence on desktop and mobile
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/admin/analytics");
   await expect(page.getByRole("heading", { name: "분석 부록" })).toBeVisible();
-  await expect(page.getByRole("table", { name: "KPI 추세" })).toBeVisible();
+  await expect(page.getByRole("table", { name: "기간별 변화" })).toBeVisible();
   const desktopScreenshot = await page.screenshot({
     path: testInfo.outputPath("admin-analytics-desktop.png"),
     fullPage: true,
