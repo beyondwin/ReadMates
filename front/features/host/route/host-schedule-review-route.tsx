@@ -170,16 +170,23 @@ function HostScheduleReviewSession({
     operationId: string,
     request: () => Promise<T>,
     publish: (result: T, handle: ReturnType<typeof transitionOwner.begin>) => Promise<unknown>,
+    publishFailure?: (error: unknown, handle: ReturnType<typeof transitionOwner.begin>) => Promise<unknown>,
   ) => {
     const handle = transitionOwner.begin(operationId, "L3", async () => ({ operationId, outcome: "still-unknown" }));
+    let settled = false;
     try {
       const result = await request();
       if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
+      settled = true;
       await publish(result, handle);
       return result;
     } catch (requestError) {
       if (requestError instanceof TransitionOwnerObsoleteError) throw requestError;
-      if (await handle.settle("failed") !== "accepted") throw new TransitionOwnerObsoleteError();
+      if (settled || await handle.settle("failed") !== "accepted") throw new TransitionOwnerObsoleteError();
+      if (publishFailure) {
+        await publishFailure(requestError, handle);
+        return undefined;
+      }
       throw requestError;
     } finally {
       handle.completePublication();
@@ -211,31 +218,51 @@ function HostScheduleReviewSession({
     };
   };
 
-  const refreshAuthority = async () => {
-    setPreviewSnapshot(null);
-    setAuthorityRecovery("refreshing");
-    await Promise.allSettled([
-      queryClient.invalidateQueries({ queryKey: hostWorkboxKeys.scope(context) }),
-      queryClient.invalidateQueries({ queryKey: hostSessionKeys.operatingRoomCurrent(context) }),
-    ]);
+  const refreshAuthority = async (
+    handle?: ReturnType<typeof transitionOwner.begin>,
+    acceptedError = "최신 권한을 확인하지 못했습니다. 다시 확인한 뒤 새 미리보기를 만들어 주세요.",
+  ) => {
+    const publishUi = async (publish: () => void) => handle
+      ? publishTransitionAction(handle, "ui", publish)
+      : publish();
+    const publishCache = async <T,>(publish: () => Promise<T>) => handle
+      ? publishTransitionAction(handle, "cache", publish)
+      : publish();
+    const publishError = async (publish: () => void) => handle
+      ? publishTransitionAction(handle, "errorCopy", publish)
+      : publish();
+    await publishUi(() => {
+      setPreviewSnapshot(null);
+      setAuthorityRecovery("refreshing");
+    });
     try {
-      const [detailResult, optionsResult] = await Promise.all([
-        detailQuery.refetch(),
-        optionsQuery.refetch(),
-      ]);
+      const [detailResult, optionsResult] = await publishCache(async () => {
+        await Promise.allSettled([
+          queryClient.invalidateQueries({ queryKey: hostWorkboxKeys.scope(context) }),
+          queryClient.invalidateQueries({ queryKey: hostSessionKeys.operatingRoomCurrent(context) }),
+        ]);
+        return Promise.all([detailQuery.refetch(), optionsQuery.refetch()]);
+      });
       const recovered = !detailResult.isError
         && !optionsResult.isError
         && hasExactScheduleAuthority(detailResult.data, optionsResult.data, sessionId);
       if (!recovered) {
-        setAuthorityRecovery("failed");
-        setError("최신 권한을 확인하지 못했습니다. 다시 확인한 뒤 새 미리보기를 만들어 주세요.");
+        await publishError(() => {
+          setAuthorityRecovery("failed");
+          setError("최신 권한을 확인하지 못했습니다. 다시 확인한 뒤 새 미리보기를 만들어 주세요.");
+        });
         return false;
       }
-      setAuthorityRecovery("idle");
+      await publishError(() => {
+        setAuthorityRecovery("idle");
+        setError(acceptedError);
+      });
       return true;
     } catch {
-      setAuthorityRecovery("failed");
-      setError("최신 권한을 확인하지 못했습니다. 다시 확인한 뒤 새 미리보기를 만들어 주세요.");
+      await publishError(() => {
+        setAuthorityRecovery("failed");
+        setError("최신 권한을 확인하지 못했습니다. 다시 확인한 뒤 새 미리보기를 만들어 주세요.");
+      });
       return false;
     }
   };
@@ -300,31 +327,38 @@ function HostScheduleReviewSession({
             setPreviewSnapshot(null);
           });
         },
+        async (confirmError, handle) => {
+          if (currentSessionRef.current !== snapshot.selection.sessionId) return;
+          if (isReadmatesTransportError(confirmError)) {
+            await publishTransitionAction(handle, "cache", invalidateAfterConfirm);
+            await publishTransitionAction(handle, "receiptCallback", () => {
+              setReceipt({
+                outcome: "unknown",
+                detail: "요청 결과를 확인할 수 없습니다. 같은 알림을 다시 보내지 말고 알림 장부에서 확인해 주세요.",
+              });
+              setPreviewSnapshot(null);
+            });
+            return;
+          }
+          const disposition = manualNotificationErrorDisposition(confirmError);
+          if (disposition === "authority") {
+            await refreshAuthority(
+              handle,
+              "미리보기 이후 일정 또는 수신 대상이 변경되었습니다. 최신 정보로 새 미리보기를 만들어 주세요.",
+            );
+            return;
+          }
+          await publishTransitionAction(handle, "errorCopy", () => {
+            if (disposition !== "unknown") setPreviewSnapshot(null);
+            setError(disposition === "preview"
+              ? "이 미리보기는 더 이상 사용할 수 없습니다. 새 미리보기를 만들어 주세요."
+              : "발송 요청이 완료되지 않았습니다. 현재 미리보기와 재발송 여부를 확인해 주세요.");
+          });
+        },
       );
     } catch (confirmError) {
       if (confirmError instanceof TransitionOwnerObsoleteError) return;
-      if (currentSessionRef.current !== snapshot.selection.sessionId) return;
-      if (isReadmatesTransportError(confirmError)) {
-        setReceipt({
-          outcome: "unknown",
-          detail: "요청 결과를 확인할 수 없습니다. 같은 알림을 다시 보내지 말고 알림 장부에서 확인해 주세요.",
-        });
-        setPreviewSnapshot(null);
-        await invalidateAfterConfirm();
-        return;
-      }
-      const disposition = manualNotificationErrorDisposition(confirmError);
-      if (disposition !== "unknown") setPreviewSnapshot(null);
-      if (disposition === "authority") {
-        setError("미리보기 이후 일정 또는 수신 대상이 변경되었습니다. 최신 정보로 새 미리보기를 만들어 주세요.");
-        await refreshAuthority();
-        return;
-      }
-      if (disposition === "preview") {
-        setError("이 미리보기는 더 이상 사용할 수 없습니다. 새 미리보기를 만들어 주세요.");
-        return;
-      }
-      setError("발송 요청이 완료되지 않았습니다. 현재 미리보기와 재발송 여부를 확인해 주세요.");
+      throw confirmError;
     }
   };
 
