@@ -183,7 +183,6 @@ export function PlatformAdminAiOps({
           items={summary?.failureCodes ?? []}
           unavailable={!summary}
           activeCode={activeFilter?.errorCode ?? null}
-          nextSafeAction={serviceDetail.nextSafeAction}
           onSelect={onSelectFailureCode}
         />
       </section>
@@ -261,16 +260,6 @@ export function PlatformAdminAiOps({
                     </p>
                   ) : null}
                   <p className="small platform-admin-ai-ops__job-next">{narrative.nextSafeAction}</p>
-                  <AdminTechnicalDisclosure
-                    items={[
-                      { label: "AI 작업 식별자", value: job.jobId },
-                      { label: "상태 코드", value: job.status },
-                      { label: "단계 코드", value: job.stage },
-                      { label: "작업 버전", value: job.revision == null ? null : `revision ${job.revision}` },
-                      { label: "정리 상태", value: job.cleanupPending == null ? null : job.cleanupPending ? "CLEANUP_PENDING" : "CLEANUP_COMPLETE" },
-                      { label: "오류 코드", value: job.errorCode },
-                    ]}
-                  />
                 </div>
                 {canAct ? (
                   <div className="platform-admin-ai-ops__job-actions">
@@ -309,6 +298,26 @@ export function PlatformAdminAiOps({
             })}
           </div>
         ) : null}
+        <p className="admin-service-detail__next-action">{serviceDetail.nextSafeAction}</p>
+        {(summary?.failureCodes ?? []).map((item) => (
+          <AdminTechnicalDisclosure
+            key={`failure-${item.code}`}
+            items={[{ label: `오류 코드 · ${item.count}건`, value: item.code }]}
+          />
+        ))}
+        {jobs.map((job) => (
+          <AdminTechnicalDisclosure
+            key={`job-${job.jobId}`}
+            items={[
+              { label: "AI 작업 식별자", value: job.jobId },
+              { label: "상태 코드", value: job.status },
+              { label: "단계 코드", value: job.stage },
+              { label: "작업 버전", value: job.revision == null ? null : `revision ${job.revision}` },
+              { label: "정리 상태", value: job.cleanupPending == null ? null : job.cleanupPending ? "CLEANUP_PENDING" : "CLEANUP_COMPLETE" },
+              { label: "오류 코드", value: job.errorCode },
+            ]}
+          />
+        ))}
       </AdminEvidenceLedger>
       {!canAct && jobs.some((job) => job.availableActions.length > 0) ? (
         <p className="tiny muted platform-admin-ai-ops__permission-note">
@@ -606,13 +615,11 @@ function FailureCodeList({
   items,
   unavailable,
   activeCode,
-  nextSafeAction,
   onSelect,
 }: {
   items: Array<{ code: string; count: number }>;
   unavailable: boolean;
   activeCode: string | null;
-  nextSafeAction: string;
   onSelect?: (code: string) => void;
 }) {
   return (
@@ -635,13 +642,6 @@ function FailureCodeList({
       ) : (
         <p className="small muted">{unavailable ? "실패 묶음 집계를 확인할 수 없습니다." : "최근 실패 묶음이 없습니다."}</p>
       )}
-      <p className="admin-service-detail__next-action">{nextSafeAction}</p>
-      {items.map((item) => (
-        <AdminTechnicalDisclosure
-          key={item.code}
-          items={[{ label: `오류 코드 · ${item.count}건`, value: item.code }]}
-        />
-      ))}
     </div>
   );
 }

@@ -102,7 +102,7 @@ describe("PlatformAdminAiOps", () => {
     expect(section.textContent).not.toContain("instructions");
   });
 
-  it("orders operator narrative, freshness, failure evidence, next action, and run evidence before raw job identifiers", () => {
+  it("orders operator narrative, freshness, failure and run evidence, next action, then raw job identifiers", () => {
     const { container } = render(
       <PlatformAdminAiOps role="OWNER" canManageActions summary={summary} jobs={[runningJob]} />,
     );
@@ -110,17 +110,18 @@ describe("PlatformAdminAiOps", () => {
     const freshness = screen.getByText(/^최근 작업 갱신 /);
     const failures = screen.getByRole("heading", { name: "최근 실패 묶음" });
     const failureEvidence = screen.getByRole("button", { name: "이 원인의 작업 보기 · 1건" }).closest("li")!;
+    const runEvidence = screen.getByText("읽는사이의 AI 처리가 오래 멈춰 있습니다.");
     const nextAction = screen.getByText("실패 원인을 좁힌 뒤 멈춘 작업의 최신 상태와 허용된 복구 방법을 확인하세요.");
     const runs = screen.getByRole("region", { name: "처리 시도 기록" });
-    const disclosure = runs.querySelector("[data-admin-technical-disclosure]");
-    const failureDisclosure = failures.closest("section")?.querySelector("[data-admin-technical-disclosure]");
+    const disclosure = Array.from(runs.querySelectorAll("[data-admin-technical-disclosure]"))
+      .find((item) => item.textContent?.includes("job-1"));
 
     expect(sentence.compareDocumentPosition(freshness) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(freshness.compareDocumentPosition(failures) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(failures.compareDocumentPosition(failureEvidence) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(failureEvidence.compareDocumentPosition(nextAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(nextAction.compareDocumentPosition(failureDisclosure!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(nextAction.compareDocumentPosition(runs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(failureEvidence.compareDocumentPosition(runEvidence) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(runEvidence.compareDocumentPosition(nextAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(nextAction.compareDocumentPosition(disclosure!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(disclosure).toHaveTextContent("job-1");
     expect(container.querySelector(".platform-admin-ai-ops__job-title")).not.toHaveTextContent("job-1");
   });
@@ -141,8 +142,8 @@ describe("PlatformAdminAiOps", () => {
 
     const section = screen.getByRole("region", { name: "AI 작업" });
     expect(within(section).getByText("임시 데이터 정리가 남아 있습니다.")).toBeInTheDocument();
-    const jobArticle = screen.getByText("임시 데이터 정리가 남아 있습니다.").closest("article");
-    const disclosure = jobArticle?.querySelector("[data-admin-technical-disclosure]");
+    const disclosure = Array.from(section.querySelectorAll("[data-admin-technical-disclosure]"))
+      .find((item) => item.textContent?.includes("revision 2"));
     expect(disclosure).toHaveTextContent("revision 2");
     expect(section.textContent).not.toContain("cleanup pending");
     expect(section.textContent).not.toContain("transcript");
