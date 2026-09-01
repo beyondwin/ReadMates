@@ -1,7 +1,16 @@
+@import "./admin-processing-records.css";
+
 /* Club management owns the operator-judgment row grammar. */
 .admin-club-management {
   min-width: 0;
   border-top: 1px solid var(--line);
+}
+
+.admin-club-management__row,
+.admin-processing-records__row {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
 }
 
 .admin-club-detail__workflow-section,
@@ -43,8 +52,11 @@
   gap: 12px 24px;
   align-items: start;
   min-width: 0;
-  padding: 18px 0;
+  padding: 18px 32px 18px 24px;
+  border: 0;
   border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
 }
 
 .admin-club-management__identity,
@@ -116,6 +128,7 @@
 
 .admin-club-management__row[data-emphasis="actionable"] {
   background: var(--warn-soft);
+  box-shadow: inset 3px 0 0 var(--warn);
 }
 
 .admin-club-management__row[data-emphasis="actionable"] .admin-club-management__action dd,

@@ -510,8 +510,60 @@ function healthyClub(): AdminClubsLedgerClub {
   };
 }
 
+function approvedClub(input: {
+  clubId: string;
+  name: string;
+  href: string;
+  currentState: string;
+  requiredAction: string | null;
+  recentSignal: string | null;
+  emphasis: "quiet" | "actionable";
+  slug: string;
+  visibility: "PRIVATE" | "PUBLIC";
+}): AdminClubsLedgerClub {
+  return {
+    clubId: input.clubId,
+    name: input.name,
+    href: input.href,
+    currentState: input.currentState,
+    requiredAction: input.requiredAction,
+    recentSignal: input.recentSignal,
+    emphasis: input.emphasis,
+    technicalDisclosure: [
+      { label: "클럽 ID", value: input.clubId },
+      { label: "Slug", value: input.slug },
+      { label: "수명주기 값", value: "ACTIVE" },
+      { label: "공개 상태 값", value: input.visibility },
+    ],
+  };
+}
+
 export const clubsTabletLedger = clubsFixture({
   capabilities: CLUBS_CREATE_CAPABILITIES,
+  clubs: [
+    approvedClub({
+      clubId: "club-sentences",
+      name: "문장과 사람들",
+      href: "/admin/clubs/club-sentences?returnTo=%2Fadmin%2Fclubs&focusId=club-sentences&scrollTop=0",
+      currentState: "10분 전",
+      requiredAction: "설정 확인 필요",
+      recentSignal: "공개 범위 설정을 다시 확인해 주세요.",
+      emphasis: "actionable",
+      slug: "sentences",
+      visibility: "PRIVATE",
+    }),
+    approvedClub({
+      clubId: "club-saturday",
+      name: "토요일의 책",
+      href: "/admin/clubs/club-saturday?returnTo=%2Fadmin%2Fclubs&focusId=club-saturday&scrollTop=0",
+      currentState: "운영 중",
+      requiredAction: null,
+      recentSignal: "35분 전",
+      emphasis: "quiet",
+      slug: "saturday-book",
+      visibility: "PUBLIC",
+    }),
+  ],
 });
 
 export const clubsPaginationFailure = clubsFixture({
@@ -641,22 +693,44 @@ function auditItem(overrides: Partial<AdminAuditLedgerItem> & Pick<AdminAuditLed
 const REVIEW_PAGE: AdminAuditLedgerPage = {
   generatedAt: GENERATED_AT,
   filters: { range: "7d" },
-  summary: { visibleCount: 2, sourceUnavailableCount: 0, metadataUnavailableCount: 0, unavailableSources: [] },
+  summary: { visibleCount: 3, sourceUnavailableCount: 0, metadataUnavailableCount: 0, unavailableSources: [] },
   nextCursor: "cursor-2",
   items: [
     auditItem({
       id: "platform_audit_events:event-1",
-      summary: EDITORIAL_LEDGER_LONG_AUDIT_SUMMARY,
+      occurredAt: "2026-08-26T05:52:00Z",
+      actor: { userId: "platform-operator-user", role: "OPERATOR", displayLabel: "OPERATOR" },
+      summary: "실패한 안내 6건을 다시 보냈습니다.",
+      safeMetadata: [
+        { label: "처리한 이유", value: "오늘 저녁 모임 안내 복구", kind: "note" },
+        { label: "영향 범위", value: "클럽 2곳 · 멤버 6명", kind: "note" },
+        { label: "변경 전", value: "전달 대기 6건", kind: "note" },
+        { label: "변경 후", value: "전달 완료 6건", kind: "note" },
+        { label: "처리 결과", value: "정상 반영 확인", kind: "note" },
+        { label: "selectionHashPrefix", value: "aaaaaaaa", kind: "fingerprint" },
+      ],
+    }),
+    auditItem({
+      id: "platform_audit_events:event-public-record",
+      occurredAt: "2026-08-26T04:52:00Z",
+      sourceSlice: "S3",
+      actionCategory: "CLUB_LIFECYCLE",
+      actionType: "FEEDBACK_DOCUMENT_PUBLISHED",
+      actor: { userId: "platform-operator-user", role: "OPERATOR", displayLabel: "OPERATOR" },
+      target: { clubId: "club-1", userId: null, jobId: null, eventId: null, label: "공개 기록" },
+      summary: "공개 기록 확인을 완료했습니다.",
+      safeMetadata: [{ label: "처리 결과", value: "정상", kind: "note" }],
     }),
     auditItem({
       id: "platform_audit_events:event-2",
-      occurredAt: "2026-08-26T10:00:00Z",
+      occurredAt: "2026-08-26T02:18:00Z",
       sourceSlice: "S4",
-      actionCategory: "SUPPORT",
-      actionType: "SUPPORT_ACCESS_GRANT_CREATED",
-      outcome: "FAILED",
-      target: { clubId: "club-1", userId: null, jobId: null, eventId: null, label: "사용자 숨김" },
-      summary: "support grant가 생성되었습니다.",
+      actionCategory: "CLUB_LIFECYCLE",
+      actionType: "ADMIN_CLUB_METADATA_UPDATED",
+      outcome: "SUCCESS",
+      actor: { userId: "platform-operator-user", role: "OPERATOR", displayLabel: "OPERATOR" },
+      target: { clubId: "club-1", userId: null, jobId: null, eventId: null, label: "대상 클럽" },
+      summary: "클럽 운영 상태를 변경했습니다.",
       safeMetadata: [{ label: "scope", value: "METADATA_READ", kind: "code" }],
     }),
   ],

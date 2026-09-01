@@ -1,3 +1,39 @@
+.admin-processing-records__row,
+.admin-audit .admin-audit__row {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+}
+
+.admin-audit .admin-audit__rows,
+.admin-audit .admin-audit__detail {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.admin-audit .admin-audit__filters {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0 0 16px;
+}
+
+.admin-audit .admin-audit__row[aria-pressed="true"] {
+  background: var(--warn-soft);
+  box-shadow: inset 3px 0 0 var(--warn);
+}
+
+.admin-audit .admin-audit__body {
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+
+.admin-audit .admin-audit__detail {
+  padding: 24px 32px;
+  border-left: 1px solid var(--line);
+}
+
 .admin-analytics__criteria,
 .admin-analytics__comparison {
   display: grid;

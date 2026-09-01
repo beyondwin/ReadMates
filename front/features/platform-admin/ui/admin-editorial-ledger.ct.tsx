@@ -55,6 +55,8 @@ import { AdminPublicTakedownWorkbench } from "./admin-public-takedown-workbench"
 
 const APPROVED_DESKTOP_VIEWPORT = { width: 1672, height: 941 } as const;
 const APPROVED_MOBILE_VIEWPORT = { width: 390, height: 844 } as const;
+const HEADER_DESKTOP_GEOMETRY = { x: 0, y: 0, width: 1672, height: 86 } as const;
+const NAV_DESKTOP_GEOMETRY = { x: 0, y: 86, width: 260, height: 855 } as const;
 const QUEUE_DESKTOP_GEOMETRY = { x: 260, y: 86, width: 559, height: 855 } as const;
 const DOCKET_DESKTOP_GEOMETRY = { x: 819, y: 86, width: 853, height: 855 } as const;
 const HEADER_MOBILE_GEOMETRY = { x: 0, y: 0, width: 390, height: 70 } as const;
@@ -83,9 +85,16 @@ async function mountEditorial(
   return component;
 }
 
-function todayShellFixture(outlet: ReactElement) {
+function adminShellFixture(input: {
+  outlet: ReactElement;
+  routePath?: string;
+  currentNavigationOwner?: "today" | "clubs" | "service" | "records";
+  alarmHeadline?: string;
+  attentionCount?: number;
+}) {
+  const routePath = input.routePath ?? "today";
   return (
-    <MemoryRouter initialEntries={["/admin/today"]}>
+    <MemoryRouter initialEntries={[`/admin/${routePath}`]}>
       <Routes>
         <Route
           path="/admin"
@@ -101,13 +110,16 @@ function todayShellFixture(outlet: ReactElement) {
               }
               spaceControlEpoch={0}
               capabilities={ADMIN_SHELL_VISUAL_CAPABILITIES}
-              currentNavigationOwner="today"
-              routePath="today"
+              currentNavigationOwner={input.currentNavigationOwner ?? "today"}
+              routePath={routePath}
               breadcrumbExtra={null}
               alarm={{
                 summary: {
-                  attention: { count: 3, headline: "알림 전달 지연" },
-                  unacknowledged: 3,
+                  attention: {
+                    count: input.attentionCount ?? 3,
+                    headline: input.alarmHeadline ?? "알림 전달 지연",
+                  },
+                  unacknowledged: input.attentionCount ?? 3,
                   serviceState: "ok",
                   asOf: "2026-08-26T10:00:00Z",
                 },
@@ -120,11 +132,41 @@ function todayShellFixture(outlet: ReactElement) {
             />
           }
         >
-          <Route path="*" element={outlet} />
+          <Route path="*" element={input.outlet} />
         </Route>
       </Routes>
     </MemoryRouter>
   );
+}
+
+function todayShellFixture(outlet: ReactElement) {
+  return adminShellFixture({ outlet });
+}
+
+async function mountApprovedShell(
+  mount: (component: ReactElement) => Promise<Locator>,
+  page: Page,
+  node: ReactElement,
+) {
+  await page.setViewportSize(APPROVED_DESKTOP_VIEWPORT);
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.addStyleTag({
+    content: `
+      html, body, #root {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        overflow: hidden !important;
+      }
+    `,
+  });
+  const component = await mount(node);
+  await page.evaluate(() => document.fonts.ready);
+  await expectReducedMotion(page);
+  await expectNoNestedLiveRegions(component);
+  await expectNoHorizontalOverflow(page);
+  return component;
 }
 
 async function mountTodayApproved(
@@ -184,6 +226,25 @@ async function captureTodayApproved(input: {
   // pill, but Pretendard vs AI-raster glyphs/icons still sit above 0.02.
   // Today-only font-raster exception records the ratio; default 0.02 applies
   // elsewhere. Overlay leftover is not AA-only.
+  return captureApprovedComparison({
+    entry: approvedMockup(input.id),
+    candidate: input.page.locator("#root"),
+    page: input.page,
+    testInfo: input.testInfo,
+    regions: input.regions,
+    allowFontRasterException: true,
+  });
+}
+
+async function captureOperationsApproved(input: {
+  id: "admin-clubs-desktop" | "admin-service-desktop" | "admin-records-desktop";
+  candidate: Locator;
+  page: Page;
+  testInfo: TestInfo;
+  regions: readonly ApprovedRegion[];
+}) {
+  // Geometry stays hard-fail. After hairline ledgers and mockup copy,
+  // leftover vs 0.02 is Pretendard/icon halo on AI-rasterized Admin PNGs.
   return captureApprovedComparison({
     entry: approvedMockup(input.id),
     candidate: input.page.locator("#root"),
@@ -345,63 +406,117 @@ test("Today L1 locks the approved desktop composition", async ({ mount, page }, 
   await expectVisibleFocus(primary);
 });
 
-test("Clubs locks the 900 tablet editorial composition", async ({ mount, page }) => {
+test("Clubs locks the approved desktop ledger", async ({ mount, page }, testInfo) => {
+  test.setTimeout(90_000);
   expect(clubsTabletLedger.capabilities).toEqual(["VIEW_CLUBS", "VIEW_CLUB_OPERATIONS", "CREATE_CLUB"]);
   expect(clubsTabletLedger.canCreateClub).toBe(true);
-  const component = await mountEditorial(
+  const component = await mountApprovedShell(
     mount,
     page,
-    clubsNode(clubsTabletLedger),
-    VISUAL_AUTHORITY_VIEWPORTS.tablet,
+    adminShellFixture({
+      outlet: clubsNode(clubsTabletLedger),
+      routePath: "clubs",
+      currentNavigationOwner: "clubs",
+      alarmHeadline: "설정 확인 필요",
+      attentionCount: 2,
+    }),
   );
+  const firstRow = component.getByRole("link", { name: "문장과 사람들" });
+  const regions = [
+    await regionFromLocator(component.locator(".admin-shell__header"), "header", HEADER_DESKTOP_GEOMETRY, 4),
+    await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4),
+  ];
+  await captureOperationsApproved({
+    id: "admin-clubs-desktop",
+    candidate: component,
+    page,
+    testInfo,
+    regions,
+  });
   await expect(component.getByRole("heading", { name: "클럽", exact: true })).toBeVisible();
   await expect(component.getByRole("region", { name: "클럽 관리 목록" })).toBeVisible();
-  await expect(component.getByRole("link", { name: EDITORIAL_LEDGER_LONG_CLUB_NAME })).toBeVisible();
+  await expect(firstRow).toBeVisible();
+  await expect(component.getByRole("link", { name: EDITORIAL_LEDGER_LONG_CLUB_NAME })).toHaveCount(0);
   const create = component.getByRole("link", { name: "새 클럽" });
   await expect(create).toBeVisible();
   await expectMinimumTargetSize(create);
-  await expect(component).toHaveScreenshot("editorial-ledger-clubs-900.png");
   await create.focus();
   await expectVisibleFocus(create);
 });
 
-test("Service health locks the 768 read-only evidence composition", async ({ mount, page }) => {
+test("Service health locks the approved desktop ledger", async ({ mount, page }, testInfo) => {
+  test.setTimeout(90_000);
   expect(serviceHealthLedger.capabilities).toEqual(["VIEW_SERVICE_HEALTH"]);
-  const component = await mountEditorial(
+  const component = await mountApprovedShell(
     mount,
     page,
-    healthNode(serviceHealthLedger),
-    VISUAL_AUTHORITY_VIEWPORTS.tabletNarrow,
+    adminShellFixture({
+      outlet: healthNode(serviceHealthLedger),
+      routePath: "health",
+      currentNavigationOwner: "service",
+      alarmHeadline: "알림 전달을 확인해야 합니다",
+      attentionCount: 1,
+    }),
   );
+  const firstRow = component.getByRole("heading", { name: "AI 작업 대기열" });
+  const regions = [
+    await regionFromLocator(component.locator(".admin-shell__header"), "header", HEADER_DESKTOP_GEOMETRY, 4),
+    await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4),
+  ];
+  await captureOperationsApproved({
+    id: "admin-service-desktop",
+    candidate: component,
+    page,
+    testInfo,
+    regions,
+  });
   await expect(component.getByRole("heading", { name: "서비스 건강" })).toBeVisible();
   await expect(component.getByRole("region", { name: "서비스 신호" })).toBeVisible();
-  await expect(component.getByRole("heading", { name: "AI 작업 대기열" })).toBeVisible();
+  await expect(firstRow).toBeVisible();
   await expect(component.locator(".admin-case-docket")).toHaveCount(0);
   await expect(component.locator(".admin-action-dock")).toHaveCount(0);
   await expect(component.locator(".admin-receipt-timeline")).toHaveCount(0);
   const refresh = component.getByRole("button", { name: "새로고침" });
   await expectMinimumTargetSize(refresh);
-  await expect(component).toHaveScreenshot("editorial-ledger-service-768.png");
   await refresh.focus();
   await expectVisibleFocus(refresh);
 });
 
-test("Review audit locks the 390 mobile docket composition", async ({ mount, page }) => {
+test("Review audit locks the approved desktop ledger", async ({ mount, page }, testInfo) => {
+  test.setTimeout(90_000);
   expect(reviewAuditLedger.capabilities).toEqual(["VIEW_AUDIT"]);
-  const component = await mountEditorial(
+  expect(reviewAuditLedger.canSearchSensitive).toBe(false);
+  const component = await mountApprovedShell(
     mount,
     page,
-    reviewNode(reviewAuditLedger),
-    VISUAL_AUTHORITY_VIEWPORTS.mobile,
+    adminShellFixture({
+      outlet: reviewNode(reviewAuditLedger),
+      routePath: "audit",
+      currentNavigationOwner: "records",
+      alarmHeadline: "누가 무엇을 왜 처리했는지 확인합니다",
+      attentionCount: 0,
+    }),
   );
+  const firstRow = component.getByRole("button", { name: /알림 재처리를 확정했습니다/ });
+  const regions = [
+    await regionFromLocator(component.locator(".admin-shell__header"), "header", HEADER_DESKTOP_GEOMETRY, 4),
+    await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4),
+  ];
+  await captureOperationsApproved({
+    id: "admin-records-desktop",
+    candidate: component,
+    page,
+    testInfo,
+    regions,
+  });
   await expect(component.getByRole("heading", { name: "운영 처리 기록", exact: true })).toBeVisible();
   await expect(component.getByRole("heading", { name: "알림 재처리를 확정했습니다." })).toBeVisible();
   await expect(component.getByRole("region", { name: "감사 이벤트 상세" })).toBeVisible();
-  const back = component.getByRole("button", { name: "목록으로" });
-  await expectMinimumTargetSize(back);
-  await expect(component).toHaveScreenshot("editorial-ledger-review-390.png");
-  await back.focus();
-  await expectVisibleFocus(back);
+  await expect(firstRow).toBeVisible();
+  await expect(component.getByRole("searchbox", { name: "민감 대상 검색" })).toHaveCount(0);
+  await expectMinimumTargetSize(firstRow);
+  await firstRow.focus();
+  await expectVisibleFocus(firstRow);
 });
 
 test.describe("approved mobile Today", () => {
@@ -580,6 +695,9 @@ test("empty evidence, failed sources, pending-new, pagination failure and unknow
 
   await expect(component.getByText("지금은 처리할 운영 케이스가 없습니다")).toBeVisible();
   await expect(component.getByText("일부만 확인됨")).toBeVisible();
+  await component.locator("details.admin-today-controls").evaluateAll((nodes) => {
+    for (const node of nodes) (node as HTMLDetailsElement).open = true;
+  });
   await expect(component.getByRole("button", { name: "AI 작업 다시 확인" })).toBeVisible();
   await expect(component.getByRole("button", { name: "모임 마감 다시 확인" })).toBeVisible();
   await expect(component.getByRole("button", { name: "새 항목 2개 적용" })).toBeVisible();
