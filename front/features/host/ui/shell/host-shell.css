@@ -311,6 +311,25 @@ button.rm-host-workspace-switcher__choice {
   }
 }
 
+.rm-app-club-shell[data-workspace="host"] .topnav-inner {
+  width: min(100% - 64px, 1472px);
+  height: 90px;
+}
+
+.rm-app-club-shell[data-workspace="host"] .app-content {
+  background: var(--paper-50);
+}
+
+@media (max-width: 767px) {
+  .rm-app-club-shell[data-workspace="host"] [data-club-shell-region="mobile-primary"] {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 40;
+    width: 100%;
+    min-height: calc(var(--m-nav-h) + var(--m-safe-bottom));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rm-host-workspace-switcher__trigger,
   .rm-host-workspace-switcher .rm-context-selector__chevron,

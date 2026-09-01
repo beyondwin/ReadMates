@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/experimental-ct-react";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
+import { expectLocatorGeometry } from "@/tests/e2e/support/approved-mockup-contract";
 import {
   expectMinimumTargetSize,
   expectNoHorizontalOverflow,
@@ -89,6 +90,32 @@ const longCopyShellContent = (
   </section>
 );
 
+test("Admin desktop shell matches approved 1672 geometry", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 1672, height: 941 });
+  const component = await mount(shellFixture(todayShellContent));
+
+  await expectLocatorGeometry(component.locator(".admin-shell__header"), { x: 0, y: 0, width: 1672, height: 86 }, 4);
+  await expectLocatorGeometry(component.locator(".admin-shell__nav"), { x: 0, y: 86, width: 260, height: 855 }, 4);
+  await expectNoHorizontalOverflow(page);
+});
+
+test("Admin mobile shell matches approved 390 geometry", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const component = await mount(shellFixture(todayShellContent));
+
+  await expectLocatorGeometry(component.locator(".admin-shell__header"), { x: 0, y: 0, width: 390, height: 70 }, 4);
+  await expect(component.getByRole("navigation", { name: "Admin 모바일 메뉴" })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
+for (const width of [767, 768, 1536] as const) {
+  test(`admin shell has no horizontal overflow at ${width}`, async ({ mount, page }) => {
+    await page.setViewportSize({ width, height: width < 768 ? 844 : 941 });
+    await mount(shellFixture(todayShellContent));
+    await expectNoHorizontalOverflow(page);
+  });
+}
+
 test("production shell imports scoped CSS in working cascade order", async ({
   mount,
   page,
@@ -141,7 +168,7 @@ test("production shell imports scoped CSS in working cascade order", async ({
 
   expect(styles).toEqual({
     bodyDisplay: "grid",
-    bodyColumns: "220px 1108px",
+    bodyColumns: "260px 1180px",
     navPosition: "sticky",
     pageDisplay: "grid",
     pageGap: "18px",
@@ -170,7 +197,7 @@ test("Today desktop locks the production shell, quiet normal state, and editoria
   });
   expect(shellMetrics.fontFamily).toMatch(/Pretendard/i);
   expect(shellMetrics.mainWidth).toBeLessThanOrEqual(1240);
-  expect(shellMetrics.bodyColumns).toBe("220px 1108px");
+  expect(shellMetrics.bodyColumns).toBe("260px 1180px");
 
   await expectMinimumTargetSize(component.getByRole("button", { name: "공간 전환, 현재 플랫폼 운영" }));
   await expectMinimumTargetSize(component.getByRole("button", { name: "다른 계정으로 로그인" }));

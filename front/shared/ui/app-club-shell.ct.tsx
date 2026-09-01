@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/experimental-ct-react";
-import { AppClubShellStory } from "./app-club-shell.story";
+import { expectLocatorGeometry } from "@/tests/e2e/support/approved-mockup-contract";
+import "@/features/host/ui/shell/host-shell.css";
+import { AppClubShellHostStory, AppClubShellStory } from "./app-club-shell.story";
 
 test("AppClubShell uses only mobile chrome at the exact 767px boundary", async ({ mount, page }) => {
   await page.evaluate(() => document.documentElement.style.setProperty("--m-safe-bottom", "20px"));
@@ -36,4 +38,29 @@ test("AppClubShell uses only horizontal desktop chrome at the exact 768px bounda
   await expect(shell.getByRole("navigation", { name: "멤버 주 메뉴" })).toBeVisible();
   await expect(shell.getByRole("button", { name: /공간 전환, 현재 내 클럽/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(768);
+});
+
+test("AppClubShell host desktop matches approved 1536 geometry", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 1536, height: 1024 });
+  const shell = await mount(
+    <AppClubShellHostStory>
+      <main><h1>운영실</h1></main>
+    </AppClubShellHostStory>,
+  );
+
+  await expectLocatorGeometry(shell.locator(".topnav"), { x: 0, y: 0, width: 1536, height: 90 }, 4);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1536);
+});
+
+test("AppClubShell host mobile keeps a fixed primary region at 390", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 390, height: 832 });
+  const shell = await mount(
+    <AppClubShellHostStory>
+      <main><h1>운영실</h1></main>
+    </AppClubShellHostStory>,
+  );
+
+  await expect(shell.locator('[data-club-shell-region="mobile-primary"]')).toBeVisible();
+  await expect(shell.locator('[data-club-shell-region="mobile-primary"]')).toHaveCSS("position", "fixed");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
