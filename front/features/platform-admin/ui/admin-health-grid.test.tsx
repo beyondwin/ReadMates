@@ -348,6 +348,63 @@ describe("AdminHealthGrid", () => {
     expect(within(screen.getByRole("article", { name: "AI 제공자" })).getAllByText("사용 안 함")).toHaveLength(2);
     expect(within(screen.getByRole("article", { name: "Redis" })).queryByText("확인 불가")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Redis 다시 확인" })).not.toBeInTheDocument();
+    const narrative = document.querySelector(".admin-health-grid__narrative");
+    expect(narrative).toHaveTextContent(
+      "사용하지 않는 서비스가 3곳 있습니다. 현재 자료로 확인했습니다.",
+    );
+    expect(narrative).not.toHaveTextContent("모든 서비스가 정상 범위입니다.");
+  });
+
+  it.each([
+    ["WARN", { status: "WARN" as const, metric: { value: 75, unit: "records", label: "max" }, reason: null }, "주의해서 살펴볼 서비스가 1곳 있습니다."],
+    ["CRIT", { status: "CRIT" as const, metric: { value: 750, unit: "records", label: "max" }, reason: null }, "지금 확인이 필요한 서비스가 1곳 있습니다."],
+    ["empty", { status: "UNKNOWN" as const, metric: null, reason: "no_data" }, "일부 서비스는 아직 판단할 자료가 없습니다."],
+    ["disabled", { status: "UNKNOWN" as const, metric: null, reason: "kafka_disabled" }, "사용하지 않는 서비스가 1곳 있습니다."],
+  ])("keeps a stale %s deviation without publishing current-evidence copy", (_kind, kafka, prefix) => {
+    renderGrid({
+      snapshot: snapshotWith(
+        HEALTH_SNAPSHOT.cards.map((item) => {
+          if (item.id === "kafka_consumer_lag") return { ...item, ...kafka };
+          if (item.id === "redis") {
+            return {
+              ...item,
+              status: "OK" as const,
+              metric: { value: 0, unit: "errors", label: "current" },
+              reason: null,
+            };
+          }
+          return item;
+        }),
+        { refreshState: "STALE", staleAgeSeconds: 125 },
+      ),
+    });
+
+    const narrative = document.querySelector(".admin-health-grid__narrative");
+    expect(narrative).toHaveTextContent(`${prefix} 마지막 확인 자료가 오래되었습니다.`);
+    expect(narrative).not.toHaveTextContent("현재 자료");
+  });
+
+  it.each([
+    ["REFRESHING", "주의해서 살펴볼 서비스가 1곳 있습니다. 새 상태를 확인하고 있습니다."],
+    ["UNAVAILABLE", "주의해서 살펴볼 서비스가 1곳 있습니다. 최근 상태 자료를 확인할 수 없어 정상 여부를 확정할 수 없습니다."],
+  ] as const)("keeps mixed deviation evidence truthful while freshness is %s", (refreshState, expected) => {
+    renderGrid({
+      snapshot: snapshotWith(
+        HEALTH_SNAPSHOT.cards.map((item) => (
+          item.id === "redis"
+            ? {
+                ...item,
+                status: "OK" as const,
+                metric: { value: 0, unit: "errors", label: "current" },
+                reason: null,
+              }
+            : item
+        )),
+        { refreshState },
+      ),
+    });
+
+    expect(document.querySelector(".admin-health-grid__narrative")).toHaveTextContent(expected);
   });
 
   it("aggregates an all-disabled snapshot without a green ready claim", () => {

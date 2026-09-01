@@ -152,6 +152,41 @@ describe("formatHealthNarrative", () => {
       "최근 상태 자료를 확인할 수 없어 정상 여부를 확정할 수 없습니다.",
     );
   });
+
+  it.each([
+    ["WARN", WARN_KAFKA, "주의해서 살펴볼 서비스가 1곳 있습니다."],
+    ["CRIT", card({ id: "redis", title: "Redis", status: "CRIT" }), "지금 확인이 필요한 서비스가 1곳 있습니다."],
+    ["empty", card({ id: "redis", title: "Redis", status: "UNKNOWN", metric: null, reason: "no_data" }), "일부 서비스는 아직 판단할 자료가 없습니다."],
+    ["disabled", card({ id: "redis", title: "Redis", status: "UNKNOWN", metric: null, reason: "redis_disabled" }), "사용하지 않는 서비스가 1곳 있습니다."],
+  ] as const)("keeps stale %s deviations while refusing a current-evidence claim", (_kind, deviation, prefix) => {
+    const narrative = formatHealthNarrative([OK_OUTBOX, deviation, DEPLOY], null, "STALE");
+
+    expect(narrative).toBe(`${prefix} 마지막 확인 자료가 오래되었습니다.`);
+    expect(narrative).not.toContain("현재 자료");
+  });
+
+  it("keeps refreshing and unavailable deviation freshness truthful", () => {
+    expect(formatHealthNarrative([OK_OUTBOX, WARN_KAFKA, DEPLOY], null, "REFRESHING")).toBe(
+      "주의해서 살펴볼 서비스가 1곳 있습니다. 새 상태를 확인하고 있습니다.",
+    );
+    expect(formatHealthNarrative([OK_OUTBOX, WARN_KAFKA, DEPLOY], null, "UNAVAILABLE")).toBe(
+      "주의해서 살펴볼 서비스가 1곳 있습니다. 최근 상태 자료를 확인할 수 없어 정상 여부를 확정할 수 없습니다.",
+    );
+  });
+
+  it("does not collapse a disabled and OK source mix into all-normal", () => {
+    const disabledRedis = card({
+      id: "redis",
+      title: "Redis",
+      status: "UNKNOWN",
+      metric: null,
+      reason: "redis_disabled",
+    });
+
+    expect(formatHealthNarrative([OK_OUTBOX, disabledRedis, DEPLOY])).toBe(
+      "사용하지 않는 서비스가 1곳 있습니다. 현재 자료로 확인했습니다.",
+    );
+  });
 });
 
 describe("health card operator view", () => {

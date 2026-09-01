@@ -361,7 +361,7 @@ export function formatHealthNarrative(
   refreshState: PlatformHealthRefreshState = "FRESH",
 ): string {
   const { deviations } = partitionHealthServiceCards(cards);
-  const summary = healthPageSummary(deviations, cards, refreshState);
+  const summary = healthPageSummary(deviations, refreshState);
   const resolved = formatResolvedIncident(lastIncident);
   return resolved && deviations.length === 0 && refreshState === "FRESH"
     ? `${summary} 마지막 이상은 ${resolved} (해소됨).`
@@ -370,10 +370,9 @@ export function formatHealthNarrative(
 
 function healthPageSummary(
   deviations: readonly HealthCard[],
-  cards: readonly HealthCard[],
   refreshState: PlatformHealthRefreshState,
 ): string {
-  if (refreshState === "UNAVAILABLE") {
+  if (refreshState === "UNAVAILABLE" && deviations.length === 0) {
     return "최근 상태 자료를 확인할 수 없어 정상 여부를 확정할 수 없습니다.";
   }
   if (refreshState === "STALE" && deviations.length === 0) {
@@ -381,6 +380,10 @@ function healthPageSummary(
   }
 
   const evidence = deviations.map(healthCardEvidenceState);
+  const disabledCount = evidence.filter((state) => state === "disabled").length;
+  const hasHigherPriorityDeviation = evidence.some((state) => (
+    state === "crit" || state === "warn" || state === "unavailable" || state === "empty"
+  ));
   const prefix = evidence.includes("crit")
     ? `지금 확인이 필요한 서비스가 ${evidence.filter((state) => state === "crit").length}곳 있습니다.`
     : evidence.includes("warn")
@@ -389,14 +392,28 @@ function healthPageSummary(
         ? "일부 서비스 상태를 확인할 수 없습니다."
         : evidence.includes("empty")
           ? "일부 서비스는 아직 판단할 자료가 없습니다."
-          : evidence.includes("disabled") && cards.every((card) => healthCardEvidenceState(card) === "disabled")
-            ? "현재 사용 중인 상태 원천이 없습니다."
+          : disabledCount > 0
+            ? `사용하지 않는 서비스가 ${disabledCount}곳 있습니다.`
             : "모든 서비스가 정상 범위입니다.";
 
-  const freshness = refreshState === "REFRESHING"
-    ? "새 상태를 확인하고 있습니다."
-    : "현재 자료로 확인했습니다.";
-  return `${prefix} ${freshness}`;
+  const disabledNote = disabledCount > 0 && hasHigherPriorityDeviation
+    ? ` 사용하지 않는 서비스도 ${disabledCount}곳 있습니다.`
+    : "";
+  const freshness = healthNarrativeFreshness(refreshState);
+  return `${prefix}${disabledNote} ${freshness}`;
+}
+
+function healthNarrativeFreshness(refreshState: PlatformHealthRefreshState): string {
+  switch (refreshState) {
+    case "FRESH":
+      return "현재 자료로 확인했습니다.";
+    case "REFRESHING":
+      return "새 상태를 확인하고 있습니다.";
+    case "STALE":
+      return "마지막 확인 자료가 오래되었습니다.";
+    case "UNAVAILABLE":
+      return "최근 상태 자료를 확인할 수 없어 정상 여부를 확정할 수 없습니다.";
+  }
 }
 
 function healthEvidenceSentence(
