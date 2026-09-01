@@ -77,6 +77,7 @@ Routine refactor, component-local layout, reversible implementation detail은 AD
 | [0050](0050-platform-admin-today-operations-desk.md) | 플랫폼 어드민을 오늘 할 일 중심 운영 데스크로 재구성 | Accepted | 2026-08-30 | product, design, platform ops, front |
 | [0051](0051-global-platform-and-club-space-transition.md) | 전역 공간을 플랫폼 운영·내 클럽 두 축으로 고정 | Accepted | 2026-08-30 | product, front, server, security |
 | [0052](0052-oci-capacity-and-recovery-guardrails.md) | OCI 용량과 복구 guardrail | Proposed | 2026-08-30 | ops, security |
+| [0053](0053-approved-mockup-pixel-fidelity-gate.md) | 승인 시안을 Admin·Host 픽셀 근접 합격 기준으로 사용 | Proposed | 2026-09-02 | product, design, front |
 
 ADR-0048/0049는 Stage 5 전체 gate와 최종 acceptance evidence가 각 결정의 named criteria를 충족해 `Accepted`다. 구현 근거와 배포·외부 서비스·수동 보조기술의 미측정 범위는 각 ADR의 `검증` 및 잔여 검증 절에서 관리한다.
 

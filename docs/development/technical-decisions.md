@@ -55,5 +55,6 @@ ReadMates의 durable product·technical·design·operational decision은 [ADR �
 | [ADR-0050](adr/0050-platform-admin-today-operations-desk.md) | 플랫폼 어드민을 오늘 할 일 중심 운영 데스크로 재구성 | Accepted |
 | [ADR-0051](adr/0051-global-platform-and-club-space-transition.md) | 전역 공간을 플랫폼 운영·내 클럽 두 축으로 고정 | Accepted |
 | [ADR-0052](adr/0052-oci-capacity-and-recovery-guardrails.md) | OCI 용량과 복구 guardrail | Proposed |
+| [ADR-0053](adr/0053-approved-mockup-pixel-fidelity-gate.md) | 승인 시안을 Admin·Host 픽셀 근접 합격 기준으로 사용 | Proposed |
 
 Active architecture는 [architecture.md](architecture.md), 검증 경로는 [test-guide.md](test-guide.md)와 각 ADR의 `검증` 절을 따른다. Server의 canonical PR gate는 `./scripts/server-ci-check.sh`다. 외부 서비스의 가격·한도·API 동작처럼 변할 수 있는 사실은 운영 판단 직전에 공식 source로 다시 확인한다.
