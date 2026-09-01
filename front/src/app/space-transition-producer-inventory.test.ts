@@ -471,6 +471,108 @@ describe("space transition mutation-producer inventory", () => {
 
   it.each([
     [
+      "IIFE object binding with a missing property",
+      "const eager = (({ value = classifiedWrite() }) => value)({});",
+    ],
+    [
+      "outer parameter default and nested binding default",
+      `
+        const eager = (({
+          nested: { value = classifiedWrite() },
+        } = { nested: {} }) => value)();
+      `,
+    ],
+    [
+      "top-level object binding from an empty source",
+      "const { value = classifiedWrite() } = {};",
+    ],
+    [
+      "IIFE-local object binding from an empty source",
+      `
+        const eager = (() => {
+          const { value = classifiedWrite() } = {};
+          return value;
+        })();
+      `,
+    ],
+    [
+      "top-level array binding from an empty source",
+      "const [value = classifiedWrite()] = [];",
+    ],
+    [
+      "object binding with an explicitly undefined property",
+      "const eager = (({ value = classifiedWrite() }) => value)({ value: undefined });",
+    ],
+    [
+      "array binding with an explicitly undefined element",
+      "const eager = (([value = classifiedWrite()]) => value)([undefined]);",
+    ],
+  ])("detects a classified write in %s", (_kind, initializer) => {
+    const { inventory, sources } = classifiedWriteConsumerFixture(`
+      import { classifiedWrite } from "@/features/example/api/classified-write";
+      ${initializer}
+    `);
+
+    expect(auditMutationProducerInventory(
+      sources,
+      buildMountedProductionPaths(sources, ["src/main.tsx"]),
+      inventory,
+    )).toMatchObject({
+      unclassifiedPaths: ["features/example/route/rogue-route.ts"],
+      modifyEntriesWithMissingMountedOwners: [
+        "features/example/api/classified-write.ts->features/example/route/rogue-route.ts",
+      ],
+    });
+  });
+
+  it.each([
+    [
+      "IIFE object binding with a defined property",
+      "const eager = (({ value = classifiedWrite() }) => value)({ value: \"provided\" });",
+    ],
+    [
+      "top-level object binding with a defined property",
+      "const { value = classifiedWrite() } = { value: \"provided\" };",
+    ],
+    [
+      "IIFE-local object binding with a defined property",
+      `
+        const eager = (() => {
+          const { value = classifiedWrite() } = { value: "provided" };
+          return value;
+        })();
+      `,
+    ],
+    [
+      "top-level array binding with a defined element",
+      "const [value = classifiedWrite()] = [\"provided\"];",
+    ],
+    [
+      "IIFE array binding with a defined element",
+      "const eager = (([value = classifiedWrite()]) => value)([\"provided\"]);",
+    ],
+  ])("keeps the default dormant for %s", (_kind, initializer) => {
+    const { inventory, sources } = classifiedWriteConsumerFixture(`
+      import { classifiedWrite } from "@/features/example/api/classified-write";
+      ${initializer}
+    `);
+
+    expect(auditMutationProducerInventory(
+      sources,
+      buildMountedProductionPaths(sources, ["src/main.tsx"]),
+      inventory,
+    )).toEqual({
+      unclassifiedPaths: [],
+      unclassifiedExportedWrites: [],
+      unreachableExportsWithMountedImports: [],
+      modifyEntriesWithoutMountedOwner: [],
+      modifyEntriesWithMissingMountedOwners: [],
+      verifiedLeavesWithForbiddenPublication: [],
+    });
+  });
+
+  it.each([
+    [
       "named function",
       `
         const eager = (() => {

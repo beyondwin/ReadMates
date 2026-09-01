@@ -317,7 +317,7 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
       path.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
     );
     const declarations = new Map<string, ts.Node>();
-    const eagerVariableInitializers: ts.Expression[] = [];
+    const eagerVariableDeclarations: ts.VariableDeclaration[] = [];
     const imports = new Map<string, { providerPath: string; importedName: string }>();
     const exportedModifier = (node: ts.Node) => ts.canHaveModifiers(node)
       && Boolean(ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword));
@@ -356,17 +356,16 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
       }
       if (ts.isVariableStatement(statement)) {
         for (const declaration of statement.declarationList.declarations) {
-          if (ts.isIdentifier(declaration.name) && declaration.initializer) {
-            declarations.set(declaration.name.text, declaration);
-            eagerVariableInitializers.push(declaration.initializer);
-          }
+          if (!declaration.initializer) continue;
+          eagerVariableDeclarations.push(declaration);
+          if (ts.isIdentifier(declaration.name)) declarations.set(declaration.name.text, declaration);
         }
       }
     }
 
     const moduleExecutionStatements = sourceFile.statements.filter(isTopLevelExecutionStatement);
     const localNames = new Set(declarations.keys());
-    if (moduleExecutionStatements.length > 0 || eagerVariableInitializers.length > 0) {
+    if (moduleExecutionStatements.length > 0 || eagerVariableDeclarations.length > 0) {
       localNames.add(MODULE_EXECUTION_SYMBOL);
     }
     localsByPath.set(path, localNames);
@@ -399,8 +398,13 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
 
     const addEagerRuntimeReferences = (from: string, root: ts.Node) => {
       type CallableScope = Map<string, EagerRuntimeFunction | null>;
+      type BindingValue = {
+        expression?: ts.Expression;
+        definitelyNonUndefined: boolean;
+      };
       const executedBodies = new Set<EagerRuntimeFunction>();
       const activeCalls = new Set<EagerRuntimeFunction>();
+      const unknownBindingValue: BindingValue = { definitelyNonUndefined: false };
 
       const addBindingNames = (
         scope: CallableScope,
@@ -462,7 +466,116 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
         return { found: false, callable: null };
       };
 
-      const visit = (candidate: ts.Node, scopes: readonly CallableScope[] = []) => {
+      const bindingValueFromExpression = (expression: ts.Expression): BindingValue => ({
+        expression,
+        definitelyNonUndefined: isDefinitelyNonUndefinedExpression(expression),
+      });
+
+      const staticPropertyName = (name: ts.PropertyName): string | null => {
+        if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) {
+          return name.text;
+        }
+        if (!ts.isComputedPropertyName(name)) return null;
+        const expression = unwrapTransparentExpression(name.expression);
+        return ts.isStringLiteral(expression)
+          || ts.isNumericLiteral(expression)
+          || ts.isNoSubstitutionTemplateLiteral(expression)
+          ? expression.text
+          : null;
+      };
+
+      const objectBindingValue = (
+        source: BindingValue,
+        element: ts.BindingElement,
+      ): BindingValue => {
+        if (!source.expression) return unknownBindingValue;
+        const expression = unwrapTransparentExpression(source.expression);
+        if (!ts.isObjectLiteralExpression(expression)) return unknownBindingValue;
+        const propertyName = element.propertyName
+          ?? (ts.isIdentifier(element.name) ? element.name : null);
+        if (!propertyName) return unknownBindingValue;
+        const targetName = staticPropertyName(propertyName);
+        if (targetName === null) return unknownBindingValue;
+
+        let mayHaveLaterOverride = false;
+        for (let index = expression.properties.length - 1; index >= 0; index -= 1) {
+          const property = expression.properties[index];
+          if (ts.isSpreadAssignment(property)) {
+            mayHaveLaterOverride = true;
+            continue;
+          }
+          const candidateName = staticPropertyName(property.name);
+          if (candidateName === null) {
+            mayHaveLaterOverride = true;
+            continue;
+          }
+          if (candidateName !== targetName) continue;
+          if (mayHaveLaterOverride) return unknownBindingValue;
+          if (ts.isPropertyAssignment(property)) {
+            return bindingValueFromExpression(property.initializer);
+          }
+          if (ts.isShorthandPropertyAssignment(property)) {
+            return bindingValueFromExpression(property.name);
+          }
+          if (ts.isMethodDeclaration(property)) {
+            return { definitelyNonUndefined: true };
+          }
+          return unknownBindingValue;
+        }
+        return unknownBindingValue;
+      };
+
+      const arrayBindingValue = (source: BindingValue, index: number): BindingValue => {
+        if (!source.expression) return unknownBindingValue;
+        const expression = unwrapTransparentExpression(source.expression);
+        if (!ts.isArrayLiteralExpression(expression)) return unknownBindingValue;
+        for (let offset = 0; offset <= index && offset < expression.elements.length; offset += 1) {
+          const element = expression.elements[offset];
+          if (ts.isSpreadElement(element)) return unknownBindingValue;
+          if (offset !== index) continue;
+          return ts.isOmittedExpression(element)
+            ? unknownBindingValue
+            : bindingValueFromExpression(element);
+        }
+        return unknownBindingValue;
+      };
+
+      const isDefinitelyNonBindingSource = (source: BindingValue): boolean => {
+        if (!source.expression) return false;
+        const expression = unwrapTransparentExpression(source.expression);
+        return expression.kind === ts.SyntaxKind.NullKeyword
+          || ts.isVoidExpression(expression)
+          || (ts.isIdentifier(expression) && expression.text === "undefined");
+      };
+
+      const visitBindingDefaults = (
+        name: ts.BindingName,
+        source: BindingValue,
+        scopes: readonly CallableScope[],
+      ) => {
+        if (ts.isIdentifier(name) || isDefinitelyNonBindingSource(source)) return;
+        for (const [index, candidate] of name.elements.entries()) {
+          if (!ts.isBindingElement(candidate) || candidate.dotDotDotToken) continue;
+          const value = ts.isObjectBindingPattern(name)
+            ? objectBindingValue(source, candidate)
+            : arrayBindingValue(source, index);
+          const defaultMayExecute = !value.definitelyNonUndefined;
+          if (candidate.initializer && defaultMayExecute) {
+            visit(candidate.initializer, scopes);
+          }
+          if (ts.isIdentifier(candidate.name)) continue;
+          visitBindingDefaults(candidate.name, value, scopes);
+          if (candidate.initializer && defaultMayExecute) {
+            visitBindingDefaults(
+              candidate.name,
+              bindingValueFromExpression(candidate.initializer),
+              scopes,
+            );
+          }
+        }
+      };
+
+      function visit(candidate: ts.Node, scopes: readonly CallableScope[] = []) {
         if (ts.isCallExpression(candidate)) {
           const invoked = unwrapTransparentExpression(candidate.expression);
           if (ts.isArrowFunction(invoked) || ts.isFunctionExpression(invoked)) {
@@ -495,7 +608,14 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
           return;
         }
         if (ts.isVariableDeclaration(candidate)) {
-          if (candidate.initializer) visit(candidate.initializer, scopes);
+          if (candidate.initializer) {
+            visit(candidate.initializer, scopes);
+            visitBindingDefaults(
+              candidate.name,
+              bindingValueFromExpression(candidate.initializer),
+              scopes,
+            );
+          }
           return;
         }
         if (ts.isIdentifier(candidate)) {
@@ -517,7 +637,7 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
           }
         }
         ts.forEachChild(candidate, (child) => visit(child, scopes));
-      };
+      }
 
       const execute = (
         callable: EagerRuntimeFunction,
@@ -528,10 +648,22 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
         const localScope = collectCallableScope(callable);
         const scopes = [localScope, ...outerScopes];
         for (const [index, parameter] of callable.parameters.entries()) {
-          if (!parameter.initializer) continue;
           const argument = arguments_[index];
-          if (!argument || !isDefinitelyNonUndefinedExpression(argument)) {
+          const defaultMayExecute = Boolean(parameter.initializer)
+            && (!argument || !isDefinitelyNonUndefinedExpression(argument));
+          if (parameter.initializer && defaultMayExecute) {
             visit(parameter.initializer, scopes);
+          }
+          if (ts.isIdentifier(parameter.name)) continue;
+          if (argument) {
+            visitBindingDefaults(parameter.name, bindingValueFromExpression(argument), scopes);
+          }
+          if (parameter.initializer && defaultMayExecute) {
+            visitBindingDefaults(
+              parameter.name,
+              bindingValueFromExpression(parameter.initializer),
+              scopes,
+            );
           }
         }
         if (executedBodies.has(callable)) return;
@@ -553,14 +685,14 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
       addRuntimeReferences(from, declaration, name);
     }
 
-    if (moduleExecutionStatements.length > 0 || eagerVariableInitializers.length > 0) {
+    if (moduleExecutionStatements.length > 0 || eagerVariableDeclarations.length > 0) {
       const moduleExecution = localSymbol(path, MODULE_EXECUTION_SYMBOL);
       executableRoots.add(moduleExecution);
       for (const statement of moduleExecutionStatements) {
         addEagerRuntimeReferences(moduleExecution, statement);
       }
-      for (const initializer of eagerVariableInitializers) {
-        addEagerRuntimeReferences(moduleExecution, initializer);
+      for (const declaration of eagerVariableDeclarations) {
+        addEagerRuntimeReferences(moduleExecution, declaration);
       }
     }
 
