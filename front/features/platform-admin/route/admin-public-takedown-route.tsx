@@ -31,6 +31,7 @@ import { AdminPublicTakedownWorkbench } from "../ui/admin-public-takedown-workbe
 import { createAdminTakedownReceiptCapsule } from "./admin-public-takedown-receipt-capsule";
 
 const OWNER_ID = "platform-admin-public-takedown";
+const DESKTOP_HANDOFF_PATH = "/admin/public-takedown";
 
 export function AdminPublicTakedownRoute() {
   const queryClient = useQueryClient();
@@ -63,6 +64,7 @@ export function AdminPublicTakedownRoute() {
           state={{ kind: "idle" }}
           pending={false}
           error={null}
+          desktopHandoff={{ href: DESKTOP_HANDOFF_PATH, status: "idle", onCopy: () => undefined }}
           onPreview={() => undefined}
           onConfirm={() => undefined}
         />
@@ -79,6 +81,7 @@ function PublicTakedownSession() {
   const preview = usePreviewAdminPublicTakedownMutation();
   const confirm = useConfirmAdminPublicTakedownMutation();
   const [state, setState] = useState<AdminTakedownState>({ kind: "idle" });
+  const [desktopHandoffStatus, setDesktopHandoffStatus] = useState<"idle" | "copying" | "copied" | "failed">("idle");
   const activeHandle = useRef<PendingHandle | null>(null);
   const activeHandles = useRef(new Set<PendingHandle>());
   const confirmLocked = useRef(false);
@@ -95,6 +98,7 @@ function PublicTakedownSession() {
     preview.reset();
     confirm.reset();
     idempotencyKey.current = null;
+    setDesktopHandoffStatus("idle");
     setState({ kind: "idle" });
     queryClient.removeQueries({ queryKey: adminTakedownKeys.all });
   }, [confirm, preview, queryClient]);
@@ -142,6 +146,21 @@ function PublicTakedownSession() {
     } finally {
       activeHandles.current.delete(handle);
       if (activeHandle.current === handle) activeHandle.current = null;
+    }
+  }
+
+  async function copyDesktopHandoffLink() {
+    const clipboard = globalThis.navigator.clipboard;
+    if (!clipboard) {
+      setDesktopHandoffStatus("failed");
+      return;
+    }
+    setDesktopHandoffStatus("copying");
+    try {
+      await clipboard.writeText(new URL(DESKTOP_HANDOFF_PATH, globalThis.location.origin).toString());
+      if (mounted.current) setDesktopHandoffStatus("copied");
+    } catch {
+      if (mounted.current) setDesktopHandoffStatus("failed");
     }
   }
 
@@ -216,6 +235,11 @@ function PublicTakedownSession() {
       state={state}
       pending={preview.isPending || confirm.isPending || state.kind === "confirming"}
       error={error}
+      desktopHandoff={{
+        href: DESKTOP_HANDOFF_PATH,
+        status: desktopHandoffStatus,
+        onCopy: () => { void copyDesktopHandoffLink(); },
+      }}
       onPreview={(target) => { void handlePreview(target); }}
       onConfirm={(input) => { void handleConfirm(input); }}
     />

@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SpaceTransitionSafetyProvider } from "@/shared/ui/space-transition-safety-context";
 import { ReadmatesTransportError } from "@/shared/api/errors";
 import type { TransitionPublicationSurface } from "@/shared/model/global-space";
@@ -41,6 +41,8 @@ const blockedPreview = parseAdminTakedownPreview(previewFixture);
 const enabledPreview = { ...blockedPreview, confirmEnabled: true, activationBoundary: "ACTIVE" };
 const receipt = parseAdminTakedownReceipt(receiptFixture);
 const capabilities: PlatformAdminCapability[] = ["VIEW_TODAY", "VIEW_CLUBS", "EMERGENCY_PUBLIC_TAKEDOWN"];
+const originalInnerWidth = window.innerWidth;
+const originalUserAgent = navigator.userAgent;
 
 const summary = {
   platformRole: "OPERATOR" as const,
@@ -92,10 +94,16 @@ beforeEach(() => {
   sessionStorage.clear();
 });
 
+afterEach(() => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: originalInnerWidth });
+  Object.defineProperty(navigator, "userAgent", { configurable: true, value: originalUserAgent });
+  Reflect.deleteProperty(navigator, "clipboard");
+});
+
 describe("AdminPublicTakedownRoute", () => {
   it("fails closed without the emergency capability", () => {
     renderRoute(false);
-    expect(screen.getByText("긴급 회수 권한이 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("이 작업을 실행할 권한이 없습니다.")).toBeInTheDocument();
     expect(screen.queryByLabelText("클럽 ID")).not.toBeInTheDocument();
     expect(confirmAdminPublicTakedown).not.toHaveBeenCalled();
   });
@@ -113,22 +121,44 @@ describe("AdminPublicTakedownRoute", () => {
     expect(screen.getByRole("button", { name: "긴급 회수 확인" })).toBeDisabled();
   });
 
-  it("sends one confirm and publishes only accepted cache and UI surfaces", async () => {
+  it("keeps compact handoff presentational and sends the exact safe-command payload", async () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+    Object.defineProperty(navigator, "userAgent", {
+      configurable: true,
+      value: "ReadMates compact fixture / 390px",
+    });
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
     vi.mocked(previewAdminPublicTakedown).mockResolvedValue(enabledPreview);
     vi.mocked(confirmAdminPublicTakedown).mockResolvedValue(receipt);
     const storageWrite = vi.spyOn(Storage.prototype, "setItem");
     const { queryClient } = renderRoute();
+    fireEvent.click(screen.getByRole("button", { name: "데스크톱용 주소 복사" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("http://localhost:3000/admin/public-takedown"));
     await previewTarget();
     fireEvent.change(screen.getByLabelText("회수 사유"), { target: { value: "공개 기록 개인정보 회수" } });
     fireEvent.click(screen.getByRole("button", { name: "긴급 회수 확인" }));
 
     expect(await screen.findByRole("region", { name: "변경 불가 회수 영수증" })).toHaveTextContent(receipt.receiptId);
     expect(confirmAdminPublicTakedown).toHaveBeenCalledTimes(1);
-    expect(confirmAdminPublicTakedown).toHaveBeenCalledWith(expect.objectContaining({
+    const confirmRequest = vi.mocked(confirmAdminPublicTakedown).mock.calls[0]?.[0];
+    expect(confirmRequest).toEqual({
       previewId: enabledPreview.previewId,
       reasonCategory: "PRIVATE_DATA",
       reason: "공개 기록 개인정보 회수",
-    }));
+      idempotencyKey: expect.any(String),
+    });
+    expect(Object.keys(confirmRequest ?? {}).sort()).toEqual([
+      "idempotencyKey",
+      "previewId",
+      "reason",
+      "reasonCategory",
+    ]);
+    expect(JSON.stringify(confirmRequest)).not.toContain("390");
+    expect(JSON.stringify(confirmRequest)).not.toContain("ReadMates compact fixture");
     expect(queryClient.getQueryData(adminTakedownKeys.receipt(receipt.receiptId))).toEqual(receipt);
     expect(storageWrite).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: /전파.*시도/ })).not.toBeInTheDocument();

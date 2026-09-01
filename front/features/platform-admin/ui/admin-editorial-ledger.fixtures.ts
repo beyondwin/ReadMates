@@ -16,6 +16,7 @@ import type {
 import type { AdminSafeActionState } from "./admin-action-dock";
 import type { AdminClubsLedgerClub, AdminClubsLedgerFilters } from "./admin-clubs-ledger";
 import type { AdminTodayFilters } from "./admin-today-controls";
+import type { AdminTakedownState } from "../model/platform-admin-takedown-model";
 
 export const EDITORIAL_LEDGER_LONG_TODAY_TITLE =
   "경계가 긴 한글 운영 신호와 A deliberately long English operations signal without clipping";
@@ -25,6 +26,8 @@ export const EDITORIAL_LEDGER_LONG_AUDIT_SUMMARY =
   "경계가 긴 한글 감사 기록과 A deliberately long English audit record without clipping";
 export const EDITORIAL_LEDGER_LONG_HEALTH_TITLE =
   "경계가 긴 한글 서비스 신호와 A deliberately long English health signal without clipping";
+export const EDITORIAL_LEDGER_LONG_TAKEDOWN_LIMITATION =
+  "이미 표시되었거나 저장된 사본과 연결이 끊긴 오프라인 사본은 원격으로 삭제할 수 없으며 a deliberately long English limitation must wrap without clipping.";
 
 export const TODAY_VIEW_CAPABILITIES = ["VIEW_TODAY"] as const satisfies readonly PlatformAdminCapability[];
 export const CLUBS_CREATE_CAPABILITIES = [
@@ -633,6 +636,25 @@ export const reviewAuditEmptyEvidence: ReviewAuditFixture = {
   nextPageError: false,
   loadingMore: false,
   canSearchSensitive: false,
+};
+
+export const emergencyTakedownIdle: AdminTakedownState = { kind: "idle" };
+
+export const emergencyTakedownBlockedPreview: AdminTakedownState = {
+  kind: "preview",
+  preview: {
+    schema: "admin.public_takedown.preview.v1",
+    previewId: "40000000-0000-4000-8000-000000000074",
+    expiresAt: "2026-08-30T04:05:00Z",
+    clubId: "00000000-0000-4000-8000-000000000071",
+    sessionId: "00000000-0000-4000-8000-000000000072",
+    publicationId: "00000000-0000-4000-8000-000000000073",
+    targetGeneration: 7,
+    currentSurfaces: ["BFF_CACHE", "BROWSER_CACHE", "CDN_CACHE", "ORIGIN"],
+    confirmEnabled: false,
+    activationBoundary: "PROTECTED_CACHE_SAFETY_EVIDENCE_REQUIRED",
+    remoteCopyLimitation: EDITORIAL_LEDGER_LONG_TAKEDOWN_LIMITATION,
+  },
 };
 
 export const noopEditorialLedgerHandler = noop;

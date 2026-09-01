@@ -14,11 +14,14 @@ import { AdminClubsLedger } from "./admin-clubs-ledger";
 import { AdminEditorialLedgerCtHarness } from "./admin-editorial-ledger-ct-harness";
 import {
   EDITORIAL_LEDGER_LONG_CLUB_NAME,
+  EDITORIAL_LEDGER_LONG_TAKEDOWN_LIMITATION,
   EDITORIAL_LEDGER_LONG_TODAY_TITLE,
   clubsEmptyEvidence,
   clubsPaginationFailure,
   clubsTabletLedger,
   healthEmptyEvidence,
+  emergencyTakedownBlockedPreview,
+  emergencyTakedownIdle,
   noopEditorialLedgerHandler,
   reviewAuditEmptyEvidence,
   reviewAuditLedger,
@@ -38,6 +41,7 @@ import {
 } from "./admin-editorial-ledger.fixtures";
 import { AdminHealthGrid } from "./admin-health-grid";
 import { AdminOperationStateActions } from "./admin-operation-state-actions";
+import { AdminPublicTakedownWorkbench } from "./admin-public-takedown-workbench";
 import { AdminTodayLedger } from "./admin-today-ledger";
 
 async function mountEditorial(
@@ -209,6 +213,24 @@ function reviewNode(fixture: ReviewAuditFixture) {
   );
 }
 
+function takedownNode(state: typeof emergencyTakedownIdle | typeof emergencyTakedownBlockedPreview) {
+  return (
+    <AdminPublicTakedownWorkbench
+      canOperate
+      state={state}
+      pending={false}
+      error={null}
+      desktopHandoff={{
+        href: "/admin/public-takedown",
+        status: "idle",
+        onCopy: noopEditorialLedgerHandler,
+      }}
+      onPreview={noopEditorialLedgerHandler}
+      onConfirm={noopEditorialLedgerHandler}
+    />
+  );
+}
+
 test("Today L1 locks the 1440 wide editorial composition", async ({ mount, page }) => {
   expect(todayDesktopLedger.capabilities).toEqual(["VIEW_TODAY"]);
   expect(todayDesktopLedger.allowedActions).toEqual(["ACKNOWLEDGE", "SNOOZE", "RESOLVE"]);
@@ -310,6 +332,39 @@ test("Today case detail locks the 320 mobile composition", async ({ mount, page 
   await expect(component).toHaveScreenshot("editorial-ledger-case-detail-320.png");
   await back.focus();
   await expectVisibleFocus(back);
+});
+
+test("Emergency takedown keeps the blocked L3 review calm at 1440", async ({ mount, page }) => {
+  const component = await mountEditorial(
+    mount,
+    page,
+    takedownNode(emergencyTakedownBlockedPreview),
+    VISUAL_AUTHORITY_VIEWPORTS.desktopWide,
+  );
+  await expect(component.getByRole("heading", { name: "긴급 공개 회수" })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "회수 대상을 마지막으로 확인하세요" })).toBeVisible();
+  await expect(component.getByText(EDITORIAL_LEDGER_LONG_TAKEDOWN_LIMITATION)).toBeVisible();
+  await expect(component.getByRole("button", { name: "긴급 회수 확인" })).toBeDisabled();
+  await expect(component.getByRole("region", { name: "데스크톱에서 이어서 처리" })).toBeHidden();
+  await expect(component).toHaveScreenshot("editorial-ledger-emergency-takedown-1440.png");
+});
+
+test("Emergency takedown offers desktop handoff first at 390", async ({ mount, page }) => {
+  const component = await mountEditorial(
+    mount,
+    page,
+    takedownNode(emergencyTakedownIdle),
+    VISUAL_AUTHORITY_VIEWPORTS.mobile,
+  );
+  const handoff = component.getByRole("region", { name: "데스크톱에서 이어서 처리" });
+  const copy = component.getByRole("button", { name: "데스크톱용 주소 복사" });
+  await expect(handoff).toBeVisible();
+  await expect(copy).toBeVisible();
+  await expectMinimumTargetSize(copy);
+  await expect(component.getByRole("region", { name: "이 기기에서 직접 처리" })).toBeVisible();
+  await expect(component).toHaveScreenshot("editorial-ledger-emergency-takedown-390.png");
+  await copy.focus();
+  await expectVisibleFocus(copy);
 });
 
 test("Today keeps the 320 queue locator intact without horizontal overflow", async ({ mount, page }) => {

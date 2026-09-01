@@ -64,16 +64,22 @@ test("owner confirms one exact target once and renders server receipt outcomes",
   await page.getByLabel("모임 ID").fill(SESSION_ID);
   await page.getByLabel("공개 기록 ID").fill(PUBLICATION_ID);
   await page.getByRole("button", { name: "대상 확인" }).click();
-  await expect(page.getByText("ORIGIN")).toBeVisible();
+  await expect(page.getByText("현재 공개 경로 4곳을 기준으로 회수 절차를 준비했습니다.")).toBeVisible();
   await expect(page.getByText(LIMITATION)).toBeVisible();
+  const previewTechnical = page.getByRole("group", { name: "기술 정보" });
+  await previewTechnical.getByText("기술 정보").click();
+  await expect(previewTechnical.getByText(/BFF_CACHE, BROWSER_CACHE, CDN_CACHE, ORIGIN/)).toBeVisible();
   await page.getByLabel("회수 사유").fill("synthetic private data request");
   await page.getByRole("button", { name: "긴급 회수 확인" }).click();
 
   const immutableReceipt = page.getByRole("region", { name: "변경 불가 회수 영수증" });
-  await expect(immutableReceipt).toContainText(RECEIPT_ID);
-  await expect(immutableReceipt).toContainText("NOT_STARTED");
-  await expect(immutableReceipt).toContainText("QUEUED");
-  await expect(immutableReceipt).toContainText("BOUNDED_BY_CACHE_POLICY");
+  await expect(immutableReceipt).toContainText("원본 공개 경로를 차단했습니다.");
+  const receiptTechnical = immutableReceipt.getByRole("group", { name: "기술 정보" });
+  await receiptTechnical.getByText("기술 정보").click();
+  await expect(receiptTechnical).toContainText(RECEIPT_ID);
+  await expect(receiptTechnical).toContainText("NOT_STARTED");
+  await expect(receiptTechnical).toContainText("QUEUED");
+  await expect(receiptTechnical).toContainText("BOUNDED_BY_CACHE_POLICY");
   await expect(page.getByRole("button", { name: /전파.*시도/ })).toHaveCount(0);
   expect(confirmCalls).toBe(1);
   expect(takedownRequests).toEqual(["/api/bff/api/admin/public-takedowns/confirm"]);
@@ -91,12 +97,31 @@ for (const scenario of [
       await json(route, 403, { code: "PERMISSION_DENIED", message: "denied", status: 403 });
     });
     await page.goto("/admin/public-takedown");
-    await expect(page.getByText("긴급 회수 권한이 없습니다.")).toBeVisible();
+    await expect(page.getByText("이 작업을 실행할 권한이 없습니다.")).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await expect(page.getByLabel("클럽 ID")).toHaveCount(0);
     expect(mutationCalls).toBe(0);
   });
 }
+
+test("compact route recommends desktop handoff without becoming an authorization boundary", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await routeAdminShell(page, "OWNER");
+  let mutationCalls = 0;
+  await page.route("**/api/bff/api/admin/public-takedowns/**", async (route) => {
+    mutationCalls += 1;
+    await json(route, 500, { code: "UNEXPECTED_REQUEST" });
+  });
+
+  await page.goto("/admin/public-takedown");
+  await expect(page.getByRole("region", { name: "데스크톱에서 이어서 처리" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "데스크톱용 주소 복사" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "이 기기에서 계속 검토" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "이 기기에서 직접 처리" })).toBeVisible();
+  await expect(page.getByLabel("클럽 ID")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  expect(mutationCalls).toBe(0);
+});
 
 function receipt() {
   return {
