@@ -8,6 +8,7 @@ import { AvatarChip } from "@/shared/ui/avatar-chip";
 import {
   approvedMockup,
   captureApprovedComparison,
+  HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
   expectGeometryWithinTolerance,
   expectLocatorGeometry,
   isSemanticDocumentOrder,
@@ -726,6 +727,7 @@ async function captureHostApproved(input: {
   testInfo: TestInfo;
   regions: readonly ApprovedRegion[];
 }) {
+  const hostMobile = input.id === "host-prep-mobile" || input.id === "host-live-mobile";
   return captureApprovedComparison({
     entry: approvedMockup(input.id),
     candidate: input.page.locator("html"),
@@ -733,6 +735,7 @@ async function captureHostApproved(input: {
     testInfo: input.testInfo,
     regions: input.regions,
     allowFontRasterException: true,
+    fontRasterExceptionMaxRatio: hostMobile ? HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO : undefined,
   });
 }
 

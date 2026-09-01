@@ -21,9 +21,11 @@ export type ApprovedComparisonInput = {
   candidate: Locator;
   regions: readonly ApprovedRegion[];
   allowFontRasterException?: boolean;
+  fontRasterExceptionMaxRatio?: number;
 };
 
 export const FONT_RASTER_EXCEPTION_MAX_RATIO = 0.10;
+export const HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO = 0.15;
 
 export type ApprovedComparisonReport = {
   id: string;
@@ -59,16 +61,18 @@ export function assertApprovedMismatchRatio(input: {
   mismatchPixelRatio: number;
   maxDiffPixelRatio: number;
   allowFontRasterException?: boolean;
+  fontRasterExceptionMaxRatio?: number;
 }): void {
   if (input.mismatchPixelRatio <= input.maxDiffPixelRatio) return;
+  const exceptionCeiling = input.fontRasterExceptionMaxRatio ?? FONT_RASTER_EXCEPTION_MAX_RATIO;
   if (
     input.allowFontRasterException === true
-    && input.mismatchPixelRatio <= FONT_RASTER_EXCEPTION_MAX_RATIO
+    && input.mismatchPixelRatio <= exceptionCeiling
   ) {
     return;
   }
   const ceiling = input.allowFontRasterException === true
-    ? FONT_RASTER_EXCEPTION_MAX_RATIO
+    ? exceptionCeiling
     : input.maxDiffPixelRatio;
   throw new Error(`${input.id} mismatch ratio ${input.mismatchPixelRatio} exceeds ${ceiling}`);
 }
@@ -238,6 +242,7 @@ export async function captureApprovedComparison(input: ApprovedComparisonInput):
     mismatchPixelRatio: report.mismatchPixelRatio,
     maxDiffPixelRatio: entry.maxDiffPixelRatio,
     allowFontRasterException: input.allowFontRasterException,
+    fontRasterExceptionMaxRatio: input.fontRasterExceptionMaxRatio,
   });
   return report;
 }

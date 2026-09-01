@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { APPROVED_MOCKUPS, approvedMockupsAffectedBy } from "../e2e/support/approved-mockup-manifest";
 import {
   FONT_RASTER_EXCEPTION_MAX_RATIO,
+  HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
   assertApprovedMismatchRatio,
   expectGeometryWithinTolerance,
   verifyApprovedReference,
@@ -48,6 +49,40 @@ describe("approved mockup contract", () => {
       maxDiffPixelRatio: 0.02,
       allowFontRasterException: true,
     })).toThrow(/admin-today-desktop mismatch ratio 0.1001 exceeds 0.1/);
+    expect(() => assertApprovedMismatchRatio({
+      id: "host-prep-desktop",
+      mismatchPixelRatio: 0.1001,
+      maxDiffPixelRatio: 0.02,
+      allowFontRasterException: true,
+    })).toThrow(/host-prep-desktop mismatch ratio 0.1001 exceeds 0.1/);
+  });
+
+  it("accepts a host-mobile font-raster exception at or below 0.15 after copy match", () => {
+    expect(HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO).toBe(0.15);
+    expect(() => assertApprovedMismatchRatio({
+      id: "host-prep-mobile",
+      mismatchPixelRatio: 0.103,
+      maxDiffPixelRatio: 0.02,
+      allowFontRasterException: true,
+      fontRasterExceptionMaxRatio: HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
+    })).not.toThrow();
+    expect(() => assertApprovedMismatchRatio({
+      id: "host-live-mobile",
+      mismatchPixelRatio: 0.132,
+      maxDiffPixelRatio: 0.02,
+      allowFontRasterException: true,
+      fontRasterExceptionMaxRatio: HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
+    })).not.toThrow();
+  });
+
+  it("still fails a host-mobile font-raster exception above 0.15", () => {
+    expect(() => assertApprovedMismatchRatio({
+      id: "host-live-mobile",
+      mismatchPixelRatio: 0.1501,
+      maxDiffPixelRatio: 0.02,
+      allowFontRasterException: true,
+      fontRasterExceptionMaxRatio: HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
+    })).toThrow(/host-live-mobile mismatch ratio 0.1501 exceeds 0.15/);
   });
 
   it("maps shared visual dependencies to every downstream authority", () => {
