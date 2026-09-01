@@ -26,8 +26,8 @@
 }
 
 .rm-host-person__identity h1,
-.rm-host-person__identity p,
 .rm-host-person h2,
+.rm-host-person h3,
 .rm-host-person p {
   margin: 0;
   overflow-wrap: anywhere;
@@ -43,27 +43,35 @@
 }
 
 .rm-host-person__body {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.6fr);
-  gap: var(--space-xl);
-  padding-top: var(--space-lg);
-}
-
-.rm-host-person__facts,
-.rm-host-person__attendance,
-.rm-host-person__management {
   min-width: 0;
-  padding-top: var(--space-sm);
-  border-top: 1px solid var(--line);
+  padding-top: var(--space-md);
 }
 
-.rm-host-person__facts dl,
 .rm-host-person__facts {
   display: grid;
   gap: 0;
+  min-width: 0;
 }
 
 .rm-host-person__facts > div {
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-md) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.rm-host-person__facts h3 {
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.rm-host-person__facts dl {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.rm-host-person__facts dl > div {
   display: grid;
   grid-template-columns: 120px minmax(0, 1fr);
   gap: var(--space-sm);
@@ -80,12 +88,8 @@
   overflow-wrap: anywhere;
 }
 
-.rm-host-person__attendance {
-  grid-column: 1;
-}
-
 .rm-host-person__attendance ol {
-  margin: var(--space-sm) 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -95,17 +99,10 @@
   grid-template-columns: minmax(120px, 1fr) minmax(150px, 1fr) auto;
   gap: var(--space-sm);
   padding: var(--space-sm) 0;
-  border-bottom: 1px solid var(--line-soft, var(--line));
-}
-
-.rm-host-person__management {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  align-self: start;
+  border-bottom: 1px solid var(--line);
 }
 
 .rm-host-person__management p {
-  margin: var(--space-sm) 0;
   color: var(--text-2);
 }
 
@@ -120,18 +117,8 @@
     padding-inline: var(--space-md);
   }
 
-  .rm-host-person__body {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .rm-host-person__attendance,
-  .rm-host-person__management {
-    grid-column: 1;
-    grid-row: auto;
-  }
-
   .rm-host-person__attendance li,
-  .rm-host-person__facts > div {
+  .rm-host-person__facts dl > div {
     grid-template-columns: minmax(0, 1fr);
   }
 }

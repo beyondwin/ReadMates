@@ -230,7 +230,7 @@ function ManualNotificationPreviewConfirmationState({
       disabled={busy || Boolean(error) || (requiresResend && !resendConfirmed)}
       busy={busy}
       confirmLabel={isSideSheet
-        ? `${preview.audience.finalTargetCount}명에게 알림 발송`
+        ? `${preview.audience.finalTargetCount}명에게 안내 보내기`
         : "발송 확인"}
       showTitle={!isSideSheet}
       presentation={presentation}

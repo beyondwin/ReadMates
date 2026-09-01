@@ -93,7 +93,7 @@ test("surface 12 records destination at 1440px", async ({ mount, page }) => {
 test("surface 13 settings destination at 1440px", async ({ mount, page }) => {
   await page.setViewportSize({ width: 1440, height: 1100 });
   const component = await mount(<HostSettingsDestinationStory />);
-  await expect(component.getByRole("heading", { name: "공유 링크" })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "초대 링크" })).toBeVisible();
   await expect(component.getByRole("region", { name: "기존 이메일 초대 호환" })).toBeVisible();
   await expect(component.getByText("revision 7", { exact: true })).toBeVisible();
   await expect(component.getByText("settings revision 7", { exact: true })).toBeVisible();

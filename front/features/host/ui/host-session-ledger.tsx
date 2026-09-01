@@ -13,6 +13,7 @@ import { resolvedSessionExposure, sessionExposureCopy } from "@/features/host/mo
 import { formatMeetingOrdinal, hostMeetingLifecycleLabel } from "@/shared/model/meeting-language";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 import { readmatesReturnState } from "@/shared/routing/readmates-route-state";
+import "./host-editorial-ledger.css";
 
 type LedgerLinkProps = {
   to: string;
@@ -386,6 +387,8 @@ export function HostSessionLedger({
           )}
         </div>
       </div>
+      <div className="rm-host-editorial-ledger--split">
+      <div>
       {!trashView && summary ? (
         <section className="rm-document-panel" aria-label="기록 장부 요약" style={{ padding: 18 }}>
           <h2 className="h4 editorial" style={{ margin: 0 }}>기록 장부 요약</h2>
@@ -398,7 +401,10 @@ export function HostSessionLedger({
         </section>
       ) : null}
       {trashView ? null : (
-        <LedgerFilters key={filters.search} filters={filters} onFiltersChange={onFiltersChange} />
+        <details className="rm-host-editorial-ledger__panel">
+          <summary className="btn btn-quiet btn-sm">기록 필터</summary>
+          <LedgerFilters key={filters.search} filters={filters} onFiltersChange={onFiltersChange} />
+        </details>
       )}
       {errorMessage ? (
         <div className="surface-quiet" role="alert" style={{ padding: 18 }}>
@@ -432,6 +438,27 @@ export function HostSessionLedger({
         </button>
       ) : null}
       {loadMoreError ? <p className="small" role="alert">{loadMoreError}</p> : null}
+      </div>
+      {trashView ? null : (
+        <aside className="rm-host-editorial-ledger__rail" aria-labelledby="closing-work-title">
+          <h2 id="closing-work-title">마감 작업</h2>
+          <ul className="rm-host-editorial-ledger__list">
+            <li className="rm-host-editorial-ledger__row">
+              <span>확인 필요</span>
+              <span>{summary?.needsAttentionCount ?? 0}건</span>
+            </li>
+            <li className="rm-host-editorial-ledger__row">
+              <span>초안</span>
+              <span>{summary?.draftCount ?? 0}건</span>
+            </li>
+            <li className="rm-host-editorial-ledger__row">
+              <span>게시 미완료</span>
+              <span>{summary?.incompletePublishedCount ?? 0}건</span>
+            </li>
+          </ul>
+        </aside>
+      )}
+      </div>
     </div>
   );
 }

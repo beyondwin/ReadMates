@@ -407,7 +407,7 @@ function ScopedHostSettingsRoute({ clubSlug }: { clubSlug: string }) {
 
   const busy = busyOperationId !== null;
 
-  return <>
+  return <div className="rm-host-editorial-ledger--split">
     <HostInvitationLinks
       links={links.data?.items ?? []}
       loading={links.isPending}
@@ -428,6 +428,7 @@ function ScopedHostSettingsRoute({ clubSlug }: { clubSlug: string }) {
       onRetryCommand={retryPendingCommand}
       onCopySharePath={() => { void copySharePath(); }}
     />
+    <div className="stack">
     {settings.isPending ? <section className="surface-quiet" role="status">클럽 설정을 불러오는 중입니다.</section> : null}
     {settings.isError ? <section className="surface-quiet" role="alert"><p>클럽 설정을 불러오지 못했습니다.</p><button type="button" onClick={() => { void settings.refetch(); }}>다시 시도</button></section> : null}
     {settings.data && visibleSettingsDraft ? <HostClubSettings settings={settings.data} draft={visibleSettingsDraft} saving={busy} stale={stale} error={settingsError} onDraftChange={(draft) => { setSettingsDraft(draft); setStale(false); setSettingsError(null); if (pendingIdentity?.kind === "settings") setPendingIdentity(null); }} onSave={saveSettings} /> : null}
@@ -464,5 +465,6 @@ function ScopedHostSettingsRoute({ clubSlug }: { clubSlug: string }) {
         onRetryConfirm={retryPendingCommand}
       />
     </section>
-  </>;
+    </div>
+  </div>;
 }

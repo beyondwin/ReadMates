@@ -39,6 +39,30 @@
   min-width: 0;
 }
 
+.rm-meeting-toc__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  gap: 0;
+  align-items: start;
+  width: 100%;
+}
+
+.rm-meeting-toc__layout > :first-child {
+  min-width: 0;
+  padding-right: var(--space-lg);
+  border-inline-end: 1px solid var(--line);
+}
+
+.rm-meeting-toc__rail {
+  min-width: 0;
+  padding: var(--space-sm) 0 var(--space-sm) var(--space-lg);
+}
+
+.rm-meeting-toc__rail h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
 .rm-meeting-calendar__disclosure {
   margin: 0;
   color: var(--text-2);
@@ -272,6 +296,18 @@
 }
 
 @media (max-width: 640px) {
+  .rm-meeting-toc__layout,
+  .rm-meeting-toc__layout > :first-child {
+    grid-template-columns: minmax(0, 1fr);
+    border-inline-end: 0;
+    padding-right: 0;
+  }
+
+  .rm-meeting-toc__rail {
+    padding-left: 0;
+    padding-top: var(--space-lg);
+  }
+
   .rm-meeting-calendar__date {
     grid-template-columns: minmax(0, 1fr);
     gap: 0;

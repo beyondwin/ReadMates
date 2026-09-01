@@ -73,8 +73,9 @@ test("people ledger matches approved desktop", async ({ mount, page }, testInfo)
 test("meetings library matches approved desktop", async ({ mount, page }, testInfo) => {
   const component = await mountApproved(mount, page, hostMeetingsApprovedView(), APPROVED_DESKTOP_VIEWPORT);
   await expect(component.getByRole("heading", { name: "일정과 모임" })).toBeVisible();
-  await expect(component.getByRole("link", { name: "지구 끝의 온실" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "지구 끝의 온실", exact: true })).toBeVisible();
   await expect(component.getByRole("link", { name: "새 모임 만들기" })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "이번 달" })).toBeVisible();
   await captureHostLedger({
     id: "host-meetings-desktop",
     candidate: component,
@@ -88,6 +89,7 @@ test("records ledger matches approved desktop", async ({ mount, page }, testInfo
   await expect(component.getByRole("heading", { name: "기록", exact: true })).toBeVisible();
   await expect(component.getByRole("row", { name: /단 한 사람/ })).toBeVisible();
   await expect(component.getByRole("link", { name: /보기·수정/ }).first()).toBeVisible();
+  await expect(component.getByRole("heading", { name: "마감 작업" })).toBeVisible();
   await captureHostLedger({
     id: "host-records-desktop",
     candidate: component,
@@ -99,8 +101,8 @@ test("records ledger matches approved desktop", async ({ mount, page }, testInfo
 test("invites and settings match approved desktop", async ({ mount, page }, testInfo) => {
   const component = await mountApproved(mount, page, hostSettingsApprovedView(), APPROVED_DESKTOP_VIEWPORT);
   await expect(component.getByRole("heading", { name: "초대와 설정" })).toBeVisible();
-  await expect(component.getByRole("heading", { name: "공유 링크" })).toBeVisible();
-  await expect(component.getByRole("heading", { name: "클럽 기본 설정" })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "초대 링크" })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "클럽 설정" })).toBeVisible();
   await captureHostLedger({
     id: "host-settings-desktop",
     candidate: component,
@@ -126,8 +128,9 @@ test("person detail matches approved mobile", async ({ mount, page }, testInfo) 
   const component = await mountApproved(mount, page, hostPersonApprovedView(), APPROVED_MOBILE_VIEWPORT);
   await expect(component.getByRole("heading", { name: "박서윤" })).toBeVisible();
   await expect(component.getByText("최근 접속", { exact: true })).toBeVisible();
+  await expect(component.getByText("일정 확인", { exact: true })).toBeVisible();
   await expect(component.getByText("참석 응답", { exact: true })).toBeVisible();
-  await expect(component.getByText("실제 출석", { exact: true })).toBeVisible();
+  await expect(component.getByRole("heading", { name: /실제 출석/ })).toBeVisible();
   await captureHostLedger({
     id: "host-person-mobile",
     candidate: component,

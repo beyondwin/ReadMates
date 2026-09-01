@@ -438,6 +438,7 @@ function HostScheduleReviewSession({
         sessionNumber={detail.sessionNumber}
         bookTitle={detail.bookTitle}
         scheduleRevision={detail.scheduleRevision}
+        unreadMemberCount={eligibleIds.length}
         LinkComponent={LinkComponent}
       />
 

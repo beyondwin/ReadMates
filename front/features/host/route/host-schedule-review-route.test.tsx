@@ -257,7 +257,7 @@ describe("HostScheduleReviewRoute", () => {
     await screen.findByRole("heading", { name: "일정 미열람 검토" });
 
     await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
-    await userEvent.click(await screen.findByRole("button", { name: "2명에게 알림 발송" }));
+    await userEvent.click(await screen.findByRole("button", { name: "2명에게 안내 보내기" }));
 
     await waitFor(() => expect(confirmManualNotification).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -310,7 +310,7 @@ describe("HostScheduleReviewRoute", () => {
     await userEvent.clear(screen.getByRole("textbox", { name: "알림 제목" }));
     await userEvent.type(screen.getByRole("textbox", { name: "알림 제목" }), "보존할 제목");
     await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
-    await userEvent.click(await screen.findByRole("button", { name: "2명에게 알림 발송" }));
+    await userEvent.click(await screen.findByRole("button", { name: "2명에게 안내 보내기" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("최신 정보로 새 미리보기를 만들어 주세요");
     expect(screen.getByRole("textbox", { name: "알림 제목" })).toHaveValue("보존할 제목");
@@ -331,7 +331,7 @@ describe("HostScheduleReviewRoute", () => {
     renderRoute();
     await screen.findByRole("heading", { name: "일정 미열람 검토" });
     await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
-    await userEvent.click(await screen.findByRole("button", { name: "2명에게 알림 발송" }));
+    await userEvent.click(await screen.findByRole("button", { name: "2명에게 안내 보내기" }));
 
     expect(await screen.findByRole("alert")).toBeVisible();
     expect(screen.queryByRole("region", { name: "발송 전 확인" })).not.toBeInTheDocument();
@@ -353,7 +353,7 @@ describe("HostScheduleReviewRoute", () => {
     await userEvent.clear(screen.getByRole("textbox", { name: "알림 제목" }));
     await userEvent.type(screen.getByRole("textbox", { name: "알림 제목" }), "보존할 제목");
     await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
-    await userEvent.click(await screen.findByRole("button", { name: "2명에게 알림 발송" }));
+    await userEvent.click(await screen.findByRole("button", { name: "2명에게 안내 보내기" }));
 
     await waitFor(() => expect(fetchHostSessionDetail).toHaveBeenCalledTimes(2));
     expect(fetchManualNotificationOptions).toHaveBeenCalledTimes(2);
@@ -372,7 +372,7 @@ describe("HostScheduleReviewRoute", () => {
     await userEvent.type(screen.getByRole("textbox", { name: "알림 제목" }), "보존할 제목");
     await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
     vi.mocked(fetchHostSessionDetail).mockRejectedValueOnce(new Error("detail refetch failed"));
-    await userEvent.click(await screen.findByRole("button", { name: "2명에게 알림 발송" }));
+    await userEvent.click(await screen.findByRole("button", { name: "2명에게 안내 보내기" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("최신 권한을 확인하지 못했습니다");
     expect(screen.queryByRole("button", { name: "알림 미리보기" })).not.toBeInTheDocument();
@@ -387,7 +387,7 @@ describe("HostScheduleReviewRoute", () => {
     const invalidate = vi.spyOn(client, "invalidateQueries");
     await screen.findByRole("heading", { name: "일정 미열람 검토" });
     await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
-    await userEvent.click(await screen.findByRole("button", { name: "2명에게 알림 발송" }));
+    await userEvent.click(await screen.findByRole("button", { name: "2명에게 안내 보내기" }));
 
     expect(await screen.findByRole("status", { name: "일정 알림 · 결과 확인 필요" })).toBeVisible();
     expect(screen.getByRole("link", { name: "알림 장부에서 결과 확인" })).toHaveAttribute(
@@ -448,7 +448,7 @@ describe("HostScheduleReviewRoute", () => {
     const storageWrite = vi.spyOn(Storage.prototype, "setItem");
     await screen.findByRole("heading", { name: "일정 미열람 검토" });
     await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
-    await userEvent.click(await screen.findByRole("button", { name: "2명에게 알림 발송" }));
+    await userEvent.click(await screen.findByRole("button", { name: "2명에게 안내 보내기" }));
 
     rejection.resolve();
     await failedSettled.promise;

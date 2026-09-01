@@ -38,7 +38,7 @@ export function MemberPendingZone({
           가입 승인
         </div>
         <h2 className="h4 editorial" style={{ margin: 0 }}>
-          가입 요청 {viewers.length}명
+          가입 승인 대기 {viewers.length}명
         </h2>
         <p className="small" style={{ margin: 0, color: "var(--text-2)" }}>
           승인·거절은 멤버에게 알림이 갑니다

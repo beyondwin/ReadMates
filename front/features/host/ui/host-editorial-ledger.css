@@ -137,9 +137,10 @@
 
 .rm-host-editorial-ledger--split {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+  grid-template-columns: minmax(0, 1fr) 280px;
   gap: 0;
   align-items: start;
+  width: 100%;
 }
 
 .rm-host-editorial-ledger--split > * {

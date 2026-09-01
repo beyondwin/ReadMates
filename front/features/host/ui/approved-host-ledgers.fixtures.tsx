@@ -3,11 +3,13 @@ import type { HostMeetingTocSections } from "@/features/host/model/host-meeting-
 import type { HostPersonDetailView } from "@/features/host/model/host-person-detail-model";
 import type { HostInvitationLinkView, HostSettingsView } from "@/features/host/model/host-settings-model";
 import type { HostSessionLedgerItem } from "@/features/host/model/host-session-ledger-model";
-import type { HostMemberListItem } from "@/features/host/model/host-view-types";
+import type { HostMemberListItem, ManualNotificationPreviewResponse } from "@/features/host/model/host-view-types";
 import { AppClubShellHostStory } from "@/shared/ui/app-club-shell.story";
 import { HostSessionLedger } from "./host-session-ledger";
 import { HostMeetingList } from "./meeting-list/host-meeting-list";
+import { HostPeoplePage } from "./members/host-people-page";
 import { MemberList } from "./members/member-list";
+import { ManualNotificationPreviewConfirmation } from "./notifications/manual-notification-preview";
 import { HostPersonDetail } from "./person/host-person-detail";
 import { HostScheduleReviewHeader } from "./schedule-review/host-schedule-review-header";
 import { HostClubSettings } from "./settings/host-club-settings";
@@ -15,6 +17,7 @@ import {
   HostInvitationLinks,
   type HostInvitationCreateDraft,
 } from "./settings/host-invitation-links";
+import { HostSettingsPage } from "./settings/host-settings-page";
 import "./host-editorial-ledger.css";
 import "./shell/host-shell.css";
 import "./workbox/host-workbox.css";
@@ -266,6 +269,36 @@ const scheduleReviewMembers = [
   { id: "membership-moon", name: "문재희", state: "미열람" },
 ] as const;
 
+const scheduleReviewPreview: ManualNotificationPreviewResponse = {
+  previewId: "preview-schedule-28",
+  expiresAt: "2026-09-02T12:00:00Z",
+  scheduleRevision: 4,
+  targetSnapshotHash: "b".repeat(64),
+  contentHash: "c".repeat(64),
+  template: {
+    eventType: "SESSION_REMINDER_DUE",
+    label: "일정 변경 알림",
+    subject: "모임 시간이 오후 7:30으로 바뀌었어요",
+    bodyPreview: "이번 모임 시작 시간이 오후 7:30으로 변경되었습니다. 최신 일정을 확인해 주세요.",
+  },
+  audience: {
+    baseGroup: "SELECTED_MEMBERS",
+    baseCount: 4,
+    excludedCount: 0,
+    includedCount: 0,
+    finalTargetCount: 4,
+  },
+  channels: {
+    requested: "BOTH",
+    inAppEligibleCount: 4,
+    emailEligibleCount: 4,
+    emailSkippedByPreferenceCount: 0,
+    emailMissingCount: 0,
+  },
+  duplicates: { requiresResendConfirmation: false, recentDispatches: [] },
+  warnings: [],
+};
+
 export function hostMeetingsApprovedView() {
   return hostApprovedShell(
     <HostMeetingList
@@ -282,37 +315,19 @@ export function hostMeetingsApprovedView() {
 
 export function hostPeopleApprovedView() {
   return hostApprovedShell(
-    <main className="rm-host-editorial-ledger rm-host-editorial-ledger--context">
-      <section className="page-header-compact">
-        <div className="container rm-host-editorial-ledger__context">
-          <h1 className="h1 editorial rm-host-editorial-ledger__heading">사람</h1>
-          <p className="small rm-host-editorial-ledger__lede">
-            가입부터 일정 확인, 참석 기록까지 멤버의 흐름을 관리하세요.
-          </p>
-        </div>
-      </section>
-      <section className="container rm-host-editorial-ledger__body rm-host-editorial-ledger--split">
-        <MemberList
-          members={peopleMembers}
-          emptyText="활성 멤버가 없습니다."
-          sectionDescription="멤버 원장"
-          personHref={(membershipId) => `/clubs/reading-sai/app/host/people/${membershipId}`}
-          LinkComponent={({ to, children, ...props }) => <a {...props} href={to}>{children}</a>}
-          renderProfileAction={() => null}
-          renderActions={() => (
-            <a className="btn btn-ghost btn-sm" href="/clubs/reading-sai/app/host/people/membership-sky">열기</a>
-          )}
-        />
-        <aside className="rm-host-editorial-ledger__rail" aria-labelledby="schedule-seen-title">
-          <h2 id="schedule-seen-title">현재 일정 확인</h2>
-          <ul className="rm-host-editorial-ledger__list">
-            <li className="rm-host-editorial-ledger__row"><span>현재 일정 확인</span><span>8</span></li>
-            <li className="rm-host-editorial-ledger__row"><span>변경 전 확인</span><span>1</span></li>
-            <li className="rm-host-editorial-ledger__row"><span>미열람</span><span>3</span></li>
-          </ul>
-        </aside>
-      </section>
-    </main>,
+    <HostPeoplePage scheduleSeen={{ current: 8, stale: 1, unseen: 3, notTarget: 3 }}>
+      <MemberList
+        members={peopleMembers}
+        emptyText="활성 멤버가 없습니다."
+        sectionDescription="멤버 원장"
+        personHref={(membershipId) => `/clubs/reading-sai/app/host/people/${membershipId}`}
+        LinkComponent={({ to, children, ...props }) => <a {...props} href={to}>{children}</a>}
+        renderProfileAction={() => null}
+        renderActions={() => (
+          <a className="btn btn-ghost btn-sm" href="/clubs/reading-sai/app/host/people/membership-sky">열기</a>
+        )}
+      />
+    </HostPeoplePage>,
   );
 }
 
@@ -345,16 +360,8 @@ export function hostRecordsApprovedView() {
 
 export function hostSettingsApprovedView() {
   return hostApprovedShell(
-    <main className="rm-host-editorial-ledger rm-host-editorial-ledger--context">
-      <section className="page-header-compact">
-        <div className="container rm-host-editorial-ledger__context">
-          <h1 className="h1 editorial rm-host-editorial-ledger__heading">초대와 설정</h1>
-          <p className="small rm-host-editorial-ledger__lede">
-            새 멤버가 들어오는 경로와 클럽 운영 기준을 함께 관리하세요.
-          </p>
-        </div>
-      </section>
-      <section className="container rm-host-editorial-ledger__body rm-host-editorial-ledger--split">
+    <HostSettingsPage>
+      <div className="rm-host-editorial-ledger--split">
         <HostInvitationLinks
           links={invitationLinks}
           loading={false}
@@ -384,8 +391,8 @@ export function hostSettingsApprovedView() {
           onDraftChange={noop}
           onSave={noop}
         />
-      </section>
-    </main>,
+      </div>
+    </HostSettingsPage>,
   );
 }
 
@@ -420,8 +427,21 @@ export function hostScheduleReviewApprovedView() {
         <section className="rm-schedule-review__composer" aria-labelledby="schedule-review-composer-title">
           <h2 id="schedule-review-composer-title">보낼 안내</h2>
           <p>대상과 문구를 확인한 뒤 직접 보내세요. 자동 발송하지 않아요.</p>
+          <label>
+            <span>알림 제목</span>
+            <input aria-label="알림 제목" readOnly value={scheduleReviewPreview.template.subject} />
+          </label>
+          <label>
+            <span>알림 본문</span>
+            <textarea aria-label="알림 본문" readOnly rows={6} value={scheduleReviewPreview.template.bodyPreview} />
+          </label>
           <button type="button" className="rm-schedule-review__preview">알림 미리보기</button>
-          <button type="button" className="btn btn-primary">4명에게 안내 보내기</button>
+          <ManualNotificationPreviewConfirmation
+            preview={scheduleReviewPreview}
+            busy={false}
+            presentation="side-sheet"
+            onConfirm={async () => undefined}
+          />
         </section>
       </div>
     </main>,
