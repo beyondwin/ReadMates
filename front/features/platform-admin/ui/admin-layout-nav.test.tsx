@@ -104,17 +104,18 @@ describe("AdminLayoutNav", () => {
     expect(screen.queryByRole("link", { name: "클럽 상세" })).not.toBeInTheDocument();
   });
 
-  it("wires rail logout to the supplied account callback and stays decorative without one", async () => {
+  it("wires the rail account control to the supplied callback and stays decorative without one", async () => {
     const onLogout = vi.fn();
     const { unmount } = renderNav({ onLogout });
-    const logout = screen.getByRole("button", { name: "로그아웃" });
-    expect(logout.tagName).toBe("BUTTON");
-    logout.click();
+    const account = screen.getByRole("button", { name: "다른 계정으로 로그인" });
+    expect(account.tagName).toBe("BUTTON");
+    expect(screen.queryByRole("button", { name: "로그아웃" })).not.toBeInTheDocument();
+    account.click();
     expect(onLogout).toHaveBeenCalledOnce();
     unmount();
 
     renderNav();
-    expect(screen.queryByRole("button", { name: "로그아웃" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "다른 계정으로 로그인" })).not.toBeInTheDocument();
     expect(document.querySelector(".admin-layout-nav__logout")).toHaveAttribute("aria-hidden", "true");
   });
 
