@@ -27,10 +27,10 @@ src/app -> src/pages -> features -> shared
 - `src/app`: router, layouts, guards, providers, route continuity.
 - `src/pages`: thin route compatibility shells; delegate to feature route modules.
 - `features/<name>/api`: BFF calls and request/response contracts.
-- `features/<name>/queries`: TanStack Query keys, `queryOptions`, mutation hooks, and invalidation policy; do not import UI, route, app, or page modules.
+- `features/<name>/queries`: TanStack Query keys, `queryOptions`, mutation hooks, and query-owned publication/invalidation policy; do not import UI, route, app, or page modules. A transition-managed mutation hook executes the request and returns its observation only. It does not automatically invalidate cache, call `setQueryData`, refetch, publish receipt/copy, or navigate from `onSuccess`/`onError`. Export an explicit query-owned publisher and let the registering route/controller invoke it only after owner settlement returns `accepted`.
 - `features/<name>/model`: pure calculation/mapping; no React, router, fetch, or API client imports. A model may use a type-only import from its own feature's `api/*-contracts` module when a pure mapper or typed failure consumes a wire-owned union; runtime API imports remain forbidden.
 - `features/<name>/route`: loader/action behavior, API/model calls, route state, UI prop assembly.
-- `features/<name>/ui`: render from props/callbacks only; no `fetch`, `shared/api`, feature API, feature queries, or route imports.
+- every nested `features/**/ui/**`: render from props/callbacks only; no `fetch`, `shared/api`, feature API, feature queries, route/app/page imports, or router package imports. Calling an owner-supplied callback is presentation composition and does not grant the UI mutation execution ownership.
 - `shared`: reusable primitives; do not import feature/page/app code.
 - `functions`: Cloudflare Pages Functions for same-origin BFF and OAuth proxy routes; never expose BFF secrets through `VITE_*`.
 
@@ -38,7 +38,7 @@ Do not add new imports from removed `shared/api/readmates`. Use feature-owned AP
 
 Do not add Next/React Server Component directives such as `"use client"` to Vite source files.
 
-Server state는 TanStack Query v5로 점진 이관 중입니다. 앱 루트(`front/src/main.tsx`)에 단일 `QueryClient`를 주입하고, `front/src/app/router.tsx`의 `createReadmatesRouter()`가 `{router, queryClient}`를 반환해 loader와 컴포넌트가 같은 cache를 공유합니다. 새 server state는 `features/<name>/queries/<area>-queries.ts`에 `queryOptions` + `useXxxMutation`을 두고, mutation은 `onSuccess`에서 `invalidateQueries({ queryKey: keys.all })`로 정리합니다. 진행 상황은 [docs/development/server-state-migration.md](../development/server-state-migration.md)를 참고합니다.
+Server state는 TanStack Query v5로 점진 이관 중입니다. 앱 루트(`front/src/main.tsx`)에 단일 `QueryClient`를 주입하고, `front/src/app/router.tsx`의 `createReadmatesRouter()`가 `{router, queryClient}`를 반환해 loader와 컴포넌트가 같은 cache를 공유합니다. 새 server state는 `features/<name>/queries/<area>-queries.ts`에 `queryOptions` + `useXxxMutation`을 둡니다. 전환 안전 등록이 필요 없는 단순 read/update도 query-owned invalidation policy를 유지하고, 등록 대상 write는 observation-only mutation execution과 explicit publisher를 분리합니다. Route/controller는 `settle(...) === "accepted"` 뒤 publisher를 한 번만 호출하고, `obsolete`·unmount·authority loss의 late response는 cache/UI/receipt/copy/navigation/return target을 발행하지 않습니다. 진행 상황은 [docs/development/server-state-migration.md](../development/server-state-migration.md)를 참고합니다.
 
 `front/src/app/router.tsx`는 composition root입니다. Route 정의는 `front/src/app/routes/{public,auth,member,host}.tsx`에 variant별로 분리되어 있으니, 새 route는 해당 variant 모듈에 추가합니다.
 

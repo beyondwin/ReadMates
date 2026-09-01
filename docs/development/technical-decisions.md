@@ -52,7 +52,7 @@ ReadMates의 durable product·technical·design·operational decision은 [ADR �
 | [ADR-0047](adr/0047-admin-case-desk-narrative-composition.md) | 플랫폼 어드민을 케이스 데스크 + 운영 서사로 재구성 | Superseded by ADR-0050 |
 | [ADR-0048](adr/0048-host-lifecycle-operating-room-composition.md) | 호스트 워크스페이스를 모임 생애주기 운영실 + 작업함으로 구성 | Proposed |
 | [ADR-0049](adr/0049-schedule-revision-seen-state.md) | 일정 revision 확인을 접속·참석 응답·실제 출석과 분리 | Proposed |
-| [ADR-0050](adr/0050-platform-admin-today-operations-desk.md) | 플랫폼 어드민을 오늘 할 일 중심 운영 데스크로 재구성 | Proposed |
-| [ADR-0051](adr/0051-global-platform-and-club-space-transition.md) | 전역 공간을 플랫폼 운영·내 클럽 두 축으로 고정 | Proposed |
+| [ADR-0050](adr/0050-platform-admin-today-operations-desk.md) | 플랫폼 어드민을 오늘 할 일 중심 운영 데스크로 재구성 | Accepted |
+| [ADR-0051](adr/0051-global-platform-and-club-space-transition.md) | 전역 공간을 플랫폼 운영·내 클럽 두 축으로 고정 | Accepted |
 
 Active architecture는 [architecture.md](architecture.md), 검증 경로는 [test-guide.md](test-guide.md)와 각 ADR의 `검증` 절을 따른다. Server의 canonical PR gate는 `./scripts/server-ci-check.sh`다. 외부 서비스의 가격·한도·API 동작처럼 변할 수 있는 사실은 운영 판단 직전에 공식 source로 다시 확인한다.

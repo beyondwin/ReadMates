@@ -1,13 +1,13 @@
 # ADR-0050: 플랫폼 어드민을 오늘 할 일 중심 운영 데스크로 재구성
 
-- 상태: Proposed
+- 상태: Accepted
 - 결정일: 2026-08-30
 - 작성자: 제품·디자인·플랫폼 운영·프런트엔드
 - 관련: ADR-0039, ADR-0040, ADR-0045, ADR-0047, `docs/development/2026-08-30-readmates-platform-admin-operations-product-redesign-design.md`, `front/features/platform-admin/**`
 
 ## 컨텍스트
 
-ADR-0047의 케이스 데스크와 운영 서사는 구현되었지만, 실제 화면은 여전히 기능명·상태 필터·raw enum이 운영자의 핵심 질문보다 먼저 보이고 route별 밀도와 mobile 완료 경로가 고르지 않다. `AdminShellLayoutInner`는 capability, authority loss, onboarding mutation, navigation blocking, account switching, alarm과 shell render를 함께 소유한다 (`front/features/platform-admin/route/admin-shell-layout.tsx:56`). UI 구조도 새 운영자가 `무슨 일인지`, `왜 중요한지`, `무엇을 해야 하는지`를 같은 순서로 읽도록 강제하지 못한다.
+ADR-0047의 케이스 데스크와 운영 서사는 구현되었지만, 개편 전 화면은 기능명·상태 필터·raw enum이 운영자의 핵심 질문보다 먼저 보이고 route별 밀도와 mobile 완료 경로가 고르지 않았다. 개편 전 `AdminShellLayoutInner`는 capability, authority loss, onboarding mutation, navigation blocking, account switching, alarm과 shell render를 함께 소유했다. 현재는 shell 책임을 `front/features/platform-admin/route/admin-shell-controller.tsx`, onboarding 책임을 clubs route의 `front/features/platform-admin/route/admin-onboarding-controller.tsx`로 분리했다.
 
 새 승인 시안은 ADR-0047의 A+B 방향을 계승하지만 상위 내비, Today 비율, 설명 순서, platform-neutral copy, desktop/mobile 일관 계약을 더 좁고 명확하게 고정한다. 기존 결정을 조용히 수정하지 않고 새 composition 결정으로 대체해야 한다.
 
@@ -58,15 +58,14 @@ ADR-0047의 케이스 데스크와 운영 서사는 구현되었지만, 실제 �
 
 ## 검증
 
-- `/admin`과 기존 모든 deep link, reload, Back/Forward가 유지되는지 route/E2E로 확인한다.
-- Today 38:62 desktop과 mobile list/detail flow를 320, 390, 768, 900, 1024, 1440px 및 200% zoom에서 확인한다.
-- loading, empty, stale, partial, 403, 409, invalid cursor, pending, unknown outcome을 route별로 검증한다.
-- keyboard, focus restore, screen reader name/current/selection, reduced motion, 긴 한국어/영어 wrapping을 검증한다.
-- raw enum/ID와 특정 club content가 platform shell의 1급 정보로 노출되지 않는지 확인한다.
-- code·tests·tracked visual evidence·`front/DESIGN.md`·`docs/development/architecture.md`가 일치한 뒤에만 `Accepted`로 승격한다.
+- `front/features/platform-admin/model/admin-route-catalog.ts`가 네 축과 기존 URL의 대응을 고정하고, route/E2E가 `/admin` deep link, reload, Back/Forward와 URL-owned selection/filter를 검증한다.
+- `front/features/platform-admin/ui/admin-today-ledger.tsx`와 `front/features/platform-admin/ui/use-admin-content-width.ts`가 observed content width 960px을 기준으로 38:62 desk와 list/detail flow를 선택한다. 320, 390, 768, 900, 1024, 1440px browser/visual matrix와 실제 Chrome 200% zoom에서 수평 overflow 없음과 focus target을 확인했다.
+- route·unit·component·E2E 검증이 loading, empty, stale, partial, 403, 409, invalid cursor, pending, unknown outcome, keyboard/focus, reduced motion와 긴 한국어/영어 wrapping을 다룬다. Docker Chromium component gate는 104/104를 통과했고 대표 admin shell·ledger·support PNG를 추적한다.
+- `front/features/platform-admin/model/admin-copy.ts`, `front/features/platform-admin/model/admin-status-language.ts`와 UI 경계 검증이 raw enum/ID와 특정 club content를 1급 정보로 올리지 않도록 고정한다.
+- Canonical frontend lint/test/build, focused/full E2E, server PR gate, MySQL/Testcontainers 1,422건, public release candidate 검증을 통과했고 code·tests·tracked visual evidence·`front/DESIGN.md`·`docs/development/architecture.md`가 일치해 `Accepted`로 승격했다.
+- 5명 초보 운영자의 30초 이해 연구와 VoiceOver/Safari·NVDA/Chrome 수동 screen-reader announcement order는 아직 `not measured`다. 이 미측정은 구현과 자동 접근성 계약의 acceptance를 막지 않지만, 해당 사용자 연구와 수동 announcement 검증을 완료했다고 주장할 수는 없다.
 
 ## 후속 작업
 
-- 설계 문서의 단계에 따라 shell, Today, 클럽 관리, 서비스 상태, 처리 기록을 순차 이관한다.
-- ADR-0051의 전역 공간 전환을 shell 이관보다 먼저 구현한다.
-- 구현 완료 시 ADR-0039의 1차 내비 문구와 active design/architecture를 실제 코드에 맞춰 갱신한다.
+- 5명 초보 운영자의 30초 이해 연구와 VoiceOver/Safari·NVDA/Chrome 수동 screen-reader 검증을 별도 evidence로 수행한다. 완료 전에는 정성 이해도나 announcement order를 production 검증 완료로 표현하지 않는다.
+- 새 admin route를 추가할 때 `admin-route-catalog.ts`, 공통 상태 문법, tracked visual matrix와 exact capability/safe-command 계약을 함께 갱신한다.

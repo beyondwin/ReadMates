@@ -1,15 +1,15 @@
 # ADR-0051: 전역 공간을 플랫폼 운영·내 클럽 두 축으로 고정
 
-- 상태: Proposed
+- 상태: Accepted
 - 결정일: 2026-08-30
 - 작성자: 제품·프런트엔드·보안
-- 관련: ADR-0019, ADR-0026, ADR-0030, ADR-0035, ADR-0040, ADR-0050, `front/shared/auth/auth-contracts.ts:5`, `front/src/app/workspace-route-model.ts:1`, `front/features/platform-admin/model/admin-workspace-switcher-model.ts:38`
+- 관련: ADR-0019, ADR-0026, ADR-0030, ADR-0035, ADR-0040, ADR-0050, `server/src/main/kotlin/com/readmates/auth/application/model/AuthAccessProjection.kt`, `front/shared/auth/available-spaces.ts`, `front/src/app/global-space-transition.ts`
 
 ## 컨텍스트
 
-같은 사용자가 platform admin, club host, member 권한을 동시에 가질 수 있다. 현재 공통 workspace 타입은 `member | host`뿐이고 (`front/shared/model/app-club-shell.ts:3`), admin은 별도 메뉴에서 `joinedClubs`의 role/status를 다시 계산한다. 이 계산은 host 접근 정책이 요구하는 approval state와도 다르다 (`front/features/platform-admin/model/admin-workspace-switcher-model.ts:43`, `front/shared/auth/member-app-access.ts:18`). Admin에서 club으로 가는 메뉴는 있지만 member/host shell에서 platform으로 돌아오는 동일한 전역 모델이 없다.
+같은 사용자가 platform admin, club host, member 권한을 동시에 가질 수 있다. 개편 전 공통 workspace 타입은 `member | host`뿐이었고 admin은 별도 메뉴에서 `joinedClubs`의 role/status를 다시 계산했다. 이 계산은 host 접근 정책이 요구하는 approval state와도 달랐고, Admin에서 club으로 가는 메뉴는 있지만 member/host shell에서 platform으로 돌아오는 동일한 전역 모델이 없었다.
 
-또한 role 전환 route model은 pathname family와 정규식 fallback을 중심으로 하고 (`front/src/app/workspace-route-model.ts:75`), 복귀 정보는 workspace별 pathname 하나만 session storage에 보존한다 (`front/src/app/workspace-route-continuity.ts:3`). 작성 중, effect 진행 중, response loss로 결과를 모르는 상태에서 공간을 바꾸는 공통 안전 계약이 없다.
+또한 개편 전 role 전환 route model은 pathname family와 정규식 fallback을 중심으로 했고 복귀 정보는 workspace별 pathname 하나만 session storage에 보존했다. 작성 중, effect 진행 중, response loss로 결과를 모르는 상태에서 공간을 바꾸는 공통 안전 계약도 없었다. 현재 구현은 `front/src/app/global-space-continuity.ts`와 `front/src/app/global-space-transition.ts`로 이 책임을 대체한다.
 
 ADR-0026은 member/host를 동급 global workspace로 놓고 platform admin을 별도 cross-club scope로 설명했다. 새 승인 방향은 최상위 선택을 platform과 personal club로 단순화하고, club과 perspective를 그 아래 독립 축으로 분리하므로 ADR-0026을 대체해야 한다.
 
@@ -23,7 +23,7 @@ ReadMates의 전역 공간 kind 전체 집합은 정확히 `플랫폼 운영`과
 - 서버 projection이 `availableSpaces`와 club별 허용 perspective를 소유한다. 각 목적 route의 기존 capability/guard는 action authority를 다시 확인하고, client는 role/status enum으로 공간 접근을 재계산하지 않는다.
 - return target은 `pathname`, `search`, `hash`, focus target, scroll 위치를 공간·club·perspective별로 보존한다. 민감 state나 command payload는 보존하지 않는다. 복원 전에 최신 `availableSpaces`, route correspondence와 route-owned allowlist를 다시 검사하고 stale/invalid target은 폐기한다.
 - 전환 안전 상태는 `clean`, `dirty`, `pending`, `unknown-outcome`이다. `dirty`는 명시적 이탈 확인을 요구한다. `pending` 등록은 operation identity와 domain-owned recovery strategy를 함께 보관하고, request가 응답하거나 기본 30초 timeout(기존 domain 계약이 더 짧으면 그 값)에 도달할 때까지 이동을 막는다. timeout이면 같은 identity와 recovery를 보존한 `unknown-outcome`으로 전환한다. `unknown-outcome`은 자동 재실행하지 않고, receipt가 있는 command는 같은 command/receipt identity로 조회·재개하며 L1은 authoritative state/history를 다시 읽는다.
-- coordinator는 등록마다 generation을 발급한다. unmount/authority loss는 등록·timer·민감 cache와 draft를 폐기하고 generation을 올리며, 이전 generation의 늦은 응답은 UI·cache·return target을 갱신하지 않고 원래 recovery strategy로만 수렴한다. Member·host·admin의 변경 producer는 전수 inventory에서 `register` 또는 근거가 있는 `verified-no-change`로 분류한다.
+- coordinator는 등록마다 generation을 발급한다. Normal unmount는 active 등록을 tombstone 처리하되 receipt capsule을 retired registry에 남겨 같은 identity의 detached lookup/reconciliation만 허용한다. Authority loss는 active/retired capsule, timer, 민감 cache와 draft를 먼저 invalidate/clear하고 generation을 올린다. 이전 generation의 늦은 응답은 UI·cache·receipt callback·success copy·navigation·return target을 갱신하지 않으며, authority loss 뒤에는 replay 없이 `authority-lost`로 끝난다. Member·host·admin의 변경 producer는 전수 inventory에서 등록 owner, 수정 factory, 검증된 leaf 또는 mounted graph에서 도달 불가한 export로 분류한다.
 - authority loss에서는 ADR-0035대로 해당 민감 cache/draft를 폐기하고, 서버 projection이 허용한 안전 목적지로 replace 이동한다.
 - 대응 route가 없으면 같은 공간·club·perspective의 마지막 안전 목적지, 그 perspective 대표 route 순으로 fallback한다.
 
@@ -63,15 +63,14 @@ ReadMates의 전역 공간 kind 전체 집합은 정확히 `플랫폼 운영`과
 
 ## 검증
 
-- platform-only, member-only, host+member, platform+member, platform+host+member 계정 조합을 contract/E2E로 검증한다.
-- inactive, suspended, approval pending, capability removal, authority loss 시 허용되지 않은 공간이 보이지 않고 direct URL도 거절되는지 확인한다.
-- pathname/search/hash/focus/scroll 복원과 club/perspective별 격리를 browser test한다.
-- dirty confirm, pending block→timeout transition, unknown-outcome의 receipt 또는 authoritative history recovery, clean transition을 각각 검증한다.
-- keyboard menu, focus return, screen reader label/current state, mobile switch flow를 검증한다.
-- server DTO, frontend schema/model, active architecture가 일치한 뒤에만 `Accepted`로 승격한다.
+- Server contract와 frontend fixture/E2E가 platform-only, member-only, host+member, platform+member, platform+host+member 조합 및 inactive/suspended/pending membership을 검증한다. `availableSpaces` unknown/malformed projection은 fail close하고, field가 없는 혼합 배포 응답에서만 legacy fallback을 허용한다.
+- Route/transition tests가 pathname/search/hash/focus/scroll의 club/perspective 격리, dirty confirm, pending block→timeout, unknown-outcome receipt/history recovery와 clean transition을 검증한다.
+- Exact interleaving `beginPending → unregister/unmount → authority loss → late settlement/reconciliation`은 원래 request count 불변, replay 0회, UI/cache/receipt/copy/navigation/return-target publication 0회, retained canonical field clear와 detached capsule 0개를 검증한다. Normal unmount의 same-identity receipt lookup은 이 authority-loss zero-replay 경로와 별도로 검증한다.
+- `front/tests/unit/frontend-boundaries.test.ts`와 `front/src/app/space-transition-producer-inventory.test.ts`가 query/API/router 없는 nested presentation, observation-only mutation execution, accepted-owner publisher 호출과 모든 write producer 분류를 강제한다.
+- Canonical frontend lint/test/build, focused/full E2E, server PR gate, MySQL/Testcontainers 1,422건, Docker Chromium component 104건과 public release candidate 검증을 통과했다. Server DTO, frontend strict schema/model, active architecture가 일치해 `Accepted`로 승격했다.
+- Keyboard menu, visible focus, mobile switch flow와 자동 접근성 계약은 검증했다. VoiceOver/Safari·NVDA/Chrome 수동 screen-reader announcement order는 아직 `not measured`이며 완료로 주장하지 않는다.
 
 ## 후속 작업
 
-- 목적에 맞는 server-owned space projection DTO와 fail-closed TypeScript normalizer contract fixture를 추가한다.
-- 공통 transition coordinator와 versioned session-storage migration을 구현한다.
-- member/host/admin shell을 같은 two-level switcher로 순차 이관한다.
+- 혼합 배포 compatibility가 필요 없다는 production residue evidence가 생기기 전에는 기존 auth field와 `availableSpaces` absent-only legacy fallback을 제거하지 않는다.
+- VoiceOver/Safari·NVDA/Chrome 수동 screen-reader announcement order를 별도 evidence로 측정한다.

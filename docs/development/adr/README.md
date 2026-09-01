@@ -74,8 +74,8 @@ Routine refactor, component-local layout, reversible implementation detail은 AD
 | [0047](0047-admin-case-desk-narrative-composition.md) | 플랫폼 어드민을 케이스 데스크 + 운영 서사로 재구성 | Superseded by ADR-0050 | 2026-08-27 | product, design, platform ops, front |
 | [0048](0048-host-lifecycle-operating-room-composition.md) | 호스트 워크스페이스를 모임 생애주기 운영실 + 작업함으로 구성 | Proposed | 2026-08-29 | product, design, front |
 | [0049](0049-schedule-revision-seen-state.md) | 일정 revision 확인을 접속·참석 응답·실제 출석과 분리 | Proposed | 2026-08-29 | product, server, front, privacy |
-| [0050](0050-platform-admin-today-operations-desk.md) | 플랫폼 어드민을 오늘 할 일 중심 운영 데스크로 재구성 | Proposed | 2026-08-30 | product, design, platform ops, front |
-| [0051](0051-global-platform-and-club-space-transition.md) | 전역 공간을 플랫폼 운영·내 클럽 두 축으로 고정 | Proposed | 2026-08-30 | product, front, server, security |
+| [0050](0050-platform-admin-today-operations-desk.md) | 플랫폼 어드민을 오늘 할 일 중심 운영 데스크로 재구성 | Accepted | 2026-08-30 | product, design, platform ops, front |
+| [0051](0051-global-platform-and-club-space-transition.md) | 전역 공간을 플랫폼 운영·내 클럽 두 축으로 고정 | Accepted | 2026-08-30 | product, front, server, security |
 
 ## 상태 범례
 

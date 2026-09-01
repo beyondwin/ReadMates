@@ -9,14 +9,11 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Highlights
 
 - **호스트 3탭 IA:** 호스트 1차 내비게이션을 오늘·모임·멤버로 고정했습니다. 홈(`/app/host`)은 처리할 일 큐와 다음 모임 히어로의 트리아지이고, 모임 목록이 목차·기록 장부를 흡수하며, 초대는 멤버 화면에, 운영 허브 신호는 오늘 큐에 흡수됩니다. 구 URL은 replace 리다이렉트합니다(`/records`→`/sessions`, `/operations`→오늘, `/invitations`→`/members`). 특정 모임은 다이어리 스프레드이며, 알림 발송은 1차 탭이 아닌 화면입니다. 흡수된 운영 허브 화면이 내던 카드 로드 메트릭은 더 이상 발행되지 않습니다. 서버 API·schema·auth 계약은 바꾸지 않았습니다.
-- **플랫폼 어드민 내비 6단계:** 사이드 내비를 오늘·클럽·파이프라인·원장 네 축으로 맞추고, 긴급 공개 회수는 내비 하단 비상 레인으로 고정합니다. 오늘 항목 옆에는 알람 주의 건수를 mono 숫자로 둡니다. URL 경로는 그대로입니다.
-- **플랫폼 어드민 클럽 상세 공유 셸:** 클럽 상세는 PageContext 아래 공개 정보 읽기 뷰(명시적 편집), 공개·도메인 명령의 SafeActionDock/영수증 타임라인, 정상 항목 숫자를 숨긴 운영 스냅샷, 이 클럽의 최근 기입 인라인으로 이어집니다.
-- **플랫폼 어드민 파이프라인 5단계:** 배달 원장은 발송됨/대기/실패와 시도 배지로 읽고, AI 작업은 PageContext 제목 하나·경과/멈춤 의심 라벨·행위 문장 확인으로 강제 취소를 분명히 합니다.
-- **플랫폼 어드민 원장 셸 4단계:** 운영 기입·접근 원장·분석 부록을 공유 PageContext/StatePanel 문법으로 맞춥니다. 분석 표 숫자는 tabular nums로 두고 KPI 수치는 우측 정렬하며, CSV는 `EXPORT_ANALYTICS`가 있을 때만 내려받습니다.
-- **플랫폼 어드민 케이스 데스크 3단계:** 오늘 도켓에서 케이스를 이전/다음으로 순회하고, 확인·보류·무시(사유 필수)·해결 확인으로 큐를 떠나며, 이 대상의 최근 기입을 인라인으로 보여 운영 기입으로 이어집니다.
-- **플랫폼 어드민 운영 서사 2단계:** 모든 관리 화면에 상주 알람 요약 바를 두고, 서비스 건강은 한 문장 서사와 이탈 카드만 펼칩니다. 정상 신호는 숫자를 숨기고 이름만 접이식에 남깁니다.
-- **호스트·관리자 시각 권위:** 호스트 현재 모임의 단일 주 행동 계산은 다이어리형에 계승되고, `/admin/**`는 Editorial Operations Ledger(ADR-0047 케이스 데스크)로 route 문법을 맞춥니다. 분석 CSV export와 알림 replay는 exact capability projection만 따르며 Today lifecycle은 서버 `allowedActions`를 역할 이름으로 재계산하지 않습니다. 서버 API·schema·auth 계약은 바꾸지 않았습니다.
-- **플랫폼 어드민 서비스 스파인:** 관리 화면을 오늘·클럽·파이프라인·원장 네 축으로 정리하고, 서버가 발급한 capability allowlist로 탐색을 제한합니다. `/admin/today`는 공통 페이지 문법(loading/empty/partial/unavailable/forbidden)과 접근 가능한 작업 dock·확인 dialog를 기준 운영 화면으로 사용합니다. 401/403이면 platform-admin 상태를 폐기합니다.
+- **플랫폼 어드민 운영 제품 개편:** `/admin/**`를 ADR-0050의 `오늘 할 일`·`클럽 관리`·`서비스 상태`·`처리 기록` 네 축으로 정리하고, 긴급 공개 회수는 하단 비상 레인으로 유지합니다. Today는 observed content width 960px 이상에서 38:62 queue/docket, 그 아래에서 URL-addressable 목록/상세 완료 흐름을 사용합니다. 서버 `allowedActions`에 있는 확인함·잠시 미룸·처리함만 제공하며 서버 의미가 없는 무시·병합·사유 입력을 만들지 않습니다.
+- **플랫폼 어드민 업무별 증거 화면:** 클럽·support는 기본 정보→상태→영향→행동→기록, health·notification·AI는 정상 상태를 조용히 두고 이탈의 이유→관측 시각→영향→다음 행동, audit는 시각→행위자→대상/행동→결과 순서로 읽습니다. Analytics는 정의·availability·값을 먼저 보여 주는 분석 부록이며 CSV는 `EXPORT_ANALYTICS`가 있을 때만 제공합니다. Raw enum/ID와 클럽 내부 독서 내용은 1급 정보로 올리지 않습니다.
+- **전역 플랫폼·클럽 공간 전환:** 서버가 additive `availableSpaces` v1으로 플랫폼 운영과 내 클럽, club별 member/host perspective를 투영합니다. Frontend는 unknown/malformed projection을 fail close하고 field가 없는 혼합 배포 응답에서만 legacy fallback을 사용합니다. 공용 two-level switcher는 URL-authoritative club identity와 route allowlist를 유지하며 pathname/search/hash/focus/scroll만 versioned continuity에 저장합니다.
+- **전환 중 mutation 발행 안전성:** 등록된 write는 query가 transport 결과만 관측하고 현재 generation의 owner가 `accepted` settlement 뒤 cache·receipt·copy·navigation을 발행합니다. Normal unmount는 same-identity receipt reconciliation capsule만 보존하고, authority loss는 active/retired capsule과 민감 state를 먼저 폐기해 늦은 응답의 replay와 UI/cache/receipt/return-target publication을 모두 막습니다. Nested presentation은 query/API/router를 소유하지 않으며 producer inventory가 mounted/exported write를 분류합니다.
+- **플랫폼 어드민 shell 책임 분리:** Shell controller는 capability·alarm·account action·authority loss만 조정하고, onboarding mutation과 dirty/pending 전환은 clubs route controller가 소유합니다. Domain URL/filter/selection/mutation은 각 route/controller가 소유하며 플랫폼 어드민이 클럽 내부 host workflow를 복제하지 않습니다.
 - **플랫폼 어드민 서비스·검토 작업대:** 알림 replay와 AI recovery는 V59 typed receipt·attempt evidence로 중복 실행과 provider 결과 과장을 막고, support grant는 V60 preview/confirm과 allowlist reason evidence로 전환합니다. `/admin/audit`는 source-aware signed cursor와 body-only sensitive search를 사용하고, `/admin/analytics`는 서버가 계산한 KPI 정의·delta·availability와 capability-gated no-store CSV export를 제공합니다.
 - **플랫폼 관리자 safe command 기반:** V57의 HMAC-only claim·key-version alias와 도메인 소유 transaction protocol로 위험한 관리자 명령의 중복 실행을 막습니다. 완료 claim만 bounded purge하고 immutable domain receipt는 보존하며, digest key rotation·retirement와 DB-backed startup 검증은 불완전한 설정에서 fail closed합니다.
 - **플랫폼 관리자 긴급 공개 회수 기반:** active OWNER/OPERATOR의 전용 capability로 공개 projection을 preview하고 confirm하는 V55 API substrate를 추가했습니다. Confirm은 durable emergency deny를 저장해 일반 host 수정·기록 적용·공개 설정 변경이 origin을 다시 열지 못하게 하고 generation을 한 번 회전하며 redacted immutable receipt/audit와 기존 convergence work를 같은 transaction에 연결합니다. 이미 저장·표시·offline인 사본은 원격 삭제할 수 없습니다.
@@ -30,7 +27,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Fixed
 
 - **릴리즈 게이트 안정성:** 호스트 운영실 서비스·조회 fixture의 Detekt 책임 경계를 동작 변경 없이 분리했습니다. Testcontainers 전체 lane은 Java 25의 Spring/Kotlin class metadata 누적을 bounded worker·context cache와 integration 전용 heap으로 제한하고, 일반 test context에서는 tracing을 끄되 tracing 계약만 명시적으로 opt-in합니다. 알림 stale lease 회수는 `SKIP LOCKED`로 선점한 exact delivery만 갱신해 동시 claim의 deadlock을 피하고, avatar CT는 이미지 decode polling과 단일 raster 검사를 분리해 Linux renderer 부하에서도 같은 투명도 계약을 검증합니다.
-- **오늘 큐 보류/무시 후 진행:** 보류·무시 성공 뒤에는 해결 확인과 같이 다음 케이스로 넘어가고, 마지막 항목이면 큐 요약으로 포커스를 돌립니다. 무시 사유는 화면에서만 필수이며 snooze HTTP body에는 넣지 않습니다(서버 DTO unknown field 거부). 사유 영속화는 서버 후속입니다.
+- **오늘 큐 작업 후 진행:** 잠시 미룸·처리함 성공 뒤에는 다음 케이스로 넘어가고 마지막 항목이면 큐 요약으로 포커스를 돌립니다. 화면 행동은 서버 `allowedActions`와 wire contract에 있는 의미만 사용합니다.
 - **호스트·관리자 leftover 권위:** Analytics CSV는 export capability가 없으면 버튼을 보여 주지 않고, 알림 replay는 응답 손실을 `unknown-outcome`으로 표시하며 같은 명령만 재확인합니다. 미종료 모임은 노트 게시 가능처럼 쓰지 않고, 관리자 workbench 권한은 역할 이름이 아니라 호출자가 넘긴 permission입니다. 사용하지 않는 Meeting Folio header와 host-dashboard-mobile CSS를 제거했습니다.
 - **긴급 회수 공개 reader·중복 실행 안전성:** 공개 club 목록·통계·상세와 PUBLISHED guest record reader는 current generation의 `origin_readable=true`, `emergency_denied=false`를 요구하고 공개 freshness를 60초로 맞춥니다. CLOSED guest archive는 publication marker가 없는 legacy/never-published row를 계속 읽되, marker가 있으면 exact generation과 non-denied 상태를 요구해 긴급 차단을 우회하지 않습니다. 동일 idempotency key 동시 confirm은 locking current read로 같은 receipt에 수렴하며 다른 payload는 conflict입니다. Reason category는 고정 allowlist만 허용합니다. Retention purge batch는 production startup에서 최소 3으로 검증하고, 각 pass에서 admin idempotency·preview·host idempotency에 최소 한 건씩 배분하면서 전체 limit과 실제 삭제 count를 보존합니다.
 - **HMAC key rotation 재시작 안전성:** host cursor와 mutation identity의 current key는 production config sync에서 필수이며 previous key는 선택적입니다. Mutation digest의 durable key state가 없거나 마지막 unreferenced 시점부터 24시간 rollout buffer가 지나지 않은 historical version을 설정에서 제거하면 startup이 값·version을 로그에 노출하지 않고 fail closed합니다. 첫 배포의 current-only 설정과 안전하게 retired된 historical version은 허용합니다.
@@ -66,7 +63,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Verification
 
-- 서버 PR gate와 MySQL/Testcontainers 1,421건, Docker Chromium component 104건을 fresh canonical command로 통과했습니다. Avatar raster 경로는 같은 Docker harness에서 5회 반복 35/35로 확인했고 snapshot은 갱신하지 않았습니다. 이 검증은 provider 호출, 실제 이메일 발송, production mutation, deploy를 수행하지 않았습니다.
+- 서버 PR gate와 MySQL/Testcontainers 1,422건, Docker Chromium component 104건, frontend lint/test/build와 focused/full E2E, public release candidate 검증을 fresh canonical command로 통과했습니다. Chrome 실제 200% zoom에서 DPR 2→4, CSS viewport 1728→864, 수평 overflow 없음과 보이는 focus target을 확인했습니다. 5명 초보 운영자 30초 이해 연구, VoiceOver/Safari·NVDA/Chrome 수동 screen-reader 순서, 로컬 gitleaks는 `not measured`이고 repository public-safety scanner는 통과했습니다. Provider 호출, 실제 이메일 발송, production mutation, deploy는 수행하지 않았습니다.
 
 ## v2.4.1 - 2026-08-17
 

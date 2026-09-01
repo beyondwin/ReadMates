@@ -4,9 +4,12 @@
 승인 설계나 미구현 목표를 적지 않는다. Public, guest, member composition은 이 문서로 바꾸지 않는다.
 
 - ADR-0044: Superseded by ADR-0046 (주 행동 계산 규칙은 다이어리형에 계승)
-- ADR-0045: Accepted — 공유 paper/ink; host composition은 ADR-0046, admin composition은 ADR-0047
-- ADR-0046: Accepted — 오늘 트리아지 + 모임 다이어리 + 3탭 셸
-- ADR-0047: Accepted — admin case desk + 운영 서사 + 오늘·클럽·파이프라인·원장 4축 내비
+- ADR-0045: Accepted — host/admin 공유 paper/ink primitive
+- ADR-0046: Superseded by ADR-0048
+- ADR-0048: Proposed — 현재 host lifecycle operating-room 결정의 acceptance는 별도 closeout 대상
+- ADR-0047: Superseded by ADR-0050
+- ADR-0050: Accepted — 오늘 할 일 중심 운영 데스크 + 클럽 관리·서비스 상태·처리 기록 4축
+- ADR-0051: Accepted — 플랫폼 운영·내 클럽 two-level 전역 공간 전환
 - Token source: `design/system/src/styles/tokens.css`
 - Viewport contract: `front/tests/e2e/support/visual-authority-contract.ts`
 
@@ -148,18 +151,19 @@ Record-dependent action은 기존 record editor query를 readiness union으로 �
 
 ## Editorial Operations Ledger
 
-`/admin/**` page-level 권위는 Editorial Operations Ledger다. ADR-0047의 케이스 데스크·운영 서사·4축 내비를 현재 구현으로 둔다. ADR-0039의 exact capability catalog와 signal→case→docket→command→receipt 운영 문법은 유지한다.
-라벨은 `admin-copy.ts` 사전 사용.
+`/admin/**` page-level 권위는 Editorial Operations Ledger다. ADR-0050의 오늘 할 일 중심 운영 데스크와 ADR-0039의 exact capability catalog, `signal → case → docket → command → receipt` 문법을 함께 유지한다. 라벨은 `admin-copy.ts`와 `admin-status-language.ts` 사전을 사용한다.
 
 Ready routes: `/admin/today`, `/admin/clubs`, `/admin/clubs/:clubId`, `/admin/health`, `/admin/notifications`, `/admin/ai-ops`, `/admin/public-takedown`, `/admin/support`, `/admin/audit`, `/admin/analytics`. URL 경로는 바꾸지 않는다.
 
-1차 내비는 오늘 · 클럽 · 파이프라인 · 원장의 네 축이다. 파이프라인은 배달 원장·AI 작업·서비스 건강, 원장은 운영 기입·접근 원장·분석 부록이다. 긴급 공개 회수는 그룹 밖 비상 레인으로 사이드 하단에 고정한다. 오늘 항목 옆에는 알람 요약의 `attention.count`를 0보다 클 때만 mono 숫자로 둔다.
+1차 내비는 `오늘 할 일` · `클럽 관리` · `서비스 상태` · `처리 기록` 네 축이다. Support는 클럽 관리, notifications/AI/health는 서비스 상태, audit/analytics는 처리 기록의 active state를 사용한다. 긴급 공개 회수는 그룹 밖 비상 레인으로 사이드 하단에 고정한다. 오늘 항목 옆에는 알람 요약의 `attention.count`를 0보다 클 때만 mono 숫자로 둔다.
 
-페이지 타입은 세 종이다.
+화면은 같은 evidence/action/result 문법을 사용하되 업무별 composition을 복제하지 않는다.
 
-- 데스크형: `/admin/today` — 좌 큐 + 우 증거 도켓, 도켓 내 이전/다음 순회, 확인·보류·무시(사유 필수)·해결
-- 원장형: 클럽 목록·배달·AI 작업·운영 기입·접근 원장 — 필터/표/도켓
-- 서사형: 서비스 건강 — 한 문장 서사, 정상은 숫자 숨김, 이탈만 펼침
+- 오늘 할 일: observed content width가 960px 이상이면 `minmax(340px, 38fr) minmax(560px, 62fr)`의 persistent queue/docket, 그 아래면 URL의 `case`·`mode=detail`이 소유하는 목록/상세 흐름이다. Docket은 `무슨 일인가 → 왜 중요한가 → 확인한 근거 → 다음 행동 → 최근 처리 기록` 순서다.
+- 클럽 관리: 이름·번역 상태·필요 행동·최근 신호를 먼저 읽고 raw slug/ID/domain은 기술 상세에 둔다. 상세와 support는 기본 정보·상태·영향·행동·기록 순서를 공유하고 club 내부 독서 content를 복제하지 않는다.
+- 서비스 상태: 정상은 한 문장으로 조용히 요약하고 stale/partial/unavailable source만 이유·관측 시각·영향·다음 행동을 펼친다. 알림과 AI detail은 실제 failure cluster/run attempt를 안전 행동보다 먼저 보여 준다.
+- 처리 기록: audit row는 `시각 · 누가 · 대상에 무엇을 함 · 결과`로 읽고, analytics는 정의·availability·값 순서의 `분석 부록`이다.
+- 비상 레인: compact 화면은 desktop handoff를 primary로 제안하지만 direct workflow의 capability와 safe-command를 제거하거나 viewport를 authorization에 쓰지 않는다.
 
 운영 문법: `signal → prioritized case → evidence docket → guarded command → 등급에 맞는 history/receipt/convergence`.
 모든 화면에 case/command/receipt를 꾸며내지 않는다. 해당 domain에 선택 대상·command·receipt가 있을 때만 조합한다.
@@ -175,14 +179,13 @@ Ready routes: `/admin/today`, `/admin/clubs`, `/admin/clubs/:clubId`, `/admin/he
 | `AdminReceiptTimeline` | L2 receipt, L3 receipt+convergence |
 | route search / `AdminRouteReturnState` | URL query, returnTo, focusId, scrollTop |
 
-Admin shell(`AdminShellLayout`)은 navigation, capability query, onboarding, authority-loss purge만 소유한다.
-Domain data, filter, selection, command, receipt reconciliation을 선행 로드하는 mega-store가 아니다.
+`AdminShellController`는 navigation composition, capability query, alarm, account action과 platform authority loss를 소유한다. Onboarding mutation과 dirty/pending 전환은 `/admin/clubs?onboarding=1`의 `AdminOnboardingController`가 소유한다. Shell은 domain data, filter, selection, command, receipt reconciliation을 선행 로드하는 mega-store가 아니다.
 
-Desktop Today는 queue + persistent inspector다. Mobile(`max-width: 768px`)은 queue → record → review → 결과의 전체 화면이며 좁아진 두 열을 압축하지 않는다.
+Today layout은 viewport breakpoint가 아니라 `ResizeObserver`로 측정한 content width가 결정한다. 측정 전과 960px 미만에서는 flow로 fail safe하고, 좁아진 두 열을 압축하지 않는다.
 Back은 `returnTo`/`focusId`/`scrollTop`으로 복원한다.
 
 일반 command 권한은 서버 exact capability다. `OWNER`/`OPERATOR`/`SUPPORT` 이름으로 새 권한을 만들지 않는다.
-Today lifecycle은 서버 `allowedActions`만 사용한다. Analytics CSV는 `EXPORT_ANALYTICS`, 알림 replay는 `REPLAY_NOTIFICATIONS`가 없으면 request를 시작하지 않는다.
+Today lifecycle은 서버 `allowedActions`에 있는 `확인함`·`잠시 미룸`·`처리함`만 사용한다. 서버 의미가 없는 `무시`·`병합`이나 전송하지 않는 사유 입력을 만들지 않는다. Analytics CSV는 `EXPORT_ANALYTICS`, 알림 replay는 `REPLAY_NOTIFICATIONS`가 없으면 request를 시작하지 않는다.
 401/403은 platform-admin state와 pending preview를 폐기한다.
 
 L1은 capability·concurrency·source 재검증·atomic history, L2는 preview/confirm/receipt, L3는 receipt/convergence/resume다.
@@ -208,7 +211,7 @@ Live region은 의미 있는 전이에만 쓰고 polling마다 반복하지 않�
 
 ## Responsive and accessibility matrix
 
-Contract widths: 320, 390, 768, 900, 1024, 1440px. keyboard, visible focus, 44px target, reduced motion, long Korean wrapping은 automated helper로 검증한다. 200% zoom은 CSS `zoom`이 아니라 레이아웃 viewport를 절반으로 줄인 proxy(예: 640×700 → 320×350)로 확인한다.
+Contract widths: 320, 390, 768, 900, 1024, 1440px. keyboard, visible focus, 44px target, reduced motion, long Korean/English wrapping은 automated helper로 검증한다. Chrome 실제 200% toolbar zoom은 DPR 2→4, CSS viewport 1728→864, document/body scroll width와 client width 일치, 보이는 focus target 높이로 확인했다. Manual screen-reader announcement order는 아직 `not measured`이며 검증 완료로 주장하지 않는다.
 
 Tracked screenshots는 대표 상태만 잠근다. 1024px는 viewport contract와 browser smoke에 있고 PNG baseline은 없다.
 
@@ -217,7 +220,9 @@ Tracked screenshots는 대표 상태만 잠근다. 1024px는 viewport contract�
 | host diary CT | `front/__screenshots__/features/host/ui/meeting-workspace/host-focus-deck.ct.tsx/` | `diary-draft-1440.png`, `diary-open-900.png`, `diary-closed-768.png`, `diary-published-390.png`, `diary-readiness-pending-320.png` (1024는 매트릭스만, PNG 없음) |
 | host closing CT | `front/__screenshots__/features/host/ui/session-closing-board.ct.tsx/` | `host-closing-embedded-blocked-1440.png`, `host-closing-embedded-published-900.png`, `host-closing-embedded-blocked-768.png`, `host-closing-embedded-published-390.png`, `host-closing-embedded-blocked-320.png` (1024는 매트릭스만) |
 | host today CT | _(없음 — 오늘형 baseline 미잠금)_ | — |
-| admin CT | `front/__screenshots__/features/platform-admin/ui/admin-editorial-ledger.ct.tsx/` | `editorial-ledger-today-1440.png`, `editorial-ledger-clubs-900.png`, `editorial-ledger-service-768.png`, `editorial-ledger-review-390.png`, `editorial-ledger-case-detail-320.png` |
+| admin shell CT | `front/__screenshots__/features/platform-admin/route/admin-shell-layout.ct.tsx/` | Today·4축 내비·space menu 1440, mobile 390, long copy 320 |
+| admin ledger CT | `front/__screenshots__/features/platform-admin/ui/admin-editorial-ledger.ct.tsx/` | Today 1440, clubs 900, service 768, records 390, detail 320, emergency 1440/390 |
+| admin support CT | `front/__screenshots__/features/platform-admin/ui/admin-support-workbench.ct.tsx/` | selected support workbench |
 
 Chromium, Firefox, mobile WebKit smoke는 host 다이어리 스프레드와 admin Today/Clubs/Service/Review 대표 흐름이다.
 VoiceOver/Safari와 NVDA/Chrome 수동 결과는 `docs/reports/host-admin-visual-authority-accessibility-evidence-template.md`에 따라 `not measured`다.
