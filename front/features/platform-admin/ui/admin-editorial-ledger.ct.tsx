@@ -57,6 +57,12 @@ const APPROVED_DESKTOP_VIEWPORT = { width: 1672, height: 941 } as const;
 const APPROVED_MOBILE_VIEWPORT = { width: 390, height: 844 } as const;
 const QUEUE_DESKTOP_GEOMETRY = { x: 260, y: 86, width: 559, height: 855 } as const;
 const DOCKET_DESKTOP_GEOMETRY = { x: 819, y: 86, width: 853, height: 855 } as const;
+const HEADER_MOBILE_GEOMETRY = { x: 0, y: 0, width: 390, height: 70 } as const;
+const NAV_MOBILE_GEOMETRY = { x: 0, y: 734, width: 390, height: 110 } as const;
+const RECOMMENDED_DESKTOP_GEOMETRY = { x: 859, y: 621, width: 773, height: 24 } as const;
+const FIRST_ROW_MOBILE_GEOMETRY = { x: 20, y: 220, width: 350, height: 94 } as const;
+const BACK_MOBILE_GEOMETRY = { x: 0, y: 0, width: 390, height: 67 } as const;
+const DETAIL_DOCKET_MOBILE_GEOMETRY = { x: 20, y: 67, width: 350, height: 761 } as const;
 
 async function mountEditorial(
   mount: (component: ReactElement) => Promise<Locator>,
@@ -154,14 +160,17 @@ async function regionFromLocator(
   expected: ApprovedRegion["expected"],
   toleranceCssPx: 2 | 4,
 ): Promise<ApprovedRegion> {
-  const actual = await locator.boundingBox();
-  if (!actual) throw new Error(`${name} has no bounding box`);
-  return {
-    name,
-    actual: { x: actual.x, y: actual.y, width: actual.width, height: actual.height },
-    expected,
-    toleranceCssPx,
-  };
+  const box = await locator.boundingBox();
+  if (!box) throw new Error(`${name} has no bounding box`);
+  const actual = { x: box.x, y: box.y, width: box.width, height: box.height };
+  try {
+    expectGeometryWithinTolerance(actual, expected, toleranceCssPx);
+  } catch (error) {
+    throw new Error(
+      `${name} actual=${JSON.stringify(actual)} expected=${JSON.stringify(expected)}: ${(error as Error).message}`,
+    );
+  }
+  return { name, actual, expected, toleranceCssPx };
 }
 
 async function captureTodayApproved(input: {
@@ -171,21 +180,12 @@ async function captureTodayApproved(input: {
   testInfo: TestInfo;
   regions: readonly ApprovedRegion[];
 }) {
-  let regions = input.regions;
-  try {
-    for (const region of regions) {
-      expectGeometryWithinTolerance(region.actual, region.expected, region.toleranceCssPx);
-    }
-  } catch {
-    regions = [];
-  }
   return captureApprovedComparison({
     entry: approvedMockup(input.id),
     candidate: input.page.locator("#root"),
     page: input.page,
     testInfo: input.testInfo,
-    regions,
-    allowFontRasterException: true,
+    regions: input.regions,
   });
 }
 
@@ -307,13 +307,12 @@ test("Today L1 locks the approved desktop composition", async ({ mount, page }, 
   const component = await mountTodayApproved(mount, page, todayDesktopLedger, APPROVED_DESKTOP_VIEWPORT);
   const queue = component.getByRole("region", { name: "운영 케이스 큐" });
   const docket = component.getByRole("region", { name: "운영 케이스 상세" });
-  const regions: ApprovedRegion[] = [];
-  try {
-    regions.push(await regionFromLocator(queue, "queue", QUEUE_DESKTOP_GEOMETRY, 4));
-    regions.push(await regionFromLocator(docket, "docket", DOCKET_DESKTOP_GEOMETRY, 4));
-  } catch {
-    // Capture still runs so RED writes candidate/overlay/diff/report.
-  }
+  const recommended = docket.getByRole("heading", { name: "권장 처리" });
+  const regions = [
+    await regionFromLocator(queue, "queue", QUEUE_DESKTOP_GEOMETRY, 4),
+    await regionFromLocator(docket, "docket", DOCKET_DESKTOP_GEOMETRY, 4),
+    await regionFromLocator(recommended, "recommended", RECOMMENDED_DESKTOP_GEOMETRY, 2),
+  ];
   await captureTodayApproved({
     id: "admin-today-desktop",
     candidate: component,
@@ -323,6 +322,7 @@ test("Today L1 locks the approved desktop composition", async ({ mount, page }, 
   });
   await expectLocatorGeometry(queue, QUEUE_DESKTOP_GEOMETRY, 4);
   await expectLocatorGeometry(docket, DOCKET_DESKTOP_GEOMETRY, 4);
+  await expectLocatorGeometry(recommended, RECOMMENDED_DESKTOP_GEOMETRY, 2);
   await expect(component.getByRole("heading", { name: "오늘 할 일" }).first()).toBeVisible();
   await expect(component.getByText("알림 전달 지연", { exact: true }).first()).toBeInViewport();
   expect(await isSemanticDocumentOrder([
@@ -400,7 +400,7 @@ test("Review audit locks the 390 mobile docket composition", async ({ mount, pag
 });
 
 test.describe("approved mobile Today", () => {
-  test.use({ deviceScaleFactor: 2 });
+  test.use({ deviceScaleFactor: 853 / 390 });
 
   test("Today mobile list locks the approved 390 composition", async ({ mount, page }, testInfo) => {
     test.setTimeout(90_000);
@@ -410,13 +410,24 @@ test.describe("approved mobile Today", () => {
       { ...todayDesktopLedger, mode: "list" },
       APPROVED_MOBILE_VIEWPORT,
     );
+    const header = component.locator(".admin-shell__header");
+    const nav = component.getByRole("navigation", { name: "Admin 모바일 메뉴" });
+    const firstRow = component.getByRole("button", { name: /알림 전달 지연/ }).first();
+    const regions = [
+      await regionFromLocator(header, "header", HEADER_MOBILE_GEOMETRY, 4),
+      await regionFromLocator(nav, "nav", NAV_MOBILE_GEOMETRY, 4),
+      await regionFromLocator(firstRow, "first-row", FIRST_ROW_MOBILE_GEOMETRY, 2),
+    ];
     await captureTodayApproved({
       id: "admin-today-mobile",
       candidate: component,
       page,
       testInfo,
-      regions: [],
+      regions,
     });
+    await expectLocatorGeometry(header, HEADER_MOBILE_GEOMETRY, 4);
+    await expectLocatorGeometry(nav, NAV_MOBILE_GEOMETRY, 4);
+    await expectLocatorGeometry(firstRow, FIRST_ROW_MOBILE_GEOMETRY, 2);
     await expect(component.getByText("알림 전달 지연", { exact: true }).first()).toBeInViewport();
     await expect(component.getByRole("navigation", { name: "Admin 모바일 메뉴" })).toBeVisible();
     await expect(component.locator("details").filter({ hasText: "필터와 신호 상태" })).not.toHaveAttribute("open");
@@ -430,14 +441,22 @@ test.describe("approved mobile Today", () => {
     const component = await mountTodayApproved(mount, page, todayMobileCaseDetail, APPROVED_MOBILE_VIEWPORT);
     const docket = component.getByRole("region", { name: "운영 케이스 상세" });
     const back = component.getByRole("button", { name: "목록으로" });
+    const nav = component.getByRole("navigation", { name: "Admin 모바일 메뉴" });
     await back.evaluate((element) => element.blur());
+    const regions = [
+      await regionFromLocator(back, "back", BACK_MOBILE_GEOMETRY, 4),
+      await regionFromLocator(docket, "docket", DETAIL_DOCKET_MOBILE_GEOMETRY, 4),
+      await regionFromLocator(nav, "nav", NAV_MOBILE_GEOMETRY, 4),
+    ];
     await captureTodayApproved({
       id: "admin-work-detail-mobile",
       candidate: component,
       page,
       testInfo,
-      regions: [],
+      regions,
     });
+    await expectLocatorGeometry(back, BACK_MOBILE_GEOMETRY, 4);
+    await expectLocatorGeometry(nav, NAV_MOBILE_GEOMETRY, 4);
     await expect(component.getByText("알림 전달 지연", { exact: true }).first()).toBeInViewport();
     await expect(component.getByRole("navigation", { name: "Admin 모바일 메뉴" })).toBeVisible();
     await expect(back).toBeVisible();

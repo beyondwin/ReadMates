@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
-import { AdminOperationStateActions } from "@/features/platform-admin/ui/admin-operation-state-actions";
+import {
+  AdminOperationStateActions,
+  APPROVED_TODAY_ACTION_COPY,
+} from "@/features/platform-admin/ui/admin-operation-state-actions";
 import { AdminPageFrame } from "@/features/platform-admin/ui/admin-page-frame";
 import { AdminStatePanel, type AdminPageState } from "@/features/platform-admin/ui/admin-state-panel";
 import {
@@ -80,6 +83,7 @@ export function AdminTodayRoute() {
         disabled={controller.actionDisabled}
         message={controller.actionMessage}
         confirmationKey={controller.confirmationKey}
+        actionCopy={APPROVED_TODAY_ACTION_COPY}
         onAcknowledge={() => void controller.acknowledgeCurrent()}
         onSnooze={(snoozedUntil) => void controller.snoozeCurrent(snoozedUntil)}
         onResolve={() => void controller.resolveCurrent()}
@@ -95,6 +99,7 @@ export function AdminTodayRoute() {
         message={controller.actionMessage}
         confirmationKey={controller.confirmationKey}
         presentation="prioritized"
+        actionCopy={APPROVED_TODAY_ACTION_COPY}
         onAcknowledge={() => void controller.acknowledgeCurrent()}
         onSnooze={(snoozedUntil) => void controller.snoozeCurrent(snoozedUntil)}
         onResolve={() => void controller.resolveCurrent()}

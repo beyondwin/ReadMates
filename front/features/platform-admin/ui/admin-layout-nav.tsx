@@ -26,12 +26,14 @@ export function AdminLayoutNav({
   renderLink,
   ariaLabel = "플랫폼 관리 메뉴",
   todayCount = null,
+  onLogout,
 }: {
   capabilities: PlatformAdminCapabilities | null | undefined;
   currentOwner: AdminRouteOwner | null;
   renderLink: AdminNavigationLinkRenderer;
   ariaLabel?: string;
   todayCount?: number | null;
+  onLogout?: () => void;
 }) {
   const compact = useAdminShellCompactLayout();
   const { areas, pinned } = useMemo(() => visibleAdminNav(capabilities), [capabilities]);
@@ -85,7 +87,11 @@ export function AdminLayoutNav({
           ))}
         </ul>
       ) : null}
-      <button type="button" className="admin-layout-nav__logout" aria-label="로그아웃" />
+      {onLogout ? (
+        <button type="button" className="admin-layout-nav__logout" aria-label="로그아웃" onClick={onLogout} />
+      ) : (
+        <span className="admin-layout-nav__logout" aria-hidden="true" />
+      )}
     </nav>
   );
 }
