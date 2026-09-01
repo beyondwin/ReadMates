@@ -29,6 +29,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Fixed
 
+- **릴리즈 게이트 안정성:** 호스트 운영실 서비스·조회 fixture의 Detekt 책임 경계를 동작 변경 없이 분리했습니다. Testcontainers 전체 lane은 Java 25의 Spring/Kotlin class metadata 누적을 bounded worker·context cache와 integration 전용 heap으로 제한하고, 일반 test context에서는 tracing을 끄되 tracing 계약만 명시적으로 opt-in합니다. 알림 stale lease 회수는 `SKIP LOCKED`로 선점한 exact delivery만 갱신해 동시 claim의 deadlock을 피하고, avatar CT는 이미지 decode polling과 단일 raster 검사를 분리해 Linux renderer 부하에서도 같은 투명도 계약을 검증합니다.
 - **오늘 큐 보류/무시 후 진행:** 보류·무시 성공 뒤에는 해결 확인과 같이 다음 케이스로 넘어가고, 마지막 항목이면 큐 요약으로 포커스를 돌립니다. 무시 사유는 화면에서만 필수이며 snooze HTTP body에는 넣지 않습니다(서버 DTO unknown field 거부). 사유 영속화는 서버 후속입니다.
 - **호스트·관리자 leftover 권위:** Analytics CSV는 export capability가 없으면 버튼을 보여 주지 않고, 알림 replay는 응답 손실을 `unknown-outcome`으로 표시하며 같은 명령만 재확인합니다. 미종료 모임은 노트 게시 가능처럼 쓰지 않고, 관리자 workbench 권한은 역할 이름이 아니라 호출자가 넘긴 permission입니다. 사용하지 않는 Meeting Folio header와 host-dashboard-mobile CSS를 제거했습니다.
 - **긴급 회수 공개 reader·중복 실행 안전성:** 공개 club 목록·통계·상세와 PUBLISHED guest record reader는 current generation의 `origin_readable=true`, `emergency_denied=false`를 요구하고 공개 freshness를 60초로 맞춥니다. CLOSED guest archive는 publication marker가 없는 legacy/never-published row를 계속 읽되, marker가 있으면 exact generation과 non-denied 상태를 요구해 긴급 차단을 우회하지 않습니다. 동일 idempotency key 동시 confirm은 locking current read로 같은 receipt에 수렴하며 다른 payload는 conflict입니다. Reason category는 고정 allowlist만 허용합니다. Retention purge batch는 production startup에서 최소 3으로 검증하고, 각 pass에서 admin idempotency·preview·host idempotency에 최소 한 건씩 배분하면서 전체 limit과 실제 삭제 count를 보존합니다.
@@ -62,6 +63,10 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - Host-client v3와 긴급 takedown은 repository merge만으로 활성화하지 않습니다. R1/R2a/R2b/R3은 각각 fresh live approval이 필요하고, emergency confirm은 R2a가 기존 720초 browser cache lifetime 소진을 attested evidence로 증명하기 전까지 fail closed합니다.
 - 일반 public change 120초와 emergency 60초는 새 navigation/read의 convergence 목표입니다. 이미 렌더링·저장·offline인 copy는 원격 회수할 수 없으며 provider retry는 같은 convergence ID에 attempt만 추가합니다.
+
+### Verification
+
+- 서버 PR gate와 MySQL/Testcontainers 1,421건, Docker Chromium component 104건을 fresh canonical command로 통과했습니다. Avatar raster 경로는 같은 Docker harness에서 5회 반복 35/35로 확인했고 snapshot은 갱신하지 않았습니다. 이 검증은 provider 호출, 실제 이메일 발송, production mutation, deploy를 수행하지 않았습니다.
 
 ## v2.4.1 - 2026-08-17
 

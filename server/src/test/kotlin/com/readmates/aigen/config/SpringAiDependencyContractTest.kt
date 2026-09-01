@@ -60,8 +60,18 @@ class SpringAiDependencyContractTest {
         assertThat(environment.getProperty("management.otlp.metrics.export.enabled")).isEqualTo("false")
     }
 
-    private fun loadApplicationEnvironment(): MockEnvironment {
-        val resource = FileSystemResource(Path.of("src/main/resources/application.yml"))
+    @Test
+    fun `test runtime disables tracing unless a tracing contract opts in`() {
+        val environment = loadYamlEnvironment("src/test/resources/application.yml")
+
+        assertThat(environment.getProperty("management.tracing.enabled")).isEqualTo("false")
+        assertThat(environment.getProperty("management.tracing.export.otlp.enabled")).isEqualTo("false")
+    }
+
+    private fun loadApplicationEnvironment() = loadYamlEnvironment("src/main/resources/application.yml")
+
+    private fun loadYamlEnvironment(path: String): MockEnvironment {
+        val resource = FileSystemResource(Path.of(path))
         val propertySources = MutablePropertySources()
         YamlPropertySourceLoader().load("application.yml", resource).forEach(propertySources::addLast)
         return MockEnvironment().also { environment ->

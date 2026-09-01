@@ -258,6 +258,18 @@ tasks.register<Test>("integrationTest") {
     useJUnitPlatform {
         includeTags("integration", "container")
     }
+    // Integration classes create many distinct Spring contexts (MySQL, Redis,
+    // Kafka, security slices, and migration variants). Bound the cache so
+    // evicted contexts close their pools and OpenTelemetry processors before
+    // a worker exhausts its heap. Java 25's Spring/Kotlin class metadata caches
+    // are JVM-scoped, so recycle the sequential worker at a bounded class count
+    // instead of allowing all integration classes to accumulate in one heap.
+    maxHeapSize =
+        (project.findProperty("testMaxHeap") as String?)
+            ?: System.getenv("READMATES_TEST_MAX_HEAP")
+            ?: "3g"
+    systemProperty("spring.test.context.cache.maxSize", "4")
+    forkEvery = 50
 }
 
 tasks.register<Test>("architectureTest") {

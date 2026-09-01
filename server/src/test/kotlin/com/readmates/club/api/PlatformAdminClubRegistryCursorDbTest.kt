@@ -180,7 +180,7 @@ class PlatformAdminClubRegistryCursorDbTest(
                 cookie(sessionCookieForUser(admin))
                 param("search", fixturePrefix)
                 param("limit", "1")
-                param("cursor", cursor.dropLast(1) + if (cursor.last() == 'A') 'B' else 'A')
+                param("cursor", tamperCursorSignature(cursor))
             }.andExpect { status { isBadRequest() } }
 
         mockMvc
@@ -228,6 +228,13 @@ class PlatformAdminClubRegistryCursorDbTest(
                 param("limit", "1")
                 param("cursor", expired)
             }.andExpect { status { isBadRequest() } }
+    }
+
+    private fun tamperCursorSignature(cursor: String): String {
+        val parts = cursor.split('.')
+        check(parts.size == 3 && parts[2].isNotEmpty())
+        val tamperedSignature = (if (parts[2].first() == 'A') 'B' else 'A') + parts[2].drop(1)
+        return "${parts[0]}.${parts[1]}.$tamperedSignature"
     }
 
     @Test

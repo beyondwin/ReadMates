@@ -25,28 +25,37 @@ class HostOperatingRoomCurrentService(
         if (!actor.activeHost) throw HostOperatingRoomAccessDeniedException()
 
         val candidates = candidateSource.loadCandidates(actor)
-        candidates.firstOrNull { candidate -> candidate.state == HostOperatingRoomCandidateState.OPEN }?.let {
-            return HostOperatingRoomCurrent(it.toCurrentMeeting(HostOperatingRoomSelection.OPEN))
-        }
-        candidates.firstOrNull { candidate -> candidate.state == HostOperatingRoomCandidateState.DRAFT }?.let {
-            return HostOperatingRoomCurrent(it.toCurrentMeeting(HostOperatingRoomSelection.UPCOMING_DRAFT))
-        }
-        candidates
-            .asSequence()
-            .filter { candidate -> candidate.state == HostOperatingRoomCandidateState.CLOSED }
-            .forEach { candidate ->
-                when (val result = closingRequirementSource.loadClosingRequirement(actor, candidate.sessionId)) {
-                    is HostOperatingRoomClosingRequirementResult.Available ->
-                        if (result.requirement == HostOperatingRoomClosingRequirement.REQUIRED) {
-                            return HostOperatingRoomCurrent(
-                                candidate.toCurrentMeeting(HostOperatingRoomSelection.CLOSING_REQUIRED),
-                            )
-                        }
-                    HostOperatingRoomClosingRequirementResult.Unavailable ->
-                        throw HostOperatingRoomAvailabilityException()
-                }
+        val currentMeeting =
+            candidates
+                .firstWithState(HostOperatingRoomCandidateState.OPEN)
+                ?.toCurrentMeeting(HostOperatingRoomSelection.OPEN)
+                ?: candidates
+                    .firstWithState(HostOperatingRoomCandidateState.DRAFT)
+                    ?.toCurrentMeeting(HostOperatingRoomSelection.UPCOMING_DRAFT)
+                ?: firstClosingRequired(candidates, actor)
+        return HostOperatingRoomCurrent(currentMeeting)
+    }
+
+    private fun List<HostOperatingRoomCandidate>.firstWithState(state: HostOperatingRoomCandidateState) =
+        firstOrNull { candidate -> candidate.state == state }
+
+    private fun firstClosingRequired(
+        candidates: List<HostOperatingRoomCandidate>,
+        actor: HostOperatingRoomActor,
+    ): HostOperatingRoomCurrentMeeting? {
+        val closedCandidates =
+            candidates.filter { candidate -> candidate.state == HostOperatingRoomCandidateState.CLOSED }
+        for (candidate in closedCandidates) {
+            when (val result = closingRequirementSource.loadClosingRequirement(actor, candidate.sessionId)) {
+                is HostOperatingRoomClosingRequirementResult.Available ->
+                    if (result.requirement == HostOperatingRoomClosingRequirement.REQUIRED) {
+                        return candidate.toCurrentMeeting(HostOperatingRoomSelection.CLOSING_REQUIRED)
+                    }
+                HostOperatingRoomClosingRequirementResult.Unavailable ->
+                    throw HostOperatingRoomAvailabilityException()
             }
-        return HostOperatingRoomCurrent(null)
+        }
+        return null
     }
 }
 

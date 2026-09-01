@@ -4,8 +4,8 @@ import com.readmates.auth.adapter.`in`.security.AuthClubContextSource
 import com.readmates.auth.adapter.`in`.security.resolveAuthClubContext
 import com.readmates.auth.application.AuthApplicationError
 import com.readmates.auth.application.AuthApplicationException
-import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
 import com.readmates.auth.application.port.`in`.ResolveAuthAccessProjectionUseCase
+import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentUser

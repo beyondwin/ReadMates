@@ -54,6 +54,28 @@ async function allImagesHaveTransparentCorners(images: Locator) {
   );
 }
 
+async function expectImagesReady(images: Locator) {
+  await expect.poll(() =>
+    images.evaluateAll((nodes) =>
+      nodes.every(
+        (node) =>
+          node instanceof HTMLImageElement &&
+          node.complete &&
+          node.naturalWidth === 256 &&
+          node.naturalHeight === 256,
+      ),
+    ),
+  ).toBe(true);
+}
+
+async function expectTransparentCorners(images: Locator) {
+  // Pixel inspection allocates a full-size canvas for every image. Wait for
+  // decode separately, then inspect once so a slow renderer cannot multiply
+  // hundreds of canvas allocations on every assertion poll.
+  await expectImagesReady(images);
+  expect(await allImagesHaveTransparentCorners(images)).toBe(true);
+}
+
 type AvatarRasterMetric = {
   key: string;
   edgeLightP90: number;
@@ -181,19 +203,18 @@ test("AvatarChip renders every local avatar at all approved small sizes", async 
   await expectFrameFreeArtwork(avatars.first());
   await expect.poll(() => avatars.evaluateAll((nodes) => nodes.every((node) => getComputedStyle(node).borderWidth === "0px"))).toBe(true);
   await expect.poll(() => images.evaluateAll((nodes) => nodes.every((node) => getComputedStyle(node).objectFit === "contain"))).toBe(true);
-  await expect.poll(() =>
-    images.evaluateAll((nodes) =>
+  await expectImagesReady(images);
+  expect(
+    await images.evaluateAll((nodes) =>
       nodes.every(
         (node) =>
           node instanceof HTMLImageElement &&
-          node.naturalWidth === 256 &&
-          node.naturalHeight === 256 &&
           node.alt === "" &&
           node.getAttribute("aria-hidden") === "true",
       ),
     ),
   ).toBe(true);
-  await expect.poll(() => allImagesHaveTransparentCorners(images)).toBe(true);
+  await expectTransparentCorners(images);
   for (const size of avatarSizes) {
     await component.locator(`[data-avatar-size="${size}"]`).screenshot({
       path: testInfo.outputPath(`avatar-chip-size-${size}.png`),
@@ -217,7 +238,7 @@ test("AvatarChip exposes every asset for full-size crop inspection", async ({ mo
   expect(sheetBounds?.width, "full-size contact sheet fits the capture viewport").toBeLessThanOrEqual(1280);
   const sheetWidth = await component.evaluate((element) => ({ client: element.clientWidth, scroll: element.scrollWidth }));
   expect(sheetWidth.scroll, "full-size contact sheet has no clipped columns").toBeLessThanOrEqual(sheetWidth.client);
-  await expect.poll(() => allImagesHaveTransparentCorners(images)).toBe(true);
+  await expectTransparentCorners(images);
   const rasterMetrics = await avatarRasterMetrics(images);
   for (const metric of rasterMetrics) {
     expect.soft(metric.edgeLightP90, `${metric.key} keeps beige through the oval edge`).toBeLessThanOrEqual(247);

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:package-name")
+
 package com.readmates.hostworkspace.adapter.`in`.web
 
 import com.readmates.hostworkspace.application.model.HostOperatingRoomAccessDeniedException

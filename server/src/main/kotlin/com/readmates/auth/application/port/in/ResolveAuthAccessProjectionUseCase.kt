@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:package-name")
+
 package com.readmates.auth.application.port.`in`
 
 import com.readmates.auth.application.model.AuthAccessProjection

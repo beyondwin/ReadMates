@@ -241,7 +241,28 @@ internal class NotificationDeliveryClaimOperations(
         clubId: UUID? = null,
     ) {
         val clubPredicate = if (clubId == null) "" else "and club_id = ?"
-        val args = if (clubId == null) emptyArray() else arrayOf(clubId.dbString() as Any)
+        val clubArgs = if (clubId == null) emptyArray() else arrayOf(clubId.dbString() as Any)
+        val staleIds =
+            jdbcTemplate.query(
+                """
+                select id
+                from notification_deliveries force index (notification_deliveries_retry_idx)
+                where channel = 'EMAIL'
+                  and status = 'SENDING'
+                  and $NOTIFICATION_CLAIM_LEASE_EXPIRED_PREDICATE
+                  $clubPredicate
+                order by locked_at, id
+                for update skip locked
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.getString("id").let(UUID::fromString) },
+                -claimLeaseMicroseconds,
+                *clubArgs,
+            )
+        if (staleIds.isEmpty()) {
+            return
+        }
+
+        val placeholders = staleIds.joinToString(",") { "?" }
         jdbcTemplate.update(
             """
             update notification_deliveries
@@ -249,13 +270,17 @@ internal class NotificationDeliveryClaimOperations(
                 locked_at = null,
                 next_attempt_at = utc_timestamp(6),
                 updated_at = utc_timestamp(6)
-            where channel = 'EMAIL'
+            where id in ($placeholders)
+              and channel = 'EMAIL'
               and status = 'SENDING'
               and $NOTIFICATION_CLAIM_LEASE_EXPIRED_PREDICATE
               $clubPredicate
             """.trimIndent(),
-            -claimLeaseMicroseconds,
-            *args,
+            *(
+                staleIds.map { it.dbString() as Any } +
+                    listOf(-claimLeaseMicroseconds as Any) +
+                    clubArgs
+            ).toTypedArray(),
         )
     }
 }

@@ -113,15 +113,14 @@ class ResolveAuthAccessProjectionServiceTest {
         description: String,
         role: MembershipRole,
         status: MembershipStatus,
-    ) =
-        ProjectionRow(
-            description = description,
-            joinedClubs = listOf(club(firstClubId, "first-club", role, status)),
-            platformAdmin = null,
-            expectedKinds = listOf(ProductSpaceKind.CLUBS),
-            expectedClubs = listOf(availableMemberClub(firstClubId, "first-club")),
-            recommendedSpace = RecommendedSpace(ProductSpaceKind.CLUBS, firstClubId, ClubPerspective.MEMBER),
-        )
+    ) = ProjectionRow(
+        description = description,
+        joinedClubs = listOf(club(firstClubId, "first-club", role, status)),
+        platformAdmin = null,
+        expectedKinds = listOf(ProductSpaceKind.CLUBS),
+        expectedClubs = listOf(availableMemberClub(firstClubId, "first-club")),
+        recommendedSpace = RecommendedSpace(ProductSpaceKind.CLUBS, firstClubId, ClubPerspective.MEMBER),
+    )
 
     private fun activeHostRow() =
         ProjectionRow(
@@ -168,49 +167,45 @@ class ResolveAuthAccessProjectionServiceTest {
     private fun availableMemberClub(
         clubId: UUID,
         clubSlug: String,
-    ) =
-        AvailableClubSpace(
-            clubId = clubId,
-            clubSlug = clubSlug,
-            clubName = clubSlug.split('-').joinToString(" ") { it.replaceFirstChar(Char::uppercase) },
-            perspectives = listOf(ClubPerspective.MEMBER),
-        )
+    ) = AvailableClubSpace(
+        clubId = clubId,
+        clubSlug = clubSlug,
+        clubName = clubSlug.split('-').joinToString(" ") { it.replaceFirstChar(Char::uppercase) },
+        perspectives = listOf(ClubPerspective.MEMBER),
+    )
 
     private fun availableHostClub(
         clubId: UUID,
         clubSlug: String,
-    ) =
-        AvailableClubSpace(
-            clubId = clubId,
-            clubSlug = clubSlug,
-            clubName = clubSlug.split('-').joinToString(" ") { it.replaceFirstChar(Char::uppercase) },
-            perspectives = listOf(ClubPerspective.MEMBER, ClubPerspective.HOST),
-        )
+    ) = AvailableClubSpace(
+        clubId = clubId,
+        clubSlug = clubSlug,
+        clubName = clubSlug.split('-').joinToString(" ") { it.replaceFirstChar(Char::uppercase) },
+        perspectives = listOf(ClubPerspective.MEMBER, ClubPerspective.HOST),
+    )
 
     private fun service(
         joinedClubs: List<TestJoinedClubSummary>,
         platformAdmin: CurrentPlatformAdmin?,
-    ) =
-        ResolveAuthAccessProjectionService(
-            memberIdentityLookup = StubMemberIdentityLookupPort(joinedClubs),
-            platformAdminLookup = StubPlatformAdminLookupPort(platformAdmin),
-        )
+    ) = ResolveAuthAccessProjectionService(
+        memberIdentityLookup = StubMemberIdentityLookupPort(joinedClubs),
+        platformAdminLookup = StubPlatformAdminLookupPort(platformAdmin),
+    )
 
     private fun club(
         clubId: UUID,
         clubSlug: String,
         role: MembershipRole,
         status: MembershipStatus,
-    ) =
-        TestJoinedClubSummary(
-            clubId = clubId,
-            clubSlug = clubSlug,
-            clubName = clubSlug.split('-').joinToString(" ") { it.replaceFirstChar(Char::uppercase) },
-            membershipId = UUID.nameUUIDFromBytes("$clubId-$role-$status".toByteArray()),
-            role = role,
-            status = status,
-            primaryHost = null,
-        )
+    ) = TestJoinedClubSummary(
+        clubId = clubId,
+        clubSlug = clubSlug,
+        clubName = clubSlug.split('-').joinToString(" ") { it.replaceFirstChar(Char::uppercase) },
+        membershipId = UUID.nameUUIDFromBytes("$clubId-$role-$status".toByteArray()),
+        role = role,
+        status = status,
+        primaryHost = null,
+    )
 
     private fun platformAdmin() =
         CurrentPlatformAdmin(

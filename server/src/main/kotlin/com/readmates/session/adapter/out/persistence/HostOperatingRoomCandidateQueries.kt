@@ -21,6 +21,25 @@ class HostOperatingRoomCandidateQueries(
         evaluatedAt: LocalDateTime,
     ): List<HostOperatingRoomCandidate> =
         jdbcTemplate.query(
+            LOAD_CANDIDATES_SQL,
+            { resultSet, _ ->
+                HostOperatingRoomCandidate(
+                    sessionId = resultSet.uuid("id"),
+                    state = HostOperatingRoomCandidateState.valueOf(resultSet.getString("state")),
+                    meetingDate = resultSet.getObject("session_date", LocalDate::class.java),
+                    startTime = resultSet.getObject("start_time", LocalTime::class.java),
+                    sessionNumber = resultSet.getInt("number"),
+                    scheduleSeenAvailable = resultSet.getBoolean("schedule_seen_available"),
+                )
+            },
+            clubId.dbString(),
+            evaluatedAt.toLocalDate(),
+            evaluatedAt.toLocalDate(),
+            evaluatedAt.toLocalTime(),
+        )
+
+    private companion object {
+        val LOAD_CANDIDATES_SQL =
             """
             select
               sessions.id,
@@ -74,20 +93,6 @@ class HostOperatingRoomCandidateQueries(
               case when sessions.state = 'CLOSED' then sessions.start_time end desc,
               case when sessions.state = 'CLOSED' then sessions.number end desc,
               case when sessions.state = 'CLOSED' then sessions.id end desc
-            """.trimIndent(),
-            { resultSet, _ ->
-                HostOperatingRoomCandidate(
-                    sessionId = resultSet.uuid("id"),
-                    state = HostOperatingRoomCandidateState.valueOf(resultSet.getString("state")),
-                    meetingDate = resultSet.getObject("session_date", LocalDate::class.java),
-                    startTime = resultSet.getObject("start_time", LocalTime::class.java),
-                    sessionNumber = resultSet.getInt("number"),
-                    scheduleSeenAvailable = resultSet.getBoolean("schedule_seen_available"),
-                )
-            },
-            clubId.dbString(),
-            evaluatedAt.toLocalDate(),
-            evaluatedAt.toLocalDate(),
-            evaluatedAt.toLocalTime(),
-        )
+            """.trimIndent()
+    }
 }

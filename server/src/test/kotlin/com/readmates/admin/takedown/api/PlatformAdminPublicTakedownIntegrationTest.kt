@@ -100,24 +100,26 @@ class PlatformAdminPublicTakedownIntegrationTest(
 
     @Test
     fun `preview binds exact public target generation surfaces ttl and remote copy limitation`() {
-        val body = mockMvc
-            .post("/api/admin/public-takedowns/preview") {
-                contentType = MediaType.APPLICATION_JSON
-                content = previewRequest()
-                trustedAdminRequest(OWNER_USER_ID)
-            }.andExpect {
-                status { isOk() }
-                jsonPath("$.schema") { value("admin.public_takedown.preview.v1") }
-                jsonPath("$.clubId") { value(CLUB_ID) }
-                jsonPath("$.sessionId") { value(SESSION_ID) }
-                jsonPath("$.publicationId") { value(PUBLICATION_ID) }
-                jsonPath("$.targetGeneration") { value(7) }
-                jsonPath("$.currentSurfaces.length()") { value(4) }
-                jsonPath("$.expiresAt") { isNotEmpty() }
-                jsonPath("$.confirmEnabled") { value(false) }
-                jsonPath("$.activationBoundary") { value("PROTECTED_CACHE_SAFETY_EVIDENCE_REQUIRED") }
-                jsonPath("$.remoteCopyLimitation") { value(REMOTE_COPY_LIMITATION) }
-            }.andReturn().response.contentAsString
+        val body =
+            mockMvc
+                .post("/api/admin/public-takedowns/preview") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content = previewRequest()
+                    trustedAdminRequest(OWNER_USER_ID)
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.schema") { value("admin.public_takedown.preview.v1") }
+                    jsonPath("$.clubId") { value(CLUB_ID) }
+                    jsonPath("$.sessionId") { value(SESSION_ID) }
+                    jsonPath("$.publicationId") { value(PUBLICATION_ID) }
+                    jsonPath("$.targetGeneration") { value(7) }
+                    jsonPath("$.currentSurfaces.length()") { value(4) }
+                    jsonPath("$.expiresAt") { isNotEmpty() }
+                    jsonPath("$.confirmEnabled") { value(false) }
+                    jsonPath("$.activationBoundary") { value("PROTECTED_CACHE_SAFETY_EVIDENCE_REQUIRED") }
+                    jsonPath("$.remoteCopyLimitation") { value(REMOTE_COPY_LIMITATION) }
+                }.andReturn()
+                .response.contentAsString
         val fixture = sharedFixture("platform-admin-takedown-preview.server.json")
         assertThat(JsonPath.read<String>(body, "$.schema")).isEqualTo(JsonPath.read<String>(fixture, "$.schema"))
         assertThat(JsonPath.read<String>(body, "$.activationBoundary"))
@@ -203,8 +205,8 @@ class PlatformAdminPublicTakedownIntegrationTest(
                 "browserRevalidationOutcome",
                 "remoteCopyLimitation",
             ).forEach { field ->
-                assertThat(JsonPath.read<Any>(body, "$.${field}"))
-                    .isEqualTo(JsonPath.read<Any>(fixture, "$.${field}"))
+                assertThat(JsonPath.read<Any>(body, "$.$field"))
+                    .isEqualTo(JsonPath.read<Any>(fixture, "$.$field"))
             }
             assertThat(body).doesNotContain("committedClubGeneration", "limitationCode")
             assertThat(

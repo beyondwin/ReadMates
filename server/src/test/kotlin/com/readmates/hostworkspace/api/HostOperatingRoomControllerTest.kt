@@ -97,9 +97,15 @@ private val resolveCurrentMemberUseCase =
 
         override fun findUserIdByEmail(email: String): UUID? = currentHost.userId
 
-        override fun resolveByUserAndClub(userId: UUID, clubId: UUID): CurrentMember? = currentHost
+        override fun resolveByUserAndClub(
+            userId: UUID,
+            clubId: UUID,
+        ): CurrentMember? = currentHost
 
-        override fun resolveByEmailAndClub(email: String, clubId: UUID): CurrentMember? = currentHost
+        override fun resolveByEmailAndClub(
+            email: String,
+            clubId: UUID,
+        ): CurrentMember? = currentHost
 
         override fun listJoinedClubs(userId: UUID): List<JoinedClubSummary> = emptyList()
 

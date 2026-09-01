@@ -100,17 +100,17 @@ data class AuthMemberResponse(
         private fun recommendedAppEntryUrl(accessProjection: AuthAccessProjection): String? =
             accessProjection.recommendedSpace?.let { recommended ->
                 when (recommended.kind) {
-                ProductSpaceKind.PLATFORM -> "/admin"
-                ProductSpaceKind.CLUBS -> {
-                    recommended
-                        .takeIf { it.perspective == ClubPerspective.MEMBER }
-                        ?.clubId
-                        ?.let { clubId ->
-                            accessProjection.availableSpaces.clubs
-                                .singleOrNull { it.clubId == clubId }
-                                ?.takeIf { ClubPerspective.MEMBER in it.perspectives }
-                                ?.let { "/clubs/${it.clubSlug}/app" }
-                        }
+                    ProductSpaceKind.PLATFORM -> "/admin"
+                    ProductSpaceKind.CLUBS -> {
+                        recommended
+                            .takeIf { it.perspective == ClubPerspective.MEMBER }
+                            ?.clubId
+                            ?.let { clubId ->
+                                accessProjection.availableSpaces.clubs
+                                    .singleOrNull { it.clubId == clubId }
+                                    ?.takeIf { ClubPerspective.MEMBER in it.perspectives }
+                                    ?.let { "/clubs/${it.clubSlug}/app" }
+                            }
                     }
                 }
             }
