@@ -41,7 +41,12 @@ import { HostSettingsHistory } from "@/features/host/ui/settings/host-settings-h
 import { isReadmatesTransportError } from "@/shared/api/errors";
 import { publishTransitionAction, TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 import { createHostSettingsReceiptCapsule } from "./host-settings-receipt-capsule";
-import { hostCloseConfirmErrorDisposition, hostCoHostErrorDisposition } from "./host-settings-recovery";
+import {
+  hostCloseConfirmErrorDisposition,
+  hostCoHostErrorDisposition,
+  hostInvitationLinkUpdateErrorDisposition,
+  hostSettingsUpdateErrorDisposition,
+} from "./host-settings-recovery";
 
 type SettingsMutationResult = { settings: HostClubSettingsContract };
 type CloseConfirmRequest = { previewId: string; effectHash: string; idempotencyKey: string };
@@ -180,10 +185,12 @@ function ScopedHostSettingsRoute({ clubSlug }: { clubSlug: string }) {
     const operationId = commandOperationId(command);
     await publishTransitionAction(handle, "errorCopy", () => {
       if (command.kind === "settings") {
-        const isStale = error instanceof Error && /STALE|REVISION|409/.test(error.message);
-        setStale(isStale);
-        setSettingsError(isStale ? null : "설정 저장 결과를 확인할 수 없습니다. 최신 revision을 확인해 주세요.");
-        if (!isReadmatesTransportError(error)) clearPending(operationId);
+        const disposition = hostSettingsUpdateErrorDisposition(error);
+        setStale(disposition === "stale");
+        setSettingsError(disposition === "stale" ? null : disposition === "unknown"
+          ? "설정 저장 결과를 확인할 수 없습니다. 최신 revision을 확인한 뒤 같은 요청으로 다시 확인해 주세요."
+          : "서버가 설정 변경 요청을 거절했습니다. 최신 revision에서 새 요청을 만들어 주세요.");
+        if (disposition !== "unknown") clearPending(operationId);
         return;
       }
       if (command.kind === "co-host") {
@@ -199,17 +206,23 @@ function ScopedHostSettingsRoute({ clubSlug }: { clubSlug: string }) {
         return;
       }
       if (command.kind === "link-create" || command.kind === "link-update") {
-        const staleLink = command.kind === "link-update" && error instanceof Error && /STALE|REVISION|409/.test(error.message);
+        const disposition = command.kind === "link-update"
+          ? hostInvitationLinkUpdateErrorDisposition(error)
+          : isReadmatesTransportError(error) ? "unknown" : "rejected";
+        const staleLink = disposition === "stale";
+        if (staleLink) setEditDraft(null);
         setLinkAlert({
           message: staleLink
             ? "링크가 변경되었습니다. 최신 상태를 확인한 뒤 다시 편집해 주세요."
-            : command.kind === "link-create"
+            : disposition === "unknown" && command.kind === "link-create"
               ? "링크 생성 결과를 확인할 수 없습니다. 최신 목록을 확인하거나 같은 요청으로 다시 확인해 주세요."
-              : "링크 변경 결과를 확인할 수 없습니다. 같은 요청으로 다시 확인할 수 있습니다.",
+              : disposition === "unknown"
+                ? "링크 변경 결과를 확인할 수 없습니다. 같은 요청으로 다시 확인할 수 있습니다."
+                : "서버가 링크 요청을 거절했습니다. 최신 상태에서 새 요청을 만들어 주세요.",
           refreshLabel: staleLink ? "최신 링크 상태 확인" : "최신 목록 확인",
-          retryLabel: staleLink ? null : command.kind === "link-create" ? "같은 요청 다시 확인" : "같은 변경 요청 다시 확인",
+          retryLabel: disposition !== "unknown" ? null : command.kind === "link-create" ? "같은 요청 다시 확인" : "같은 변경 요청 다시 확인",
         });
-        if (staleLink) clearPending(operationId);
+        if (disposition !== "unknown") clearPending(operationId);
         return;
       }
       const disposition = hostCloseConfirmErrorDisposition(error);

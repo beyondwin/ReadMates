@@ -279,21 +279,27 @@ function HostScheduleReviewSession({
           if (currentSessionRef.current !== selection.sessionId) return;
           setPreviewSnapshot({ response, selection });
         }),
+        async (previewError, handle) => {
+          if (currentSessionRef.current !== selection.sessionId) return;
+          const disposition = manualNotificationErrorDisposition(previewError);
+          if (disposition === "authority") {
+            await refreshAuthority(
+              handle,
+              "일정 또는 수신 대상이 변경되었습니다. 최신 정보로 새 미리보기를 만들어 주세요.",
+            );
+            return;
+          }
+          await publishTransitionAction(handle, "errorCopy", () => {
+            if (disposition !== "unknown") setPreviewSnapshot(null);
+            setError(disposition === "preview"
+              ? "이 미리보기는 더 이상 사용할 수 없습니다. 새 미리보기를 만들어 주세요."
+              : "미리보기를 만들지 못했습니다. 대상과 문구를 확인한 뒤 다시 시도해 주세요.");
+          });
+        },
       );
     } catch (previewError) {
       if (previewError instanceof TransitionOwnerObsoleteError) return;
-      const disposition = manualNotificationErrorDisposition(previewError);
-      if (disposition !== "unknown") setPreviewSnapshot(null);
-      if (disposition === "authority") {
-        setError("일정 또는 수신 대상이 변경되었습니다. 최신 정보로 새 미리보기를 만들어 주세요.");
-        await refreshAuthority();
-        return;
-      }
-      if (disposition === "preview") {
-        setError("이 미리보기는 더 이상 사용할 수 없습니다. 새 미리보기를 만들어 주세요.");
-        return;
-      }
-      setError("미리보기를 만들지 못했습니다. 대상과 문구를 확인한 뒤 다시 시도해 주세요.");
+      throw previewError;
     }
   };
 
