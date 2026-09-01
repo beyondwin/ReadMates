@@ -2,6 +2,8 @@ import { useState, type FormEvent } from "react";
 import {
   normalizeTakedownReason,
   remoteCopyLimitationLabel,
+  takedownReasonRecordLabel,
+  takedownReceiptOutcomePresentation,
   type AdminTakedownState,
   type TakedownPreviewRequest,
   type TakedownReasonCategory,
@@ -194,6 +196,7 @@ export function AdminPublicTakedownWorkbench({
                 <p className="admin-emergency-lane__step">3 · 처리 결과</p>
                 <h2 className="h4 editorial">원본 공개 경로를 차단했습니다.</h2>
                 <p className="body">회수 명령과 공개 캐시 반영 결과가 변경 불가 영수증에 기록되었습니다.</p>
+                <p className="body">{takedownReasonRecordLabel(receiptState.receipt.reasonRedacted)}</p>
                 <p className="body">{remoteCopyLimitationLabel(receiptState.receipt.remoteCopyLimitation)}</p>
                 <AdminTechnicalDisclosure items={receiptTechnicalItems(receiptState.receipt)} />
               </section>
@@ -201,12 +204,7 @@ export function AdminPublicTakedownWorkbench({
               <AdminReceiptTimeline
                 level="L3"
                 receiptId="변경 불가 처리 영수증"
-                entries={[
-                  { key: "origin", label: "원본 접근 차단 완료", state: "succeeded" },
-                  { key: "bff", label: "브라우저 앞단 캐시 결과 기록됨", state: "unknown" },
-                  { key: "cdn", label: "공개 캐시 반영 기록", state: "unknown" },
-                  { key: "browser", label: "브라우저 재확인 범위 기록됨", state: "unknown" },
-                ]}
+                entries={receiptTimelineEntries(receiptState.receipt)}
               />
               <AdminSafeActionDock level="L3" authority="allowed" state={dockState} />
             </>
@@ -260,5 +258,19 @@ function receiptTechnicalItems(receipt: Extract<AdminTakedownState, { kind: "ori
     { label: "CDN purge", value: receipt.cdnPurgeOutcome },
     { label: "브라우저 재검증", value: receipt.browserRevalidationOutcome },
     { label: "커밋 시각", value: receipt.createdAt },
+  ];
+}
+
+function receiptTimelineEntries(
+  receipt: Extract<AdminTakedownState, { kind: "origin-denied" }>["receipt"],
+) {
+  const bff = takedownReceiptOutcomePresentation("bff", receipt.bffEvictionOutcome);
+  const cdn = takedownReceiptOutcomePresentation("cdn", receipt.cdnPurgeOutcome);
+  const browser = takedownReceiptOutcomePresentation("browser", receipt.browserRevalidationOutcome);
+  return [
+    { key: "origin", label: "원본 접근 차단 완료", state: "succeeded" as const },
+    { key: "bff", ...bff },
+    { key: "cdn", ...cdn },
+    { key: "browser", ...browser },
   ];
 }

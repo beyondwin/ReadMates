@@ -27,6 +27,7 @@ describe("platform-admin public takedown contracts", () => {
       bffEvictionOutcome: "NOT_STARTED",
       cdnPurgeOutcome: "QUEUED",
       browserRevalidationOutcome: "BOUNDED_BY_CACHE_POLICY",
+      remoteCopyLimitation: expect.stringContaining("원격으로 삭제할 수 없습니다"),
     });
   });
 

@@ -1,7 +1,16 @@
+.admin-public-takedown,
+.admin-emergency-lane {
+  min-width: 0;
+}
+
+.admin-public-takedown {
+  display: grid;
+  gap: var(--space-md);
+}
+
 .admin-emergency-lane {
   width: 100%;
   max-width: 1240px;
-  min-width: 0;
   margin: 0 auto;
   color: var(--text);
   font-family: var(--f-sans);

@@ -12,6 +12,7 @@ import type { AdminTakedownState } from "../model/platform-admin-takedown-model"
 import { AdminPublicTakedownWorkbench } from "./admin-public-takedown-workbench";
 
 const EMERGENCY_CSS = readFileSync(path.resolve("features/platform-admin/ui/admin-emergency-lane.css"), "utf8");
+const LEGACY_LEDGER_CSS = readFileSync(path.resolve("features/platform-admin/ui/admin-editorial-ledger.css"), "utf8");
 const blockedPreview = parseAdminTakedownPreview(previewFixture);
 const enabledPreview = { ...blockedPreview, confirmEnabled: true, activationBoundary: "ACTIVE" };
 const receipt = parseAdminTakedownReceipt(receiptFixture);
@@ -83,15 +84,38 @@ describe("AdminPublicTakedownWorkbench", () => {
     renderWorkbench({ kind: "origin-denied", receipt });
     const region = screen.getByRole("region", { name: "변경 불가 회수 영수증" });
     expect(region).toHaveTextContent("원본 공개 경로를 차단했습니다.");
+    expect(region).toHaveTextContent("회수 사유 원문은 영수증에 남기지 않았습니다.");
     expect(region).toHaveTextContent(receipt.remoteCopyLimitation);
     const technical = screen.getByRole("group", { name: "기술 정보" });
     expect(technical).toHaveTextContent(receipt.receiptId);
     expect(technical).toHaveTextContent(receipt.bffEvictionOutcome);
     expect(technical).toHaveTextContent(receipt.cdnPurgeOutcome);
     expect(technical).toHaveTextContent(receipt.browserRevalidationOutcome);
-    expect(screen.getByRole("region", { name: "명령 기록" })).toHaveTextContent("공개 캐시 반영 기록");
+    const timeline = screen.getByRole("region", { name: "명령 기록" });
+    expect(timeline).toHaveTextContent("브라우저 앞단 캐시 회수는 아직 시작되지 않았습니다.");
+    expect(timeline).toHaveTextContent("공개 캐시 회수가 대기열에 등록되었습니다.");
+    expect(timeline).toHaveTextContent("브라우저 캐시는 정책이 허용하는 범위에서 다시 확인됩니다.");
+    expect(timeline).not.toHaveTextContent(/NOT_STARTED|QUEUED|BOUNDED_BY_CACHE_POLICY/);
     expect(screen.queryByRole("button", { name: /전파.*시도/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "전파 수렴 타임라인" })).not.toBeInTheDocument();
+  });
+
+  it("fails closed when a future server receipt outcome is not recognized", () => {
+    renderWorkbench({
+      kind: "origin-denied",
+      receipt: {
+        ...receipt,
+        bffEvictionOutcome: "FUTURE_BFF_OUTCOME",
+        cdnPurgeOutcome: "FUTURE_CDN_OUTCOME",
+        browserRevalidationOutcome: "FUTURE_BROWSER_OUTCOME",
+      },
+    });
+    const timeline = screen.getByRole("region", { name: "명령 기록" });
+    expect(timeline).toHaveTextContent("브라우저 앞단 캐시 결과를 확인해야 합니다.");
+    expect(timeline).toHaveTextContent("공개 캐시 결과를 확인해야 합니다.");
+    expect(timeline).toHaveTextContent("브라우저 캐시 결과를 확인해야 합니다.");
+    expect(timeline).not.toHaveTextContent(/FUTURE_.*_OUTCOME/);
+    expect(screen.queryByRole("button", { name: /전파.*시도/ })).not.toBeInTheDocument();
   });
 
   it("locks 44px targets and reduced motion in the scoped takedown stylesheet", () => {
@@ -100,5 +124,12 @@ describe("AdminPublicTakedownWorkbench", () => {
     expect(EMERGENCY_CSS).toMatch(/@media \(max-width:\s*768px\)[\s\S]*\.admin-emergency-lane__compact-handoff[\s\S]*display:\s*grid/);
     expect(EMERGENCY_CSS).toMatch(/@media \(prefers-reduced-motion: reduce\)[\s\S]*\.admin-emergency-lane[\s\S]*animation-duration:\s*0\.01ms/);
     expect(EMERGENCY_CSS).not.toMatch(/backdrop-filter|linear-gradient/);
+  });
+
+  it("keeps emergency takedown selectors under one stylesheet owner", () => {
+    expect(LEGACY_LEDGER_CSS).not.toMatch(/\.admin-public-takedown\b/);
+    expect(EMERGENCY_CSS).toContain(".admin-emergency-lane");
+    expect(EMERGENCY_CSS).toContain("var(--warning-line)");
+    expect(EMERGENCY_CSS).toContain("var(--focus-ring-soft)");
   });
 });
