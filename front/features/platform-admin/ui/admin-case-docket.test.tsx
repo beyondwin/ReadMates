@@ -20,7 +20,7 @@ describe("AdminCaseDocket", () => {
         label="사건 기록"
         title="알림 실패"
         identity="club-reading-sai"
-        status="미확인"
+        status={<span>확인 전</span>}
         evidence={<p>최근 실패 4건</p>}
         history={<p>운영자가 확인함</p>}
         related={<a href="/admin/notifications">알림 운영</a>}
@@ -32,7 +32,7 @@ describe("AdminCaseDocket", () => {
     expect(docket).toHaveClass("admin-case-docket");
     expect(screen.getByRole("heading", { name: "알림 실패" })).toBeInTheDocument();
     expect(screen.getByText("club-reading-sai")).toBeInTheDocument();
-    expect(screen.getByText("미확인")).toBeInTheDocument();
+    expect(screen.getByText("확인 전")).toBeInTheDocument();
     expect(screen.getByText("최근 실패 4건")).toBeInTheDocument();
     expect(screen.getByText("운영자가 확인함")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "알림 운영" })).toHaveAttribute("href", "/admin/notifications");

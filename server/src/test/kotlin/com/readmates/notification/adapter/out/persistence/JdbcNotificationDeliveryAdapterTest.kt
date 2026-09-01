@@ -37,6 +37,7 @@ import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import javax.sql.DataSource
 
 private const val CLEANUP_NOTIFICATION_DELIVERY_SQL = """
     delete from member_notifications
@@ -99,6 +100,7 @@ class JdbcNotificationDeliveryAdapterTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val transactionalOps: NotificationDeliveryTransactionalOperations,
     @param:Autowired private val objectMapper: ObjectMapper,
+    @param:Autowired private val dataSource: DataSource,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
     private val eventId = UUID.fromString("00000000-0000-0000-0000-000000009701")
@@ -417,6 +419,60 @@ class JdbcNotificationDeliveryAdapterTest(
         assertThat(processedCounts.sum() + remainingProcessedCount).isEqualTo(3)
         assertThat(mailPort.recipients()).hasSize(3).doesNotHaveDuplicates()
         assertThat(emailDeliveryRowsByStatus(NotificationDeliveryStatus.SENT)).isEqualTo(3)
+    }
+
+    @Test
+    fun `stale lease reclaim skips a locked row and delivers it exactly once after release`() {
+        insertEventOutboxRow()
+        deliveryAdapter.persistPlannedDeliveries(message())
+        val lockedStaleId = pendingEmailDeliveryIdFor("member1@example.com")
+        val availableStaleId = pendingEmailDeliveryIdFor("member5@example.com")
+        setSendingLease(lockedStaleId, -Duration.ofMinutes(16).toNanos() / 1_000)
+        setSendingLease(availableStaleId, -Duration.ofMinutes(16).toNanos() / 1_000)
+        val mailPort = RecordingMailPort()
+        val service = processingService(mailPort)
+        val executor = Executors.newFixedThreadPool(2)
+        val rowLockAcquired = CountDownLatch(1)
+        val releaseRowLock = CountDownLatch(1)
+        val rowLock =
+            executor.submit {
+                dataSource.connection.use { connection ->
+                    connection.autoCommit = false
+                    connection
+                        .prepareStatement("select id from notification_deliveries where id = ? for update")
+                        .use { statement ->
+                            statement.setString(1, lockedStaleId.toString())
+                            statement.executeQuery().use { result -> check(result.next()) }
+                        }
+                    rowLockAcquired.countDown()
+                    check(releaseRowLock.await(10, TimeUnit.SECONDS)) {
+                        "Timed out waiting to release delivery row lock"
+                    }
+                    connection.commit()
+                }
+            }
+
+        try {
+            check(rowLockAcquired.await(5, TimeUnit.SECONDS)) { "Timed out acquiring delivery row lock" }
+            val processedWhileLocked =
+                executor
+                    .submit<Int> { service.processPending(limit = 2) }
+                    .get(3, TimeUnit.SECONDS)
+
+            assertThat(processedWhileLocked).isEqualTo(2)
+            assertThat(statusFor(lockedStaleId)).isEqualTo("SENDING")
+            assertThat(statusFor(availableStaleId)).isEqualTo("SENT")
+
+            releaseRowLock.countDown()
+            rowLock.get(5, TimeUnit.SECONDS)
+
+            assertThat(service.processPending(limit = 2)).isEqualTo(1)
+            assertThat(mailPort.recipients()).hasSize(3).doesNotHaveDuplicates()
+            assertThat(emailDeliveryRowsByStatus(NotificationDeliveryStatus.SENT)).isEqualTo(3)
+        } finally {
+            releaseRowLock.countDown()
+            executor.shutdownNow()
+        }
     }
 
     @Test
@@ -1025,6 +1081,20 @@ class JdbcNotificationDeliveryAdapterTest(
             executor.shutdownNow()
         }
     }
+
+    private fun processingService(mailPort: MailDeliveryPort): NotificationDeliveryProcessingService =
+        NotificationDeliveryProcessingService(
+            deliveryEngine =
+                NotificationDeliveryEngine(
+                    deliveryStatusPort = deliveryAdapter,
+                    mailDeliveryPort = mailPort,
+                    metrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
+                    runtimeProperties = NotificationRuntimeProperties(),
+                    clock = Clock.fixed(Instant.parse("2026-04-29T02:00:00Z"), ZoneOffset.UTC),
+                ),
+            transactionalOps = transactionalOps,
+            deliveryEnabled = true,
+        )
 
     private data class InsertedMember(
         val userId: UUID,

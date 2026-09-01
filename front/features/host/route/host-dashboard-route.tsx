@@ -39,15 +39,18 @@ import {
 import {
   HostMutationPendingError,
   hostSessionDetailQuery,
+  publishHostSessionAttendance,
   useUpdateHostSessionAttendanceMutation,
 } from "@/features/host/queries/host-session-queries";
 import {
   hostSessionRestorePreviewQuery,
+  publishRestoredHostSessionChange,
   useRestoreHostSessionChangeMutation,
 } from "@/features/host/queries/host-session-recovery-queries";
 import { hostNotificationHealthQuery } from "@/features/host/queries/host-notification-queries";
 import {
   hostWorkboxPageQuery,
+  publishHostWorkboxComposition,
   useDeferHostWorkboxItemMutation,
   useRemoveHostWorkboxDeferralMutation,
 } from "@/features/host/queries/host-workbox-queries";
@@ -72,6 +75,7 @@ import { HostWorkbox } from "@/features/host/ui/workbox/host-workbox";
 import type { HostWorkboxDeferralOption } from "@/features/host/ui/workbox/host-work-item";
 import type { WorkspacePendingUndo } from "@/features/host/ui/session-workspace/workspace-undo-bar";
 import { formatSessionKicker } from "@/shared/ui/readmates-display";
+import { publishTransitionAction, TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 import type { HostDashboardRouteData } from "./host-dashboard-data";
 
 const PHASE_REASON_STATE_KEY = "hostOperatingRoomPhaseReason";
@@ -176,6 +180,7 @@ export function HostDashboardRoute({
   });
   const attendanceMutation = useUpdateHostSessionAttendanceMutation(context);
   const restoreMutation = useRestoreHostSessionChangeMutation(context);
+  const transitionOwner = useTransitionSafetyOwner(`host-operating-room:${sessionId ?? "empty"}`);
   const [detailOverride, setDetailOverride] = useState<{
     sessionId: string;
     detail: HostSessionDetailResponse;
@@ -364,41 +369,52 @@ export function HostDashboardRoute({
     setAttendanceConflict(null);
     setAttendanceUnknown(null);
     setAttendanceWriteState(expectedSessionId, membershipIds, "saving");
+    const operationId = `host-attendance:${expectedSessionId}:${membershipIds.join(",")}`;
+    const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
     try {
+      const attendanceEntries = membershipIds.map((membershipId) => ({
+        membershipId,
+        attendanceStatus: attendance,
+      }));
       const result = await attendanceMutation.mutateAsync({
         sessionId: expectedSessionId,
-        attendance: membershipIds.map((membershipId) => ({
-          membershipId,
-          attendanceStatus: attendance,
-        })),
+        attendance: attendanceEntries,
       });
+      if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
+      await publishTransitionAction(handle, "cache", () => publishHostSessionAttendance(queryClient, expectedSessionId, attendanceEntries, context));
       if (currentSessionIdRef.current !== expectedSessionId) return;
-      setAttendanceWriteState(expectedSessionId, membershipIds, null);
       const receipt = result.changeReceipt ?? null;
-      setPendingAttendanceUndo(receipt?.undoAvailable ? {
-        sessionId: expectedSessionId,
-        receipt,
-        description: hostSessionChangeUndoDescription("ATTENDANCE"),
-        error: null,
-      } : null);
+      await publishTransitionAction(handle, "ui", () => {
+        setAttendanceWriteState(expectedSessionId, membershipIds, null);
+        setPendingAttendanceUndo(receipt?.undoAvailable ? {
+          sessionId: expectedSessionId,
+          receipt,
+          description: hostSessionChangeUndoDescription("ATTENDANCE"),
+          error: null,
+        } : null);
+      });
     } catch (error) {
+      if (!(error instanceof TransitionOwnerObsoleteError) && await handle.settle("failed") !== "accepted") return;
       if (currentSessionIdRef.current !== expectedSessionId) return;
+      if (error instanceof TransitionOwnerObsoleteError) return;
       if (error instanceof HostMutationPendingError) {
-        setAttendanceUnknown({ ...attempt, canonicalLabel: null });
+        await publishTransitionAction(handle, "errorCopy", () => setAttendanceUnknown({ ...attempt, canonicalLabel: null }));
         return;
       }
       const writeState = meetingDayAttendanceWriteStateFromError(error);
-      setAttendanceWriteState(expectedSessionId, membershipIds, writeState);
+      await publishTransitionAction(handle, "errorCopy", () => setAttendanceWriteState(expectedSessionId, membershipIds, writeState));
       if (writeState === "conflict") {
         const refreshed = await refreshExactDetail(expectedSessionId);
         if (currentSessionIdRef.current !== expectedSessionId) return;
-        setAttendanceConflict({
-          ...attempt,
-          canonicalLabel: attendanceAttemptCanonicalLabel(refreshed, membershipIds),
+        await publishTransitionAction(handle, "errorCopy", () => {
+          setAttendanceConflict({
+            ...attempt,
+            canonicalLabel: attendanceAttemptCanonicalLabel(refreshed, membershipIds),
+          });
         });
       }
     }
-  }, [attendanceMutation, refreshExactDetail, sessionId, setAttendanceWriteState]);
+  }, [attendanceMutation, context, queryClient, refreshExactDetail, sessionId, setAttendanceWriteState, transitionOwner]);
 
   const reconcileUnknownAttendance = useCallback(async () => {
     const attempt = activeAttendanceUnknown;
@@ -437,14 +453,30 @@ export function HostDashboardRoute({
               });
               return;
             }
-            await restoreMutation.mutateAsync({
-              sessionId: current.sessionId,
-              changeId: preview.changeId,
-              request: { expectedCurrentHash: preview.expectedCurrentHash },
-            });
+            const operationId = `host-attendance-restore:${current.sessionId}:${preview.changeId}`;
+            const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
+            try {
+              await restoreMutation.mutateAsync({
+                sessionId: current.sessionId,
+                changeId: preview.changeId,
+                request: { expectedCurrentHash: preview.expectedCurrentHash },
+              });
+            } catch {
+              if (await handle.settle("failed") !== "accepted") return;
+              await publishTransitionAction(handle, "errorCopy", () => {
+                setPendingAttendanceUndo({
+                  ...current,
+                  error: "되돌리지 못했습니다. 변경 내역에서 다시 시도해 주세요.",
+                });
+              });
+              return;
+            }
+            if (await handle.settle("succeeded") !== "accepted") return;
+            await publishTransitionAction(handle, "cache", () => publishRestoredHostSessionChange(queryClient, current.sessionId, context));
             if (currentSessionIdRef.current !== current.sessionId) return;
-            setPendingAttendanceUndo(null);
-          } catch {
+            await publishTransitionAction(handle, "ui", () => setPendingAttendanceUndo(null));
+          } catch (error) {
+            if (error instanceof TransitionOwnerObsoleteError) return;
             if (currentSessionIdRef.current !== current.sessionId) return;
             setPendingAttendanceUndo({
               ...current,
@@ -541,43 +573,59 @@ export function HostDashboardRoute({
     workboxMutationKeyRef.current = workItemKey;
     setWorkboxPendingKey(workItemKey);
     setWorkboxRowError(null);
+    const operationId = `host-workbox:defer:${workItemKey}`;
+    const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
     try {
       await deferWorkboxMutation.mutateAsync({
         key: workItemKey,
         deferredUntil: deferredUntilForOption(option),
       });
-    } catch {
-      setWorkboxRowError({
+      if (await handle.settle("succeeded") !== "accepted") return;
+      await publishTransitionAction(handle, "cache", () => publishHostWorkboxComposition(queryClient, context));
+      await publishTransitionAction(handle, "ui", () => setWorkboxPendingKey((current) => current === workItemKey ? null : current));
+    } catch (error) {
+      if (error instanceof TransitionOwnerObsoleteError) return;
+      if (await handle.settle("failed") !== "accepted") return;
+      await publishTransitionAction(handle, "errorCopy", () => setWorkboxRowError({
         key: workItemKey,
         message: "작업을 보류하지 못했습니다. 항목을 유지한 채 다시 시도할 수 있습니다.",
-      });
+      }));
+      await publishTransitionAction(handle, "ui", () => setWorkboxPendingKey((current) => current === workItemKey ? null : current));
     } finally {
       if (workboxMutationKeyRef.current === workItemKey) {
         workboxMutationKeyRef.current = null;
       }
-      setWorkboxPendingKey((current) => current === workItemKey ? null : current);
+      handle.completePublication();
     }
-  }, [deferWorkboxMutation]);
+  }, [context, deferWorkboxMutation, queryClient, transitionOwner]);
 
   const undoWorkItemDeferral = useCallback(async (workItemKey: string) => {
     if (workboxMutationKeyRef.current !== null) return;
     workboxMutationKeyRef.current = workItemKey;
     setWorkboxPendingKey(workItemKey);
     setWorkboxRowError(null);
+    const operationId = `host-workbox:remove-deferral:${workItemKey}`;
+    const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
     try {
       await removeWorkboxDeferralMutation.mutateAsync(workItemKey);
-    } catch {
-      setWorkboxRowError({
+      if (await handle.settle("succeeded") !== "accepted") return;
+      await publishTransitionAction(handle, "cache", () => publishHostWorkboxComposition(queryClient, context));
+      await publishTransitionAction(handle, "ui", () => setWorkboxPendingKey((current) => current === workItemKey ? null : current));
+    } catch (error) {
+      if (error instanceof TransitionOwnerObsoleteError) return;
+      if (await handle.settle("failed") !== "accepted") return;
+      await publishTransitionAction(handle, "errorCopy", () => setWorkboxRowError({
         key: workItemKey,
         message: "보류를 해제하지 못했습니다. 항목을 유지한 채 다시 시도할 수 있습니다.",
-      });
+      }));
+      await publishTransitionAction(handle, "ui", () => setWorkboxPendingKey((current) => current === workItemKey ? null : current));
     } finally {
       if (workboxMutationKeyRef.current === workItemKey) {
         workboxMutationKeyRef.current = null;
       }
-      setWorkboxPendingKey((current) => current === workItemKey ? null : current);
+      handle.completePublication();
     }
-  }, [removeWorkboxDeferralMutation]);
+  }, [context, queryClient, removeWorkboxDeferralMutation, transitionOwner]);
 
   const workboxContent = (
     <HostWorkbox

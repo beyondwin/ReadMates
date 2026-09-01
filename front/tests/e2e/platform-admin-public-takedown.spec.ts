@@ -8,157 +8,127 @@ const PUBLICATION_ID = "30000000-0000-4000-8000-000000000003";
 const PREVIEW_ID = "40000000-0000-4000-8000-000000000004";
 const RECEIPT_ID = "50000000-0000-4000-8000-000000000005";
 const CONVERGENCE_ID = "60000000-0000-4000-8000-000000000006";
+const LIMITATION = "이미 표시되었거나 저장된 사본과 연결이 끊긴 오프라인 사본은 원격으로 삭제할 수 없습니다.";
 
 async function json(route: Route, status: number, body: unknown) {
   await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 }
 
-async function routeAdminShell(
-  page: Page,
-  role: "OWNER" | "SUPPORT",
-  capabilities?: string[],
-) {
+async function routeAdminShell(page: Page, role: "OWNER" | "SUPPORT", capabilities?: string[]) {
   await routeEmptyAdminOperations(page);
   await page.route("**/api/bff/api/auth/me**", (route) => json(route, 200, {
-    authenticated: true,
-    userId: "synthetic-admin",
-    membershipId: null,
-    clubId: null,
-    email: "synthetic-admin@example.test",
-    displayName: "Synthetic admin",
-    accountName: "Synthetic admin",
-    role: null,
-    membershipStatus: null,
-    approvalState: "INACTIVE",
-    currentMembership: null,
-    joinedClubs: [],
+    authenticated: true, userId: "synthetic-admin", membershipId: null, clubId: null,
+    email: "synthetic-admin@example.test", displayName: "Synthetic admin", accountName: "Synthetic admin",
+    role: null, membershipStatus: null, approvalState: "INACTIVE", currentMembership: null, joinedClubs: [],
     platformAdmin: { userId: "synthetic-admin", email: "synthetic-admin@example.test", role },
+    availableSpaces: { version: 1, kinds: ["PLATFORM"], clubs: [] },
     recommendedAppEntryUrl: "/admin",
   }));
   await page.route("**/api/bff/api/admin/summary", (route) => json(route, 200, {
-    platformRole: role,
-    activeClubCount: 0,
-    domainActionRequiredCount: 0,
-    domains: [],
-    domainsRequiringAction: [],
+    platformRole: role, activeClubCount: 0, domainActionRequiredCount: 0, domains: [], domainsRequiringAction: [],
   }));
-  await page.route("**/api/bff/api/admin/capabilities", (route) => json(route, 200, {
-    schemaVersion: 1,
-    role,
-    status: "ACTIVE",
-    capabilities: capabilities ?? (role === "OWNER"
-      ? ["VIEW_TODAY", "VIEW_CLUBS", "EMERGENCY_PUBLIC_TAKEDOWN"]
-      : ["VIEW_TODAY", "VIEW_CLUBS"]),
-    generatedAt: "2026-08-26T04:00:00Z",
+  await page.route("**/api/bff/api/admin/capabilities**", (route) => json(route, 200, {
+    schemaVersion: 1, role, status: "ACTIVE",
+    capabilities: capabilities ?? (role === "OWNER" ? ["VIEW_TODAY", "VIEW_CLUBS", "EMERGENCY_PUBLIC_TAKEDOWN"] : ["VIEW_TODAY", "VIEW_CLUBS"]),
+    generatedAt: "2026-08-30T04:00:00Z",
   }));
   await page.route("**/api/bff/api/admin/clubs**", (route) => json(route, 200, { items: [] }));
+  await page.route("**/api/bff/api/admin/health/snapshot", (route) => json(route, 200, {
+    schema: "platform.health_snapshot.v1", generatedAt: "2026-08-30T04:00:00Z",
+    lastSuccessfulAt: "2026-08-30T04:00:00Z", refreshState: "FRESH", staleAgeSeconds: 0, cards: [],
+  }));
 }
 
-test("owner confirms one exact target, response loss reconciles, and reload preserves the immutable receipt", async ({ page }) => {
+test("owner confirms one exact target once and renders server receipt outcomes", async ({ page }) => {
   await routeAdminShell(page, "OWNER");
   let confirmCalls = 0;
-  const idempotencyKeys: string[] = [];
-
+  const takedownRequests: string[] = [];
   await page.route("**/api/bff/api/admin/public-takedowns/preview", (route) => json(route, 200, {
-    schema: "admin.public_takedown.preview.v1",
-    previewId: PREVIEW_ID,
-    expiresAt: "2026-08-26T04:05:00Z",
-    clubId: CLUB_ID,
-    sessionId: SESSION_ID,
-    publicationId: PUBLICATION_ID,
-    targetGeneration: 17,
-    currentSurfaces: ["PUBLIC_CLUB", "PUBLIC_SESSION"],
-    limitationCode: "STORED_OR_OFFLINE_COPY_MAY_REMAIN",
+    schema: "admin.public_takedown.preview.v1", previewId: PREVIEW_ID, expiresAt: "2026-08-30T23:59:00Z",
+    clubId: CLUB_ID, sessionId: SESSION_ID, publicationId: PUBLICATION_ID, targetGeneration: 17,
+    currentSurfaces: ["BFF_CACHE", "BROWSER_CACHE", "CDN_CACHE", "ORIGIN"], confirmEnabled: true,
+    activationBoundary: "ACTIVE", remoteCopyLimitation: LIMITATION,
   }));
   await page.route("**/api/bff/api/admin/public-takedowns/confirm", async (route) => {
     confirmCalls += 1;
-    const request = route.request().postDataJSON() as { idempotencyKey: string };
-    idempotencyKeys.push(request.idempotencyKey);
-    if (confirmCalls === 1) {
-      await route.abort("failed");
-      return;
-    }
+    takedownRequests.push(new URL(route.request().url()).pathname);
     await json(route, 200, receipt());
   });
-  await page.route(`**/api/bff/api/admin/public-takedowns/${RECEIPT_ID}/convergence`, (route) => json(route, 200, {
-    schema: "admin.public_takedown.convergence.v1",
-    convergenceId: CONVERGENCE_ID,
-    originResult: "DENIED",
-    committedGeneration: 18,
-    status: "PENDING",
-    lastAttemptAt: "2026-08-26T04:01:01Z",
-    retryable: false,
-    attempts: [{ attemptNo: 1, status: "PENDING", observedAt: "2026-08-26T04:01:01Z", resultCategory: null }],
-  }));
+  await page.route("**/api/bff/api/admin/public-takedowns/**/convergence**", async (route) => {
+    takedownRequests.push(new URL(route.request().url()).pathname);
+    await json(route, 404, { code: "NOT_FOUND" });
+  });
 
   await page.goto("/admin/public-takedown");
   await page.getByLabel("클럽 ID").fill(CLUB_ID);
   await page.getByLabel("모임 ID").fill(SESSION_ID);
   await page.getByLabel("공개 기록 ID").fill(PUBLICATION_ID);
   await page.getByRole("button", { name: "대상 확인" }).click();
-  await expect(page.getByText("PUBLIC_SESSION")).toBeVisible();
-  await expect(page.getByText(/저장하거나 오프라인으로 보관한 사본/)).toBeVisible();
-  await page.getByLabel("회수 사유").fill("synthetic privacy request");
+  await expect(page.getByText("현재 공개 경로 4곳을 기준으로 회수 절차를 준비했습니다.")).toBeVisible();
+  await expect(page.getByText(LIMITATION)).toBeVisible();
+  const previewTechnical = page.getByRole("group", { name: "기술 정보" });
+  await previewTechnical.getByText("기술 정보").click();
+  await expect(previewTechnical.getByText(/BFF_CACHE, BROWSER_CACHE, CDN_CACHE, ORIGIN/)).toBeVisible();
+  await page.getByLabel("회수 사유").fill("synthetic private data request");
   await page.getByRole("button", { name: "긴급 회수 확인" }).click();
 
-  await expect(page.getByRole("region", { name: "변경 불가 회수 영수증" })).toContainText(RECEIPT_ID);
-  expect(confirmCalls).toBe(2);
-  expect(new Set(idempotencyKeys).size).toBe(1);
-  await expect(page.getByRole("region", { name: "전파 수렴 타임라인" })).toContainText("시도 1");
-
-  await page.getByRole("link", { name: "클럽", exact: true }).click();
-  await expect(page).toHaveURL(/\/admin\/clubs$/);
-  await page.goBack();
-  await expect(page).toHaveURL(/\/admin\/public-takedown$/);
-  await expect(page.getByRole("region", { name: "변경 불가 회수 영수증" })).toContainText(RECEIPT_ID);
-  await page.reload();
-  await expect(page.getByRole("region", { name: "변경 불가 회수 영수증" })).toContainText(RECEIPT_ID);
-  expect(confirmCalls).toBe(2);
+  const immutableReceipt = page.getByRole("region", { name: "변경 불가 회수 영수증" });
+  await expect(immutableReceipt).toContainText("원본 공개 경로를 차단했습니다.");
+  const receiptTechnical = immutableReceipt.getByRole("group", { name: "기술 정보" });
+  await receiptTechnical.getByText("기술 정보").click();
+  await expect(receiptTechnical).toContainText(RECEIPT_ID);
+  await expect(receiptTechnical).toContainText("NOT_STARTED");
+  await expect(receiptTechnical).toContainText("QUEUED");
+  await expect(receiptTechnical).toContainText("BOUNDED_BY_CACHE_POLICY");
+  await expect(page.getByRole("button", { name: /전파.*시도/ })).toHaveCount(0);
+  expect(confirmCalls).toBe(1);
+  expect(takedownRequests).toEqual(["/api/bff/api/admin/public-takedowns/confirm"]);
 });
 
-test("OWNER without EMERGENCY_PUBLIC_TAKEDOWN cannot submit a takedown", async ({ page }) => {
-  await routeAdminShell(page, "OWNER", ["VIEW_TODAY", "VIEW_CLUBS"]);
+for (const scenario of [
+  { role: "OWNER" as const, capabilities: ["VIEW_TODAY", "VIEW_CLUBS"] },
+  { role: "SUPPORT" as const, capabilities: undefined },
+]) {
+  test(`${scenario.role} without capability cannot submit a takedown`, async ({ page }) => {
+    await routeAdminShell(page, scenario.role, scenario.capabilities);
+    let mutationCalls = 0;
+    await page.route("**/api/bff/api/admin/public-takedowns/**", async (route) => {
+      mutationCalls += 1;
+      await json(route, 403, { code: "PERMISSION_DENIED", message: "denied", status: 403 });
+    });
+    await page.goto("/admin/public-takedown");
+    await expect(page.getByText("이 작업을 실행할 권한이 없습니다.")).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    await expect(page.getByLabel("클럽 ID")).toHaveCount(0);
+    expect(mutationCalls).toBe(0);
+  });
+}
+
+test("compact route recommends desktop handoff without becoming an authorization boundary", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await routeAdminShell(page, "OWNER");
   let mutationCalls = 0;
   await page.route("**/api/bff/api/admin/public-takedowns/**", async (route) => {
     mutationCalls += 1;
-    await json(route, 403, { code: "PERMISSION_DENIED", message: "denied", status: 403 });
+    await json(route, 500, { code: "UNEXPECTED_REQUEST" });
   });
 
   await page.goto("/admin/public-takedown");
-  await expect(page.getByText("긴급 회수 권한이 없습니다.")).toBeVisible();
+  await expect(page.getByRole("region", { name: "데스크톱에서 이어서 처리" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "데스크톱용 주소 복사" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "이 기기에서 계속 검토" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "이 기기에서 직접 처리" })).toBeVisible();
+  await expect(page.getByLabel("클럽 ID")).toBeVisible();
   await expectNoHorizontalOverflow(page);
-  await expect(page.getByLabel("클럽 ID")).toHaveCount(0);
-  expect(mutationCalls).toBe(0);
-});
-
-test("SUPPORT is capability denied and cannot submit a takedown", async ({ page }) => {
-  await routeAdminShell(page, "SUPPORT");
-  let mutationCalls = 0;
-  await page.route("**/api/bff/api/admin/public-takedowns/**", async (route) => {
-    mutationCalls += 1;
-    await json(route, 403, { code: "PERMISSION_DENIED", message: "denied", status: 403 });
-  });
-
-  await page.goto("/admin/public-takedown");
-  await expect(page.getByText("긴급 회수 권한이 없습니다.")).toBeVisible();
-  await expect(page.getByRole("link", { name: "긴급 공개 회수" })).toHaveCount(0);
-  await expect(page.getByLabel("클럽 ID")).toHaveCount(0);
   expect(mutationCalls).toBe(0);
 });
 
 function receipt() {
   return {
-    schema: "admin.public_takedown.receipt.v1",
-    receiptId: RECEIPT_ID,
-    convergenceId: CONVERGENCE_ID,
-    clubId: CLUB_ID,
-    sessionId: SESSION_ID,
-    publicationId: PUBLICATION_ID,
-    originResult: "DENIED",
-    committedGeneration: 18,
-    committedClubGeneration: 9,
-    reasonCategory: "PRIVACY",
-    createdAt: "2026-08-26T04:01:00Z",
-    limitationCode: "STORED_OR_OFFLINE_COPY_MAY_REMAIN",
+    schema: "admin.public_takedown.receipt.v1", receiptId: RECEIPT_ID, convergenceId: CONVERGENCE_ID,
+    clubId: CLUB_ID, sessionId: SESSION_ID, publicationId: PUBLICATION_ID, originResult: "DENIED",
+    committedGeneration: 18, reasonCategory: "PRIVATE_DATA", reasonRedacted: true,
+    createdAt: "2026-08-30T04:01:00Z", bffEvictionOutcome: "NOT_STARTED", cdnPurgeOutcome: "QUEUED",
+    browserRevalidationOutcome: "BOUNDED_BY_CACHE_POLICY", remoteCopyLimitation: LIMITATION,
   };
 }

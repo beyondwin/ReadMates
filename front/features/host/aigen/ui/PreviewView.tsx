@@ -9,7 +9,8 @@ import type {
   RegenerateResponse,
   ReviewSection,
   SessionImportV1,
-} from "@/features/host/aigen/api/aigen-contracts";
+  RegenerateRequest,
+} from "@/features/host/aigen/model/aigen-presentation-types";
 import {
   confirmEditedSection,
   isSectionChanged,
@@ -60,6 +61,7 @@ export type PreviewViewProps = {
   onSnapshotChange: (next: SessionImportV1, section?: ReviewSection) => void;
   onReviewStateChange?: (next: AiGenerationReviewState) => void;
   onRegenerated?: (response: RegenerateResponse) => void;
+  onRegenerate: (request: RegenerateRequest) => Promise<RegenerateResponse>;
   onExpandEvidence?: (turnId: string, revision: number) => Promise<ExpandedEvidenceTurn>;
   onReloadRevision?: () => void;
   onVisibilityChange: (next: AiRecordVisibility) => void;
@@ -86,6 +88,7 @@ export function PreviewView(props: PreviewViewProps) {
     onSnapshotChange,
     onReviewStateChange,
     onRegenerated,
+    onRegenerate,
     onExpandEvidence,
     onReloadRevision,
     onVisibilityChange,
@@ -340,6 +343,7 @@ export function PreviewView(props: PreviewViewProps) {
           models={models}
           expectedRevision={revision}
           onClose={() => setRegenItem(null)}
+          onRegenerate={onRegenerate}
           onSuccess={handleRegenSuccess}
         />
       ) : null}

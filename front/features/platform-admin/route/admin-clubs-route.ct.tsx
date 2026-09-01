@@ -1,8 +1,14 @@
 import { expect, test } from "@playwright/experimental-ct-react";
+import "../ui/admin-club-management.css";
 
-test("AdminClubsRoute keeps real triage reasons at supporting-copy size and rhythm", async ({ mount }) => {
+test("AdminClubsRoute keeps actionable recent signals at supporting-copy size and rhythm", async ({ mount }) => {
   const component = await mount(
-    <span className="admin-clubs__triage-reasons">알림 실패 4건 · 도메인 조치 필요</span>,
+    <dl className="admin-club-management__facts">
+      <div className="admin-club-management__signal">
+        <dt>최근 신호</dt>
+        <dd>알림 실패 4건 · 도메인 조치 필요</dd>
+      </div>
+    </dl>,
   );
   const typography = await component.evaluate((element) => {
     const style = getComputedStyle(element);

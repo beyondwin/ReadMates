@@ -40,13 +40,20 @@ async function expectCanonicalHostDashboard(page: Page) {
 
 async function openCurrentMeetingFromDashboard(page: Page) {
   await expectCanonicalHostDashboard(page);
-  const meetingHref = await page
+  const meetingLink = page
     .getByRole("group", { name: "현재 모임" })
-    .getByRole("link", { name: "모임 정보" })
-    .getAttribute("href");
-  expect(meetingHref).toBeTruthy();
-  await page.goto(new URL(meetingHref!, page.url()).pathname);
+    .getByRole("link", { name: "모임 정보" });
+  await expect(meetingLink).toBeVisible();
+  await expect(meetingLink).toHaveAttribute("href", hostMeetingPath);
+  await meetingLink.focus();
+  await expect(meetingLink).toBeFocused();
+  await meetingLink.click();
   await expectCanonicalMeetingUrl(page);
+  expect(new URL(page.url()).searchParams.get("section")).toBe("basic");
+  const meetingInfo = page.getByRole("dialog", { name: "모임 정보" });
+  await expect(meetingInfo).toBeVisible();
+  await meetingInfo.getByRole("button", { name: "접기" }).click();
+  await expect(meetingInfo).toBeHidden();
 }
 
 async function fillNewMeetingBasics(
@@ -113,6 +120,8 @@ async function confirmLifecycle(page: Page, name: string, pathIncludes: string) 
         }
         await attendanceSheet.getByRole("button", { name: "접기" }).click();
         await expect(attendanceSheet).toBeHidden();
+        await page.reload();
+        await expect(primaryActions).toBeVisible();
       }
     }
     const trigger = primaryActions.getByRole("button", { name: triggerName });
@@ -242,17 +251,15 @@ test("host creates session seven and member sees current session", async ({ page
     author: "테스트 저자",
     date: "2026-05-20",
   });
+  await expectCanonicalMeetingUrl(page);
+  const createdHostMeetingHref = `${new URL(page.url()).pathname}${new URL(page.url()).search}`;
   await page.goto("/app/session/current");
   await expect(page.getByRole("heading", { level: 1, name: "테스트 책" })).toBeVisible();
-  const memberWorkspaceSelector = page.locator(".desktop-only .rm-workspace-selector");
-  await memberWorkspaceSelector.locator("summary").click();
-  await expect(memberWorkspaceSelector.getByRole("link", { name: "호스트 공간" }))
-    .toHaveAttribute("href", hostMeetingPath);
-  await memberWorkspaceSelector.getByRole("link", { name: "호스트 공간" }).click();
+  await expect(page.locator('[data-global-space-switcher]')).toHaveCount(0);
+  await expect(page.getByText("현재 공간 내 클럽, 읽는사이 멤버로 보기", { exact: true })).toHaveCount(2);
+  await page.goto(createdHostMeetingHref);
   await expectCanonicalMeetingUrl(page);
-  const hostWorkspaceSelector = page.locator(".desktop-only .rm-host-workspace-switcher");
-  await hostWorkspaceSelector.getByRole("button", { name: "읽는사이 · 호스트 운영실" }).click();
-  await hostWorkspaceSelector.getByRole("button", { name: "멤버 공간" }).click();
+  await page.getByRole("navigation", { name: "호스트 유틸리티" }).getByRole("link", { name: "멤버 시야" }).click();
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/session\/current\/?$/);
 
   await loginWithGoogleFixture(page, "member5@example.com");

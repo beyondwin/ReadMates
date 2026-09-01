@@ -1,11 +1,10 @@
 import { useState, type CSSProperties } from "react";
-import { regenerateItem } from "@/features/host/aigen/api/aigen-api";
 import type {
   AiGenerationItem,
   AvailableGenerationModel,
   RegenerateRequest,
   RegenerateResponse,
-} from "@/features/host/aigen/api/aigen-contracts";
+} from "@/features/host/aigen/model/aigen-presentation-types";
 
 export type RegenerateModalProps = {
   open: boolean;
@@ -16,6 +15,7 @@ export type RegenerateModalProps = {
   models?: AvailableGenerationModel[];
   expectedRevision?: number;
   onClose: () => void;
+  onRegenerate: (request: RegenerateRequest) => Promise<RegenerateResponse>;
   onSuccess: (response: RegenerateResponse) => void;
 };
 
@@ -39,13 +39,11 @@ const ITEM_LABEL: Record<AiGenerationItem, string> = {
 
 export function RegenerateModal({
   open,
-  clubSlug,
-  sessionId,
-  jobId,
   item,
   models = [],
   expectedRevision,
   onClose,
+  onRegenerate,
   onSuccess,
 }: RegenerateModalProps) {
   const [instructions, setInstructions] = useState("");
@@ -67,7 +65,7 @@ export function RegenerateModal({
         ...(instructions.trim() ? { instructions } : {}),
         ...(expectedRevision !== undefined ? { expectedRevision } : {}),
       } satisfies RegenerateRequest;
-      const response = await regenerateItem(sessionId, jobId, request, { clubSlug });
+      const response = await onRegenerate(request);
       onSuccess(response);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "재생성에 실패했습니다.";

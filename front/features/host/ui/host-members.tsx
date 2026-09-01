@@ -11,7 +11,11 @@ import {
   HostMemberProfileActionError,
   type HostMembersActions,
 } from "@/features/host/model/host-member-actions";
-import type { HostInvitationsActions } from "@/features/host/model/host-invitation-actions";
+import {
+  isOwnerFencedInvitationError,
+  type RegisteredHostInvitationsActions,
+} from "@/features/host/model/host-invitation-actions";
+import { isTransitionOwnerObsoleteError } from "@/shared/ui/use-transition-safety-owner";
 import { LifecyclePolicyDialog } from "./members/member-approval-actions";
 import { actionKey, disabledProfileReason, isMembershipPending } from "./members/member-action-rules";
 import { MemberActionButton } from "./members/member-list";
@@ -36,7 +40,7 @@ type HostMembersProps = {
   initialMembers: HostMemberListPage | HostMemberListItem[];
   actions: HostMembersActions;
   initialInvitations: HostInvitationListPage | HostInvitationListItem[];
-  invitationActions: HostInvitationsActions;
+  invitationActions: RegisteredHostInvitationsActions;
   /** Kept for route API compatibility; Stage 5 absorbed invitations into this page (no outbound link). */
   LinkComponent?: HostMembersLinkComponent;
 };
@@ -52,6 +56,7 @@ type InvitationRowsState = {
   source: HostInvitationListItem[];
   invitations: HostInvitationListItem[];
 };
+type InvitationPublication = { accepted: () => void; failed: () => void };
 
 export default function HostMembers({
   initialMembers,
@@ -116,48 +121,61 @@ export default function HostMembers({
     email: string;
     name: string;
     applyToCurrentSession: boolean;
-  }) => {
-    const response = await invitationActions.createInvitation(request);
-    if (!response.ok) {
-      const error = new Error("create-failed") as Error & { status?: number };
-      error.status = response.status;
-      throw error;
+  }, publication: InvitationPublication) => {
+    try {
+      const result = await invitationActions.createInvitation(request);
+      result.publishUi(({ refreshed }) => {
+        replaceInvitationsFromPage(refreshed);
+        publication.accepted();
+      });
+    } catch (error) {
+      if (isTransitionOwnerObsoleteError(error)) return;
+      if (isOwnerFencedInvitationError(error)) error.publishUi(publication.failed);
     }
-    replaceInvitationsFromPage(await invitationActions.refreshInvitations({ limit: 50 }));
   };
 
-  const revokeInvitation = async (invitationId: string) => {
+  const revokeInvitation = async (invitationId: string, publication: InvitationPublication) => {
     if (invitationBusyId) {
       throw new Error("invitation-busy");
     }
 
     setInvitationBusyId(invitationId);
     try {
-      const response = await invitationActions.revokeInvitation(invitationId);
-      if (!response.ok) {
-        throw new Error("revoke-failed");
-      }
-      replaceInvitationsFromPage(await invitationActions.refreshInvitations({ limit: 50 }));
-    } finally {
-      setInvitationBusyId(null);
+      const result = await invitationActions.revokeInvitation(invitationId);
+      result.publishUi(({ refreshed }) => {
+        replaceInvitationsFromPage(refreshed);
+        setInvitationBusyId(null);
+        publication.accepted();
+      });
+    } catch (error) {
+      if (isTransitionOwnerObsoleteError(error)) return;
+      if (isOwnerFencedInvitationError(error)) error.publishUi(() => {
+        setInvitationBusyId(null);
+        publication.failed();
+      });
     }
   };
 
-  const reissueInvitation = async (invitation: HostInvitationListItem) => {
+  const reissueInvitation = async (invitation: HostInvitationListItem, publication: InvitationPublication) => {
     if (invitationBusyId) {
       throw new Error("invitation-busy");
     }
 
     setInvitationBusyId(invitation.invitationId);
-    try {
-      await createInvitation({
+    await createInvitation({
         email: invitation.email,
         name: invitation.name,
         applyToCurrentSession: invitation.applyToCurrentSession,
+      }, {
+        accepted: () => {
+          setInvitationBusyId(null);
+          publication.accepted();
+        },
+        failed: () => {
+          setInvitationBusyId(null);
+          publication.failed();
+        },
       });
-    } finally {
-      setInvitationBusyId(null);
-    }
   };
 
   const setMembers = (update: MemberRowsUpdate) => {
@@ -271,7 +289,8 @@ export default function HostMembers({
         current.map((item) => (item.membershipId === result.member.membershipId ? result.member : item)),
       );
       setMessage({ kind: "status", text: "멤버 상태를 업데이트했습니다." });
-    } catch {
+    } catch (error) {
+      if (isTransitionOwnerObsoleteError(error)) return;
       setMessage({ kind: "alert", text: "멤버 상태 업데이트에 실패했습니다. 멤버 상태를 확인한 뒤 다시 시도해 주세요." });
     } finally {
       setActionPending(key, false);
@@ -301,7 +320,8 @@ export default function HostMembers({
       } catch {
         setMessage({ kind: "alert", text: "처리는 완료됐지만 멤버 목록 새로고침에 실패했습니다. 새로고침해서 최신 상태를 확인해 주세요." });
       }
-    } catch {
+    } catch (error) {
+      if (isTransitionOwnerObsoleteError(error)) return;
       setMessage({
         kind: "alert",
         text:
@@ -330,6 +350,7 @@ export default function HostMembers({
       );
       setMessage({ kind: "status", text: "이름을 저장했습니다." });
     } catch (error) {
+      if (isTransitionOwnerObsoleteError(error)) return;
       const failure = error instanceof HostMemberProfileActionError
         ? new Error(hostProfileErrorMessage(error.status, error.code), { cause: error })
         : error;

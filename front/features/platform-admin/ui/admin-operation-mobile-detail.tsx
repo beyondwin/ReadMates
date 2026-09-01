@@ -15,8 +15,10 @@ type HistoryEvent = {
 
 type Props = {
   view: AdminOperationsView;
+  auditHref: string;
   history: readonly HistoryEvent[];
   lifecycleControls: ReactNode;
+  queueControls?: ReactNode;
   detailLoading?: boolean;
   detailUnavailable?: boolean;
   permissionDenied?: boolean;
@@ -33,8 +35,10 @@ type Props = {
 
 export function AdminOperationMobileDetail({
   view,
+  auditHref,
   history,
   lifecycleControls,
+  queueControls,
   detailLoading = false,
   detailUnavailable = false,
   permissionDenied = false,
@@ -52,11 +56,17 @@ export function AdminOperationMobileDetail({
   const listContainerRef = useRef<HTMLDivElement>(null);
   const backButtonRef = useRef<HTMLButtonElement>(null);
   const restoreSelectionRef = useRef(false);
+  const previousShowDetailRef = useRef(false);
   const listScrollPositionRef = useRef({ left: 0, top: 0 });
   const controlled = mode !== undefined;
   const showDetail = controlled
     ? mode === "detail" && view.selectedCase != null
     : detailCaseId !== null && view.selectedCase?.id === detailCaseId;
+
+  useEffect(() => {
+    if (previousShowDetailRef.current && !showDetail) restoreSelectionRef.current = true;
+    previousShowDetailRef.current = showDetail;
+  }, [showDetail]);
 
   useEffect(() => {
     if (showDetail) backButtonRef.current?.focus({ preventScroll: true });
@@ -93,6 +103,7 @@ export function AdminOperationMobileDetail({
         </button>
         <AdminOperationsInspector
           selectedCase={view.selectedCase}
+          auditHref={auditHref}
           history={history}
           lifecycleControls={lifecycleControls}
           detailLoading={detailLoading}
@@ -119,6 +130,7 @@ export function AdminOperationMobileDetail({
         hasNextPage={hasNextPage}
         loadingMore={loadingMore}
         onLoadMore={onLoadMore}
+        controls={queueControls}
       />
     </div>
   );

@@ -3,8 +3,11 @@ import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { routeEmptyAdminOperations } from "./admin-operations-e2e-fixtures";
 import { expectNoHorizontalOverflow } from "./support/visual-authority-contract";
 
-const CLUB_ID = "club-1";
-const SUBJECT_ID = "support-1";
+const CLUB_ID = "00000000-0000-4000-8000-000000006301";
+const SUBJECT_ID = "00000000-0000-4000-8000-000000006302";
+const GRANT_ID = "00000000-0000-4000-8000-000000006303";
+const CREATE_PREVIEW_ID = "00000000-0000-4000-8000-000000006304";
+const REVOKE_PREVIEW_ID = "00000000-0000-4000-8000-000000006305";
 
 function platformAdminAuth(): AuthMeResponse {
   return {
@@ -46,6 +49,14 @@ async function routeSupport(page: Page): Promise<void> {
     capabilities: ["VIEW_SUPPORT", "MANAGE_SUPPORT_ACCESS"],
     generatedAt: "2026-08-25T10:00:00Z",
   }));
+  await page.route("**/api/bff/api/admin/health/snapshot", async (route) => json(route, 200, {
+    schema: "platform.health_snapshot.v1",
+    generatedAt: "2026-08-25T10:00:00Z",
+    lastSuccessfulAt: "2026-08-25T10:00:00Z",
+    refreshState: "FRESH",
+    staleAgeSeconds: 0,
+    cards: [],
+  }));
   await page.route("**/api/bff/api/admin/clubs", async (route) => json(route, 200, {
     items: [{
       clubId: CLUB_ID,
@@ -79,15 +90,15 @@ async function routeSupport(page: Page): Promise<void> {
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith("/revoke/preview")) {
       await json(route, 200, {
-        previewId: "revoke-preview-1",
+        previewId: REVOKE_PREVIEW_ID,
         commandType: "REVOKE",
-        grantId: "grant-1",
+        grantId: GRANT_ID,
         clubId: CLUB_ID,
         scope: "HOST_SUPPORT_READ",
         grantExpiresAt: "2026-08-25T12:00:00Z",
         reasonCategory: "MEMBER_ASSISTANCE",
         notePresent: false,
-        impactCodes: ["REVOKE_SUPPORT_ACCESS"],
+        impactCodes: ["SUPPORT_ACCESS_WILL_BE_REVOKED"],
         expiresAt: "2026-08-25T10:10:00Z",
         fingerprintPrefix: "00112233",
       });
@@ -98,7 +109,7 @@ async function routeSupport(page: Page): Promise<void> {
     }
   });
   await page.route("**/api/bff/api/admin/support/grants/preview", async (route) => json(route, 200, {
-    previewId: "create-preview-1",
+    previewId: CREATE_PREVIEW_ID,
     commandType: "CREATE",
     grantId: null,
     clubId: CLUB_ID,
@@ -106,14 +117,14 @@ async function routeSupport(page: Page): Promise<void> {
     grantExpiresAt: "2026-08-25T12:00:00Z",
     reasonCategory: "MEMBER_ASSISTANCE",
     notePresent: true,
-    impactCodes: ["GRANT_SUPPORT_ACCESS"],
+    impactCodes: ["SUPPORT_ACCESS_WILL_BECOME_ACTIVE"],
     expiresAt: "2026-08-25T10:10:00Z",
     fingerprintPrefix: "00112233",
   }));
   await page.route("**/api/bff/api/admin/support/grants/confirm", async (route) => json(route, 200, receipt("CREATE", "ABSENT", "ACTIVE")));
   await page.route("**/api/bff/api/admin/support/grants?**", async (route) => json(route, 200, {
     items: [{
-      grantId: "grant-1",
+      grantId: GRANT_ID,
       clubId: CLUB_ID,
       clubName: "읽는사이",
       granteeDisplayName: "지원관리자",
@@ -132,7 +143,23 @@ async function routeSupport(page: Page): Promise<void> {
 }
 
 function receipt(commandType: "CREATE" | "REVOKE", beforeStatus: string, afterStatus: string) {
-  return { receiptId: `${commandType.toLowerCase()}-receipt-1`, previewId: `${commandType.toLowerCase()}-preview-1`, commandType, grantId: "grant-1", clubId: CLUB_ID, scope: "HOST_SUPPORT_READ", grantExpiresAt: "2026-08-25T12:00:00Z", reasonCategory: "MEMBER_ASSISTANCE", notePresent: true, beforeStatus, afterStatus, outcome: "SUCCEEDED", createdAt: "2026-08-25T10:00:00Z" };
+  return {
+    receiptId: commandType === "CREATE"
+      ? "00000000-0000-4000-8000-000000006306"
+      : "00000000-0000-4000-8000-000000006307",
+    previewId: commandType === "CREATE" ? CREATE_PREVIEW_ID : REVOKE_PREVIEW_ID,
+    commandType,
+    grantId: GRANT_ID,
+    clubId: CLUB_ID,
+    scope: "HOST_SUPPORT_READ",
+    grantExpiresAt: "2026-08-25T12:00:00Z",
+    reasonCategory: "MEMBER_ASSISTANCE",
+    notePresent: true,
+    beforeStatus,
+    afterStatus,
+    outcome: "SUCCEEDED",
+    createdAt: "2026-08-25T10:00:00Z",
+  };
 }
 
 test("owner searches support subject then creates and revokes grant", async ({ page }) => {
@@ -150,7 +177,7 @@ test("owner searches support subject then creates and revokes grant", async ({ p
   await page.getByRole("textbox", { name: "검토 시에만 확인하는 사유 메모 (저장되지 않음)" }).fill("ticket");
   await page.getByRole("button", { name: "발급 검토" }).click();
   await page.getByRole("button", { name: "지원 접근 발급" }).click();
-  await expect(page.getByRole("region", { name: "명령 기록" })).toContainText("create-receipt-1");
+  await expect(page.getByRole("region", { name: "명령 기록" })).toContainText("00000000-0000-4000-8000-000000006306");
   await expect(page.getByText("내부 메모")).toHaveCount(0);
   await page.getByRole("button", { name: "권한 취소 검토" }).click();
   await page.getByRole("button", { name: "취소 검토", exact: true }).click();

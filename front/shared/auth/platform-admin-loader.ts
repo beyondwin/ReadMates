@@ -1,6 +1,7 @@
 import { redirect } from "react-router";
 import { readmatesFetch } from "@/shared/api/client";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import { normalizeAuthAvailableSpaces } from "@/shared/auth/available-spaces";
 import { loginPathForReturnTo } from "@/shared/auth/login-return";
 import { returnToFromRequest } from "@/shared/auth/member-app-loader";
 import { canUsePlatformAdmin } from "@/shared/auth/platform-admin-access";
@@ -10,7 +11,9 @@ type PlatformAdminLoaderArgs = {
 };
 
 export async function requirePlatformAdminLoaderAuth(args?: PlatformAdminLoaderArgs) {
-  const auth = await readmatesFetch<AuthMeResponse>("/api/auth/me", undefined, { clubSlug: undefined });
+  const auth = normalizeAuthAvailableSpaces(
+    await readmatesFetch<AuthMeResponse>("/api/auth/me", undefined, { clubSlug: undefined }),
+  );
 
   if (!auth.authenticated) {
     throw redirect(loginPathForReturnTo(returnToFromRequest(args?.request)));

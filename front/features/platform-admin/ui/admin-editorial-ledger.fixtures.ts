@@ -1,5 +1,7 @@
 import type { AdminAuditLedgerItem, AdminAuditLedgerPage } from "@/features/platform-admin/model/platform-admin-audit-model";
 import type { PlatformAdminCapability } from "@/features/platform-admin/model/platform-admin-capabilities";
+import type { PlatformAdminCapabilities } from "@/features/platform-admin/model/platform-admin-capabilities";
+import type { GlobalSpaceSwitcherOption } from "@/shared/ui/global-space-switcher";
 import type {
   HealthCard,
   PlatformHealthSnapshot,
@@ -14,6 +16,7 @@ import type {
 import type { AdminSafeActionState } from "./admin-action-dock";
 import type { AdminClubsLedgerClub, AdminClubsLedgerFilters } from "./admin-clubs-ledger";
 import type { AdminTodayFilters } from "./admin-today-controls";
+import type { AdminTakedownState } from "../model/platform-admin-takedown-model";
 
 export const EDITORIAL_LEDGER_LONG_TODAY_TITLE =
   "경계가 긴 한글 운영 신호와 A deliberately long English operations signal without clipping";
@@ -23,6 +26,8 @@ export const EDITORIAL_LEDGER_LONG_AUDIT_SUMMARY =
   "경계가 긴 한글 감사 기록과 A deliberately long English audit record without clipping";
 export const EDITORIAL_LEDGER_LONG_HEALTH_TITLE =
   "경계가 긴 한글 서비스 신호와 A deliberately long English health signal without clipping";
+export const EDITORIAL_LEDGER_LONG_TAKEDOWN_LIMITATION =
+  "이미 표시되었거나 저장된 사본과 연결이 끊긴 오프라인 사본은 원격으로 삭제할 수 없으며 a deliberately long English limitation must wrap without clipping.";
 
 export const TODAY_VIEW_CAPABILITIES = ["VIEW_TODAY"] as const satisfies readonly PlatformAdminCapability[];
 export const CLUBS_CREATE_CAPABILITIES = [
@@ -41,6 +46,44 @@ export const NOTIFICATION_REPLAY_CAPABILITIES = [
 export const NOTIFICATION_VIEW_ONLY_CAPABILITIES = [
   "VIEW_NOTIFICATION_OPERATIONS",
 ] as const satisfies readonly PlatformAdminCapability[];
+
+export const ADMIN_SHELL_VISUAL_CAPABILITIES: PlatformAdminCapabilities = {
+  schemaVersion: 1,
+  role: "OPERATOR",
+  status: "ACTIVE",
+  capabilities: [
+    "VIEW_TODAY",
+    "VIEW_CLUBS",
+    "VIEW_SERVICE_HEALTH",
+    "VIEW_AUDIT",
+  ],
+  generatedAt: "2026-08-26T10:00:00Z",
+};
+
+export const ADMIN_SHELL_VISUAL_SPACE_OPTIONS: readonly GlobalSpaceSwitcherOption[] = [
+  { identity: { productSpace: "platform" } },
+  {
+    identity: {
+      productSpace: "clubs",
+      clubId: "club-editorial",
+      clubSlug: "editorial-room",
+      perspective: "member",
+    },
+    clubName: "읽는사이",
+  },
+  {
+    identity: {
+      productSpace: "clubs",
+      clubId: "club-editorial",
+      clubSlug: "editorial-room",
+      perspective: "host",
+    },
+    clubName: "읽는사이",
+  },
+];
+
+export const ADMIN_SHELL_LONG_COPY =
+  "운영자가 바로 판단할 수 있도록 긴 한국어 안내와 a deliberately long English operational summary를 한 줄도 잃지 않고 보여 줍니다";
 
 type TodayLifecycleAction = AdminOperationCaseView["allowedActions"][number];
 
@@ -165,7 +208,7 @@ function todayCase(input: {
     },
     summary: {
       title: input.title ?? EDITORIAL_LEDGER_LONG_TODAY_TITLE,
-      description: "같은 원인의 실패를 확인하세요.",
+      description: "같은 원인의 실패가 여러 지역에서 반복되고 있습니다. Review the delivery ledger, confirm the latest authoritative observation, and keep the current case open until the operator deliberately chooses the next item.",
     },
     severityLabel: "긴급",
     stateLabel: "미확인",
@@ -375,32 +418,36 @@ function clubsFixture(input: {
 function criticalClub(): AdminClubsLedgerClub {
   return {
     clubId: "club-1",
-    slug: "broken",
     name: EDITORIAL_LEDGER_LONG_CLUB_NAME,
-    status: "ACTIVE",
-    publicVisibility: "PRIVATE",
-    domainCount: 1,
-    domainActionRequiredCount: 2,
-    firstHostOnboardingState: "ASSIGNED",
     href: "/admin/clubs/club-1?returnTo=%2Fadmin%2Fclubs&focusId=club-1&scrollTop=0",
-    severity: "critical",
-    reasons: ["알림 실패 2건", "도메인 조치 2건"],
+    currentState: "활성 · 비공개",
+    requiredAction: "실패 신호 확인",
+    recentSignal: "알림 실패 2건 · 도메인 조치 필요",
+    emphasis: "actionable",
+    technicalDisclosure: [
+      { label: "클럽 ID", value: "club-1" },
+      { label: "Slug", value: "broken" },
+      { label: "수명주기 값", value: "ACTIVE" },
+      { label: "공개 상태 값", value: "PRIVATE" },
+    ],
   };
 }
 
 function healthyClub(): AdminClubsLedgerClub {
   return {
     clubId: "club-2",
-    slug: "healthy",
     name: "읽는사이 Healthy Club",
-    status: "ACTIVE",
-    publicVisibility: "PUBLIC",
-    domainCount: 1,
-    domainActionRequiredCount: 0,
-    firstHostOnboardingState: "ASSIGNED",
     href: "/admin/clubs/club-2?returnTo=%2Fadmin%2Fclubs&focusId=club-2&scrollTop=0",
-    severity: "ok",
-    reasons: [],
+    currentState: "활성 · 공개",
+    requiredAction: null,
+    recentSignal: null,
+    emphasis: "quiet",
+    technicalDisclosure: [
+      { label: "클럽 ID", value: "club-2" },
+      { label: "Slug", value: "healthy" },
+      { label: "수명주기 값", value: "ACTIVE" },
+      { label: "공개 상태 값", value: "PUBLIC" },
+    ],
   };
 }
 
@@ -589,6 +636,25 @@ export const reviewAuditEmptyEvidence: ReviewAuditFixture = {
   nextPageError: false,
   loadingMore: false,
   canSearchSensitive: false,
+};
+
+export const emergencyTakedownIdle: AdminTakedownState = { kind: "idle" };
+
+export const emergencyTakedownBlockedPreview: AdminTakedownState = {
+  kind: "preview",
+  preview: {
+    schema: "admin.public_takedown.preview.v1",
+    previewId: "40000000-0000-4000-8000-000000000074",
+    expiresAt: "2026-08-30T04:05:00Z",
+    clubId: "00000000-0000-4000-8000-000000000071",
+    sessionId: "00000000-0000-4000-8000-000000000072",
+    publicationId: "00000000-0000-4000-8000-000000000073",
+    targetGeneration: 7,
+    currentSurfaces: ["BFF_CACHE", "BROWSER_CACHE", "CDN_CACHE", "ORIGIN"],
+    confirmEnabled: false,
+    activationBoundary: "PROTECTED_CACHE_SAFETY_EVIDENCE_REQUIRED",
+    remoteCopyLimitation: EDITORIAL_LEDGER_LONG_TAKEDOWN_LIMITATION,
+  },
 };
 
 export const noopEditorialLedgerHandler = noop;

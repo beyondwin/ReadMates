@@ -1,11 +1,11 @@
-import type { ReactNode } from "react";
+import { Children, type ReactElement, type ReactNode } from "react";
 
 export type AdminCaseDocketProps = {
   label: string;
   title: ReactNode;
   nav?: ReactNode;
   identity?: ReactNode;
-  status?: ReactNode;
+  status?: ReactElement | null;
   evidence?: ReactNode;
   history?: ReactNode;
   related?: ReactNode;
@@ -35,7 +35,7 @@ export function AdminCaseDocket({
         <p className="admin-case-docket__identity">{identity}</p>
       ) : null}
       {status != null && status !== false ? (
-        <p className="admin-case-docket__status">{status}</p>
+        <p className="admin-case-docket__status">{Children.only(status)}</p>
       ) : null}
       {evidence != null && evidence !== false ? (
         <div className="admin-case-docket__evidence">{evidence}</div>

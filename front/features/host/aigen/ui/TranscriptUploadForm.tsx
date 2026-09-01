@@ -3,7 +3,7 @@ import type {
   AiGenerationProblem,
   AvailableGenerationModel,
   StartGenerationRequest,
-} from "@/features/host/aigen/api/aigen-contracts";
+} from "@/features/host/aigen/model/aigen-presentation-types";
 
 const MAX_TRANSCRIPT_BYTES = 1024 * 1024;
 

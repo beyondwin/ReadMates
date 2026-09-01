@@ -2,7 +2,6 @@ import {
   infiniteQueryOptions,
   queryOptions,
   useMutation,
-  useQueryClient,
   type QueryClient,
 } from "@tanstack/react-query";
 import { ReadMatesSessionExpiredError } from "@/shared/api/client";
@@ -26,6 +25,7 @@ import type {
   ConfirmPlatformAdminClubVisibilityRequest,
   ConfirmPlatformAdminDomainRequest,
   ConfirmPlatformAdminOnboardingRequest,
+  PlatformAdminClub,
   PlatformAdminClubListFilters,
   PreviewPlatformAdminClubVisibilityRequest,
   PreviewPlatformAdminDomainRequest,
@@ -83,11 +83,11 @@ export function subscribePlatformAdminAuthorityLoss(
 }
 
 export function purgePlatformAdminState(queryClient: QueryClient): void {
-  void queryClient.cancelQueries({ queryKey: platformAdminKeys.all });
-  queryClient.removeQueries({ queryKey: platformAdminKeys.all });
   for (const listener of authorityLossListeners) {
     listener();
   }
+  void queryClient.cancelQueries({ queryKey: platformAdminKeys.all });
+  queryClient.removeQueries({ queryKey: platformAdminKeys.all });
 }
 
 export function installPlatformAdminAuthorityLossHandler(
@@ -237,7 +237,7 @@ function invalidateClubState(queryClient: QueryClient, clubId: string) {
 export function useCheckPlatformAdminDomainProvisioningMutation(
   clubId: string,
 ) {
-  const queryClient = useQueryClient();
+  void clubId;
   return useMutation({
     mutationKey: PLATFORM_ADMIN_MUTATION_KEY,
     mutationFn: ({
@@ -247,24 +247,14 @@ export function useCheckPlatformAdminDomainProvisioningMutation(
       domainId: string;
       request: RecheckPlatformAdminDomainRequest;
     }) => checkPlatformAdminDomainProvisioning(domainId, request),
-    onSuccess: () => invalidateClubState(queryClient, clubId),
   });
 }
 
 export function useCommitPlatformAdminOnboardingMutation() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationKey: PLATFORM_ADMIN_MUTATION_KEY,
     mutationFn: (request: ConfirmPlatformAdminOnboardingRequest) =>
       commitPlatformAdminOnboarding(request),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: platformAdminKeys.summary(),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: platformAdminKeys.clubsRoot(),
-      });
-    },
   });
 }
 
@@ -276,7 +266,6 @@ export function usePreviewPlatformAdminOnboardingMutation() {
 }
 
 export function useUpdatePlatformAdminClubMutation() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationKey: PLATFORM_ADMIN_MUTATION_KEY,
     mutationFn: ({
@@ -286,16 +275,6 @@ export function useUpdatePlatformAdminClubMutation() {
       clubId: string;
       request: UpdatePlatformAdminClubRequest;
     }) => updatePlatformAdminClubMetadata(clubId, request),
-    onSuccess: (club) => {
-      setRetainedQueryData(
-        queryClient,
-        platformAdminKeys.club(club.clubId),
-        () => club,
-      );
-      void queryClient.invalidateQueries({
-        queryKey: platformAdminKeys.clubsRoot(),
-      });
-    },
   });
 }
 
@@ -308,12 +287,10 @@ export function usePreviewPlatformAdminClubVisibilityMutation(clubId: string) {
 }
 
 export function useConfirmPlatformAdminClubVisibilityMutation(clubId: string) {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationKey: PLATFORM_ADMIN_MUTATION_KEY,
     mutationFn: (request: ConfirmPlatformAdminClubVisibilityRequest) =>
       confirmPlatformAdminClubVisibility(clubId, request),
-    onSuccess: () => invalidateClubState(queryClient, clubId),
   });
 }
 
@@ -326,11 +303,25 @@ export function usePreviewPlatformAdminDomainMutation(clubId: string) {
 }
 
 export function useConfirmPlatformAdminDomainMutation(clubId: string) {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationKey: PLATFORM_ADMIN_MUTATION_KEY,
     mutationFn: (request: ConfirmPlatformAdminDomainRequest) =>
       confirmPlatformAdminDomain(clubId, request),
-    onSuccess: () => invalidateClubState(queryClient, clubId),
   });
+}
+
+export function publishPlatformAdminClubState(queryClient: QueryClient, clubId: string) {
+  return invalidateClubState(queryClient, clubId);
+}
+
+export async function publishPlatformAdminOnboarding(queryClient: QueryClient) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: platformAdminKeys.summary() }),
+    queryClient.invalidateQueries({ queryKey: platformAdminKeys.clubsRoot() }),
+  ]);
+}
+
+export function publishUpdatedPlatformAdminClub(queryClient: QueryClient, club: PlatformAdminClub) {
+  setRetainedQueryData(queryClient, platformAdminKeys.club(club.clubId), () => club);
+  return queryClient.invalidateQueries({ queryKey: platformAdminKeys.clubsRoot() });
 }

@@ -1,8 +1,12 @@
 package com.readmates.aigen.config
 
+import io.opentelemetry.sdk.trace.export.SpanExporter
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.springframework.boot.autoconfigure.AutoConfigurations
 import org.springframework.boot.env.YamlPropertySourceLoader
+import org.springframework.boot.micrometer.tracing.opentelemetry.autoconfigure.otlp.OtlpTracingAutoConfiguration
+import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.core.env.MutablePropertySources
 import org.springframework.core.io.FileSystemResource
 import org.springframework.mock.env.MockEnvironment
@@ -60,12 +64,48 @@ class SpringAiDependencyContractTest {
         assertThat(environment.getProperty("management.otlp.metrics.export.enabled")).isEqualTo("false")
     }
 
-    private fun loadApplicationEnvironment(): MockEnvironment {
-        val resource = FileSystemResource(Path.of("src/main/resources/application.yml"))
+    @Test
+    fun `test runtime disables Boot tracing export auto configuration`() {
+        tracingExportContext().run { context ->
+            assertThat(context).doesNotHaveBean(SpanExporter::class.java)
+            assertThat(context.environment.getProperty("management.tracing.export.enabled")).isEqualTo("false")
+            assertThat(context.environment.getProperty("management.tracing.enabled")).isNull()
+        }
+    }
+
+    @Test
+    fun `tracing contract can opt into Boot tracing export auto configuration`() {
+        tracingExportContext()
+            .withPropertyValues("management.tracing.export.enabled=true")
+            .run { context ->
+                assertThat(context).hasSingleBean(SpanExporter::class.java)
+                assertThat(context.getBean(SpanExporter::class.java).javaClass.name)
+                    .isEqualTo("io.opentelemetry.exporter.otlp.http.trace.OtlpHttpSpanExporter")
+            }
+    }
+
+    private fun loadApplicationEnvironment() = loadYamlEnvironment("src/main/resources/application.yml")
+
+    private fun loadYamlEnvironment(path: String): MockEnvironment {
+        val resource = FileSystemResource(Path.of(path))
         val propertySources = MutablePropertySources()
         YamlPropertySourceLoader().load("application.yml", resource).forEach(propertySources::addLast)
         return MockEnvironment().also { environment ->
             propertySources.forEach(environment.propertySources::addLast)
         }
     }
+
+    private fun tracingExportContext(): ApplicationContextRunner =
+        ApplicationContextRunner()
+            .withConfiguration(AutoConfigurations.of(OtlpTracingAutoConfiguration::class.java))
+            .withInitializer { context ->
+                listOf(
+                    "test-application.yml" to "src/test/resources/application.yml",
+                    "application.yml" to "src/main/resources/application.yml",
+                ).forEach { (name, path) ->
+                    YamlPropertySourceLoader()
+                        .load(name, FileSystemResource(Path.of(path)))
+                        .forEach(context.environment.propertySources::addLast)
+                }
+            }
 }

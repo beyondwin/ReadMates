@@ -56,6 +56,8 @@ describe("AdminOperationsQueue", () => {
 
     const row = screen.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ });
     expect(row).toHaveAttribute("aria-pressed", "true");
+    expect(row).not.toHaveAttribute("aria-selected");
+    expect(row).not.toHaveAttribute("aria-current");
     expect(row).toHaveTextContent("알림");
     expect(row).toHaveTextContent("영향 2건");
     expect(row).toHaveTextContent("2시간 전");
@@ -63,7 +65,24 @@ describe("AdminOperationsQueue", () => {
 
     await user.click(row);
     expect(onSelectCase).toHaveBeenCalledWith("case-notification");
-    expect(row).toHaveAttribute("aria-selected", "true");
+    expect(row).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("places compact secondary controls after the queue title and count", () => {
+    const { container } = render(
+      <AdminOperationsQueue
+        items={[queueItem()]}
+        selectedCaseId="case-notification"
+        controls={<div data-testid="queue-controls">필터</div>}
+        onSelectCase={vi.fn()}
+      />,
+    );
+
+    const header = container.querySelector(".admin-operations-queue__header");
+    const controls = screen.getByTestId("queue-controls");
+    const list = container.querySelector(".admin-operations-queue__list");
+    expect(header?.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(controls.compareDocumentPosition(list!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("keeps locators stable and wraps a long safe identifier", () => {

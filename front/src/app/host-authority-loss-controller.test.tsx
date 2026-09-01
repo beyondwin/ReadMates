@@ -208,4 +208,43 @@ describe("HostAuthorityLossController", () => {
       .toHaveTextContent("/clubs/other-club/app/host"));
     expect(onHandled).not.toHaveBeenCalled();
   });
+
+  it("does not replace user navigation completed while safe-target resolution is awaiting", async () => {
+    const queryClient = client();
+    let finishResolution!: (target: string) => void;
+    const resolveSafeTarget = vi.fn(() => new Promise<string>((resolve) => {
+      finishResolution = resolve;
+    }));
+    const onHandled = vi.fn();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/clubs/reading-sai/app/host"]}>
+          <HostAuthorityLossController
+            storage={createHostSensitiveStorage()}
+            resolveSafeTarget={resolveSafeTarget}
+            onHandled={onHandled}
+          />
+          <LocationProbe />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    signalHostAuthorityLoss({
+      code: "HOST_AUTHORITY_REVOKED",
+      clubSlug: "reading-sai",
+      requestKind: "SESSION_BASIC_SAVE",
+    });
+    await waitFor(() => expect(resolveSafeTarget).toHaveBeenCalledTimes(1));
+
+    await userEvent.click(screen.getByRole("button", { name: "other club" }));
+    await waitFor(() => expect(screen.getByLabelText("location"))
+      .toHaveTextContent("/clubs/other-club/app/host"));
+    finishResolution("/clubs/reading-sai/app");
+
+    await act(async () => Promise.resolve());
+    expect(screen.getByLabelText("location")).toHaveTextContent("/clubs/other-club/app/host");
+    expect(onHandled).not.toHaveBeenCalled();
+  });
+
 });

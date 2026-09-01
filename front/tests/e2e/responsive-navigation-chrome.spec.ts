@@ -12,48 +12,9 @@ async function expectPracticalTapTarget(locator: Locator) {
   expect(box!.width + 0.01).toBeGreaterThanOrEqual(44);
 }
 
-function memberWorkspaceSelector(page: Page, viewport: "desktop" | "mobile") {
-  return viewport === "desktop"
-    ? page.locator('.desktop-only .rm-workspace-selector')
-    : page.locator('.rm-club-shell-mobile-context .rm-workspace-selector');
-}
-
-async function openMemberWorkspaceSelector(page: Page, viewport: "desktop" | "mobile") {
-  const selector = memberWorkspaceSelector(page, viewport);
-  const trigger = selector.locator("summary");
-  await expect(trigger).toBeVisible();
-  await expectPracticalTapTarget(trigger);
-  await trigger.click();
-  await expect(selector.getByRole("navigation", { name: "공간 선택" })).toBeVisible();
-  return selector;
-}
-
-function hostWorkspaceSwitcher(page: Page, viewport: "desktop" | "mobile") {
-  return viewport === "desktop"
-    ? page.locator('.desktop-only .rm-host-workspace-switcher')
-    : page.locator('.rm-club-shell-mobile-context .rm-host-workspace-switcher');
-}
-
-async function openHostWorkspaceSwitcher(
-  page: Page,
-  viewport: "desktop" | "mobile",
-  interaction: "pointer" | "keyboard" = "pointer",
-) {
-  const switcher = hostWorkspaceSwitcher(page, viewport);
-  const trigger = switcher.getByRole("button", { name: "읽는사이 · 호스트 운영실" });
-  await expect(trigger).toBeVisible();
-  await expectPracticalTapTarget(trigger);
-
-  if (interaction === "keyboard") {
-    await trigger.focus();
-    await page.keyboard.press("Enter");
-  } else {
-    await trigger.click();
-  }
-
-  const menu = switcher.getByRole("navigation", { name: "클럽과 작업 공간 선택" });
-  await expect(menu).toBeVisible();
-  return { menu, switcher, trigger };
+async function expectSingleKindSpaceLabel(page: Page, label: string) {
+  await expect(page.getByRole("button", { name: /공간 전환/ })).toHaveCount(0);
+  await expect(page.getByText(label, { exact: true })).toHaveCount(2);
 }
 
 async function expectDomOrder(...locators: Locator[]) {
@@ -196,11 +157,8 @@ test("desktop public and host pages show the expected top navigation", async ({ 
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.locator(".mobile-only .rm-account-menu__trigger")).toBeHidden();
-  const desktopWorkspaceSelector = await openMemberWorkspaceSelector(page, "desktop");
-  const hostEntry = desktopWorkspaceSelector.getByRole("link", { name: "호스트 공간" });
-  await expect(hostEntry).toHaveAttribute("href", baselineClubHostPath);
-
-  await hostEntry.click();
+  await expectSingleKindSpaceLabel(page, "현재 공간 내 클럽, 읽는사이 멤버로 보기");
+  await page.goto(baselineClubHostPath);
   await expect(page).toHaveURL(hostLandingUrl);
   const hostNav = page.getByRole("navigation", { name: "호스트 주 메뉴" });
   await expect(hostNav.getByRole("link")).toHaveText(hostDesktopTabs);
@@ -225,36 +183,25 @@ test("desktop public and host pages show the expected top navigation", async ({ 
     await expect(hostNav.getByRole("link", { name: label })).toHaveCount(0);
   }
   const routeSecurityStatus = page.locator('[data-app-route-security-controller] [role="status"]');
-  await expect(routeSecurityStatus).toHaveText("호스트 공간으로 전환했습니다");
-  await expect(routeSecurityStatus).toHaveCount(1);
+  await expect(routeSecurityStatus).toHaveCount(0);
   await expect(page).toHaveTitle("호스트 공간 · ReadMates");
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeFocused();
 
-  const hostWorkspace = await openHostWorkspaceSwitcher(page, "desktop", "keyboard");
-  await expect(hostWorkspace.menu.locator('[aria-current="true"]')).toHaveText("읽는사이");
-  await expect(hostWorkspace.menu.locator('[aria-current="page"]')).toHaveText("호스트 운영실");
-  await page.keyboard.press("Escape");
-  await expect(hostWorkspace.menu).toBeHidden();
-  await expect(hostWorkspace.trigger).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(hostWorkspace.menu).toBeVisible();
-  const desktopMemberChoice = hostWorkspace.menu.getByRole("button", { name: "멤버 공간" });
+  await expectSingleKindSpaceLabel(page, "현재 공간 내 클럽, 읽는사이 호스트로 운영");
+  const desktopMemberChoice = hostUtilities.getByRole("link", { name: "멤버 시야" });
   await expectPracticalTapTarget(desktopMemberChoice);
   await desktopMemberChoice.click();
   await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}$`));
-  await expect(routeSecurityStatus).toHaveText("멤버 공간으로 전환했습니다");
   await expect(page).toHaveTitle("멤버 공간 · ReadMates");
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeFocused();
 
   await page.goBack();
   await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/app\/host(?:\/sessions\/[^/]+)?$/);
-  await expect(routeSecurityStatus).toHaveText("호스트 공간으로 전환했습니다");
   await expect(page).toHaveTitle("호스트 공간 · ReadMates");
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeFocused();
 
   await page.goForward();
   await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}$`));
-  await expect(routeSecurityStatus).toHaveText("멤버 공간으로 전환했습니다");
   await expect(page).toHaveTitle("멤버 공간 · ReadMates");
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeFocused();
 
@@ -264,7 +211,7 @@ test("desktop public and host pages show the expected top navigation", async ({ 
   await expect(routeSecurityStatus).toHaveCount(0);
 });
 
-test("current club and workspace items preserve a scoped host record location and browser history", async ({ page }) => {
+test("single-kind current-space label and member view preserve a scoped host record location and browser history", async ({ page }) => {
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto(baselineClubAppPath);
   await page.goto(`${baselineClubHostPath}/sessions/${seededHostSessionId}?section=records#draft`);
@@ -289,14 +236,7 @@ test("current club and workspace items preserve a scoped host record location an
     state: JSON.stringify(window.history.state),
   }));
 
-  const hostWorkspace = await openHostWorkspaceSwitcher(page, "desktop", "keyboard");
-  const currentClub = hostWorkspace.menu.locator('.rm-host-workspace-switcher__choice[aria-current="true"]');
-  await expect(currentClub).toHaveText("읽는사이");
-  await expect(hostWorkspace.menu.getByRole("button", { name: "읽는사이" })).toHaveCount(0);
-
-  const currentWorkspace = hostWorkspace.menu.locator('.rm-host-workspace-switcher__choice[aria-current="page"]');
-  await expect(currentWorkspace).toHaveText("호스트 운영실");
-  await expect(hostWorkspace.menu.getByRole("button", { name: "호스트 운영실" })).toHaveCount(0);
+  await expectSingleKindSpaceLabel(page, "현재 공간 내 클럽, 읽는사이 호스트로 운영");
 
   expect(await page.evaluate(() => ({
     href: window.location.href,
@@ -304,7 +244,9 @@ test("current club and workspace items preserve a scoped host record location an
     state: JSON.stringify(window.history.state),
   }))).toEqual(before);
 
-  const memberRecordChoice = hostWorkspace.menu.getByRole("button", { name: "멤버 공간" });
+  const memberRecordChoice = page
+    .getByRole("navigation", { name: "호스트 유틸리티" })
+    .getByRole("link", { name: "멤버 시야" });
   await expectPracticalTapTarget(memberRecordChoice);
   await memberRecordChoice.click();
   await expect(page).toHaveURL(`${baselineClubAppPath}/sessions/${seededHostSessionId}`);
@@ -330,10 +272,9 @@ test("club shell has one non-overlapping global boundary at 767px and 768px", as
   await page.goto(baselineClubAppPath);
   await expect(page.locator('[data-club-shell-region="desktop-spine"]')).toBeHidden();
   await expect(page.locator('[data-club-shell-region="mobile-spine"]')).toBeVisible();
-  await expect(page.locator('[data-club-shell-region="mobile-context"]')).toBeVisible();
+  await expect(page.locator('[data-club-shell-region="mobile-context"]')).toBeHidden();
   await expect(page.getByRole("navigation", { name: "멤버 주 메뉴 모바일" })).toBeVisible();
-  const mobileSelector = memberWorkspaceSelector(page, "mobile");
-  await expectPracticalTapTarget(mobileSelector.locator("summary"));
+  await expectSingleKindSpaceLabel(page, "현재 공간 내 클럽, 읽는사이 멤버로 보기");
   const mobileGeometry = await page.evaluate(() => {
     const tabbar = document.querySelector<HTMLElement>(".m-tabbar")!;
     const content = document.querySelector<HTMLElement>(".app-content")!;
@@ -355,7 +296,7 @@ test("club shell has one non-overlapping global boundary at 767px and 768px", as
   await expect(page.locator('[data-club-shell-region="mobile-context"]')).toBeHidden();
   await expect(page.locator('[data-club-shell-region="mobile-primary"]')).toBeHidden();
   await expect(page.getByRole("navigation", { name: "멤버 주 메뉴" })).toBeVisible();
-  await expect(memberWorkspaceSelector(page, "desktop").locator("summary")).toBeVisible();
+  await expectSingleKindSpaceLabel(page, "현재 공간 내 클럽, 읽는사이 멤버로 보기");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 });
 
@@ -396,13 +337,7 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await page.goto("/app");
   await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}$`));
   await expect(page.locator(".app-content > .rm-route-reveal")).toBeVisible();
-  const initialWorkspaceSelector = await openMemberWorkspaceSelector(page, "mobile");
-  await expect(initialWorkspaceSelector.getByRole("link", { name: "호스트 공간" })).toHaveAttribute(
-    "href",
-    baselineClubHostPath,
-  );
-  await expectPracticalTapTarget(initialWorkspaceSelector.getByRole("link", { name: "호스트 공간" }));
-  await initialWorkspaceSelector.locator("summary").click();
+  await expectSingleKindSpaceLabel(page, "현재 공간 내 클럽, 읽는사이 멤버로 보기");
   const accountMenu = page.getByRole("button", { name: /계정 메뉴$/ });
   await expect(accountMenu).toHaveCount(1);
   await expectPracticalTapTarget(accountMenu);
@@ -434,24 +369,14 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await expect(mobileHeader.locator(".m-hdr-side")).toHaveCount(2);
   await expect(memberTabs.getByRole("link")).toHaveText(memberMobileTabs);
   await expectPracticalTapTarget(memberTabs.getByRole("link", { name: "오늘" }));
-  const mobileMemberSelector = await openMemberWorkspaceSelector(page, "mobile");
-  await mobileMemberSelector.getByRole("link", { name: "호스트 공간" }).click();
+  await page.goto(baselineClubHostPath);
   await expect(page).toHaveURL(hostLandingUrl);
-  await expect(page.locator('[data-app-route-security-controller] [role="status"]')).toHaveText("호스트 공간으로 전환했습니다");
-  const mobileHostSwitcher = await openHostWorkspaceSwitcher(page, "mobile");
-  const memberEntry = mobileHostSwitcher.menu.getByRole("button", { name: "멤버 공간" });
-  await expectPracticalTapTarget(memberEntry);
-  await memberEntry.click();
+  await expectSingleKindSpaceLabel(page, "현재 공간 내 클럽, 읽는사이 호스트로 운영");
+  await page.goto(baselineClubAppPath);
   await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}$`));
-  await expect(page.locator('[data-app-route-security-controller] [role="status"]')).toHaveText("멤버 공간으로 전환했습니다");
   await memberTabs.getByRole("link", { name: "기록" }).click();
   await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}/archive$`));
-  const archiveWorkspaceSelector = await openMemberWorkspaceSelector(page, "mobile");
-  await expect(archiveWorkspaceSelector.getByRole("link", { name: "호스트 공간" })).toHaveAttribute(
-    "href",
-    baselineClubHostPath,
-  );
-  await archiveWorkspaceSelector.locator("summary").click();
+  await expectSingleKindSpaceLabel(page, "현재 공간 내 클럽, 읽는사이 멤버로 보기");
   await expect(memberTabs.getByRole("link")).toHaveText(memberMobileTabs);
   await expect(memberTabs.getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
 
@@ -463,10 +388,8 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
     `${baselineClubHostPath}/sessions`,
   );
   await expect(mobileHeader.getByRole("link", { name: "뒤로" })).toHaveText("");
-  const editorHostSwitcher = await openHostWorkspaceSwitcher(page, "mobile");
-  const editorMemberChoice = editorHostSwitcher.menu.getByRole("button", { name: "멤버 공간" });
-  await expectPracticalTapTarget(editorMemberChoice);
-  await editorMemberChoice.click();
+  await expectSingleKindSpaceLabel(page, "현재 공간 내 클럽, 읽는사이 호스트로 운영");
+  await page.goto(`${baselineClubAppPath}/archive`);
   await expect(page).toHaveURL(`${baselineClubAppPath}/archive`);
   await page.goBack();
   await expect(page).toHaveURL(`${baselineClubHostPath}/sessions/new`);
@@ -517,12 +440,7 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await page.goto(`${baselineClubHostPath}/records`);
   await expect(page).toHaveURL(new RegExp(`${baselineClubHostPath}/records$`));
   await expect(mobileHeader).toContainText("기록");
-  const recordsHostSwitcher = await openHostWorkspaceSwitcher(page, "mobile");
-  await expect(recordsHostSwitcher.menu.locator('[aria-current="true"]')).toHaveText("읽는사이");
-  await expect(recordsHostSwitcher.menu.locator('[aria-current="page"]')).toHaveText("호스트 운영실");
-  await page.keyboard.press("Escape");
-  await expect(recordsHostSwitcher.menu).toBeHidden();
-  await expect(recordsHostSwitcher.trigger).toBeFocused();
+  await expectSingleKindSpaceLabel(page, "현재 공간 내 클럽, 읽는사이 호스트로 운영");
   await expect(tabs.getByRole("link")).toHaveText(hostMobileTabs);
   await expect(tabs.getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
 
@@ -607,12 +525,14 @@ test("mobile app route continuity returns to archive tabs and host dashboard sou
 
   await page.goto("/app/host");
   await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/app\/host(\/sessions\/[^/]+)?$/);
+  await expect(page.getByRole("heading", { level: 1, name: "모임 운영실" })).toBeVisible();
   await expect(page.getByRole("region", { name: "현재 운영할 모임이 없습니다" })).toBeVisible();
   const hostBack = page.getByRole("banner").getByRole("link", { name: "뒤로" });
   if (await hostBack.count()) {
     await expect(hostBack).toHaveAttribute("href", "/app/host");
     await hostBack.click();
     await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/app\/host(\/sessions\/[^/]+)?$/);
+    await expect(page.getByRole("heading", { level: 1, name: "모임 운영실" })).toBeVisible();
     await expect(page.getByRole("region", { name: "현재 운영할 모임이 없습니다" })).toBeVisible();
   }
 });

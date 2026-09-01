@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AdminNotificationsPage } from "@/features/platform-admin/ui/admin-notifications-page";
 
 const LEDGER_CSS = readFileSync(
-  path.resolve("features/platform-admin/ui/admin-editorial-ledger.css"),
+  path.resolve("features/platform-admin/ui/admin-service-status.css"),
   "utf8",
 );
 import type {
@@ -103,7 +103,7 @@ describe("AdminNotificationsPage", () => {
     renderPage();
 
     expect(screen.getByText("운영 · 배달")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "배달 원장" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "알림 전달 상태" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "실패 클러스터" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "재발송" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "발송 대기 장부" })).toBeInTheDocument();
@@ -114,7 +114,28 @@ describe("AdminNotificationsPage", () => {
     expect(screen.getByText("배달 실패")).toBeInTheDocument();
     expect(screen.getByText("중계 지연")).toBeInTheDocument();
     expect(screen.queryByText("Outbox pending")).toBeNull();
-    expect(screen.getAllByText("mailbox_unavailable").length).toBeGreaterThan(0);
+    expect(screen.getByText("발송 실패 3건, 배달 실패 2건, 중계 지연 2건을 확인해야 합니다.")).toBeInTheDocument();
+  });
+
+  it("orders the operator sentence, freshness, failure evidence, and next safe action before technical identifiers", () => {
+    const { container } = renderPage();
+    const sentence = screen.getByText("발송 실패 3건, 배달 실패 2건, 중계 지연 2건을 확인해야 합니다.");
+    const freshness = screen.getByText(/^최근 집계 /);
+    const failures = screen.getByRole("heading", { name: "실패 클러스터" });
+    const failureEvidence = screen.getByRole("listitem", { name: "읽는사이 알림 전달 실패 2건" });
+    const nextAction = screen.getByText("같은 원인의 실패와 자동 재시도 상태를 확인한 뒤 필요한 항목만 수동 재발송하세요.");
+    const failureDisclosure = failures.closest("section")?.querySelector("[data-admin-technical-disclosure]");
+    const technical = Array.from(container.querySelectorAll("[data-admin-technical-disclosure]"));
+
+    expect(sentence.compareDocumentPosition(freshness) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(freshness.compareDocumentPosition(failures) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(failures.compareDocumentPosition(failureEvidence) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(failureEvidence.compareDocumentPosition(nextAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(nextAction.compareDocumentPosition(failureDisclosure!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(technical.some((item) => item.textContent?.includes("event-1"))).toBe(true);
+    expect(technical.some((item) => item.textContent?.includes("SESSION_REMINDER_DUE"))).toBe(true);
+    expect(technical.some((item) => item.textContent?.includes("mailbox_unavailable"))).toBe(true);
+    expect(screen.queryByText(/event-1/, { selector: ".admin-notifications__row-title" })).toBeNull();
   });
 
   it("shows the fixed replay warning under failure clusters", () => {
@@ -161,24 +182,33 @@ describe("AdminNotificationsPage", () => {
     expect(within(ledger).getByText("발송됨", { exact: true })).toBeInTheDocument();
     expect(within(ledger).getByText("대기", { exact: true })).toBeInTheDocument();
     expect(within(ledger).getByText("실패", { exact: true })).toBeInTheDocument();
-    expect(within(outbox).queryByText("PUBLISHED")).toBeNull();
-    expect(within(ledger).queryByText("SENT")).toBeNull();
+    expect(within(outbox).queryByText("PUBLISHED", { selector: ".platform-admin-domain-status" })).toBeNull();
+    expect(within(ledger).queryByText("SENT", { selector: ".platform-admin-domain-status" })).toBeNull();
     expect(within(outbox).getByText(/다음 재시도/)).toBeInTheDocument();
     expect(within(ledger).queryByText(/다음 재시도/)).toBeNull();
   });
 
-  it("labels a failure cluster as club · notification type · error class", () => {
+  it("keeps the failure cluster operator-readable and raw values in technical disclosure", () => {
     renderPage();
 
-    expect(screen.getByText("읽는사이 · SESSION_REMINDER_DUE · mailbox_unavailable")).toBeInTheDocument();
+    const cluster = screen.getByRole("listitem", { name: "읽는사이 알림 전달 실패 2건" });
+    const failures = screen.getByRole("heading", { name: "실패 클러스터" }).closest("section")!;
+    const disclosure = failures.querySelector("[data-admin-technical-disclosure]");
+    expect(cluster).toHaveTextContent("읽는사이 알림 전달 실패");
+    expect(cluster).toHaveTextContent("최근 확인");
+    expect(cluster.querySelector("[data-admin-technical-disclosure]")).toBeNull();
+    expect(disclosure).toHaveTextContent("SESSION_REMINDER_DUE");
+    expect(disclosure).toHaveTextContent("mailbox_unavailable");
   });
 
   it("uses supporting copy for replay expiry and runtime summaries", () => {
     renderPage({ replayPreview });
 
     expect(screen.getByText(/^만료 /)).toHaveClass("small");
-    expect(screen.getByText("MAIL_AMBIGUOUS")).toBeInTheDocument();
-    expect(screen.getByText(/DEAD 2/)).toBeInTheDocument();
+    const preview = document.querySelector(".admin-notifications__preview") as HTMLElement;
+    expect(within(preview).getByText("확인할 주의 사항이 있습니다.")).toBeInTheDocument();
+    expect(preview.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("MAIL_AMBIGUOUS");
+    expect(within(preview).getByText(/실패 2/)).toBeInTheDocument();
   });
 
   it("shows immutable receipt counts and disabled pending convergence separately", () => {
@@ -187,16 +217,18 @@ describe("AdminNotificationsPage", () => {
     expect(screen.getByRole("region", { name: "명령 기록" })).toBeInTheDocument();
     expect(screen.getByText(/영수증 00000000-0000-4000-8000-000000005901/)).toBeInTheDocument();
     expect(screen.getByText(/재처리 1건 · 건너뜀 1건/)).toBeInTheDocument();
-    expect(screen.getByText(/TARGET_STATE_CHANGED 1/)).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "명령 기록" }).querySelector("[data-admin-technical-disclosure]")).toHaveTextContent(
+      "TARGET_STATE_CHANGED 1",
+    );
     expect(screen.getByText(/효과 대기 · 현재 비활성/)).toBeInTheDocument();
     expect(screen.queryByText("공개 반영 추적")).not.toBeInTheDocument();
   });
 
-  it("renders an L2 receipt timeline only after an actual replay receipt", () => {
+  it("renders an L3 receipt and convergence timeline only after an actual replay receipt", () => {
     const { rerender } = renderPage({ replayPreview });
 
     expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
-    expect(document.querySelector(".admin-safe-action-dock")).toHaveAttribute("data-level", "L2");
+    expect(document.querySelector(".admin-safe-action-dock")).toHaveAttribute("data-level", "L3");
 
     rerender(
       <AdminNotificationsPage
@@ -217,7 +249,9 @@ describe("AdminNotificationsPage", () => {
       />,
     );
 
-    expect(screen.getByRole("region", { name: "명령 기록" })).toBeInTheDocument();
+    const timeline = screen.getByRole("region", { name: "명령 기록" });
+    expect(timeline).toBeInTheDocument();
+    expect(timeline.querySelector(".admin-receipt-timeline__convergence")).toHaveTextContent("후속 배달 효과");
   });
 
   it("renders masked recipients without raw email fixture", () => {
@@ -231,7 +265,7 @@ describe("AdminNotificationsPage", () => {
   it("shows focus banner from health drill-down", () => {
     renderPage({ focus: "outbox_backlog" });
 
-    expect(screen.getByText(/Health outbox backlog/)).toBeInTheDocument();
+    expect(screen.getByText(/서비스 상태의 발송 대기 신호/)).toBeInTheDocument();
   });
 
   it("keeps confirm disabled until preview and reason exist", async () => {
@@ -245,7 +279,7 @@ describe("AdminNotificationsPage", () => {
     expect(onReasonChange).toHaveBeenCalled();
   });
 
-  it("marks the L2 dock unknown-outcome without treating the command as ready", () => {
+  it("keeps the L3 same-receipt reconciliation available without treating the command as ready", () => {
     renderPage({
       replayPreview,
       replayReason: "retry delivery",

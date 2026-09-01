@@ -1,11 +1,24 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import type { AdminOperationCaseView } from "@/features/platform-admin/model/platform-admin-operations-model";
 import { findNestedLiveRegions } from "@/shared/testing/accessibility-checks";
 import { AdminOperationStateActions } from "./admin-operation-state-actions";
-import { AdminOperationsInspector } from "./admin-operations-inspector";
+import { AdminOperationsInspector as ProductionAdminOperationsInspector } from "./admin-operations-inspector";
+
+type AdminOperationsInspectorProps = Omit<
+  ComponentProps<typeof ProductionAdminOperationsInspector>,
+  "auditHref"
+> & { auditHref?: string };
+
+function AdminOperationsInspector({
+  auditHref = "/admin/audit",
+  ...props
+}: AdminOperationsInspectorProps) {
+  return <ProductionAdminOperationsInspector auditHref={auditHref} {...props} />;
+}
 
 const selectedCase: AdminOperationCaseView = {
   id: "case-notification",
@@ -36,7 +49,7 @@ const selectedCase: AdminOperationCaseView = {
     description: "같은 원인의 실패를 확인하세요.",
   },
   severityLabel: "경고",
-  stateLabel: "미확인",
+  stateLabel: "확인 전",
   sourceLabel: "알림",
   impactLabel: "영향 2건",
   ageLabel: "2시간 전",
@@ -47,6 +60,7 @@ describe("AdminOperationsInspector", () => {
     render(
       <MemoryRouter>
         <AdminOperationsInspector
+          {...{ auditHref: "/admin/audit?target=route-owned-target" }}
           selectedCase={selectedCase}
           history={[
             {
@@ -74,30 +88,70 @@ describe("AdminOperationsInspector", () => {
     expect(screen.getByText("영향 2건")).toBeInTheDocument();
     expect(screen.getByText(/일부 확인 불가/)).toBeInTheDocument();
     expect(screen.getByText("관측 출처")).toBeInTheDocument();
+    expect(screen.getByText("관측 시각")).toBeInTheDocument();
+    expect(screen.getByText("감지 기준")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "배달 원장에서 확인" })).toHaveAttribute(
       "href",
       "/admin/notifications?focus=delivery",
     );
-    expect(screen.getByRole("heading", { name: "이 대상의 최근 기입" })).toBeInTheDocument();
-    expect(screen.getByText("신호가 처음 감지됨 · 미확인")).toBeInTheDocument();
-    expect(screen.getByText("상태 변경 기록 · 확인됨")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "최근 처리 기록" })).toBeInTheDocument();
+    expect(screen.getByText("신호가 처음 감지됨 · 확인 전")).toBeInTheDocument();
+    expect(screen.getByText("상태 변경 기록 · 확인함")).toBeInTheDocument();
     expect(screen.queryByText("PRIVATE_HISTORY_CODE")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "전체 기입 보기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "전체 처리 기록 보기" })).toHaveAttribute(
       "href",
-      "/admin/audit?target=case-notification",
+      "/admin/audit?target=route-owned-target",
     );
     expect(screen.getByRole("group", { name: "작업" })).toHaveClass("admin-action-dock");
     expect(screen.getByRole("button", { name: "확인 처리" })).toBeInTheDocument();
 
     const commands = screen.getByRole("group", { name: "작업" });
-    const ledgerHeading = screen.getByRole("heading", { name: "이 대상의 최근 기입" });
+    const ledgerHeading = screen.getByRole("heading", { name: "최근 처리 기록" });
     expect(commands.closest(".admin-case-docket__actions")?.contains(ledgerHeading)).toBe(false);
     expect(
       Boolean(commands.compareDocumentPosition(ledgerHeading) & Node.DOCUMENT_POSITION_FOLLOWING),
     ).toBe(true);
   });
 
-  it("renders the case docket with a wrapping safe id, L1 dock, and no receipt timeline", () => {
+  it("uses the approved docket hierarchy and keeps exact identifiers inside technical disclosure", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <AdminOperationsInspector
+          {...{ auditHref: "/admin/audit?target=club-exact-identifier" }}
+          selectedCase={{ ...selectedCase, clubId: "club-exact-identifier" }}
+          history={[]}
+          lifecycleControls={<button type="button">확인 처리</button>}
+        />
+      </MemoryRouter>,
+    );
+
+    const headings = [
+      screen.getByRole("heading", { name: selectedCase.summary.title }),
+      screen.getByRole("heading", { name: "무슨 일인가" }),
+      screen.getByRole("heading", { name: "왜 중요한가" }),
+      screen.getByRole("heading", { name: "확인한 근거" }),
+      screen.getByRole("heading", { name: "다음 행동" }),
+      screen.getByRole("heading", { name: "최근 처리 기록" }),
+    ];
+    for (let index = 0; index < headings.length - 1; index += 1) {
+      expect(
+        headings[index]!.compareDocumentPosition(headings[index + 1]!)
+          & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+
+    expect(container.querySelector(".admin-case-docket__identity")).toBeNull();
+    const disclosure = container.querySelector("details[data-admin-technical-disclosure]");
+    expect(disclosure).toHaveTextContent("case-notification");
+    expect(disclosure).toHaveTextContent("NOTIFICATION");
+    expect(disclosure).toHaveTextContent("club-exact-identifier");
+    expect(screen.getByRole("link", { name: "전체 처리 기록 보기" })).toHaveAttribute(
+      "href",
+      "/admin/audit?target=club-exact-identifier",
+    );
+  });
+
+  it("renders the case docket with an exact id only in disclosure, L1 dock, and no receipt timeline", () => {
     const { container } = render(
       <MemoryRouter>
         <AdminOperationsInspector
@@ -114,12 +168,9 @@ describe("AdminOperationsInspector", () => {
 
     const docket = screen.getByRole("region", { name: "운영 케이스 상세" });
     expect(docket).toHaveClass("admin-case-docket");
-    expect(screen.getAllByText("case-notification-opaque-identifier-that-wraps-safely").length).toBeGreaterThan(0);
-    expect(
-      screen.getAllByText("case-notification-opaque-identifier-that-wraps-safely").every(
-        (node) => node.classList.contains("admin-operation-wrap"),
-      ),
-    ).toBe(true);
+    expect(container.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent(
+      "case-notification-opaque-identifier-that-wraps-safely",
+    );
     expect(screen.getByRole("group", { name: "작업" }).closest("[data-level]")).toHaveAttribute(
       "data-level",
       "L1",
@@ -175,8 +226,8 @@ describe("AdminOperationsInspector", () => {
     );
 
     expect(screen.getByText("현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "해결 확인" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "확인함" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "처리함" })).not.toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "작업" })).not.toBeInTheDocument();
   });
 
@@ -273,40 +324,7 @@ describe("AdminOperationsInspector", () => {
     expect(onNext).toHaveBeenCalledTimes(1);
   });
 
-  it("cannot confirm 무시 without a one-line reason", async () => {
-    const user = userEvent.setup();
-    const onSnooze = vi.fn();
-    render(
-      <MemoryRouter>
-        <AdminOperationsInspector
-          selectedCase={selectedCase}
-          history={[]}
-          lifecycleControls={
-            <AdminOperationStateActions
-              allowedActions={["ACKNOWLEDGE", "SNOOZE", "RESOLVE"]}
-              pending={false}
-              message={null}
-              now={() => new Date("2026-08-04T10:00:00.000Z")}
-              onAcknowledge={vi.fn()}
-              onSnooze={onSnooze}
-              onResolve={vi.fn()}
-            />
-          }
-        />
-      </MemoryRouter>,
-    );
-
-    await user.click(screen.getByRole("button", { name: "무시" }));
-    const confirm = screen.getByRole("button", { name: "무시 확정" });
-    expect(confirm).toBeDisabled();
-    await user.click(confirm);
-    expect(onSnooze).not.toHaveBeenCalled();
-
-    await user.type(screen.getByLabelText("무시 사유"), "   ");
-    expect(confirm).toBeDisabled();
-  });
-
-  it("exposes a duration select instead of stacked individual snooze buttons", () => {
+  it("does not expose unsupported actions or an untransmitted reason input", () => {
     render(
       <MemoryRouter>
         <AdminOperationsInspector
@@ -327,7 +345,39 @@ describe("AdminOperationsInspector", () => {
       </MemoryRouter>,
     );
 
-    const duration = screen.getByRole("combobox", { name: "보류 기간" });
+    expect(screen.getByRole("button", { name: "확인함" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "잠시 미룸" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "처리함" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "무시" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "병합" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it("asks for one duration instead of stacked individual snooze buttons", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <AdminOperationsInspector
+          selectedCase={selectedCase}
+          history={[]}
+          lifecycleControls={
+            <AdminOperationStateActions
+              allowedActions={["ACKNOWLEDGE", "SNOOZE", "RESOLVE"]}
+              pending={false}
+              message={null}
+              now={() => new Date("2026-08-04T10:00:00.000Z")}
+              onAcknowledge={vi.fn()}
+              onSnooze={vi.fn()}
+              onResolve={vi.fn()}
+            />
+          }
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "잠시 미룸" }));
+
+    const duration = screen.getByRole("combobox", { name: "미룰 시간" });
     expect(duration).toBeInTheDocument();
     expect(Array.from(duration.querySelectorAll("option")).map((option) => option.textContent)).toEqual([
       "1시간",
@@ -335,14 +385,14 @@ describe("AdminOperationsInspector", () => {
       "24시간",
       "7일",
     ]);
-    expect(screen.getByRole("button", { name: "보류" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "1시간 보류" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "4시간 보류" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "24시간 보류" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "7일 보류" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "잠시 미룸" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "1시간 미루기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "4시간 미루기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "24시간 미루기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "7일 미루기" })).not.toBeInTheDocument();
   });
 
-  it("includes the ignore reason in the snooze command args", async () => {
+  it("submits snooze from the selected duration only", async () => {
     const user = userEvent.setup();
     const onSnooze = vi.fn();
     render(
@@ -365,18 +415,18 @@ describe("AdminOperationsInspector", () => {
       </MemoryRouter>,
     );
 
-    await user.click(screen.getByRole("button", { name: "무시" }));
-    await user.type(screen.getByLabelText("무시 사유"), "중복 신호로 판단");
-    await user.click(screen.getByRole("button", { name: "무시 확정" }));
+    await user.click(screen.getByRole("button", { name: "잠시 미룸" }));
+    await user.click(screen.getByRole("button", { name: "미루기" }));
 
     expect(onSnooze).toHaveBeenCalledOnce();
-    expect(onSnooze).toHaveBeenCalledWith("2026-08-11T10:00:00.000Z", "중복 신호로 판단");
+    expect(onSnooze).toHaveBeenCalledWith("2026-08-04T14:00:00.000Z");
   });
 
   it("renders at most three recent case-history sentences and the audit prefilter href", () => {
     const { container } = render(
       <MemoryRouter>
         <AdminOperationsInspector
+          {...{ auditHref: "/admin/audit?target=club-reading-sai" }}
           selectedCase={{ ...selectedCase, clubId: "club-reading-sai" }}
           history={[
             {
@@ -425,12 +475,12 @@ describe("AdminOperationsInspector", () => {
       "8.4 17:10",
     ]);
     expect(rows.map((row) => row.querySelector("span")?.textContent)).toEqual([
-      "신호 재감지로 다시 열림 · 미확인",
-      "운영자가 보류함 · 보류됨",
-      "운영자가 확인함 · 확인됨",
+      "신호 재감지로 다시 열림 · 확인 전",
+      "운영자가 보류함 · 잠시 미룸",
+      "운영자가 확인함 · 확인함",
     ]);
     expect(screen.queryByText("신호가 처음 감지됨 · 미확인")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "전체 기입 보기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "전체 처리 기록 보기" })).toHaveAttribute(
       "href",
       "/admin/audit?target=club-reading-sai",
     );
@@ -440,6 +490,7 @@ describe("AdminOperationsInspector", () => {
     render(
       <MemoryRouter>
         <AdminOperationsInspector
+          {...{ auditHref: "/admin/audit" }}
           selectedCase={selectedCase}
           history={[]}
           lifecycleControls={null}
@@ -447,12 +498,12 @@ describe("AdminOperationsInspector", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { name: "이 대상의 최근 기입" })).toBeInTheDocument();
-    expect(screen.getByText("표시할 기입이 없습니다.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "최근 처리 기록" })).toBeInTheDocument();
+    expect(screen.getByText("표시할 처리 기록이 없습니다.")).toBeInTheDocument();
     expect(document.querySelectorAll(".ledger-inline .li")).toHaveLength(0);
-    expect(screen.getByRole("link", { name: "전체 기입 보기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "전체 처리 기록 보기" })).toHaveAttribute(
       "href",
-      "/admin/audit?target=case-notification",
+      "/admin/audit",
     );
   });
 });

@@ -1,260 +1,116 @@
-import {
-  type MouseEvent,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Outlet,
-  useBlocker,
-  useLocation,
-  useNavigate,
-  useSearchParams,
-} from "react-router";
-import {
-  adminOtherAccountLoginPath,
-  adminWorkspaceAccountLabel,
-  deriveAdminWorkspaceDestinations,
-} from "@/features/platform-admin/model/admin-workspace-switcher-model";
-import { buildAdminDetailHref } from "@/features/platform-admin/model/admin-route-state";
-import { platformAdminClubListHref } from "@/features/platform-admin/model/platform-admin-club-list-filters";
-import { canAdmin } from "@/features/platform-admin/model/platform-admin-capabilities";
-import {
-  installPlatformAdminAuthorityLossHandler,
-  platformAdminCapabilitiesQuery,
-  subscribePlatformAdminAuthorityLoss,
-  useCommitPlatformAdminOnboardingMutation,
-  usePreviewPlatformAdminOnboardingMutation,
-} from "@/features/platform-admin/queries/platform-admin-queries";
-import { useAdminAlarmSummary } from "@/features/platform-admin/queries/admin-alarm-summary";
+import type { MouseEvent, ReactNode } from "react";
+import { Link, Outlet } from "react-router";
+import type { AdminRouteOwner } from "@/features/platform-admin/model/admin-route-catalog";
+import type { PlatformAdminCapabilities } from "@/features/platform-admin/model/platform-admin-capabilities";
+import type { AdminAlarmSummary } from "@/features/platform-admin/model/admin-alarm-summary";
 import { AdminAlarmBar } from "@/features/platform-admin/ui/admin-alarm-bar";
 import { AdminBreadcrumb } from "@/features/platform-admin/ui/admin-breadcrumb";
-import { AdminLayoutNav } from "@/features/platform-admin/ui/admin-layout-nav";
-import { AdminOnboardingModal } from "@/features/platform-admin/ui/admin-onboarding-modal";
-import { AdminWorkspaceSwitcher } from "@/features/platform-admin/ui/admin-workspace-switcher";
-import { PlatformAdminOnboardingWizard } from "@/features/platform-admin/ui/platform-admin-onboarding-wizard";
-import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
-import { logoutCurrentSession } from "@/shared/auth/session-api";
-import { AdminBreadcrumbProvider } from "./admin-breadcrumb-context";
-import { useAdminBreadcrumbExtra } from "./admin-breadcrumb-hook";
+import {
+  AdminLayoutNav,
+  type AdminNavigationLinkRenderProps,
+} from "@/features/platform-admin/ui/admin-layout-nav";
+import { AdminMobileNavigation } from "@/features/platform-admin/ui/admin-mobile-navigation";
+import "@/features/platform-admin/ui/admin-shell.css";
+import "@/features/platform-admin/ui/admin-page-patterns.css";
 import "@/features/platform-admin/ui/admin-editorial-ledger.css";
+import "@/features/platform-admin/ui/admin-club-management.css";
+
+export type AdminShellOutletContext = { authorityEpoch: number };
+
+type AdminShellLayoutProps = {
+  workspaceAccountLabel: string;
+  spaceSwitcher: ReactNode;
+  spaceControlEpoch: number;
+  capabilities: PlatformAdminCapabilities | null;
+  currentNavigationOwner: AdminRouteOwner | null;
+  routePath: string;
+  breadcrumbExtra: string | null;
+  alarm: {
+    summary: AdminAlarmSummary | null;
+    state: "ready" | "loading" | "unavailable";
+  };
+  accountBusy: boolean;
+  accountError: string | null;
+  onOtherAccountLogin: () => void;
+  outletContext: AdminShellOutletContext;
+};
 
 export function AdminShellLayout({
-  auth = null,
-}: {
-  auth?: AuthMeResponse | null;
-}) {
-  return (
-    <AdminBreadcrumbProvider>
-      <AdminShellLayoutInner auth={auth} />
-    </AdminBreadcrumbProvider>
-  );
-}
-
-function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
-  const queryClient = useQueryClient();
-  const [authorityLost, setAuthorityLost] = useState(false);
-  const [workspaceMenuEpoch, setWorkspaceMenuEpoch] = useState(0);
-  const capabilitiesQuery = useQuery({
-    ...platformAdminCapabilitiesQuery(),
-    enabled: !authorityLost,
-  });
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const { extra } = useAdminBreadcrumbExtra();
-  const [isWizardDirty, setIsWizardDirty] = useState(false);
-  const [onboardingEffectPending, setOnboardingEffectPending] = useState(false);
-  const allowOnboardingNavigation = useRef(false);
-  const previewOnboarding = usePreviewPlatformAdminOnboardingMutation();
-  const commitOnboarding = useCommitPlatformAdminOnboardingMutation();
-  const workspaceDestinations = deriveAdminWorkspaceDestinations(auth);
-  const workspaceAccountLabel = adminWorkspaceAccountLabel(auth);
-  const otherAccountLoginPath = adminOtherAccountLoginPath(
-    location.pathname,
-    location.search,
-    location.hash,
-  );
-
-  const capabilities = capabilitiesQuery.data ?? null;
-  const alarm = useAdminAlarmSummary();
-  const canCreateClub =
-    capabilities != null && canAdmin(capabilities, "CREATE_CLUB");
-
-  const routePath = derivePathSegment(location.pathname);
-  const onboardingRequested = searchParams.get("onboarding") === "1";
-  const onboardingOpen = onboardingRequested && canCreateClub;
-  const blocker = useBlocker(
-    useCallback(
-      ({ currentLocation, nextLocation }) => {
-        if (allowOnboardingNavigation.current) return false;
-        if ((!isWizardDirty && !onboardingEffectPending) || !onboardingOpen)
-          return false;
-        const nextOnboarding =
-          new URLSearchParams(nextLocation.search).get("onboarding") === "1";
-        return (
-          currentLocation.pathname !== nextLocation.pathname || !nextOnboarding
-        );
-      },
-      [isWizardDirty, onboardingEffectPending, onboardingOpen],
-    ),
-  );
-
-  useEffect(() => {
-    allowOnboardingNavigation.current = false;
-  }, [location.key]);
-
-  if (!canCreateClub && (isWizardDirty || onboardingEffectPending)) {
-    setIsWizardDirty(false);
-    setOnboardingEffectPending(false);
-  }
-
-  useEffect(() => {
-    if (capabilities == null || canCreateClub || !onboardingRequested) return;
-    allowOnboardingNavigation.current = true;
-    const next = new URLSearchParams(searchParams);
-    next.delete("onboarding");
-    navigate(
-      {
-        pathname: location.pathname,
-        search: next.toString() ? `?${next.toString()}` : "",
-      },
-      { replace: true },
-    );
-  }, [
-    canCreateClub,
-    capabilities,
-    location.pathname,
-    navigate,
-    onboardingRequested,
-    searchParams,
-  ]);
-
-  useEffect(() => {
-    if (blocker.state !== "blocked") return;
-    if (onboardingEffectPending) {
-      blocker.reset();
-      return;
-    }
-    if (window.confirm("작성 중인 클럽 온보딩을 중단하고 이동할까요?")) {
-      blocker.proceed();
-    } else {
-      blocker.reset();
-    }
-  }, [blocker, onboardingEffectPending]);
-
-  function closeOnboarding() {
-    if (onboardingEffectPending) return;
-    allowOnboardingNavigation.current = true;
-    const next = new URLSearchParams(searchParams);
-    next.delete("onboarding");
-    navigate(
-      {
-        pathname: location.pathname,
-        search: next.toString() ? `?${next.toString()}` : "",
-      },
-      { replace: true },
-    );
-    setIsWizardDirty(false);
-  }
-
-  useEffect(() => {
-    installPlatformAdminAuthorityLossHandler(queryClient);
-    return subscribePlatformAdminAuthorityLoss(() => {
-      setAuthorityLost(true);
-      setWorkspaceMenuEpoch((epoch) => epoch + 1);
-      setIsWizardDirty(false);
-      allowOnboardingNavigation.current = true;
-      const next = new URLSearchParams(searchParams);
-      if (!next.has("onboarding")) {
-        return;
-      }
-      next.delete("onboarding");
-      navigate(
-        {
-          pathname: location.pathname,
-          search: next.toString() ? `?${next.toString()}` : "",
-        },
-        { replace: true },
-      );
-    });
-  }, [location.pathname, navigate, queryClient, searchParams]);
-
-  async function otherAccountLogin() {
-    const response = await logoutCurrentSession();
-    if (response.ok || response.status === 401) {
-      window.location.assign(otherAccountLoginPath);
-      return true;
-    }
-    return false;
-  }
-
+  workspaceAccountLabel,
+  spaceSwitcher,
+  spaceControlEpoch,
+  capabilities,
+  currentNavigationOwner,
+  routePath,
+  breadcrumbExtra,
+  alarm,
+  accountBusy,
+  accountError,
+  onOtherAccountLogin,
+  outletContext,
+}: AdminShellLayoutProps) {
   return (
     <div className="admin-shell">
-      <a
-        href="#admin-main"
-        className="admin-shell__skip-link"
-        onClick={focusAdminMain}
-      >
+      <a href="#admin-main" className="admin-shell__skip-link" onClick={focusAdminMain}>
         본문으로 건너뛰기
       </a>
       <header className="admin-shell__header">
         <span className="admin-shell__wordmark">ReadMates · 운영</span>
-        <AdminBreadcrumb routePath={routePath} extra={extra} />
+        <AdminBreadcrumb routePath={routePath} extra={breadcrumbExtra} />
         <div className="admin-shell__header-actions">
-          {capabilities ? (
-            <span className="admin-shell__role-badge">{capabilities.role}</span>
-          ) : null}
-          <AdminWorkspaceSwitcher
-            key={workspaceMenuEpoch}
-            accountLabel={workspaceAccountLabel}
-            destinations={workspaceDestinations}
-            onOtherAccountLogin={otherAccountLogin}
-          />
+          <div key={spaceControlEpoch} className="admin-shell__space-control">
+            {spaceSwitcher}
+          </div>
+          <div className="admin-shell__account-control">
+            <span className="admin-shell__account-label">{workspaceAccountLabel}</span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={accountBusy}
+              onClick={onOtherAccountLogin}
+            >
+              {accountBusy ? "로그아웃 중" : "다른 계정으로 로그인"}
+            </button>
+            {accountError ? <p role="alert">{accountError}</p> : null}
+          </div>
         </div>
       </header>
       <div className="admin-shell__body">
         <aside className="admin-shell__nav">
           <AdminLayoutNav
             capabilities={capabilities}
+            currentOwner={currentNavigationOwner}
+            renderLink={renderAdminNavigationLink}
             ariaLabel="Admin 콘솔"
             todayCount={alarm.summary?.attention.count ?? null}
           />
         </aside>
         <main id="admin-main" className="admin-shell__main" tabIndex={-1}>
           <AdminAlarmBar summary={alarm.summary} state={alarm.state} />
-          <Outlet />
+          <Outlet context={outletContext} />
         </main>
       </div>
-      {onboardingOpen ? (
-        <AdminOnboardingModal
-          isDirty={isWizardDirty}
-          effectPending={onboardingEffectPending}
-          onRequestClose={closeOnboarding}
-        >
-          <PlatformAdminOnboardingWizard
-            enabled={canCreateClub}
-            onPreview={previewOnboarding.mutateAsync}
-            onCommit={commitOnboarding.mutateAsync}
-            onDirtyChange={setIsWizardDirty}
-            onEffectPendingChange={setOnboardingEffectPending}
-            onViewClub={(clubId) => {
-              allowOnboardingNavigation.current = true;
-              navigate(
-                buildAdminDetailHref(`/admin/clubs/${clubId}`, {
-                  returnTo: platformAdminClubListHref(searchParams),
-                  focusId: clubId,
-                  scrollTop: 0,
-                }),
-                { replace: true },
-              );
-            }}
-          />
-        </AdminOnboardingModal>
-      ) : null}
+      <AdminMobileNavigation
+        capabilities={capabilities}
+        currentOwner={currentNavigationOwner}
+        renderLink={renderAdminNavigationLink}
+        ariaLabel="Admin 모바일 메뉴"
+      />
     </div>
+  );
+}
+
+function renderAdminNavigationLink({
+  href,
+  className,
+  ariaCurrent,
+  style,
+  children,
+}: AdminNavigationLinkRenderProps) {
+  return (
+    <Link to={href} className={className} aria-current={ariaCurrent} style={style}>
+      {children}
+    </Link>
   );
 }
 
@@ -263,12 +119,4 @@ function focusAdminMain(event: MouseEvent<HTMLAnchorElement>) {
   if (!main) return;
   event.preventDefault();
   main.focus();
-}
-
-function derivePathSegment(pathname: string): string {
-  const stripped = pathname.replace(/^\/admin\/?/, "");
-  if (!stripped) return "today";
-  if (stripped.startsWith("clubs/") && stripped !== "clubs")
-    return "clubs/:clubId";
-  return stripped;
 }

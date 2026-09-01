@@ -4,6 +4,7 @@ import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 import { AdminSupportWorkbench } from "./admin-support-workbench";
+import { parseAdminSupportGrantPreview } from "../api/platform-admin-support-contracts";
 
 const grant = {
   grantId: "grant-1",
@@ -33,19 +34,19 @@ const selected = {
   grantBlockedReason: null,
 };
 
-const createPreview = {
-  previewId: "preview-1",
+const createPreview = parseAdminSupportGrantPreview({
+  previewId: "00000000-0000-4000-8000-000000006011",
   commandType: "CREATE" as const,
   grantId: null,
-  clubId: "club-1",
+  clubId: "00000000-0000-4000-8000-000000006012",
   scope: "HOST_SUPPORT_READ" as const,
   grantExpiresAt: "2026-08-25T12:00:00Z",
   reasonCategory: "MEMBER_ASSISTANCE" as const,
   notePresent: false,
-  impactCodes: ["GRANT_SUPPORT_ACCESS"],
+  impactCodes: ["SUPPORT_ACCESS_WILL_BECOME_ACTIVE"],
   expiresAt: "2026-08-25T10:10:00Z",
   fingerprintPrefix: "00112233",
-};
+});
 
 function props(overrides: Partial<ComponentProps<typeof AdminSupportWorkbench>> = {}): ComponentProps<typeof AdminSupportWorkbench> {
   return {
@@ -65,11 +66,31 @@ function props(overrides: Partial<ComponentProps<typeof AdminSupportWorkbench>> 
 }
 
 describe("AdminSupportWorkbench", () => {
-  it("renders the page-context heading 접근 원장", () => {
+  it("uses the club-management hierarchy for current state, actions, and records", () => {
+    const { container } = render(<AdminSupportWorkbench {...props()} />);
+
+    expect(screen.getByText("클럽 관리", { selector: ".admin-page-context__eyebrow" })).toBeInTheDocument();
+    expect(
+      [...container.querySelectorAll<HTMLElement>("[data-admin-support-section]")]
+        .map((section) => section.dataset.adminSupportSection),
+    ).toEqual(["state", "actions", "history"]);
+    expect(
+      [...container.querySelectorAll<HTMLElement>("[data-admin-support-section] > h2")]
+        .map((heading) => heading.textContent),
+    ).toEqual(["현재 상태", "가능한 조치", "최근 처리 기록"]);
+  });
+
+  it("renders the page-context heading 지원 접근", () => {
     render(<AdminSupportWorkbench {...props()} />);
-    expect(screen.getByRole("heading", { level: 1, name: "접근 원장" })).toBeInTheDocument();
-    expect(screen.getByText("원장")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "지원 접근" })).toBeInTheDocument();
+    expect(screen.getByText("클럽 관리", { selector: ".admin-page-context__eyebrow" })).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  it("renders the grant creator role as Korean primary copy and raw only in technical disclosure", () => {
+    const { container } = render(<AdminSupportWorkbench {...props()} />);
+    expect(screen.getByText(/처리 역할: 소유자/)).toBeInTheDocument();
+    expect(container.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("OWNER");
   });
 
   it("disables the issue button when reason or expiry is missing", () => {
@@ -102,6 +123,10 @@ describe("AdminSupportWorkbench", () => {
     expect(dock.closest("[data-level]")).toHaveAttribute("data-level", "L2");
     expect(within(dock).getByRole("button", { name: "지원 접근 발급" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "발급 확정" })).not.toBeInTheDocument();
+    const review = screen.getByRole("region", { name: "변경 검토" });
+    expect(within(review).getByText("지원 접근 권한을 발급합니다.")).toBeInTheDocument();
+    expect(within(review).getByLabelText("기술 정보")).toHaveTextContent("SUPPORT_ACCESS_WILL_BECOME_ACTIVE");
+    expect(within(review).queryByText("SUPPORT_ACCESS_WILL_BECOME_ACTIVE", { selector: "li" })).not.toBeInTheDocument();
   });
 
   it("keeps search accessible and has no unnamed controls", () => {
@@ -146,7 +171,7 @@ describe("AdminSupportWorkbench", () => {
       canManage: false,
       search: { ...props().search, selected },
       create: { ...props().create, preview: createPreview },
-      revoke: { ...props().revoke, target: grant, preview: { ...createPreview, commandType: "REVOKE", grantId: grant.grantId, impactCodes: ["REVOKE_SUPPORT_ACCESS"] } },
+      revoke: { ...props().revoke, target: grant, preview: { ...createPreview, commandType: "REVOKE", grantId: grant.grantId, impactCodes: ["SUPPORT_ACCESS_WILL_BE_REVOKED"] } },
     })} />);
 
     expect(screen.getByRole("button", { name: "지원 접근 발급" })).toBeDisabled();
@@ -159,11 +184,25 @@ describe("AdminSupportWorkbench", () => {
     } })} />);
     const receipt = screen.getByLabelText("명령 영수증");
     expect(receipt).toHaveTextContent("receipt-1");
+    expect(receipt).toHaveTextContent("완료");
+    expect(receipt).toHaveTextContent("없음 → 활성");
+    const primaryReceiptText = Array.from(receipt.querySelectorAll(":scope > p")).map((node) => node.textContent).join(" ");
+    expect(primaryReceiptText).not.toContain("SUCCEEDED");
+    expect(primaryReceiptText).not.toContain("ABSENT");
+    expect(primaryReceiptText).not.toContain("ACTIVE");
+    const disclosure = receipt.querySelector("[data-admin-technical-disclosure]");
+    expect(disclosure).toHaveAttribute("aria-label", "기술 정보");
+    expect(disclosure).toHaveTextContent("SUCCEEDED");
+    expect(disclosure).toHaveTextContent("ABSENT");
+    expect(disclosure).toHaveTextContent("ACTIVE");
     expect(receipt).toHaveTextContent("검토 시 사유 메모 사용");
     expect(receipt).not.toHaveTextContent("raw private note");
     expect(screen.queryByText(/내부 메모/)).not.toBeInTheDocument();
     const timeline = screen.getByRole("region", { name: "명령 기록" });
     expect(timeline).toHaveTextContent("receipt-1");
+    expect(timeline).toHaveTextContent("발급 완료");
+    expect(timeline).toHaveTextContent("없음 → 활성");
+    expect(timeline).not.toHaveTextContent("SUCCEEDED");
     expect(timeline.querySelector(".admin-receipt-timeline__convergence")).toBeNull();
   });
 

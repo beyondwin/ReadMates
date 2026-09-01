@@ -19,6 +19,8 @@ import {
 } from "@/features/host/api/host-api";
 import {
   hostNotificationKeys,
+  publishHostNotificationPolicy,
+  publishManualNotificationConfirm,
   useConfirmManualNotificationMutation,
   useUpdateHostNotificationPolicyMutation,
 } from "./host-notification-queries";
@@ -101,6 +103,8 @@ describe("useConfirmManualNotificationMutation", () => {
       confirmRequest,
       { clubSlug: "reading-sai" },
     );
+    expect(invalidateSpy).not.toHaveBeenCalled();
+    await publishManualNotificationConfirm(client, { clubSlug: "reading-sai" });
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: hostNotificationKeys.manualDispatchesRoot({ clubSlug: "reading-sai" }),
     });
@@ -154,6 +158,9 @@ describe("useConfirmManualNotificationMutation", () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
+    expect(invalidateSpy).not.toHaveBeenCalled();
+    await publishManualNotificationConfirm(client, { clubSlug: "other-club" });
+
     const invalidatedKeys = invalidateSpy.mock.calls.map((call) => call[0]?.queryKey);
     expect(invalidatedKeys).toEqual(
       expect.arrayContaining([
@@ -193,6 +200,8 @@ describe("useUpdateHostNotificationPolicyMutation", () => {
       { sessionReminderEnabled: true },
       { clubSlug: "reading-sai" },
     );
+    expect(invalidateSpy).not.toHaveBeenCalled();
+    await publishHostNotificationPolicy(client, { clubSlug: "reading-sai" }, response);
     expect(invalidateSpy).toHaveBeenCalledTimes(1);
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: hostNotificationKeys.policy({ clubSlug: "reading-sai" }),

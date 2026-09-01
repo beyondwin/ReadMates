@@ -1,10 +1,8 @@
 import { readmatesFetch } from "@/shared/api/client";
 import {
-  parseAdminTakedownConvergence,
   parseAdminTakedownPreview,
   parseAdminTakedownReceipt,
   type ConfirmTakedownRequest,
-  type ConvergenceView,
   type TakedownPreview,
   type TakedownPreviewRequest,
   type TakedownReceipt,
@@ -25,22 +23,6 @@ export async function confirmAdminPublicTakedown(request: ConfirmTakedownRequest
   return parseAdminTakedownReceipt(await readmatesFetch<unknown>(
     `${ROOT}/confirm`,
     { method: "POST", body: JSON.stringify(request) },
-    PLATFORM_CONTEXT,
-  ));
-}
-
-export async function fetchAdminTakedownConvergence(receiptId: string): Promise<ConvergenceView> {
-  return parseAdminTakedownConvergence(await readmatesFetch<unknown>(
-    `${ROOT}/${encodeURIComponent(receiptId)}/convergence`,
-    undefined,
-    PLATFORM_CONTEXT,
-  ));
-}
-
-export async function retryAdminTakedownConvergence(receiptId: string): Promise<ConvergenceView> {
-  return parseAdminTakedownConvergence(await readmatesFetch<unknown>(
-    `${ROOT}/${encodeURIComponent(receiptId)}/convergence/retry`,
-    { method: "POST" },
     PLATFORM_CONTEXT,
   ));
 }

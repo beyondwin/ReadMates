@@ -24,6 +24,7 @@ import {
 import {
   platformAdminSupportLedgerInfiniteQuery,
   platformAdminSupportKeys,
+  publishAdminSupportLedger,
   useAdminSupportCreateConfirmMutation,
   useAdminSupportCreatePreviewMutation,
   useAdminSupportRevokeConfirmMutation,
@@ -31,6 +32,9 @@ import {
   useAdminSupportSearchMutation,
 } from "@/features/platform-admin/queries/platform-admin-support-queries";
 import { AdminSupportWorkbench } from "@/features/platform-admin/ui/admin-support-workbench";
+import { confirmAdminSupportGrant } from "@/features/platform-admin/api/platform-admin-support-api";
+import { publishTransitionAction, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import { createAdminSupportReceiptCapsule } from "./admin-support-receipt-capsule";
 
 const DEFAULT_REASON: SupportGrantReasonCategory = "MEMBER_ASSISTANCE";
 
@@ -58,6 +62,7 @@ export function AdminSupportRoute() {
   const createConfirmMutation = useAdminSupportCreateConfirmMutation();
   const revokePreviewMutation = useAdminSupportRevokePreviewMutation();
   const revokeConfirmMutation = useAdminSupportRevokeConfirmMutation();
+  const transitionOwner = useTransitionSafetyOwner("admin-support-command");
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<AdminSupportSearchResult[]>([]);
@@ -200,27 +205,42 @@ export function AdminSupportRoute() {
     if (!canManage || !createPreview || !createSnapshot || !createIntentKey) return;
     setCreateRecovery(null);
     setCreateOutcomeUnknown(true);
+    const operationId = `admin-support-create:${createIntentKey}`;
+    const request = {
+      ...createSnapshot,
+      previewId: createPreview.previewId,
+      idempotencyKey: createIntentKey,
+      confirmed: true as const,
+    };
+    const capsule = createAdminSupportReceiptCapsule({
+      operationId,
+      request,
+      replayLookup: confirmAdminSupportGrant,
+    });
+    const handle = transitionOwner.beginReceipt(capsule);
     try {
-      const receipt = await createConfirmMutation.confirm({
-        ...createSnapshot,
-        previewId: createPreview.previewId,
-        idempotencyKey: createIntentKey,
-        confirmed: true,
-      });
-      setLatestReceipt(receipt);
-      setQuery("");
-      setResults([]);
-      setSelectedResult(null);
-      setCreateNote("");
-      setCreateOutcomeUnknown(false);
-      clearCreateCommand();
-    } catch (error) {
-      const recovery = supportGrantCommandRecovery(error);
-      setCreateRecovery(recovery.message);
-      if (recovery.kind === "RESTART_PREVIEW") {
+      const receipt = await createConfirmMutation.confirm(request);
+      if (await handle.settle("succeeded") !== "accepted") return;
+      await publishTransitionAction(handle, "cache", () => publishAdminSupportLedger(queryClient));
+      await publishTransitionAction(handle, "ui", () => {
+        setLatestReceipt(receipt);
+        setQuery("");
+        setResults([]);
+        setSelectedResult(null);
+        setCreateNote("");
         setCreateOutcomeUnknown(false);
         clearCreateCommand();
-      }
+      });
+    } catch (error) {
+      if (await handle.settle("failed") !== "accepted") return;
+      const recovery = supportGrantCommandRecovery(error);
+      await publishTransitionAction(handle, "errorCopy", () => {
+        setCreateRecovery(recovery.message);
+        if (recovery.kind === "RESTART_PREVIEW") {
+          setCreateOutcomeUnknown(false);
+          clearCreateCommand();
+        }
+      });
     } finally {
       createConfirmMutation.reset();
     }
@@ -268,6 +288,8 @@ export function AdminSupportRoute() {
     if (!canManage || !revokeTarget || !revokePreview || !revokeSnapshot || !revokeIntentKey) return;
     setRevokeRecovery(null);
     setRevokeOutcomeUnknown(true);
+    const operationId = `admin-support-revoke:${revokeIntentKey}`;
+    const handle = transitionOwner.begin(operationId, "L3", async () => ({ operationId, outcome: "still-unknown" }));
     try {
       const receipt = await revokeConfirmMutation.confirm(revokeTarget.grantId, {
         ...revokeSnapshot,
@@ -278,22 +300,29 @@ export function AdminSupportRoute() {
         expiresAt: revokeTarget.expiresAt,
         confirmed: true,
       });
-      setLatestReceipt(receipt);
-      setRevokeTarget(null);
-      setRevokeNote("");
-      setRevokePreview(null);
-      setRevokeSnapshot(null);
-      setRevokeIntentKey(null);
-      setRevokeOutcomeUnknown(false);
-    } catch (error) {
-      const recovery = supportGrantCommandRecovery(error);
-      setRevokeRecovery(recovery.message);
-      if (recovery.kind === "RESTART_PREVIEW") {
-        setRevokeOutcomeUnknown(false);
+      if (await handle.settle("succeeded") !== "accepted") return;
+      await publishTransitionAction(handle, "cache", () => publishAdminSupportLedger(queryClient));
+      await publishTransitionAction(handle, "ui", () => {
+        setLatestReceipt(receipt);
+        setRevokeTarget(null);
+        setRevokeNote("");
         setRevokePreview(null);
         setRevokeSnapshot(null);
         setRevokeIntentKey(null);
-      }
+        setRevokeOutcomeUnknown(false);
+      });
+    } catch (error) {
+      if (await handle.settle("failed") !== "accepted") return;
+      const recovery = supportGrantCommandRecovery(error);
+      await publishTransitionAction(handle, "errorCopy", () => {
+        setRevokeRecovery(recovery.message);
+        if (recovery.kind === "RESTART_PREVIEW") {
+          setRevokeOutcomeUnknown(false);
+          setRevokePreview(null);
+          setRevokeSnapshot(null);
+          setRevokeIntentKey(null);
+        }
+      });
     } finally {
       revokeConfirmMutation.reset();
     }

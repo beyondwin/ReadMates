@@ -21,7 +21,7 @@ export type AdminSafeActionState =
 export type AdminActionDockProps = {
   primary?: ReactNode;
   secondary?: ReactNode;
-  status?: ReactNode;
+  status?: ReactElement | null;
 };
 
 export type AdminSafeActionDockProps = {
@@ -31,7 +31,7 @@ export type AdminSafeActionDockProps = {
   reason?: ReactNode;
   primary?: ReactNode;
   secondary?: ReactNode;
-  status?: ReactNode;
+  status?: ReactElement | null;
 };
 
 const LOCKED_STATES = new Set<AdminSafeActionState>([
@@ -46,7 +46,7 @@ const LOCKED_STATES = new Set<AdminSafeActionState>([
 export function AdminActionDock({ primary, secondary, status }: AdminActionDockProps) {
   return (
     <div className="admin-action-dock" role="group" aria-label="작업">
-      {status ? <div className="admin-action-dock__status">{status}</div> : null}
+      {status ? <div className="admin-action-dock__status">{Children.only(status)}</div> : null}
       {secondary ? <div className="admin-action-dock__secondary">{secondary}</div> : null}
       {primary ? <div className="admin-action-dock__primary">{primary}</div> : null}
     </div>
@@ -63,7 +63,7 @@ export function AdminSafeActionDock({
   status,
 }: AdminSafeActionDockProps) {
   const locked = authority === "denied"
-    || (LOCKED_STATES.has(state) && !(level === "L2" && state === "unknown-outcome"));
+    || (LOCKED_STATES.has(state) && !((level === "L2" || level === "L3") && state === "unknown-outcome"));
   return (
     <div
       className="admin-safe-action-dock"
@@ -80,7 +80,7 @@ export function AdminSafeActionDock({
               {reason != null && reason !== false ? (
                 <div className="admin-safe-action-dock__reason">{reason}</div>
               ) : null}
-              {status}
+              {status ? Children.only(status) : null}
             </>
           ) : null
         }

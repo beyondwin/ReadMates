@@ -1,10 +1,10 @@
-import type { ClubWorkspace } from "./workspace-route-model";
+import type { ClubPerspective } from "@/shared/model/global-space";
 
-function lastSafeWorkspaceTargetKey(workspace: ClubWorkspace) {
+function lastSafeWorkspaceTargetKey(workspace: ClubPerspective) {
   return `readmates:last-safe-workspace-target:${workspace}`;
 }
 
-export function readLastSafeWorkspaceTarget(workspace: ClubWorkspace) {
+export function readLastSafeWorkspaceTarget(workspace: ClubPerspective) {
   if (typeof window === "undefined") {
     return null;
   }
@@ -16,7 +16,7 @@ export function readLastSafeWorkspaceTarget(workspace: ClubWorkspace) {
   }
 }
 
-export function rememberLastSafeWorkspaceTarget(workspace: ClubWorkspace, pathname: string) {
+export function rememberLastSafeWorkspaceTarget(workspace: ClubPerspective, pathname: string) {
   if (typeof window === "undefined") {
     return;
   }

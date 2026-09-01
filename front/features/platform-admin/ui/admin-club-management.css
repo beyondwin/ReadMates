@@ -1,0 +1,166 @@
+/* Club management owns the operator-judgment row grammar. */
+.admin-club-management {
+  min-width: 0;
+  border-top: 1px solid var(--line);
+}
+
+.admin-club-detail__workflow-section,
+.admin-support-workbench__workflow-section {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding-block: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.admin-club-detail__workflow-section > .h2,
+.admin-support-workbench__workflow-section > .h2 {
+  margin: 0;
+}
+
+.admin-club-detail__workflow-section[data-admin-club-section="actions"],
+.admin-support-workbench__workflow-section[data-admin-support-section="actions"] {
+  gap: 18px;
+}
+
+.admin-support-workbench__workflow-section > .admin-support-workbench__panel,
+.admin-support-workbench__workflow-section > .admin-evidence-ledger,
+.admin-club-detail__workflow-section > .admin-club-detail__panel,
+.admin-club-detail__workflow-section > .admin-club-operations {
+  min-width: 0;
+}
+
+.admin-club-management__list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-club-management__row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1.15fr) minmax(0, 1.8fr) auto;
+  gap: 12px 24px;
+  align-items: start;
+  min-width: 0;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-club-management__identity,
+.admin-club-management__facts,
+.admin-club-management__facts > div,
+.admin-club-management__row details {
+  min-width: 0;
+}
+
+.admin-club-management__identity a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--text);
+  font-weight: 750;
+  overflow-wrap: anywhere;
+  text-underline-offset: 0.2em;
+}
+
+.admin-club-management__facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 18px;
+  margin: 0;
+}
+
+.admin-club-management__facts dt {
+  color: var(--text-3);
+  font-size: var(--type-size-label);
+  font-weight: 700;
+}
+
+.admin-club-management__facts dd {
+  margin: 3px 0 0;
+  color: var(--text-2);
+  line-height: var(--type-leading-body);
+  overflow-wrap: anywhere;
+}
+
+.admin-club-management__row details {
+  align-self: center;
+  color: var(--text-3);
+  font-size: var(--type-size-supporting);
+}
+
+.admin-club-management__row summary {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.admin-club-management__row details dl {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-club-management__row details div {
+  display: grid;
+  grid-template-columns: minmax(6rem, auto) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.admin-club-management__row details dd {
+  margin: 0;
+}
+
+.admin-club-management__row[data-emphasis="actionable"] {
+  background: var(--warn-soft);
+}
+
+.admin-club-management__row[data-emphasis="actionable"] .admin-club-management__action dd,
+.admin-club-management__row[data-emphasis="actionable"] .admin-club-management__signal dd {
+  color: var(--warn);
+  font-weight: 750;
+}
+
+.admin-club-management :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+@media (max-width: 900px) {
+  .admin-club-management__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .admin-club-management__facts {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .admin-club-management__row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .admin-club-management__facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-club-management__row details {
+    justify-self: start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-club-management,
+  .admin-club-management *,
+  .admin-club-management *::before,
+  .admin-club-management *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,4 +1,4 @@
-import { queryOptions, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, type QueryClient } from "@tanstack/react-query";
 import {
   changeHostCoHost,
   confirmHostClubClose,
@@ -20,20 +20,17 @@ export const hostClubSettingsKeys = {
 
 export const hostClubSettingsQuery = (context: ExplicitReadmatesApiContext) => queryOptions({ queryKey: hostClubSettingsKeys.detail(context), queryFn: () => fetchHostClubSettings(context) });
 export const hostClubSettingsHistoryQuery = (page: PageRequest | undefined, context: ExplicitReadmatesApiContext) => queryOptions({ queryKey: hostClubSettingsKeys.history(page, context), queryFn: () => fetchHostClubSettingsHistory(context, page) });
-export const invalidateHostClubSettings = (client: QueryClient, context: ExplicitReadmatesApiContext) => client.invalidateQueries({ queryKey: hostClubSettingsKeys.scope(context) });
+export const publishHostClubSettings = (client: QueryClient, context: ExplicitReadmatesApiContext) => client.invalidateQueries({ queryKey: hostClubSettingsKeys.scope(context) });
 
 export function useUpdateHostClubSettings(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
-  return useMutation({ mutationKey: hostMutationKey(context.clubSlug, "club-settings", "update"), mutationFn: (request: UpdateHostClubSettingsRequest) => updateHostClubSettings(request, context), onSuccess: () => invalidateHostClubSettings(client, context) });
+  return useMutation({ mutationKey: hostMutationKey(context.clubSlug, "club-settings", "update"), mutationFn: (request: UpdateHostClubSettingsRequest) => updateHostClubSettings(request, context) });
 }
 
 export function useChangeHostCoHost(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
-  return useMutation({ mutationKey: hostMutationKey(context.clubSlug, "club-settings", "co-host"), mutationFn: ({ membershipId, action, expectedRevision, idempotencyKey }: { membershipId: string; action: "promote" | "demote"; expectedRevision: number; idempotencyKey: string }) => changeHostCoHost(membershipId, action, { expectedRevision, idempotencyKey }, context), onSuccess: () => invalidateHostClubSettings(client, context) });
+  return useMutation({ mutationKey: hostMutationKey(context.clubSlug, "club-settings", "co-host"), mutationFn: ({ membershipId, action, expectedRevision, idempotencyKey }: { membershipId: string; action: "promote" | "demote"; expectedRevision: number; idempotencyKey: string }) => changeHostCoHost(membershipId, action, { expectedRevision, idempotencyKey }, context) });
 }
 
 export const usePreviewHostClubClose = (context: ExplicitReadmatesApiContext) => useMutation({ mutationKey: hostMutationKey(context.clubSlug, "club-settings", "end-preview"), mutationFn: () => previewHostClubClose(context) });
 export function useConfirmHostClubClose(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
-  return useMutation({ mutationKey: hostMutationKey(context.clubSlug, "club-settings", "end-confirm"), mutationFn: (request: { previewId: string; effectHash: string; idempotencyKey: string }) => confirmHostClubClose(request, context), onSuccess: () => invalidateHostClubSettings(client, context) });
+  return useMutation({ mutationKey: hostMutationKey(context.clubSlug, "club-settings", "end-confirm"), mutationFn: (request: { previewId: string; effectHash: string; idempotencyKey: string }) => confirmHostClubClose(request, context) });
 }

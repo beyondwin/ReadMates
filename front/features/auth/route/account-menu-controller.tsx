@@ -5,12 +5,13 @@ import {
   type AccountMenuLinkComponent,
 } from "@/features/auth/ui/account-menu";
 import { LogoutButton } from "@/features/auth/route/logout-button";
+import type { LogoutAcceptedHandler } from "@/features/auth/route/logout-button";
 
 export type AccountMenuControllerProps = {
   auth: AuthMeResponse;
   appBasePath: string;
   LinkComponent: AccountMenuLinkComponent;
-  onLoggedOut: () => void;
+  onLogoutAccepted: LogoutAcceptedHandler;
 };
 
 function scopedAccountPath(appBasePath: string, suffix: "/notifications" | "/me/settings") {
@@ -21,7 +22,7 @@ export function AccountMenuController({
   auth,
   appBasePath,
   LinkComponent,
-  onLoggedOut,
+  onLogoutAccepted,
 }: AccountMenuControllerProps) {
   const memberName = auth.displayName ?? auth.accountName ?? "멤버";
 
@@ -34,7 +35,7 @@ export function AccountMenuController({
       settingsHref={scopedAccountPath(appBasePath, "/me/settings")}
       LinkComponent={LinkComponent}
       LogoutControl={
-        <LogoutButton className="rm-account-menu__logout" onLoggedOut={onLoggedOut}>
+        <LogoutButton className="rm-account-menu__logout" onLogoutAccepted={onLogoutAccepted}>
           로그아웃
         </LogoutButton>
       }

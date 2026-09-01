@@ -1,5 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type {
   HostClosePreviewView as HostClubClosePreview,
@@ -9,209 +10,91 @@ import type {
 import { HostClubCloseDialog } from "./host-club-close-dialog";
 import { HostClubSettings } from "./host-club-settings";
 import { HostCoHostManagement } from "./host-co-host-management";
-import { HostInvitationLinks } from "./host-invitation-links";
+import { HostInvitationLinks, type HostInvitationCreateDraft } from "./host-invitation-links";
 import { HostSettingsHistory } from "./host-settings-history";
 
 const link: HostInvitationLink = { linkId: "link-1", name: "가을 신규 멤버", status: "ACTIVE", maxUses: 4, usedCount: 1, expiresAt: "2026-09-30T00:00:00Z", revision: 2, createdAt: "2026-08-30T00:00:00Z", updatedAt: "2026-08-30T00:00:00Z" };
 const settings: Settings = { clubId: "club-1", clubSlug: "reading-sai", name: "읽는사이", approvalPolicy: "INVITE_ONLY", defaultTimezone: "Asia/Seoul", scheduleReminderEnabled: true, recordPublicationDefault: "MEMBER", revision: 3, status: "ACTIVE" };
+const preview: HostClubClosePreview = { previewId: "preview-1", clubId: "club-1", actorMembershipId: "member-1", clubRevision: 3, effectHash: "a".repeat(64), effects: { clubStatus: "ARCHIVED", memberAccess: "ENDED", publicRecords: "UNCHANGED" }, expiresAt: "2026-08-30T01:00:00Z" };
 
-describe("host settings controls", () => {
-  it("copies a newly issued path once and exposes link status controls", async () => {
-    const user = userEvent.setup();
-    const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
-    const path = `/clubs/reading-sai/invite/lnk_${"a".repeat(43)}`;
-    const create = vi.fn().mockResolvedValue({ link, oneTimeSharePath: path, receipt: { receiptId: "r", action: "CREATED", linkId: "link-1", revision: 2, replayed: false } });
-    render(<HostInvitationLinks links={[link]} loading={false} error={null} onRetry={vi.fn()} onRefresh={vi.fn()} onCreate={create} onUpdate={vi.fn()} />);
-    expect(screen.getByText("ACTIVE")).toBeInTheDocument();
-    await user.type(screen.getByLabelText("링크 이름"), "새 멤버");
-    await user.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
-    await user.click(await screen.findByRole("button", { name: "한 번만 복사" }));
-    expect(writeText).toHaveBeenCalledWith(path);
-    expect(screen.queryByText(path)).not.toBeInTheDocument();
+function InvitationHarness({ onCreate = vi.fn(), onCopy = vi.fn() }: { onCreate?: () => void; onCopy?: () => void }) {
+  const [draft, setDraft] = useState<HostInvitationCreateDraft>({ name: "", maxUses: "20", expiresAt: "2026-09-30" });
+  return <HostInvitationLinks
+    links={[link]}
+    loading={false}
+    error={null}
+    busy={false}
+    createDraft={draft}
+    editDraft={null}
+    sharePath="/clubs/reading-sai/invite/one-time"
+    message="한 번만 표시됩니다."
+    alert={{ message: "최신 목록에서 결과를 확인해 주세요.", refreshLabel: "최신 목록 확인", retryLabel: "같은 요청 다시 확인" }}
+    onRetry={vi.fn()}
+    onRefresh={vi.fn()}
+    onCreateDraftChange={setDraft}
+    onEditDraftChange={vi.fn()}
+    onCreate={onCreate}
+    onUpdate={vi.fn()}
+    onToggle={vi.fn()}
+    onRetryCommand={vi.fn()}
+    onCopySharePath={onCopy}
+  />;
+}
+
+describe("host settings presentation controls", () => {
+  it("renders route-owned invitation outcome and emits create/copy callbacks", async () => {
+    const onCreate = vi.fn();
+    const onCopy = vi.fn();
+    render(<InvitationHarness onCreate={onCreate} onCopy={onCopy} />);
+    await userEvent.type(screen.getByLabelText("링크 이름"), "새 멤버");
+    await userEvent.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
+    await userEvent.click(screen.getByRole("button", { name: "한 번만 복사" }));
+    expect(onCreate).toHaveBeenCalledTimes(1);
+    expect(onCopy).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("alert")).toHaveTextContent("최신 목록");
     expect(screen.getByRole("button", { name: "링크 일시정지" })).toBeInTheDocument();
   });
 
-  it("retries an unknown create with the same idempotency key and refreshes the list", async () => {
-    const user = userEvent.setup();
-    const create = vi.fn().mockRejectedValueOnce(new Error("NETWORK")).mockResolvedValueOnce({ link, oneTimeSharePath: null, receipt: { receiptId: "r", action: "CREATED", linkId: "link-1", revision: 2, replayed: true } });
-    const refresh = vi.fn().mockResolvedValue(undefined);
-    render(<HostInvitationLinks links={[]} loading={false} error={null} onRetry={vi.fn()} onRefresh={refresh} onCreate={create} onUpdate={vi.fn()} />);
-    await user.type(screen.getByLabelText("링크 이름"), "재시도 링크");
-    await user.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
-    await user.click(await screen.findByRole("button", { name: "같은 요청 다시 확인" }));
-    expect(create).toHaveBeenCalledTimes(2);
-    expect(create.mock.calls[1][0].idempotencyKey).toBe(create.mock.calls[0][0].idempotencyKey);
-    expect(refresh).toHaveBeenCalled();
+  it("emits controlled settings draft changes and save intent", async () => {
+    const onDraftChange = vi.fn();
+    const onSave = vi.fn();
+    render(<HostClubSettings settings={settings} draft={settings} saving={false} stale={false} error={null} onDraftChange={onDraftChange} onSave={onSave} />);
+    fireEvent.change(screen.getByLabelText("클럽 이름"), { target: { value: "읽는사이 새 이름" } });
+    await userEvent.click(screen.getByRole("button", { name: "설정 저장" }));
+    expect(onDraftChange).toHaveBeenCalledWith(expect.objectContaining({ name: "읽는사이 새 이름" }));
+    expect(onSave).toHaveBeenCalledTimes(1);
   });
 
-  it("edits link name capacity and expiry and recovers stale updates", async () => {
-    const user = userEvent.setup();
-    const update = vi.fn().mockRejectedValueOnce(new Error("INVITATION_LINK_STALE")).mockResolvedValueOnce(undefined);
-    const refresh = vi.fn().mockResolvedValue(undefined);
-    render(<HostInvitationLinks links={[link]} loading={false} error={null} onRetry={vi.fn()} onRefresh={refresh} onCreate={vi.fn()} onUpdate={update} />);
-    await user.click(screen.getByRole("button", { name: "링크 편집" }));
-    await user.clear(screen.getByLabelText("편집 링크 이름"));
-    await user.type(screen.getByLabelText("편집 링크 이름"), "연장 링크");
-    await user.clear(screen.getByLabelText("편집 최대 사용 횟수"));
-    await user.type(screen.getByLabelText("편집 최대 사용 횟수"), "8");
-    await user.click(screen.getByRole("button", { name: "링크 변경 저장" }));
-    expect(update).toHaveBeenCalledWith("link-1", expect.objectContaining({ name: "연장 링크", maxUses: 8, expectedRevision: 2 }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("최신 상태");
-    await user.click(screen.getByRole("button", { name: "최신 링크 상태 확인" }));
-    expect(refresh).toHaveBeenCalled();
+  it("renders route-owned close preview and unknown recovery without executing work", async () => {
+    const onConfirm = vi.fn();
+    const onRetryConfirm = vi.fn();
+    render(<HostClubCloseDialog open preview={preview} busy={false} previewError={false} recovery="unknown" canRetryConfirm onClose={vi.fn()} onPreview={vi.fn()} onConfirm={onConfirm} onRefresh={vi.fn()} onRetryConfirm={onRetryConfirm} />);
+    expect(screen.getByText("공개 기록은 유지됩니다.")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("결과를 확인할 수 없습니다");
+    await userEvent.click(screen.getByRole("button", { name: "클럽 운영 종료 확인" }));
+    await userEvent.click(screen.getByRole("button", { name: "같은 종료 요청 다시 확인" }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onRetryConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it("submits editable settings with the visible revision", async () => {
-    const user = userEvent.setup();
-    const save = vi.fn().mockResolvedValue(undefined);
-    render(<HostClubSettings settings={settings} saving={false} stale={false} error={null} onSave={save} />);
-    expect(screen.getByText("revision 3")).toBeInTheDocument();
-    await user.clear(screen.getByLabelText("클럽 이름"));
-    await user.type(screen.getByLabelText("클럽 이름"), "읽는사이 새 이름");
-    await user.click(screen.getByRole("button", { name: "설정 저장" }));
-    expect(save).toHaveBeenCalledWith(expect.objectContaining({ name: "읽는사이 새 이름", expectedRevision: 3 }));
-  });
-
-  it("requires a bound preview before club end and keeps unknown outcome recoverable", async () => {
-    const user = userEvent.setup();
-    const preview: HostClubClosePreview = { previewId: "preview-1", clubId: "club-1", actorMembershipId: "member-1", clubRevision: 3, effectHash: "a".repeat(64), effects: { clubStatus: "ARCHIVED", memberAccess: "ENDED", publicRecords: "UNCHANGED" }, expiresAt: "2026-08-30T01:00:00Z" };
-    const onPreview = vi.fn().mockResolvedValue(preview);
-    const onConfirm = vi.fn().mockRejectedValue(new Error("indeterminate transport"));
-    const onRefresh = vi.fn().mockResolvedValue(undefined);
-    render(<HostClubCloseDialog open onClose={vi.fn()} onPreview={onPreview} onConfirm={onConfirm} onRefresh={onRefresh} />);
-    expect(screen.queryByRole("button", { name: "클럽 운영 종료 확인" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "종료 영향 미리보기" }));
-    expect(await screen.findByText("공개 기록은 유지됩니다.")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "클럽 운영 종료 확인" }));
-    expect(await screen.findByText(/결과를 확인할 수 없습니다/)).toBeInTheDocument();
-    expect(screen.queryByText("공개 기록은 유지됩니다.")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "최신 클럽 상태 확인" }));
-    expect(onRefresh).toHaveBeenCalled();
-    onConfirm.mockResolvedValueOnce(undefined);
-    await user.click(screen.getByRole("button", { name: "같은 종료 요청 다시 확인" }));
-    expect(onConfirm.mock.calls[1][0].idempotencyKey).toBe(onConfirm.mock.calls[0][0].idempotencyKey);
-  });
-
-  it("uses the visible settings revision and one idempotency key while reconciling a co-host change", async () => {
-    const user = userEvent.setup();
-    const change = vi.fn()
-      .mockRejectedValueOnce(new Error("indeterminate transport"))
-      .mockResolvedValueOnce(undefined);
-    const refresh = vi.fn().mockResolvedValue(undefined);
-    render(
-      <HostCoHostManagement
-        settingsRevision={7}
-        members={[{
-          membershipId: "membership-1",
-          displayName: "은하",
-          avatarKey: "cloud-green-book",
-          status: "ACTIVE",
-          role: "MEMBER",
-        }]}
-        busy={false}
-        onChange={change}
-        onRefresh={refresh}
-      />,
-    );
-
-    expect(screen.queryByText(/@|email|userId/i)).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "은하 공동 호스트 지정" }));
-    expect(change).toHaveBeenCalledWith(expect.objectContaining({
-      membershipId: "membership-1",
-      action: "promote",
-      expectedRevision: 7,
-    }));
-    expect(refresh).toHaveBeenCalledTimes(1);
-    await user.click(await screen.findByRole("button", { name: "같은 권한 변경 요청 다시 확인" }));
-    expect(change.mock.calls[1][0].idempotencyKey).toBe(change.mock.calls[0][0].idempotencyKey);
-    expect(refresh).toHaveBeenCalledTimes(2);
+  it("renders route-owned co-host recovery and emits the selected member", async () => {
+    const member = { membershipId: "membership-1", displayName: "은하", avatarKey: "cloud-green-book", status: "ACTIVE", role: "MEMBER" } as const;
+    const onChange = vi.fn();
+    const onRetryCommand = vi.fn();
+    render(<HostCoHostManagement settingsRevision={7} members={[member]} busy={false} alert="같은 요청의 결과를 확인해 주세요." canRetry onChange={onChange} onRefresh={vi.fn()} onRetryCommand={onRetryCommand} />);
+    await userEvent.click(screen.getByRole("button", { name: "은하 공동 호스트 지정" }));
+    await userEvent.click(screen.getByRole("button", { name: "같은 권한 변경 요청 다시 확인" }));
+    expect(onChange).toHaveBeenCalledWith(member);
+    expect(onRetryCommand).toHaveBeenCalledTimes(1);
   });
 
   it("continues settings history with the exact cursor and retains visible rows on failure", async () => {
-    const user = userEvent.setup();
     const loadMore = vi.fn().mockRejectedValue(new Error("internal stack detail"));
-    render(
-      <HostSettingsHistory
-        page={{
-          items: [{
-            historyId: "history-1",
-            revision: 6,
-            action: "SETTINGS_UPDATED",
-            subjectMembershipId: null,
-            beforeSettings: { name: "이전 이름", secretFlag: "never render" },
-            afterSettings: { name: "새 이름", secretFlag: "never render" },
-            occurredAt: "2026-08-30T01:00:00Z",
-          }],
-          nextCursor: "opaque/history+cursor==",
-        }}
-        onLoadMore={loadMore}
-      />,
-    );
-
-    await user.click(screen.getByRole("button", { name: "설정 변경 이력 더 보기" }));
+    render(<HostSettingsHistory page={{ items: [{ historyId: "history-1", revision: 6, action: "SETTINGS_UPDATED", subjectMembershipId: null, beforeSettings: { name: "이전 이름", secretFlag: "never render" }, afterSettings: { name: "새 이름", secretFlag: "never render" }, occurredAt: "2026-08-30T01:00:00Z" }], nextCursor: "opaque/history+cursor==" }} onLoadMore={loadMore} />);
+    await userEvent.click(screen.getByRole("button", { name: "설정 변경 이력 더 보기" }));
     expect(loadMore).toHaveBeenCalledWith("opaque/history+cursor==");
     expect(screen.getByText("클럽 이름").closest("div")).toHaveTextContent("이전 이름 → 새 이름");
     expect(screen.queryByText("never render")).not.toBeInTheDocument();
     expect(await screen.findByRole("alert")).toHaveTextContent("보이는 이력은 유지됩니다");
-    expect(screen.queryByText("internal stack detail")).not.toBeInTheDocument();
-  });
-
-  it.each([
-    ["HOST_CLUB_CLOSE_PREVIEW_EXPIRED", 409],
-    ["HOST_CLUB_CLOSE_PREVIEW_MISMATCH", 409],
-    ["HOST_CLUB_CLOSE_PREVIEW_NOT_FOUND", 404],
-    ["HOST_CLUB_CLOSE_PREVIEW_CONSUMED", 409],
-    ["HOST_SETTINGS_STALE", 409],
-  ])("clears a non-current close preview for %s and cannot reconfirm it", async (code, status) => {
-    const user = userEvent.setup();
-    const firstPreview: HostClubClosePreview = { previewId: "preview-1", clubId: "club-1", actorMembershipId: "member-1", clubRevision: 3, effectHash: "a".repeat(64), effects: { clubStatus: "ARCHIVED", memberAccess: "ENDED", publicRecords: "UNCHANGED" }, expiresAt: "2026-08-30T01:00:00Z" };
-    const nextPreview: HostClubClosePreview = { ...firstPreview, previewId: "preview-2", clubRevision: 4, effectHash: "b".repeat(64) };
-    const onPreview = vi.fn().mockResolvedValueOnce(firstPreview).mockResolvedValueOnce(nextPreview);
-    const rejection = new Error(`${code}:${status}`);
-    const onConfirm = vi.fn().mockRejectedValueOnce(rejection).mockResolvedValueOnce(undefined);
-    render(<HostClubCloseDialog open onClose={vi.fn()} onPreview={onPreview} onConfirm={onConfirm} onRefresh={vi.fn()} classifyConfirmError={(error) => error === rejection ? "non-current" : "unknown"} />);
-    await user.click(screen.getByRole("button", { name: "종료 영향 미리보기" }));
-    await user.click(await screen.findByRole("button", { name: "클럽 운영 종료 확인" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("미리보기가 더 이상 유효하지 않습니다");
-    expect(screen.queryByText("공개 기록은 유지됩니다.")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "같은 종료 요청 다시 확인" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "새 종료 영향 미리보기" })).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "새 종료 영향 미리보기" }));
-    await user.click(await screen.findByRole("button", { name: "클럽 운영 종료 확인" }));
-    expect(onConfirm.mock.calls[1][0]).toMatchObject({ previewId: "preview-2", effectHash: "b".repeat(64) });
-    expect(onConfirm.mock.calls[1][0].idempotencyKey).not.toBe(onConfirm.mock.calls[0][0].idempotencyKey);
-  });
-
-  it.each([
-    ["HOST_SETTINGS_STALE", 409, "revision"],
-    ["LAST_ACTIVE_HOST_REQUIRED", 409, "허용하지 않았습니다"],
-    ["PERMISSION_DENIED", 403, "허용하지 않았습니다"],
-  ])("clears a rejected co-host request for %s before a fresh logical attempt", async (code, status, copy) => {
-    const user = userEvent.setup();
-    const rejection = new Error(`${code}:${status}`);
-    const change = vi.fn().mockRejectedValueOnce(rejection).mockResolvedValueOnce(undefined);
-    const refresh = vi.fn().mockResolvedValue(undefined);
-    const member = { membershipId: "membership-1", displayName: "은하", avatarKey: "cloud-green-book", status: "ACTIVE", role: "MEMBER" } as const;
-    const classifyChangeError = () => code === "HOST_SETTINGS_STALE" ? "stale" as const : "permission" as const;
-    const { rerender } = render(<HostCoHostManagement settingsRevision={7} members={[member]} busy={false} onChange={change} onRefresh={refresh} classifyChangeError={classifyChangeError} />);
-
-    await user.click(screen.getByRole("button", { name: "은하 공동 호스트 지정" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(copy);
-    expect(screen.queryByRole("button", { name: "같은 권한 변경 요청 다시 확인" })).not.toBeInTheDocument();
-
-    rerender(<HostCoHostManagement settingsRevision={8} members={[member]} busy={false} onChange={change} onRefresh={refresh} classifyChangeError={classifyChangeError} />);
-    await user.click(screen.getByRole("button", { name: "은하 공동 호스트 지정" }));
-    expect(change.mock.calls[1][0].expectedRevision).toBe(8);
-    expect(change.mock.calls[1][0].idempotencyKey).not.toBe(change.mock.calls[0][0].idempotencyKey);
-  });
-
-  it("offers a retry when close preview loading fails", async () => {
-    const user = userEvent.setup();
-    const preview: HostClubClosePreview = { previewId: "preview-1", clubId: "club-1", actorMembershipId: "member-1", clubRevision: 3, effectHash: "a".repeat(64), effects: { clubStatus: "ARCHIVED", memberAccess: "ENDED", publicRecords: "UNCHANGED" }, expiresAt: "2026-08-30T01:00:00Z" };
-    const onPreview = vi.fn().mockRejectedValueOnce(new Error("NETWORK")).mockResolvedValueOnce(preview);
-    render(<HostClubCloseDialog open onClose={vi.fn()} onPreview={onPreview} onConfirm={vi.fn()} onRefresh={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: "종료 영향 미리보기" }));
-    await user.click(await screen.findByRole("button", { name: "미리보기 다시 시도" }));
-    expect(await screen.findByText("공개 기록은 유지됩니다.")).toBeInTheDocument();
   });
 });

@@ -1,13 +1,23 @@
 import { expect, test } from "@playwright/experimental-ct-react";
+import type { SaveProfile } from "./types";
 import { ProfileEditorDialog } from "./profile-editor-dialog";
 
 const viewports = [{ width: 320, height: 700 }, { width: 390, height: 844 }, { width: 1280, height: 900 }];
 const pickerViewports = [...viewports, { width: 320, height: 350 }];
+const saveProfile: SaveProfile = async (profile) => ({
+  status: "accepted",
+  profile: {
+    membershipId: "membership-1",
+    ...profile,
+    accountName: "member-one",
+    profileImageUrl: null,
+  },
+});
 
 for (const viewport of viewports) {
   test(`profile editor adapts at ${viewport.width}px`, async ({ mount, page }, testInfo) => {
     await page.setViewportSize(viewport);
-    await mount(<ProfileEditorDialog profile={{ displayName: "여러 줄로 이어지는 긴 표시 이름", avatarKey: "banana-green-book" }} opener={null} onClose={() => undefined} onSaveProfile={async (profile) => ({ ...profile, accountName: "member-one" })} />);
+    await mount(<ProfileEditorDialog profile={{ displayName: "여러 줄로 이어지는 긴 표시 이름", avatarKey: "banana-green-book" }} opener={null} onClose={() => undefined} onSaveProfile={saveProfile} />);
     const dialog = page.getByRole("dialog", { name: "프로필 편집" });
     const input = dialog.getByRole("textbox", { name: "표시 이름" });
     const action = dialog.getByRole("button", {
@@ -35,7 +45,7 @@ for (const viewport of viewports) {
 test("profile editor remains contained at 200 percent zoom", async ({ mount, page }, testInfo) => {
   // A 640×700 screen at 200% browser zoom exposes a 320×350 CSS layout viewport.
   await page.setViewportSize({ width: 320, height: 350 });
-  await mount(<ProfileEditorDialog profile={{ displayName: "멤버", avatarKey: "banana-green-book" }} opener={null} onClose={() => undefined} onSaveProfile={async (profile) => ({ ...profile, accountName: "member-one" })} />);
+  await mount(<ProfileEditorDialog profile={{ displayName: "멤버", avatarKey: "banana-green-book" }} opener={null} onClose={() => undefined} onSaveProfile={saveProfile} />);
   const dialog = page.getByRole("dialog", { name: "프로필 편집" });
   const action = dialog.getByRole("button", {
     name: "아바타 선택, 현재 한 장 더 읽는 바나나",
@@ -61,7 +71,7 @@ for (const viewport of pickerViewports) {
 
   test(`profile editor avatar step remains usable at ${viewportName}`, async ({ mount, page }, testInfo) => {
     await page.setViewportSize(viewport);
-    await mount(<ProfileEditorDialog profile={{ displayName: "멤버", avatarKey: "banana-green-book" }} opener={null} onClose={() => undefined} onSaveProfile={async (profile) => ({ ...profile, accountName: "member-one" })} />);
+    await mount(<ProfileEditorDialog profile={{ displayName: "멤버", avatarKey: "banana-green-book" }} opener={null} onClose={() => undefined} onSaveProfile={saveProfile} />);
 
     const avatarAction = page.getByRole("button", {
       name: "아바타 선택, 현재 한 장 더 읽는 바나나",

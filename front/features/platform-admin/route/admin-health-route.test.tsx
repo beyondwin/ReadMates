@@ -91,6 +91,18 @@ const HEALTH_SNAPSHOT: PlatformHealthSnapshotResponse = {
       deployStrip: null,
     },
     {
+      id: "outbound-resilience",
+      title: "Outbound resilience",
+      status: "OK",
+      metric: { value: 0, unit: "open circuits", label: "current" },
+      thresholds: { warn: 1, crit: 1 },
+      lastCheckedAt: "2026-05-26T00:00:00Z",
+      source: "IN_PROCESS",
+      drill: null,
+      reason: null,
+      deployStrip: null,
+    },
+    {
       id: "deploy_attempts_strip",
       title: "Deploy attempts",
       status: "OK",
@@ -138,7 +150,7 @@ describe("AdminHealthRoute", () => {
     expect(screen.getByRole("heading", { name: "서비스 건강" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "서비스 건강" })).toHaveClass("admin-page-frame");
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(await screen.findByRole("heading", { name: "Kafka consumer lag" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "AI 작업 대기열" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "서비스 신호" })).toHaveClass("admin-evidence-ledger");
     expect(container.querySelector(".admin-case-docket")).toBeNull();
     expect(container.querySelector(".admin-action-dock")).toBeNull();
@@ -148,11 +160,12 @@ describe("AdminHealthRoute", () => {
     expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
     expect(screen.getByRole("heading", { name: "Redis" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Outbox backlog" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "DB pool" })).not.toBeInTheDocument();
-    expect(within(screen.getByText("정상 신호").closest("details") as HTMLElement).getByText("Outbox backlog")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "알림 대기열" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "데이터베이스 연결" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "정상 범위 서비스" })).getByText("알림 대기열")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "정상 범위 서비스" })).getByText("외부 연결 보호")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "최근에 바뀐 것" })).toBeInTheDocument();
-    expect(screen.getByText(/readmates-api:dev-20260526/)).toBeInTheDocument();
+    expect(screen.getByText("주의해서 살펴볼 서비스가 1곳 있습니다. 현재 자료로 확인했습니다.")).toBeInTheDocument();
     expect(screen.getByText(/생성 시각/)).toBeInTheDocument();
     expect(screen.queryByText(/NaN/)).toBeNull();
     expect(screen.queryByRole("heading", { name: "Platform Health" })).not.toBeInTheDocument();
@@ -195,11 +208,11 @@ describe("AdminHealthRoute", () => {
       .mockResolvedValueOnce(staleSnapshot);
     renderRoute();
 
-    expect(await screen.findByText("정상 갱신 완료")).toBeInTheDocument();
+    expect(await screen.findByText("현재 자료로 확인했습니다.")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "서비스 신호" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "새로고침" }));
 
-    expect(await screen.findByText("마지막 정상 갱신 2분 5초 전")).toBeInTheDocument();
+    expect(await screen.findByText("마지막 확인 자료가 2분 5초 전입니다.")).toBeInTheDocument();
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 });

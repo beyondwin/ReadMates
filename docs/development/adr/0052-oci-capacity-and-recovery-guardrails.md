@@ -1,4 +1,4 @@
-# ADR-0050: OCI 용량과 복구 guardrail
+# ADR-0052: OCI 용량과 복구 guardrail
 
 - 상태: Proposed
 - 결정일: 2026-08-30

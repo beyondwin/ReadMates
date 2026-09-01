@@ -11,16 +11,17 @@ import {
 } from "@/tests/e2e/support/visual-authority-contract";
 import { AdminAuditLedger } from "./admin-audit-ledger";
 import { AdminClubsLedger } from "./admin-clubs-ledger";
-import "./admin-editorial-ledger.css";
+import { AdminEditorialLedgerCtHarness } from "./admin-editorial-ledger-ct-harness";
 import {
-  EDITORIAL_LEDGER_LONG_AUDIT_SUMMARY,
   EDITORIAL_LEDGER_LONG_CLUB_NAME,
-  EDITORIAL_LEDGER_LONG_HEALTH_TITLE,
+  EDITORIAL_LEDGER_LONG_TAKEDOWN_LIMITATION,
   EDITORIAL_LEDGER_LONG_TODAY_TITLE,
   clubsEmptyEvidence,
   clubsPaginationFailure,
   clubsTabletLedger,
   healthEmptyEvidence,
+  emergencyTakedownBlockedPreview,
+  emergencyTakedownIdle,
   noopEditorialLedgerHandler,
   reviewAuditEmptyEvidence,
   reviewAuditLedger,
@@ -40,6 +41,7 @@ import {
 } from "./admin-editorial-ledger.fixtures";
 import { AdminHealthGrid } from "./admin-health-grid";
 import { AdminOperationStateActions } from "./admin-operation-state-actions";
+import { AdminPublicTakedownWorkbench } from "./admin-public-takedown-workbench";
 import { AdminTodayLedger } from "./admin-today-ledger";
 
 async function mountEditorial(
@@ -52,7 +54,7 @@ async function mountEditorial(
   await page.emulateMedia({ colorScheme: "light" });
   const component = await mount(
     <MemoryRouter>
-      <div style={{ width: "100%" }}>{node}</div>
+      <AdminEditorialLedgerCtHarness>{node}</AdminEditorialLedgerCtHarness>
     </MemoryRouter>,
   );
   await expectReducedMotion(page);
@@ -86,28 +88,45 @@ async function expectNoNestedLiveRegions(component: Locator): Promise<void> {
 }
 
 function todayNode(fixture: TodayLedgerFixture) {
+  const lifecycleControls = fixture.allowedActions.length > 0 ? (
+    <AdminOperationStateActions
+      allowedActions={fixture.allowedActions}
+      pending={false}
+      disabled={fixture.actionState !== "ready"}
+      message={
+        fixture.actionState === "unknown-outcome"
+          ? { kind: "unknown-outcome", text: fixture.actionReason ?? "결과를 확인하지 못했습니다." }
+          : null
+      }
+      onAcknowledge={noopEditorialLedgerHandler}
+      onSnooze={noopEditorialLedgerHandler}
+      onResolve={noopEditorialLedgerHandler}
+    />
+  ) : null;
+  const mobileLifecycleControls = fixture.allowedActions.length > 0 ? (
+    <AdminOperationStateActions
+      allowedActions={fixture.allowedActions}
+      pending={false}
+      disabled={fixture.actionState !== "ready"}
+      message={
+        fixture.actionState === "unknown-outcome"
+          ? { kind: "unknown-outcome", text: fixture.actionReason ?? "결과를 확인하지 못했습니다." }
+          : null
+      }
+      presentation="prioritized"
+      onAcknowledge={noopEditorialLedgerHandler}
+      onSnooze={noopEditorialLedgerHandler}
+      onResolve={noopEditorialLedgerHandler}
+    />
+  ) : null;
   return (
     <AdminTodayLedger
       view={fixture.view}
+      auditHref="/admin/audit"
       filters={fixture.filters}
       history={fixture.history}
-      lifecycleControls={
-        fixture.allowedActions.length > 0 ? (
-          <AdminOperationStateActions
-            allowedActions={fixture.allowedActions}
-            pending={false}
-            disabled={fixture.actionState !== "ready"}
-            message={
-              fixture.actionState === "unknown-outcome"
-                ? { kind: "unknown-outcome", text: fixture.actionReason ?? "결과를 확인하지 못했습니다." }
-                : null
-            }
-            onAcknowledge={noopEditorialLedgerHandler}
-            onSnooze={noopEditorialLedgerHandler}
-            onResolve={noopEditorialLedgerHandler}
-          />
-        ) : null
-      }
+      lifecycleControls={lifecycleControls}
+      mobileLifecycleControls={mobileLifecycleControls}
       actionState={fixture.actionState}
       actionReason={fixture.actionReason}
       pendingCount={fixture.pendingCount}
@@ -194,6 +213,24 @@ function reviewNode(fixture: ReviewAuditFixture) {
   );
 }
 
+function takedownNode(state: typeof emergencyTakedownIdle | typeof emergencyTakedownBlockedPreview) {
+  return (
+    <AdminPublicTakedownWorkbench
+      canOperate
+      state={state}
+      pending={false}
+      error={null}
+      desktopHandoff={{
+        href: "/admin/public-takedown",
+        status: "idle",
+        onCopy: noopEditorialLedgerHandler,
+      }}
+      onPreview={noopEditorialLedgerHandler}
+      onConfirm={noopEditorialLedgerHandler}
+    />
+  );
+}
+
 test("Today L1 locks the 1440 wide editorial composition", async ({ mount, page }) => {
   expect(todayDesktopLedger.capabilities).toEqual(["VIEW_TODAY"]);
   expect(todayDesktopLedger.allowedActions).toEqual(["ACKNOWLEDGE", "SNOOZE", "RESOLVE"]);
@@ -207,9 +244,9 @@ test("Today L1 locks the 1440 wide editorial composition", async ({ mount, page 
   await expect(component.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
   await expect(component.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
   await expect(component.getByRole("heading", { name: EDITORIAL_LEDGER_LONG_TODAY_TITLE })).toBeVisible();
-  await expect(component.getByRole("button", { name: "확인 처리" })).toBeEnabled();
+  await expect(component.getByRole("button", { name: "확인함" })).toBeEnabled();
   await expect(component.locator(".admin-receipt-timeline")).toHaveCount(0);
-  const primary = component.getByRole("button", { name: "확인 처리" });
+  const primary = component.getByRole("button", { name: "확인함" });
   await expectMinimumTargetSize(primary);
   await expect(component).toHaveScreenshot("editorial-ledger-today-1440.png");
   await primary.focus();
@@ -226,7 +263,7 @@ test("Clubs locks the 900 tablet editorial composition", async ({ mount, page })
     VISUAL_AUTHORITY_VIEWPORTS.tablet,
   );
   await expect(component.getByRole("heading", { name: "클럽", exact: true })).toBeVisible();
-  await expect(component.getByRole("region", { name: "클럽 장부" })).toBeVisible();
+  await expect(component.getByRole("region", { name: "클럽 관리 목록" })).toBeVisible();
   await expect(component.getByRole("link", { name: EDITORIAL_LEDGER_LONG_CLUB_NAME })).toBeVisible();
   const create = component.getByRole("link", { name: "새 클럽" });
   await expect(create).toBeVisible();
@@ -246,7 +283,7 @@ test("Service health locks the 768 read-only evidence composition", async ({ mou
   );
   await expect(component.getByRole("heading", { name: "서비스 건강" })).toBeVisible();
   await expect(component.getByRole("region", { name: "서비스 신호" })).toBeVisible();
-  await expect(component.getByRole("heading", { name: EDITORIAL_LEDGER_LONG_HEALTH_TITLE })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "AI 작업 대기열" })).toBeVisible();
   await expect(component.locator(".admin-case-docket")).toHaveCount(0);
   await expect(component.locator(".admin-action-dock")).toHaveCount(0);
   await expect(component.locator(".admin-receipt-timeline")).toHaveCount(0);
@@ -265,8 +302,8 @@ test("Review audit locks the 390 mobile docket composition", async ({ mount, pag
     reviewNode(reviewAuditLedger),
     VISUAL_AUTHORITY_VIEWPORTS.mobile,
   );
-  await expect(component.getByRole("heading", { name: "운영 기입", exact: true })).toBeVisible();
-  await expect(component.getByRole("heading", { name: EDITORIAL_LEDGER_LONG_AUDIT_SUMMARY })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "운영 처리 기록", exact: true })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "알림 재처리를 확정했습니다." })).toBeVisible();
   await expect(component.getByRole("region", { name: "감사 이벤트 상세" })).toBeVisible();
   const back = component.getByRole("button", { name: "목록으로" });
   await expectMinimumTargetSize(back);
@@ -286,7 +323,8 @@ test("Today case detail locks the 320 mobile composition", async ({ mount, page 
   await expect(component.getByRole("heading", { name: "오늘의 운영 케이스" })).toBeVisible();
   await expect(component.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
   await expect(component.getByRole("button", { name: "목록으로" })).toBeVisible();
-  await expect(component.getByRole("button", { name: "확인 처리" })).toBeEnabled();
+  await expect(component.getByRole("button", { name: "확인함" })).toBeEnabled();
+  await expect(component.getByText("다른 처리")).toBeVisible();
   await expect(component.locator(".admin-today-ledger__columns")).toHaveCount(0);
   await expect(component.locator(".admin-receipt-timeline")).toHaveCount(0);
   const back = component.getByRole("button", { name: "목록으로" });
@@ -295,6 +333,80 @@ test("Today case detail locks the 320 mobile composition", async ({ mount, page 
   await back.focus();
   await expectVisibleFocus(back);
 });
+
+test("Emergency takedown keeps the blocked L3 review calm at 1440", async ({ mount, page }) => {
+  const component = await mountEditorial(
+    mount,
+    page,
+    takedownNode(emergencyTakedownBlockedPreview),
+    VISUAL_AUTHORITY_VIEWPORTS.desktopWide,
+  );
+  await expect(component.getByRole("heading", { name: "긴급 공개 회수" })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "회수 대상을 마지막으로 확인하세요" })).toBeVisible();
+  await expect(component.getByText(EDITORIAL_LEDGER_LONG_TAKEDOWN_LIMITATION)).toBeVisible();
+  await expect(component.getByRole("button", { name: "긴급 회수 확인" })).toBeDisabled();
+  await expect(component.getByRole("region", { name: "데스크톱에서 이어서 처리" })).toBeHidden();
+  await expect(component).toHaveScreenshot("editorial-ledger-emergency-takedown-1440.png");
+});
+
+test("Emergency takedown offers desktop handoff first at 390", async ({ mount, page }) => {
+  const component = await mountEditorial(
+    mount,
+    page,
+    takedownNode(emergencyTakedownIdle),
+    VISUAL_AUTHORITY_VIEWPORTS.mobile,
+  );
+  const handoff = component.getByRole("region", { name: "데스크톱에서 이어서 처리" });
+  const copy = component.getByRole("button", { name: "데스크톱용 주소 복사" });
+  await expect(handoff).toBeVisible();
+  await expect(copy).toBeVisible();
+  await expectMinimumTargetSize(copy);
+  await expect(component.getByRole("region", { name: "이 기기에서 직접 처리" })).toBeVisible();
+  await expect(component).toHaveScreenshot("editorial-ledger-emergency-takedown-390.png");
+  await copy.focus();
+  await expectVisibleFocus(copy);
+});
+
+test("Today keeps the 320 queue locator intact without horizontal overflow", async ({ mount, page }) => {
+  const fixture = {
+    ...todayDesktopLedger,
+    mode: "list" as const,
+    view: {
+      ...todayDesktopLedger.view,
+      items: todayDesktopLedger.view.items.map((item, index) => ({
+        ...item,
+        locatorLabel: String(index + 1).padStart(2, "0"),
+      })),
+    },
+  };
+  const component = await mountEditorial(
+    mount,
+    page,
+    todayNode(fixture),
+    VISUAL_AUTHORITY_VIEWPORTS.mobileNarrow,
+  );
+  const locator = component.locator(".admin-operations-queue__locator").first();
+  await expect(locator).toBeVisible();
+  await expect(locator).toHaveCSS("white-space", "nowrap");
+  await expect(locator).toHaveCSS("flex-shrink", "0");
+  await expect(locator).toHaveCSS("overflow-wrap", "normal");
+  await expectNoHorizontalOverflow(page);
+});
+
+for (const width of [390, 768, 900, 1024] as const) {
+  test(`Today follows observed content width without overflow at ${width}px`, async ({ mount, page }) => {
+    const component = await mountEditorial(
+      mount,
+      page,
+      todayNode({ ...todayDesktopLedger, mode: width < 960 ? "list" : undefined }),
+      { width, height: 900 },
+    );
+    await expect(component.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    const layout = component.locator(".admin-today-ledger");
+    await expect(layout).toHaveAttribute("data-content-layout", width >= 1024 ? "split" : "flow");
+  });
+}
 
 test("empty evidence, failed sources, pending-new, pagination failure and unknown-outcome stay inside the contract", async ({ mount, page }) => {
   const component = await mountEditorial(
@@ -330,7 +442,7 @@ test("empty evidence, failed sources, pending-new, pagination failure and unknow
   await expect(component.getByText("스냅샷을 불러오지 못했습니다")).toBeVisible();
   await expect(component.getByText("이어지는 페이지를 불러오지 못했습니다.")).toBeVisible();
   await expect(component.getByText("기록된 감사 이벤트가 없습니다.")).toBeVisible();
-  await expect(component.getByRole("button", { name: "확인 처리" })).toHaveCount(3);
-  await expect(component.getByRole("button", { name: "확인 처리", disabled: true })).toHaveCount(1);
+  await expect(component.getByRole("button", { name: "확인함" })).toHaveCount(3);
+  await expect(component.getByRole("button", { name: "확인함", disabled: true })).toHaveCount(1);
   await expectMinimumTargetSize(component.getByRole("button", { name: "AI 작업 다시 확인" }));
 });

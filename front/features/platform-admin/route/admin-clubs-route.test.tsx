@@ -1,9 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import {
-  MemoryRouter,
-  Route,
-  Routes,
+  createMemoryRouter,
+  RouterProvider,
   useLocation,
   useNavigate,
 } from "react-router";
@@ -103,38 +102,62 @@ function renderRoute(
     capabilities,
     generatedAt: "2026-08-24T00:00:00Z",
   });
+  const initialEntries = [
+    locationState
+      ? {
+          pathname: url.pathname,
+          search: url.search,
+          hash: url.hash,
+          state: locationState,
+        }
+      : initialEntry,
+  ];
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/admin/clubs",
+        element: (
+          <>
+            <LocationProbe />
+            <AdminClubsRoute />
+          </>
+        ),
+      },
+      { path: "/admin/clubs/:clubId", element: <div>club detail</div> },
+    ],
+    { initialEntries },
+  );
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter
-        initialEntries={[
-          locationState
-            ? {
-                pathname: url.pathname,
-                search: url.search,
-                hash: url.hash,
-                state: locationState,
-              }
-            : initialEntry,
-        ]}
-      >
-        <LocationProbe />
-        <Routes>
-          <Route path="/admin/clubs" element={<AdminClubsRoute />} />
-          <Route path="/admin/clubs/:clubId" element={<div>club detail</div>} />
-        </Routes>
-      </MemoryRouter>
+      <RouterProvider router={router} />
     </QueryClientProvider>,
   );
 }
 
 describe("AdminClubsRoute", () => {
   beforeEach(() => vi.clearAllMocks());
-  it("renders server-ordered registry rows with accessible controls", () => {
+
+  it("opens real clubs onboarding without consuming registry query filters", () => {
+    renderRoute(
+      [club],
+      "/admin/clubs?search=alpha&visibility=PRIVATE&onboarding=1",
+    );
+
+    expect(screen.getByRole("dialog", { name: "새 클럽" })).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "클럽 검색" })).toHaveValue("alpha");
+    expect(screen.getByRole("combobox", { name: "공개 상태" })).toHaveValue("PRIVATE");
+    expect(screen.getByTestId("location-search")).toHaveTextContent("search=alpha");
+    expect(screen.getByTestId("location-search")).toHaveTextContent("visibility=PRIVATE");
+    expect(screen.getByTestId("location-search")).toHaveTextContent("onboarding=1");
+  });
+
+  it("renders server-ordered registry rows as operator judgment records with accessible controls", () => {
     const { container } = renderRoute();
     expect(screen.getByRole("heading", { name: "클럽" })).toBeInTheDocument();
     expect(
       screen.getByRole("searchbox", { name: "클럽 검색" }),
     ).toBeInTheDocument();
+    expect(screen.getByText("활성 · 비공개")).toBeInTheDocument();
     expect(screen.getByText("alpha")).toBeInTheDocument();
     const href = screen.getByRole("link", { name: "Alpha" }).getAttribute("href");
     expect(href).toContain("/admin/clubs/c-1");

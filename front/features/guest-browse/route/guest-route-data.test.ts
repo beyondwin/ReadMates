@@ -194,6 +194,19 @@ describe("guest route loaders", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("uses normalized auth for the protected audience without broadening malformed spaces", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({
+      ...activeAuth,
+      availableSpaces: { version: 12, kinds: ["PLATFORM", "CLUBS"], clubs: [] },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const access = await loadClubAppAudience({ params: { clubSlug: "alpha" } });
+
+    expect(access.audience).toBe("MEMBER");
+    expect(access.auth.availableSpaces).toEqual({ version: 1, kinds: [], clubs: [] });
+  });
+
   it("deduplicates concurrent audience reads for the same navigation request only", async () => {
     const fetchMock = vi
       .fn()

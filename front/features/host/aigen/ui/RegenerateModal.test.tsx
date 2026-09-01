@@ -32,6 +32,7 @@ describe("RegenerateModal", () => {
         sessionId="s1"
         jobId="j1"
         item="summary"
+        onRegenerate={(request) => mockedRegenerate("s1", "j1", request, { clubSlug: "club-a" })}
         models={[{ id: "gpt-5.4-mini", provider: "OPENAI", isDefault: true }]}
         expectedRevision={7}
         onClose={() => {}}
@@ -58,6 +59,7 @@ describe("RegenerateModal", () => {
         sessionId="s1"
         jobId="j1"
         item="oneLineReviews"
+        onRegenerate={(request) => mockedRegenerate("s1", "j1", request, { clubSlug: "club-a" })}
         onClose={() => {}}
         onSuccess={onSuccess}
       />,
@@ -94,6 +96,7 @@ describe("RegenerateModal", () => {
         sessionId="s1"
         jobId="j1"
         item="summary"
+        onRegenerate={(request) => mockedRegenerate("s1", "j1", request, { clubSlug: "club-a" })}
         models={[{ id: "gpt-5.4-mini", provider: "OPENAI", isDefault: true }]}
         expectedRevision={7}
         onClose={() => {}}
@@ -135,6 +138,7 @@ describe("RegenerateModal", () => {
         sessionId="s1"
         jobId="j1"
         item="highlights"
+        onRegenerate={(request) => mockedRegenerate("s1", "j1", request, { clubSlug: "club-a" })}
         onClose={onClose}
         onSuccess={() => {}}
       />,
@@ -159,6 +163,7 @@ describe("RegenerateModal", () => {
         sessionId="s1"
         jobId="j1"
         item="feedbackDocument"
+        onRegenerate={(request) => mockedRegenerate("s1", "j1", request, { clubSlug: "club-a" })}
         onClose={onClose}
         onSuccess={() => {}}
       />,

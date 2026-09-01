@@ -1,4 +1,4 @@
-import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, type QueryClient } from "@tanstack/react-query";
 import {
   cancelGeneration,
   commitGeneration,
@@ -76,20 +76,16 @@ export function availableAiModelsQuery(sessionId: string, context: ExplicitReadm
 }
 
 export function useStartAiJobMutation(sessionId: string, context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "aigen", "start"),
     mutationFn: (request: StartGenerationRequest) => startGeneration(sessionId, request, context),
-    onSuccess: () => client.invalidateQueries({ queryKey: aiJobKeys.session(sessionId, context) }),
   });
 }
 
 export function useCancelAiJobMutation(sessionId: string, context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "aigen", "cancel"),
     mutationFn: (jobId: string) => cancelGeneration(sessionId, jobId, context),
-    onSuccess: () => client.invalidateQueries({ queryKey: aiJobKeys.session(sessionId, context) }),
   });
 }
 
@@ -98,11 +94,9 @@ export function useRegenerateAiItemMutation(
   jobId: string,
   context: ExplicitReadmatesApiContext,
 ) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "aigen", "regenerate"),
     mutationFn: (request: RegenerateRequest) => regenerateItem(sessionId, jobId, request, context),
-    onSuccess: () => client.invalidateQueries({ queryKey: aiJobKeys.detail(sessionId, jobId, context) }),
   });
 }
 
@@ -111,15 +105,23 @@ export function useCommitAiJobMutation(
   jobId: string,
   context: ExplicitReadmatesApiContext,
 ) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "aigen", "commit"),
     mutationFn: (request: CommitGenerationRequest) => commitGeneration(sessionId, jobId, request, context),
-    onSuccess: async () => {
-      await Promise.all([
-        client.invalidateQueries({ queryKey: aiJobKeys.session(sessionId, context) }),
-        invalidateHostSessionRecordSurfaces(client, sessionId, context),
-      ]);
-    },
   });
+}
+
+export async function publishAiJobSession(client: QueryClient, sessionId: string, context: ExplicitReadmatesApiContext) {
+  await client.invalidateQueries({ queryKey: aiJobKeys.session(sessionId, context) });
+}
+
+export async function publishAiJobDetail(client: QueryClient, sessionId: string, jobId: string, context: ExplicitReadmatesApiContext) {
+  await client.invalidateQueries({ queryKey: aiJobKeys.detail(sessionId, jobId, context) });
+}
+
+export async function publishCommittedAiJob(client: QueryClient, sessionId: string, context: ExplicitReadmatesApiContext) {
+  await Promise.all([
+    publishAiJobSession(client, sessionId, context),
+    invalidateHostSessionRecordSurfaces(client, sessionId, context),
+  ]);
 }

@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import type {
   AiGenerationJobResponse,
   AiGenerationStage,
-} from "@/features/host/aigen/api/aigen-contracts";
+} from "@/features/host/aigen/model/aigen-presentation-types";
 
 const STAGE_LABEL: Record<AiGenerationStage, string> = {
   QUEUED: "대기 중",

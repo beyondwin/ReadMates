@@ -11,7 +11,7 @@ import {
 } from "@/features/platform-admin/ui/platform-admin-ai-ops";
 
 const LEDGER_CSS = readFileSync(
-  path.resolve("features/platform-admin/ui/admin-editorial-ledger.css"),
+  path.resolve("features/platform-admin/ui/admin-service-status.css"),
   "utf8",
 );
 
@@ -84,22 +84,68 @@ describe("PlatformAdminAiOps", () => {
     render(<PlatformAdminAiOps role="SUPPORT" summary={summary} jobs={[runningJob]} />);
 
     const section = screen.getByRole("region", { name: "AI 작업" });
-    expect(within(section).getByText("Active")).toBeInTheDocument();
+    expect(within(section).getByText("진행 중", { selector: ".platform-admin-metric__label" })).toBeInTheDocument();
     expect(within(section).getByText("2")).toBeInTheDocument();
-    expect(within(section).getByText("$0.2000")).toBeInTheDocument();
-    expect(within(section).getByText(/읽는사이/)).toBeInTheDocument();
+    expect(within(section).getAllByText("$0.2000").length).toBeGreaterThan(0);
+    expect(within(section).getAllByText(/읽는사이/).length).toBeGreaterThan(0);
+    expect(
+      section.querySelector('.platform-admin-domain-status')?.textContent,
+    ).toBe("진행 중");
+    expect(within(section).getByText("요약 생성 중")).toBeInTheDocument();
+    expect(within(section).getByText("오래됨")).toBeInTheDocument();
+    expect(within(section).queryByText("RUNNING", { selector: ".platform-admin-domain-status" })).toBeNull();
+    expect(within(section).queryByText("GENERATING_SUMMARY", { selector: ".platform-admin-domain-status" })).toBeNull();
+    expect(section.textContent).not.toContain("STALE");
     expect(within(section).queryByRole("button", { name: "강제 취소 검토" })).not.toBeInTheDocument();
     expect(section.textContent).not.toContain("transcript");
     expect(section.textContent).not.toContain("feedbackDocumentMarkdown");
     expect(section.textContent).not.toContain("instructions");
   });
 
+  it("orders operator narrative, freshness, failure and run evidence, next action, then raw job identifiers", () => {
+    const { container } = render(
+      <PlatformAdminAiOps role="OWNER" canManageActions summary={summary} jobs={[runningJob]} />,
+    );
+    const sentence = screen.getByText("최근 24시간 실패 1건과 오래 멈춘 작업 1건을 먼저 확인하세요.");
+    const freshness = screen.getByText(/^최근 작업 갱신 /);
+    const failures = screen.getByRole("heading", { name: "최근 실패 묶음" });
+    const failureEvidence = screen.getByRole("button", { name: "이 원인의 작업 보기 · 1건" }).closest("li")!;
+    const runEvidence = screen.getByText("읽는사이의 AI 처리가 오래 멈춰 있습니다.");
+    const nextAction = screen.getByText("실패 원인을 좁힌 뒤 멈춘 작업의 최신 상태와 허용된 복구 방법을 확인하세요.");
+    const runs = screen.getByRole("region", { name: "처리 시도 기록" });
+    const disclosure = Array.from(runs.querySelectorAll("[data-admin-technical-disclosure]"))
+      .find((item) => item.textContent?.includes("job-1"));
+
+    expect(sentence.compareDocumentPosition(freshness) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(freshness.compareDocumentPosition(failures) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(failures.compareDocumentPosition(failureEvidence) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(failureEvidence.compareDocumentPosition(runEvidence) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(runEvidence.compareDocumentPosition(nextAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(nextAction.compareDocumentPosition(disclosure!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(disclosure).toHaveTextContent("job-1");
+    expect(container.querySelector(".platform-admin-ai-ops__job-title")).not.toHaveTextContent("job-1");
+  });
+
+  it("keeps raw AI job values inside explicit technical disclosure in detail", () => {
+    render(
+      <PlatformAdminAiOps role="OWNER" summary={summary} jobs={[runningJob]} selectedJob={runningJob} />,
+    );
+    const dialog = screen.getByRole("dialog", { name: "AI 작업 상세" });
+    expect(within(dialog).getByText("진행 중")).toBeInTheDocument();
+    expect(within(dialog).queryByText("Job drill-down")).not.toBeInTheDocument();
+    expect(dialog.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("RUNNING");
+    expect(dialog.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("GENERATING_SUMMARY");
+  });
+
   it("shows recovery revision and cleanup state without exposing generation content", () => {
     render(<PlatformAdminAiOps role="OWNER" summary={summary} jobs={[committingJob]} />);
 
     const section = screen.getByRole("region", { name: "AI 작업" });
-    expect(within(section).getByText(/revision 2/)).toBeInTheDocument();
-    expect(within(section).getByText(/cleanup pending/)).toBeInTheDocument();
+    expect(within(section).getByText("임시 데이터 정리가 남아 있습니다.")).toBeInTheDocument();
+    const disclosure = Array.from(section.querySelectorAll("[data-admin-technical-disclosure]"))
+      .find((item) => item.textContent?.includes("revision 2"));
+    expect(disclosure).toHaveTextContent("revision 2");
+    expect(section.textContent).not.toContain("cleanup pending");
     expect(section.textContent).not.toContain("transcript");
     expect(section.textContent).not.toContain("evidence");
     expect(section.textContent).not.toContain("result");
@@ -156,18 +202,22 @@ describe("PlatformAdminAiOps", () => {
     );
 
     const dialog = screen.getByRole("dialog", { name: "강제 취소 확인" });
-    expect(within(dialog).getByText("RUNNING · revision 7")).toBeInTheDocument();
-    expect(within(dialog).getByText("DELETE_TRANSIENT_PAYLOAD")).toBeInTheDocument();
-    expect(within(dialog).getByText(/00112233/)).toBeInTheDocument();
+    expect(within(dialog).getByText("진행 중인 작업을 중단하고 임시 데이터를 정리합니다.")).toBeInTheDocument();
+    expect(within(dialog).getByText("완료되지 않은 임시 데이터를 정리합니다.")).toBeInTheDocument();
+    const disclosure = dialog.querySelector("[data-admin-technical-disclosure]");
+    expect(disclosure).toHaveTextContent("RUNNING");
+    expect(disclosure).toHaveTextContent("DELETE_TRANSIENT_PAYLOAD");
+    expect(disclosure).toHaveTextContent("00112233");
     expect(dialog.contains(document.activeElement)).toBe(true);
 
-    await userEvent.click(within(dialog).getByRole("button", { name: "작업 job-1 강제 취소" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "이 작업 강제 취소" }));
     expect(onConfirmCommand).toHaveBeenCalledTimes(1);
     trigger.remove();
   });
 
   it("keeps an ambiguous command open for same-key reconciliation and shows its receipt", async () => {
     const onRetrySameCommand = vi.fn();
+    const onDismissCommand = vi.fn();
     const unknown: PlatformAdminAiOpsCommandState = {
       ...reviewState,
       phase: "UNKNOWN",
@@ -182,11 +232,16 @@ describe("PlatformAdminAiOps", () => {
         jobs={[runningJob]}
         commandState={unknown}
         onRetrySameCommand={onRetrySameCommand}
+        onDismissCommand={onDismissCommand}
       />,
     );
 
     await userEvent.click(screen.getByRole("button", { name: "같은 명령으로 다시 확인" }));
     expect(onRetrySameCommand).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "최신 상태로 다시 검토" })).not.toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    await userEvent.click(screen.getByTestId("admin-modal-dialog-backdrop"));
+    expect(onDismissCommand).not.toHaveBeenCalled();
 
     rerender(
       <PlatformAdminAiOps
@@ -217,8 +272,9 @@ describe("PlatformAdminAiOps", () => {
 
     const receipt = screen.getByRole("status", { name: "AI 명령 영수증" });
     expect(within(receipt).getByText(/receipt-1/)).toBeInTheDocument();
-    expect(within(receipt).getByText(/PENDING/)).toBeInTheDocument();
-    expect(within(receipt).getByText(/AI_EFFECT_UNAVAILABLE/)).toBeInTheDocument();
+    expect(within(receipt).getByText(/후속 처리 대기/)).toBeInTheDocument();
+    expect(receipt.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("PENDING");
+    expect(receipt.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("AI_EFFECT_UNAVAILABLE");
     await userEvent.click(screen.getByRole("button", { name: "같은 명령으로 상태 다시 확인" }));
     expect(onRetrySameCommand).toHaveBeenCalledTimes(2);
   });
@@ -240,7 +296,7 @@ describe("PlatformAdminAiOps", () => {
         onSelectFailureCode={onSelectFailureCode}
       />,
     );
-    await userEvent.click(screen.getByRole("button", { name: /PROVIDER_RATE_LIMITED/ }));
+    await userEvent.click(screen.getByRole("button", { name: "이 원인의 작업 보기 · 1건" }));
     expect(onSelectFailureCode).toHaveBeenCalledWith("PROVIDER_RATE_LIMITED");
   });
 
@@ -256,7 +312,8 @@ describe("PlatformAdminAiOps", () => {
       />,
     );
     const banner = screen.getByRole("status");
-    expect(within(banner).getByText(/PROVIDER_RATE_LIMITED/)).toBeInTheDocument();
+    expect(within(banner).getByText("선택한 실패 원인의 작업만 보는 중")).toBeInTheDocument();
+    expect(banner.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("PROVIDER_RATE_LIMITED");
     await userEvent.click(within(banner).getByRole("button", { name: "전체 보기" }));
     expect(onClearFilter).toHaveBeenCalledTimes(1);
   });
@@ -270,7 +327,7 @@ describe("PlatformAdminAiOps", () => {
         activeFilter={{ errorCode: "PROVIDER_RATE_LIMITED", clubId: null }}
       />,
     );
-    expect(screen.getByText("이 필터에 해당하는 AI job이 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("이 조건에 해당하는 AI 처리 기록이 없습니다.")).toBeInTheDocument();
   });
 
   it("lets a capable operator review retry-commit on an eligible job", async () => {
@@ -287,7 +344,7 @@ describe("PlatformAdminAiOps", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "커밋 복구 검토" }));
+    await user.click(screen.getByRole("button", { name: "저장 복구 검토" }));
 
     expect(onRequestPreview).toHaveBeenCalledWith("job-2", "RETRY_COMMIT");
   });
@@ -295,7 +352,7 @@ describe("PlatformAdminAiOps", () => {
   it("hides retry-commit from support role", () => {
     render(<PlatformAdminAiOps role="SUPPORT" summary={summary} jobs={[committingJob]} />);
 
-    expect(screen.queryByRole("button", { name: "커밋 복구 검토" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "저장 복구 검토" })).not.toBeInTheDocument();
   });
 
   it("does not show retry-commit when the job does not offer it", () => {
@@ -309,7 +366,7 @@ describe("PlatformAdminAiOps", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: "커밋 복구 검토" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "저장 복구 검토" })).not.toBeInTheDocument();
   });
 
   it("uses the authoritative capability instead of role inference", () => {
@@ -395,12 +452,12 @@ describe("PlatformAdminAiOps", () => {
     );
 
     expect(screen.getByRole("heading", { name: "AI 작업" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "작업 목록" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "처리 시도 기록" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
     expect(screen.queryByText("공개 반영 추적")).not.toBeInTheDocument();
   });
 
-  it("renders an L2 receipt timeline only after an actual command receipt", () => {
+  it("renders an L3 receipt and convergence timeline only after an actual command receipt", () => {
     const { rerender } = render(
       <PlatformAdminAiOps
         role="OWNER"
@@ -411,7 +468,7 @@ describe("PlatformAdminAiOps", () => {
       />,
     );
 
-    expect(document.querySelector(".admin-safe-action-dock")).toHaveAttribute("data-level", "L2");
+    expect(document.querySelector(".admin-safe-action-dock")).toHaveAttribute("data-level", "L3");
     expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
 
     rerender(
@@ -440,7 +497,9 @@ describe("PlatformAdminAiOps", () => {
       />,
     );
 
-    expect(screen.getByRole("region", { name: "명령 기록" })).toHaveTextContent("receipt-1");
+    const timeline = screen.getByRole("region", { name: "명령 기록" });
+    expect(timeline).toHaveTextContent("receipt-1");
+    expect(timeline.querySelector(".admin-receipt-timeline__convergence")).toHaveTextContent("후속 처리");
     expect(screen.queryByText("공개 반영 추적")).not.toBeInTheDocument();
   });
 

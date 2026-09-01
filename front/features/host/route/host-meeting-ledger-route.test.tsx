@@ -65,6 +65,8 @@ vi.mock("@/features/host/queries/host-session-queries", async (importOriginal) =
     isPending: false,
   }),
   hostSessionScheduleDefaultsQuery: () => ({ testData: routeMocks.scheduleDefaults }),
+  publishHostSessionCreated: vi.fn(),
+  publishHostSessionVisibility: vi.fn(),
 }));
 
 vi.mock("@/features/host/queries/host-session-record-queries", () => ({

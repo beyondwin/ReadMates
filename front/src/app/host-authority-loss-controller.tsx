@@ -6,12 +6,18 @@ import {
   type HostSecurityPurgeCode,
 } from "@/features/host/model/host-authority-loss";
 import { HOST_AUTHORITY_LOSS_HANDOFF_STATE_KEY } from "@/features/host/model/host-authority-navigation";
-import { purgeClubHostState } from "@/features/host/queries/host-state-purge";
+import {
+  hostClubMutationPrefix,
+  hostClubQueryPrefix,
+  purgeClubHostState,
+} from "@/features/host/queries/host-state-purge";
 import {
   hostSensitiveStorage,
   type HostSensitiveStorage,
 } from "@/features/host/storage/host-sensitive-storage";
 import { subscribeHostAuthorityLoss } from "@/shared/api/host-authority-event";
+import type { HostAuthorityLossEvent } from "@/shared/api/host-authority-event";
+import { GLOBAL_SPACE_ROUTER_CANCELLATION_HASH_PREFIX } from "./global-space-transition-controller";
 
 let authorityLossHandoffSequence = 0;
 
@@ -42,9 +48,13 @@ function afterMountedSensitiveStateCommit(): Promise<void> {
 
 export function HostAuthorityLossController({
   storage = hostSensitiveStorage,
+  onBeforePurge,
+  resolveSafeTarget,
   onHandled,
 }: {
   storage?: HostSensitiveStorage;
+  onBeforePurge?: (event: HostAuthorityLossEvent) => void;
+  resolveSafeTarget?: (event: HostAuthorityLossEvent) => Promise<string>;
   onHandled: (
     code: HostSecurityPurgeCode,
     targetPathname: string,
@@ -55,39 +65,102 @@ export function HostAuthorityLossController({
   const location = useLocation();
   const navigate = useNavigate();
   const pathnameRef = useRef(location.pathname);
+  const hrefRef = useRef(`${location.pathname}${location.search}${location.hash}`);
+  const navigationEpochRef = useRef(0);
   const handlingClubSlugsRef = useRef(new Set<string>());
 
   useEffect(() => {
+    const href = `${location.pathname}${location.search}${location.hash}`;
     pathnameRef.current = location.pathname;
-  }, [location.pathname]);
+    const previous = hrefRef.current;
+    const previousBase = previous.split("#", 1)[0];
+    const isSafetyCancellation = location.hash.startsWith(GLOBAL_SPACE_ROUTER_CANCELLATION_HASH_PREFIX)
+      && previousBase === `${location.pathname}${location.search}`;
+    if (previous !== href && !isSafetyCancellation) {
+      hrefRef.current = href;
+      navigationEpochRef.current += 1;
+    } else if (previous !== href) {
+      hrefRef.current = href;
+    }
+  }, [location.hash, location.key, location.pathname, location.search]);
 
   useEffect(() => subscribeHostAuthorityLoss((event) => {
     if (handlingClubSlugsRef.current.has(event.clubSlug)) return;
     handlingClubSlugsRef.current.add(event.clubSlug);
+    const navigationEpoch = navigationEpochRef.current;
+    try {
+      onBeforePurge?.(event);
+    } catch {
+      // Transition invalidation is best-effort isolated; host request/cache purge must continue.
+    }
     void (async () => {
       let replacementCommitted = false;
       try {
-        await purgeClubHostState({
-          clubSlug: event.clubSlug,
-          queryClient,
-          storage,
-        });
+        let purgeSucceeded = true;
+        try {
+          await purgeClubHostState({
+            clubSlug: event.clubSlug,
+            queryClient,
+            storage,
+          });
+        } catch {
+          purgeSucceeded = false;
+          queryClient.removeQueries({ queryKey: hostClubQueryPrefix(event.clubSlug) });
+          for (const mutation of queryClient.getMutationCache().findAll({
+            mutationKey: hostClubMutationPrefix(event.clubSlug),
+          })) {
+            queryClient.getMutationCache().remove(mutation);
+          }
+        }
         if (clubSlugFromPathname(pathnameRef.current) !== event.clubSlug) return;
-        await afterMountedSensitiveStateCommit();
-        if (clubSlugFromPathname(pathnameRef.current) !== event.clubSlug) return;
-        const targetPathname = hostAuthoritySafeDestination(event.clubSlug);
+        if (purgeSucceeded) {
+          await afterMountedSensitiveStateCommit();
+          if (clubSlugFromPathname(pathnameRef.current) !== event.clubSlug) return;
+        }
+        if (navigationEpochRef.current !== navigationEpoch) return;
+        let targetPathname = hostAuthoritySafeDestination(event.clubSlug);
+        if (resolveSafeTarget) {
+          try {
+            const resolved = await resolveSafeTarget(event);
+            if (isSafeInternalTarget(resolved)) targetPathname = resolved;
+          } catch {
+            // A fresh projection failure falls back to the existing member-safe route.
+          }
+        }
+        if (
+          navigationEpochRef.current !== navigationEpoch
+          || clubSlugFromPathname(pathnameRef.current) !== event.clubSlug
+        ) return;
         const handoffId = nextAuthorityLossHandoffId();
         onHandled(event.code, targetPathname, handoffId);
-        void navigate(targetPathname, {
+        const navigation = navigate(targetPathname, {
           replace: true,
           state: { [HOST_AUTHORITY_LOSS_HANDOFF_STATE_KEY]: handoffId },
         });
+        if (navigation) await navigation;
         replacementCommitted = true;
+      } catch {
+        const fallback = hostAuthoritySafeDestination(event.clubSlug);
+        if (
+          navigationEpochRef.current === navigationEpoch
+          && clubSlugFromPathname(pathnameRef.current) === event.clubSlug
+        ) {
+          try {
+            window.location.replace(fallback);
+            replacementCommitted = true;
+          } catch {
+            // A browser-level same-origin replace is the final fail-closed URL cleanup.
+          }
+        }
       } finally {
         if (!replacementCommitted) handlingClubSlugsRef.current.delete(event.clubSlug);
       }
     })();
-  }), [navigate, onHandled, queryClient, storage]);
+  }), [navigate, onBeforePurge, onHandled, queryClient, resolveSafeTarget, storage]);
 
   return null;
+}
+
+function isSafeInternalTarget(target: string): boolean {
+  return target.startsWith("/") && !target.startsWith("//");
 }

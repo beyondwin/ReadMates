@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
 import { useLoaderData, useNavigate, useRevalidator } from "react-router";
 import type { ReadmatesReturnState } from "@/shared/routing/readmates-route-state";
+import { publishTransitionAction, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 import { MemberNotificationsPage } from "../ui/member-notifications-page";
-import { memberNotificationsActions, type MemberNotificationsRouteData } from "./member-notifications-data";
+import { memberNotificationsActions, publishMemberNotificationsRefresh, type MemberNotificationsRouteData } from "./member-notifications-data";
 
 const READ_ACTION_ERROR = "알림을 읽음 처리하지 못했습니다. 다시 시도해 주세요.";
 
@@ -10,6 +11,7 @@ export function MemberNotificationsRoute() {
   const data = useLoaderData() as MemberNotificationsRouteData;
   const navigate = useNavigate();
   const revalidator = useRevalidator();
+  const transitionOwner = useTransitionSafetyOwner("member-notifications");
   const pendingReadIdsRef = useRef(new Set<string>());
   const markAllReadPendingRef = useRef(false);
   const [pendingReadIds, setPendingReadIds] = useState<ReadonlySet<string>>(() => new Set());
@@ -37,23 +39,29 @@ export function MemberNotificationsRoute() {
     setPendingReadIds(next);
   };
 
-  const markRead = async (id: string) => {
+  const markRead = async (id: string, onAccepted?: () => void | Promise<void>) => {
     if (pendingReadIdsRef.current.has(id) || markAllReadPendingRef.current) {
       return false;
     }
 
     setActionError(null);
     setReadPending(id, true);
+    const operationId = `member-notification-read-${id}`;
+    const handle = transitionOwner.begin(operationId, "L1", async () => ({ operationId, outcome: "still-unknown" }));
 
     try {
       await memberNotificationsActions.markRead(id);
-      await revalidator.revalidate();
+      if (await handle.settle("succeeded") !== "accepted") return false;
+      await publishTransitionAction(handle, "cache", () => publishMemberNotificationsRefresh(() => revalidator.revalidate()));
+      if (onAccepted) await publishTransitionAction(handle, "navigation", onAccepted);
       return true;
     } catch {
-      setActionError(READ_ACTION_ERROR);
+      if (await handle.settle("failed") === "accepted") {
+        handle.publishAccepted({ surface: "errorCopy", publish: () => setActionError(READ_ACTION_ERROR) });
+      }
       return false;
     } finally {
-      setReadPending(id, false);
+      handle.publishAccepted({ surface: "ui", publish: () => setReadPending(id, false) });
     }
   };
 
@@ -65,24 +73,31 @@ export function MemberNotificationsRoute() {
     setActionError(null);
     markAllReadPendingRef.current = true;
     setMarkAllReadPending(true);
+    const operationId = `member-notifications-read-all-${globalThis.crypto.randomUUID()}`;
+    const handle = transitionOwner.begin(operationId, "L1", async () => ({ operationId, outcome: "still-unknown" }));
 
     try {
       await memberNotificationsActions.markAllRead();
-      await revalidator.revalidate();
+      if (await handle.settle("succeeded") === "accepted") {
+        await publishTransitionAction(handle, "cache", () => publishMemberNotificationsRefresh(() => revalidator.revalidate()));
+      }
     } catch {
-      setActionError(READ_ACTION_ERROR);
+      if (await handle.settle("failed") === "accepted") {
+        handle.publishAccepted({ surface: "errorCopy", publish: () => setActionError(READ_ACTION_ERROR) });
+      }
     } finally {
-      markAllReadPendingRef.current = false;
-      setMarkAllReadPending(false);
+      handle.publishAccepted({
+        surface: "ui",
+        publish: () => {
+          markAllReadPendingRef.current = false;
+          setMarkAllReadPending(false);
+        },
+      });
     }
   };
 
   const openNotification = (id: string, href: string, state?: ReadmatesReturnState) => {
-    void (async () => {
-      if (await markRead(id)) {
-        await navigate(href, { state });
-      }
-    })();
+    void markRead(id, () => navigate(href, { state }));
   };
 
   const navigateNotification = (href: string, state: ReadmatesReturnState) => {

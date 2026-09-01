@@ -3,14 +3,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { logout } from "@/features/auth/api/auth-api";
 import { SessionExpiryRecovery } from "@/features/auth/ui/session-expiry-recovery";
-import { usableJoinedClubs } from "@/features/club-selection/model/club-entry";
 import { AccountMenuController } from "@/features/auth/route/account-menu-controller";
 import {
   HostPrimaryNavigation,
   type HostPrimaryDestination,
 } from "@/features/host/ui/shell/host-primary-navigation";
 import { HostUtilityActions } from "@/features/host/ui/shell/host-utility-actions";
-import { HostWorkspaceSwitcher } from "@/features/host/ui/shell/host-workspace-switcher";
 import { GuestNavigationLink } from "@/features/guest-browse/ui/guest-navigation-dialog";
 import type { ClubAppAudience } from "@/features/guest-browse/model/club-app-audience";
 import { guestNavigationCapability } from "@/features/guest-browse/model/club-app-audience";
@@ -24,8 +22,14 @@ import {
   fetchGuestUpcomingSessions,
   type GuestBrowsePage,
 } from "@/features/guest-browse/api/guest-browse-api";
-import { useAuth, useAuthActions } from "@/src/app/auth-state";
+import { anonymousAuth, useAuth, useAuthActions } from "@/src/app/auth-state";
+import { useAuthenticatedLogoutPublications } from "@/src/app/use-authenticated-logout-publications";
 import { AppRouteSecurityController } from "@/src/app/app-route-security-controller";
+import {
+  GlobalSpaceTransitionController,
+  globalSpaceTransitionEpochKey,
+} from "@/src/app/global-space-transition-controller";
+import { AppGlobalSpaceSwitcherBridge } from "@/src/app/global-space-switcher-bridge";
 import {
   archiveReportReturnTarget,
   archiveSessionsReturnTarget,
@@ -36,7 +40,6 @@ import {
   resetReadmatesNavigationScroll,
 } from "@/src/app/route-continuity";
 import {
-  buildClubSwitchTarget,
   candidateRoleSwitchTarget,
   resolveAuthorizedRoleSwitchTarget,
   workspaceFromCanonicalPath,
@@ -49,14 +52,12 @@ import {
 import { Link } from "@/src/app/router-link";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { touchClubAccessOnce } from "@/shared/auth/club-access-query";
-import { canUseHostApp, canUseJoinedClubHostApp, canUseMemberApp } from "@/shared/auth/member-app-access";
+import { canUseHostApp, canUseMemberApp } from "@/shared/auth/member-app-access";
 import { loginPathForReturnTo } from "@/shared/auth/login-return";
 import type {
-  ClubNavigationItem,
   ClubShellBackTarget,
   ClubWorkspace as ShellClubWorkspace,
   PrimaryNavigationItem,
-  WorkspaceNavigationItem,
 } from "@/shared/model/app-club-shell";
 import {
   hasHostRecordsReturnState,
@@ -68,6 +69,11 @@ import { AppClubShell } from "@/shared/ui/app-club-shell";
 import { MobileHeader } from "@/shared/ui/mobile-header";
 import { MobileTabBar } from "@/shared/ui/mobile-tab-bar";
 import { PublicFooter } from "@/shared/ui/public-footer";
+import {
+  publishTransitionAction,
+  TransitionOwnerObsoleteError,
+  useTransitionSafetyOwner,
+} from "@/shared/ui/use-transition-safety-owner";
 import { READMATES_MOBILE_TAB_LABELS, READMATES_NAV_LABELS, READMATES_PRIMARY_NAV_LABELS } from "@/shared/ui/readmates-copy";
 import { TopNav } from "@/shared/ui/top-nav";
 
@@ -429,6 +435,50 @@ function appMobileBackTarget({
   return null;
 }
 
+function useAppSpaceComposition({
+  auth,
+  isGuestAudience,
+  pathname,
+}: {
+  auth: AuthMeResponse | null;
+  isGuestAudience: boolean;
+  pathname: string;
+}) {
+  const isHostWorkspace = workspaceFromCanonicalPath(pathname) === "host";
+  const isActiveHost = !isGuestAudience && auth ? canUseHostApp(auth) : false;
+  const authorizedWorkspaces = useMemo<ClubWorkspace[]>(() => {
+    if (isGuestAudience || !auth) return [];
+    return [
+      ...(canUseMemberApp(auth) ? ["member" as const] : []),
+      ...(canUseHostApp(auth) ? ["host" as const] : []),
+    ];
+  }, [auth, isGuestAudience]);
+  const roleSwitchAction = useMemo(() => {
+    const targetWorkspace: ClubWorkspace = isHostWorkspace ? "member" : "host";
+    if (!authorizedWorkspaces.includes(targetWorkspace)) return null;
+    const candidate = candidateRoleSwitchTarget({ pathname, targetWorkspace });
+    const target = resolveAuthorizedRoleSwitchTarget({
+      candidate,
+      authorizedWorkspaces,
+      correspondence: "unknown",
+      lastSafeTarget: readLastSafeWorkspaceTarget(targetWorkspace),
+    });
+    return {
+      href: target,
+      label: targetWorkspace === "host" ? "호스트 공간" : "멤버 공간",
+      navigation: candidate.navigation,
+    };
+  }, [authorizedWorkspaces, isHostWorkspace, pathname]);
+  const desktopVariant: ShellClubWorkspace = isHostWorkspace ? "host" : "member";
+  return {
+    isHostWorkspace,
+    isActiveHost,
+    authorizedWorkspaces,
+    roleSwitchAction,
+    desktopVariant,
+  };
+}
+
 export function AppRouteLayout({
   scopedAuth,
   audience,
@@ -441,6 +491,8 @@ export function AppRouteLayout({
   const queryClient = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
+  const onLogoutAccepted = useAuthenticatedLogoutPublications();
+  const guestLogoutOwner = useTransitionSafetyOwner("guest-continuation-logout");
   const pathname = location.pathname;
   const appPath = appPathname(pathname);
   const guestTarget = useMemo(
@@ -457,40 +509,17 @@ export function AppRouteLayout({
       : null;
   const isGuestAudience = audience === "GUEST";
   const AppLinkComponent = isGuestAudience ? GuestNavigationLink : Link;
-  const isHostWorkspace = workspaceFromCanonicalPath(pathname) === "host";
-  const isActiveHost = !isGuestAudience && auth ? canUseHostApp(auth) : false;
-  const authorizedWorkspaces = useMemo<ClubWorkspace[]>(() => {
-    if (isGuestAudience || !auth) {
-      return [];
-    }
-
-    return [
-      ...(canUseMemberApp(auth) ? ["member" as const] : []),
-      ...(canUseHostApp(auth) ? ["host" as const] : []),
-    ];
-  }, [auth, isGuestAudience]);
-  const roleSwitchAction = useMemo(() => {
-    const targetWorkspace: ClubWorkspace = isHostWorkspace ? "member" : "host";
-    if (!authorizedWorkspaces.includes(targetWorkspace)) {
-      return null;
-    }
-
-    const candidate = candidateRoleSwitchTarget({ pathname, targetWorkspace });
-    const target = resolveAuthorizedRoleSwitchTarget({
-      candidate,
-      authorizedWorkspaces,
-      // The target's route loader remains the authority for the same object before it renders.
-      correspondence: "unknown",
-      lastSafeTarget: readLastSafeWorkspaceTarget(targetWorkspace),
-    });
-
-    return {
-      href: target,
-      label: targetWorkspace === "host" ? "호스트 공간" : "멤버 공간",
-      navigation: candidate.navigation,
-    };
-  }, [authorizedWorkspaces, isHostWorkspace, pathname]);
-  const desktopVariant: ShellClubWorkspace = isHostWorkspace ? "host" : "member";
+  const {
+    isHostWorkspace,
+    isActiveHost,
+    authorizedWorkspaces,
+    roleSwitchAction,
+    desktopVariant,
+  } = useAppSpaceComposition({
+    auth,
+    isGuestAudience,
+    pathname,
+  });
   const [guestVerification, setGuestVerification] = useState<{
     key: string | null;
     status: "not-applicable" | "pending" | "available" | "unavailable";
@@ -611,16 +640,34 @@ export function AppRouteLayout({
       throw new Error("Guest continuation route changed during verification.");
     }
 
-    const response = await logout();
-    if (!response.ok && response.status !== 401) {
-      throw new Error(`Guest continuation logout failed: ${response.status}`);
+    const operationId = `guest-continuation-logout-${globalThis.crypto.randomUUID()}`;
+    const handle = guestLogoutOwner.begin(operationId, "L1", async () => ({ operationId, outcome: "still-unknown" }));
+    let settled = false;
+    try {
+      const response = await logout();
+      const succeeded = response.ok || response.status === 401;
+      if (await handle.settle(succeeded ? "succeeded" : "failed") !== "accepted") {
+        throw new TransitionOwnerObsoleteError();
+      }
+      settled = true;
+      if (!succeeded) {
+        return await publishTransitionAction(handle, "errorCopy", () => {
+          throw new Error(`Guest continuation logout failed: ${response.status}`);
+        });
+      }
+      await publishTransitionAction(handle, "cache", () => queryClient.clear());
+      await publishTransitionAction(handle, "navigation", () => {
+        markLoggedOut();
+        void navigate(returnTo, { replace: true });
+        navigate(0);
+      });
+      return "completed" as const;
+    } catch (error) {
+      if (error instanceof TransitionOwnerObsoleteError || settled) throw error;
+      return "unknown" as const;
+    } finally {
+      if (settled) handle.completePublication();
     }
-
-    await queryClient.cancelQueries();
-    queryClient.clear();
-    markLoggedOut();
-    await navigate(returnTo, { replace: true });
-    navigate(0);
   };
 
   const accountControl = auth?.authenticated ? (
@@ -628,7 +675,7 @@ export function AppRouteLayout({
       auth={auth}
       appBasePath={basePath}
       LinkComponent={Link}
-      onLoggedOut={markLoggedOut}
+      onLogoutAccepted={onLogoutAccepted}
     />
   ) : null;
   const expiryRecovery = sessionExpiry ? (
@@ -673,46 +720,6 @@ export function AppRouteLayout({
     );
   }
 
-  const currentClubSlug = clubSlug ?? auth?.currentMembership?.clubSlug ?? "";
-  const joinedClubs = usableJoinedClubs(auth?.joinedClubs ?? []);
-  const shellClubs: ClubNavigationItem[] = joinedClubs.map((joinedClub) => {
-    const targetWorkspace: ClubWorkspace = auth
-      && canUseJoinedClubHostApp(auth, joinedClub)
-      ? "host"
-      : "member";
-    return {
-      slug: joinedClub.clubSlug,
-      name: joinedClub.clubName,
-      href: joinedClub.clubSlug === currentClubSlug
-        ? pathname
-        : buildClubSwitchTarget({
-            pathname,
-            targetClubSlug: joinedClub.clubSlug,
-            targetWorkspace,
-          }),
-    };
-  });
-  if (currentClubSlug && !shellClubs.some((club) => club.slug === currentClubSlug)) {
-    shellClubs.unshift({ slug: currentClubSlug, name: "현재 클럽", href: pathname });
-  }
-
-  const workspaceItems: WorkspaceNavigationItem[] = authorizedWorkspaces.map((workspace) => {
-    if (workspace === desktopVariant) {
-      return {
-        id: workspace,
-        label: workspace === "host" ? "호스트 공간" : "멤버 공간",
-        href: pathname,
-        navigation: "push",
-      };
-    }
-
-    return {
-      id: workspace,
-      label: workspace === "host" ? "호스트 공간" : "멤버 공간",
-      href: roleSwitchAction?.href ?? scopedAppPath(basePath, workspace === "host" ? "/app/host" : "/app"),
-      navigation: roleSwitchAction?.navigation ?? "push",
-    };
-  });
   const recordOwned = desktopVariant === "host" && hostRecordOwnedRoute(appPath, location.state, pathname);
   const primaryItems = primaryNavigationItems({
     workspace: desktopVariant,
@@ -733,7 +740,6 @@ export function AppRouteLayout({
     recordOwned,
   });
   const brandHref = scopedAppPath(basePath, desktopVariant === "host" ? "/app/host" : "/app");
-  const currentShellClub = shellClubs.find((club) => club.slug === currentClubSlug) ?? shellClubs[0];
   const hostUtilityActions = desktopVariant === "host" ? (
     <HostUtilityActions
       settingsHref={scopedAppPath(basePath, HOST_ROUTE_HREFS.settings)}
@@ -747,57 +753,48 @@ export function AppRouteLayout({
   ) : null;
 
   return (
-    <AppClubShell
-      clubs={shellClubs}
-      currentClubSlug={currentClubSlug}
-      workspace={desktopVariant}
-      workspaceItems={workspaceItems}
-      primaryItems={primaryItems}
-      account={{ control: accountControl }}
-      brandHref={brandHref}
-      mobileTitle={appMobileTitle(desktopVariant, appPath, recordOwned)}
-      mobileKicker={desktopVariant === "host" ? "호스트" : null}
-      mobileBackTarget={mobileBackTarget}
-      LinkComponent={AppLinkComponent}
-      contextSlot={desktopVariant === "host" && currentShellClub ? {
-        desktop: (
-          <HostWorkspaceSwitcher
-            club={{
-              name: currentShellClub.name,
-              slug: currentShellClub.slug,
-              avatarKey: auth?.currentMembership?.avatarKey ?? auth?.avatarKey ?? "cloud-green-book",
-            }}
-            clubs={shellClubs}
-            currentWorkspace="host"
-            workspaceItems={workspaceItems}
-            onSelectTarget={(href) => void navigate(href)}
-          />
-        ),
-      } : undefined}
-      primarySlot={hostDestinations ? {
-        desktop: (
-          <HostPrimaryNavigation
-            destinations={hostDestinations}
-            mode="desktop"
+    <GlobalSpaceTransitionController
+      key={globalSpaceTransitionEpochKey(pathname, auth ?? anonymousAuth)}
+      auth={auth ?? anonymousAuth}
+    >
+      <AppClubShell
+        workspace={desktopVariant}
+        primaryItems={primaryItems}
+        account={{ control: accountControl }}
+        brandHref={brandHref}
+        mobileTitle={appMobileTitle(desktopVariant, appPath, recordOwned)}
+        mobileKicker={desktopVariant === "host" ? "호스트" : null}
+        mobileBackTarget={mobileBackTarget}
+        LinkComponent={AppLinkComponent}
+        spaceSwitcher={{
+          desktop: <AppGlobalSpaceSwitcherBridge auth={auth ?? anonymousAuth} />,
+          mobile: <AppGlobalSpaceSwitcherBridge auth={auth ?? anonymousAuth} />,
+        }}
+        primarySlot={hostDestinations ? {
+          desktop: (
+            <HostPrimaryNavigation
+              destinations={hostDestinations}
+              mode="desktop"
+              LinkComponent={AppLinkComponent}
+            />
+          ),
+        } : undefined}
+        utilitySlot={hostUtilityActions ? {
+          desktop: hostUtilityActions,
+          mobile: <HostMobileUtilityMenu>{hostUtilityActions}</HostMobileUtilityMenu>,
+        } : undefined}
+        beforeContent={expiryRecovery}
+        securityController={<AppRouteSecurityController workspace={desktopVariant} />}
+        desktopFooter={(
+          <PublicFooter
+            publicBasePath=""
+            showGuestMemberActions={false}
             LinkComponent={AppLinkComponent}
           />
-        ),
-      } : undefined}
-      utilitySlot={hostUtilityActions ? {
-        desktop: hostUtilityActions,
-        mobile: <HostMobileUtilityMenu>{hostUtilityActions}</HostMobileUtilityMenu>,
-      } : undefined}
-      beforeContent={expiryRecovery}
-      securityController={<AppRouteSecurityController workspace={desktopVariant} />}
-      desktopFooter={(
-        <PublicFooter
-          publicBasePath=""
-          showGuestMemberActions={false}
-          LinkComponent={AppLinkComponent}
-        />
-      )}
-    >
-      <RouteOutlet />
-    </AppClubShell>
+        )}
+      >
+        <RouteOutlet />
+      </AppClubShell>
+    </GlobalSpaceTransitionController>
   );
 }

@@ -7,6 +7,7 @@ import type {
 } from "@/features/platform-admin/api/platform-admin-operations-contracts";
 import type { PlatformAdminCapability } from "@/features/platform-admin/model/platform-admin-capabilities";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import { routeEmptyAdminOperations } from "./admin-operations-e2e-fixtures";
 import {
   VISUAL_AUTHORITY_VIEWPORTS,
   expectNoHorizontalOverflow,
@@ -183,6 +184,7 @@ async function installOperationsHarness(
   }];
   const mutationBodies: Array<{ action: string; body: Record<string, unknown> }> = [];
 
+  await routeEmptyAdminOperations(page);
   await page.route("**/api/bff/api/auth/me**", (route) => json(route, 200, platformAdminAuth(role)));
   await page.route("**/api/bff/api/admin/capabilities**", (route) => json(route, 200, {
     schemaVersion: 1,
@@ -325,9 +327,9 @@ test("OWNER deep link acknowledges with optimistic version and records history",
   const harness = await installOperationsHarness(page);
   await openSelectedCase(page);
 
-  await page.getByRole("button", { name: "확인 처리" }).click();
+  await page.getByRole("button", { name: "확인함" }).click();
 
-  await expect(page.getByRole("region", { name: "운영 케이스 상세" }).getByText("현재 상태 · 확인됨")).toBeVisible();
+  await expect(page.getByRole("region", { name: "운영 케이스 상세" }).getByText("현재 상태 · 확인함")).toBeVisible();
   await expect(page.getByText("운영자가 확인함")).toBeVisible();
   expect(harness.mutationBodies).toEqual([{ action: "acknowledge", body: { expectedVersion: 3 } }]);
   expect(harness.item.version).toBe(4);
@@ -339,11 +341,11 @@ test("OPERATOR snoozes with a preset while preserving selection and filters", as
   const harness = await installOperationsHarness(page, { role: "OPERATOR" });
   await openSelectedCase(page, "case=case-notification&state=open&source=notification");
 
-  await page.getByRole("button", { name: "보류" }).click();
-  await page.getByLabel("보류 사유").fill("야간 관찰");
-  await page.getByRole("button", { name: "보류 확정" }).click();
+  await page.getByRole("button", { name: "잠시 미룸" }).click();
+  await page.getByRole("combobox", { name: "미룰 시간" }).selectOption("4");
+  await page.getByRole("button", { name: "미루기" }).click();
 
-  await expect(page.getByRole("region", { name: "운영 케이스 상세" }).getByText("현재 상태 · 보류됨")).toBeVisible();
+  await expect(page.getByRole("region", { name: "운영 케이스 상세" }).getByText("현재 상태 · 잠시 미룸")).toBeVisible();
   await expect(page).toHaveURL(/case=case-notification/);
   await expect(page).toHaveURL(/state=open/);
   await expect(page).toHaveURL(/source=notification/);
@@ -357,8 +359,8 @@ test("SUPPORT reads list and detail without controls and direct lifecycle POST i
   const harness = await installOperationsHarness(page, { role: "SUPPORT" });
   await openSelectedCase(page);
 
-  await expect(page.getByRole("button", { name: "확인 처리" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "해결 확인" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "확인함" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "처리함" })).toHaveCount(0);
   await expect(page.getByText("현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.")).toBeVisible();
 
   const response = await page.evaluate(async () => {
@@ -379,12 +381,12 @@ test("typed version conflict announces refresh and loads the latest detail", asy
   await openSelectedCase(page);
   const detailBefore = harness.detailRequests;
 
-  await page.getByRole("button", { name: "확인 처리" }).click();
+  await page.getByRole("button", { name: "확인함" }).click();
 
   await expect(page.getByRole("alert")).toContainText(
     "최신 상태를 다시 불러왔습니다. 내용을 확인한 뒤 다시 시도해 주세요.",
   );
-  await expect(page.getByRole("region", { name: "운영 케이스 상세" }).getByText("현재 상태 · 확인됨")).toBeVisible();
+  await expect(page.getByRole("region", { name: "운영 케이스 상세" }).getByText("현재 상태 · 확인함")).toBeVisible();
   expect(harness.detailRequests).toBe(detailBefore + 1);
   expect(harness.item.version).toBe(4);
 });
@@ -395,7 +397,7 @@ test("partial source failure leaves available cases usable", async ({ page }) =>
 
   await expect(page.getByText("일부 신호 확인 불가").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "AI 작업 다시 확인" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "확인 처리" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "확인함" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "알림 다시 확인" })).toHaveCount(0);
 });
 
@@ -455,16 +457,16 @@ test("Escape close backdrop and navigation never confirm resolution", async ({ p
   const harness = await installOperationsHarness(page);
   await openSelectedCase(page);
 
-  await page.getByRole("button", { name: "해결 확인" }).click();
+  await page.getByRole("button", { name: "처리함" }).click();
   await expect(page.getByRole("dialog", { name: "해결 상태 확인" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "해결 상태 확인" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "해결 확인" }).click();
+  await page.getByRole("button", { name: "처리함" }).click();
   await page.getByRole("button", { name: "닫기" }).click();
   await expect(page.getByRole("dialog", { name: "해결 상태 확인" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "해결 확인" }).click();
+  await page.getByRole("button", { name: "처리함" }).click();
   const backdrop = await page.getByTestId("resolve-backdrop").boundingBox();
   expect(backdrop).not.toBeNull();
   await page.mouse.click(
@@ -473,7 +475,7 @@ test("Escape close backdrop and navigation never confirm resolution", async ({ p
   );
   await expect(page.getByRole("dialog", { name: "해결 상태 확인" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "해결 확인" }).click();
+  await page.getByRole("button", { name: "처리함" }).click();
   await page.goto("/admin/clubs");
   await expect(page).toHaveURL(/\/admin\/clubs$/);
   expect(harness.mutationRequests).toBe(0);

@@ -67,6 +67,7 @@ vi.mock("@/features/host/queries/host-session-queries", async (importOriginal) =
     reset: routeMocks.resetAttendance,
     reconciliationState: routeMocks.reconciliationState,
   }),
+  publishHostSessionAttendance: vi.fn(),
 }));
 
 vi.mock("@/features/host/queries/host-session-recovery-queries", () => ({
@@ -78,6 +79,7 @@ vi.mock("@/features/host/queries/host-session-recovery-queries", () => ({
     mutateAsync: routeMocks.restoreChange,
     reset: routeMocks.resetRestore,
   }),
+  publishRestoredHostSessionChange: vi.fn(),
 }));
 
 vi.mock("@/features/host/queries/host-workbox-queries", async (importOriginal) => ({

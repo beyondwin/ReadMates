@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { PropsWithChildren } from "react";
+import { PropsWithChildren, type ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -11,6 +11,9 @@ import type {
   ManualNotificationPreviewResponse,
 } from "@/features/host/api/host-contracts";
 import { ReadmatesTransportError } from "@/shared/api/errors";
+import type { PendingHandle, PendingRegistration, TransitionSafetyRegistrationPort } from "@/shared/model/global-space";
+import { SpaceTransitionSafetyProvider } from "@/shared/ui/space-transition-safety-context";
+import { createGlobalSpaceTransitionCoordinator } from "@/src/app/global-space-transition";
 
 vi.mock("@/features/host/api/host-api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/host/api/host-api")>()),
@@ -164,7 +167,7 @@ const confirmed: ManualNotificationConfirmResponse = {
   },
 };
 
-function renderRoute() {
+function renderRoute(transitionPort?: TransitionSafetyRegistrationPort) {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: 0, gcTime: 0 },
@@ -172,7 +175,10 @@ function renderRoute() {
     },
   });
   function Wrapper({ children }: PropsWithChildren) {
-    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    const content: ReactNode = transitionPort
+      ? <SpaceTransitionSafetyProvider port={transitionPort}>{children}</SpaceTransitionSafetyProvider>
+      : children;
+    return <QueryClientProvider client={client}>{content}</QueryClientProvider>;
   }
   render(
     <Routes>
@@ -398,4 +404,137 @@ describe("HostScheduleReviewRoute", () => {
       expect(invalidate).toHaveBeenCalledWith({ queryKey: hostSessionKeys.operatingRoomCurrent(context) });
     });
   });
+
+  it("publishes nothing when authority is lost after failed settlement but before error continuation", async () => {
+    const rejection = deferred<void>();
+    const failedSettled = deferred<void>();
+    const continueFailure = deferred<void>();
+    vi.mocked(confirmManualNotification).mockImplementation(() => rejection.promise.then(() => {
+      throw new ReadmatesTransportError();
+    }));
+    const coordinator = createGlobalSpaceTransitionCoordinator();
+    const replay = vi.fn();
+    let capturedHandle: PendingHandle | null = null;
+    const transitionPort: TransitionSafetyRegistrationPort = {
+      ...coordinator,
+      beginPending(registration: PendingRegistration) {
+        const handle = coordinator.beginPending({
+          ...registration,
+          recovery: {
+            kind: "authoritative-history",
+            operationId: registration.operationId,
+            reconcile: async () => {
+              replay();
+              return { operationId: registration.operationId, outcome: "still-unknown" };
+            },
+          },
+        });
+        capturedHandle = handle;
+        return {
+          ...handle,
+          async settle(result) {
+            const outcome = await handle.settle(result);
+            if (result === "failed") {
+              failedSettled.resolve();
+              await continueFailure.promise;
+            }
+            return outcome;
+          },
+        };
+      },
+    };
+    const client = renderRoute(transitionPort);
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const storageWrite = vi.spyOn(Storage.prototype, "setItem");
+    await screen.findByRole("heading", { name: "일정 미열람 검토" });
+    await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
+    await userEvent.click(await screen.findByRole("button", { name: "2명에게 알림 발송" }));
+
+    rejection.resolve();
+    await failedSettled.promise;
+    coordinator.invalidateForAuthorityLoss();
+    continueFailure.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(confirmManualNotification).toHaveBeenCalledTimes(1);
+    expect(replay).not.toHaveBeenCalled();
+    expect(invalidate).not.toHaveBeenCalled();
+    expect(screen.queryByRole("status", { name: /일정 알림/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "알림 장부에서 결과 확인" })).not.toBeInTheDocument();
+    expect(storageWrite).not.toHaveBeenCalled();
+    await expect(capturedHandle?.reconcile()).resolves.toEqual(expect.objectContaining({ outcome: "authority-lost" }));
+    storageWrite.mockRestore();
+  });
+
+  it("publishes nothing when preview authority is lost after failed settlement but before recovery continuation", async () => {
+    const rejection = deferred<void>();
+    const failedSettled = deferred<void>();
+    const continueFailure = deferred<void>();
+    const coordinator = createGlobalSpaceTransitionCoordinator();
+    const replay = vi.fn();
+    let capturedHandle: PendingHandle | null = null;
+    const transitionPort: TransitionSafetyRegistrationPort = {
+      ...coordinator,
+      beginPending(registration: PendingRegistration) {
+        const handle = coordinator.beginPending({
+          ...registration,
+          recovery: {
+            kind: "authoritative-history",
+            operationId: registration.operationId,
+            reconcile: async () => {
+              replay();
+              return { operationId: registration.operationId, outcome: "still-unknown" };
+            },
+          },
+        });
+        capturedHandle = handle;
+        return {
+          ...handle,
+          async settle(result) {
+            const outcome = await handle.settle(result);
+            if (result === "failed") {
+              failedSettled.resolve();
+              await continueFailure.promise;
+            }
+            return outcome;
+          },
+        };
+      },
+    };
+    const client = renderRoute(transitionPort);
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const storageWrite = vi.spyOn(Storage.prototype, "setItem");
+    await screen.findByRole("heading", { name: "일정 미열람 검토" });
+    await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
+    expect(await screen.findByRole("region", { name: "발송 전 확인" })).toBeVisible();
+
+    vi.mocked(previewManualNotification).mockClear();
+    vi.mocked(previewManualNotification).mockImplementation(() => rejection.promise.then(() => {
+      throw { code: "MANUAL_NOTIFICATION_RECIPIENTS_CHANGED", status: 409 };
+    }));
+    await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
+    rejection.resolve();
+    await failedSettled.promise;
+    coordinator.invalidateForAuthorityLoss();
+    continueFailure.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(previewManualNotification).toHaveBeenCalledTimes(1);
+    expect(replay).not.toHaveBeenCalled();
+    expect(invalidate).not.toHaveBeenCalled();
+    expect(screen.getByRole("region", { name: "발송 전 확인" })).toBeVisible();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: /일정 알림/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "일정 미열람 검토" })).toBeVisible();
+    expect(storageWrite).not.toHaveBeenCalled();
+    await expect(capturedHandle?.reconcile()).resolves.toEqual(expect.objectContaining({ outcome: "authority-lost" }));
+    storageWrite.mockRestore();
+  });
 });
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((next) => { resolve = next; });
+  return { promise, resolve };
+}

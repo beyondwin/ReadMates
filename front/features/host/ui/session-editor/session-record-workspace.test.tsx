@@ -142,6 +142,24 @@ function props(
       importStatus: "ready",
       importError: null,
     },
+    renderAiGeneration: ({ onCommitted }) => (
+      <div data-testid="aigen-workspace">
+        <button
+          type="button"
+          onClick={() => onCommitted({
+            sessionId: "session-1",
+            status: "COMMITTED",
+            recovered: false,
+            participantUpdatesCount: null,
+            draftRevision: 5,
+            baseLiveRevision: 0,
+            liveApplied: false,
+          })}
+        >
+          AI 초안 저장 완료
+        </button>
+      </div>
+    ),
     actions: {
       onSnapshotChange: vi.fn(),
       onReloadDraft: vi.fn(),

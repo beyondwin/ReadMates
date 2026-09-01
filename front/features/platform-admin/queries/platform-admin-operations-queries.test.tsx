@@ -29,6 +29,7 @@ import {
   platformAdminOperationCaseQuery,
   platformAdminOperationCasePagesQuery,
   platformAdminOperationCasesQuery,
+  publishAdminOperationCase,
   useAcknowledgeAdminOperationCaseMutation,
   useResolveAdminOperationCaseMutation,
   useSnoozeAdminOperationCaseMutation,
@@ -225,6 +226,9 @@ describe("platform admin operations queries", () => {
       await result.current.mutateAsync(variables as never);
     });
 
+    expect(client.getQueryState(listKey)?.isInvalidated).toBe(false);
+    expect(client.getQueryState(detailKey)?.isInvalidated).toBe(false);
+    await publishAdminOperationCase(client, caseId);
     expect(client.getQueryState(listKey)?.isInvalidated).toBe(true);
     expect(client.getQueryState(detailKey)?.isInvalidated).toBe(true);
     expect(client.getQueryState(otherDetailKey)?.isInvalidated).toBe(false);

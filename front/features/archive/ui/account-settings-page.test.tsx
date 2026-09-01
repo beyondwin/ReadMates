@@ -26,7 +26,7 @@ function renderAccountSettings() {
     <MemoryRouter>
       <AccountSettingsPage
         data={profile}
-        onLeaveMembership={vi.fn()}
+        onLeaveMembership={vi.fn(async () => "accepted" as const)}
       />
     </MemoryRouter>,
   );

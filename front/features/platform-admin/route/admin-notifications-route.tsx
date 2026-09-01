@@ -12,6 +12,7 @@ import {
   platformAdminNotificationDeliveriesQuery,
   platformAdminNotificationEventsQuery,
   platformAdminNotificationSnapshotQuery,
+  publishPlatformAdminNotifications,
   useConfirmAdminNotificationReplayMutation,
   usePreviewAdminNotificationReplayMutation,
 } from "@/features/platform-admin/queries/platform-admin-notifications-queries";
@@ -21,6 +22,7 @@ import {
   platformAdminCapabilitiesQuery,
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { AdminNotificationsPage } from "@/features/platform-admin/ui/admin-notifications-page";
+import { publishTransitionAction, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 const GENERIC_ERROR = "알림 운영 정보를 처리하지 못했습니다. 다시 시도해 주세요.";
 
@@ -113,6 +115,8 @@ function NotificationReplaySession({
   const [error, setError] = useState<string | null>(null);
   const previewMutation = usePreviewAdminNotificationReplayMutation();
   const confirmMutation = useConfirmAdminNotificationReplayMutation();
+  const queryClient = useQueryClient();
+  const transitionOwner = useTransitionSafetyOwner("admin-notification-replay");
   const busy = previewMutation.isPending || confirmMutation.isPending;
 
   function purgeReplayState() {
@@ -155,6 +159,8 @@ function NotificationReplaySession({
     if (!canReplay || !replayPreview || !replayReason.trim() || !replayIntentKey) return;
     setError(null);
     setCommandSubmitted(true);
+    const operationId = `admin-notification-replay:${replayIntentKey}`;
+    const handle = transitionOwner.begin(operationId, "L3", async () => ({ operationId, outcome: "still-unknown" }));
     try {
       const result = await confirmMutation.mutateAsync({
         previewId: replayPreview.previewId,
@@ -162,15 +168,22 @@ function NotificationReplaySession({
         reason: replayReason,
         idempotencyKey: replayIntentKey,
       });
-      setReplayResult(result);
-      setUnknownOutcome(false);
+      if (await handle.settle("succeeded") !== "accepted") return;
+      await publishTransitionAction(handle, "cache", () => publishPlatformAdminNotifications(queryClient));
+      await publishTransitionAction(handle, "ui", () => {
+        setReplayResult(result);
+        setUnknownOutcome(false);
+      });
     } catch (caught) {
+      if (await handle.settle("failed") !== "accepted") return;
       if (isPlatformAdminAuthorityLossError(caught)) {
-        purgeReplayState();
+        await publishTransitionAction(handle, "errorCopy", purgeReplayState);
         return;
       }
-      setUnknownOutcome(true);
-      setError("재처리 결과를 확인하지 못했습니다. 같은 요청으로 다시 확인해 주세요.");
+      await publishTransitionAction(handle, "errorCopy", () => {
+        setUnknownOutcome(true);
+        setError("재처리 결과를 확인하지 못했습니다. 같은 요청으로 다시 확인해 주세요.");
+      });
     }
   }
 

@@ -50,6 +50,9 @@ spring:
       moderation: none
 
 management:
+  tracing:
+    export:
+      enabled: false
   otlp:
     metrics:
       export:

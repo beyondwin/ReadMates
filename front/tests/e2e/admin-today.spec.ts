@@ -116,6 +116,14 @@ async function routePlatformAdminToday(page: Page, role: PlatformAdminRole): Pro
     domainsRequiringAction: [],
   }));
   await page.route("**/api/bff/api/admin/clubs", (route) => json(route, 200, { items: [] }));
+  await page.route("**/api/bff/api/admin/health/snapshot**", (route) => json(route, 200, {
+    schema: "platform.health_snapshot.v1",
+    generatedAt: GENERATED_AT,
+    lastSuccessfulAt: GENERATED_AT,
+    refreshState: "FRESH",
+    staleAgeSeconds: 0,
+    cards: [],
+  }));
   await page.route("**/api/bff/api/admin/operations/cases**", (route) => {
     const pathname = new URL(route.request().url()).pathname;
     if (pathname.endsWith("/cases/case-notification")) {
@@ -155,12 +163,18 @@ test("owner sees the durable operations queue inside the admin shell", async ({ 
     "aria-pressed",
     "true",
   );
-  await expect(page.getByRole("button", { name: "확인 처리" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "확인함" })).toBeEnabled();
   await expect(page.getByRole("link", { name: "배달 원장에서 확인" })).toHaveAttribute(
     "href",
     "/admin/notifications",
   );
   await expect(page.getByText("페이지를 불러오지 못했습니다.")).toHaveCount(0);
+
+  await page.getByRole("link", { name: "전체 처리 기록 보기" }).click();
+  await expect(page).toHaveURL((url) => (
+    url.pathname === "/admin/audit"
+    && url.searchParams.get("target") === null
+  ));
 });
 
 test("support can inspect a case without lifecycle controls", async ({ page }) => {
@@ -190,6 +204,20 @@ test("768px uses mobile drill-in instead of stacked columns", async ({ page }) =
   await expect(page.getByRole("button", { name: "목록으로" })).toBeFocused();
   await expect(page.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
   await expect(page.getByRole("group", { name: "작업", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "확인함" })).toHaveClass(/btn-primary/);
+  await expect(page.getByText("다른 처리")).toBeVisible();
+
+  await page.reload();
+  await expect(page).toHaveURL(/case=case-notification/);
+  await expect(page).toHaveURL(/mode=detail/);
+  await expect(page.getByRole("button", { name: "목록으로" })).toBeFocused();
+
+  await page.goBack();
+  const selectedRow = page.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ });
+  await expect(selectedRow).toBeFocused();
+
+  await page.goForward();
+  await expect(page.getByRole("button", { name: "목록으로" })).toBeFocused();
 
   await page.getByRole("button", { name: "목록으로" }).click();
   await expect(page.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();

@@ -47,6 +47,11 @@ class DevLoginControllerTest(
                 jsonPath("$.displayName") { value("호스트") }
                 jsonPath("$.accountName") { value("김호스트") }
                 jsonPath("$.shortName") { doesNotExist() }
+                jsonPath("$.availableSpaces.version") { value(1) }
+                jsonPath("$.availableSpaces.kinds[0]") { value("CLUBS") }
+                jsonPath("$.availableSpaces.clubs[0].clubSlug") { value("reading-sai") }
+                jsonPath("$.availableSpaces.clubs[0].perspectives[0]") { value("MEMBER") }
+                jsonPath("$.availableSpaces.clubs[0].perspectives[1]") { value("HOST") }
             }
     }
 
@@ -87,6 +92,9 @@ class DevLoginControllerTest(
                 jsonPath("$.platformAdmin.role") { value("OWNER") }
                 jsonPath("$.platformAdmin.email") { value("admin-owner@example.com") }
                 jsonPath("$.recommendedAppEntryUrl") { value("/admin") }
+                jsonPath("$.availableSpaces.version") { value(1) }
+                jsonPath("$.availableSpaces.kinds[0]") { value("PLATFORM") }
+                jsonPath("$.availableSpaces.clubs.length()") { value(0) }
             }
     }
 

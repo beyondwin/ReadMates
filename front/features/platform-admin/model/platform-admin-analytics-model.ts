@@ -99,6 +99,16 @@ export type AnalyticsKpiAction = {
   href: string;
 };
 
+export type AnalyticsKpiDecisionView = {
+  key: KpiKey;
+  label: string;
+  definition: string;
+  availability: string;
+  value: string | null;
+  comparison: string;
+  action: AnalyticsKpiAction;
+};
+
 const KPI_ACTIONS: Record<KpiKey, AnalyticsKpiAction> = {
   ACTIVE_MEMBERS: { label: "클럽 운영 보기", href: "/admin/clubs" },
   SESSION_COMPLETION: { label: "클럽 운영 보기", href: "/admin/clubs" },
@@ -109,6 +119,22 @@ const KPI_ACTIONS: Record<KpiKey, AnalyticsKpiAction> = {
 
 export function analyticsActionForKpi(key: KpiKey): AnalyticsKpiAction {
   return KPI_ACTIONS[key];
+}
+
+export function buildAnalyticsKpiDecisionView(
+  card: AdminAnalyticsKpiCard,
+): AnalyticsKpiDecisionView {
+  return {
+    key: card.key,
+    label: card.label.trim() || labelKpi(card.key),
+    definition: card.definition.trim() || "집계 기준을 확인할 수 없습니다.",
+    availability: formatAvailabilityLabel(card.availability),
+    value: card.availability === "AVAILABLE" && card.current !== null
+      ? formatKpiValue(card)
+      : null,
+    comparison: deltaLabel(card),
+    action: analyticsActionForKpi(card.key),
+  };
 }
 
 export function formatAvailabilityLabel(availability: Availability): string {
@@ -157,4 +183,23 @@ export function deltaLabel(card: AdminAnalyticsKpiCard): string {
   const arrow = card.deltaDirection === "UP" ? "▲" : card.deltaDirection === "DOWN" ? "▼" : "→";
   const sign = card.delta > 0 ? "+" : "";
   return `${arrow} ${sign}${card.delta} (이전 구간 대비)`;
+}
+
+const ANALYTICS_SEOUL_TIMESTAMP = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+export function formatAnalyticsGeneratedAt(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "집계 시각 확인 필요";
+  const parts = new Map(
+    ANALYTICS_SEOUL_TIMESTAMP.formatToParts(date).map((part) => [part.type, part.value]),
+  );
+  return `${parts.get("year")}. ${parts.get("month")}. ${parts.get("day")}. ${parts.get("hour")}:${parts.get("minute")} 기준`;
 }

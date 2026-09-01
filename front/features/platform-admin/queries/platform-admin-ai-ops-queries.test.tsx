@@ -31,6 +31,7 @@ import {
   platformAdminAiOpsJobsInfiniteQuery,
   platformAdminAiOpsKeys,
   platformAdminAiOpsSummaryQuery,
+  publishPlatformAdminAiOps,
   useConfirmPlatformAdminAiJobCommandMutation,
   usePreviewPlatformAdminAiJobCommandMutation,
 } from "./platform-admin-ai-ops-queries";
@@ -199,6 +200,8 @@ describe("platform admin AI 작업 mutation cache behavior", () => {
     });
 
     expect(confirmRetryCommitPlatformAdminAiJob).toHaveBeenCalledWith("job-1", request);
+    expect(invalidateSpy).not.toHaveBeenCalled();
+    await publishPlatformAdminAiOps(client);
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: platformAdminAiOpsKeys.all });
   });
 });

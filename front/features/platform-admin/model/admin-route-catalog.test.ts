@@ -4,10 +4,12 @@ import {
   ADMIN_ROUTES,
   ADMIN_SHELL_LAYOUT_BREAKPOINT_PX,
   ADMIN_SHELL_LAYOUT_MEDIA_QUERY,
+  resolveAdminRouteOwner,
   type AdminRouteDescriptor,
   visibleAdminNav,
 } from "./admin-route-catalog";
 import type { PlatformAdminCapabilities } from "./platform-admin-capabilities";
+import { adminNavigationLanguage } from "./admin-status-language";
 
 function projection(
   capabilities: PlatformAdminCapabilities["capabilities"],
@@ -42,7 +44,7 @@ describe("ADMIN_ROUTES catalog", () => {
     expect(new Set(paths).size).toBe(paths.length);
   });
 
-  it("uses a single Korean label per primary area", () => {
+  it("keeps one breadcrumb label per route owner", () => {
     const labelByGroup = new Map<string, string>();
     for (const route of ADMIN_ROUTES) {
       if (route.group == null) continue;
@@ -51,10 +53,10 @@ describe("ADMIN_ROUTES catalog", () => {
       else labelByGroup.set(route.group, route.groupLabel);
     }
     expect([...labelByGroup.entries()]).toEqual([
-      ["today", "오늘"],
-      ["clubs", "클럽"],
-      ["pipeline", "파이프라인"],
-      ["ledger", "원장"],
+      ["today", adminNavigationLanguage("today").primaryText],
+      ["clubs", adminNavigationLanguage("clubs").primaryText],
+      ["service", adminNavigationLanguage("service").primaryText],
+      ["records", adminNavigationLanguage("records").primaryText],
     ]);
   });
 
@@ -72,56 +74,56 @@ describe("ADMIN_ROUTES catalog", () => {
         path: "today",
         label: "오늘",
         group: "today",
-        groupLabel: "오늘",
+        groupLabel: "오늘 할 일",
         requiredCapability: "VIEW_TODAY",
       },
       {
         path: "clubs",
         label: "클럽",
         group: "clubs",
-        groupLabel: "클럽",
+        groupLabel: "클럽 관리",
         requiredCapability: "VIEW_CLUBS",
       },
       {
         path: "notifications",
-        label: "배달 원장",
-        group: "pipeline",
-        groupLabel: "파이프라인",
+        label: "알림 전달",
+        group: "service",
+        groupLabel: "서비스 상태",
         requiredCapability: "VIEW_NOTIFICATION_OPERATIONS",
       },
       {
         path: "ai-ops",
         label: "AI 작업",
-        group: "pipeline",
-        groupLabel: "파이프라인",
+        group: "service",
+        groupLabel: "서비스 상태",
         requiredCapability: "VIEW_AI_OPERATIONS",
       },
       {
         path: "health",
-        label: "서비스 건강",
-        group: "pipeline",
-        groupLabel: "파이프라인",
+        label: "서비스 상태",
+        group: "service",
+        groupLabel: "서비스 상태",
         requiredCapability: "VIEW_SERVICE_HEALTH",
       },
       {
         path: "audit",
-        label: "운영 기입",
-        group: "ledger",
-        groupLabel: "원장",
+        label: "처리 기록",
+        group: "records",
+        groupLabel: "처리 기록",
         requiredCapability: "VIEW_AUDIT",
       },
       {
         path: "support",
-        label: "접근 원장",
-        group: "ledger",
-        groupLabel: "원장",
+        label: "지원 접근",
+        group: "clubs",
+        groupLabel: "클럽 관리",
         requiredCapability: "VIEW_SUPPORT",
       },
       {
         path: "analytics",
         label: "분석 부록",
-        group: "ledger",
-        groupLabel: "원장",
+        group: "records",
+        groupLabel: "처리 기록",
         requiredCapability: "VIEW_ANALYTICS",
       },
       {
@@ -184,7 +186,7 @@ describe("ADMIN_ROUTES catalog", () => {
       path: "clubs/:clubId",
       label: "클럽 상세",
       group: "clubs",
-      groupLabel: "클럽",
+      groupLabel: "클럽 관리",
       status: "ready",
       requiredCapability: "VIEW_CLUB_OPERATIONS",
     });
@@ -214,7 +216,7 @@ describe("ADMIN_ROUTES catalog", () => {
 });
 
 describe("visibleAdminNav", () => {
-  it("places today and clubs as direct destinations and nests pipeline and ledger children", () => {
+  it("returns exactly four operating axes while keeping nested destinations inside their owners", () => {
     const nav = visibleAdminNav(
       projection([
         "VIEW_TODAY",
@@ -230,19 +232,22 @@ describe("visibleAdminNav", () => {
     );
 
     expect(nav.areas.map((area) => ({ id: area.id, label: area.label, href: area.href }))).toEqual([
-      { id: "today", label: "오늘", href: "/admin/today" },
-      { id: "clubs", label: "클럽", href: "/admin/clubs" },
-      { id: "pipeline", label: "파이프라인", href: undefined },
-      { id: "ledger", label: "원장", href: undefined },
+      { id: "today", label: "오늘 할 일", href: "/admin/today" },
+      { id: "clubs", label: "클럽 관리", href: "/admin/clubs" },
+      { id: "service", label: "서비스 상태", href: "/admin/health" },
+      { id: "records", label: "처리 기록", href: "/admin/audit" },
     ]);
-    expect(nav.areas.find((area) => area.id === "pipeline")?.children.map((route) => route.path)).toEqual([
+    expect(nav.areas.find((area) => area.id === "clubs")?.children.map((route) => route.path)).toEqual([
+      "clubs",
+      "support",
+    ]);
+    expect(nav.areas.find((area) => area.id === "service")?.children.map((route) => route.path)).toEqual([
       "notifications",
       "ai-ops",
       "health",
     ]);
-    expect(nav.areas.find((area) => area.id === "ledger")?.children.map((route) => route.path)).toEqual([
+    expect(nav.areas.find((area) => area.id === "records")?.children.map((route) => route.path)).toEqual([
       "audit",
-      "support",
       "analytics",
     ]);
     expect(nav.areas.flatMap((area) => area.children.map((route) => route.path))).not.toContain(
@@ -260,16 +265,28 @@ describe("visibleAdminNav", () => {
     expect(nav.pinned.map((route) => ({ path: route.path, label: route.label, group: route.group }))).toEqual([
       { path: "public-takedown", label: "긴급 공개 회수", group: null },
     ]);
-    expect(nav.areas.map((area) => area.id)).toEqual(["today", "ledger"]);
+    expect(nav.areas.map((area) => area.id)).toEqual(["today", "records"]);
   });
 
-  it("hides routes, empty parents, and pinned emergency when the projection omits their capability", () => {
+  it("keeps nested-only capabilities under their existing axes instead of promoting fifth tabs", () => {
+    const nav = visibleAdminNav(
+      projection(["VIEW_SUPPORT", "VIEW_ANALYTICS", "EMERGENCY_PUBLIC_TAKEDOWN"]),
+    );
+    expect(nav.areas.map(({ id, label, href }) => ({ id, label, href }))).toEqual([
+      { id: "clubs", label: "클럽 관리", href: "/admin/support" },
+      { id: "records", label: "처리 기록", href: "/admin/analytics" },
+    ]);
+    expect(nav.areas).toHaveLength(2);
+    expect(nav.pinned.map((route) => route.path)).toEqual(["public-takedown"]);
+  });
+
+  it("hides unavailable axes and pinned emergency when the projection omits their capability", () => {
     const nav = visibleAdminNav(projection(["VIEW_TODAY", "VIEW_SERVICE_HEALTH", "VIEW_AUDIT"]));
-    expect(nav.areas.map((area) => area.id)).toEqual(["today", "pipeline", "ledger"]);
-    expect(nav.areas.find((area) => area.id === "pipeline")?.children.map((route) => route.path)).toEqual([
+    expect(nav.areas.map((area) => area.id)).toEqual(["today", "service", "records"]);
+    expect(nav.areas.find((area) => area.id === "service")?.children.map((route) => route.path)).toEqual([
       "health",
     ]);
-    expect(nav.areas.find((area) => area.id === "ledger")?.children.map((route) => route.path)).toEqual([
+    expect(nav.areas.find((area) => area.id === "records")?.children.map((route) => route.path)).toEqual([
       "audit",
     ]);
     expect(nav.pinned).toEqual([]);
@@ -279,5 +296,31 @@ describe("visibleAdminNav", () => {
     expect(visibleAdminNav(null)).toEqual({ areas: [], pinned: [] });
     expect(visibleAdminNav(undefined)).toEqual({ areas: [], pinned: [] });
     expect(visibleAdminNav(projection([]))).toEqual({ areas: [], pinned: [] });
+  });
+});
+
+describe("resolveAdminRouteOwner", () => {
+  it.each([
+    [{ pathname: "/admin", search: "" }, "today"],
+    [{ pathname: "/admin/", search: "" }, "today"],
+    [{ pathname: "/admin/today", search: "?state=OPEN" }, "today"],
+    [{ pathname: "/admin/clubs", search: "" }, "clubs"],
+    [{ pathname: "/admin/clubs/club-1", search: "?returnTo=%2Fadmin%2Fclubs" }, "clubs"],
+    [{ pathname: "/admin/support", search: "?clubId=club-1" }, "clubs"],
+    [{ pathname: "/admin/today", search: "?onboarding=1" }, "today"],
+    [{ pathname: "/admin/clubs", search: "?onboarding=1" }, "clubs"],
+    [{ pathname: "/admin/health", search: "" }, "service"],
+    [{ pathname: "/admin/notifications", search: "?focus=failed" }, "service"],
+    [{ pathname: "/admin/ai-ops", search: "?window=30d" }, "service"],
+    [{ pathname: "/admin/audit", search: "?range=24h" }, "records"],
+    [{ pathname: "/admin/analytics", search: "?window=30d" }, "records"],
+    [{ pathname: "/admin/public-takedown", search: "" }, "emergency"],
+    [{ pathname: "/admin/public-takedown", search: "?onboarding=1" }, "emergency"],
+  ] as const)("maps %o to exactly one explicit owner", (location, expected) => {
+    expect(resolveAdminRouteOwner(location)).toBe(expected);
+  });
+
+  it("does not infer an owner for an unknown admin route", () => {
+    expect(resolveAdminRouteOwner({ pathname: "/admin/unknown", search: "" })).toBeNull();
   });
 });

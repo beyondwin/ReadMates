@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PlatformAdminClubDetail } from "@/features/platform-admin/api/platform-admin-contracts";
@@ -226,15 +226,38 @@ beforeEach(() => {
 });
 
 describe("AdminClubDetailRoute", () => {
+  it("orders the club detail by operator judgement from facts through recent records", () => {
+    const { container } = renderRoute(
+      detail,
+      [
+        "VIEW_CLUBS",
+        "VIEW_CLUB_OPERATIONS",
+        "VIEW_SUPPORT",
+        "VIEW_AUDIT",
+        "MANAGE_CLUBS",
+        "MANAGE_CLUB_DOMAINS",
+      ],
+    );
+
+    expect(
+      [...container.querySelectorAll<HTMLElement>("[data-admin-club-section]")]
+        .map((section) => section.dataset.adminClubSection),
+    ).toEqual(["basic", "state", "impact", "actions", "history"]);
+    expect(
+      [...container.querySelectorAll<HTMLElement>("[data-admin-club-section] > h2")]
+        .map((heading) => heading.textContent),
+    ).toEqual(["기본 정보", "현재 상태", "영향", "가능한 조치", "최근 처리 기록"]);
+  });
+
   it("renders authoritative detail with a read-only slug and independent domain panel", () => {
     const { container } = renderRoute();
     expect(screen.getByText("운영 · 클럽 상세")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Alpha" })).toBeInTheDocument();
-    expect(screen.getByText("revision 7 · 활성 · 비공개")).toBeInTheDocument();
+    expect(screen.getByText("활성 · 비공개")).toBeInTheDocument();
     expect(screen.getByText("현재 비공개")).toBeInTheDocument();
     expect(screen.getByText("식별")).toBeInTheDocument();
     expect(screen.getByText("공개 설정")).toBeInTheDocument();
-    expect(screen.getByText("도메인 준비")).toBeInTheDocument();
+    expect(screen.getAllByText("도메인 준비")).toHaveLength(2);
     expect(screen.queryByText("Identity")).toBeNull();
     expect(screen.queryByText("Visibility")).toBeNull();
     expect(screen.queryByText("Domain provisioning")).toBeNull();
@@ -242,7 +265,8 @@ describe("AdminClubDetailRoute", () => {
     expect(screen.queryByText(/\bPRIVATE\b/)).toBeNull();
     expect(screen.getByText("alpha.example.test")).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Slug" })).not.toBeInTheDocument();
-    expect(container.querySelector(".admin-club-detail__facts")).toHaveTextContent("alpha");
+    expect(container.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("alpha");
+    expect(container.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("관리 revision7");
     expect(screen.getByRole("button", { name: "편집" })).toBeInTheDocument();
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });
@@ -270,6 +294,37 @@ describe("AdminClubDetailRoute", () => {
     );
   });
 
+  it("edits product fields with Korean primary labels while keeping raw field names out of the form", async () => {
+    vi.mocked(updatePlatformAdminClubMetadata).mockResolvedValue({
+      ...detail,
+      tagline: "새 소개 문구",
+      about: "새 공개 소개",
+      adminRevision: 8,
+    });
+    renderRoute();
+
+    fireEvent.click(screen.getByRole("button", { name: "편집" }));
+    expect(screen.queryByRole("textbox", { name: "Slug" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Tagline" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "About" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/revision 기준/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("기술 정보")).toHaveTextContent("관리 revision");
+    fireEvent.change(screen.getByRole("textbox", { name: "소개 문구" }), {
+      target: { value: "새 소개 문구" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "공개 소개" }), {
+      target: { value: "새 공개 소개" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "공개 정보 저장" }));
+
+    await waitFor(() => expect(updatePlatformAdminClubMetadata).toHaveBeenCalledWith("c-1", {
+      expectedAdminRevision: 7,
+      name: "Alpha",
+      tagline: "새 소개 문구",
+      about: "새 공개 소개",
+    }));
+  });
+
   it("locks metadata fields while a revision-guarded save is pending", async () => {
     let resolveSave: ((value: PlatformAdminClubDetail) => void) | undefined;
     vi.mocked(updatePlatformAdminClubMetadata).mockReturnValue(
@@ -286,8 +341,8 @@ describe("AdminClubDetailRoute", () => {
     await waitFor(() =>
       expect(screen.getByRole("textbox", { name: "클럽 이름" })).toBeDisabled(),
     );
-    expect(screen.getByRole("textbox", { name: "Tagline" })).toBeDisabled();
-    expect(screen.getByRole("textbox", { name: "About" })).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "소개 문구" })).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "공개 소개" })).toBeDisabled();
     resolveSave?.({ ...detail, name: "Alpha Books", adminRevision: 8 });
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "편집" })).toBeInTheDocument(),
@@ -299,7 +354,7 @@ describe("AdminClubDetailRoute", () => {
 
   it("hides the support grant metric without VIEW_SUPPORT", () => {
     renderRoute(detail, ["VIEW_CLUBS", "VIEW_CLUB_OPERATIONS"]);
-    expect(screen.getByText("Alpha 운영 스냅샷")).toBeInTheDocument();
+    expect(screen.getByText("운영 영향 요약")).toBeInTheDocument();
     expect(screen.queryByText("접근 발급")).not.toBeInTheDocument();
   });
 
@@ -354,10 +409,8 @@ describe("AdminClubDetailRoute", () => {
 
   it("renders the club recent-ledger link onto the shared audit prefilter", () => {
     renderRoute();
-    expect(
-      screen.getByRole("heading", { name: "이 클럽의 최근 기입" }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "전체 기입 보기" })).toHaveAttribute(
+    expect(screen.getByRole("heading", { name: "최근 처리 기록" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "전체 처리 기록 보기" })).toHaveAttribute(
       "href",
       "/admin/audit?target=c-1",
     );
@@ -389,6 +442,10 @@ describe("AdminClubDetailRoute", () => {
     expect(
       await screen.findByText("PUBLIC_DISCOVERY_ENABLED"),
     ).toBeInTheDocument();
+    const visibilityReview = screen.getByLabelText("공개 전환 영향");
+    expect(within(visibilityReview).getByText("클럽이 공개 검색과 탐색에 표시됩니다.")).toBeInTheDocument();
+    expect(within(visibilityReview).queryByText("PUBLIC_DISCOVERY_ENABLED", { selector: "li" })).not.toBeInTheDocument();
+    expect(within(visibilityReview).getByLabelText("기술 정보")).toHaveTextContent("PUBLIC_DISCOVERY_ENABLED");
     const confirm = screen.getByRole("button", { name: "공개 전환 확정" });
     expect(confirm).toBeDisabled();
     fireEvent.click(

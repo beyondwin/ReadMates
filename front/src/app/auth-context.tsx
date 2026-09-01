@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
-import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import type { AuthMeResponse, NormalizedAuthMeResponse } from "@/shared/auth/auth-contracts";
+import { normalizeAuthAvailableSpaces } from "@/shared/auth/available-spaces";
 import {
   READMATES_SESSION_EXPIRED_EVENT,
   sessionExpiryCause,
@@ -7,7 +8,7 @@ import {
 import { anonymousAuth, AuthActionsContext, AuthContext, type AuthState } from "@/src/app/auth-state";
 
 type FetchAuthMeOutcome =
-  | { kind: "ok"; auth: AuthMeResponse }
+  | { kind: "ok"; auth: NormalizedAuthMeResponse }
   | { kind: "expired" }
   | { kind: "error" };
 
@@ -16,7 +17,7 @@ async function fetchAuthMeOutcome(): Promise<FetchAuthMeOutcome> {
     const response = await fetch("/api/bff/api/auth/me", { cache: "no-store" });
     if (response.status === 401) return { kind: "expired" };
     if (!response.ok) return { kind: "error" };
-    return { kind: "ok", auth: (await response.json()) as AuthMeResponse };
+    return { kind: "ok", auth: normalizeAuthAvailableSpaces((await response.json()) as AuthMeResponse) };
   } catch {
     return { kind: "error" };
   }

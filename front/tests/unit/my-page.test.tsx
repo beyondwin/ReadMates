@@ -60,7 +60,7 @@ describe("MyPage", () => {
         notificationsHref="/app/notifications"
         settingsHref="/app/me/settings"
         archiveSessionsHref="/app/archive?view=sessions"
-        onSaveProfile={vi.fn().mockImplementation(async (editable) => ({ ...editable, accountName: profile.accountName }))}
+        onSaveProfile={vi.fn().mockImplementation(async (editable) => ({ status: "accepted", profile: { ...editable, accountName: profile.accountName } }))}
       />,
     );
 

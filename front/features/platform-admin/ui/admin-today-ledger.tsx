@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, type ReactNode } from "react";
 import {
   beginAdminEditorialLedgerCaseSelection,
   beginAdminEditorialLedgerFilterCommit,
@@ -7,7 +7,6 @@ import {
   commitAdminEditorialLedgerPollMergeRaf,
 } from "@/shared/observability/admin-editorial-ledger-performance";
 import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
-import { ADMIN_SHELL_LAYOUT_MEDIA_QUERY } from "@/features/platform-admin/model/admin-route-catalog";
 import type {
   AdminOperationsSearchMode,
   AdminOperationsView,
@@ -21,6 +20,7 @@ import { AdminOperationsQueue } from "./admin-operations-queue";
 import { AdminPageContext } from "./admin-page-context";
 import { AdminStatePanel } from "./admin-state-panel";
 import { AdminTodayControls, type AdminTodayFilters } from "./admin-today-controls";
+import { useAdminContentWidth } from "./use-admin-content-width";
 
 export const ADMIN_TODAY_HEADING = "오늘의 운영 케이스";
 export const ADMIN_TODAY_DESCRIPTION =
@@ -39,9 +39,11 @@ type HistoryEvent = {
 
 type Props = {
   view: AdminOperationsView;
+  auditHref: string;
   filters: AdminTodayFilters;
   history: readonly HistoryEvent[];
   lifecycleControls: ReactNode;
+  mobileLifecycleControls?: ReactNode;
   detailLoading?: boolean;
   detailUnavailable?: boolean;
   permissionDenied?: boolean;
@@ -69,9 +71,11 @@ type Props = {
 
 export function AdminTodayLedger({
   view,
+  auditHref,
   filters,
   history,
   lifecycleControls,
+  mobileLifecycleControls,
   detailLoading = false,
   detailUnavailable = false,
   permissionDenied = false,
@@ -96,14 +100,14 @@ export function AdminTodayLedger({
   onApplyPending,
   onBackToList,
 }: Props) {
-  const mobileLayout = useMobileOperationsLayout();
-  const ledgerRef = useRef<HTMLDivElement>(null);
+  const { ref: ledgerRef, layout: contentLayout, width: contentWidth } = useAdminContentWidth<HTMLDivElement>();
+  const flowLayout = contentLayout === "flow";
   const filtered = hasActiveTodayFilters(filters) || Boolean(query.trim());
   const pageState = deriveTodayPageState(view);
 
   const selectDocketCase = (caseId: string) => {
     beginAdminEditorialLedgerCaseSelection(caseId);
-    onSelectCase(caseId, mobileLayout ? { mode: "detail" } : undefined);
+    onSelectCase(caseId, flowLayout ? { mode: "detail" } : undefined);
   };
   const traversal = buildTodayCaseTraversal(view.items, view.selectedCaseId, selectDocketCase);
 
@@ -112,7 +116,7 @@ export function AdminTodayLedger({
       `input[type='search'][aria-label='${ADMIN_COPY.search.loadedCases}']`,
     );
     if (control) commitAdminEditorialLedgerFirstUsable();
-  }, [view.items.length, view.generatedAt]);
+  }, [ledgerRef, view.items.length, view.generatedAt]);
 
   useLayoutEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -142,6 +146,7 @@ export function AdminTodayLedger({
   const inspector = (
     <AdminOperationsInspector
       selectedCase={view.selectedCase}
+      auditHref={auditHref}
       history={history}
       lifecycleControls={lifecycleControls}
       detailLoading={detailLoading}
@@ -153,11 +158,63 @@ export function AdminTodayLedger({
     />
   );
 
-  const workSurface = view.items.length === 0 ? null : mobileLayout ? (
+  const queueControls = (
+    <>
+      <AdminTodayControls
+        workViews={view.workViews}
+        activeView={workView}
+        query={query}
+        filters={filters}
+        pendingCount={pendingCount}
+        urgentCount={urgentCount}
+        refreshing={refreshing}
+        urgentAnnouncement={urgentAnnouncement}
+        onViewChange={onViewChange ?? (() => undefined)}
+        onQueryChange={(value) => {
+          beginAdminEditorialLedgerFilterCommit();
+          onQueryChange?.(value);
+        }}
+        onFilterChange={onFilterChange}
+        onApplyPending={onApplyPending}
+      />
+
+      {view.sources.length > 0 ? (
+        <section className="admin-operation-sources" aria-labelledby="admin-operation-sources-title">
+          <header className="admin-operation-sources__header">
+            <h3 id="admin-operation-sources-title">신호 상태</h3>
+            <p>{view.sourceStatusLabel}</p>
+          </header>
+          <ul className="admin-operation-sources__list">
+            {view.sources.map((source) => (
+              <li key={source.sourceType} data-source-status={source.status.toLowerCase()}>
+                <div>
+                  <strong>{source.sourceLabel}</strong>
+                  <span className="admin-operation-wrap">{source.message}</span>
+                </div>
+                {source.canRetry && onRetrySource ? (
+                  <button
+                    type="button"
+                    className="btn btn-secondary admin-operation-control--touch"
+                    onClick={() => onRetrySource(source.sourceType)}
+                  >
+                    {source.sourceLabel} 다시 확인
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </>
+  );
+
+  const workSurface = view.items.length === 0 ? null : flowLayout ? (
     <AdminOperationMobileDetail
       view={view}
+      auditHref={auditHref}
       history={history}
-      lifecycleControls={lifecycleControls}
+      lifecycleControls={mobileLifecycleControls ?? lifecycleControls}
+      queueControls={queueControls}
       detailLoading={detailLoading}
       detailUnavailable={detailUnavailable}
       permissionDenied={permissionDenied}
@@ -186,6 +243,7 @@ export function AdminTodayLedger({
         hasNextPage={hasNextPage}
         loadingMore={loadingMore}
         onLoadMore={onLoadMore}
+        controls={queueControls}
       />
       {inspector}
     </div>
@@ -208,52 +266,13 @@ export function AdminTodayLedger({
         </p>
       }
     >
-      <div className="admin-today-ledger" ref={ledgerRef}>
-        <AdminTodayControls
-          workViews={view.workViews}
-          activeView={workView}
-          query={query}
-          filters={filters}
-          pendingCount={pendingCount}
-          urgentCount={urgentCount}
-          refreshing={refreshing}
-          urgentAnnouncement={urgentAnnouncement}
-          onViewChange={onViewChange ?? (() => undefined)}
-          onQueryChange={(value) => {
-            beginAdminEditorialLedgerFilterCommit();
-            onQueryChange?.(value);
-          }}
-          onFilterChange={onFilterChange}
-          onApplyPending={onApplyPending}
-        />
-
-        {view.sources.length > 0 ? (
-          <section className="admin-operation-sources" aria-labelledby="admin-operation-sources-title">
-            <header className="admin-operation-sources__header">
-              <h2 id="admin-operation-sources-title" className="h3">신호 상태</h2>
-              <p>{view.sourceStatusLabel}</p>
-            </header>
-            <ul className="admin-operation-sources__list">
-              {view.sources.map((source) => (
-                <li key={source.sourceType} data-source-status={source.status.toLowerCase()}>
-                  <div>
-                    <strong>{source.sourceLabel}</strong>
-                    <span className="admin-operation-wrap">{source.message}</span>
-                  </div>
-                  {source.canRetry && onRetrySource ? (
-                    <button
-                      type="button"
-                      className="btn btn-secondary admin-operation-control--touch"
-                      onClick={() => onRetrySource(source.sourceType)}
-                    >
-                      {source.sourceLabel} 다시 확인
-                    </button>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
+      <div
+        className="admin-today-ledger"
+        ref={ledgerRef}
+        data-content-layout={contentLayout}
+        data-content-width={contentWidth}
+      >
+        {view.items.length === 0 ? queueControls : null}
 
         <AdminStatePanel
           state={pageState}
@@ -303,23 +322,4 @@ function buildTodayCaseTraversal(
     onPrev: index > 0 ? () => onSelect(items[index - 1]!.id) : null,
     onNext: index < items.length - 1 ? () => onSelect(items[index + 1]!.id) : null,
   };
-}
-
-function useMobileOperationsLayout(): boolean {
-  const [mobile, setMobile] = useState(() => (
-    typeof window !== "undefined" && typeof window.matchMedia === "function"
-      ? window.matchMedia(ADMIN_SHELL_LAYOUT_MEDIA_QUERY).matches
-      : false
-  ));
-
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
-    const media = window.matchMedia(ADMIN_SHELL_LAYOUT_MEDIA_QUERY);
-    const update = () => setMobile(media.matches);
-    update();
-    media.addEventListener?.("change", update);
-    return () => media.removeEventListener?.("change", update);
-  }, []);
-
-  return mobile;
 }

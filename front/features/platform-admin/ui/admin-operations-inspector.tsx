@@ -1,11 +1,15 @@
 import { useLayoutEffect, type ReactNode } from "react";
 import { commitAdminEditorialLedgerCaseDocket } from "@/shared/observability/admin-editorial-ledger-performance";
 import { Link } from "react-router";
-import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
+import {
+  adminCaseLifecycleLanguage,
+  adminHealthAvailabilityLanguage,
+} from "@/features/platform-admin/model/admin-status-language";
 import type { AdminOperationCaseView } from "@/features/platform-admin/model/platform-admin-operations-model";
 import { AdminSafeActionDock, type AdminSafeActionState } from "./admin-action-dock";
 import { AdminCaseDocket } from "./admin-case-docket";
 import { AdminTargetLedgerInline } from "./admin-target-ledger-inline";
+import { AdminTechnicalDisclosure } from "./admin-technical-disclosure";
 
 type SafeHistoryEvent = {
   fromState: string | null;
@@ -25,6 +29,7 @@ export type AdminCaseTraversal = {
 
 type Props = {
   selectedCase: AdminOperationCaseView | null;
+  auditHref: string;
   history: readonly SafeHistoryEvent[];
   lifecycleControls: ReactNode;
   detailLoading?: boolean;
@@ -51,20 +56,6 @@ const SOURCE_DETAIL_LABELS: Record<string, string> = {
   CLOSING_RISK: "마감 운영에서 확인",
 };
 
-const SOURCE_STATUS_LABELS: Record<string, string> = {
-  AVAILABLE: "정상",
-  PARTIAL: "일부 확인 불가",
-  UNAVAILABLE: "확인 불가",
-  DISABLED: "비활성",
-};
-
-const CASE_STATE_LABELS: Record<string, string> = {
-  OPEN: "미확인",
-  ACKNOWLEDGED: "확인됨",
-  SNOOZED: "보류됨",
-  RESOLVED: "해결됨",
-};
-
 const KOREAN_TIME = new Intl.DateTimeFormat("ko-KR", {
   dateStyle: "medium",
   timeStyle: "short",
@@ -82,6 +73,7 @@ const LEDGER_TIME = new Intl.DateTimeFormat("ko-KR", {
 
 export function AdminOperationsInspector({
   selectedCase,
+  auditHref,
   history,
   lifecycleControls,
   detailLoading = false,
@@ -103,7 +95,7 @@ export function AdminOperationsInspector({
     );
   }
 
-  const sourceStatus = SOURCE_STATUS_LABELS[selectedCase.source.status] ?? "상태 확인 필요";
+  const sourceStatus = adminHealthAvailabilityLanguage(selectedCase.source.status).primaryText;
   const freshness = sourceFreshnessLabel(
     selectedCase.source.status,
     sourceStatus,
@@ -117,60 +109,68 @@ export function AdminOperationsInspector({
       label="운영 케이스 상세"
       nav={traversal ? <DocketNav traversal={traversal} /> : null}
       title={<span className="admin-operation-wrap">{selectedCase.summary.title}</span>}
-      identity={<code className="admin-operation-wrap">{selectedCase.id}</code>}
-      status={
-        <span className="admin-operations-inspector__state-line">
-          <span>심각도 · {selectedCase.severityLabel}</span>
-          <span>현재 상태 · {selectedCase.stateLabel}</span>
-          {selectedCase.reopenCount > 0 ? <span>해결 후 재개방 {selectedCase.reopenCount}회</span> : null}
-        </span>
-      }
       evidence={
         <div className="admin-operations-inspector">
-          <p className="admin-operation-wrap">{selectedCase.summary.description}</p>
-          <dl className="admin-operations-inspector__facts">
-            <div>
-              <dt>영향 범위</dt>
-              <dd>{selectedCase.impactLabel}</dd>
-            </div>
-            <div>
-              <dt>관측 출처</dt>
-              <dd>{selectedCase.sourceLabel}</dd>
-            </div>
-            <div>
-              <dt>최신성</dt>
-              <dd>{freshness}</dd>
-            </div>
-            <div>
-              <dt>최초 관측</dt>
-              <dd>{selectedCase.ageLabel}</dd>
-            </div>
-            <div>
-              <dt>케이스 식별자</dt>
-              <dd><code className="admin-operation-wrap">{selectedCase.id}</code></dd>
-            </div>
-          </dl>
+          <section className="admin-operations-inspector__section">
+            <h3>무슨 일인가</h3>
+            <p className="admin-operation-wrap">{selectedCase.summary.description}</p>
+          </section>
+          <section className="admin-operations-inspector__section">
+            <h3>왜 중요한가</h3>
+            <p>{selectedCase.impactLabel}</p>
+            <p className="admin-operations-inspector__state-line">
+              <span>심각도 · {selectedCase.severityLabel}</span>
+              <span>현재 상태 · {selectedCase.stateLabel}</span>
+              {selectedCase.reopenCount > 0 ? <span>해결 후 재개방 {selectedCase.reopenCount}회</span> : null}
+            </p>
+          </section>
+          <section className="admin-operations-inspector__section">
+            <h3>확인한 근거</h3>
+            <dl className="admin-operations-inspector__facts">
+              <div>
+                <dt>관측 출처</dt>
+                <dd>{selectedCase.sourceLabel}</dd>
+              </div>
+              <div>
+                <dt>관측 시각</dt>
+                <dd>{freshness}</dd>
+              </div>
+              <div>
+                <dt>감지 기준</dt>
+                <dd>{detectionCriterion(selectedCase.summaryCode)}</dd>
+              </div>
+              <div>
+                <dt>최초 관측</dt>
+                <dd>{selectedCase.ageLabel}</dd>
+              </div>
+            </dl>
+            <Link className="btn btn-secondary admin-operations-inspector__detail-link admin-operation-control--touch" to={selectedCase.detailHref}>
+              {SOURCE_DETAIL_LABELS[selectedCase.sourceType] ?? "운영 상세에서 확인"}
+            </Link>
+            <AdminTechnicalDisclosure
+              items={[
+                { label: "케이스 식별자", value: selectedCase.id },
+                { label: "관측 출처 식별자", value: selectedCase.sourceType },
+                { label: "클럽 식별자", value: selectedCase.clubId },
+              ]}
+            />
+          </section>
         </div>
-      }
-      related={
-        <Link className="btn btn-primary admin-operations-inspector__detail-link admin-operation-control--touch" to={selectedCase.detailHref}>
-          {SOURCE_DETAIL_LABELS[selectedCase.sourceType] ?? "운영 상세에서 확인"}
-        </Link>
       }
       history={
         <div className="admin-operations-inspector__history">
           <div className="sec-h">
-            <h3>{ADMIN_COPY.targetLedger.heading}</h3>
+            <h3>최근 처리 기록</h3>
           </div>
           <AdminTargetLedgerInline
             entries={targetLedgerEntries(history)}
-            moreHref={targetLedgerHref(selectedCase)}
+            moreHref={auditHref}
           />
         </div>
       }
       actions={
         <div className="admin-operations-inspector__lifecycle" aria-label="케이스 상태 관리">
-          <h3 className="h3">상태 관리</h3>
+          <h3 className="h3">다음 행동</h3>
           {detailLoading ? <p role="status">최신 상태를 확인하고 있습니다.</p> : null}
           {detailUnavailable && !permissionDenied ? (
             <p role="alert">상세 이력을 불러오지 못했습니다. 목록 정보는 계속 확인할 수 있습니다.</p>
@@ -196,6 +196,21 @@ export function AdminOperationsInspector({
       }
     />
   );
+}
+
+const DETECTION_CRITERIA: Record<string, string> = {
+  CLUB_SETUP_REQUIRED: "공개 필수 설정 중 누락이 있음",
+  CLUB_DOMAIN_ACTION_REQUIRED: "도메인 조치가 필요한 항목이 있음",
+  CLUB_READY_TO_PUBLISH: "비공개 클럽이 공개 필수 조건을 충족",
+  NOTIFICATION_DELIVERY_FAILURE: "알림 전달 실패 또는 영구 실패가 있음",
+  NOTIFICATION_PLATFORM_BACKLOG: "알림 전달 실패 또는 처리 지연이 있음",
+  AI_JOB_FAILED: "AI 작업 상태가 실패로 확인됨",
+  AI_JOB_STALE: "AI 작업이 정체 판단 기준을 넘김",
+  SESSION_CLOSING_BLOCKED: "모임 마감 상태에 확인할 항목이 있음",
+};
+
+function detectionCriterion(summaryCode: string): string {
+  return DETECTION_CRITERIA[summaryCode] ?? "현재 관측 출처의 운영 신호 기준을 충족";
 }
 
 function formatTime(value: string): string {
@@ -225,12 +240,8 @@ function targetLedgerEntries(history: readonly SafeHistoryEvent[]) {
     .slice(0, 3)
     .map((event) => ({
       at: formatLedgerTime(event.occurredAt),
-      sentence: `${HISTORY_LABELS[event.reasonCode] ?? "상태 변경 기록"} · ${CASE_STATE_LABELS[event.toState] ?? "상태 확인"}`,
+      sentence: `${HISTORY_LABELS[event.reasonCode] ?? "상태 변경 기록"} · ${adminCaseLifecycleLanguage(event.toState).primaryText}`,
     }));
-}
-
-function targetLedgerHref(selectedCase: AdminOperationCaseView): string {
-  return `/admin/audit?target=${encodeURIComponent(selectedCase.clubId ?? selectedCase.id)}`;
 }
 
 function DocketNav({ traversal }: { traversal: AdminCaseTraversal }) {

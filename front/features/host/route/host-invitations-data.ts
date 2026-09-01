@@ -9,7 +9,7 @@ import {
   revokeHostInvitation,
 } from "@/features/host/api/host-api";
 import type { HostInvitationsActions } from "@/features/host/model/host-invitation-actions";
-import { hostInvitationListQuery, invalidateHostInvitations } from "@/features/host/queries/host-invitation-queries";
+import { hostInvitationListQuery } from "@/features/host/queries/host-invitation-queries";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 import { requireHostLoaderAuth } from "./host-loader-auth";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
@@ -40,13 +40,16 @@ export function createHostInvitationsActions(
   context: { clubSlug: string },
 ): HostInvitationsActions {
   const refreshInvitations = async (page: Parameters<HostInvitationsActions["refreshInvitations"]>[0]) => {
-    await invalidateHostInvitations(client, context);
-    return client.fetchQuery(hostInvitationListQuery(page, context));
+    const response = await listHostInvitationsResponse(context, page);
+    return parseHostInvitationListResponse(response);
   };
 
   return {
     listInvitations: (page) => listHostInvitationsResponse(context, page),
     refreshInvitations,
+    publishInvitations: (observed, page) => {
+      client.setQueryData(hostInvitationListQuery(page, context).queryKey, observed);
+    },
     createInvitation: (request) => createHostInvitation(request, context),
     revokeInvitation: (invitationId) => revokeHostInvitation(invitationId, context),
     parseInvitation: parseHostInvitationResponse,

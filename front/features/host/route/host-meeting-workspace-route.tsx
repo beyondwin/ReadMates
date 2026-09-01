@@ -17,14 +17,15 @@ import {
   hostSessionClosingStatusQuery,
   invalidateHostSessionRecordSurfaces,
   isHostSessionNotFoundError,
+  publishHostPublicConvergence,
 } from "@/features/host/queries/host-session-queries";
 import {
   hostPublicConvergenceQuery,
   useRetryHostPublicConvergenceMutation,
 } from "@/features/host/queries/host-session-queries";
 import { buildPublicConvergenceStatus } from "@/features/host/model/public-convergence-model";
-import { hostSessionRecordEditorQuery, hostSessionRecordHistoryQuery, useRestoreHostSessionRevisionToDraftMutation } from "@/features/host/queries/host-session-record-queries";
-import { hostSessionRestorePreviewQuery, useRestoreHostSessionChangeMutation } from "@/features/host/queries/host-session-recovery-queries";
+import { hostSessionRecordEditorQuery, hostSessionRecordHistoryQuery, publishRestoredHostSessionRevisionDraft, useRestoreHostSessionRevisionToDraftMutation } from "@/features/host/queries/host-session-record-queries";
+import { hostSessionRestorePreviewQuery, publishRestoredHostSessionChange, useRestoreHostSessionChangeMutation } from "@/features/host/queries/host-session-recovery-queries";
 import { useHostMeetingPanelQueries, type PanelLoadState } from "@/features/host/queries/host-meeting-panel-queries";
 import { registerHostSensitiveState } from "@/features/host/storage/host-sensitive-storage";
 import { SessionHistoryPanel } from "@/features/host/ui/session-editor/session-history-panel";
@@ -64,10 +65,13 @@ import {
   hostNotificationManualDispatchesQuery,
   hostNotificationManualOptionsQuery,
   hostNotificationPolicyQuery,
+  publishHostNotificationPolicy,
+  publishManualNotificationConfirm,
   useConfirmManualNotificationMutation,
   usePreviewManualNotificationMutation,
   useUpdateHostNotificationPolicyMutation,
 } from "@/features/host/queries/host-notification-queries";
+import { publishTransitionAction, TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 import type { HostSessionRecordsChangedEvent } from "./host-session-editor-route";
 import { useHostMeetingWorkspaceActions } from "./host-meeting-workspace-actions";
 import type { HostMeetingWorkspaceRouteData } from "./host-meeting-workspace-data";
@@ -258,6 +262,24 @@ export function HostMeetingWorkspaceRoute({
   const routerLocation = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const transitionOwner = useTransitionSafetyOwner("host-meeting-workspace");
+  const runAccepted = useCallback(async <T,>(
+    operationId: string,
+    recoveryClass: "L1" | "L2" | "L3",
+    request: () => Promise<T>,
+    publish: (result: T) => Promise<unknown>,
+  ) => {
+    const handle = transitionOwner.begin(operationId, recoveryClass, async () => ({ operationId, outcome: "still-unknown" }));
+    try {
+      const result = await request();
+      if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
+      await publishTransitionAction(handle, "cache", () => publish(result));
+      return result;
+    } catch (error) {
+      if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");
+      throw error;
+    }
+  }, [transitionOwner]);
   const currentUrl = `${routerLocation.pathname}${routerLocation.search}${routerLocation.hash}`;
   const meetingLocation = useMemo(
     () => parseHostMeetingLocation(routerLocation.search),
@@ -379,9 +401,33 @@ export function HostMeetingWorkspaceRoute({
       sessionState,
     });
   }, [context.clubSlug, sessionId]);
+  const executeReceiptFencedAction = useCallback(async <T,>(
+    operationId: string,
+    request: () => Promise<T>,
+    prepareReceipt: (result: T) => (() => void | Promise<void>) | Promise<() => void | Promise<void>>,
+  ) => {
+    const handle = transitionOwner.begin(operationId, "L3", async () => ({ operationId, outcome: "still-unknown" }));
+    try {
+      const result = await request();
+      if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
+      const releasePreparation = handle.retainPublication();
+      try {
+        const publishReceipt = await prepareReceipt(result);
+        await publishTransitionAction(handle, "receiptCallback", publishReceipt);
+      } finally {
+        releasePreparation();
+      }
+      return result;
+    } catch (error) {
+      if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");
+      throw error;
+    } finally {
+      handle.completePublication();
+    }
+  }, [transitionOwner]);
   const editorActions = useMemo(
-    () => wrapHostSessionEditorActionsForUndo(actions, captureChangeReceipt),
-    [actions, captureChangeReceipt],
+    () => wrapHostSessionEditorActionsForUndo(actions, captureChangeReceipt, executeReceiptFencedAction),
+    [actions, captureChangeReceipt, executeReceiptFencedAction],
   );
   const baseQuery = useQuery({
     ...hostSessionDetailQuery(sessionId, context),
@@ -637,7 +683,12 @@ export function HostMeetingWorkspaceRoute({
           : null
       }
       onPolicyChange={async (enabled) => {
-        await updatePolicyMutation.mutateAsync({ sessionReminderEnabled: enabled });
+        await runAccepted(
+          `host-notification-policy:${sessionId}`,
+          "L3",
+          () => updatePolicyMutation.mutateAsync({ sessionReminderEnabled: enabled }),
+          (policy) => publishHostNotificationPolicy(queryClient, context, policy),
+        );
       }}
       dispatches={reminderDispatchesQuery.data?.items ?? []}
       responseRows={responseRows}
@@ -683,8 +734,14 @@ export function HostMeetingWorkspaceRoute({
       onPreview={async (draft) => {
         setNotificationError(null);
         try {
-          setNotificationPreview(await previewManualMutation.mutateAsync(buildComposerSelection(draft)));
-        } catch {
+          await runAccepted(
+            `host-notification-preview:${sessionId}`,
+            "L3",
+            () => previewManualMutation.mutateAsync(buildComposerSelection(draft)),
+            async (accepted) => { setNotificationPreview(accepted); },
+          );
+        } catch (error) {
+          if (error instanceof TransitionOwnerObsoleteError) return;
           setNotificationPreview(null);
           setNotificationError("미리보기를 만들지 못했습니다. 대상과 채널을 확인해 주세요.");
         }
@@ -693,14 +750,22 @@ export function HostMeetingWorkspaceRoute({
         if (!notificationPreview) return;
         setNotificationError(null);
         try {
-          await confirmManualMutation.mutateAsync({
-            ...buildComposerSelection(draft),
-            previewId: notificationPreview.previewId,
-            resendConfirmed,
-          });
-          setNotificationPreview(null);
-          await reminderDispatchesQuery.refetch();
-        } catch {
+          await runAccepted(
+            `host-notification-confirm:${notificationPreview.previewId}`,
+            "L3",
+            () => confirmManualMutation.mutateAsync({
+              ...buildComposerSelection(draft),
+              previewId: notificationPreview.previewId,
+              resendConfirmed,
+            }),
+            async () => {
+              await publishManualNotificationConfirm(queryClient, context);
+              setNotificationPreview(null);
+              await reminderDispatchesQuery.refetch();
+            },
+          );
+        } catch (error) {
+          if (error instanceof TransitionOwnerObsoleteError) return;
           setNotificationError("발송을 요청하지 못했습니다. 미리보기 만료 또는 재발송 여부를 확인해 주세요.");
         }
       }}
@@ -751,13 +816,19 @@ export function HostMeetingWorkspaceRoute({
       ? { ...current, submitting: true, error: null }
       : current);
     try {
-      await restoreChange.mutateAsync({
-        sessionId,
-        changeId: historyUndoConfirm.changeId,
-        request: { expectedCurrentHash: historyUndoConfirm.expectedCurrentHash },
-      });
+      await runAccepted(
+        `host-session-restore-change:${sessionId}:${historyUndoConfirm.changeId}`,
+        "L2",
+        () => restoreChange.mutateAsync({
+          sessionId,
+          changeId: historyUndoConfirm.changeId,
+          request: { expectedCurrentHash: historyUndoConfirm.expectedCurrentHash },
+        }),
+        () => publishRestoredHostSessionChange(queryClient, sessionId, context),
+      );
       setHistoryUndoConfirm(null);
     } catch (error) {
+      if (error instanceof TransitionOwnerObsoleteError) return;
       const code = error && typeof error === "object" && "code" in error
         ? String((error as { code?: unknown }).code ?? "")
         : "";
@@ -905,11 +976,12 @@ export function HostMeetingWorkspaceRoute({
           restoring={restoreRevision.isPending || restoreChange.isPending || lifecycleSubmitting}
           recoveryActionsDisabled={recoveryActionsDisabled}
           onLoadMore={(cursor) => queryClient.fetchQuery(hostSessionRecordHistoryQuery(sessionId, { limit: 30, cursor }, context)).then(() => undefined)}
-          onRestore={({ revisionId, expectedDraftRevision }) => restoreRevision.mutateAsync({
-            sessionId,
-            revisionId,
-            request: { expectedDraftRevision },
-          }).then(() => undefined)}
+          onRestore={({ revisionId, expectedDraftRevision }) => runAccepted(
+            `host-record:restore-revision:${sessionId}:${revisionId}`,
+            "L2",
+            () => restoreRevision.mutateAsync({ sessionId, revisionId, request: { expectedDraftRevision } }),
+            (draft) => publishRestoredHostSessionRevisionDraft(queryClient, sessionId, context, draft),
+          ).then(() => undefined)}
           onRestoreCompleted={() => changeMeetingLocation({ task: "records", overviewEditOpen: false, recordSource: "manual" })}
           onRestoreChange={(changeId) => startChangeRestore(changeId)}
           onReverseLifecycle={requestLifecycleReverse}
@@ -1116,7 +1188,12 @@ export function HostMeetingWorkspaceRoute({
               className="btn btn-quiet btn-sm"
               onClick={() => {
                 const convergenceId = convergenceQuery.data?.convergenceId;
-                if (convergenceId) void retryConvergence.mutateAsync({ sessionId, convergenceId });
+                if (convergenceId) void runAccepted(
+                  `host-public-convergence:${sessionId}:${convergenceId}`,
+                  "L3",
+                  () => retryConvergence.mutateAsync({ sessionId, convergenceId }),
+                  () => publishHostPublicConvergence(queryClient, sessionId, context),
+                );
               }}
             >
               공개 캐시 회수 다시 시도

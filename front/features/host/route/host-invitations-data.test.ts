@@ -29,29 +29,42 @@ const createdPage = {
   nextCursor: null,
 };
 
-describe("createHostInvitationsActions.refreshInvitations", () => {
+describe("createHostInvitationsActions refresh publication", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("invalidates the cached page before fetchQuery so the ledger can show the new row", async () => {
+  it("observes outside the cache, then publishes only when the route owner requests it", async () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: 30_000 } },
     });
     const query = hostInvitationListQuery({ limit: 50 }, context);
     client.setQueryData(query.queryKey, { items: [], nextCursor: null });
 
-    let sawInvalidationBeforeFetch = false;
     vi.mocked(listHostInvitationsResponse).mockImplementation(async () => {
-      sawInvalidationBeforeFetch = client.getQueryState(query.queryKey)?.isInvalidated === true;
       return new Response(JSON.stringify(createdPage), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
     });
 
-    const page = await createHostInvitationsActions(client, context).refreshInvitations({ limit: 50 });
+    const actions = createHostInvitationsActions(client, context);
+    const page = await actions.refreshInvitations({ limit: 50 });
 
-    expect(sawInvalidationBeforeFetch).toBe(true);
+    expect(client.getQueryData(query.queryKey)).toEqual({ items: [], nextCursor: null });
+    actions.publishInvitations(page, { limit: 50 });
+    expect(client.getQueryData(query.queryKey)).toEqual(createdPage);
     expect(page.items).toHaveLength(1);
     expect(page.items[0]?.invitationId).toBe("invite-new");
+  });
+
+  it("keeps detached list observation outside Query cache", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    vi.mocked(listHostInvitationsResponse).mockResolvedValue(new Response(JSON.stringify(createdPage), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+
+    await createHostInvitationsActions(client, context).listInvitations({ limit: 50 });
+
+    expect(client.getQueryCache().getAll()).toHaveLength(0);
   });
 });

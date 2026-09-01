@@ -5,6 +5,8 @@ import {
 
 export type HostCloseConfirmErrorDisposition = "non-current" | "rejected" | "unknown";
 export type HostCoHostErrorDisposition = "stale" | "permission" | "rejected" | "unknown";
+export type HostSettingsUpdateErrorDisposition = "stale" | "rejected" | "unknown";
+export type HostInvitationLinkUpdateErrorDisposition = "stale" | "rejected" | "unknown";
 
 const NON_CURRENT_PREVIEW_CODES = new Set([
   "HOST_CLUB_CLOSE_PREVIEW_EXPIRED",
@@ -34,6 +36,22 @@ export function hostCoHostErrorDisposition(error: unknown): HostCoHostErrorDispo
     if (error.code === "LAST_ACTIVE_HOST_REQUIRED" || error.code === "PERMISSION_DENIED" || error.status === 403) {
       return "permission";
     }
+    return "rejected";
+  }
+  return isReadmatesTransportError(error) ? "unknown" : "rejected";
+}
+
+export function hostSettingsUpdateErrorDisposition(error: unknown): HostSettingsUpdateErrorDisposition {
+  if (isReadmatesApiError(error)) {
+    if (error.code === "HOST_SETTINGS_STALE" || (error.fallback && error.status === 409)) return "stale";
+    return "rejected";
+  }
+  return isReadmatesTransportError(error) ? "unknown" : "rejected";
+}
+
+export function hostInvitationLinkUpdateErrorDisposition(error: unknown): HostInvitationLinkUpdateErrorDisposition {
+  if (isReadmatesApiError(error)) {
+    if (error.code === "INVITATION_LINK_STALE" || (error.fallback && error.status === 409)) return "stale";
     return "rejected";
   }
   return isReadmatesTransportError(error) ? "unknown" : "rejected";

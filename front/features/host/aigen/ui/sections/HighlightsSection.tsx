@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import type { SessionImportAuthoredText } from "@/features/host/aigen/api/aigen-contracts";
+import type { SessionImportAuthoredText } from "@/features/host/aigen/model/aigen-presentation-types";
 
 export type HighlightsSectionProps = {
   items: SessionImportAuthoredText[];

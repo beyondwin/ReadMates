@@ -1,5 +1,7 @@
+/* eslint-disable react-refresh/only-export-components -- route modules intentionally export components and factories */
 import type { QueryClient } from "@tanstack/react-query";
 import { Navigate, type RouteObject, useLoaderData } from "react-router";
+import type { PropsWithChildren, ReactNode } from "react";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequirePlatformAdmin } from "@/src/app/route-guards";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
@@ -10,6 +12,31 @@ import {
   type AdminRouteDescriptor,
 } from "@/features/platform-admin/model/admin-route-catalog";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import {
+  GlobalSpaceTransitionController,
+  useGlobalSpaceTransitionController,
+} from "@/src/app/global-space-transition-controller";
+import { AppGlobalSpaceSwitcherBridge } from "@/src/app/global-space-switcher-bridge";
+import { AppHostAuthorityLossBridge } from "@/src/app/app-route-security-controller";
+
+// This route-only boundary is intentionally colocated with the router configuration.
+export function AdminTransitionBoundary({ auth, children }: PropsWithChildren<{ auth: AuthMeResponse }>) {
+  return (
+    <GlobalSpaceTransitionController auth={auth}>
+      <AppHostAuthorityLossBridge />
+      {children}
+    </GlobalSpaceTransitionController>
+  );
+}
+
+export function AdminPlatformAuthorityInvalidationBridge({
+  children,
+}: {
+  children: (invalidateForPlatformAuthorityLoss: () => void) => ReactNode;
+}) {
+  const controller = useGlobalSpaceTransitionController();
+  return children(controller.invalidateForPlatformAuthorityLoss);
+}
 
 export function adminRoutes(queryClient: QueryClient): RouteObject[] {
   return [
@@ -25,14 +52,24 @@ export function adminRoutes(queryClient: QueryClient): RouteObject[] {
       ),
       loader: adminShellLoaderFactory(queryClient),
       lazy: async () => {
-        const { AdminShellLayout } = await import(
-          "@/features/platform-admin/route/admin-shell-layout"
+        const { AdminShellController } = await import(
+          "@/features/platform-admin/route/admin-shell-controller"
         );
         function AdminShellElement() {
           const auth = useLoaderData() as AuthMeResponse;
           return (
             <RequirePlatformAdmin>
-              <AdminShellLayout auth={auth} />
+              <AdminTransitionBoundary auth={auth}>
+                <AdminPlatformAuthorityInvalidationBridge>
+                  {(invalidateForPlatformAuthorityLoss) => (
+                    <AdminShellController
+                      auth={auth}
+                      spaceSwitcher={<AppGlobalSpaceSwitcherBridge auth={auth} />}
+                      onPlatformAuthorityLoss={invalidateForPlatformAuthorityLoss}
+                    />
+                  )}
+                </AdminPlatformAuthorityInvalidationBridge>
+              </AdminTransitionBoundary>
             </RequirePlatformAdmin>
           );
         }

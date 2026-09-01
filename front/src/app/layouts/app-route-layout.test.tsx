@@ -55,6 +55,16 @@ const hostAuth: AuthMeResponse = {
       primaryHost: "김호스트",
     },
   ],
+  availableSpaces: {
+    version: 1,
+    kinds: ["CLUBS"],
+    clubs: [{
+      clubId: "club-1",
+      clubSlug: "reading-sai",
+      clubName: "읽는사이",
+      perspectives: ["MEMBER", "HOST"],
+    }],
+  },
 };
 
 const memberAuth: AuthMeResponse = {
@@ -92,6 +102,35 @@ const mixedAuthorityHostAuth: AuthMeResponse = {
       primaryHost: "김호스트",
     },
   ],
+  platformAdmin: {
+    userId: "host-1",
+    email: "host@example.com",
+    role: "OWNER",
+  },
+  availableSpaces: {
+    version: 1,
+    kinds: ["PLATFORM", "CLUBS"],
+    clubs: [
+      {
+        clubId: "club-1",
+        clubSlug: "reading-sai",
+        clubName: "읽는사이",
+        perspectives: ["MEMBER", "HOST"],
+      },
+      {
+        clubId: "club-member-only",
+        clubSlug: "member-only",
+        clubName: "멤버 전용 클럽",
+        perspectives: ["MEMBER"],
+      },
+      {
+        clubId: "club-host-next",
+        clubSlug: "host-next",
+        clubName: "다음 호스트 클럽",
+        perspectives: ["MEMBER", "HOST"],
+      },
+    ],
+  },
 };
 
 type Deferred<T> = {
@@ -350,22 +389,30 @@ describe("AppRouteLayout host session navigation", () => {
       expect(screen.getAllByRole("link", { name: utilityLabel }).length).toBeGreaterThan(0);
     }
 
-    expect(screen.getAllByRole("button", { name: "읽는사이 · 호스트 운영실" })).toHaveLength(2);
+    expect(screen.getAllByText("현재 공간 내 클럽, 읽는사이 호스트로 운영")).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: /공간 전환/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "클럽 선택" })).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "공간 선택" })).not.toBeInTheDocument();
   });
 
   it.each([
-    ["member-only club", "/clubs/reading-sai/app/host/people", "멤버 전용 클럽", "/clubs/member-only/app"],
-    ["host-capable club", "/clubs/reading-sai/app/host/people/member-7", "다음 호스트 클럽", "/clubs/host-next/app/host/people"],
-  ])("uses the target club's authority-safe URL for a %s", async (_caseName, initialEntry, clubName, expected) => {
+    ["member-only club", "/clubs/reading-sai/app/host/people", "멤버 전용 클럽 멤버로 보기", "/clubs/member-only/app"],
+    ["host-capable club", "/clubs/reading-sai/app/host/people/member-7", "다음 호스트 클럽 호스트로 운영", "/clubs/host-next/app/host"],
+  ])("uses the target club's authority-safe URL for a %s", async (_caseName, initialEntry, targetName, expected) => {
     const user = userEvent.setup();
     renderHostShellAt(initialEntry, undefined, mixedAuthorityHostAuth, true);
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (input.toString().includes("/api/bff/api/auth/me")) return jsonResponse(mixedAuthorityHostAuth);
+      throw new Error(`Unexpected fetch: ${input.toString()}`);
+    }));
 
-    await user.click(screen.getAllByRole("button", { name: "읽는사이 · 호스트 운영실" })[0]);
-    await user.click(screen.getAllByRole("button", { name: clubName })[0]);
+    await user.click(screen.getAllByRole("button", { name: /^공간 전환, 현재 내 클럽/ })[0]);
+    await user.click(screen.getByRole("menuitem", { name: "내 클럽" }));
+    await user.click(screen.getByRole("menuitemradio", { name: targetName }));
 
-    expect(screen.getByRole("status", { name: "현재 경로" }).textContent).toBe(expected);
+    await waitFor(() => {
+      expect(screen.getByRole("status", { name: "현재 경로" }).textContent).toBe(expected);
+    });
   });
 
   it.each([
@@ -619,7 +666,7 @@ describe("AppRouteLayout guest shell", () => {
 });
 
 describe("AppRouteLayout workspace authority", () => {
-  it("derives the same-meeting host role-switch destination in app chrome", () => {
+  it("keeps the single authorized club kind hidden while exposing the current member perspective", () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     });
@@ -643,10 +690,8 @@ describe("AppRouteLayout workspace authority", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getAllByRole("link", { name: "호스트 공간" })).toHaveLength(2);
-    for (const link of screen.getAllByRole("link", { name: "호스트 공간" })) {
-      expect(link).toHaveAttribute("href", "/clubs/reading-sai/app/host/sessions/meeting-7");
-    }
+    expect(screen.queryByRole("button", { name: /공간 전환/ })).not.toBeInTheDocument();
+    expect(screen.getAllByText("현재 공간 내 클럽, 읽는사이 멤버로 보기")).toHaveLength(2);
     expect(document.querySelectorAll("[data-app-route-security-controller]")).toHaveLength(1);
   });
 

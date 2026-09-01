@@ -13,6 +13,7 @@ import {
   installPlatformAdminAuthorityLossHandler,
   platformAdminCapabilitiesQuery,
   platformAdminKeys,
+  purgePlatformAdminState,
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { apiErrorFromResponse } from "@/shared/api/errors";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
@@ -187,5 +188,29 @@ describe("AdminAnalyticsRoute", () => {
     expect(await screen.findByRole("button", { name: "CSV 내려받기" })).toBeEnabled();
     expect(fetchAdminAnalyticsExport).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("CSV 파일을 내려받았습니다.")).not.toBeInTheDocument();
+  });
+
+  it("does not publish a late export after platform authority is lost", async () => {
+    let resolveExport!: (value: { blob: Blob; filename: string }) => void;
+    vi.mocked(fetchAdminAnalyticsExport).mockImplementation(() => new Promise((resolve) => {
+      resolveExport = resolve;
+    }));
+    const createObjectURL = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:late-export");
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    const { queryClient } = renderRoute();
+
+    fireEvent.click(screen.getByRole("button", { name: "CSV 내려받기" }));
+    await waitFor(() => expect(fetchAdminAnalyticsExport).toHaveBeenCalledTimes(1));
+
+    act(() => purgePlatformAdminState(queryClient));
+    await act(async () => resolveExport({
+      blob: new Blob(["late"]),
+      filename: "late.csv",
+    }));
+
+    expect(createObjectURL).not.toHaveBeenCalled();
+    expect(click).not.toHaveBeenCalled();
+    expect(screen.queryByText("CSV 파일을 내려받았습니다.")).not.toBeInTheDocument();
+    expect(queryClient.getQueriesData({ queryKey: platformAdminKeys.all })).toEqual([]);
   });
 });

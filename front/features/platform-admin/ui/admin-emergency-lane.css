@@ -1,0 +1,197 @@
+.admin-public-takedown,
+.admin-emergency-lane {
+  min-width: 0;
+}
+
+.admin-public-takedown {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.admin-emergency-lane {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  color: var(--text);
+  font-family: var(--f-sans);
+}
+
+.admin-emergency-lane,
+.admin-emergency-lane .admin-page-context,
+.admin-emergency-lane .admin-safe-action-dock,
+.admin-emergency-lane .admin-receipt-timeline,
+.admin-emergency-lane__direct-workflow,
+.admin-emergency-lane__target-form,
+.admin-emergency-lane__review,
+.admin-emergency-lane__receipt {
+  min-width: 0;
+}
+
+.admin-emergency-lane .admin-page-frame__description {
+  max-width: 52rem;
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--type-size-body);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.admin-emergency-lane__compact-handoff {
+  display: none;
+}
+
+.admin-emergency-lane__direct-workflow,
+.admin-emergency-lane__target-form,
+.admin-emergency-lane__review,
+.admin-emergency-lane__receipt {
+  display: grid;
+  gap: var(--space-lg);
+}
+
+.admin-emergency-lane__direct-workflow {
+  scroll-margin-top: var(--space-xl);
+}
+
+.admin-emergency-lane__target-form,
+.admin-emergency-lane__review,
+.admin-emergency-lane__receipt,
+.admin-emergency-lane__notice {
+  border-block: 1px solid var(--line);
+  background: transparent;
+  padding: clamp(20px, 3vw, 32px) 0;
+}
+
+.admin-emergency-lane__section-heading,
+.admin-emergency-lane__impact,
+.admin-emergency-lane__reason {
+  display: grid;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.admin-emergency-lane__section-heading > *,
+.admin-emergency-lane__impact > *,
+.admin-emergency-lane__reason > *,
+.admin-emergency-lane__receipt > *,
+.admin-emergency-lane__notice > *,
+.admin-emergency-lane__compact-handoff > * {
+  margin-block: 0;
+}
+
+.admin-emergency-lane__step {
+  color: var(--muted);
+  font-size: var(--type-size-supporting);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.admin-emergency-lane__target-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.admin-emergency-lane__impact {
+  padding-left: var(--space-lg);
+  border-left: 3px solid var(--warning);
+}
+
+.admin-emergency-lane__blocked {
+  color: var(--danger);
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.admin-emergency-lane [data-admin-technical-disclosure] {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-sm);
+}
+
+.admin-emergency-lane [data-admin-technical-disclosure] summary {
+  color: var(--text-2);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-emergency-lane [data-admin-technical-disclosure] dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm) var(--space-lg);
+}
+
+.admin-emergency-lane [data-admin-technical-disclosure] dd,
+.admin-emergency-lane code,
+.admin-emergency-lane .admin-safe-action-dock__reason,
+.admin-emergency-lane .admin-page-context__authority,
+.admin-emergency-lane p,
+.admin-emergency-lane h2,
+.admin-emergency-lane h3 {
+  overflow-wrap: anywhere;
+}
+
+.admin-emergency-lane button,
+.admin-emergency-lane input,
+.admin-emergency-lane select,
+.admin-emergency-lane textarea,
+.admin-emergency-lane a,
+.admin-emergency-lane [data-admin-technical-disclosure] summary {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.admin-emergency-lane a,
+.admin-emergency-lane [data-admin-technical-disclosure] summary {
+  display: inline-flex;
+  align-items: center;
+}
+
+.admin-emergency-lane :focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px var(--focus-ring-soft);
+}
+
+@media (max-width: 768px) {
+  .admin-emergency-lane__compact-handoff {
+    display: grid;
+    gap: var(--space-md);
+    margin-bottom: var(--space-xl);
+    border: 1px solid var(--warning-line);
+    background: var(--bg-raised);
+    padding: var(--space-lg);
+  }
+
+  .admin-emergency-lane__target-grid,
+  .admin-emergency-lane [data-admin-technical-disclosure] dl,
+  .admin-emergency-lane .admin-action-dock {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-emergency-lane .admin-action-dock,
+  .admin-emergency-lane .admin-action-dock__primary,
+  .admin-emergency-lane .admin-action-dock__secondary {
+    width: 100%;
+  }
+
+  .admin-emergency-lane .admin-action-dock__primary > *,
+  .admin-emergency-lane .admin-action-dock__secondary > * {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .admin-emergency-lane__impact {
+    padding-left: var(--space-md);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-emergency-lane,
+  .admin-emergency-lane *,
+  .admin-emergency-lane *::before,
+  .admin-emergency-lane *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

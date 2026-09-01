@@ -1,6 +1,6 @@
 # ADR-0026: Member와 host가 공통 global club shell을 사용
 
-- 상태: Proposed
+- 상태: Superseded by ADR-0051
 - 결정일: 2026-08-22
 - 작성자: 제품·디자인·프런트엔드
 - 관련: ADR-0019, ADR-0020, `front/shared/ui/top-nav.tsx:390`

@@ -71,17 +71,9 @@ export function createHostMembersActions(
   client: QueryClient,
   context: { clubSlug: string },
 ): HostMembersActions {
-  const markMembersStale = () => invalidateHostMembers(client, context);
-  const refreshMembers = async () => {
-    const page = await fetchHostMembers(context, { limit: HOST_MEMBERS_PAGE_LIMIT });
-    client.setQueryData(hostMemberListQuery({ limit: HOST_MEMBERS_PAGE_LIMIT }, context).queryKey, page);
-    await markMembersStale();
-    return page;
-  };
-
   return {
     loadMembers: (page) => fetchHostMembers(context, page),
-    refreshMembers,
+    refreshMembers: () => publishHostMembersRefresh(client, context),
     submitLifecycle: async (membershipId, path, body) => {
       const response = await submitHostMemberLifecycle(membershipId, path, body, context);
       if (!response.ok) {
@@ -89,7 +81,6 @@ export function createHostMembersActions(
         throw new Error("HOST_MEMBER_LIFECYCLE_ACTION_FAILED");
       }
       const result = await readHostResponseJson(response);
-      await markMembersStale();
       return result;
     },
     submitProfile: async (membershipId, displayName) => {
@@ -107,9 +98,19 @@ export function createHostMembersActions(
         throw new HostMemberProfileActionError(response.status, code);
       }
       const member = await readHostResponseJson(response);
-      await markMembersStale();
       return member;
     },
     submitViewerAction: (membershipId, action) => submitHostViewerAction(membershipId, action, context),
   };
+}
+
+/** Cache publication. A route owner may call this only after accepted settlement. */
+export async function publishHostMembersRefresh(
+  client: QueryClient,
+  context: { clubSlug: string },
+): Promise<HostMemberListPage> {
+  const page = await fetchHostMembers(context, { limit: HOST_MEMBERS_PAGE_LIMIT });
+  client.setQueryData(hostMemberListQuery({ limit: HOST_MEMBERS_PAGE_LIMIT }, context).queryKey, page);
+  await invalidateHostMembers(client, context);
+  return page;
 }

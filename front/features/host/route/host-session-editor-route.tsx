@@ -74,6 +74,10 @@ import {
   hostSessionRecordEditorQuery,
   hostSessionRecordHistoryQuery,
   hostSessionRecordKeys,
+  publishAppliedHostSessionRecord,
+  publishRebasedHostSessionRecordDraft,
+  publishRestoredHostSessionRevisionDraft,
+  publishSavedHostSessionRecordDraft,
   useApplyHostSessionRecordMutation,
   usePreviewHostSessionRecordApplyMutation,
   useRebaseHostSessionRecordDraftMutation,
@@ -83,6 +87,7 @@ import {
 import { useSessionRecordDraftController } from "@/features/host/hooks/use-session-record-draft-controller";
 import {
   hostSessionRestorePreviewQuery,
+  publishRestoredHostSessionChange,
   useRestoreHostSessionChangeMutation,
 } from "@/features/host/queries/host-session-recovery-queries";
 import {
@@ -104,6 +109,8 @@ import {
   HostNotificationComposerController,
   type HostNotificationComposerRequest,
 } from "./host-notification-composer-controller";
+import { AiGenerateController } from "./ai-generate-controller";
+import { publishTransitionAction, TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 const EDITOR_MANUAL_DISPATCH_PAGE_LIMIT = 20;
 const EDITOR_HISTORY_PAGE_LIMIT = 30;
@@ -683,6 +690,19 @@ export function EditHostSessionRecordWorkflow({
   const rebaseMutation = useRebaseHostSessionRecordDraftMutation(context);
   const restoreMutation = useRestoreHostSessionRevisionToDraftMutation(context);
   const restoreChangeMutation = useRestoreHostSessionChangeMutation(context);
+  const transitionOwner = useTransitionSafetyOwner(`host-session-record:${recordEditor.sessionId}`);
+  const runAccepted = useCallback(async <T,>(operationId: string, request: () => Promise<T>, publish: (result: T) => Promise<unknown>) => {
+    const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
+    try {
+      const result = await request();
+      if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
+      await publishTransitionAction(handle, "cache", () => publish(result));
+      return result;
+    } catch (error) {
+      if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");
+      throw error;
+    }
+  }, [transitionOwner]);
   const [pendingUndo, setPendingUndo] = useState<{
     receipt: HostSessionChangeReceipt;
     description: string;
@@ -743,9 +763,18 @@ export function EditHostSessionRecordWorkflow({
       };
   const controller = useSessionRecordDraftController({
     editor: recordEditor,
-    onSave: saveMutation.mutateAsync,
+    onSave: (variables) => runAccepted(
+      `host-record:save:${recordEditor.sessionId}`,
+      () => saveMutation.mutateAsync(variables),
+      (draft) => publishSavedHostSessionRecordDraft(queryClient, recordEditor.sessionId, context, draft),
+    ),
     onReload: reloadRecordEditor,
   });
+  useTransitionSafetyOwner(
+    `host-session-record-dirty:${recordEditor.sessionId}`,
+    controller.shouldBlockNavigation,
+    "저장하지 않은 모임 기록 초안이 있습니다.",
+  );
   useDraftRouteNavigationGuard(controller.shouldBlockNavigation);
 
   useEffect(() => {
@@ -821,14 +850,15 @@ export function EditHostSessionRecordWorkflow({
     }
     setRebaseError(null);
     try {
-      const draft = await rebaseMutation.mutateAsync({
+      const request = {
+        expectedDraftRevision: controller.expectedDraftRevision,
+        expectedLiveRevision: recordEditor.liveRevision,
+        expectedSessionUpdatedAt: recordEditor.liveSessionUpdatedAt,
+      };
+      const draft = await runAccepted(`host-record:rebase:${recordEditor.sessionId}`, () => rebaseMutation.mutateAsync({
         sessionId: recordEditor.sessionId,
-        request: {
-          expectedDraftRevision: controller.expectedDraftRevision,
-          expectedLiveRevision: recordEditor.liveRevision,
-          expectedSessionUpdatedAt: recordEditor.liveSessionUpdatedAt,
-        },
-      });
+        request,
+      }), (accepted) => publishRebasedHostSessionRecordDraft(queryClient, recordEditor.sessionId, request, context, accepted));
       rebasedDraftRevisionRef.current = draft.draftRevision;
       let previewDraftRevision = draft.draftRevision;
       try {
@@ -866,7 +896,7 @@ export function EditHostSessionRecordWorkflow({
           : "재확인 결과를 확인하지 못했습니다. 최신 상태를 불러온 뒤 다시 시도해 주세요.",
       );
     }
-  }, [controller, rebaseMutation, recordEditor, reloadRecordEditor]);
+  }, [context, controller, queryClient, rebaseMutation, recordEditor, reloadRecordEditor, runAccepted]);
 
   const requestApplyPreview = useCallback(async () => {
     const expectedDraftRevision =
@@ -939,7 +969,11 @@ export function EditHostSessionRecordWorkflow({
       return;
     }
     try {
-      const result = await applyMutation.mutateAsync(pendingApply);
+      const result = await runAccepted(
+        `host-record:apply:${pendingApply.request.applyRequestId}`,
+        () => applyMutation.mutateAsync(pendingApply),
+        () => publishAppliedHostSessionRecord(queryClient, pendingApply.sessionId, context, async (event) => onSessionRecordsChanged(event.sessionId)),
+      );
       setConfirmationOpen(false);
       setApplyPreview(null);
       setPendingApply(null);
@@ -992,9 +1026,11 @@ export function EditHostSessionRecordWorkflow({
     applyPreview,
     context,
     onApplyCompleted,
+    onSessionRecordsChanged,
     pendingApply,
     queryClient,
     reloadAuthoritativeDraft,
+    runAccepted,
   ]);
 
   const captureChangeReceipt = useCallback((
@@ -1013,9 +1049,34 @@ export function EditHostSessionRecordWorkflow({
     setRestoreNotice(null);
   }, []);
 
+  const executeReceiptFencedAction = useCallback(async <T,>(
+    operationId: string,
+    request: () => Promise<T>,
+    prepareReceipt: (result: T) => (() => void | Promise<void>) | Promise<() => void | Promise<void>>,
+  ) => {
+    const handle = transitionOwner.begin(operationId, "L3", async () => ({ operationId, outcome: "still-unknown" }));
+    try {
+      const result = await request();
+      if (await handle.settle("succeeded") !== "accepted") throw new TransitionOwnerObsoleteError();
+      const releasePreparation = handle.retainPublication();
+      try {
+        const publishReceipt = await prepareReceipt(result);
+        await publishTransitionAction(handle, "receiptCallback", publishReceipt);
+      } finally {
+        releasePreparation();
+      }
+      return result;
+    } catch (error) {
+      if (!(error instanceof TransitionOwnerObsoleteError)) await handle.settle("failed");
+      throw error;
+    } finally {
+      handle.completePublication();
+    }
+  }, [transitionOwner]);
+
   const editorActions = useMemo(
-    () => wrapHostSessionEditorActionsForUndo(actions, captureChangeReceipt),
-    [actions, captureChangeReceipt],
+    () => wrapHostSessionEditorActionsForUndo(actions, captureChangeReceipt, executeReceiptFencedAction),
+    [actions, captureChangeReceipt, executeReceiptFencedAction],
   );
 
   const openHistoryPanel = useCallback(() => {
@@ -1130,11 +1191,11 @@ export function EditHostSessionRecordWorkflow({
     }
     setUndoConfirm((current) => current ? { ...current, submitting: true, error: null } : current);
     try {
-      const receipt = await restoreChangeMutation.mutateAsync({
+      const receipt = await runAccepted(`host-record:restore-change:${undoConfirm.changeId}`, () => restoreChangeMutation.mutateAsync({
         sessionId: session.sessionId,
         changeId: undoConfirm.changeId,
         request: { expectedCurrentHash: undoConfirm.expectedCurrentHash },
-      });
+      }), () => publishRestoredHostSessionChange(queryClient, session.sessionId, context));
       if (receipt.undoAvailable) {
         captureChangeReceipt(receipt, hostSessionChangeUndoDescription(receipt.kind));
       } else {
@@ -1149,8 +1210,11 @@ export function EditHostSessionRecordWorkflow({
     }
   }, [
     captureChangeReceipt,
+    context,
+    queryClient,
     restoreChangeFailureMessage,
     restoreChangeMutation,
+    runAccepted,
     session.sessionId,
     undoConfirm,
   ]);
@@ -1194,6 +1258,7 @@ export function EditHostSessionRecordWorkflow({
     <>
       <HostSessionEditor
         composeDeck={composeDeck}
+        renderAiGeneration={(input) => <AiGenerateController {...input} />}
         primaryActionRef={primaryActionRef}
         session={session}
         notificationDispatches={notificationDispatches}
@@ -1260,11 +1325,11 @@ export function EditHostSessionRecordWorkflow({
             onConfirm: confirmApply,
           },
           onRestore: async ({ revisionId, expectedDraftRevision }) => {
-            const draft = await restoreMutation.mutateAsync({
+            const draft = await runAccepted(`host-record:restore-revision:${revisionId}`, () => restoreMutation.mutateAsync({
               sessionId: recordEditor.sessionId,
               revisionId,
               request: { expectedDraftRevision },
-            });
+            }), (accepted) => publishRestoredHostSessionRevisionDraft(queryClient, recordEditor.sessionId, context, accepted));
             rebasedDraftRevisionRef.current = null;
             controller.adoptEditor({
               ...recordEditor,

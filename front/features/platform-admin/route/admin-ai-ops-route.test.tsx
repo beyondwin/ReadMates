@@ -177,20 +177,21 @@ describe("AdminAiOpsRoute", () => {
 
   it("selecting a failure code pushes the errorCode filter to the URL", async () => {
     renderRoute();
-    await userEvent.click(screen.getByRole("button", { name: /PROVIDER_RATE_LIMITED/ }));
+    await userEvent.click(screen.getByRole("button", { name: "이 원인의 작업 보기 · 2건" }));
     expect(await screen.findByRole("button", { name: "전체 보기" })).toBeInTheDocument();
   });
 
   it("renders the active filter banner when navigated with an errorCode", () => {
     renderRoute("/admin/ai-ops?errorCode=PROVIDER_RATE_LIMITED");
     const banner = screen.getByRole("status");
-    expect(within(banner).getByText(/PROVIDER_RATE_LIMITED/)).toBeInTheDocument();
+    expect(within(banner).getByText("선택한 실패 원인의 작업만 보는 중")).toBeInTheDocument();
+    expect(banner.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("PROVIDER_RATE_LIMITED");
     expect(within(banner).getByRole("button", { name: "전체 보기" })).toBeInTheDocument();
   });
 
   it("flattens cursor pages without rendering a duplicate boundary job", () => {
     renderRoute("/admin/ai-ops", { pages: [[runningJob], [runningJob, { ...runningJob, jobId: "job-2" }]] });
-    expect(screen.getAllByText(/한강 독서회/)).toHaveLength(2);
+    expect(screen.getAllByText(/한강 독서회/, { selector: ".platform-admin-ai-ops__job-title" })).toHaveLength(2);
   });
 
   it("uses authoritative capabilities instead of inferring mutations from role", () => {
@@ -203,7 +204,7 @@ describe("AdminAiOpsRoute", () => {
     renderRoute("/admin/ai-ops", { pages: [[runningJob]], summaryError: new TypeError("network failed") });
 
     expect(await screen.findByRole("alert")).toHaveTextContent("일부 AI 작업 데이터를 불러오지 못했습니다.");
-    expect(screen.getByText(/한강 독서회/)).toBeInTheDocument();
+    expect(screen.getByText(/한강 독서회/, { selector: ".platform-admin-ai-ops__job-title" })).toBeInTheDocument();
     expect(screen.queryByText("$0.0000")).not.toBeInTheDocument();
     expect(screen.queryByText("최근 실패 코드 없음")).not.toBeInTheDocument();
   });
@@ -252,7 +253,20 @@ describe("AdminAiOpsRoute", () => {
     expect(screen.getByText("운영 · AI 작업")).toBeInTheDocument();
   });
 
-  it("purges an in-flight safe command when platform authority is lost", async () => {
+  it("purges an in-flight safe command and publishes no late receipt when platform authority is lost", async () => {
+    const confirmation = deferred<{
+      receiptId: string;
+      previewId: string;
+      jobId: string;
+      action: "FORCE_CANCEL";
+      beforeJobStatus: string;
+      beforeJobRevision: number;
+      afterJobStatus: string;
+      afterJobRevision: number;
+      originStatus: "ACCEPTED";
+      effectStatus: "PENDING";
+      safeErrorCode: null;
+    }>();
     vi.mocked(previewForceCancelPlatformAdminAiJob).mockResolvedValue({
       previewId: "preview-1",
       jobId: "job-1",
@@ -264,9 +278,12 @@ describe("AdminAiOpsRoute", () => {
       expiresAt: "2026-08-25T01:00:00Z",
       fingerprintPrefix: "00112233",
     });
+    vi.mocked(confirmForceCancelPlatformAdminAiJob).mockReturnValue(confirmation.promise);
     const { queryClient } = renderRoute("/admin/ai-ops", { pages: [[runningJob]] });
     await userEvent.click(screen.getByRole("button", { name: "강제 취소 검토" }));
     expect(await screen.findByRole("dialog", { name: "강제 취소 확인" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "이 작업 강제 취소" }));
+    await waitFor(() => expect(confirmForceCancelPlatformAdminAiJob).toHaveBeenCalledTimes(1));
 
     act(() => {
       purgePlatformAdminState(queryClient);
@@ -286,7 +303,28 @@ describe("AdminAiOpsRoute", () => {
     });
 
     expect(screen.queryByRole("dialog", { name: "강제 취소 확인" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "작업 job-1 강제 취소" })).not.toBeInTheDocument();
+    expect(previewForceCancelPlatformAdminAiJob).toHaveBeenCalledTimes(1);
+    expect(confirmForceCancelPlatformAdminAiJob).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "이 작업 강제 취소" })).not.toBeInTheDocument();
+    await act(async () => {
+      confirmation.resolve({
+        receiptId: "receipt-late",
+        previewId: "preview-1",
+        jobId: "job-1",
+        action: "FORCE_CANCEL",
+        beforeJobStatus: "RUNNING",
+        beforeJobRevision: 7,
+        afterJobStatus: "RUNNING",
+        afterJobRevision: 7,
+        originStatus: "ACCEPTED",
+        effectStatus: "PENDING",
+        safeErrorCode: null,
+      });
+      await confirmation.promise;
+    });
+    expect(confirmForceCancelPlatformAdminAiJob).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("receipt-late")).not.toBeInTheDocument();
     act(() => {
       queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, {
         schemaVersion: 1,
@@ -302,8 +340,8 @@ describe("AdminAiOpsRoute", () => {
   it("opens a safe deep-linked drill-down without placing content in the URL", () => {
     renderRoute("/admin/ai-ops?jobId=job-1", { pages: [[runningJob]], job: runningJob });
     const dialog = screen.getByRole("dialog", { name: "AI 작업 상세" });
-    expect(within(dialog).getByText(/job-1/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/revision 7/)).toBeInTheDocument();
+    expect(dialog.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("job-1");
+    expect(dialog.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("revision 7");
   });
 
   it("retries an ambiguous confirmation with the exact same idempotency request", async () => {
@@ -337,13 +375,35 @@ describe("AdminAiOpsRoute", () => {
     renderRoute("/admin/ai-ops", { pages: [[runningJob]] });
 
     await userEvent.click(screen.getByRole("button", { name: "강제 취소 검토" }));
-    await userEvent.click(await screen.findByRole("button", { name: "작업 job-1 강제 취소" }));
+    await userEvent.click(await screen.findByRole("button", { name: "이 작업 강제 취소" }));
+    expect(screen.queryByRole("button", { name: "최신 상태로 다시 검토" })).not.toBeInTheDocument();
     await userEvent.click(await screen.findByRole("button", { name: "같은 명령으로 다시 확인" }));
 
     await waitFor(() => expect(confirmForceCancelPlatformAdminAiJob).toHaveBeenCalledTimes(2));
+    expect(previewForceCancelPlatformAdminAiJob).toHaveBeenCalledTimes(1);
     expect(vi.mocked(confirmForceCancelPlatformAdminAiJob).mock.calls[0]).toEqual(
       vi.mocked(confirmForceCancelPlatformAdminAiJob).mock.calls[1],
     );
+    expect(vi.mocked(confirmForceCancelPlatformAdminAiJob).mock.calls).toEqual([
+      [
+        "job-1",
+        {
+          previewId: "preview-1",
+          idempotencyKey: "preview-1",
+          expectedJobRevision: 7,
+          confirmed: true,
+        },
+      ],
+      [
+        "job-1",
+        {
+          previewId: "preview-1",
+          idempotencyKey: "preview-1",
+          expectedJobRevision: 7,
+          confirmed: true,
+        },
+      ],
+    ]);
     expect(await screen.findByRole("status", { name: "AI 명령 영수증" })).toHaveTextContent("receipt-1");
     expect(await screen.findByRole("region", { name: "명령 기록" })).toHaveTextContent("receipt-1");
     expect(screen.queryByText("공개 반영 추적")).not.toBeInTheDocument();
@@ -373,7 +433,7 @@ describe("AdminAiOpsRoute", () => {
     const { queryClient } = renderRoute("/admin/ai-ops", { pages: [[runningJob]] });
 
     await userEvent.click(screen.getByRole("button", { name: "강제 취소 검토" }));
-    await userEvent.click(await screen.findByRole("button", { name: "작업 job-1 강제 취소" }));
+    await userEvent.click(await screen.findByRole("button", { name: "이 작업 강제 취소" }));
 
     await waitFor(() => {
       expect(confirmForceCancelPlatformAdminAiJob).toHaveBeenCalledTimes(1);
@@ -413,4 +473,14 @@ async function forbiddenAiError() {
       { status: 403, headers: { "Content-Type": "application/json" } },
     ),
   );
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
 }

@@ -109,4 +109,4 @@ journalctl --disk-usage
 systemctl list-timers backup-mysql.timer readmates-docker-image-prune.timer readmates-apt-autoclean.timer
 ```
 
-용량 값이나 보관 한도를 바꾸면 [ADR-0050](../../development/adr/0050-oci-capacity-and-recovery-guardrails.md)와 이 runbook을 함께 갱신한다.
+용량 값이나 보관 한도를 바꾸면 [ADR-0052](../../development/adr/0052-oci-capacity-and-recovery-guardrails.md)와 이 runbook을 함께 갱신한다.

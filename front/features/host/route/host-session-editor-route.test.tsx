@@ -5,6 +5,8 @@ import { beforeEach, vi, describe, expect, it } from "vitest";
 import { createMemoryRouter, MemoryRouter, Router } from "react-router";
 import { RouterProvider } from "react-router/dom";
 import { StrictMode, useState } from "react";
+import { createGlobalSpaceTransitionCoordinator } from "@/src/app/global-space-transition";
+import { SpaceTransitionSafetyProvider } from "@/shared/ui/space-transition-safety-context";
 
 const loaderApiMocks = vi.hoisted(() => ({
   fetchHostSessionDetail: vi.fn(),
@@ -366,12 +368,14 @@ function renderWorkflow(
   options?: {
     session?: ReturnType<typeof sessionDetail>;
     actions?: Record<string, unknown>;
+    onSessionRecordsChanged?: (sessionId: string) => void | Promise<void>;
   },
 ) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   const workflowSession = options?.session ?? sessionDetail();
+  const coordinator = createGlobalSpaceTransitionCoordinator();
   loaderApiMocks.fetchHostSessionDetail.mockResolvedValue(workflowSession);
   client.setQueryData(
     hostSessionKeys.detail("session-1", { clubSlug: "club-a" }),
@@ -379,21 +383,23 @@ function renderWorkflow(
   );
   const rendered = render(
     <QueryClientProvider client={client}>
-      <EditHostSessionRecordWorkflow
-        session={workflowSession as never}
-        recordEditor={editor}
-        historyPage={{ items: [], nextCursor: null }}
-        loadHistoryPage={vi.fn()}
-        notificationDispatches={[]}
-        context={{ clubSlug: "club-a" }}
-        actions={(options?.actions ?? {}) as never}
-        reloadRecordEditor={reloadRecordEditor}
-        onSessionRecordsChanged={vi.fn()}
-        navigation={navigation}
-      />
+      <SpaceTransitionSafetyProvider port={coordinator}>
+        <EditHostSessionRecordWorkflow
+          session={workflowSession as never}
+          recordEditor={editor}
+          historyPage={{ items: [], nextCursor: null }}
+          loadHistoryPage={vi.fn()}
+          notificationDispatches={[]}
+          context={{ clubSlug: "club-a" }}
+          actions={(options?.actions ?? {}) as never}
+          reloadRecordEditor={reloadRecordEditor}
+          onSessionRecordsChanged={options?.onSessionRecordsChanged ?? vi.fn()}
+          navigation={navigation}
+        />
+      </SpaceTransitionSafetyProvider>
     </QueryClientProvider>,
   );
-  return { ...rendered, client, navigation };
+  return { ...rendered, client, coordinator, navigation };
 }
 
 function workflow() {
@@ -1341,6 +1347,56 @@ describe("EditHostSessionRecordWorkflow", () => {
     );
     expect((routeMocks.capturedProps?.pendingUndo as { description: string }).description)
       .toBe("모임 정보를 저장했습니다.");
+  });
+
+  it("publishes no receipt, undo, refetch, copy, or navigation after delayed response parsing loses authority and unmounts", async () => {
+    let resolveReceipt!: (value: unknown) => void;
+    const parseStarted = vi.fn();
+    const receipt = new Promise<unknown>((resolve) => {
+      resolveReceipt = resolve;
+    });
+    const response = {
+      ok: true,
+      clone: () => ({
+        status: 200,
+        json: async () => {
+          parseStarted();
+          return receipt;
+        },
+      }),
+    } as Response;
+    const saveSession = vi.fn(async () => response);
+    const recordsChanged = vi.fn();
+    const navigate = vi.fn();
+    const rendered = renderWorkflow(recordEditor, vi.fn(), {
+      location: { panel: "basic", source: "manual" },
+      onChange: navigate,
+    }, {
+      session: sessionDetail(),
+      actions: { saveSession },
+      onSessionRecordsChanged: recordsChanged,
+    });
+    const invalidate = vi.spyOn(rendered.client, "invalidateQueries");
+    const refetch = vi.spyOn(rendered.client, "refetchQueries");
+
+    const action = (routeMocks.capturedProps?.actions as { saveSession: typeof saveSession })
+      .saveSession("session-1", { title: "새 제목" } as never);
+    await waitFor(() => expect(parseStarted).toHaveBeenCalledTimes(1));
+    act(() => rendered.coordinator.invalidateForAuthorityLoss());
+    rendered.unmount();
+    resolveReceipt({
+      changeReceipt: { changeId: "change-late-1", kind: "BASIC_INFO", undoAvailable: true },
+    });
+
+    await expect(action).rejects.toThrow("TRANSITION_OWNER_OBSOLETE");
+    expect(saveSession).toHaveBeenCalledTimes(1);
+    expect(routeMocks.capturedProps?.pendingUndo).toBeNull();
+    expect(workflow().confirmation.message).toBeNull();
+    expect(recordsChanged).not.toHaveBeenCalled();
+    expect(invalidate).not.toHaveBeenCalled();
+    expect(refetch).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
+    expect(rendered.coordinator.getSnapshot()).toEqual({ kind: "clean" });
   });
 
   it("clears mounted draft, receipt, and reconciliation state for the revoked club only", async () => {

@@ -2,6 +2,7 @@ import {
   supportGrantReasonLabel,
   supportGrantStatusLabel,
 } from "@/features/platform-admin/model/admin-copy";
+import { adminPlatformRoleLanguage } from "@/features/platform-admin/model/admin-status-language";
 
 export type AdminSupportSearchResult = {
   subjectId: string;
@@ -38,6 +39,9 @@ export type SupportGrantReasonCategory =
   | "MEMBER_ASSISTANCE"
   | "DATA_CORRECTION"
   | "SECURITY_REVIEW";
+export type SupportGrantImpactCode =
+  | "SUPPORT_ACCESS_WILL_BECOME_ACTIVE"
+  | "SUPPORT_ACCESS_WILL_BE_REVOKED";
 
 export type AdminSupportGrantLedgerPage = {
   items: AdminSupportGrantLedgerItem[];
@@ -67,7 +71,7 @@ export type AdminSupportGrantPreview = {
   grantExpiresAt: string;
   reasonCategory: SupportGrantReasonCategory;
   notePresent: boolean;
-  impactCodes: string[];
+  impactCodes: SupportGrantImpactCode[];
   expiresAt: string;
   fingerprintPrefix: string;
 };
@@ -192,7 +196,8 @@ export function formatSupportGrantLedgerSentence(item: AdminSupportGrantLedgerIt
     : item.status === "EXPIRED"
       ? "지원 접근이 만료됨"
       : "지원 접근을 발급함";
-  return `${formatSupportGrantOccurredAt(item.createdAt)} · ${item.clubName}에서 ${item.granteeDisplayName}에게 ${verb} · 사유: ${supportGrantReasonLabel(item.reasonCategory)} · ${supportGrantStatusLabel(item.status)}`;
+  const roleLabel = adminPlatformRoleLanguage(item.createdByRole).primaryText;
+  return `${formatSupportGrantOccurredAt(item.createdAt)} · ${item.clubName}에서 ${item.granteeDisplayName}에게 ${verb} · 사유: ${supportGrantReasonLabel(item.reasonCategory)} · ${supportGrantStatusLabel(item.status)} · 처리 역할: ${roleLabel}`;
 }
 
 export function supportGrantCommandRecovery(error: unknown): {
@@ -252,8 +257,8 @@ export function buildSupportGrantRiskSummary(input: SupportGrantRiskSummaryInput
       label: "발급 권한",
       state: input.canCreateGrant ? "PASS" : "BLOCKED",
       detail: input.canCreateGrant
-        ? "OWNER 권한으로 발급합니다."
-        : "OWNER만 지원 접근 권한을 발급할 수 있습니다.",
+        ? "소유자 권한으로 발급합니다."
+        : "소유자만 지원 접근 권한을 발급할 수 있습니다.",
     },
     {
       id: "eligibility",

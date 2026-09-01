@@ -1,9 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { useLocation, useNavigate, useSearchParams } from "react-router";
 import {
-  clubTriageReasons,
-  clubTriageSeverity,
+  useLocation,
+  useNavigate,
+  useOutletContext,
+  useSearchParams,
+} from "react-router";
+import {
+  buildClubManagementRow,
 } from "@/features/platform-admin/model/platform-admin-club-triage-model";
 import {
   platformAdminClubListFiltersFromSearch,
@@ -20,6 +24,8 @@ import {
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { AdminClubsLedger } from "@/features/platform-admin/ui/admin-clubs-ledger";
 import type { AdminPageState } from "@/features/platform-admin/ui/admin-state-panel";
+import { AdminOnboardingController } from "./admin-onboarding-controller";
+import type { AdminShellOutletContext } from "./admin-shell-layout";
 
 type FilterKey =
   | "search"
@@ -35,6 +41,7 @@ export function AdminClubsRoute() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [scrollTop, setScrollTop] = useState(0);
+  const shellContext = useOutletContext<AdminShellOutletContext | null>();
   const [consumedRestoreKey, setConsumedRestoreKey] = useState<string | null>(
     null,
   );
@@ -102,21 +109,13 @@ export function AdminClubsRoute() {
   const ledgerClubs = useMemo(
     () =>
       clubs.map((club) => ({
+        ...buildClubManagementRow(club),
         clubId: club.clubId,
-        slug: club.slug,
-        name: club.name,
-        status: club.status,
-        publicVisibility: club.publicVisibility,
-        domainCount: club.domainCount,
-        domainActionRequiredCount: club.domainActionRequiredCount,
-        firstHostOnboardingState: club.firstHostOnboardingState,
         href: buildAdminDetailHref(`/admin/clubs/${club.clubId}`, {
           returnTo,
           focusId: club.clubId,
           scrollTop,
         }),
-        severity: clubTriageSeverity(club),
-        reasons: clubTriageReasons(club),
       })),
     [clubs, returnTo, scrollTop],
   );
@@ -143,26 +142,32 @@ export function AdminClubsRoute() {
   });
 
   return (
-    <AdminClubsLedger
-      clubs={ledgerClubs}
-      filters={filters}
-      searchDraft={filters.search ?? ""}
-      pageState={pageState}
-      canCreateClub={canCreateClub}
-      onboardingHref={onboardingHref}
-      focusId={restore.focusId}
-      scrollTop={restore.scrollTop}
-      restoreKey={location.key}
-      onRestoreConsumed={consumeRestore}
-      hasNextPage={Boolean(clubsQuery.hasNextPage)}
-      loadingMore={clubsQuery.isFetchingNextPage}
-      loadMoreError={clubsQuery.isFetchNextPageError}
-      onSearchChange={updateSearch}
-      onFilterChange={(key, value) => updateFilter(key, value)}
-      onRetry={() => void clubsQuery.refetch()}
-      onLoadMore={() => void clubsQuery.fetchNextPage()}
-      onScrollChange={setScrollTop}
-    />
+    <>
+      <AdminClubsLedger
+        clubs={ledgerClubs}
+        filters={filters}
+        searchDraft={filters.search ?? ""}
+        pageState={pageState}
+        canCreateClub={canCreateClub}
+        onboardingHref={onboardingHref}
+        focusId={restore.focusId}
+        scrollTop={restore.scrollTop}
+        restoreKey={location.key}
+        onRestoreConsumed={consumeRestore}
+        hasNextPage={Boolean(clubsQuery.hasNextPage)}
+        loadingMore={clubsQuery.isFetchingNextPage}
+        loadMoreError={clubsQuery.isFetchNextPageError}
+        onSearchChange={updateSearch}
+        onFilterChange={(key, value) => updateFilter(key, value)}
+        onRetry={() => void clubsQuery.refetch()}
+        onLoadMore={() => void clubsQuery.fetchNextPage()}
+        onScrollChange={setScrollTop}
+      />
+      <AdminOnboardingController
+        capabilities={capabilities}
+        authorityEpoch={shellContext?.authorityEpoch ?? 0}
+      />
+    </>
   );
 }
 

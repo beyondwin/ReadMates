@@ -1,0 +1,384 @@
+.admin-service-status {
+  width: 100%;
+  max-width: 1240px;
+  min-width: 0;
+  margin: 0 auto;
+}
+
+.admin-notifications,
+.admin-ai-ops {
+  width: 100%;
+  max-width: 1240px;
+  min-width: 0;
+  margin: 0 auto;
+}
+
+.admin-notifications .admin-page-frame__description,
+.admin-ai-ops .admin-page-frame__description {
+  max-width: 50rem;
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--type-size-body);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.admin-service-detail__next-action {
+  margin: 8px 0 18px;
+  color: var(--text);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.admin-notifications .admin-notifications__summary,
+.admin-ai-ops .platform-admin-ai-ops__metrics {
+  display: grid;
+  gap: 0;
+  margin: 12px 0 28px;
+  border-block: 1px solid var(--line);
+}
+
+.admin-notifications .admin-notifications__summary {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.admin-ai-ops .platform-admin-ai-ops__metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.admin-notifications .admin-notifications__metric,
+.admin-ai-ops .platform-admin-ai-ops__metric {
+  min-width: 0;
+  border: 0;
+  border-right: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  padding: 14px 16px;
+}
+
+.admin-notifications .admin-notifications__metric:last-child,
+.admin-ai-ops .platform-admin-ai-ops__metric:last-child {
+  border-right: 0;
+}
+
+.admin-notifications .admin-notifications__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(20rem, 0.92fr);
+  gap: clamp(24px, 4vw, 52px);
+  align-items: start;
+  margin-bottom: 32px;
+}
+
+.admin-notifications .admin-notifications__panel,
+.admin-ai-ops .platform-admin-ai-ops__failure-overview,
+.admin-ai-ops .platform-admin-ai-ops__cost-reference {
+  min-width: 0;
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+
+.admin-notifications .admin-notifications__cluster-list,
+.admin-ai-ops .platform-admin-ai-ops__failure-list ul {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-notifications .admin-notifications__cluster-list li,
+.admin-ai-ops .platform-admin-ai-ops__failure-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: start;
+  border-bottom: 1px solid var(--line);
+  padding: 14px 0;
+}
+
+.admin-ai-ops .platform-admin-ai-ops__failure-list li {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.admin-notifications .admin-notifications__rows,
+.admin-ai-ops .platform-admin-ai-ops__jobs {
+  display: grid;
+  gap: 0;
+}
+
+.admin-notifications .admin-notifications__row,
+.admin-ai-ops .platform-admin-ai-ops__job {
+  min-width: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  padding: 18px 0;
+}
+
+.admin-ai-ops .platform-admin-ai-ops__job-sentence,
+.admin-ai-ops .platform-admin-ai-ops__job-next {
+  margin: 7px 0 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.admin-ai-ops .platform-admin-ai-ops__job-elapsed--stalled {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.admin-ai-ops .platform-admin-ai-ops__failure-overview {
+  margin-bottom: 24px;
+}
+
+.admin-ai-ops .platform-admin-ai-ops__filter-banner {
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.admin-ai-ops .platform-admin-ai-ops__cost-reference {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.6fr);
+  gap: 24px;
+  margin-top: 32px;
+}
+
+.admin-notifications button,
+.admin-notifications textarea,
+.admin-notifications [data-admin-technical-disclosure] summary,
+.admin-ai-ops button,
+.admin-ai-ops [data-admin-technical-disclosure] summary {
+  min-height: 44px;
+}
+
+.admin-notifications button:focus-visible,
+.admin-notifications textarea:focus-visible,
+.admin-notifications [data-admin-technical-disclosure] summary:focus-visible,
+.admin-ai-ops button:focus-visible,
+.admin-ai-ops [data-admin-technical-disclosure] summary:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.admin-service-status .admin-health-grid__narrative {
+  margin: 0;
+  border-block: 1px solid var(--line);
+  padding: clamp(16px, 2.4vw, 24px) 0;
+  color: var(--text);
+  font-size: var(--type-size-h4);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.admin-service-status .admin-health-grid__cards {
+  grid-template-columns: 1fr;
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+
+.admin-service-status .admin-health-card {
+  gap: 16px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  padding: clamp(18px, 2.4vw, 26px) 0;
+}
+
+.admin-service-status .admin-health-card__header > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.admin-service-status .admin-health-card__state-sentence {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--type-size-body);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.admin-service-status .admin-health-card__narrative {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  border: 1px solid var(--line);
+  background: var(--bg-sub);
+}
+
+.admin-service-status .admin-health-card__narrative > div {
+  min-width: 0;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-service-status .admin-health-card__narrative > div:nth-child(odd) {
+  border-right: 1px solid var(--line);
+}
+
+.admin-service-status .admin-health-card__narrative > div:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.admin-service-status .admin-health-card__narrative dt {
+  color: var(--text-3);
+  font-size: var(--type-size-supporting);
+  font-weight: 700;
+}
+
+.admin-service-status .admin-health-card__narrative dd {
+  margin: 5px 0 0;
+  color: var(--text);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.admin-service-status .admin-health-card__pill--ok {
+  border-color: var(--line);
+  color: var(--text-3);
+}
+
+.admin-service-status .admin-health-card__pill--warn,
+.admin-service-status .admin-health-card__pill--crit {
+  background: var(--bg-sub);
+}
+
+.admin-service-status .admin-health-card__footer {
+  justify-content: flex-start;
+}
+
+.admin-service-status .admin-health-card__drill,
+.admin-service-status .admin-health-card__retry,
+.admin-service-status .admin-health-grid__refresh {
+  min-height: 44px;
+}
+
+.admin-service-status .admin-health-card__drill:focus-visible,
+.admin-service-status .admin-health-card__retry:focus-visible,
+.admin-service-status .admin-health-grid__refresh:focus-visible,
+.admin-service-status [data-admin-technical-disclosure] summary:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.admin-service-status .admin-health-grid__ok-signals {
+  display: grid;
+  grid-template-columns: minmax(9rem, 0.28fr) minmax(0, 1fr);
+  gap: 14px 24px;
+  align-items: start;
+  border-block: 1px solid var(--line);
+  padding: 16px 0;
+}
+
+.admin-service-status .admin-health-grid__ok-signals > p,
+.admin-service-status .admin-health-grid__ok-signals ul {
+  margin: 0;
+}
+
+.admin-service-status .admin-health-grid__ok-signals > p {
+  color: var(--text-3);
+  font-size: var(--type-size-supporting);
+  font-weight: 700;
+}
+
+.admin-service-status .admin-health-grid__ok-signals ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-service-status .admin-health-grid__ok-signals li,
+.admin-service-status .admin-health-grid__ok-signals a {
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+.admin-service-status .admin-health-grid__strip {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  padding: 20px 0;
+}
+
+@media (max-width: 767px) {
+  .admin-notifications .admin-notifications__summary,
+  .admin-ai-ops .platform-admin-ai-ops__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-notifications .admin-notifications__metric:nth-child(2n),
+  .admin-ai-ops .platform-admin-ai-ops__metric:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .admin-notifications .admin-notifications__grid,
+  .admin-ai-ops .platform-admin-ai-ops__cost-reference {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-notifications .admin-notifications__cluster-list li,
+  .admin-ai-ops .platform-admin-ai-ops__failure-list li {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-service-status .admin-health-card__header,
+  .admin-service-status .admin-health-grid__strip-header {
+    align-items: flex-start;
+  }
+
+  .admin-service-status .admin-health-card__narrative {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-service-status .admin-health-card__narrative > div,
+  .admin-service-status .admin-health-card__narrative > div:nth-child(odd),
+  .admin-service-status .admin-health-card__narrative > div:nth-last-child(-n + 2) {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .admin-service-status .admin-health-card__narrative > div:last-child {
+    border-bottom: 0;
+  }
+
+  .admin-service-status .admin-health-grid__ok-signals {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-service-status .admin-health-card__footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-service-status .admin-health-card__drill,
+  .admin-service-status .admin-health-card__retry {
+    justify-content: center;
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-service-status,
+  .admin-notifications,
+  .admin-ai-ops,
+  .admin-service-status *,
+  .admin-notifications *,
+  .admin-ai-ops *,
+  .admin-service-status *::before,
+  .admin-notifications *::before,
+  .admin-ai-ops *::before,
+  .admin-service-status *::after,
+  .admin-notifications *::after,
+  .admin-ai-ops *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

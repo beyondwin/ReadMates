@@ -2,16 +2,11 @@ import { expect, test } from "@playwright/experimental-ct-react";
 import type { HostMeetingTocSections } from "@/features/host/model/host-meeting-list-model";
 import type { HostPersonDetailView } from "@/features/host/model/host-person-detail-model";
 import type { HostSessionLedgerItem } from "@/features/host/model/host-session-ledger-model";
-import type { HostCoHostMemberView, HostSettingsView } from "@/features/host/model/host-settings-model";
 import type { HostMemberListItem } from "@/features/host/model/host-view-types";
 import { HostMeetingList } from "@/features/host/ui/meeting-list/host-meeting-list";
 import { MemberList } from "@/features/host/ui/members/member-list";
 import { HostPersonDetail } from "@/features/host/ui/person/host-person-detail";
 import { HostScheduleReviewHeader } from "@/features/host/ui/schedule-review/host-schedule-review-header";
-import { HostClubSettings } from "@/features/host/ui/settings/host-club-settings";
-import { HostCoHostManagement } from "@/features/host/ui/settings/host-co-host-management";
-import { HostInvitationLinks } from "@/features/host/ui/settings/host-invitation-links";
-import { HostSettingsHistory } from "@/features/host/ui/settings/host-settings-history";
 import { HostSessionLedger } from "@/features/host/ui/host-session-ledger";
 import {
   expectMinimumTargetSize,
@@ -19,9 +14,9 @@ import {
   expectReducedMotion,
   expectVisibleFocus,
 } from "@/tests/e2e/support/visual-authority-contract";
+import { HostSettingsDestinationStory } from "./host-settings-destination.story";
 
 const noop = () => undefined;
-const asyncNoop = async () => undefined;
 
 const meetingSections: HostMeetingTocSections = {
   upcoming: {
@@ -61,13 +56,6 @@ const record: HostSessionLedgerItem = {
   recordStatus: "INCOMPLETE", needsAttention: true, hasDraft: true, liveRevision: 3, draftRevision: 4, lastModifiedAt: "2026-08-21T10:00:00+09:00",
 };
 
-const settings: HostSettingsView = {
-  clubId: "club-fixture", clubSlug: "reading-sai", name: "읽는 사이", approvalPolicy: "INVITE_ONLY", defaultTimezone: "Asia/Seoul",
-  scheduleReminderEnabled: true, recordPublicationDefault: "MEMBER", revision: 7, status: "ACTIVE",
-};
-
-const coHosts: HostCoHostMemberView[] = [{ membershipId: "membership-7", displayName: "정하늘", avatarKey: "banana-green-book", status: "ACTIVE", role: "MEMBER" }];
-
 const person: HostPersonDetailView = {
   membershipId: "membership-7", displayName: "정하늘", avatarKey: "banana-green-book", status: "ACTIVE", role: "MEMBER",
   lastClubAccessAt: "2026-08-29T10:00:00+09:00", currentSchedule: { state: "OPEN", scheduleRevision: 4, scheduledAt: "2026-09-03T19:30:00" }, currentRsvp: "GOING",
@@ -104,10 +92,11 @@ test("surface 12 records destination at 1440px", async ({ mount, page }) => {
 
 test("surface 13 settings destination at 1440px", async ({ mount, page }) => {
   await page.setViewportSize({ width: 1440, height: 1100 });
-  const component = await mount(<main><h1>초대와 설정</h1><HostInvitationLinks links={[]} loading={false} error={null} onRetry={noop} onRefresh={asyncNoop} onCreate={async () => { throw new Error("mock only"); }} onUpdate={asyncNoop} /><section aria-label="기존 이메일 초대 호환"><h2>기존 이메일 초대</h2><a href="/app/host/invitations">기존 이메일 초대 관리</a></section><HostClubSettings settings={settings} saving={false} stale={false} error={null} onSave={asyncNoop} /><HostCoHostManagement settingsRevision={7} members={coHosts} busy={false} onChange={asyncNoop} onRefresh={asyncNoop} /><HostSettingsHistory page={{ items: [], nextCursor: null }} onLoadMore={async () => ({ items: [], nextCursor: null })} /></main>);
+  const component = await mount(<HostSettingsDestinationStory />);
   await expect(component.getByRole("heading", { name: "공유 링크" })).toBeVisible();
   await expect(component.getByRole("region", { name: "기존 이메일 초대 호환" })).toBeVisible();
-  await expect(component.getByText("settings revision 7")).toBeVisible();
+  await expect(component.getByText("revision 7", { exact: true })).toBeVisible();
+  await expect(component.getByText("settings revision 7", { exact: true })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await expectReducedMotion(page);
 });

@@ -15,6 +15,7 @@ import { openAlreadyExistsMessage } from "@/features/host/model/host-session-lif
 import {
   hostSessionTrashListQuery,
   isHostSessionTrashExpiredError,
+  publishRestoredHostSession,
   useRestoreHostSessionMutation,
 } from "@/features/host/queries/host-session-queries";
 import { hostSessionRecordLedgerQuery } from "@/features/host/queries/host-session-record-queries";
@@ -30,6 +31,11 @@ import {
   HOST_SESSION_LEDGER_PAGE_LIMIT,
   type HostSessionLedgerRouteData,
 } from "./host-session-ledger-data";
+import {
+  publishTransitionAction,
+  TransitionOwnerObsoleteError,
+  useTransitionSafetyOwner,
+} from "@/shared/ui/use-transition-safety-owner";
 
 function sameFilters(left: HostSessionLedgerFilters, right: HostSessionLedgerFilters) {
   return left.view === right.view
@@ -76,6 +82,7 @@ export function HostSessionLedgerRoute({
     enabled: trashView,
   });
   const restoreMutation = useRestoreHostSessionMutation(context);
+  const transitionOwner = useTransitionSafetyOwner("host-session-ledger");
   const loaderPage = !trashView && sameFilters(filters, loaderData.filters) ? loaderData.page : null;
   const loaderTrashPage = trashView && sameFilters(filters, loaderData.filters) ? loaderData.trashPage : null;
   const basePage = query.data ?? loaderPage;
@@ -197,50 +204,66 @@ export function HostSessionLedgerRoute({
       ...current,
       [sessionId]: { restoring: true, restoreError: null, restoreConflict: null },
     }));
+    const operationId = `host-session-restore:${sessionId}`;
+    const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
     try {
-      await restoreMutation.mutateAsync(sessionId);
-      await trashQuery.refetch();
-      setTrashAppended(null);
-      setRestoreState((current) => {
+      const detail = await restoreMutation.mutateAsync(sessionId);
+      if (await handle.settle("succeeded") !== "accepted") return;
+      await publishTransitionAction(handle, "cache", async () => {
+        await publishRestoredHostSession(queryClient, detail, sessionId, context);
+        if (!handle.isPublicationCurrent()) throw new TransitionOwnerObsoleteError();
+        await trashQuery.refetch();
+      });
+      await publishTransitionAction(handle, "ui", () => {
+        setTrashAppended(null);
+        setRestoreState((current) => {
         const next = { ...current };
         delete next[sessionId];
         return next;
+        });
       });
     } catch (error) {
+      if (await handle.settle("failed") !== "accepted") return;
       if (isHostSessionTrashExpiredError(error)) {
-        setRestoreState((current) => ({
-          ...current,
-          [sessionId]: {
-            restoring: false,
-            restoreDisabled: true,
-            restoreDisabledReason: "복원 기간이 지났습니다.",
-            restoreError: null,
-            restoreConflict: null,
-          },
-        }));
+        await publishTransitionAction(handle, "errorCopy", () => {
+          setRestoreState((current) => ({
+            ...current,
+            [sessionId]: {
+              restoring: false,
+              restoreDisabled: true,
+              restoreDisabledReason: "복원 기간이 지났습니다.",
+              restoreError: null,
+              restoreConflict: null,
+            },
+          }));
+        });
         return;
       }
       if (isReadmatesApiError(error) && error.code === "SESSION_OPEN_ALREADY_EXISTS" && error.openSessionId) {
+        await publishTransitionAction(handle, "errorCopy", () => {
+          setRestoreState((current) => ({
+            ...current,
+            [sessionId]: {
+              restoring: false,
+              restoreError: null,
+              restoreConflict: {
+                openSessionHref: openSessionHref(error.openSessionId as string),
+                message: openAlreadyExistsMessage(),
+              },
+            },
+          }));
+        });
+        return;
+      }
+      await publishTransitionAction(handle, "errorCopy", () => {
         setRestoreState((current) => ({
           ...current,
           [sessionId]: {
             restoring: false,
-            restoreError: null,
-            restoreConflict: {
-              openSessionHref: openSessionHref(error.openSessionId as string),
-              message: openAlreadyExistsMessage(),
-            },
+            restoreError: "모임을 복원하지 못했습니다.",
           },
         }));
-        return;
-      }
-      setRestoreState((current) => ({
-        ...current,
-        [sessionId]: {
-          restoring: false,
-          restoreError: "모임을 복원하지 못했습니다.",
-        },
-      }));
+      });
     }
   };
 

@@ -59,9 +59,12 @@ export function MemberInvitationsSection({
 }: {
   invitations: readonly HostInvitationListItem[];
   pendingCount: number;
-  onCreate: (request: { email: string; name: string; applyToCurrentSession: boolean }) => Promise<void>;
-  onRevoke: (invitationId: string) => Promise<void>;
-  onReissue: (invitation: HostInvitationListItem) => Promise<void>;
+  onCreate: (
+    request: { email: string; name: string; applyToCurrentSession: boolean },
+    publication: { accepted: () => void; failed: () => void },
+  ) => Promise<void>;
+  onRevoke: (invitationId: string, publication: { accepted: () => void; failed: () => void }) => Promise<void>;
+  onReissue: (invitation: HostInvitationListItem, publication: { accepted: () => void; failed: () => void }) => Promise<void>;
   busyId: string | null;
 }): ReactElement {
   const [name, setName] = useState("");
@@ -89,20 +92,22 @@ export function MemberInvitationsSection({
     }
 
     setIsCreating(true);
-    try {
-      await onCreate({
+    await onCreate({
         email: trimmedEmail,
         name: trimmedName,
         applyToCurrentSession,
+      }, {
+        accepted: () => {
+          setName("");
+          setEmail("");
+          setMessage({ kind: "status", text: "초대를 보냈습니다." });
+          setIsCreating(false);
+        },
+        failed: () => {
+          setMessage({ kind: "alert", text: "초대 생성에 실패했습니다. 이메일과 이름을 확인한 뒤 다시 시도해 주세요." });
+          setIsCreating(false);
+        },
       });
-      setName("");
-      setEmail("");
-      setMessage({ kind: "status", text: "초대를 보냈습니다." });
-    } catch {
-      setMessage({ kind: "alert", text: "초대 생성에 실패했습니다. 이메일과 이름을 확인한 뒤 다시 시도해 주세요." });
-    } finally {
-      setIsCreating(false);
-    }
   };
 
   const revealEmail = (invitationId: string) => {
@@ -132,22 +137,18 @@ export function MemberInvitationsSection({
 
   const handleRevoke = async (invitationId: string) => {
     setMessage(null);
-    try {
-      await onRevoke(invitationId);
-      setMessage({ kind: "status", text: "초대를 중지했습니다." });
-    } catch {
-      setMessage({ kind: "alert", text: "초대 중지에 실패했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요." });
-    }
+    await onRevoke(invitationId, {
+      accepted: () => setMessage({ kind: "status", text: "초대를 중지했습니다." }),
+      failed: () => setMessage({ kind: "alert", text: "초대 중지에 실패했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요." }),
+    });
   };
 
   const handleReissue = async (invitation: HostInvitationListItem) => {
     setMessage(null);
-    try {
-      await onReissue(invitation);
-      setMessage({ kind: "status", text: "초대를 재발송했습니다." });
-    } catch {
-      setMessage({ kind: "alert", text: "재발송에 실패했습니다. 대상 이메일을 확인한 뒤 다시 시도해 주세요." });
-    }
+    await onReissue(invitation, {
+      accepted: () => setMessage({ kind: "status", text: "초대를 재발송했습니다." }),
+      failed: () => setMessage({ kind: "alert", text: "재발송에 실패했습니다. 대상 이메일을 확인한 뒤 다시 시도해 주세요." }),
+    });
   };
 
   return (

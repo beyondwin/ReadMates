@@ -47,6 +47,8 @@ export type ClubShellResponsiveSlot = {
   mobile?: ReactNode;
 };
 
+export type GlobalSpaceSwitcherSlot = ClubShellResponsiveSlot;
+
 export type ClubShellBackTarget = {
   href: string;
   label: string;

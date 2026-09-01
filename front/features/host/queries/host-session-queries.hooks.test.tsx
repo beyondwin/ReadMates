@@ -56,6 +56,15 @@ import {
 } from "@/features/host/api/host-api";
 import {
   hostSessionKeys,
+  publishDeletedHostSession,
+  publishHostPublicConvergence,
+  publishHostSessionAttendance,
+  publishHostSessionCreated,
+  publishHostSessionImport,
+  publishHostSessionPublication,
+  publishHostSessionResponse,
+  publishHostSessionVisibility,
+  publishRestoredHostSession,
   useCloseHostSessionMutation,
   useCorrectionPublishHostSessionMutation,
   useCommitHostSessionImportMutation,
@@ -327,6 +336,8 @@ describe("host session mutation hooks", () => {
     });
 
     expect(retryHostPublicConvergence).toHaveBeenCalledWith("session-7", response.convergenceId, context);
+    expect(client.getQueryState(exactKey)?.isInvalidated).toBe(false);
+    await publishHostPublicConvergence(client, "session-7", context);
     expect(client.getQueryState(exactKey)?.isInvalidated).toBe(true);
     expect(client.getQueryState(otherKey)?.isInvalidated).toBe(false);
   });
@@ -510,9 +521,9 @@ describe("host session mutation hooks", () => {
     const { entries } = seedSurfaces(client);
     const { result } = renderHook(() => useCreateHostSessionMutation(context), { wrapper: Wrapper });
 
-    await act(async () => {
-      await result.current.mutateAsync(sessionRequest);
-    });
+    let created!: Response;
+    await act(async () => { created = await result.current.mutateAsync(sessionRequest); });
+    await publishHostSessionCreated(client, created, context);
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(createHostSession).toHaveBeenCalledWith(expect.objectContaining({
@@ -693,9 +704,9 @@ describe("host session mutation hooks", () => {
     const { entries } = seedSurfaces(client);
     const { result } = renderHook(() => useUpdateHostSessionMutation(context), { wrapper: Wrapper });
 
-    await act(async () => {
-      await result.current.mutateAsync({ sessionId: "session-7", request: sessionRequest });
-    });
+    let updated!: Response;
+    await act(async () => { updated = await result.current.mutateAsync({ sessionId: "session-7", request: sessionRequest }); });
+    await publishHostSessionResponse(client, updated, "session-7", context);
 
     expect(updateHostSession).toHaveBeenCalledWith("session-7", expect.objectContaining({
       idempotencyKey: expect.any(String),
@@ -761,9 +772,9 @@ describe("host session mutation hooks", () => {
     const { entries, keys } = seedSurfaces(client);
     const { result } = renderHook(() => useDeleteHostSessionMutation(context), { wrapper: Wrapper });
 
-    await act(async () => {
-      await result.current.mutateAsync("session-7");
-    });
+    let deleted!: Awaited<ReturnType<typeof result.current.mutateAsync>>;
+    await act(async () => { deleted = await result.current.mutateAsync("session-7"); });
+    await publishDeletedHostSession(client, deleted, "session-7", context);
 
     expect(deleteHostSession).toHaveBeenCalledWith("session-7", expect.objectContaining({
       idempotencyKey: expect.any(String),
@@ -791,9 +802,9 @@ describe("host session mutation hooks", () => {
     const { entries } = seedSurfaces(client);
     const { result } = renderHook(() => useRestoreHostSessionMutation(context), { wrapper: Wrapper });
 
-    await act(async () => {
-      await result.current.mutateAsync("session-7");
-    });
+    let restored!: Awaited<ReturnType<typeof result.current.mutateAsync>>;
+    await act(async () => { restored = await result.current.mutateAsync("session-7"); });
+    await publishRestoredHostSession(client, restored, "session-7", context);
 
     expectInvalidated(client, [entries.recordLedger, entries.recordAttention, entries.recordEditor, entries.recordHistory]);
     expectFresh(client, [entries.otherClubDetail, entries.otherClubRecordLedger]);
@@ -829,9 +840,9 @@ describe("host session mutation hooks", () => {
     }
     const { result } = renderHook(() => hook(context), { wrapper: Wrapper });
 
-    await act(async () => {
-      await result.current.mutateAsync("session-7");
-    });
+    let response!: Response;
+    await act(async () => { response = await result.current.mutateAsync("session-7"); });
+    await publishHostSessionResponse(client, response, "session-7", context, expectsManualDispatches);
 
     expect(apiFn).toHaveBeenCalledWith(
       "session-7",
@@ -893,9 +904,9 @@ describe("host session mutation hooks", () => {
     }
     const { result } = renderHook(() => hook(context), { wrapper: Wrapper });
 
-    await act(async () => {
-      await result.current.mutateAsync({ sessionId: "session-7", request });
-    });
+    let response!: Response;
+    await act(async () => { response = await result.current.mutateAsync({ sessionId: "session-7", request }); });
+    await publishHostSessionResponse(client, response, "session-7", context, true);
 
     expect(apiFn).toHaveBeenCalledWith("session-7", expect.objectContaining({
       idempotencyKey: expect.any(String),
@@ -951,6 +962,7 @@ describe("host session mutation hooks", () => {
       { visibility: "MEMBER" },
       context,
     );
+    await publishHostSessionVisibility(client, mutationResult!, "session-7", context);
     expect(client.getQueryData(detailKey)).toEqual(visibilityResult().session);
     expect(client.getQueryData(manualOptionsKey)).toBeUndefined();
     expectInvalidated(client, [entries.list, entries.dashboard, entries.recordLedger, entries.recordAttention, entries.recordEditor]);
@@ -971,12 +983,14 @@ describe("host session mutation hooks", () => {
     const { entries } = seedSurfaces(client);
     const { result } = renderHook(() => useSaveHostSessionPublicationMutation(context), { wrapper: Wrapper });
 
+    let response!: Response;
     await act(async () => {
-      await result.current.mutateAsync({
+      response = await result.current.mutateAsync({
         sessionId: "session-7",
         request: { publicSummary: "요약", visibility: "MEMBER" },
       });
     });
+    await publishHostSessionPublication(client, response, "session-7", context);
 
     expectInvalidated(client, [
       entries.detail,
@@ -1002,9 +1016,9 @@ describe("host session mutation hooks", () => {
     const { entries } = seedSurfaces(client);
     const { result } = renderHook(() => useSaveHostSessionAccessScopeMutation(context), { wrapper: Wrapper });
 
-    await act(async () => {
-      await result.current.mutateAsync({ sessionId: "session-7", request: { accessScope: "GUEST_READABLE" } });
-    });
+    let accessResult!: ReturnType<typeof visibilityResult>;
+    await act(async () => { accessResult = await result.current.mutateAsync({ sessionId: "session-7", request: { accessScope: "GUEST_READABLE" } }); });
+    await publishHostSessionVisibility(client, accessResult, "session-7", context);
 
     expectInvalidated(client, [entries.list, entries.dashboard, entries.recordLedger, entries.recordAttention, entries.recordEditor]);
     expectFresh(client, [entries.recordHistory, entries.otherClubDetail, entries.otherClubRecordLedger]);
@@ -1051,6 +1065,7 @@ describe("host session mutation hooks", () => {
         expectedAttendanceRevision: 6,
       }] },
     }), context);
+    await publishHostSessionAttendance(client, "session-7", [{ membershipId: "member-1", attendanceStatus: "ATTENDED" }], context);
     expect(fetchHostSessionDetail).toHaveBeenCalledWith("session-7", context);
     expectInvalidated(client, [
       entries.current,
@@ -1086,6 +1101,7 @@ describe("host session mutation hooks", () => {
     await act(async () => {
       await result.current.mutateAsync({ sessionId: "session-7", request: importRequest });
     });
+    await publishHostSessionImport(client, "session-7", context);
 
     expect(commitHostSessionImport).toHaveBeenCalledWith("session-7", importRequest, context);
     expectInvalidated(client, [

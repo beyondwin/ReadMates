@@ -133,13 +133,26 @@ test("owner reviews admin audit ledger without raw private fields", async ({ pag
 
   await page.goto("/admin/audit");
 
-  await expect(page.getByRole("heading", { name: "운영 기입" })).toBeVisible();
-  await expect(page.getByLabel("운영 기입 목록").getByText("알림 재처리가 확정되었습니다.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "알림 재처리가 확정되었습니다." })).toBeVisible();
-  await expect(page.getByLabel("운영 기입 목록").getByText("support grant가 생성되었습니다.")).toBeVisible();
-  await page.getByRole("button", { name: /support grant가 생성되었습니다/ }).click();
+  await expect(page.getByRole("heading", { name: "운영 처리 기록" })).toBeVisible();
+  const ledger = page.getByLabel("처리 기록 목록");
+  await expect(ledger.getByRole("button", { name: /알림 재처리 대상에 알림 재처리를 확정했습니다/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "알림 재처리를 확정했습니다." })).toBeVisible();
+  const supportRow = ledger.getByRole("button", { name: /지원 접근 대상에 지원 접근 권한을 부여했습니다/ });
+  await expect(supportRow).toBeVisible();
+  await expect(supportRow).not.toContainText("support grant");
+  await supportRow.click();
   await expect(page).toHaveURL(/event=platform_audit_events%3Aevent-2|event=platform_audit_events:event-2/);
   await expect(page).toHaveURL(/mode=detail/);
+  const detail = page.getByRole("region", { name: "감사 이벤트 상세" });
+  await expect(detail.getByRole("heading", { name: "지원 접근 권한을 부여했습니다." })).toBeVisible();
+  await expect(detail.getByText("support grant가 생성되었습니다.")).toBeHidden();
+  await expect(detail.getByText("METADATA_READ")).toBeHidden();
+  await detail.getByText("기술 정보", { exact: true }).click();
+  await expect(detail.getByText("support grant가 생성되었습니다.")).toBeVisible();
+  await expect(detail.getByText("METADATA_READ")).toBeVisible();
+  await expect(page.getByLabel("행위자 역할").getByRole("option", { name: "소유자" })).toHaveAttribute("value", "OWNER");
+  await expect(page.getByLabel("소스 영역").getByRole("option", { name: "지원 접근" })).toHaveAttribute("value", "S4");
+  await expect(page.getByLabel("행동 분류").getByRole("option", { name: "알림" })).toHaveAttribute("value", "NOTIFICATION");
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
   await expect(page.getByText("{\"")).toHaveCount(0);
 });
@@ -155,7 +168,7 @@ test("sensitive audit target stays in POST memory and out of browser persistence
   await page.getByRole("searchbox", { name: "민감 대상 검색" }).fill(sentinel);
   await page.getByRole("button", { name: "대상 검색" }).click();
 
-  await expect(page.getByRole("button", { name: /민감 대상과 연결된 안전한 감사 증거/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /지원 접근 권한을 부여했습니다/ })).toBeVisible();
   expect(requestBody).toMatchObject({ sensitiveTarget: sentinel, sourceSlice: "S4" });
   await expect(page).toHaveURL(/\/admin\/audit\?sourceSlice=S4$/);
   const persisted = await page.evaluate(() => JSON.stringify({
@@ -178,7 +191,7 @@ test("owner captures audit operation summary visual evidence on desktop and mobi
 
   await page.setViewportSize(VISUAL_AUTHORITY_VIEWPORTS.desktopWide);
   await page.goto("/admin/audit");
-  await expect(page.getByRole("heading", { name: "운영 기입" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "운영 처리 기록" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await expect(page.getByText("운영 판단")).toBeVisible();
   await expectNoAuditPrivateSentinels(page);
@@ -190,15 +203,15 @@ test("owner captures audit operation summary visual evidence on desktop and mobi
 
   await page.setViewportSize(VISUAL_AUTHORITY_VIEWPORTS.mobile);
   await page.goto("/admin/audit");
-  await expect(page.getByRole("heading", { name: "운영 기입" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "운영 처리 기록" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
-  await page.getByRole("button", { name: /support grant가 생성되었습니다/ }).click();
+  await page.getByRole("button", { name: /지원 접근 권한을 부여했습니다/ }).click();
   await expect(page).toHaveURL(/mode=detail/);
-  await expect(page.getByText("확인 필요")).toBeVisible();
+  await expect(page.getByRole("region", { name: "감사 이벤트 상세" }).getByText("확인 필요", { exact: true })).toBeVisible();
   await expectMinimumTargetSize(page.getByRole("button", { name: "목록으로" }));
   await page.getByRole("button", { name: "목록으로" }).click();
   await expect(page).not.toHaveURL(/mode=detail/);
-  await expect(page.getByRole("button", { name: /support grant가 생성되었습니다/ })).toBeFocused();
+  await expect(page.getByRole("button", { name: /지원 접근 권한을 부여했습니다/ })).toBeFocused();
   await expectNoAuditPrivateSentinels(page);
   const mobileScreenshot = await page.screenshot({
     path: testInfo.outputPath("admin-audit-mobile.png"),

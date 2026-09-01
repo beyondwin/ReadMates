@@ -1,4 +1,4 @@
-import { ClubAiDefaultsSection } from "@/features/host/club/ui/ClubAiDefaultsSection";
+import { ClubAiDefaultsSection, type ClubAiDefaultsPresentation } from "@/features/host/club/ui/ClubAiDefaultsSection";
 import type { HostNotificationSummary } from "@/features/host/model/host-view-types";
 import type { HostSessionLedgerItem } from "@/features/host/model/host-session-ledger-model";
 import { HostClubOperationsCard } from "@/features/host/ui/host-club-operations-card";
@@ -71,12 +71,14 @@ export function HostOperationsPage({
   attention,
   clubReadiness,
   notifications,
+  aiDefaults,
 }: {
   clubSlug: string;
   LinkComponent?: HostLinkComponent;
   attention: HostOperationsAttentionState;
   clubReadiness: HostOperationsCardState<HostClubOperationsSnapshot>;
   notifications: HostOperationsCardState<HostNotificationSummary>;
+  aiDefaults: ClubAiDefaultsPresentation;
 }) {
   return (
     <main className="rm-meeting-ledger">
@@ -139,7 +141,7 @@ export function HostOperationsPage({
           ) : null}
         </section>
 
-        {clubSlug ? <ClubAiDefaultsSection clubSlug={clubSlug} variant="compact" /> : null}
+        {clubSlug ? <ClubAiDefaultsSection state={aiDefaults} variant="compact" /> : null}
 
         <section aria-label="클럽 준비도">
           {clubReadiness.data ? (

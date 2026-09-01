@@ -1,9 +1,8 @@
 import type { KeyboardEvent } from "react";
 import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
 import {
-  analyticsActionForKpi,
-  deltaLabel,
-  formatKpiValue,
+  buildAnalyticsKpiDecisionView,
+  formatAnalyticsGeneratedAt,
   formatSeriesPointValue,
   labelKpi,
   labelWindow,
@@ -15,6 +14,7 @@ import {
 } from "@/features/platform-admin/model/platform-admin-analytics-model";
 import { AdminPageContext } from "./admin-page-context";
 import { AdminStatePanel } from "./admin-state-panel";
+import "./admin-processing-records.css";
 
 export type AdminAnalyticsOverviewViewProps = {
   overview: AdminAnalyticsOverview | null;
@@ -60,6 +60,10 @@ export function AdminAnalyticsOverviewView({
       <AdminPageContext
         eyebrow={ADMIN_COPY.eyebrow.ledger}
         heading={ADMIN_COPY.heading.analytics}
+        description="처리 기록을 해석할 때 참고하는 집계입니다."
+        freshness={overview ? (
+          <time dateTime={overview.generatedAt}>{formatAnalyticsGeneratedAt(overview.generatedAt)}</time>
+        ) : null}
         action={
           <div className="admin-analytics__windows" role="group" aria-label="분석 기간 선택">
             {WINDOWS.map((value) => (
@@ -107,11 +111,20 @@ export function AdminAnalyticsOverviewView({
               {exportStatus === "success" ? <p className="admin-analytics__export-status" role="status">CSV 파일을 내려받았습니다.</p> : null}
               {exportStatus === "error" ? <p className="admin-analytics__export-error" role="alert">CSV 파일을 만들지 못했습니다. 다시 시도해 주세요.</p> : null}
             </div>
-            <ul className="admin-analytics__kpis" aria-label="핵심 지표">
-              {overview.kpis.map((card) => (
-                <AdminAnalyticsKpiTile key={card.key} card={card} />
-              ))}
-            </ul>
+            <section className="admin-analytics__criteria" aria-labelledby="admin-analytics-criteria-heading">
+              <div className="admin-analytics__section-heading">
+                <div>
+                  <p className="admin-analytics__section-eyebrow">수치를 읽기 전에</p>
+                  <h2 id="admin-analytics-criteria-heading">판단 기준</h2>
+                </div>
+                <p>정의와 측정 가능 여부를 먼저 확인하고, 값은 기간 비교의 근거로 사용하세요.</p>
+              </div>
+              <ol className="admin-analytics__criteria-list" aria-label="분석 판단 기준">
+                {overview.kpis.map((card) => (
+                  <AdminAnalyticsKpiCriterion key={card.key} card={card} />
+                ))}
+              </ol>
+            </section>
             <AdminAnalyticsSeriesTable series={overview.series} />
             <AdminAnalyticsBenchmarkTable benchmark={overview.clubBenchmark} />
           </>
@@ -121,17 +134,21 @@ export function AdminAnalyticsOverviewView({
   );
 }
 
-function AdminAnalyticsKpiTile({ card }: { card: AdminAnalyticsKpiCard }) {
-  const unavailable = card.availability !== "AVAILABLE";
-  const action = analyticsActionForKpi(card.key);
+function AdminAnalyticsKpiCriterion({ card }: { card: AdminAnalyticsKpiCard }) {
+  const item = buildAnalyticsKpiDecisionView(card);
   return (
-    <li className={`admin-analytics__kpi${unavailable ? " admin-analytics__kpi--empty" : ""}`}>
-      <span className="admin-analytics__kpi-label">{card.label || labelKpi(card.key)}</span>
-      {card.definition ? <span className="admin-analytics__kpi-definition">{card.definition}</span> : null}
-      <span className="admin-analytics__kpi-value ledger-number">{formatKpiValue(card)}</span>
-      <span className="admin-analytics__kpi-delta">{deltaLabel(card)}</span>
-      <a className="admin-analytics__kpi-action small" href={action.href}>
-        {action.label}
+    <li className="admin-analytics__criterion" aria-label={item.label}>
+      <div className="admin-analytics__criterion-context">
+        <h3>{item.label}</h3>
+        <p className="admin-analytics__criterion-definition">{item.definition}</p>
+        <p className="admin-analytics__criterion-availability">측정 상태 · {item.availability}</p>
+      </div>
+      <div className="admin-analytics__criterion-result">
+        {item.value ? <strong className="admin-analytics__criterion-value">{item.value}</strong> : null}
+        <span className="admin-analytics__criterion-comparison ledger-number">{item.comparison}</span>
+      </div>
+      <a className="admin-analytics__criterion-action small" href={item.action.href}>
+        {item.action.label}
       </a>
     </li>
   );
@@ -139,16 +156,16 @@ function AdminAnalyticsKpiTile({ card }: { card: AdminAnalyticsKpiCard }) {
 
 function AdminAnalyticsSeriesTable({ series }: { series: AdminAnalyticsKpiSeries[] }) {
   if (series.length === 0 || series.every((item) => item.points.length === 0)) {
-    return <p className="admin-analytics__benchmark-empty">KPI 추세를 만들 충분한 데이터가 없습니다.</p>;
+    return <p className="admin-analytics__benchmark-empty">기간별 변화를 만들 충분한 데이터가 없습니다.</p>;
   }
 
   const bucketStarts = [...new Set(series.flatMap((item) => item.points.map((point) => point.bucketStart)))].sort();
 
   return (
     <section className="admin-analytics__trend" aria-labelledby="admin-analytics-trends-heading">
-      <h2 id="admin-analytics-trends-heading">KPI 추세</h2>
+      <h2 id="admin-analytics-trends-heading">기간별 변화</h2>
       <div className="admin-analytics__trend-scroll">
-        <table className="admin-analytics__trend-table" aria-label="KPI 추세">
+        <table className="admin-analytics__trend-table" aria-label="기간별 변화">
           <thead>
             <tr>
               <th scope="col">지표</th>
@@ -186,11 +203,18 @@ function AdminAnalyticsBenchmarkTable({
   benchmark: AdminAnalyticsOverview["clubBenchmark"];
 }) {
   if (benchmark.availability === "NOT_ENOUGH_DATA" || benchmark.rows.length === 0) {
-    return <p className="admin-analytics__benchmark-empty">클럽 비교에 충분한 데이터가 없습니다.</p>;
+    return (
+      <section className="admin-analytics__comparison" aria-labelledby="admin-analytics-comparison-heading">
+        <h2 id="admin-analytics-comparison-heading">클럽별 비교</h2>
+        <p className="admin-analytics__benchmark-empty">클럽 비교에 충분한 데이터가 없습니다.</p>
+      </section>
+    );
   }
   return (
-    <div className="admin-analytics__benchmark-scroll">
-      <table className="admin-analytics__benchmark" aria-label="클럽 비교">
+    <section className="admin-analytics__comparison" aria-labelledby="admin-analytics-comparison-heading">
+      <h2 id="admin-analytics-comparison-heading">클럽별 비교</h2>
+      <div className="admin-analytics__benchmark-scroll">
+        <table className="admin-analytics__benchmark" aria-label="클럽 비교">
         <thead>
           <tr>
             <th scope="col">클럽</th>
@@ -206,8 +230,9 @@ function AdminAnalyticsBenchmarkTable({
             <AdminAnalyticsBenchmarkRowView key={row.clubId} row={row} />
           ))}
         </tbody>
-      </table>
-    </div>
+        </table>
+      </div>
+    </section>
   );
 }
 

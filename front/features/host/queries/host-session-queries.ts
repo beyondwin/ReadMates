@@ -479,23 +479,21 @@ export function invalidateHostSessionRecordSurfaces(
 }
 
 export function useRetryHostPublicConvergenceMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "public-convergence", "retry"),
     mutationFn: ({ sessionId, convergenceId }: { sessionId: string; convergenceId: string }) =>
       retryHostPublicConvergence(sessionId, convergenceId, context),
-    onSuccess: (_result, { sessionId }) => client.invalidateQueries({
-      queryKey: hostSessionKeys.convergence(sessionId, context),
-      exact: true,
-    }),
   });
+}
+
+export function publishHostPublicConvergence(client: QueryClient, sessionId: string, context: ExplicitReadmatesApiContext) {
+  return client.invalidateQueries({ queryKey: hostSessionKeys.convergence(sessionId, context), exact: true });
 }
 
 export function useCreateHostSessionMutation(
   context: ExplicitReadmatesApiContext,
   options: { retainUntilResolved?: boolean } = {},
 ) {
-  const client = useQueryClient();
   const reconciliation = useReconciliationState();
   const setReconciliationState = reconciliation.setReconciliationState;
   const pendingCreateRef = useRef<HostMutationEnvelope<HostSessionRequest, Record<string, never>> | null>(null);
@@ -515,12 +513,6 @@ export function useCreateHostSessionMutation(
     }
     return committedDetailResponse(result.receipt.resourceId, context, 201);
   }, [context]);
-
-  const invalidateCreateSurfaces = useCallback((response: Response) =>
-    invalidateOk(response, () => Promise.all([
-      invalidateHostSessionLists(client, context),
-      invalidateHostSessionDashboard(client, context),
-    ])), [client, context]);
 
   const mutation = useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "sessions", "create"),
@@ -550,7 +542,6 @@ export function useCreateHostSessionMutation(
         throw error instanceof HostMutationPendingError ? error : new HostMutationPendingError();
       }
     },
-    onSuccess: invalidateCreateSurfaces,
   });
 
   const reconcilePendingCreate = useCallback(async (): Promise<Response> => {
@@ -577,13 +568,12 @@ export function useCreateHostSessionMutation(
       } else {
         throw new HostMutationPendingError();
       }
-      await invalidateCreateSurfaces(response);
       if (!options.retainUntilResolved) markPendingCreate(null);
       return response;
     } finally {
       setReconciliationState(pendingCreateRef.current ? "pending" : "idle");
     }
-  }, [acceptCommittedCreate, context, invalidateCreateSurfaces, markPendingCreate, options.retainUntilResolved, setReconciliationState]);
+  }, [acceptCommittedCreate, context, markPendingCreate, options.retainUntilResolved, setReconciliationState]);
 
   const resolvePendingCreate = useCallback(() => markPendingCreate(null), [markPendingCreate]);
   const resetMutation = mutation.reset;
@@ -625,8 +615,6 @@ export function useUpdateHostSessionMutation(context: ExplicitReadmatesApiContex
         onStateChange: reconciliation.setReconciliationState,
       });
     },
-    onSuccess: (response, variables) =>
-      invalidateOk(response, () => invalidateSessionMutationSurfaces(client, variables.sessionId, context)),
   });
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
@@ -653,20 +641,6 @@ export function useDeleteHostSessionMutation(context: ExplicitReadmatesApiContex
         acceptCommitted: () => fetchHostSessionTrash(sessionId, explicitContext) as Promise<HostSessionDeletionResponse>,
         onStateChange: reconciliation.setReconciliationState,
       });
-    },
-    onSuccess: async (result, sessionId) => {
-      client.removeQueries({ queryKey: hostSessionKeys.detail(sessionId, context) });
-      client.removeQueries({ queryKey: hostSessionRecordKeys.editor(sessionId, context) });
-      client.removeQueries({ queryKey: hostSessionRecordKeys.historyRoot(sessionId, context) });
-      client.setQueryData(hostSessionKeys.trashDetail(sessionId, context), toTrashItem(result));
-      await Promise.all([
-        invalidateHostSessionLists(client, context),
-        invalidateHostSessionDashboard(client, context),
-        invalidateHostCurrentSession(client, context),
-        invalidateHostSessionManualDispatches(client, context),
-        invalidateHostSessionTrash(client, context),
-        client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) }),
-      ]);
     },
   });
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
@@ -698,18 +672,6 @@ export function useRestoreHostSessionMutation(context: ExplicitReadmatesApiConte
         onStateChange: reconciliation.setReconciliationState,
       });
     },
-    onSuccess: async (detail, sessionId) => {
-      client.setQueryData(hostSessionKeys.detail(sessionId, context), detail);
-      client.removeQueries({ queryKey: hostSessionKeys.trashDetail(sessionId, context) });
-      await Promise.all([
-        invalidateHostSessionSurface(client, context),
-        invalidateHostSessionRecordCaches(client, sessionId, context, {
-          editor: true,
-          history: true,
-          ledgers: true,
-        }),
-      ]);
-    },
   });
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
@@ -737,8 +699,6 @@ export function useOpenHostSessionMutation(context: ExplicitReadmatesApiContext)
         onStateChange: reconciliation.setReconciliationState,
       });
     },
-    onSuccess: (response, sessionId) =>
-      invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context)),
   });
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
@@ -770,8 +730,6 @@ export function useCloseHostSessionMutation(context: ExplicitReadmatesApiContext
         onStateChange: reconciliation.setReconciliationState,
       });
     },
-    onSuccess: (response, sessionId) =>
-      invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
   });
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
@@ -807,8 +765,6 @@ export function usePublishHostSessionMutation(context: ExplicitReadmatesApiConte
         onStateChange: reconciliation.setReconciliationState,
       });
     },
-    onSuccess: (response, sessionId) =>
-      invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
   });
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
@@ -848,8 +804,6 @@ export function useCorrectionPublishHostSessionMutation(context: ExplicitReadmat
         onStateChange: reconciliation.setReconciliationState,
       });
     },
-    onSuccess: (response, sessionId) =>
-      invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
   });
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
@@ -878,8 +832,6 @@ export function useReopenHostSessionMutation(context: ExplicitReadmatesApiContex
         onStateChange: reconciliation.setReconciliationState,
       });
     },
-    onSuccess: (response, { sessionId }) =>
-      invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
   });
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
@@ -904,8 +856,6 @@ export function useUnpublishHostSessionMutation(context: ExplicitReadmatesApiCon
         onStateChange: reconciliation.setReconciliationState,
       });
     },
-    onSuccess: (response, { sessionId }) =>
-      invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
   });
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
@@ -930,14 +880,11 @@ export function useReturnHostSessionToDraftMutation(context: ExplicitReadmatesAp
         onStateChange: reconciliation.setReconciliationState,
       });
     },
-    onSuccess: (response, { sessionId }) =>
-      invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
   });
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
 export function useSaveHostSessionVisibilityMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation<
     HostSessionVisibilityUpdateResult,
     Error,
@@ -946,22 +893,6 @@ export function useSaveHostSessionVisibilityMutation(context: ExplicitReadmatesA
     mutationKey: hostMutationKey(context.clubSlug, "sessions", "visibility"),
     mutationFn: ({ sessionId, request }: { sessionId: string; request: HostSessionVisibilityRequest }) =>
       saveHostSessionVisibility(sessionId, request, context),
-    onSuccess: (result, variables) => {
-      client.setQueryData(
-        hostSessionKeys.detail(variables.sessionId, context),
-        result.session,
-      );
-      if (result.composer) {
-        client.removeQueries({
-          queryKey: hostNotificationManualOptionsRootKey(context),
-        });
-      }
-      return Promise.all([
-        invalidateHostSessionLists(client, context),
-        invalidateHostSessionDashboard(client, context),
-        invalidateHostSessionRecordCaches(client, variables.sessionId, context, { editor: true, ledgers: true }),
-      ]);
-    },
   });
 }
 
@@ -995,17 +926,6 @@ export function useSaveHostSessionAccessScopeMutation(context: ExplicitReadmates
         onStateChange: reconciliation.setReconciliationState,
       });
     },
-    onSuccess: (result, variables) => {
-      client.setQueryData(hostSessionKeys.detail(variables.sessionId, context), result.session);
-      if (result.composer) {
-        client.removeQueries({ queryKey: hostNotificationManualOptionsRootKey(context) });
-      }
-      return Promise.all([
-        invalidateHostSessionLists(client, context),
-        invalidateHostSessionDashboard(client, context),
-        invalidateHostSessionRecordCaches(client, variables.sessionId, context, { editor: true, ledgers: true }),
-      ]);
-    },
   });
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
@@ -1038,16 +958,6 @@ export function useSaveHostSessionPublicationMutation(context: ExplicitReadmates
         onStateChange: reconciliation.setReconciliationState,
       });
     },
-    onSuccess: (response, variables) =>
-      invalidateOk(response, () =>
-        Promise.all([
-          invalidateHostSessionDetail(client, variables.sessionId, context),
-          invalidateHostSessionLists(client, context),
-          invalidateHostSessionDashboard(client, context),
-          invalidateHostSessionManualDispatches(client, context),
-          invalidateHostSessionRecordCaches(client, variables.sessionId, context, { editor: true, ledgers: true }),
-        ]),
-      ),
   });
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
@@ -1096,49 +1006,82 @@ export function useUpdateHostSessionAttendanceMutation(context: ExplicitReadmate
         onStateChange: reconciliation.setReconciliationState,
       });
     },
-    onSuccess: async (_result, variables) => {
-      if (variables.attendance.length === 1) {
-        const refreshed = await fetchHostSessionDetail(variables.sessionId, context);
-        const requested = variables.attendance[0];
-        const accepted = refreshed.attendees.find((row) => row.membershipId === requested.membershipId);
-        if (accepted && accepted.attendanceStatus === requested.attendanceStatus) {
-          beginHostMeetingAttendanceCommit({
-            ...requested,
-            attendanceRevision: accepted.attendanceRevision,
-          });
-        }
-        client.setQueryData(hostSessionKeys.detail(variables.sessionId, context), refreshed);
-      }
-      await Promise.all([
-        ...(variables.attendance.length === 1 ? [] : [invalidateHostSessionDetail(client, variables.sessionId, context)]),
-        invalidateHostCurrentSession(client, context),
-        invalidateHostSessionRecordCaches(client, variables.sessionId, context, {
-          history: true,
-          ledgers: true,
-        }),
-      ]);
-    },
   });
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
 export function useCommitHostSessionImportMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "sessions", "import"),
     mutationFn: ({ sessionId, request }: { sessionId: string; request: SessionImportRequest }) =>
       commitHostSessionImport(sessionId, request, context),
-    onSuccess: (_response, variables) =>
-      Promise.all([
-        invalidateHostSessionDetail(client, variables.sessionId, context),
-        invalidateHostSessionLists(client, context),
-        invalidateHostSessionDashboard(client, context),
-        invalidateHostCurrentSession(client, context),
-        invalidateHostSessionRecordCaches(client, variables.sessionId, context, {
-          editor: true,
-          history: true,
-          ledgers: true,
-        }),
-      ]),
   });
+}
+
+export function publishHostSessionCreated(client: QueryClient, response: Response, context: ExplicitReadmatesApiContext) {
+  return invalidateOk(response, () => Promise.all([
+    invalidateHostSessionLists(client, context),
+    invalidateHostSessionDashboard(client, context),
+  ]));
+}
+
+export function publishHostSessionResponse(client: QueryClient, response: Response, sessionId: string, context: ExplicitReadmatesApiContext, manualDispatches = false) {
+  return invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches }));
+}
+
+export async function publishDeletedHostSession(client: QueryClient, result: HostSessionDeletionResponse, sessionId: string, context: ExplicitReadmatesApiContext) {
+  client.removeQueries({ queryKey: hostSessionKeys.detail(sessionId, context) });
+  client.removeQueries({ queryKey: hostSessionRecordKeys.editor(sessionId, context) });
+  client.removeQueries({ queryKey: hostSessionRecordKeys.historyRoot(sessionId, context) });
+  client.setQueryData(hostSessionKeys.trashDetail(sessionId, context), toTrashItem(result));
+  await Promise.all([
+    invalidateHostSessionLists(client, context), invalidateHostSessionDashboard(client, context),
+    invalidateHostCurrentSession(client, context), invalidateHostSessionManualDispatches(client, context),
+    invalidateHostSessionTrash(client, context), client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) }),
+  ]);
+}
+
+export async function publishRestoredHostSession(client: QueryClient, detail: HostSessionDetailResponse, sessionId: string, context: ExplicitReadmatesApiContext) {
+  client.setQueryData(hostSessionKeys.detail(sessionId, context), detail);
+  client.removeQueries({ queryKey: hostSessionKeys.trashDetail(sessionId, context) });
+  await Promise.all([invalidateHostSessionSurface(client, context), invalidateHostSessionRecordCaches(client, sessionId, context, { editor: true, history: true, ledgers: true })]);
+}
+
+export async function publishHostSessionVisibility(client: QueryClient, result: HostSessionVisibilityUpdateResult, sessionId: string, context: ExplicitReadmatesApiContext) {
+  client.setQueryData(hostSessionKeys.detail(sessionId, context), result.session);
+  if (result.composer) client.removeQueries({ queryKey: hostNotificationManualOptionsRootKey(context) });
+  await Promise.all([invalidateHostSessionLists(client, context), invalidateHostSessionDashboard(client, context), invalidateHostSessionRecordCaches(client, sessionId, context, { editor: true, ledgers: true })]);
+}
+
+export async function publishHostSessionAttendance(client: QueryClient, sessionId: string, attendance: HostAttendanceUpdate[], context: ExplicitReadmatesApiContext) {
+  if (attendance.length === 1) {
+    const refreshed = await fetchHostSessionDetail(sessionId, context);
+    const requested = attendance[0];
+    const accepted = refreshed.attendees.find((row) => row.membershipId === requested.membershipId);
+    if (accepted && accepted.attendanceStatus === requested.attendanceStatus) beginHostMeetingAttendanceCommit({ ...requested, attendanceRevision: accepted.attendanceRevision });
+    client.setQueryData(hostSessionKeys.detail(sessionId, context), refreshed);
+  }
+  await Promise.all([
+    ...(attendance.length === 1 ? [] : [invalidateHostSessionDetail(client, sessionId, context)]),
+    invalidateHostCurrentSession(client, context),
+    invalidateHostSessionRecordCaches(client, sessionId, context, { history: true, ledgers: true }),
+  ]);
+}
+
+export function publishHostSessionImport(client: QueryClient, sessionId: string, context: ExplicitReadmatesApiContext) {
+  return Promise.all([
+    invalidateHostSessionDetail(client, sessionId, context), invalidateHostSessionLists(client, context),
+    invalidateHostSessionDashboard(client, context), invalidateHostCurrentSession(client, context),
+    invalidateHostSessionRecordCaches(client, sessionId, context, { editor: true, history: true, ledgers: true }),
+  ]);
+}
+
+export function publishHostSessionPublication(client: QueryClient, response: Response, sessionId: string, context: ExplicitReadmatesApiContext) {
+  return invalidateOk(response, () => Promise.all([
+    invalidateHostSessionDetail(client, sessionId, context),
+    invalidateHostSessionLists(client, context),
+    invalidateHostSessionDashboard(client, context),
+    invalidateHostSessionManualDispatches(client, context),
+    invalidateHostSessionRecordCaches(client, sessionId, context, { editor: true, ledgers: true }),
+  ]));
 }

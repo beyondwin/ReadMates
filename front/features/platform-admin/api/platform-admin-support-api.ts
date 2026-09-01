@@ -4,12 +4,14 @@ import type {
   AdminSupportGrantCreateDraft,
   AdminSupportGrantLedgerFilters,
   AdminSupportGrantLedgerPage,
-  AdminSupportGrantPreview,
-  AdminSupportGrantReceipt,
   AdminSupportGrantRevokeConfirmRequest,
   AdminSupportGrantRevokeDraft,
   AdminSupportSearchResult,
 } from "@/features/platform-admin/model/platform-admin-support-model";
+import {
+  parseAdminSupportGrantPreview,
+  parseAdminSupportGrantReceipt,
+} from "./platform-admin-support-contracts";
 
 const ADMIN_CONTEXT = { clubSlug: undefined } as const;
 
@@ -38,36 +40,36 @@ export function fetchAdminSupportGrantLedger(
 }
 
 export function previewAdminSupportGrant(request: AdminSupportGrantCreateDraft) {
-  return readmatesFetch<AdminSupportGrantPreview>(
+  return readmatesFetch<unknown>(
     "/api/admin/support/grants/preview",
     { method: "POST", body: JSON.stringify(request) },
     ADMIN_CONTEXT,
-  );
+  ).then(parseAdminSupportGrantPreview);
 }
 
 export function confirmAdminSupportGrant(request: AdminSupportGrantCreateConfirmRequest) {
-  return readmatesFetch<AdminSupportGrantReceipt>(
+  return readmatesFetch<unknown>(
     "/api/admin/support/grants/confirm",
     { method: "POST", body: JSON.stringify(request) },
     ADMIN_CONTEXT,
-  );
+  ).then(parseAdminSupportGrantReceipt);
 }
 
 export function previewAdminSupportGrantRevoke(grantId: string, request: AdminSupportGrantRevokeDraft) {
-  return readmatesFetch<AdminSupportGrantPreview>(
+  return readmatesFetch<unknown>(
     `/api/admin/support/grants/${encodeURIComponent(grantId)}/revoke/preview`,
     { method: "POST", body: JSON.stringify(request) },
     ADMIN_CONTEXT,
-  );
+  ).then(parseAdminSupportGrantPreview);
 }
 
 export function confirmAdminSupportGrantRevoke(
   grantId: string,
   request: AdminSupportGrantRevokeConfirmRequest,
 ) {
-  return readmatesFetch<AdminSupportGrantReceipt>(
+  return readmatesFetch<unknown>(
     `/api/admin/support/grants/${encodeURIComponent(grantId)}/revoke/confirm`,
     { method: "POST", body: JSON.stringify(request) },
     ADMIN_CONTEXT,
-  );
+  ).then(parseAdminSupportGrantReceipt);
 }

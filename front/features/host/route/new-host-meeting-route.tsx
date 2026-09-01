@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router";
 import {
   adoptSensitiveMeetingSuggestion,
@@ -19,6 +19,8 @@ import {
   HostMutationPendingError,
   classifyScheduleDefaultsError,
   hostSessionScheduleDefaultsQuery,
+  publishHostSessionCreated,
+  publishHostSessionResponse,
   useCreateHostSessionMutation,
   useOpenHostSessionMutation,
 } from "../queries/host-session-queries";
@@ -26,6 +28,8 @@ import { registerHostSensitiveState } from "../storage/host-sensitive-storage";
 import { NewHostMeetingPage, type SavedNewMeeting } from "../ui/new-meeting/new-host-meeting-page";
 import { hostApiErrorFromResponse, readHostResponseJson } from "@/shared/api/host-authority-event";
 import { recordHostScheduleDefaults } from "@/shared/observability/frontend-observability";
+import type { PendingHandle } from "@/shared/model/global-space";
+import { publishTransitionAction, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 import "@/features/host/ui/host-editorial-ledger.css";
 
 export type NewHostMeetingRouteProps = {
@@ -62,6 +66,7 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
   const context = useMemo(() => requireHostClubContext(routeClubSlug), [routeClubSlug]);
   const clubSlug = context.clubSlug;
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const defaultsQuery = useQuery(hostSessionScheduleDefaultsQuery(context));
   const defaultsTelemetryRecordedRef = useRef(false);
   const createMutation = useCreateHostSessionMutation(context, { retainUntilResolved: true });
@@ -83,6 +88,12 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
   const [prepareConfirmationOpen, setPrepareConfirmationOpen] = useState(false);
   const [prepareError, setPrepareError] = useState<string | null>(null);
   const [focusTarget, setFocusTarget] = useState<NewMeetingField | "summary" | null>(null);
+  const transitionOwner = useTransitionSafetyOwner(
+    "host-new-meeting",
+    dirty.size > 0,
+    "저장하지 않은 새 모임 정보가 있습니다.",
+  );
+  const pendingCreateHandleRef = useRef<PendingHandle | null>(null);
 
   useEffect(() => {
     if (
@@ -140,6 +151,8 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
   }, []);
 
   const clearAllSensitiveState = useCallback(() => {
+    pendingCreateHandleRef.current?.unregister();
+    pendingCreateHandleRef.current = null;
     clearDraftState();
     setSavedMeeting(null);
     setPrepareConfirmationOpen(false);
@@ -190,26 +203,28 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
     if (!response.ok) {
       const body = await readHostResponseJson(response.clone()).catch(() => null);
       const fieldFailure = classifyNewMeetingServerFailure(response.status, body);
-      resolvePendingCreate();
-      const apiError = await hostApiErrorFromResponse(response, {
+      const handle = pendingCreateHandleRef.current;
+      if (!handle) throw new Error("MISSING_CREATE_TRANSITION_OWNER");
+      if (await handle.settle("failed") !== "accepted") return;
+      await hostApiErrorFromResponse(response, {
         clubSlug,
         requestKind: "SESSION_CREATE",
       });
-      if (fieldFailure?.field) {
-        setErrors({ [fieldFailure.field]: fieldFailure.message });
-        setFormError(null);
+      await publishTransitionAction(handle, "errorCopy", () => {
+        resolvePendingCreate();
+        if (pendingCreateHandleRef.current === handle) pendingCreateHandleRef.current = null;
         setStatus("error");
-        setFocusTarget(fieldFailure.field);
-        return;
-      }
-      if (fieldFailure) {
-        setErrors({});
-        setFormError(fieldFailure.message);
-        setStatus("error");
-        setFocusTarget("summary");
-        return;
-      }
-      throw apiError;
+        if (fieldFailure?.field) {
+          setErrors({ [fieldFailure.field]: fieldFailure.message });
+          setFormError(null);
+          setFocusTarget(fieldFailure.field);
+        } else {
+          setErrors({});
+          setFormError(fieldFailure?.message ?? "모임 초안을 저장하지 못했습니다. 입력을 유지한 채 다시 시도해 주세요.");
+          setFocusTarget("summary");
+        }
+      });
+      return;
     }
     let projected: SavedNewMeeting;
     try {
@@ -225,13 +240,20 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
     } catch {
       throw new HostMutationPendingError();
     }
-    resolvePendingCreate();
-    clearDraftState();
-    resetCreate();
-    setSavedMeeting(projected);
-    setStatus("saved");
-    await onSessionRecordsChanged?.({ sessionId: projected.sessionId, clubSlug });
-  }, [clubSlug, clearDraftState, onSessionRecordsChanged, resetCreate, resolvePendingCreate]);
+    const handle = pendingCreateHandleRef.current;
+    if (!handle) throw new Error("MISSING_CREATE_TRANSITION_OWNER");
+    if (await handle.settle("succeeded") !== "accepted") return;
+    await publishTransitionAction(handle, "cache", () => publishHostSessionCreated(queryClient, response, context));
+    await publishTransitionAction(handle, "ui", () => {
+      if (pendingCreateHandleRef.current === handle) pendingCreateHandleRef.current = null;
+      resolvePendingCreate();
+      clearDraftState();
+      resetCreate();
+      setSavedMeeting(projected);
+      setStatus("saved");
+    });
+    await publishTransitionAction(handle, "receiptCallback", () => onSessionRecordsChanged?.({ sessionId: projected.sessionId, clubSlug }));
+  }, [clubSlug, clearDraftState, context, onSessionRecordsChanged, queryClient, resetCreate, resolvePendingCreate]);
 
   const submit = useCallback(async () => {
     if (status === "saving" || status === "pending" || status === "checking") return;
@@ -247,22 +269,36 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
     setStatus("saving");
     setErrors({});
     setFormError(null);
+    const operationId = `host-session-create:${clubSlug}`;
+    pendingCreateHandleRef.current = transitionOwner.begin(
+      operationId,
+      "L2",
+      async () => ({ operationId, outcome: "still-unknown" }),
+    );
     try {
       const response = await createMeeting(buildNewMeetingRequest(draftRef.current));
       await acceptCreateResponse(response);
     } catch (error) {
+      const handle = pendingCreateHandleRef.current;
+      if (!handle) return;
       if (error instanceof HostMutationPendingError) {
-        setStatus("pending");
-        setErrors({});
-        setFormError(null);
+        await publishTransitionAction(handle, "ui", () => {
+          setStatus("pending");
+          setErrors({});
+          setFormError(null);
+        });
         return;
       }
-      setStatus("error");
-      setErrors({});
-      setFormError("모임 초안을 저장하지 못했습니다. 입력을 유지한 채 다시 시도해 주세요.");
-      setFocusTarget("summary");
+      if (await handle.settle("failed") !== "accepted") return;
+      await publishTransitionAction(handle, "errorCopy", () => {
+        if (pendingCreateHandleRef.current === handle) pendingCreateHandleRef.current = null;
+        setStatus("error");
+        setErrors({});
+        setFormError("모임 초안을 저장하지 못했습니다. 입력을 유지한 채 다시 시도해 주세요.");
+        setFocusTarget("summary");
+      });
     }
-  }, [acceptCreateResponse, createMeeting, status]);
+  }, [acceptCreateResponse, clubSlug, createMeeting, status, transitionOwner]);
 
   const checkPendingCreate = useCallback(async () => {
     if (status !== "pending") return;
@@ -272,10 +308,14 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
       const response = await reconcilePendingCreate();
       await acceptCreateResponse(response);
     } catch (error) {
-      setStatus("pending");
-      setFormError(error instanceof HostMutationPendingError
-        ? null
-        : "저장 결과를 확인하지 못했습니다. 새 요청을 보내지 않고 다시 확인해 주세요.");
+      const handle = pendingCreateHandleRef.current;
+      if (!handle) return;
+      await publishTransitionAction(handle, "errorCopy", () => {
+        setStatus("pending");
+        setFormError(error instanceof HostMutationPendingError
+          ? null
+          : "저장 결과를 확인하지 못했습니다. 새 요청을 보내지 않고 다시 확인해 주세요.");
+      });
     }
   }, [acceptCreateResponse, reconcilePendingCreate, status]);
 
@@ -283,6 +323,8 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
     if (!savedMeeting || status === "preparing") return;
     setStatus("preparing");
     setPrepareError(null);
+    const operationId = `host-session-open:${savedMeeting.sessionId}`;
+    const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
     try {
       const response = await openMeeting(savedMeeting.sessionId);
       if (!response.ok) {
@@ -296,14 +338,19 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
       if (opened.state !== "OPEN" || opened.accessScope !== "GUEST_READABLE") {
         throw new Error("UNSAFE_PREPARE_RESULT");
       }
-      setPrepareConfirmationOpen(false);
-      await onSessionRecordsChanged?.({ sessionId: savedMeeting.sessionId, clubSlug });
-      void navigate(`/clubs/${encodeURIComponent(clubSlug)}/app/host/sessions/${encodeURIComponent(savedMeeting.sessionId)}`);
+      if (await handle.settle("succeeded") !== "accepted") return;
+      await publishTransitionAction(handle, "cache", () => publishHostSessionResponse(queryClient, response, savedMeeting.sessionId, context));
+      await publishTransitionAction(handle, "ui", () => setPrepareConfirmationOpen(false));
+      await publishTransitionAction(handle, "receiptCallback", () => onSessionRecordsChanged?.({ sessionId: savedMeeting.sessionId, clubSlug }));
+      await publishTransitionAction(handle, "navigation", () => { void navigate(`/clubs/${encodeURIComponent(clubSlug)}/app/host/sessions/${encodeURIComponent(savedMeeting.sessionId)}`); });
     } catch {
-      setStatus("saved");
-      setPrepareError("준비를 시작하지 못했습니다. 초안은 그대로 유지됩니다.");
+      if (await handle.settle("failed") !== "accepted") return;
+      await publishTransitionAction(handle, "errorCopy", () => {
+        setStatus("saved");
+        setPrepareError("준비를 시작하지 못했습니다. 초안은 그대로 유지됩니다.");
+      });
     }
-  }, [clubSlug, navigate, onSessionRecordsChanged, openMeeting, savedMeeting, status]);
+  }, [clubSlug, context, navigate, onSessionRecordsChanged, openMeeting, queryClient, savedMeeting, status, transitionOwner]);
 
   const reason = suggestions.status === "ready" ? suggestions.message : null;
   const count = suggestions.meetingTime?.sourceMeetingCount

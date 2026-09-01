@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { DangerZone } from "./danger-zone";
 
 function renderDangerZone() {
-  return render(<DangerZone onLeaveMembership={vi.fn()} />);
+  return render(<DangerZone onLeaveMembership={vi.fn(async () => "accepted" as const)} />);
 }
 
 describe("DangerZone", () => {
@@ -45,5 +45,15 @@ describe("DangerZone", () => {
     expect(trigger).toHaveAttribute("aria-expanded", "false");
     expect(document.getElementById(confirmationId!)).toBeNull();
     expect(trigger).toHaveFocus();
+  });
+
+  it("does not publish success copy or navigation for an obsolete leave owner", async () => {
+    const user = userEvent.setup();
+    render(<DangerZone onLeaveMembership={vi.fn(async () => "obsolete" as const)} />);
+
+    await user.click(screen.getByRole("button", { name: "클럽 탈퇴…" }));
+    await user.click(screen.getByRole("button", { name: "클럽 탈퇴" }));
+
+    expect(screen.queryByText("탈퇴 처리되었습니다.")).not.toBeInTheDocument();
   });
 });

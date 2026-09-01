@@ -1,23 +1,30 @@
 import { canAdmin, type PlatformAdminCapabilities } from "./platform-admin-capabilities";
 import type {
-  ConvergenceView,
   TakedownPreview,
+  TakedownPreviewRequest,
   TakedownReceipt,
+  TakedownReasonCategory,
 } from "../api/platform-admin-takedown-contracts";
 
-export type TakedownReasonCategory = "PRIVACY" | "SECURITY" | "LEGAL" | "CONTENT_POLICY";
-export type TakedownPreviewRequest = {
-  clubId: string;
-  sessionId: string;
-  publicationId: string;
-};
+export type { TakedownPreviewRequest, TakedownReasonCategory };
 
 export type AdminTakedownState =
   | { kind: "idle" }
   | { kind: "preview"; preview: TakedownPreview }
   | { kind: "confirming"; preview: TakedownPreview }
-  | { kind: "origin-denied"; receipt: TakedownReceipt; convergence: ConvergenceView }
-  | { kind: "convergence-failed"; receipt: TakedownReceipt; convergence: ConvergenceView };
+  | { kind: "origin-denied"; receipt: TakedownReceipt };
+
+export type TakedownReceiptOutcomeChannel = "bff" | "cdn" | "browser";
+export type TakedownReceiptOutcomePresentation = {
+  label: string;
+  state: "pending" | "unknown";
+};
+
+const UNKNOWN_OUTCOME_LABELS: Record<TakedownReceiptOutcomeChannel, string> = {
+  bff: "브라우저 앞단 캐시 결과를 확인해야 합니다.",
+  cdn: "공개 캐시 결과를 확인해야 합니다.",
+  browser: "브라우저 캐시 결과를 확인해야 합니다.",
+};
 
 export function canOperatePublicTakedown(
   capabilities: PlatformAdminCapabilities | null | undefined,
@@ -31,32 +38,41 @@ export function normalizeTakedownReason(reason: string): string {
   return normalized;
 }
 
-export function remoteCopyLimitationLabel(code: TakedownPreview["limitationCode"]): string {
-  if (code === "STORED_OR_OFFLINE_COPY_MAY_REMAIN") {
-    return "이미 저장하거나 오프라인으로 보관한 사본은 남아 있을 수 있습니다.";
+export function remoteCopyLimitationLabel(limitation: string): string {
+  return limitation;
+}
+
+export function takedownReceiptOutcomePresentation(
+  channel: TakedownReceiptOutcomeChannel,
+  value: string,
+): TakedownReceiptOutcomePresentation {
+  if (channel === "bff" && value === "NOT_STARTED") {
+    return {
+      label: "브라우저 앞단 캐시 회수는 아직 시작되지 않았습니다.",
+      state: "unknown",
+    };
   }
-  return "원격 사본은 별도로 남아 있을 수 있습니다.";
+  if (channel === "cdn" && value === "QUEUED") {
+    return {
+      label: "공개 캐시 회수가 대기열에 등록되었습니다.",
+      state: "pending",
+    };
+  }
+  if (channel === "browser" && value === "BOUNDED_BY_CACHE_POLICY") {
+    return {
+      label: "브라우저 캐시는 정책이 허용하는 범위에서 다시 확인됩니다.",
+      state: "unknown",
+    };
+  }
+  return { label: UNKNOWN_OUTCOME_LABELS[channel], state: "unknown" };
 }
 
-export function initialConvergenceFromReceipt(receipt: TakedownReceipt): ConvergenceView {
-  return {
-    schema: "admin.public_takedown.convergence.v1",
-    convergenceId: receipt.convergenceId,
-    originResult: receipt.originResult,
-    committedGeneration: receipt.committedGeneration,
-    status: "PENDING",
-    lastAttemptAt: null,
-    retryable: false,
-    attempts: [],
-  };
+export function takedownReasonRecordLabel(reasonRedacted: boolean): string {
+  return reasonRedacted
+    ? "회수 사유 원문은 영수증에 남기지 않았습니다."
+    : "회수 사유 원문이 영수증에 포함될 수 있습니다.";
 }
 
-export function stateFromReceipt(
-  receipt: TakedownReceipt,
-  convergence: ConvergenceView | undefined,
-): AdminTakedownState {
-  const current = convergence ?? initialConvergenceFromReceipt(receipt);
-  return current.status === "FAILED"
-    ? { kind: "convergence-failed", receipt, convergence: current }
-    : { kind: "origin-denied", receipt, convergence: current };
+export function stateFromReceipt(receipt: TakedownReceipt): AdminTakedownState {
+  return { kind: "origin-denied", receipt };
 }

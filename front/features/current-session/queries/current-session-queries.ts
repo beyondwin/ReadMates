@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation } from "@tanstack/react-query";
 import {
   getCurrentSession,
   markCurrentScheduleSeen,
@@ -52,81 +52,61 @@ export function isCurrentScheduleSeenConflict(error: unknown) {
 }
 
 export function useMarkCurrentScheduleSeenMutation(context?: ReadmatesApiContext) {
-  const client = useQueryClient();
-  const queryKey = currentSessionKeys.current(context);
-
   return useMutation({
     mutationFn: (scheduleRevision: number) => markCurrentScheduleSeen(scheduleRevision, context),
-    onSuccess: (receipt) => {
-      client.setQueryData<CurrentSessionResponse>(queryKey, (current) => {
-        if (!current?.currentSession || current.currentSession.scheduleRevision !== receipt.scheduleRevision) {
-          return current;
-        }
+  });
+}
 
-        return {
-          ...current,
-          currentSession: {
-            ...current.currentSession,
-            mySeenScheduleRevision: receipt.scheduleRevision,
-            myScheduleSeenAt: receipt.seenAt,
-          },
-        };
-      });
-    },
-    onError: (error) => {
-      if (isCurrentScheduleSeenConflict(error)) {
-        return invalidateCurrentSession(client, context);
-      }
-    },
+export function publishCurrentScheduleSeen(
+  client: QueryClient,
+  context: ReadmatesApiContext | undefined,
+  receipt: Awaited<ReturnType<typeof markCurrentScheduleSeen>>,
+) {
+  client.setQueryData<CurrentSessionResponse>(currentSessionKeys.current(context), (current) => {
+    if (!current?.currentSession || current.currentSession.scheduleRevision !== receipt.scheduleRevision) return current;
+    return {
+      ...current,
+      currentSession: { ...current.currentSession, mySeenScheduleRevision: receipt.scheduleRevision, myScheduleSeenAt: receipt.seenAt },
+    };
   });
 }
 
 export function useUpdateCurrentSessionRsvpMutation(context?: ReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationFn: async (status: Exclude<RsvpStatus, "NO_RESPONSE">) => {
       await requireOk(await updateCurrentSessionRsvp(status, context));
     },
-    onSuccess: () => invalidateCurrentSession(client, context),
   });
 }
 
 export function useSaveCurrentSessionCheckinMutation(context?: ReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationFn: async (readingProgress: number) => {
       await requireOk(await saveCurrentSessionCheckin(readingProgress, context));
     },
-    onSuccess: () => invalidateCurrentSession(client, context),
   });
 }
 
 export function useSaveCurrentSessionQuestionsMutation(context?: ReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationFn: async (questions: CurrentSessionQuestionPayloadItem[]) => {
       await requireOk(await saveCurrentSessionQuestions(questions, context));
     },
-    onSuccess: () => invalidateCurrentSession(client, context),
   });
 }
 
 export function useSaveCurrentSessionLongReviewMutation(context?: ReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationFn: async (body: string) => {
       await requireOk(await saveCurrentSessionLongReview(body, context));
     },
-    onSuccess: () => invalidateCurrentSession(client, context),
   });
 }
 
 export function useSaveCurrentSessionOneLineReviewMutation(context?: ReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationFn: async (text: string) => {
       await requireOk(await saveCurrentSessionOneLineReview(text, context));
     },
-    onSuccess: () => invalidateCurrentSession(client, context),
   });
 }

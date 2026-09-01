@@ -9,6 +9,10 @@ import {
   aiOpsWindowFromSearchParams,
   classifyAiOpsError,
   formatAiJobElapsedLabel,
+  aiOpsJobStageLanguage,
+  aiOpsJobStatusLanguage,
+  buildAiOpsServiceDetail,
+  buildAiOpsJobNarrative,
   mergeAiOpsJobPages,
   hasActiveAiOpsFilter,
 } from "./platform-admin-ai-ops-model";
@@ -138,6 +142,97 @@ describe("AI 작업 elapsed labels", () => {
         now,
       ),
     ).toBeNull();
+  });
+});
+
+describe("AI 작업 semantic language", () => {
+  it("maps status and stage while keeping unknown raw values out of primary copy", () => {
+    expect(aiOpsJobStatusLanguage("RUNNING").primaryText).toBe("진행 중");
+    expect(aiOpsJobStatusLanguage("FAILED").primaryText).toBe("실패");
+    expect(aiOpsJobStageLanguage("GENERATING_SUMMARY").primaryText).toBe("요약 생성 중");
+    expect(aiOpsJobStageLanguage("FUTURE_STAGE")).toEqual({
+      primaryText: "확인 필요",
+      technicalDisclosure: { label: "기술 값", value: "FUTURE_STAGE" },
+    });
+  });
+});
+
+describe("AI service detail narrative", () => {
+  const job = (overrides: Record<string, unknown> = {}) => ({
+    jobId: "job-1",
+    club: { clubId: "club-1", slug: "reading-sai", name: "읽는사이" },
+    session: { sessionId: "session-1", number: 7, bookTitle: "Book" },
+    status: "RUNNING",
+    stage: "GENERATING_SUMMARY",
+    provider: "OPENAI",
+    model: "gpt-model",
+    errorCode: null,
+    safeErrorMessage: null,
+    costEstimateUsd: "0.1200",
+    createdAt: "2026-05-18T00:00:00Z",
+    lastUpdatedAt: "2026-05-18T00:01:00Z",
+    expiresAt: null,
+    staleCandidate: true,
+    revision: 2,
+    cleanupPending: true,
+    availableActions: ["FORCE_CANCEL"],
+    ...overrides,
+  });
+
+  const summary = {
+    activeJobCount: 2,
+    failedLast24h: 1,
+    monthToDateCostEstimateUsd: "0.2000",
+    failureCodes: [{ code: "PROVIDER_RATE_LIMITED", count: 1 }],
+    providerCosts: [],
+    staleCandidateCount: 1,
+    costTrend: {
+      window: "30d" as const,
+      currentCostUsd: "0.2000",
+      priorCostUsd: "0.1000",
+      currentJobCount: 2,
+      priorJobCount: 1,
+      deltaDirection: "UP" as const,
+      availability: "AVAILABLE" as const,
+    },
+  };
+
+  it("puts the operator sentence, latest real update, and next safe action ahead of identifiers", () => {
+    expect(buildAiOpsServiceDetail(summary, [
+      job(),
+      job({ jobId: "job-2", lastUpdatedAt: "2026-05-18T00:05:00Z" }),
+    ])).toEqual({
+      operatorSentence: "최근 24시간 실패 1건과 오래 멈춘 작업 1건을 먼저 확인하세요.",
+      latestObservedAt: "2026-05-18T00:05:00Z",
+      nextSafeAction: "실패 원인을 좁힌 뒤 멈춘 작업의 최신 상태와 허용된 복구 방법을 확인하세요.",
+    });
+  });
+
+  it("does not invent freshness when no job observation exists", () => {
+    expect(buildAiOpsServiceDetail({ ...summary, activeJobCount: 0, failedLast24h: 0, staleCandidateCount: 0 }, []))
+      .toEqual({
+        operatorSentence: "지금 확인할 AI 처리 이상은 없습니다.",
+        latestObservedAt: null,
+        nextSafeAction: "새 이상 신호가 생기기 전에는 별도 조치가 필요하지 않습니다.",
+      });
+  });
+
+  it("describes each run with an operator sentence and a capability-neutral next step", () => {
+    expect(buildAiOpsJobNarrative(job())).toEqual({
+      operatorSentence: "읽는사이의 AI 처리가 오래 멈춰 있습니다.",
+      nextSafeAction: "최신 상태를 확인한 뒤 강제 취소를 검토할 수 있습니다.",
+      cleanupSentence: "임시 데이터 정리가 남아 있습니다.",
+    });
+    expect(buildAiOpsJobNarrative(job({
+      status: "FAILED",
+      staleCandidate: false,
+      cleanupPending: false,
+      availableActions: [],
+    }))).toEqual({
+      operatorSentence: "읽는사이의 AI 처리가 실패했습니다.",
+      nextSafeAction: "실패 원인과 최근 갱신 시각을 확인하세요.",
+      cleanupSentence: "임시 데이터 정리가 끝났습니다.",
+    });
   });
 });
 

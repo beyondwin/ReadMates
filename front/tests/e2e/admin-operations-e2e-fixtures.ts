@@ -29,6 +29,28 @@ async function fulfillEmptyOperations(route: Route): Promise<void> {
   });
 }
 
+async function fulfillEmptyHealth(route: Route): Promise<void> {
+  const request = route.request();
+  if (request.method() !== "GET" || new URL(request.url()).pathname !== "/api/bff/api/admin/health/snapshot") {
+    await route.fallback();
+    return;
+  }
+
+  await route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      schema: "platform.health_snapshot.v1",
+      generatedAt: GENERATED_AT,
+      lastSuccessfulAt: GENERATED_AT,
+      refreshState: "FRESH",
+      staleAgeSeconds: 0,
+      cards: [],
+    }),
+  });
+}
+
 export async function routeEmptyAdminOperations(page: Page): Promise<void> {
   await page.route("**/api/bff/api/admin/operations/cases**", fulfillEmptyOperations);
+  await page.route("**/api/bff/api/admin/health/snapshot**", fulfillEmptyHealth);
 }

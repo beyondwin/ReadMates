@@ -15,6 +15,7 @@ import {
 import {
   hostNotificationKeys,
   hostNotificationManualOptionsQuery,
+  publishManualNotificationConfirm,
   useConfirmManualNotificationMutation,
   usePreviewManualNotificationMutation,
 } from "@/features/host/queries/host-notification-queries";
@@ -23,6 +24,7 @@ import { HostNotificationComposerDialog } from "@/features/host/ui/notifications
 import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import { registerHostSensitiveState } from "@/features/host/storage/host-sensitive-storage";
+import { publishTransitionAction, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 
 export type HostNotificationComposerRequest = {
   sessionId: string;
@@ -199,6 +201,11 @@ function ReadyComposerController({
     selectedMembershipIds: [],
   });
   const [preview, setPreview] = useState<ManualNotificationPreviewResponse | null>(null);
+  const transitionOwner = useTransitionSafetyOwner(
+    `host-notification-composer:${request.sessionId}`,
+    preview !== null,
+    "확정하지 않은 알림 미리보기가 있습니다.",
+  );
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [membersLoading, setMembersLoading] = useState(false);
@@ -380,16 +387,21 @@ function ReadyComposerController({
       return;
     }
     setError(null);
+    const operationId = `host-notification-confirm:${preview.previewId}`;
+    const handle = transitionOwner.begin(operationId, "L3", async () => ({ operationId, outcome: "still-unknown" }));
     try {
       const result = await confirmMutation.mutateAsync({
         ...buildComposerSelection(draft),
         previewId: preview.previewId,
         resendConfirmed,
       });
-      onConfirmed?.(result);
-      onClose();
+      if (await handle.settle("succeeded") !== "accepted") return;
+      await publishTransitionAction(handle, "cache", () => publishManualNotificationConfirm(client, context));
+      await publishTransitionAction(handle, "receiptCallback", () => onConfirmed?.(result));
+      await publishTransitionAction(handle, "ui", onClose);
     } catch (mutationError) {
-      setError(recoverFromMutationError(mutationError, "confirm"));
+      if (await handle.settle("failed") !== "accepted") return;
+      await publishTransitionAction(handle, "errorCopy", () => setError(recoverFromMutationError(mutationError, "confirm")));
     }
   };
 

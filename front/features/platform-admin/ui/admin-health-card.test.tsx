@@ -9,8 +9,8 @@ function card(overrides: Partial<HealthCard> = {}): HealthCard {
   return {
     id: "outbox_backlog",
     title: "Outbox backlog",
-    status: "OK",
-    metric: { value: 42, unit: "rows", label: "pending" },
+    status: "WARN",
+    metric: { value: 142, unit: "rows", label: "pending" },
     thresholds: { warn: 100, crit: 1000 },
     lastCheckedAt: "2026-05-26T00:00:00Z",
     source: "IN_PROCESS",
@@ -41,43 +41,55 @@ function articleNamed(name: string) {
 }
 
 describe("AdminHealthCard", () => {
-  it("renders state, primary reading, source, last evidence, freshness, and one drill", () => {
+  it("explains a known abnormal source with reason, observation, impact, and next action", () => {
     renderCard(card());
 
-    const article = articleNamed("Outbox backlog");
-    expect(within(article).getByText("정상")).toBeInTheDocument();
-    expect(within(article).getByText("42 rows")).toBeInTheDocument();
-    expect(within(article).getByText("원천")).toBeInTheDocument();
-    expect(within(article).getByText("프로세스")).toBeInTheDocument();
-    expect(within(article).getByText("최근 근거")).toBeInTheDocument();
-    expect(within(article).getByText("최신성")).toBeInTheDocument();
-    expect(within(article).getByText("최신")).toBeInTheDocument();
-    expect(within(article).getByRole("link", { name: /자세히/ })).toHaveAttribute(
+    const article = articleNamed("알림 대기열");
+    expect(within(article).getByText("주의해서 살펴봐야 합니다.")).toBeInTheDocument();
+    expect(within(article).getByText("관측값이 주의 범위에 들어왔습니다.")).toBeInTheDocument();
+    expect(within(article).getByText("알림 처리가 늦어질 수 있습니다.")).toBeInTheDocument();
+    expect(within(article).getByText("알림 상태에서 대기 항목을 확인하세요.")).toBeInTheDocument();
+    expect(within(article).getByText("확인 시각")).toBeInTheDocument();
+    expect(within(article).getByRole("link", { name: "알림 상태 열기" })).toHaveAttribute(
       "href",
       "/admin/notifications?focus=outbox_backlog",
     );
-    expect(within(article).queryAllByRole("link")).toHaveLength(1);
+
+    const disclosure = article.querySelector("[data-admin-technical-disclosure]");
+    expect(disclosure).not.toBeNull();
+    expect(disclosure).toHaveTextContent("Outbox backlog");
+    expect(disclosure).toHaveTextContent("WARN");
+    expect(disclosure).toHaveTextContent("142 rows");
+    expect(disclosure).toHaveTextContent("IN_PROCESS");
+    expect(article.querySelector(".admin-health-card__metric")).toBeNull();
+    expect(article.querySelector(".admin-health-card__thresholds")).toBeNull();
   });
 
-  it("keeps a true zero reading distinct from unavailable", () => {
-    renderCard(card({ metric: { value: 0, unit: "rows", label: "pending" } }));
+  it("keeps a true zero reading in technical evidence rather than treating it as unavailable", () => {
+    renderCard(card({ status: "OK", metric: { value: 0, unit: "rows", label: "pending" } }));
 
-    const article = articleNamed("Outbox backlog");
-    expect(within(article).getByText("0 rows")).toBeInTheDocument();
-    expect(within(article).getByText("정상")).toBeInTheDocument();
-    expect(within(article).queryByText("확인 불가")).not.toBeInTheDocument();
-    expect(within(article).queryByText("비활성")).not.toBeInTheDocument();
+    const article = articleNamed("알림 대기열");
+    expect(within(article).getByText("현재 정상 범위입니다.")).toBeInTheDocument();
+    expect(within(article).queryByText("상태를 확인할 수 없습니다")).not.toBeInTheDocument();
+    expect(article.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("0 rows");
   });
 
-  it("does not synthesize a reading when the metric is unavailable", () => {
-    renderCard(card({ status: "UNKNOWN", metric: null, reason: "prometheus_unreachable" }));
+  it("derives no-data from the reason without adding a wire status", () => {
+    renderCard(card({
+      id: "ai_provider_availability",
+      title: "AI provider availability",
+      status: "UNKNOWN",
+      metric: null,
+      reason: "no_data",
+      drill: { kind: "ADMIN_ROUTE", target: "/admin/ai-ops" },
+    }));
 
-    const article = articleNamed("Outbox backlog");
-    expect(within(article).getByText("확인 불가")).toBeInTheDocument();
-    expect(within(article).getByText("prometheus_unreachable")).toBeInTheDocument();
-    expect(within(article).queryByText("정상")).not.toBeInTheDocument();
-    expect(within(article).queryByText("0 rows")).not.toBeInTheDocument();
-    expect(article.querySelector(".admin-health-card__pill--ok")).toBeNull();
+    const article = articleNamed("AI 제공자");
+    expect(within(article).getByText("아직 판단할 자료가 없습니다.")).toBeInTheDocument();
+    expect(within(article).getByText("원천에 아직 판단할 관측 자료가 없습니다.")).toBeInTheDocument();
+    expect(article).toHaveAttribute("data-evidence", "empty");
+    expect(article.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("UNKNOWN");
+    expect(within(article).queryByRole("button", { name: /다시 확인/ })).not.toBeInTheDocument();
   });
 
   it("treats disabled Redis as configured absence, not an error", () => {
@@ -95,16 +107,14 @@ describe("AdminHealthCard", () => {
     );
 
     const article = articleNamed("Redis");
-    expect(within(article).getByText("비활성")).toBeInTheDocument();
-    expect(within(article).queryByText("확인 불가")).not.toBeInTheDocument();
-    expect(within(article).queryByText("정상")).not.toBeInTheDocument();
+    expect(within(article).getByText("현재 운영 설정에서 사용하지 않습니다.")).toBeInTheDocument();
+    expect(within(article).queryByText("상태를 확인할 수 없습니다")).not.toBeInTheDocument();
     expect(within(article).queryByRole("alert")).not.toBeInTheDocument();
     expect(within(article).queryByRole("button", { name: /다시 확인/ })).not.toBeInTheDocument();
-    expect(article.querySelector(".admin-health-card__pill--ok")).toBeNull();
     expect(onRetry).not.toHaveBeenCalled();
   });
 
-  it("retries only the unavailable card", async () => {
+  it("retries only an unavailable known source", async () => {
     const user = userEvent.setup();
     const onRetry = vi.fn();
     renderCard(
@@ -124,11 +134,11 @@ describe("AdminHealthCard", () => {
     expect(onRetry).toHaveBeenCalledWith("redis");
   });
 
-  it("reaches the drill target from the keyboard", async () => {
+  it("reaches the domain detail from the keyboard", async () => {
     const user = userEvent.setup();
     renderCard(card());
 
-    const drill = screen.getByRole("link", { name: /자세히/ });
+    const drill = screen.getByRole("link", { name: "알림 상태 열기" });
     drill.focus();
     expect(drill).toHaveFocus();
     await user.keyboard("{Enter}");
@@ -136,50 +146,36 @@ describe("AdminHealthCard", () => {
   });
 
   it.each(["STALE", "UNAVAILABLE"] as const)(
-    "keeps an OK reading but removes current-green evidence when the snapshot is %s",
+    "does not present cached OK evidence as current when the snapshot is %s",
     (refreshState) => {
-      renderCard(card(), { refreshState });
+      renderCard(card({ status: "OK" }), { refreshState });
 
-      const article = articleNamed("Outbox backlog");
-      expect(within(article).getByText("42 rows")).toBeInTheDocument();
-      expect(within(article).getByText("정상")).toBeInTheDocument();
-      expect(within(article).getByText(refreshState === "STALE" ? "지연" : "이력 없음")).toBeInTheDocument();
+      const article = articleNamed("알림 대기열");
+      expect(within(article).getByText(refreshState === "STALE" ? "오래됨" : "확인 불가")).toBeInTheDocument();
       expect(article.querySelector(".admin-health-card__pill--ok")).toBeNull();
       expect(article.querySelector(".admin-health-card__pill--last-known")).not.toBeNull();
     },
   );
 
-  it("does not render a drill link when drill is null", () => {
-    renderCard(card({ drill: null }));
-    expect(screen.queryByRole("link", { name: /자세히/ })).toBeNull();
-  });
+  it("fails closed for an unknown card without fabricated impact or action", () => {
+    renderCard(card({
+      id: "api_latency",
+      title: "API latency",
+      status: "OK",
+      drill: null,
+    }));
 
-  it("keeps source-specific retry and one drill without case or receipt chrome", async () => {
-    const user = userEvent.setup();
-    const onRetry = vi.fn();
-    renderCard(
-      card({
-        status: "UNKNOWN",
-        metric: null,
-        reason: "prometheus_unreachable",
-      }),
-      { onRetry },
-    );
-
-    await user.click(screen.getByRole("button", { name: "Outbox backlog 다시 확인" }));
-    expect(onRetry).toHaveBeenCalledWith("outbox_backlog");
-    expect(screen.getByRole("link", { name: /자세히/ })).toHaveAttribute(
-      "href",
-      "/admin/notifications?focus=outbox_backlog",
-    );
-    expect(document.querySelector(".admin-case-docket")).toBeNull();
-    expect(document.querySelector(".admin-action-dock")).toBeNull();
-    expect(document.querySelector(".admin-receipt-timeline")).toBeNull();
+    const article = articleNamed("알 수 없는 서비스");
+    expect(within(article).getByText("상태를 확인할 수 없습니다")).toBeInTheDocument();
+    expect(within(article).queryByText("영향")).not.toBeInTheDocument();
+    expect(within(article).queryByText("다음 확인")).not.toBeInTheDocument();
+    expect(article.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("api_latency");
+    expect(article.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("API latency");
   });
 
   it("does not render NaN for invalid last checked timestamps", () => {
     renderCard(card({ lastCheckedAt: "not-a-date" }));
     expect(screen.queryByText(/NaN/)).toBeNull();
-    expect(screen.getByText(/확인 시각 없음/)).toBeInTheDocument();
+    expect(screen.getByText("확인 시각 없음")).toBeInTheDocument();
   });
 });

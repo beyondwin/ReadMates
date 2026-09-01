@@ -28,6 +28,7 @@ import {
   currentSessionKeys,
   currentSessionQuery,
   invalidateCurrentSession,
+  publishCurrentScheduleSeen,
   useMarkCurrentScheduleSeenMutation,
   useSaveCurrentSessionCheckinMutation,
   useSaveCurrentSessionLongReviewMutation,
@@ -148,6 +149,13 @@ describe("current session mutation hooks", () => {
 
     expect(markCurrentScheduleSeen).toHaveBeenCalledWith(7, { clubSlug: "reading-sai" });
     expect(client.getQueryData(selectedKey)).toEqual({
+      currentSession: { scheduleRevision: 7, mySeenScheduleRevision: 6, myScheduleSeenAt: null },
+    });
+    publishCurrentScheduleSeen(client, { clubSlug: "reading-sai" }, {
+      scheduleRevision: 7,
+      seenAt: "2026-08-29T00:00:00Z",
+    });
+    expect(client.getQueryData(selectedKey)).toEqual({
       currentSession: {
         scheduleRevision: 7,
         mySeenScheduleRevision: 7,
@@ -179,6 +187,8 @@ describe("current session mutation hooks", () => {
 
     expect(markCurrentScheduleSeen).toHaveBeenCalledTimes(1);
     expect(client.getQueryData(selectedKey)).toEqual(cached);
+    expect(client.getQueryState(selectedKey)?.isInvalidated).toBe(false);
+    await invalidateCurrentSession(client, { clubSlug: "reading-sai" });
     expect(client.getQueryState(selectedKey)?.isInvalidated).toBe(true);
   });
 
@@ -227,6 +237,8 @@ describe("current session mutation hooks", () => {
     });
 
     expect(apiFn).toHaveBeenCalledWith(payload, { clubSlug: "reading-sai" });
+    expect(client.getQueryState(selectedKey)?.isInvalidated).toBe(false);
+    await invalidateCurrentSession(client, { clubSlug: "reading-sai" });
     expect(client.getQueryState(selectedKey)?.isInvalidated).toBe(true);
     expect(client.getQueryState(otherKey)?.isInvalidated).toBe(false);
     expect(client.getQueryData(selectedKey)).toEqual({ currentSession: { sessionId: "session-7" } });

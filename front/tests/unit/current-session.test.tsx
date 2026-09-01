@@ -206,7 +206,7 @@ describe("CurrentSession", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(currentSessionLoader()).resolves.toEqual({
-      auth: routeAuthFixture,
+      auth: { ...routeAuthFixture, availableSpaces: { version: 1, kinds: [], clubs: [] } },
       current: currentSessionData,
     });
     expect(fetchMock).toHaveBeenCalledWith(

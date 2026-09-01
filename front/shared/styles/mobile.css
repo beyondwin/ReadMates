@@ -24,6 +24,10 @@
   backdrop-filter: saturate(1.25) blur(12px);
 }
 
+.rm-club-shell-mobile-context:has(> .rm-club-shell-mobile-context__inner > .rm-sr-only:only-child) {
+  display: none;
+}
+
 .rm-club-shell-mobile-context__inner {
   min-width: 0;
   display: flex;

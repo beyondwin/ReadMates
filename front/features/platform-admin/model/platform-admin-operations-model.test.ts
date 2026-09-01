@@ -60,6 +60,16 @@ function response(overrides: Partial<AdminOperationCasesResponse> = {}): AdminOp
 }
 
 describe("platform admin operations model", () => {
+  it("uses the centralized case lifecycle language in actual case views", () => {
+    const states = ["OPEN", "ACKNOWLEDGED", "SNOOZED", "RESOLVED"] as const;
+    const labels = states.map((state) => buildAdminOperationsView(
+      response({ items: [operationCase({ state })] }),
+      null,
+      new Date(generatedAt),
+    ).items[0]?.stateLabel);
+
+    expect(labels).toEqual(["확인 전", "확인함", "잠시 미룸", "처리함"]);
+  });
   it("round-trips case state severity source assignee and cursor filters", () => {
     const parsed = parseAdminOperationsSearch(
       new URLSearchParams(
@@ -380,9 +390,9 @@ describe("platform admin operations model", () => {
       label: "활성 2건 · 긴급 1건 · 내 담당 1건 · 보류 1건",
     });
     expect(view.sources.map(({ sourceType, message, canRetry }) => ({ sourceType, message, canRetry }))).toEqual([
-      { sourceType: "NOTIFICATION", message: "정상 · 19:00 기준", canRetry: false },
+      { sourceType: "NOTIFICATION", message: "확인 가능 · 19:00 기준", canRetry: false },
       { sourceType: "AI_JOB", message: "확인 불가 · 마지막 정상 18:30", canRetry: true },
-      { sourceType: "CLOSING_RISK", message: "비활성", canRetry: false },
+      { sourceType: "CLOSING_RISK", message: "사용 안 함", canRetry: false },
     ]);
   });
 });

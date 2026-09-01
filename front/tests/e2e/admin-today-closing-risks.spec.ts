@@ -1,5 +1,6 @@
 import { expect, test, type Route } from "@playwright/test";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import { routeEmptyAdminOperations } from "./admin-operations-e2e-fixtures";
 
 const GENERATED_AT = "2026-08-04T10:00:00Z";
 
@@ -27,6 +28,7 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
 }
 
 test("owner sees a safe closing-risk case and follows its host board link", async ({ page }) => {
+  await routeEmptyAdminOperations(page);
   const source = {
     sourceType: "CLOSING_RISK",
     status: "AVAILABLE",

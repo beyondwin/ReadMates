@@ -54,6 +54,20 @@ const page: AdminAuditLedgerPage = {
 };
 
 describe("AdminAuditLedger", () => {
+  it.each(["OWNER", "OPERATOR", "SUPPORT"] as const)("never renders raw %s as primary row actor copy", (role) => {
+    render(
+      <AdminAuditLedger
+        page={{ ...page, items: [{ ...page.items[0], actor: { userId: "admin-1", role, displayLabel: role } }] }}
+        filters={{ range: "7d" }} loading={false} error={null} nextPageError={false} loadingMore={false}
+        sensitiveSearch={defaultSearch} selectedId={null} detailOpen={false} onSelect={vi.fn()} onCloseDetail={vi.fn()}
+        onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()}
+      />,
+    );
+    const row = screen.getByRole("button", { name: /알림 재처리를 확정했습니다/ });
+    expect(row).toHaveTextContent(role === "OWNER" ? "소유자" : role === "OPERATOR" ? "운영자" : "지원 담당");
+    expect(row).not.toHaveTextContent(role);
+  });
+
   it("renders ledger rows and safe metadata detail", async () => {
     const user = userEvent.setup();
     render(
@@ -75,13 +89,18 @@ describe("AdminAuditLedger", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "운영 기입" })).toBeInTheDocument();
-    expect(screen.getByText("원장")).toBeInTheDocument();
-    const notificationRow = screen.getByRole("button", { name: /알림 재처리가 확정되었습니다/ });
+    expect(screen.getByRole("heading", { name: "운영 처리 기록" })).toBeInTheDocument();
+    expect(screen.getByText("처리 기록")).toBeInTheDocument();
+    const notificationRow = screen.getByRole("button", { name: /알림 재처리를 확정했습니다/ });
     expect(notificationRow).toBeInTheDocument();
     await user.click(notificationRow);
 
     const detail = screen.getByRole("region", { name: "감사 이벤트 상세" });
+    const identity = detail.querySelector(".admin-audit__identity");
+    expect(identity).toHaveTextContent("소유자");
+    expect(identity).not.toHaveTextContent("OWNER");
+    expect(detail.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("OWNER");
+    expect(detail.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("preview-1");
     expect(within(detail).getByText("selectionHashPrefix")).toBeInTheDocument();
     expect(detail.textContent).not.toContain("{");
     expect(within(detail).getByText("운영 판단")).toBeInTheDocument();
@@ -122,7 +141,7 @@ describe("AdminAuditLedger", () => {
           sourceSlice: "S6",
           sourceTable: "platform_audit_events",
           actionCategory: "AI_OPS",
-          actionType: "ADMIN_AI_OPS_RETRY_COMMIT",
+          actionType: "AI_COMMAND_RETRY_COMMIT",
           outcome: "SUCCESS",
           actor: { userId: "admin-1", role: "OWNER", displayLabel: "OWNER" },
           target: { clubId: "club-7", userId: null, jobId: "job-1", eventId: null, label: "AI job" },
@@ -154,7 +173,7 @@ describe("AdminAuditLedger", () => {
       </MemoryRouter>,
     );
 
-    await user.click(screen.getByRole("button", { name: /AI 커밋 재시도를 실행했습니다/ }));
+    await user.click(screen.getByRole("button", { name: /AI 작업 반영을 다시 시도했습니다/ }));
 
     const detail = screen.getByRole("region", { name: "감사 이벤트 상세" });
     expect(within(detail).getByText("후속 화면 있음")).toBeInTheDocument();
@@ -224,7 +243,7 @@ describe("AdminAuditLedger", () => {
         />
       </MemoryRouter>,
     );
-    await user.click(screen.getByRole("button", { name: /알림 재처리가 확정되었습니다/ }));
+    await user.click(screen.getByRole("button", { name: /알림 재처리를 확정했습니다/ }));
     const detail = screen.getByRole("region", { name: "감사 이벤트 상세" });
     expect(detail).toHaveTextContent("notification-worker");
     expect(detail).toHaveTextContent("알림 재처리");
@@ -245,7 +264,7 @@ describe("AdminAuditLedger", () => {
         selectedId={page.items[0].id} detailOpen={true} onSelect={onSelect} onCloseDetail={onCloseDetail}
         onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()} />,
     );
-    const first = screen.getByRole("button", { name: /알림 재처리가 확정되었습니다/ });
+    const first = screen.getByRole("button", { name: /알림 재처리를 확정했습니다/ });
     first.focus();
     await user.keyboard("{ArrowDown}");
     expect(onSelect).toHaveBeenCalledWith(page.items[1]);
@@ -255,8 +274,11 @@ describe("AdminAuditLedger", () => {
         selectedId={page.items[1].id} detailOpen={true} onSelect={onSelect} onCloseDetail={onCloseDetail}
         onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()} />,
     );
-    expect(screen.getByRole("button", { name: /support grant가 생성되었습니다/ })).toHaveFocus();
-    expect(screen.getByRole("region", { name: "감사 이벤트 상세" })).toHaveTextContent("support grant가 생성되었습니다");
+    expect(screen.getByRole("button", { name: /지원 접근 권한을 부여했습니다/ })).toHaveFocus();
+    const supportDetail = screen.getByRole("region", { name: "감사 이벤트 상세" });
+    expect(supportDetail.querySelector(".admin-audit__identity")).toHaveTextContent("지원 접근 권한을 부여했습니다");
+    expect(supportDetail.querySelector(".admin-audit__identity")).not.toHaveTextContent("support grant");
+    expect(supportDetail.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("support grant가 생성되었습니다");
     await user.click(screen.getByRole("button", { name: "목록으로" }));
     expect(onCloseDetail).toHaveBeenCalledOnce();
     rerender(
@@ -265,7 +287,7 @@ describe("AdminAuditLedger", () => {
         selectedId={page.items[1].id} detailOpen={false} onSelect={onSelect} onCloseDetail={onCloseDetail}
         onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()} />,
     );
-    expect(screen.getByRole("button", { name: /support grant가 생성되었습니다/ })).toHaveFocus();
+    expect(screen.getByRole("button", { name: /지원 접근 권한을 부여했습니다/ })).toHaveFocus();
   });
 
   it("exposes every share-safe filter without exposing cursor controls", () => {
@@ -286,9 +308,15 @@ describe("AdminAuditLedger", () => {
     expect(screen.getByLabelText("행동 분류")).toBeInTheDocument();
     expect(screen.getByLabelText("결과")).toBeInTheDocument();
     expect(screen.queryByLabelText(/cursor/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "소유자" })).toHaveValue("OWNER");
+    expect(within(screen.getByLabelText("소스 영역")).getByRole("option", { name: "알림" })).toHaveValue("S5");
+    expect(within(screen.getByLabelText("행동 분류")).getByRole("option", { name: "지원 접근" })).toHaveValue("SUPPORT");
+    expect(screen.queryByRole("option", { name: "OWNER" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "S5" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "NOTIFICATION" })).not.toBeInTheDocument();
   });
 
-  it("renders a sentence row that names 사유 없음", () => {
+  it("renders rows in the exact time, actor, target action, and result order", () => {
     render(
       <AdminAuditLedger
         page={page}
@@ -308,10 +336,17 @@ describe("AdminAuditLedger", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "운영 기입" })).toBeInTheDocument();
-    const row = screen.getByRole("button", { name: /OWNER가 Replay preview에 알림 재처리가 확정되었습니다/ });
-    expect(row).toHaveTextContent("사유: 사유 없음");
-    expect(row).toHaveTextContent("성공");
+    expect(screen.getByRole("heading", { name: "운영 처리 기록" })).toBeInTheDocument();
+    const row = screen.getByRole("button", { name: /소유자 · 알림 재처리 대상에 알림 재처리를 확정했습니다/ });
+    const fields = [...row.querySelectorAll<HTMLElement>("[data-audit-row-field]")];
+    expect(fields.map((field) => field.dataset.auditRowField)).toEqual(["time", "actor", "action", "outcome"]);
+    expect(fields.map((field) => field.textContent)).toEqual([
+      expect.stringMatching(/2026/),
+      "소유자",
+      "알림 재처리 대상에 알림 재처리를 확정했습니다.",
+      "완료",
+    ]);
+    expect(row).not.toHaveTextContent("사유");
     expect(row.querySelector("time")).toHaveAttribute("datetime", "2026-05-27T00:01:00Z");
     expect(row).not.toHaveTextContent("preview-1");
     expect(row).not.toHaveTextContent("ADMIN_NOTIFICATION_REPLAY_CONFIRMED");
@@ -341,8 +376,8 @@ describe("AdminAuditLedger", () => {
       />,
     );
 
-    const row = screen.getByRole("button", { name: /OWNER가 Replay preview에/ });
-    expect(row).toHaveTextContent("차단");
+    const row = screen.getByRole("button", { name: /소유자 · 알림 재처리 대상에/ });
+    expect(row).toHaveTextContent("차단됨");
     expect(row).not.toHaveTextContent("거부");
   });
 
@@ -367,12 +402,78 @@ describe("AdminAuditLedger", () => {
       />,
     );
 
-    const row = screen.getByRole("button", { name: /OWNER가 Replay preview에 알림 재처리가 확정되었습니다/ });
+    const row = screen.getByRole("button", { name: /소유자 · 알림 재처리 대상에 알림 재처리를 확정했습니다/ });
     expect(row).not.toHaveTextContent("preview-1");
     await user.click(row);
 
     const detail = screen.getByRole("region", { name: "감사 이벤트 상세" });
     expect(within(detail).getByText("preview-1")).toBeInTheDocument();
     expect(detail).toHaveTextContent("ADMIN_NOTIFICATION_REPLAY_CONFIRMED");
+  });
+
+  it("keeps reason absence and source, action, receipt identifiers in detail only", async () => {
+    const user = userEvent.setup();
+    render(
+      <AdminAuditLedger
+        page={{
+          ...page,
+          items: [{
+            ...page.items[0],
+            safeMetadata: [{ label: "receiptId", value: "receipt-1", kind: "id" }],
+          }],
+        }}
+        filters={{ range: "7d" }}
+        loading={false}
+        error={null}
+        nextPageError={false}
+        loadingMore={false}
+        sensitiveSearch={defaultSearch}
+        selectedId={null}
+        detailOpen={false}
+        onSelect={vi.fn()}
+        onCloseDetail={vi.fn()}
+        onFilterChange={vi.fn()}
+        onLoadMore={vi.fn()}
+        onRetryLoadMore={vi.fn()}
+      />,
+    );
+
+    const row = screen.getByRole("button", { name: /알림 재처리 대상에 알림 재처리를 확정했습니다/ });
+    expect(row).not.toHaveTextContent("platform_audit_events");
+    expect(row).not.toHaveTextContent("ADMIN_NOTIFICATION_REPLAY_CONFIRMED");
+    expect(row).not.toHaveTextContent("receipt-1");
+    expect(row).not.toHaveTextContent("사유");
+    await user.click(row);
+
+    const detail = screen.getByRole("region", { name: "감사 이벤트 상세" });
+    expect(within(detail).getByText("기록된 사유 정보가 없습니다.")).toBeInTheDocument();
+    const disclosure = detail.querySelector("[data-admin-technical-disclosure]");
+    expect(disclosure).toHaveTextContent("platform_audit_events");
+    expect(disclosure).toHaveTextContent("ADMIN_NOTIFICATION_REPLAY_CONFIRMED");
+    expect(disclosure).toHaveTextContent("receipt-1");
+  });
+
+  it("keeps raw server summary and code metadata inside technical disclosure", async () => {
+    const user = userEvent.setup();
+    render(
+      <AdminAuditLedger
+        page={{ ...page, items: [page.items[1]] }}
+        filters={{ range: "7d" }} loading={false} error={null} nextPageError={false} loadingMore={false}
+        sensitiveSearch={defaultSearch} selectedId={null} detailOpen={false} onSelect={vi.fn()} onCloseDetail={vi.fn()}
+        onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()}
+      />,
+    );
+
+    const row = screen.getByRole("button", { name: /지원 접근 대상에 지원 접근 권한을 부여했습니다/ });
+    expect(row).not.toHaveTextContent("support grant");
+    expect(row).not.toHaveTextContent("METADATA_READ");
+    await user.click(row);
+    const detail = screen.getByRole("region", { name: "감사 이벤트 상세" });
+    expect(detail.querySelector(".admin-audit__identity")).not.toHaveTextContent("support grant");
+    expect(detail.querySelector(".admin-audit__metadata")).toBeNull();
+    const disclosure = detail.querySelector("[data-admin-technical-disclosure]");
+    expect(disclosure).toHaveTextContent("원본 설명");
+    expect(disclosure).toHaveTextContent("support grant가 생성되었습니다.");
+    expect(disclosure).toHaveTextContent("METADATA_READ");
   });
 });

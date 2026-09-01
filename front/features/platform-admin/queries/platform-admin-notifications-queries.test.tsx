@@ -23,6 +23,7 @@ import {
 import {
   platformAdminNotificationSnapshotQuery,
   platformAdminNotificationsKeys,
+  publishPlatformAdminNotifications,
   useConfirmAdminNotificationReplayMutation,
   usePreviewAdminNotificationReplayMutation,
 } from "./platform-admin-notifications-queries";
@@ -144,6 +145,8 @@ describe("platform admin notification queries", () => {
     });
 
     expect(platformAdminNotificationsKeys.all[0]).toBe("platform-admin");
+    expect(client.getQueryState(snapshotKey)?.isInvalidated).toBe(false);
+    await publishPlatformAdminNotifications(client);
     expect(client.getQueryState(snapshotKey)?.isInvalidated).toBe(true);
     expect(client.getQueryData(snapshotKey)).toEqual(snapshot);
   });

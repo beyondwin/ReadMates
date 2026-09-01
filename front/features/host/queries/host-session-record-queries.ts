@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { infiniteQueryOptions, queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import { infiniteQueryOptions, queryOptions, useMutation } from "@tanstack/react-query";
 import {
   applyHostSessionRecord,
   deleteHostSessionRecordDraft,
@@ -133,30 +133,32 @@ function invalidateRecordDraftLedgerProjection(
 }
 
 export function useSaveHostSessionRecordDraftMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "records", "save-draft"),
     mutationFn: ({ sessionId, request }: {
       sessionId: string;
       request: SaveHostSessionRecordDraftRequest;
     }) => saveHostSessionRecordDraft(sessionId, request, context),
-    onSuccess: async (draft, variables) => {
-      updateEditorDraft(client, variables.sessionId, context, draft, true);
-      await invalidateRecordDraftLedgerProjection(client, context);
-    },
   });
 }
 
+export async function publishSavedHostSessionRecordDraft(client: QueryClient, sessionId: string, context: ExplicitReadmatesApiContext, draft: HostSessionRecordDraft) {
+  updateEditorDraft(client, sessionId, context, draft, true);
+  await invalidateRecordDraftLedgerProjection(client, context);
+}
+
 export function useRebaseHostSessionRecordDraftMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "records", "rebase-draft"),
     mutationFn: ({ sessionId, request }: {
       sessionId: string;
       request: RebaseHostSessionRecordDraftRequest;
     }) => rebaseHostSessionRecordDraft(sessionId, request, context),
-    onSuccess: async (draft, variables) => {
-      const editorKey = hostSessionRecordKeys.editor(variables.sessionId, context);
+  });
+}
+
+export async function publishRebasedHostSessionRecordDraft(client: QueryClient, sessionId: string, request: RebaseHostSessionRecordDraftRequest, context: ExplicitReadmatesApiContext, draft: HostSessionRecordDraft) {
+      const editorKey = hostSessionRecordKeys.editor(sessionId, context);
       let cacheAdvanced = false;
       client.setQueryData<HostSessionRecordEditor>(
         editorKey,
@@ -165,17 +167,17 @@ export function useRebaseHostSessionRecordDraftMutation(context: ExplicitReadmat
             return editor;
           }
           const liveStillMatches =
-            editor.liveRevision === variables.request.expectedLiveRevision
-            && editor.liveSessionUpdatedAt === variables.request.expectedSessionUpdatedAt;
+            editor.liveRevision === request.expectedLiveRevision
+            && editor.liveSessionUpdatedAt === request.expectedSessionUpdatedAt;
           const cachedDraftRevision = editor.draft?.draftRevision ?? null;
           const draftStateStillMatches =
-            cachedDraftRevision === variables.request.expectedDraftRevision
+            cachedDraftRevision === request.expectedDraftRevision
             || cachedDraftRevision === draft.draftRevision;
           if (!liveStillMatches || !draftStateStillMatches) {
             cacheAdvanced = true;
             return {
               ...editor,
-              draft: cachedDraftRevision === variables.request.expectedDraftRevision
+              draft: cachedDraftRevision === request.expectedDraftRevision
                 ? draft
                 : editor.draft,
               draftLiveBaseStale: true,
@@ -194,23 +196,21 @@ export function useRebaseHostSessionRecordDraftMutation(context: ExplicitReadmat
         ...(cacheAdvanced ? [client.invalidateQueries({ queryKey: editorKey, exact: true })] : []),
         invalidateRecordDraftLedgerProjection(client, context),
       ]);
-    },
-  });
 }
 
 export function useDeleteHostSessionRecordDraftMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "records", "delete-draft"),
     mutationFn: ({ sessionId, expectedDraftRevision }: {
       sessionId: string;
       expectedDraftRevision: number;
     }) => deleteHostSessionRecordDraft(sessionId, expectedDraftRevision, context),
-    onSuccess: async (_response, variables) => {
-      updateEditorDraft(client, variables.sessionId, context, null);
-      await invalidateRecordDraftLedgerProjection(client, context);
-    },
   });
+}
+
+export async function publishDeletedHostSessionRecordDraft(client: QueryClient, sessionId: string, context: ExplicitReadmatesApiContext) {
+  updateEditorDraft(client, sessionId, context, null);
+  await invalidateRecordDraftLedgerProjection(client, context);
 }
 
 export function usePreviewHostSessionRecordApplyMutation(context: ExplicitReadmatesApiContext) {
@@ -260,7 +260,7 @@ export function useApplyHostSessionRecordMutation(
     clubSlug: string;
   }) => Promise<unknown>,
 ) {
-  const client = useQueryClient();
+  void invalidateMemberAndPublicSurfaces;
   return useMutation<
     HostSessionRecordApplyResult,
     Error,
@@ -319,18 +319,14 @@ export function useApplyHostSessionRecordMutation(
         },
       });
     },
-    onSuccess: (_result, variables) =>
-      invalidateAppliedRecordSurfaces(
-        client,
-        variables.sessionId,
-        context,
-        invalidateMemberAndPublicSurfaces,
-      ),
   });
 }
 
+export function publishAppliedHostSessionRecord(client: QueryClient, sessionId: string, context: ExplicitReadmatesApiContext, invalidateMemberAndPublicSurfaces: (event: { sessionId: string; clubSlug: string }) => Promise<unknown>) {
+  return invalidateAppliedRecordSurfaces(client, sessionId, context, invalidateMemberAndPublicSurfaces);
+}
+
 export function useRestoreHostSessionRevisionToDraftMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "records", "restore-revision"),
     mutationFn: ({ sessionId, revisionId, request }: {
@@ -338,9 +334,11 @@ export function useRestoreHostSessionRevisionToDraftMutation(context: ExplicitRe
       revisionId: string;
       request: RestoreHostSessionRecordDraftRequest;
     }) => restoreHostSessionRevisionToDraft(sessionId, revisionId, request, context),
-    onSuccess: async (draft, variables) => {
-      updateEditorDraft(client, variables.sessionId, context, draft);
-      await invalidateRecordDraftLedgerProjection(client, context);
-    },
   });
+}
+
+
+export async function publishRestoredHostSessionRevisionDraft(client: QueryClient, sessionId: string, context: ExplicitReadmatesApiContext, draft: HostSessionRecordDraft) {
+  updateEditorDraft(client, sessionId, context, draft);
+  await invalidateRecordDraftLedgerProjection(client, context);
 }

@@ -20,6 +20,7 @@ import { hostSessionKeys } from "./host-session-queries";
 import {
   hostSessionRecoveryKeys,
   hostSessionRestorePreviewQuery,
+  publishRestoredHostSessionChange,
   useRestoreHostSessionChangeMutation,
 } from "./host-session-recovery-queries";
 
@@ -125,6 +126,7 @@ describe("host session recovery queries", () => {
         request: { expectedCurrentHash: "f".repeat(64) },
       });
     });
+    await publishRestoredHostSessionChange(client, "session-7", context);
 
     expect(restoreHostSessionChange).toHaveBeenCalledWith(
       "session-7",

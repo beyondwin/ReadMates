@@ -84,17 +84,13 @@ test("public to Google fixture login to host smoke flow", async ({ page }) => {
   await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/clubs\/reading-sai\/app\/host(\/sessions\/[^/]+)?$/);
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
   await expect(page.getByRole("group", { name: "현재 모임" })).toBeVisible();
-  await expect(page.getByRole("complementary", { name: "클럽 작업함" })).toBeVisible();
   await expect(page.locator("[data-app-route-security-controller]")).toHaveCount(1);
-  const hostWorkspaceSelector = page.locator('.desktop-only .rm-host-workspace-switcher');
-  await expect(hostWorkspaceSelector.getByRole("button", { name: "읽는사이 · 호스트 운영실" })).toBeVisible();
-  await hostWorkspaceSelector.getByRole("button", { name: "읽는사이 · 호스트 운영실" }).click();
-  await expect(hostWorkspaceSelector.locator('[aria-current="true"]')).toHaveText("읽는사이");
-  await expect(hostWorkspaceSelector.locator('[aria-current="page"]')).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
-  await expect(hostWorkspaceSelector.getByRole("button", { name: "멤버 공간" })).toBeVisible();
+  await expect(page.locator('[data-global-space-switcher]')).toHaveCount(0);
+  await expect(page.getByText("현재 공간 내 클럽, 읽는사이 호스트로 운영", { exact: true })).toHaveCount(2);
+  await expect(
+    page.getByRole("navigation", { name: "호스트 유틸리티" }).getByRole("link", { name: "멤버 시야" }),
+  ).toHaveAttribute("href", "/clubs/reading-sai/app");
+  await expect(page.getByRole("complementary", { name: "클럽 작업함" })).toBeVisible();
 
   await page.goto(`/app/feedback/${seededFeedbackSessionId}/print`);
   await expect(page.getByRole("heading", { name: /독서모임 1차 피드백/ })).toBeVisible();

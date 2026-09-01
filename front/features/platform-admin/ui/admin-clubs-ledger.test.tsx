@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
@@ -9,23 +9,28 @@ import {
   type AdminClubsLedgerClub,
 } from "./admin-clubs-ledger";
 
-const LEDGER_CSS = readFileSync(
-  path.resolve("features/platform-admin/ui/admin-editorial-ledger.css"),
-  "utf8",
+const CLUB_MANAGEMENT_CSS_PATH = path.resolve(
+  "features/platform-admin/ui/admin-club-management.css",
 );
+const CLUB_MANAGEMENT_CSS =
+  existsSync(CLUB_MANAGEMENT_CSS_PATH)
+    ? readFileSync(CLUB_MANAGEMENT_CSS_PATH, "utf8")
+    : "";
 
 const club: AdminClubsLedgerClub = {
   clubId: "c-1",
-  slug: "alpha",
   name: "Alpha",
-  status: "ACTIVE",
-  publicVisibility: "PRIVATE",
-  domainCount: 1,
-  domainActionRequiredCount: 0,
-  firstHostOnboardingState: "ASSIGNED",
   href: "/admin/clubs/c-1?returnTo=%2Fadmin%2Fclubs%3Fsearch%3Dalpha&focusId=c-1&scrollTop=240",
-  severity: "ok",
-  reasons: [],
+  currentState: "활성 · 비공개",
+  requiredAction: null,
+  recentSignal: null,
+  emphasis: "quiet",
+  technicalDisclosure: [
+    { label: "클럽 ID", value: "c-1" },
+    { label: "Slug", value: "alpha" },
+    { label: "수명주기 값", value: "ACTIVE" },
+    { label: "공개 상태 값", value: "PRIVATE" },
+  ],
 };
 
 function renderLedger(
@@ -73,16 +78,18 @@ describe("AdminClubsLedger", () => {
       "href",
       club.href,
     );
-    expect(screen.getByRole("region", { name: "클럽 장부" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "클럽 관리 목록" })).toBeInTheDocument();
     const row = container.querySelector(
       '[data-club-id="c-1"]',
     ) as HTMLElement;
-    expect(within(row).getByText("활성")).toBeInTheDocument();
-    expect(within(row).getByText("비공개")).toBeInTheDocument();
-    expect(within(row).getByText("배정됨")).toBeInTheDocument();
-    expect(within(row).queryByText("ACTIVE")).toBeNull();
-    expect(within(row).queryByText("PRIVATE")).toBeNull();
-    expect(within(row).queryByText("ASSIGNED")).toBeNull();
+    expect(within(row).getByText("활성 · 비공개")).toBeInTheDocument();
+    expect(row).toHaveAttribute("data-emphasis", "quiet");
+    expect(within(row).queryByText("필요한 조치")).toBeNull();
+    expect(within(row).queryByText("마지막 확인")).toBeNull();
+    expect(within(row).getByRole("group", { name: "기술 정보" })).toBeInTheDocument();
+    expect(within(row).getByText("alpha")).toBeInTheDocument();
+    expect(within(row).getByText("ACTIVE")).toBeInTheDocument();
+    expect(within(row).getByText("PRIVATE")).toBeInTheDocument();
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });
 
@@ -261,11 +268,29 @@ describe("AdminClubsLedger", () => {
   });
 
   it("locks 44px targets and reduced motion in the scoped clubs ledger stylesheet", () => {
-    expect(LEDGER_CSS).toMatch(
-      /\.admin-clubs-ledger[\s\S]*min-height:\s*44px/,
+    expect(existsSync(CLUB_MANAGEMENT_CSS_PATH)).toBe(true);
+    expect(CLUB_MANAGEMENT_CSS).toMatch(
+      /\.admin-club-management[\s\S]*min-height:\s*44px/,
     );
-    expect(LEDGER_CSS).toContain(".admin-clubs-ledger");
-    expect(LEDGER_CSS).toContain("prefers-reduced-motion");
+    expect(CLUB_MANAGEMENT_CSS).toContain(".admin-club-management");
+    expect(CLUB_MANAGEMENT_CSS).toContain("prefers-reduced-motion");
+  });
+
+  it("emphasizes only rows that need an operator decision", () => {
+    const actionable: AdminClubsLedgerClub = {
+      ...club,
+      requiredAction: "실패 신호 확인",
+      recentSignal: "알림 실패 2건",
+      emphasis: "actionable",
+    };
+    const { container } = renderLedger({ clubs: [actionable] });
+    const row = container.querySelector('[data-club-id="c-1"]') as HTMLElement;
+
+    expect(row).toHaveAttribute("data-emphasis", "actionable");
+    expect(within(row).getByText("필요한 조치")).toBeInTheDocument();
+    expect(within(row).getByText("실패 신호 확인")).toBeInTheDocument();
+    expect(within(row).getByText("최근 신호")).toBeInTheDocument();
+    expect(within(row).getByText("알림 실패 2건")).toBeInTheDocument();
   });
 
   it("does not import route, query, or API modules", () => {

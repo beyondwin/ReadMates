@@ -12,12 +12,18 @@ import {
   type SupportGrantReasonCategory,
   type SupportGrantStatus,
 } from "@/features/platform-admin/model/platform-admin-support-model";
+import {
+  adminPlatformRoleLanguage,
+  adminSupportCommandOutcomeLanguage,
+  adminSupportReceiptStatusLanguage,
+} from "@/features/platform-admin/model/admin-status-language";
 import { AdminSafeActionDock, type AdminSafeActionState } from "./admin-action-dock";
 import { AdminEvidenceLedger } from "./admin-evidence-ledger";
 import { AdminPageContext } from "./admin-page-context";
 import { AdminReceiptTimeline } from "./admin-receipt-timeline";
 import type { AdminPageState } from "./admin-state-panel";
 import { AdminWorkViewBar } from "./admin-work-view-bar";
+import { AdminTechnicalDisclosure } from "@/features/platform-admin/ui/admin-technical-disclosure";
 
 export type AdminSupportWorkbenchClub = { clubId: string; name: string };
 
@@ -104,7 +110,7 @@ export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
   return (
     <div className="admin-support-workbench">
       <AdminPageContext
-        eyebrow={ADMIN_COPY.eyebrow.ledger}
+        eyebrow={ADMIN_COPY.navigation.clubs}
         heading={ADMIN_COPY.heading.access}
         description="민감한 대상 정보는 이 화면을 떠나면 즉시 폐기됩니다."
         scope={activeGrants > 0 ? `활성 접근 ${activeGrants}건` : undefined}
@@ -133,16 +139,18 @@ export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
         />
       </AdminPageContext>
 
-      {!props.canManage ? <p className="admin-support-workbench__notice">현재 권한으로는 지원 접근 권한을 변경할 수 없습니다.</p> : null}
-      {props.latestReceipt ? (
-        <>
-          <ReceiptSummary receipt={props.latestReceipt} />
-          <SupportReceiptTimeline receipt={props.latestReceipt} />
-        </>
-      ) : null}
+      <section className="admin-support-workbench__workflow-section" data-admin-support-section="state">
+        <h2 className="h2 editorial">현재 상태</h2>
+        <p className="muted">
+          {activeGrants > 0 ? `현재 활성 지원 접근 ${activeGrants}건을 확인하고 있습니다.` : "현재 활성 지원 접근이 없습니다."}
+        </p>
+        {!props.canManage ? <p className="admin-support-workbench__notice">현재 권한으로는 지원 접근 권한을 변경할 수 없습니다.</p> : null}
+      </section>
 
+      <section className="admin-support-workbench__workflow-section" data-admin-support-section="actions">
+      <h2 className="h2 editorial">가능한 조치</h2>
       <section className="admin-support-workbench__panel" aria-labelledby="support-search-title">
-        <h2 id="support-search-title" className="h3 editorial">지원 대상 검색</h2>
+        <h3 id="support-search-title" className="h3 editorial">지원 대상 검색</h3>
         <form className="admin-support-workbench__search" onSubmit={(event) => { event.preventDefault(); props.search.onSubmit(); }}>
           <label className="field-group admin-support-workbench__search-field">
             <span className="label">지원 대상 검색</span>
@@ -156,7 +164,7 @@ export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
           <div className="admin-support-workbench__results">
             {props.search.results.map((result) => (
               <button key={result.subjectId} type="button" disabled={effectLocked} onClick={() => props.search.onSelect(result)}>
-                <strong>{result.displayName}</strong><span>{result.maskedEmail}</span><em>{result.grantEligible ? result.platformAdminRole ?? result.kind : result.grantBlockedReason ?? "발급 불가"}</em>
+                <strong>{result.displayName}</strong><span>{result.maskedEmail}</span><em>{supportSearchResultLabel(result)}</em>
               </button>
             ))}
           </div>
@@ -166,7 +174,7 @@ export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
       {props.search.selected ? (
         <section className="admin-support-workbench__panel" aria-labelledby="support-grant-title">
           <div className="admin-support-workbench__section-heading">
-            <div><h2 id="support-grant-title" className="h3 editorial">지원 접근 권한 발급</h2><p className="small muted">{props.search.selected.displayName} · {props.search.selected.maskedEmail}</p></div>
+            <div><h3 id="support-grant-title" className="h3 editorial">지원 접근 권한 발급</h3><p className="small muted">{props.search.selected.displayName} · {props.search.selected.maskedEmail}</p></div>
             {props.create.receipt ? <button type="button" className="btn btn-ghost btn-sm" onClick={props.create.onReset}>새 발급</button> : null}
           </div>
           <CommandFields
@@ -205,30 +213,9 @@ export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
         </section>
       ) : null}
 
-      <AdminEvidenceLedger
-        label={ADMIN_COPY.heading.accessLedger}
-        count={ledgerState === "ready" ? props.ledger.items.length : undefined}
-        state={ledgerState}
-        description={ledgerState === "unavailable" ? props.ledger.error ?? undefined : ledgerState === "empty" ? "조건에 맞는 지원 접근 권한이 없습니다." : ledgerState === "loading" ? "발급 목록을 불러오는 중입니다." : undefined}
-        action={ledgerState === "unavailable" ? <button className="btn btn-ghost btn-sm" type="button" onClick={props.ledger.onRetry}>다시 시도</button> : undefined}
-      >
-        <div className="admin-support-workbench__ledger">
-          {props.ledger.items.map((item) => (
-            <article key={item.grantId} className="admin-support-workbench__ledger-row">
-              <div>
-                <p>{formatSupportGrantLedgerSentence(item)}</p>
-                <p className="small muted">{item.granteeMaskedEmail} · {notePresenceLabel(item.notePresent)}</p>
-              </div>
-              {props.canManage && item.status === "ACTIVE" ? <button type="button" className="btn btn-ghost btn-sm" disabled={effectLocked} onClick={() => props.revoke.onStart(item)}>권한 취소 검토</button> : null}
-            </article>
-          ))}
-        </div>
-      </AdminEvidenceLedger>
-      {props.ledger.hasNextPage ? <div className="admin-support-workbench__load-more">{props.ledger.nextPageError ? <p className="danger" role="alert">다음 이력을 불러오지 못했습니다. 현재 목록은 유지됩니다.</p> : null}<button type="button" className="btn btn-ghost btn-sm" disabled={props.ledger.loadingMore} onClick={props.ledger.onLoadMore}>{props.ledger.loadingMore ? "불러오는 중" : props.ledger.nextPageError ? "다시 불러오기" : "더 보기"}</button></div> : null}
-
       {props.revoke.target ? (
         <section className="admin-support-workbench__panel" aria-labelledby="support-revoke-title">
-          <div className="admin-support-workbench__section-heading"><div><h2 id="support-revoke-title" className="h3 editorial">지원 접근 권한 취소</h2><p className="small muted">{props.revoke.target.clubName} · {props.revoke.target.granteeDisplayName}</p></div><button type="button" className="btn btn-ghost btn-sm" disabled={props.revoke.confirmPending || props.revoke.outcomeUnknown} onClick={props.revoke.onCancel}>닫기</button></div>
+          <div className="admin-support-workbench__section-heading"><div><h3 id="support-revoke-title" className="h3 editorial">지원 접근 권한 취소</h3><p className="small muted">{props.revoke.target.clubName} · {props.revoke.target.granteeDisplayName}</p></div><button type="button" className="btn btn-ghost btn-sm" disabled={props.revoke.confirmPending || props.revoke.outcomeUnknown} onClick={props.revoke.onCancel}>닫기</button></div>
           <CommandFields categoryLabel="취소 사유" noteLabel="검토 시에만 확인하는 사유 메모 (저장되지 않음)" reasonCategory={props.revoke.reasonCategory} note={props.revoke.note} locked={props.revoke.preview !== null || props.revoke.confirmPending || props.revoke.receipt !== null} onReasonCategoryChange={props.revoke.onReasonCategoryChange} onNoteChange={props.revoke.onNoteChange} />
           {props.revoke.preview ? <PreviewSummary preview={props.revoke.preview} /> : null}
           {props.revoke.receipt ? <ReceiptSummary receipt={props.revoke.receipt} /> : null}
@@ -247,6 +234,38 @@ export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
           ) : null}
         </section>
       ) : null}
+      </section>
+
+      <section className="admin-support-workbench__workflow-section" data-admin-support-section="history">
+      <h2 className="h2 editorial">최근 처리 기록</h2>
+      {props.latestReceipt ? (
+        <>
+          <ReceiptSummary receipt={props.latestReceipt} />
+          <SupportReceiptTimeline receipt={props.latestReceipt} />
+        </>
+      ) : null}
+      <AdminEvidenceLedger
+        label={ADMIN_COPY.heading.accessLedger}
+        count={ledgerState === "ready" ? props.ledger.items.length : undefined}
+        state={ledgerState}
+        description={ledgerState === "unavailable" ? props.ledger.error ?? undefined : ledgerState === "empty" ? "조건에 맞는 지원 접근 권한이 없습니다." : ledgerState === "loading" ? "발급 목록을 불러오는 중입니다." : undefined}
+        action={ledgerState === "unavailable" ? <button className="btn btn-ghost btn-sm" type="button" onClick={props.ledger.onRetry}>다시 시도</button> : undefined}
+      >
+        <div className="admin-support-workbench__ledger">
+          {props.ledger.items.map((item) => (
+            <article key={item.grantId} className="admin-support-workbench__ledger-row">
+              <div>
+                <p>{formatSupportGrantLedgerSentence(item)}</p>
+                <p className="small muted">{item.granteeMaskedEmail} · {notePresenceLabel(item.notePresent)}</p>
+                <AdminTechnicalDisclosure items={[{ label: "처리 역할 코드", value: item.createdByRole }]} />
+              </div>
+              {props.canManage && item.status === "ACTIVE" ? <button type="button" className="btn btn-ghost btn-sm" disabled={effectLocked} onClick={() => props.revoke.onStart(item)}>권한 취소 검토</button> : null}
+            </article>
+          ))}
+        </div>
+      </AdminEvidenceLedger>
+      {props.ledger.hasNextPage ? <div className="admin-support-workbench__load-more">{props.ledger.nextPageError ? <p className="danger" role="alert">다음 이력을 불러오지 못했습니다. 현재 목록은 유지됩니다.</p> : null}<button type="button" className="btn btn-ghost btn-sm" disabled={props.ledger.loadingMore} onClick={props.ledger.onLoadMore}>{props.ledger.loadingMore ? "불러오는 중" : props.ledger.nextPageError ? "다시 불러오기" : "더 보기"}</button></div> : null}
+      </section>
     </div>
   );
 }
@@ -271,14 +290,33 @@ function CommandFields(props: {
 }
 
 function PreviewSummary({ preview }: { preview: AdminSupportGrantPreview }) {
-  return <section className="admin-support-workbench__review" aria-label="변경 검토"><p><strong>{preview.commandType === "CREATE" ? "발급" : "취소"} 영향</strong></p><ul>{preview.impactCodes.map((code) => <li key={code}>{code}</li>)}</ul><p className="small muted">사유 {supportGrantReasonLabel(preview.reasonCategory)} · {notePresenceLabel(preview.notePresent)} · 검토 만료 {preview.expiresAt}</p></section>;
+  return <section className="admin-support-workbench__review" aria-label="변경 검토"><p><strong>{preview.commandType === "CREATE" ? "발급" : "취소"} 영향</strong></p><ul>{preview.impactCodes.map((code) => <li key={code}>{supportImpactLabel(code)}</li>)}</ul><p className="small muted">사유 {supportGrantReasonLabel(preview.reasonCategory)} · {notePresenceLabel(preview.notePresent)} · 검토 만료 {preview.expiresAt}</p><AdminTechnicalDisclosure items={preview.impactCodes.map((code) => ({ label: "영향 코드", value: code }))} /></section>;
 }
 
 function ReceiptSummary({ receipt }: { receipt: AdminSupportGrantReceipt }) {
-  return <section className="admin-support-workbench__receipt" aria-label="명령 영수증"><p><strong>{ADMIN_COPY.receipt}</strong> · {receipt.outcome}</p><p className="small muted">영수증 {receipt.receiptId} · {receipt.beforeStatus} → {receipt.afterStatus}</p><p className="small muted">{supportGrantReasonLabel(receipt.reasonCategory)} · {notePresenceLabel(receipt.notePresent)}</p></section>;
+  const outcome = adminSupportCommandOutcomeLanguage(receipt.outcome).primaryText;
+  const beforeStatus = adminSupportReceiptStatusLanguage(receipt.beforeStatus).primaryText;
+  const afterStatus = adminSupportReceiptStatusLanguage(receipt.afterStatus).primaryText;
+  return (
+    <section className="admin-support-workbench__receipt" aria-label="명령 영수증">
+      <p><strong>{ADMIN_COPY.receipt}</strong> · {outcome}</p>
+      <p className="small muted">영수증 {receipt.receiptId} · {beforeStatus} → {afterStatus}</p>
+      <p className="small muted">{supportGrantReasonLabel(receipt.reasonCategory)} · {notePresenceLabel(receipt.notePresent)}</p>
+      <AdminTechnicalDisclosure
+        items={[
+          { label: "명령 결과 코드", value: receipt.outcome },
+          { label: "이전 상태 코드", value: receipt.beforeStatus },
+          { label: "이후 상태 코드", value: receipt.afterStatus },
+        ]}
+      />
+    </section>
+  );
 }
 
 function SupportReceiptTimeline({ receipt }: { receipt: AdminSupportGrantReceipt }) {
+  const outcome = adminSupportCommandOutcomeLanguage(receipt.outcome).primaryText;
+  const beforeStatus = adminSupportReceiptStatusLanguage(receipt.beforeStatus).primaryText;
+  const afterStatus = adminSupportReceiptStatusLanguage(receipt.afterStatus).primaryText;
   return (
     <AdminReceiptTimeline
       level="L2"
@@ -286,10 +324,10 @@ function SupportReceiptTimeline({ receipt }: { receipt: AdminSupportGrantReceipt
       entries={[
         {
           key: "command",
-          label: `${receipt.commandType === "CREATE" ? "발급" : "취소"} ${receipt.outcome}`,
+          label: `${receipt.commandType === "CREATE" ? "발급" : "취소"} ${outcome}`,
           state: receipt.outcome === "SUCCEEDED" ? "succeeded" : "failed",
           occurredAt: receipt.createdAt,
-          detail: `${receipt.beforeStatus} → ${receipt.afterStatus} · ${supportGrantReasonLabel(receipt.reasonCategory)} · ${notePresenceLabel(receipt.notePresent)}`,
+          detail: `${beforeStatus} → ${afterStatus} · ${supportGrantReasonLabel(receipt.reasonCategory)} · ${notePresenceLabel(receipt.notePresent)}`,
         },
       ]}
     />
@@ -312,4 +350,21 @@ function supportLedgerState(ledger: AdminSupportWorkbenchProps["ledger"]): Admin
 
 function notePresenceLabel(notePresent: boolean) {
   return notePresent ? "검토 시 사유 메모 사용" : "검토 시 사유 메모 없음";
+}
+
+function supportSearchResultLabel(result: AdminSupportSearchResult): string {
+  if (!result.grantEligible) return "발급 조건 확인 필요";
+  if (result.platformAdminRole) return adminPlatformRoleLanguage(result.platformAdminRole).primaryText;
+  return result.kind === "USER" ? "일반 사용자" : "지원 대상";
+}
+
+function supportImpactLabel(code: string): string {
+  switch (code) {
+    case "SUPPORT_ACCESS_WILL_BECOME_ACTIVE":
+      return "지원 접근 권한을 발급합니다.";
+    case "SUPPORT_ACCESS_WILL_BE_REVOKED":
+      return "지원 접근 권한을 취소합니다.";
+    default:
+      return "지원 접근 범위가 변경됩니다.";
+  }
 }

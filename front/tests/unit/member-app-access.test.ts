@@ -126,7 +126,7 @@ describe("member app access helpers", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(loadMemberAppAuth({ clubSlug: "reading-sai" })).resolves.toEqual({
-      auth,
+      auth: { ...auth, availableSpaces: { version: 1, kinds: [], clubs: [] } },
       allowed: true,
     });
 
@@ -143,7 +143,7 @@ describe("member app access helpers", () => {
     window.history.pushState({}, "", "/clubs/reading-sai/app");
 
     await expect(loadMemberAppAuth({ params: {} })).resolves.toEqual({
-      auth,
+      auth: { ...auth, availableSpaces: { version: 1, kinds: [], clubs: [] } },
       allowed: true,
     });
 

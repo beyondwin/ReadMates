@@ -382,9 +382,11 @@ test.describe("host club operations hub", () => {
     await page.goto("/clubs/reading-sai/app/host");
     await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/clubs\/reading-sai\/app\/host(\/sessions\/[^/]+)?$/);
     await expectHostMeetingLedgerPublicSafe(page);
-    const workspaceSwitcher = page.getByRole("banner").locator(".rm-host-workspace-switcher");
-    await workspaceSwitcher.getByRole("button", { name: "읽는사이 · 호스트 운영실" }).click();
-    await expect(workspaceSwitcher.getByRole("button", { name: "멤버 공간" })).toBeVisible();
+    await expect(page.locator('[data-global-space-switcher]')).toHaveCount(0);
+    await expect(page.getByText("현재 공간 내 클럽, 읽는사이 호스트로 운영", { exact: true })).toHaveCount(2);
+    await expect(
+      page.getByRole("navigation", { name: "호스트 유틸리티" }).getByRole("link", { name: "멤버 시야" }),
+    ).toHaveAttribute("href", "/clubs/reading-sai/app");
   });
 
   test("host meeting ledger captures public-safe visual evidence", async ({ page }, testInfo) => {

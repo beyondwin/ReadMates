@@ -1,3 +1,9 @@
+import {
+  adminAuditOutcomeLanguage,
+  adminNavigationLanguage,
+  mapAdminSemanticLanguage,
+} from "./admin-status-language";
+
 export const ADMIN_COPY = {
   eyebrow: {
     clubs: "운영 · 클럽",
@@ -9,8 +15,14 @@ export const ADMIN_COPY = {
     visibility: "공개 설정",
     domainProvisioning: "도메인 준비",
     operationsSnapshot: "운영 스냅샷",
-    pipeline: "파이프라인",
-    ledger: "원장",
+    pipeline: "서비스 상태",
+    ledger: "처리 기록",
+  },
+  navigation: {
+    today: adminNavigationLanguage("today").primaryText,
+    clubs: adminNavigationLanguage("clubs").primaryText,
+    service: adminNavigationLanguage("service").primaryText,
+    records: adminNavigationLanguage("records").primaryText,
   },
   search: {
     loadedCases: "이미 불러온 케이스 검색",
@@ -19,13 +31,13 @@ export const ADMIN_COPY = {
     aiOps: "AI 작업",
     failureClusters: "실패 클러스터",
     replay: "재발송",
-    clubsLedger: "클럽 장부",
-    delivery: "배달 원장",
+    clubsLedger: "클럽 관리 목록",
+    delivery: "알림 전달 상태",
     recentChanges: "최근에 바뀐 것",
-    audit: "운영 기입",
-    auditLedger: "기입 목록",
-    access: "접근 원장",
-    accessLedger: "발급 목록",
+    audit: "운영 처리 기록",
+    auditLedger: "처리 목록",
+    access: "지원 접근",
+    accessLedger: "접근 발급 기록",
     analytics: "분석 부록",
   },
   support: {
@@ -35,10 +47,10 @@ export const ADMIN_COPY = {
     retry: "접근 발급 다시 시도",
   },
   targetLedger: {
-    heading: "이 대상의 최근 기입",
-    clubHeading: "이 클럽의 최근 기입",
-    more: "전체 기입 보기",
-    empty: "표시할 기입이 없습니다.",
+    heading: "이 대상의 최근 처리 기록",
+    clubHeading: "이 클럽의 최근 처리 기록",
+    more: "전체 처리 기록 보기",
+    empty: "표시할 처리 기록이 없습니다.",
   },
   metric: {
     outboxPending: "발송 대기",
@@ -48,19 +60,6 @@ export const ADMIN_COPY = {
     relayStale: "중계 지연",
   },
   receipt: "영수증",
-  queueExit: {
-    acknowledge: "확인 처리",
-    hold: "보류",
-    ignore: "무시",
-    resolve: "해결 확인",
-    holdDuration: "보류 기간",
-    holdReason: "보류 사유",
-    ignoreReason: "무시 사유",
-    holdConfirm: "보류 확정",
-    ignoreConfirm: "무시 확정",
-    holdHint: "기간이 끝나면 큐로 돌아옵니다.",
-    ignoreHint: "최대 7일 보류합니다. 기간이 끝나면 큐로 돌아옵니다.",
-  },
   alarm: {
     attention: "주의",
     noUnacknowledged: "미확인 신호 없음",
@@ -76,7 +75,7 @@ export const ADMIN_COPY = {
 } as const;
 
 function fromMap(map: Record<string, string>) {
-  return (value: string): string => map[value] ?? value;
+  return (value: string): string => mapAdminSemanticLanguage(value, map).primaryText;
 }
 
 export const clubLifecycleLabel = fromMap({
@@ -111,12 +110,8 @@ export const supportGrantReasonLabel = fromMap({
   SECURITY_REVIEW: "보안 검토",
 });
 
-export const auditOutcomeLabel = fromMap({
-  SUCCESS: "성공",
-  FAILED: "실패",
-  DENIED: "차단",
-  PREPARED: "진행",
-});
+export const auditOutcomeLabel = (value: string): string =>
+  adminAuditOutcomeLanguage(value).primaryText;
 
 export const deliveryLedgerStatusLabel = fromMap({
   SENT: "발송됨",

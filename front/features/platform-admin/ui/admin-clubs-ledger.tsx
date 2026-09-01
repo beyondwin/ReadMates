@@ -2,30 +2,20 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import {
   ADMIN_COPY,
-  clubLifecycleLabel,
-  clubVisibilityLabel,
-  hostOnboardingLabel,
 } from "@/features/platform-admin/model/admin-copy";
+import type { ClubManagementRow } from "@/features/platform-admin/model/platform-admin-club-triage-model";
 import type { AdminPageState } from "./admin-state-panel";
 import { AdminEvidenceLedger } from "./admin-evidence-ledger";
 import { AdminPageContext } from "./admin-page-context";
+import { AdminTechnicalDisclosure } from "./admin-technical-disclosure";
 import { AdminWorkViewBar } from "./admin-work-view-bar";
 
 const FOCUS_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const MAX_SCROLL_TOP = 1_000_000;
 
-export type AdminClubsLedgerClub = {
+export type AdminClubsLedgerClub = ClubManagementRow & {
   clubId: string;
-  slug: string;
-  name: string;
-  status: string;
-  publicVisibility: string;
-  domainCount: number;
-  domainActionRequiredCount: number;
-  firstHostOnboardingState: string;
   href: string;
-  severity: "critical" | "attention" | "ok";
-  reasons: readonly string[];
 };
 
 export type AdminClubsLedgerFilters = {
@@ -37,12 +27,6 @@ export type AdminClubsLedgerFilters = {
 };
 
 type FilterKey = Exclude<keyof AdminClubsLedgerFilters, "search">;
-
-const TRIAGE_LABEL: Record<AdminClubsLedgerClub["severity"], string> = {
-  critical: "긴급",
-  attention: "주의",
-  ok: "정상",
-};
 
 type Props = {
   clubs: readonly AdminClubsLedgerClub[];
@@ -241,7 +225,7 @@ export function AdminClubsLedger({
           {pageState === "ready" ? (
             <div
               ref={scrollerRef}
-              className="admin-clubs__table-wrap admin-clubs-ledger__scroller"
+              className="admin-club-management admin-clubs-ledger__scroller"
               onScroll={(event) => {
                 const next = event.currentTarget.scrollTop;
                 onScrollChange(
@@ -253,65 +237,41 @@ export function AdminClubsLedger({
                 );
               }}
             >
-              <table className="admin-clubs__table">
-                <thead>
-                  <tr>
-                    <th scope="col">상태 신호</th>
-                    <th scope="col">Slug</th>
-                    <th scope="col">이름</th>
-                    <th scope="col">상태</th>
-                    <th scope="col">공개</th>
-                    <th scope="col">도메인</th>
-                    <th scope="col">호스트</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {clubs.map((club) => (
-                    <tr
-                      key={club.clubId}
-                      className={`admin-clubs__row admin-clubs__row--${club.severity}`}
-                      data-club-id={club.clubId}
-                    >
-                      <td data-label="상태 신호">
-                        <span
-                          className={`admin-clubs__triage admin-clubs__triage--${club.severity}`}
-                        >
-                          {TRIAGE_LABEL[club.severity]}
-                        </span>
-                        {club.reasons.length > 0 ? (
-                          <span className="admin-clubs__triage-reasons">
-                            {club.reasons.join(" · ")}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td data-label="Slug">
-                        <code>{club.slug}</code>
-                      </td>
-                      <td data-label="이름">
-                        <Link
-                          id={`admin-club-row-${club.clubId}`}
-                          to={club.href}
-                        >
-                          {club.name}
-                        </Link>
-                      </td>
-                      <td data-label="상태">{clubLifecycleLabel(club.status)}</td>
-                      <td data-label="공개">
-                        {clubVisibilityLabel(club.publicVisibility)}
-                      </td>
-                      <td data-label="도메인">
-                        {club.domainCount}
-                        {club.domainActionRequiredCount > 0
-                          ? ` · ${club.domainActionRequiredCount} 조치 필요`
-                          : ""}
-                      </td>
-                      <td data-label="호스트">
-                        {hostOnboardingLabel(club.firstHostOnboardingState)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <ul className="admin-club-management__list" aria-label="클럽 운영 판단 목록">
+                {clubs.map((club) => (
+                  <li
+                    key={club.clubId}
+                    className="admin-club-management__row"
+                    data-club-id={club.clubId}
+                    data-emphasis={club.emphasis}
+                  >
+                    <div className="admin-club-management__identity">
+                      <Link id={`admin-club-row-${club.clubId}`} to={club.href}>
+                        {club.name}
+                      </Link>
+                    </div>
+                    <dl className="admin-club-management__facts">
+                      <div>
+                        <dt>현재 상태</dt>
+                        <dd>{club.currentState}</dd>
+                      </div>
+                      {club.requiredAction ? (
+                        <div className="admin-club-management__action">
+                          <dt>필요한 조치</dt>
+                          <dd>{club.requiredAction}</dd>
+                        </div>
+                      ) : null}
+                      {club.recentSignal ? (
+                        <div className="admin-club-management__signal">
+                          <dt>최근 신호</dt>
+                          <dd>{club.recentSignal}</dd>
+                        </div>
+                      ) : null}
+                    </dl>
+                    <AdminTechnicalDisclosure items={club.technicalDisclosure} />
+                  </li>
+                ))}
+              </ul>
             </div>
           ) : null}
         </AdminEvidenceLedger>

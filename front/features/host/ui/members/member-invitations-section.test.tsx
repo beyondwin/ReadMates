@@ -104,7 +104,7 @@ describe("MemberInvitationsSection", () => {
 
   it("reissues by calling onReissue so the host can recreate via createInvitation", async () => {
     const user = userEvent.setup();
-    const onReissue = vi.fn(async () => undefined);
+    const onReissue = vi.fn(async (_invitation: HostInvitationListItem, publication: { accepted: () => void }) => publication.accepted());
     const target = invitation({
       invitationId: "invite-expired",
       email: "expired@example.com",
@@ -129,12 +129,12 @@ describe("MemberInvitationsSection", () => {
     await user.click(screen.getByRole("button", { name: /재발송/ }));
 
     expect(onReissue).toHaveBeenCalledTimes(1);
-    expect(onReissue).toHaveBeenCalledWith(target);
+    expect(onReissue).toHaveBeenCalledWith(target, expect.objectContaining({ accepted: expect.any(Function), failed: expect.any(Function) }));
   });
 
   it("labels the revoke row action as 중지 and invokes onRevoke", async () => {
     const user = userEvent.setup();
-    const onRevoke = vi.fn(async () => undefined);
+    const onRevoke = vi.fn(async (_invitationId: string, publication: { accepted: () => void }) => publication.accepted());
     const pending = invitation();
 
     render(
@@ -152,13 +152,13 @@ describe("MemberInvitationsSection", () => {
     expect(stopButton).toHaveTextContent(/^중지$/);
     await user.click(stopButton);
 
-    expect(onRevoke).toHaveBeenCalledWith("invite-1");
+    expect(onRevoke).toHaveBeenCalledWith("invite-1", expect.objectContaining({ accepted: expect.any(Function), failed: expect.any(Function) }));
   });
 
   it("surfaces revoke and reissue feedback inside the invitations region", async () => {
     const user = userEvent.setup();
-    const onRevoke = vi.fn(async () => undefined);
-    const onReissue = vi.fn(async () => undefined);
+    const onRevoke = vi.fn(async (_invitationId: string, publication: { accepted: () => void; failed: () => void }) => publication.accepted());
+    const onReissue = vi.fn(async (_invitation: HostInvitationListItem, publication: { accepted: () => void; failed: () => void }) => publication.accepted());
     const pending = invitation();
     const expired = invitation({
       invitationId: "invite-expired",
@@ -187,7 +187,7 @@ describe("MemberInvitationsSection", () => {
     expect(within(section).getByRole("status")).toHaveTextContent("초대를 중지했습니다.");
     expect(screen.getAllByRole("status")).toHaveLength(1);
 
-    onRevoke.mockRejectedValueOnce(new Error("revoke-failed"));
+    onRevoke.mockImplementationOnce(async (_invitationId, publication) => publication.failed());
     await user.click(screen.getByRole("button", { name: /중지/ }));
     expect(within(section).getByRole("alert")).toHaveTextContent("초대 중지에 실패했습니다.");
 
@@ -207,7 +207,7 @@ describe("MemberInvitationsSection", () => {
       "초대를 재발송했습니다.",
     );
 
-    onReissue.mockRejectedValueOnce(new Error("reissue-failed"));
+    onReissue.mockImplementationOnce(async (_invitation, publication) => publication.failed());
     await user.click(screen.getByRole("button", { name: /재발송/ }));
     expect(within(screen.getByRole("region", { name: "초대" })).getByRole("alert")).toHaveTextContent(
       "재발송에 실패했습니다.",

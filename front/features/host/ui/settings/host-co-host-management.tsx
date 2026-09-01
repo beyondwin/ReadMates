@@ -1,59 +1,25 @@
-import { useState } from "react";
-import type {
-  HostCoHostChangeRequest,
-  HostCoHostMemberView,
-} from "@/features/host/model/host-settings-model";
+import type { HostCoHostMemberView } from "@/features/host/model/host-settings-model";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
-
-type ChangeFailureKind = "stale" | "permission" | "unknown" | "rejected";
 
 export function HostCoHostManagement({
   settingsRevision,
   members,
   busy,
+  alert,
+  canRetry,
   onChange,
   onRefresh,
-  classifyChangeError = () => "unknown",
+  onRetryCommand,
 }: {
   settingsRevision: number;
   members: HostCoHostMemberView[];
   busy: boolean;
-  onChange: (request: HostCoHostChangeRequest) => Promise<unknown>;
-  onRefresh: () => Promise<unknown> | void;
-  classifyChangeError?: (error: unknown) => ChangeFailureKind;
+  alert: string | null;
+  canRetry: boolean;
+  onChange: (member: HostCoHostMemberView) => void;
+  onRefresh: () => void;
+  onRetryCommand: () => void;
 }) {
-  const [pending, setPending] = useState<HostCoHostChangeRequest | null>(null);
-  const [alert, setAlert] = useState<string | null>(null);
-
-  async function run(request: HostCoHostChangeRequest) {
-    setAlert(null);
-    try {
-      await onChange(request);
-      setPending(null);
-      await onRefresh();
-    } catch (error) {
-      const failure = classifyChangeError(error);
-      setPending(failure === "unknown" ? request : null);
-      await onRefresh();
-      setAlert(failure === "permission"
-        ? "서버가 현재 호스트 권한 변경을 허용하지 않았습니다. 최신 운영 상태를 확인해 주세요."
-        : failure === "stale"
-          ? "설정 revision이 변경되었습니다. 최신 운영 상태에서 새 요청을 만들어 주세요."
-          : failure === "unknown"
-            ? "권한 변경 결과를 확인할 수 없습니다. 최신 상태를 확인한 뒤 같은 요청으로 다시 확인할 수 있습니다."
-            : "서버가 권한 변경 요청을 거절했습니다. 최신 운영 상태에서 새 요청을 만들어 주세요.");
-    }
-  }
-
-  function requestChange(member: HostCoHostMemberView) {
-    void run({
-      membershipId: member.membershipId,
-      action: member.role === "HOST" ? "demote" : "promote",
-      expectedRevision: settingsRevision,
-      idempotencyKey: crypto.randomUUID(),
-    });
-  }
-
   return (
     <section className="surface-quiet stack rm-host-editorial-ledger__panel" aria-labelledby="co-host-title">
       <div className="cluster">
@@ -64,12 +30,8 @@ export function HostCoHostManagement({
       {alert ? (
         <div role="alert" className="stack">
           <p>{alert}</p>
-          <button type="button" onClick={() => { void onRefresh(); }}>최신 운영 상태 확인</button>
-          {pending ? (
-            <button disabled={busy} type="button" onClick={() => { void run(pending); }}>
-              같은 권한 변경 요청 다시 확인
-            </button>
-          ) : null}
+          <button type="button" onClick={onRefresh}>최신 운영 상태 확인</button>
+          {canRetry ? <button disabled={busy} type="button" onClick={onRetryCommand}>같은 권한 변경 요청 다시 확인</button> : null}
         </div>
       ) : null}
       <div className="stack">
@@ -82,7 +44,7 @@ export function HostCoHostManagement({
               type="button"
               disabled={busy || member.status !== "ACTIVE"}
               aria-label={`${member.displayName} 공동 호스트 ${member.role === "HOST" ? "해제" : "지정"}`}
-              onClick={() => requestChange(member)}
+              onClick={() => onChange(member)}
             >
               {member.role === "HOST" ? "호스트 해제 요청" : "공동 호스트 지정"}
             </button>

@@ -58,7 +58,11 @@ import {
   platformAdminClubsQuery,
   platformAdminKeys,
   platformAdminSummaryQuery,
+  publishPlatformAdminClubState,
+  publishPlatformAdminOnboarding,
+  publishUpdatedPlatformAdminClub,
   purgePlatformAdminState,
+  subscribePlatformAdminAuthorityLoss,
   useCheckPlatformAdminDomainProvisioningMutation,
   useCommitPlatformAdminOnboardingMutation,
   useConfirmPlatformAdminClubVisibilityMutation,
@@ -304,6 +308,8 @@ describe("platform admin mutation cache behavior", () => {
         expectedStatus: "ACTION_REQUIRED",
       },
     );
+    expect(client.getQueryState(platformAdminKeys.club("club-1"))?.isInvalidated).toBe(false);
+    await publishPlatformAdminClubState(client, "club-1");
     expect(
       client.getQueryState(platformAdminKeys.club("club-1"))?.isInvalidated,
     ).toBe(true);
@@ -341,6 +347,8 @@ describe("platform admin mutation cache behavior", () => {
     });
 
     expect(returned).toEqual(onboardingResult);
+    expect(invalidate).not.toHaveBeenCalled();
+    await publishPlatformAdminOnboarding(client);
     expect(invalidate).toHaveBeenCalledWith({
       queryKey: platformAdminKeys.clubsRoot(),
     });
@@ -350,7 +358,6 @@ describe("platform admin mutation cache behavior", () => {
     const updated = { ...detail, name: "새 이름", adminRevision: 8 };
     vi.mocked(updatePlatformAdminClubMetadata).mockResolvedValue(updated);
     const { client, Wrapper } = createWrapper();
-    client.setQueryData(platformAdminKeys.club("club-1"), detail);
     const { result } = renderHook(() => useUpdatePlatformAdminClubMutation(), {
       wrapper: Wrapper,
     });
@@ -361,6 +368,8 @@ describe("platform admin mutation cache behavior", () => {
         request: { expectedAdminRevision: 7, name: "새 이름" },
       });
     });
+    expect(client.getQueryData(platformAdminKeys.club("club-1"))).toBeUndefined();
+    await publishUpdatedPlatformAdminClub(client, updated);
 
     expect(
       client.getQueryData<PlatformAdminClubDetail>(
@@ -406,6 +415,9 @@ describe("platform admin mutation cache behavior", () => {
       });
     });
 
+    expect(invalidate).not.toHaveBeenCalled();
+    await publishPlatformAdminClubState(client, "club-1");
+
     expect(invalidate).toHaveBeenCalledWith({
       queryKey: platformAdminKeys.club("club-1"),
     });
@@ -414,6 +426,42 @@ describe("platform admin mutation cache behavior", () => {
 });
 
 describe("platform admin authority-loss purge", () => {
+  it("invalidates authority listeners synchronously before cache cancellation and removal", () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    const events: string[] = [];
+    const cancel = vi.spyOn(client, "cancelQueries").mockImplementation(() => {
+      events.push("cancel-cache");
+      return Promise.resolve();
+    });
+    const remove = vi.spyOn(client, "removeQueries").mockImplementation(() => {
+      events.push("remove-cache");
+    });
+    const unsubscribeCapsule = subscribePlatformAdminAuthorityLoss(() => {
+      events.push("invalidate-capsule");
+    });
+    const unsubscribeGeneration = subscribePlatformAdminAuthorityLoss(() => {
+      events.push("invalidate-generation");
+    });
+
+    try {
+      purgePlatformAdminState(client);
+    } finally {
+      unsubscribeGeneration();
+      unsubscribeCapsule();
+    }
+
+    expect(events).toEqual([
+      "invalidate-capsule",
+      "invalidate-generation",
+      "cancel-cache",
+      "remove-cache",
+    ]);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(remove).toHaveBeenCalledOnce();
+  });
+
   it("removes the entire platform-admin prefix without touching member or public queries", () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: 0 } },

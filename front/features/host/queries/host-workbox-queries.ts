@@ -1,7 +1,6 @@
 import {
   queryOptions,
   useMutation,
-  useQueryClient,
   type QueryClient,
 } from "@tanstack/react-query";
 import {
@@ -43,7 +42,7 @@ export function hostWorkboxPageQuery(
   });
 }
 
-async function invalidateHostWorkboxComposition(
+export async function publishHostWorkboxComposition(
   client: QueryClient,
   context: ExplicitReadmatesApiContext,
 ) {
@@ -54,22 +53,18 @@ async function invalidateHostWorkboxComposition(
 }
 
 export function useDeferHostWorkboxItemMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "workbox", "defer"),
     mutationFn: (input: HostWorkboxDeferralRequest & { key: string }) => {
       const { key, ...request } = input;
       return deferHostWorkboxItem(key, request, context);
     },
-    onSuccess: () => invalidateHostWorkboxComposition(client, context),
   });
 }
 
 export function useRemoveHostWorkboxDeferralMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "workbox", "remove-deferral"),
     mutationFn: (key: string) => removeHostWorkboxDeferral(key, context),
-    onSuccess: () => invalidateHostWorkboxComposition(client, context),
   });
 }

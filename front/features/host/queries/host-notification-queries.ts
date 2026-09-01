@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation } from "@tanstack/react-query";
 import {
   confirmManualNotification,
   fetchHostNotificationDeliveries,
@@ -222,44 +222,34 @@ async function processHostNotificationsOrThrow(context: ExplicitReadmatesApiCont
 }
 
 export function useProcessHostNotificationsMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "notifications", "process"),
     mutationFn: () => processHostNotificationsOrThrow(context),
-    onSuccess: () => invalidateHostNotificationOverview(client, context),
   });
 }
 
 export function useRetryHostNotificationMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "notifications", "retry"),
     mutationFn: (id: string) => retryHostNotification(id, context),
-    onSuccess: () => invalidateHostNotificationOverview(client, context),
   });
 }
 
 export function useRestoreHostNotificationMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "notifications", "restore"),
     mutationFn: (id: string) => restoreHostNotification(id, context),
-    onSuccess: () => invalidateHostNotificationOverview(client, context),
   });
 }
 
 export function useSendHostNotificationTestMailMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "notifications", "test-mail"),
     mutationFn: (request: SendNotificationTestMailRequest) => sendHostNotificationTestMail(request, context),
-    onSuccess: () => invalidateHostNotificationOverview(client, context),
   });
 }
 
 export function useUpdateHostNotificationPolicyMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
-  const policyKey = hostNotificationKeys.policy(context);
   return useMutation<
     HostNotificationPolicyResponse,
     Error,
@@ -267,18 +257,6 @@ export function useUpdateHostNotificationPolicyMutation(context: ExplicitReadmat
   >({
     mutationKey: hostMutationKey(context.clubSlug, "notifications", "policy"),
     mutationFn: (request) => updateHostNotificationPolicy(request, context),
-    onSuccess: async (policy) => {
-      client.setQueryData(policyKey, policy);
-      await invalidateHostNotificationPolicy(client, context).catch(() => undefined);
-    },
-    onError: async (error) => {
-      if (!shouldRecoverHostNotificationMutation(error)) return;
-      await client.refetchQueries({
-        queryKey: policyKey,
-        exact: true,
-        type: "active",
-      }).catch(() => undefined);
-    },
   });
 }
 
@@ -290,27 +268,33 @@ export function usePreviewManualNotificationMutation(context: ExplicitReadmatesA
 }
 
 export function useConfirmManualNotificationMutation(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation<ManualNotificationConfirmResponse, Error, ManualNotificationConfirmRequest>({
     mutationKey: hostMutationKey(context.clubSlug, "notifications", "confirm"),
     mutationFn: (request) => confirmManualNotification(request, context),
-    onSuccess: async () => {
-      await Promise.all([
-        client.invalidateQueries({
-          queryKey: hostNotificationKeys.manualDispatchesRoot(context),
-        }),
-        client.invalidateQueries({
-          queryKey: hostNotificationKeys.eventsRoot(context),
-        }),
-        client.invalidateQueries({
-          queryKey: hostNotificationKeys.deliveriesRoot(context),
-        }),
-        client.invalidateQueries({
-          queryKey: hostNotificationKeys.summary(context),
-        }),
-      ]);
-    },
   });
+}
+
+export async function publishHostNotificationPolicy(
+  client: QueryClient,
+  context: ExplicitReadmatesApiContext,
+  policy: HostNotificationPolicyResponse,
+) {
+  client.setQueryData(hostNotificationKeys.policy(context), policy);
+  await invalidateHostNotificationPolicy(client, context).catch(() => undefined);
+}
+
+export async function publishHostNotificationPolicyFailure(client: QueryClient, context: ExplicitReadmatesApiContext, error: unknown) {
+  if (!shouldRecoverHostNotificationMutation(error)) return;
+  await client.refetchQueries({ queryKey: hostNotificationKeys.policy(context), exact: true, type: "active" }).catch(() => undefined);
+}
+
+export async function publishManualNotificationConfirm(client: QueryClient, context: ExplicitReadmatesApiContext) {
+  await Promise.all([
+    client.invalidateQueries({ queryKey: hostNotificationKeys.manualDispatchesRoot(context) }),
+    client.invalidateQueries({ queryKey: hostNotificationKeys.eventsRoot(context) }),
+    client.invalidateQueries({ queryKey: hostNotificationKeys.deliveriesRoot(context) }),
+    client.invalidateQueries({ queryKey: hostNotificationKeys.summary(context) }),
+  ]);
 }
 
 export type HostNotificationQueryData = {

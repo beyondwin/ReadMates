@@ -35,7 +35,7 @@ const overview: AdminAnalyticsOverview = {
 };
 
 describe("AdminAnalyticsOverviewView", () => {
-  it("renders KPI values and a not-enough-data benchmark empty state", () => {
+  it("renders records appendix context and reads definition and availability before a value", () => {
     render(
       <AdminAnalyticsOverviewView
         overview={overview}
@@ -50,19 +50,39 @@ describe("AdminAnalyticsOverviewView", () => {
     );
 
     expect(screen.getByRole("heading", { level: 1, name: "분석 부록" })).toBeInTheDocument();
-    expect(screen.getByText("원장")).toBeInTheDocument();
+    expect(screen.getByText("처리 기록")).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByRole("region", { name: "분석 부록" })).toHaveClass("admin-page-frame");
+    expect(screen.getByText("처리 기록을 해석할 때 참고하는 집계입니다.")).toBeInTheDocument();
+    expect(screen.getByText("2026. 05. 30. 09:00 기준")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "판단 기준" })).toBeInTheDocument();
     expect(screen.getAllByText("모임 완료율").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("80%")).toBeInTheDocument();
     expect(screen.getAllByText("0")).toHaveLength(2);
-    expect(screen.getAllByText("측정 불가").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/측정 상태 · 측정 불가/)).toBeInTheDocument();
     expect(screen.getByText("완료된 모임 비율")).toBeInTheDocument();
-    expect(screen.getAllByText("데이터 부족").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/측정 상태 · 데이터 부족/)).toBeInTheDocument();
     expect(screen.getByText("클럽 비교에 충분한 데이터가 없습니다.")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "KPI 추세" })).toBeInTheDocument();
-    expect(screen.getByRole("table", { name: "KPI 추세" })).toBeInTheDocument();
-    const trendCells = [...screen.getByRole("table", { name: "KPI 추세" }).querySelectorAll("tbody td")];
+    const completionItem = screen.getByRole("listitem", { name: "모임 완료율" });
+    const definition = completionItem.querySelector(".admin-analytics__criterion-definition");
+    const availability = completionItem.querySelector(".admin-analytics__criterion-availability");
+    const value = completionItem.querySelector(".admin-analytics__criterion-value");
+    const comparison = completionItem.querySelector(".admin-analytics__criterion-comparison");
+    expect(definition).toHaveTextContent("완료된 모임 비율");
+    expect(availability).toHaveTextContent("측정 상태 · 측정됨");
+    expect(value).toHaveTextContent("80%");
+    expect(definition?.compareDocumentPosition(availability as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(availability?.compareDocumentPosition(value as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(value).not.toHaveClass("ledger-number");
+    expect(comparison).toHaveClass("ledger-number");
+
+    const unavailableItem = screen.getByRole("listitem", { name: "참석 응답률" });
+    expect(unavailableItem.querySelector(".admin-analytics__criterion-availability")).toHaveTextContent("측정 상태 · 데이터 부족");
+    expect(unavailableItem.querySelector(".admin-analytics__criterion-value")).toBeNull();
+
+    expect(screen.getByRole("heading", { name: "기간별 변화" })).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "기간별 변화" })).toBeInTheDocument();
+    const trendCells = [...screen.getByRole("table", { name: "기간별 변화" }).querySelectorAll("tbody td")];
     expect(trendCells.length).toBeGreaterThan(0);
     for (const cell of trendCells) {
       expect(cell).toHaveClass("ledger-number");
@@ -225,8 +245,8 @@ describe("AdminAnalyticsOverviewView", () => {
       />,
     );
 
-    expect(screen.getByText("KPI 추세를 만들 충분한 데이터가 없습니다.")).toBeInTheDocument();
-    expect(screen.queryByRole("table", { name: "KPI 추세" })).not.toBeInTheDocument();
+    expect(screen.getByText("기간별 변화를 만들 충분한 데이터가 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: "기간별 변화" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "CSV 내려받는 중" })).toBeDisabled();
   });
 

@@ -1,13 +1,16 @@
 import { type CSSProperties, type FormEvent, type InvalidEvent, useMemo, useRef, useState } from "react";
 import type {
-  CreateHostInvitationRequest,
   HostInvitationListPage,
   HostInvitationListItem,
   HostInvitationResponse,
   InvitationStatus,
 } from "@/features/host/model/host-view-types";
-import type { HostInvitationsActions } from "@/features/host/model/host-invitation-actions";
+import {
+  isOwnerFencedInvitationError,
+  type RegisteredHostInvitationsActions,
+} from "@/features/host/model/host-invitation-actions";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
+import { isTransitionOwnerObsoleteError } from "@/shared/ui/use-transition-safety-owner";
 
 const statusLabels: Record<InvitationStatus, string> = {
   PENDING: "대기",
@@ -66,7 +69,7 @@ export default function HostInvitations({
   actions,
 }: {
   initialInvitations: HostInvitationListPage | HostInvitationListItem[];
-  actions: HostInvitationsActions;
+  actions: RegisteredHostInvitationsActions;
 }) {
   const initialPage = useMemo(() => normalizeInvitationPage(initialInvitations), [initialInvitations]);
   const initialPageItems = initialPage.items;
@@ -92,26 +95,6 @@ export default function HostInvitations({
       appendedInvitations: [],
       nextCursor: nextPage.nextCursor,
     });
-  };
-  const createInvitation = async (request: CreateHostInvitationRequest) => {
-    const response = await actions.createInvitation(request);
-    if (!response.ok) {
-      const error = new Error("create-failed") as Error & { status?: number };
-      error.status = response.status;
-      throw error;
-    }
-    const created = await actions.parseInvitation(response);
-    const refreshed = await actions.refreshInvitations({ limit: 50 });
-    return { created, refreshed };
-  };
-  const revokeInvitation = async (invitationId: string) => {
-    const response = await actions.revokeInvitation(invitationId);
-    if (!response.ok) {
-      throw new Error("revoke-failed");
-    }
-    const revoked = await actions.parseInvitation(response);
-    const refreshed = await actions.refreshInvitations({ limit: 50 });
-    return { revoked, refreshed };
   };
   const invitations = appendedInvitations.length > 0 ? [...queryItems, ...appendedInvitations] : queryItems;
   const [lastCreated, setLastCreated] = useState<HostInvitationResponse | null>(null);
@@ -211,27 +194,30 @@ export default function HostInvitations({
     setIsCreating(true);
 
     try {
-      const { created, refreshed } = await createInvitation({
+      const result = await actions.createInvitation({
         email: trimmedEmail,
         name: trimmedName,
         applyToCurrentSession,
       });
-      if (requestId === lastCreatedRequestRef.current) {
+      result.publishUi(({ created, refreshed }) => {
+        if (requestId !== lastCreatedRequestRef.current) return;
         setLastCreated(created);
         resetPagination(refreshed);
         setName("");
         setEmail("");
         setNameTouched(false);
-      }
+        setIsCreating(false);
+      });
     } catch (error) {
-      const status = (error as { status?: number } | null)?.status;
-      showAlert(
-        status === 409
-          ? "이미 활성 멤버인 이메일입니다. 멤버 목록에서 상태를 확인해 주세요."
-          : "초대 생성에 실패했습니다. 이메일과 이름을 확인한 뒤 다시 시도해 주세요.",
-      );
-    } finally {
-      setIsCreating(false);
+      if (isTransitionOwnerObsoleteError(error)) return;
+      if (isOwnerFencedInvitationError(error)) error.publishUi((failure) => {
+        showAlert(
+          failure.status === 409
+            ? "이미 활성 멤버인 이메일입니다. 멤버 목록에서 상태를 확인해 주세요."
+            : "초대 생성에 실패했습니다. 이메일과 이름을 확인한 뒤 다시 시도해 주세요.",
+        );
+        setIsCreating(false);
+      });
     }
   };
 
@@ -266,13 +252,18 @@ export default function HostInvitations({
     setMessage(null);
     setRowPending(invitation.invitationId, "revoke");
     try {
-      const { refreshed } = await revokeInvitation(invitation.invitationId);
-      setLastCreated((current) => (current?.invitationId === invitation.invitationId ? null : current));
-      resetPagination(refreshed);
-    } catch {
-      showAlert("초대 취소에 실패했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요.");
-    } finally {
-      setRowPending(invitation.invitationId, null);
+      const result = await actions.revokeInvitation(invitation.invitationId);
+      result.publishUi(({ refreshed }) => {
+        setLastCreated((current) => (current?.invitationId === invitation.invitationId ? null : current));
+        resetPagination(refreshed);
+        setRowPending(invitation.invitationId, null);
+      });
+    } catch (error) {
+      if (isTransitionOwnerObsoleteError(error)) return;
+      if (isOwnerFencedInvitationError(error)) error.publishUi(() => {
+        showAlert("초대 취소에 실패했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요.");
+        setRowPending(invitation.invitationId, null);
+      });
     }
   };
 
@@ -290,19 +281,23 @@ export default function HostInvitations({
     const requestId = ++lastCreatedRequestRef.current;
 
     try {
-      const { created, refreshed } = await createInvitation({
+      const result = await actions.createInvitation({
         email: invitation.email,
         name: invitation.name,
         applyToCurrentSession: invitation.applyToCurrentSession,
       });
-      if (requestId === lastCreatedRequestRef.current) {
+      result.publishUi(({ created, refreshed }) => {
+        if (requestId !== lastCreatedRequestRef.current) return;
         setLastCreated(created);
         resetPagination(refreshed);
-      }
-    } catch {
-      showAlert("새 링크 발급에 실패했습니다. 대상 이메일을 확인한 뒤 다시 시도해 주세요.");
-    } finally {
-      setRowPending(invitation.invitationId, null);
+        setRowPending(invitation.invitationId, null);
+      });
+    } catch (error) {
+      if (isTransitionOwnerObsoleteError(error)) return;
+      if (isOwnerFencedInvitationError(error)) error.publishUi(() => {
+        showAlert("새 링크 발급에 실패했습니다. 대상 이메일을 확인한 뒤 다시 시도해 주세요.");
+        setRowPending(invitation.invitationId, null);
+      });
     }
   };
 

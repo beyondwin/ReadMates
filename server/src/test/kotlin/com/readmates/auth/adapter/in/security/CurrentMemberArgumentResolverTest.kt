@@ -1,6 +1,8 @@
 package com.readmates.auth.adapter.`in`.security
 
 import com.readmates.auth.adapter.`in`.web.AuthMemberResponse
+import com.readmates.auth.application.model.AuthAccessProjection
+import com.readmates.auth.application.model.AvailableSpacesV1
 import com.readmates.auth.application.model.JoinedClubSummary
 import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
 import com.readmates.auth.domain.MembershipRole
@@ -201,8 +203,13 @@ class CurrentMemberArgumentResolverTest {
             AuthMemberResponse.authenticatedUser(
                 userId = legacyMember.userId,
                 email = legacyMember.email,
-                joinedClubs = listOf(joinedClub),
-                platformAdmin = null,
+                accessProjection =
+                    AuthAccessProjection(
+                        joinedClubs = listOf(joinedClub),
+                        platformAdmin = null,
+                        availableSpaces = AvailableSpacesV1(kinds = emptyList(), clubs = emptyList()),
+                        recommendedSpace = null,
+                    ),
             )
         val objectMapper = JsonMapper.builder().findAndAddModules().build()
         val joinedClubJson =

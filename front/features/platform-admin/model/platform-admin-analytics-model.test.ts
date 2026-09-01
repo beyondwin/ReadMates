@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   analyticsActionForKpi,
+  buildAnalyticsKpiDecisionView,
   analyticsSearchFromWindow,
   analyticsWindowFromSearchParams,
   deltaLabel,
   formatAvailabilityLabel,
+  formatAnalyticsGeneratedAt,
   formatKpiValue,
   formatSeriesPointValue,
   labelKpi,
@@ -86,6 +88,41 @@ describe("platform-admin-analytics-model", () => {
       .toBe("75%");
     expect(formatSeriesPointValue({ bucketStart: "2026-05-08", availability: "AVAILABLE", value: 0.5 }, "USD"))
       .toBe("$0.5000");
+  });
+
+  it("builds a decision view from the server definition and availability before optional values", () => {
+    expect(buildAnalyticsKpiDecisionView(card({
+      label: "서버가 정의한 완료율",
+      definition: "선택 기간에 끝난 모임의 비율",
+      availability: "AVAILABLE",
+      current: 80,
+      delta: 12.5,
+      deltaDirection: "UP",
+    }))).toEqual({
+      key: "SESSION_COMPLETION",
+      label: "서버가 정의한 완료율",
+      definition: "선택 기간에 끝난 모임의 비율",
+      availability: "측정됨",
+      value: "80%",
+      comparison: "▲ +12.5 (이전 구간 대비)",
+      action: { label: "클럽 운영 보기", href: "/admin/clubs" },
+    });
+
+    expect(buildAnalyticsKpiDecisionView(card({
+      availability: "NOT_ENOUGH_DATA",
+      current: null,
+      delta: null,
+      deltaDirection: "NONE",
+    }))).toMatchObject({
+      availability: "데이터 부족",
+      value: null,
+      comparison: "이전 구간 대비 비교 불가",
+    });
+  });
+
+  it("formats the aggregate generation time in the operator timezone", () => {
+    expect(formatAnalyticsGeneratedAt("2026-05-30T00:00:00Z")).toBe("2026. 05. 30. 09:00 기준");
+    expect(formatAnalyticsGeneratedAt("not-a-time")).toBe("집계 시각 확인 필요");
   });
 
   it("keeps zero values distinct from unavailable values", () => {

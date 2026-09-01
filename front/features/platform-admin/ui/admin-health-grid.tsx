@@ -17,20 +17,23 @@ import {
   healthCardEvidenceState,
   healthCardsForPage,
   healthEvidenceLabel,
+  healthCardOperatorView,
   healthFailedSources,
   healthFreshnessLabel,
-  healthSourceLabel,
   isLastKnownHealthEvidence,
   missingDeployCard,
   partitionHealthServiceCards,
   type HealthCard,
   type PlatformHealthSnapshot,
 } from "@/features/platform-admin/model/platform-admin-health-model";
+import { adminHealthAvailabilityLanguage } from "@/features/platform-admin/model/admin-status-language";
+import { AdminTechnicalDisclosure } from "@/features/platform-admin/ui/admin-technical-disclosure";
 import { AdminEvidenceLedger } from "./admin-evidence-ledger";
 import { AdminHealthCard } from "./admin-health-card";
 import { AdminHealthDeployStrip } from "./admin-health-deploy-strip";
 import { AdminPageContext } from "./admin-page-context";
 import type { AdminPageState } from "./admin-state-panel";
+import "./admin-service-status.css";
 
 export type AdminHealthGridProps = {
   snapshot: PlatformHealthSnapshot | null;
@@ -54,7 +57,7 @@ export function AdminHealthGrid({
 }: AdminHealthGridProps) {
   if (loading) {
     return (
-      <div className="admin-health-grid">
+      <div className="admin-health-grid admin-service-status">
         <HealthPage>
           <AdminEvidenceLedger
             label={EVIDENCE_LEDGER_LABEL}
@@ -79,7 +82,7 @@ export function AdminHealthGrid({
 
   if (error || !snapshot) {
     return (
-      <div className="admin-health-grid">
+      <div className="admin-health-grid admin-service-status">
         <HealthPage>
           <AdminEvidenceLedger
             label={EVIDENCE_LEDGER_LABEL}
@@ -111,7 +114,11 @@ export function AdminHealthGrid({
   };
 
   return (
-    <div className="admin-health-grid" data-testid="admin-health-grid" data-page-state={pageState}>
+    <div
+      className="admin-health-grid admin-service-status"
+      data-testid="admin-health-grid"
+      data-page-state={pageState}
+    >
       <HealthPage
         freshness={
           <span
@@ -137,7 +144,9 @@ export function AdminHealthGrid({
           </button>
         }
       >
-        <p className="admin-health-grid__narrative">{formatHealthNarrative(cards)}</p>
+        <p className="admin-health-grid__narrative">
+          {formatHealthNarrative(cards, null, snapshot.refreshState)}
+        </p>
         <AdminEvidenceLedger
           label={EVIDENCE_LEDGER_LABEL}
           state={ledgerState}
@@ -155,8 +164,8 @@ export function AdminHealthGrid({
         >
           {pageState === "disabled" ? (
             <div className="admin-health-grid__notice" role="status">
-              <h2 className="admin-health-grid__notice-title">비활성 구성</h2>
-              <p>설정된 원천이 꺼져 있습니다. 장애가 아닙니다.</p>
+              <h2 className="admin-health-grid__notice-title">{adminHealthAvailabilityLanguage("DISABLED").primaryText}</h2>
+              <p>설정된 원천을 사용하지 않습니다. 장애가 아닙니다.</p>
             </div>
           ) : null}
           {deviations.length > 0 ? (
@@ -172,20 +181,26 @@ export function AdminHealthGrid({
             </div>
           ) : null}
           {okSignals.length > 0 ? (
-            <details className="admin-health-grid__ok-signals">
-              <summary>{HEALTH_OK_SIGNALS_LABEL}</summary>
+            <section
+              className="admin-health-grid__ok-signals"
+              aria-label={HEALTH_OK_SIGNALS_LABEL}
+            >
+              <p>{HEALTH_OK_SIGNALS_LABEL}</p>
               <ul>
-                {okSignals.map((card) => (
-                  <li key={card.id}>
-                    {card.drill ? (
-                      <Link to={card.drill.target}>{card.title}</Link>
-                    ) : (
-                      card.title
-                    )}
-                  </li>
-                ))}
+                {okSignals.map((card) => {
+                  const view = healthCardOperatorView(card);
+                  return (
+                    <li key={card.id}>
+                      {card.drill ? (
+                        <Link to={card.drill.target}>{view.label}</Link>
+                      ) : (
+                        view.label
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
-            </details>
+            </section>
           ) : null}
           <DeployEvidence
             card={deployCard}
@@ -256,6 +271,7 @@ function DeployEvidence({
   onRetry?: (cardId: string) => void;
 }) {
   const evidence = healthCardEvidenceState(card);
+  const view = healthCardOperatorView(card);
   const lastEvidenceStamp = formatHealthTimestamp(card.lastCheckedAt);
   const lastKnown = isLastKnownHealthEvidence(evidence, refreshState);
 
@@ -269,32 +285,51 @@ function DeployEvidence({
         <div>
           <h2 id="admin-health-deploy-heading">{ADMIN_COPY.heading.recentChanges}</h2>
           <p className="admin-health-grid__strip-reading">
-            {evidence === "ok" && card.deployStrip ? `${card.deployStrip.length}건` : healthEvidenceLabel(evidence)}
+            {evidence === "ok" && card.deployStrip ? `${card.deployStrip.length}건` : view.stateSentence}
           </p>
         </div>
-        <span className={`admin-health-card__pill admin-health-card__pill--${lastKnown ? "last-known" : evidence}`}>
-          {healthEvidenceLabel(evidence)}
-        </span>
+        {evidence !== "ok" || lastKnown ? (
+          <span className={`admin-health-card__pill admin-health-card__pill--${lastKnown ? "last-known" : evidence}`}>
+            {lastKnown ? healthFreshnessLabel(refreshState) : healthEvidenceLabel(evidence)}
+          </span>
+        ) : null}
       </header>
-      <dl className="admin-health-card__meta">
+      <dl className="admin-health-card__narrative">
         <div>
-          <dt>원천</dt>
-          <dd>{healthSourceLabel(card.source)}</dd>
+          <dt>이유</dt>
+          <dd>{view.reason}</dd>
         </div>
         <div>
-          <dt>최근 근거</dt>
+          <dt>확인 시각</dt>
           <dd>
             <time dateTime={lastEvidenceStamp ? card.lastCheckedAt : undefined}>
               {formatLastEvidenceLabel(card.lastCheckedAt)}
             </time>
           </dd>
         </div>
-        <div>
-          <dt>최신성</dt>
-          <dd>{healthFreshnessLabel(refreshState)}</dd>
-        </div>
+        {view.impact && evidence !== "ok" && evidence !== "disabled" ? (
+          <div>
+            <dt>영향</dt>
+            <dd>{view.impact}</dd>
+          </div>
+        ) : null}
+        {view.nextAction && evidence !== "ok" && evidence !== "disabled" ? (
+          <div>
+            <dt>다음 확인</dt>
+            <dd>{view.nextAction}</dd>
+          </div>
+        ) : null}
       </dl>
-      {card.reason && evidence === "unavailable" ? <p>{card.reason}</p> : null}
+      <AdminTechnicalDisclosure
+        items={[
+          { label: "원천 ID", value: card.id },
+          { label: "원천 제목", value: card.title },
+          { label: "상태 코드", value: card.status },
+          { label: "자료 원천", value: card.source },
+          { label: "최신성 코드", value: refreshState },
+          { label: "상태 사유", value: card.reason },
+        ]}
+      />
       <AdminHealthDeployStrip entries={card.deployStrip} evidenceState={evidence} lastKnown={lastKnown} />
       {onRetry ? (
         <button type="button" className="admin-health-card__retry" onClick={() => onRetry(card.id)}>

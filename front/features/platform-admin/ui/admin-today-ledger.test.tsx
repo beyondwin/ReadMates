@@ -1,11 +1,10 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { ADMIN_SHELL_LAYOUT_MEDIA_QUERY } from "@/features/platform-admin/model/admin-route-catalog";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   AdminOperationCaseView,
   AdminOperationSourceFreshnessView,
@@ -17,10 +16,24 @@ import {
   resetAdminEditorialLedgerPerformanceStateForTests,
 } from "@/shared/observability/admin-editorial-ledger-performance";
 import { findNestedLiveRegions } from "@/shared/testing/accessibility-checks";
-import { AdminTodayLedger } from "./admin-today-ledger";
+import { AdminTodayLedger as ProductionAdminTodayLedger } from "./admin-today-ledger";
 
-const GLOBALS_CSS = readFileSync("src/styles/globals.css", "utf8");
+type AdminTodayLedgerProps = Omit<
+  ComponentProps<typeof ProductionAdminTodayLedger>,
+  "auditHref"
+> & { auditHref?: string };
+
+function AdminTodayLedger({
+  auditHref = "/admin/audit",
+  ...props
+}: AdminTodayLedgerProps) {
+  return <ProductionAdminTodayLedger auditHref={auditHref} {...props} />;
+}
+
 const LEDGER_CSS = readFileSync(path.resolve("features/platform-admin/ui/admin-editorial-ledger.css"), "utf8");
+const SCOPED_ADMIN_CSS =
+  readFileSync(path.resolve("features/platform-admin/ui/admin-page-patterns.css"), "utf8") +
+  LEDGER_CSS;
 
 const emptyView: AdminOperationsView = {
   generatedAt: "2026-08-04T10:00:00Z",
@@ -153,18 +166,40 @@ function emptyQueueView(
   };
 }
 
-function stubMatchMedia(matches: boolean | ((query: string) => boolean)) {
-  const matchMedia = vi.fn().mockImplementation((query: string) => ({
-    matches: typeof matches === "function" ? matches(query) : matches,
-    media: query,
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-  }));
-  vi.stubGlobal("matchMedia", matchMedia);
-  return matchMedia;
+function stubContentResizeObserver() {
+  let callback: ResizeObserverCallback | null = null;
+  const observe = vi.fn();
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(next: ResizeObserverCallback) {
+      callback = next;
+    }
+    observe = observe;
+    disconnect = vi.fn();
+  });
+  return {
+    observe,
+    resize(width: number) {
+      const target = observe.mock.calls[0]?.[0] as Element | undefined;
+      if (!target || !callback) throw new Error("Today content observer was not attached");
+      callback([{ target, contentRect: { width } } as ResizeObserverEntry], {} as ResizeObserver);
+    },
+  };
 }
 
 describe("AdminTodayLedger", () => {
+  beforeEach(() => {
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(private readonly callback: ResizeObserverCallback) {}
+      observe = (target: Element) => {
+        this.callback(
+          [{ target, contentRect: { width: 1200 } } as ResizeObserverEntry],
+          this as unknown as ResizeObserver,
+        );
+      };
+      disconnect = vi.fn();
+    });
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
     resetAdminEditorialLedgerPerformanceStateForTests();
@@ -326,8 +361,9 @@ describe("AdminTodayLedger", () => {
     expect(screen.queryByText("지금은 처리할 운영 케이스가 없습니다")).not.toBeInTheDocument();
   });
 
-  it("uses the shared 768px contract for mobile drill-in instead of stacked columns", () => {
-    const matchMedia = stubMatchMedia((query) => query.includes("768px"));
+  it("uses content width below 960px for URL-addressable flow even in a wide viewport", () => {
+    const observer = stubContentResizeObserver();
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
     const { container } = render(
       <MemoryRouter>
         <AdminTodayLedger
@@ -341,16 +377,15 @@ describe("AdminTodayLedger", () => {
       </MemoryRouter>,
     );
 
-    expect(ADMIN_SHELL_LAYOUT_MEDIA_QUERY).toBe("(max-width: 768px)");
-    expect(matchMedia).toHaveBeenCalledWith("(max-width: 768px)");
-    expect(matchMedia).not.toHaveBeenCalledWith("(max-width: 600px)");
+    act(() => observer.resize(900));
     expect(container.querySelector(".admin-today-ledger__columns")).toBeNull();
     expect(screen.getByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "운영 케이스 상세" })).not.toBeInTheDocument();
   });
 
-  it("keeps desktop two-pane composition above 768px", () => {
-    stubMatchMedia(false);
+  it("uses a persistent split at 960px observed content width even in a 900px viewport", () => {
+    const observer = stubContentResizeObserver();
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 900 });
     const { container } = render(
       <MemoryRouter>
         <AdminTodayLedger
@@ -364,39 +399,36 @@ describe("AdminTodayLedger", () => {
       </MemoryRouter>,
     );
 
+    act(() => observer.resize(960));
     expect(container.querySelector(".admin-today-ledger__columns")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toBeInTheDocument();
   });
 
-  it("pins Today CSS to the 768px contract without stacking columns at tablet width", () => {
-    expect(GLOBALS_CSS).toContain(".admin-today-ledger");
-    expect(GLOBALS_CSS).toMatch(/\.admin-today-ledger[\s\S]*overflow-x:\s*(clip|hidden)/);
-    expect(GLOBALS_CSS).toMatch(
-      /\.admin-today-ledger__columns\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*[^)]+\)\s+minmax\(0,\s*[^)]+\)/,
-    );
-    const todayStackAt1120 = GLOBALS_CSS.match(
+  it("pins the 38:62 pane minimums and overflow containment without viewport layout queries", () => {
+    expect(SCOPED_ADMIN_CSS).toContain(".admin-today-ledger");
+    expect(SCOPED_ADMIN_CSS).toMatch(/\.admin-today-ledger[\s\S]*overflow-x:\s*(clip|hidden)/);
+    expect(SCOPED_ADMIN_CSS).toMatch(/grid-template-columns:\s*minmax\(340px,\s*38fr\)\s+minmax\(560px,\s*62fr\)/);
+    const todayStackAt1120 = SCOPED_ADMIN_CSS.match(
       /@media \(max-width: 1120px\)\s*\{[\s\S]*?\.admin-today-ledger__columns[\s\S]*?\}/,
     );
     expect(todayStackAt1120).toBeNull();
-    expect(GLOBALS_CSS).not.toMatch(
+    expect(SCOPED_ADMIN_CSS).not.toMatch(
       /@media \(max-width: 600px\)[\s\S]{0,400}\.admin-today-ledger__/,
     );
-    expect(GLOBALS_CSS).toMatch(
+    expect(SCOPED_ADMIN_CSS).toMatch(
       /@media \(max-width: 768px\)[\s\S]*\.admin-action-dock[\s\S]*env\(safe-area-inset-bottom/,
     );
-    expect(GLOBALS_CSS).toMatch(
+    expect(SCOPED_ADMIN_CSS).toMatch(
       /\.admin-today-ledger__filter select[\s\S]*min-height:\s*44px/,
     );
     expect(LEDGER_CSS).toMatch(/\.admin-today-ledger[\s\S]*min-height:\s*44px/);
-    expect(LEDGER_CSS).not.toMatch(
-      /@media \(max-width: 768px\)[\s\S]{0,400}\.admin-today-ledger__columns[\s\S]{0,200}grid-template-columns:\s*1fr/,
-    );
+    expect(SCOPED_ADMIN_CSS).toContain('[data-content-layout="flow"]');
     expect(LEDGER_CSS).toContain("overflow-wrap: anywhere");
   });
 
   it("composes a persistent desktop ledger and docket without a receipt timeline", () => {
-    stubMatchMedia(false);
+    const observer = stubContentResizeObserver();
     const { container } = render(
       <MemoryRouter>
         <AdminTodayLedger
@@ -416,11 +448,16 @@ describe("AdminTodayLedger", () => {
       </MemoryRouter>,
     );
 
+    act(() => observer.resize(1200));
+
     expect(container.querySelector(".admin-today-ledger__columns")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toHaveClass("admin-case-docket");
     expect(container.querySelector(".admin-receipt-timeline")).toBeNull();
     expect(screen.getByRole("button", { name: "오늘의 브리핑 0" })).toHaveAttribute("aria-pressed", "true");
+    const queueHeading = screen.getByRole("heading", { name: "오늘 할 일" });
+    const controls = screen.getByRole("group", { name: "작업 보기" });
+    expect(queueHeading.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(findNestedLiveRegions(container)).toEqual([]);
   });
 
@@ -428,7 +465,7 @@ describe("AdminTodayLedger", () => {
     const user = userEvent.setup();
     const onSelectCase = vi.fn();
     const onBackToList = vi.fn();
-    stubMatchMedia(true);
+    const observer = stubContentResizeObserver();
     const { container, rerender } = render(
       <MemoryRouter>
         <AdminTodayLedger
@@ -443,6 +480,8 @@ describe("AdminTodayLedger", () => {
         />
       </MemoryRouter>,
     );
+
+    act(() => observer.resize(390));
 
     expect(container.querySelector(".admin-today-ledger__columns")).toBeNull();
     expect(screen.getByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
@@ -677,7 +716,6 @@ describe("AdminTodayLedger", () => {
 
   it("moves the selected case when the docket next control is clicked", async () => {
     const user = userEvent.setup();
-    stubMatchMedia(false);
     const cases = [
       operationCase({ id: "case-a", summary: { title: "첫 번째 운영 케이스", description: "하나." } }),
       operationCase({ id: "case-b", summary: { title: "두 번째 운영 케이스", description: "둘." } }),
@@ -717,7 +755,7 @@ describe("AdminTodayLedger", () => {
   });
 
   it("shows the same docket traversal in the mobile fullscreen detail", () => {
-    stubMatchMedia(true);
+    const observer = stubContentResizeObserver();
     const cases = [
       operationCase({ id: "case-a", summary: { title: "첫 번째 운영 케이스", description: "하나." } }),
       operationCase({ id: "case-b", summary: { title: "두 번째 운영 케이스", description: "둘." } }),
@@ -739,6 +777,8 @@ describe("AdminTodayLedger", () => {
         />
       </MemoryRouter>,
     );
+
+    act(() => observer.resize(390));
 
     expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toBeInTheDocument();
     expect(screen.getByText("케이스 2 / 4")).toBeInTheDocument();

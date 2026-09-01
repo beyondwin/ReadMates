@@ -3,6 +3,8 @@ import { ReadmatesApiError, ReadmatesTransportError } from "@/shared/api/errors"
 import {
   hostCloseConfirmErrorDisposition,
   hostCoHostErrorDisposition,
+  hostInvitationLinkUpdateErrorDisposition,
+  hostSettingsUpdateErrorDisposition,
 } from "./host-settings-recovery";
 
 function apiError(code: string, status: number, fallback = false) {
@@ -46,5 +48,21 @@ describe("host settings recovery disposition", () => {
     [new Error("unexpected"), "rejected"],
   ])("classifies a co-host failure from code/status as %s", (error, expected) => {
     expect(hostCoHostErrorDisposition(error)).toBe(expected);
+  });
+
+  it("classifies settings stale only from the structured server code or fallback 409", () => {
+    expect(hostSettingsUpdateErrorDisposition(apiError("HOST_SETTINGS_STALE", 409))).toBe("stale");
+    expect(hostSettingsUpdateErrorDisposition(apiError("CONFLICT", 409, true))).toBe("stale");
+    expect(hostSettingsUpdateErrorDisposition(apiError("INVALID_REQUEST", 400))).toBe("rejected");
+    expect(hostSettingsUpdateErrorDisposition(new ReadmatesTransportError())).toBe("unknown");
+    expect(hostSettingsUpdateErrorDisposition(new Error("HOST_SETTINGS_STALE:409"))).toBe("rejected");
+  });
+
+  it("classifies invitation-link stale only from the structured server code or fallback 409", () => {
+    expect(hostInvitationLinkUpdateErrorDisposition(apiError("INVITATION_LINK_STALE", 409))).toBe("stale");
+    expect(hostInvitationLinkUpdateErrorDisposition(apiError("CONFLICT", 409, true))).toBe("stale");
+    expect(hostInvitationLinkUpdateErrorDisposition(apiError("INVALID_REQUEST", 400))).toBe("rejected");
+    expect(hostInvitationLinkUpdateErrorDisposition(new ReadmatesTransportError())).toBe("unknown");
+    expect(hostInvitationLinkUpdateErrorDisposition(new Error("INVITATION_LINK_STALE:409"))).toBe("rejected");
   });
 });

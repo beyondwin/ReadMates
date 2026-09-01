@@ -18,7 +18,7 @@ function renderEditor(overrides: Partial<React.ComponentProps<typeof ProfileEdit
   document.body.append(opener);
   opener.focus();
   const onClose = vi.fn();
-  const onSaveProfile = vi.fn(async (draft) => ({ ...draft, accountName: "member-one" }));
+  const onSaveProfile = vi.fn(async (draft) => ({ status: "accepted" as const, profile: { ...draft, accountName: "member-one" } }));
   render(<ProfileEditorDialog profile={profile} opener={opener} onClose={onClose} onSaveProfile={onSaveProfile} {...overrides} />);
   return { opener, onClose, onSaveProfile };
 }
@@ -84,7 +84,7 @@ describe("ProfileEditorDialog", () => {
     const props = {
       opener: null,
       onClose,
-      onSaveProfile: vi.fn(async (draft) => ({ ...draft, accountName: "member-one" })),
+      onSaveProfile: vi.fn(async (draft) => ({ status: "accepted" as const, profile: { ...draft, accountName: "member-one" } })),
     };
     const { rerender } = render(<ProfileEditorDialog profile={profile} {...props} />);
 
@@ -101,7 +101,13 @@ describe("ProfileEditorDialog", () => {
   });
 
   it("locks controls and prevents duplicate saves", async () => {
-    const pending = deferred<{ displayName: string; avatarKey: "banana-green-book"; accountName: string }>();
+    const pending = deferred<{ status: "accepted"; profile: {
+      membershipId: string;
+      displayName: string;
+      avatarKey: "banana-green-book";
+      accountName: string;
+      profileImageUrl: null;
+    } }>();
     const save = vi.fn(() => pending.promise);
     const user = userEvent.setup();
     renderEditor({ onSaveProfile: save });
@@ -113,7 +119,12 @@ describe("ProfileEditorDialog", () => {
     expect(action).toBeDisabled();
     expect(screen.getByRole("textbox", { name: "표시 이름" })).toBeDisabled();
     expect(screen.getByRole("dialog")).toBeVisible();
-    pending.resolve({ ...profile, accountName: "member-one" });
+    pending.resolve({ status: "accepted", profile: {
+      membershipId: "membership-1",
+      ...profile,
+      accountName: "member-one",
+      profileImageUrl: null,
+    } });
   });
 
   it.each(["Escape", "backdrop", "close"])("closes a pristine draft by %s", async (method) => {
@@ -191,6 +202,24 @@ describe("ProfileEditorDialog", () => {
       expect(screen.getByRole("button", { name: "아바타 선택, 현재 한 장 더 읽는 바나나" })).toHaveFocus();
       expect(scrollBody.scrollTop).toBe(48);
     }
+  });
+
+  it("keeps the editor open without success or error publication for an obsolete save", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    renderEditor({
+      onClose,
+      onSaveProfile: vi.fn().mockResolvedValue({ status: "obsolete" } as never),
+    });
+
+    const input = screen.getByRole("textbox", { name: "표시 이름" });
+    await user.clear(input);
+    await user.type(input, "새 멤버");
+    await user.click(screen.getByRole("button", { name: "변경사항 저장" }));
+
+    expect(await screen.findByRole("dialog", { name: "프로필 편집" })).toBeVisible();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("wraps keyboard focus inside the dialog", async () => {

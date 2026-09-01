@@ -1,40 +1,22 @@
 import { describe, expect, it } from "vitest";
-import type { TakedownReceipt } from "../api/platform-admin-takedown-contracts";
+import receiptFixture from "../../../tests/unit/__fixtures__/platform-admin-takedown-receipt.server.json";
 import type { PlatformAdminCapabilities } from "./platform-admin-capabilities";
 import {
   canOperatePublicTakedown,
-  initialConvergenceFromReceipt,
   normalizeTakedownReason,
   remoteCopyLimitationLabel,
+  stateFromReceipt,
+  takedownReceiptOutcomePresentation,
+  takedownReasonRecordLabel,
 } from "./platform-admin-takedown-model";
+import { parseAdminTakedownReceipt } from "../api/platform-admin-takedown-contracts";
 
 function caps(
   role: PlatformAdminCapabilities["role"],
   capabilities: PlatformAdminCapabilities["capabilities"],
 ): PlatformAdminCapabilities {
-  return {
-    schemaVersion: 1,
-    role,
-    status: "ACTIVE",
-    capabilities,
-    generatedAt: "2026-08-26T04:00:00Z",
-  };
+  return { schemaVersion: 1, role, status: "ACTIVE", capabilities, generatedAt: "2026-08-30T04:00:00Z" };
 }
-
-const receipt: TakedownReceipt = {
-  schema: "admin.public_takedown.receipt.v1",
-  receiptId: "50000000-0000-4000-8000-000000000005",
-  convergenceId: "60000000-0000-4000-8000-000000000006",
-  clubId: "10000000-0000-4000-8000-000000000001",
-  sessionId: "20000000-0000-4000-8000-000000000002",
-  publicationId: "30000000-0000-4000-8000-000000000003",
-  originResult: "DENIED",
-  committedGeneration: 18,
-  committedClubGeneration: 9,
-  reasonCategory: "PRIVACY",
-  createdAt: "2026-08-26T04:01:00Z",
-  limitationCode: "STORED_OR_OFFLINE_COPY_MAY_REMAIN",
-};
 
 describe("platform-admin takedown model", () => {
   it("allows only the exact EMERGENCY_PUBLIC_TAKEDOWN capability", () => {
@@ -50,20 +32,51 @@ describe("platform-admin takedown model", () => {
     expect(() => normalizeTakedownReason("  \n ")).toThrow("회수 사유를 입력해 주세요.");
   });
 
-  it("keeps origin denial independent from provider convergence", () => {
-    expect(initialConvergenceFromReceipt(receipt)).toEqual({
-      schema: "admin.public_takedown.convergence.v1",
-      convergenceId: receipt.convergenceId,
-      originResult: "DENIED",
-      committedGeneration: 18,
-      status: "PENDING",
-      lastAttemptAt: null,
-      retryable: false,
-      attempts: [],
+  it("projects the immutable server receipt without inventing convergence state", () => {
+    const receipt = parseAdminTakedownReceipt(receiptFixture);
+    expect(stateFromReceipt(receipt)).toEqual({ kind: "origin-denied", receipt });
+  });
+
+  it("renders the server-authoritative remote-copy limitation verbatim", () => {
+    expect(remoteCopyLimitationLabel(receiptFixture.remoteCopyLimitation)).toBe(receiptFixture.remoteCopyLimitation);
+  });
+
+  it("translates only each channel's exact server snapshot without inventing progress", () => {
+    expect(takedownReceiptOutcomePresentation("bff", "NOT_STARTED")).toEqual({
+      label: "브라우저 앞단 캐시 회수는 아직 시작되지 않았습니다.",
+      state: "unknown",
+    });
+    expect(takedownReceiptOutcomePresentation("cdn", "QUEUED")).toEqual({
+      label: "공개 캐시 회수가 대기열에 등록되었습니다.",
+      state: "pending",
+    });
+    expect(takedownReceiptOutcomePresentation("browser", "BOUNDED_BY_CACHE_POLICY")).toEqual({
+      label: "브라우저 캐시는 정책이 허용하는 범위에서 다시 확인됩니다.",
+      state: "unknown",
     });
   });
 
-  it("explains the stored or offline copy limitation without promising deletion", () => {
-    expect(remoteCopyLimitationLabel("STORED_OR_OFFLINE_COPY_MAY_REMAIN")).toContain("저장하거나 오프라인으로 보관한 사본");
+  it("fails closed for cross-channel or unknown outcomes", () => {
+    expect(takedownReceiptOutcomePresentation("bff", "QUEUED")).toEqual({
+      label: "브라우저 앞단 캐시 결과를 확인해야 합니다.",
+      state: "unknown",
+    });
+    expect(takedownReceiptOutcomePresentation("cdn", "SUCCEEDED")).toEqual({
+      label: "공개 캐시 결과를 확인해야 합니다.",
+      state: "unknown",
+    });
+    expect(takedownReceiptOutcomePresentation("browser", "UNRECOGNIZED")).toEqual({
+      label: "브라우저 캐시 결과를 확인해야 합니다.",
+      state: "unknown",
+    });
+  });
+
+  it("states whether the immutable server receipt redacted the operator reason", () => {
+    expect(takedownReasonRecordLabel(receiptFixture.reasonRedacted)).toBe(
+      "회수 사유 원문은 영수증에 남기지 않았습니다.",
+    );
+    expect(takedownReasonRecordLabel(false)).toBe(
+      "회수 사유 원문이 영수증에 포함될 수 있습니다.",
+    );
   });
 });

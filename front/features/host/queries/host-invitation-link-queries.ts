@@ -1,4 +1,4 @@
-import { queryOptions, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, type QueryClient } from "@tanstack/react-query";
 import {
   createHostInvitationLink,
   fetchHostInvitationLinkHistory,
@@ -26,23 +26,19 @@ export const hostInvitationLinkHistoryQuery = (linkId: string, page: PageRequest
   queryFn: () => fetchHostInvitationLinkHistory(linkId, context, page),
 });
 
-export const invalidateHostInvitationLinks = (client: QueryClient, context: ExplicitReadmatesApiContext) =>
+export const publishHostInvitationLinks = (client: QueryClient, context: ExplicitReadmatesApiContext) =>
   client.invalidateQueries({ queryKey: hostInvitationLinkKeys.scope(context) });
 
 export function useCreateHostInvitationLink(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "invitation-links", "create"),
     mutationFn: (request: CreateHostInvitationLinkRequest) => createHostInvitationLink(request, context),
-    onSuccess: () => invalidateHostInvitationLinks(client, context),
   });
 }
 
 export function useUpdateHostInvitationLink(context: ExplicitReadmatesApiContext) {
-  const client = useQueryClient();
   return useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "invitation-links", "update"),
     mutationFn: ({ linkId, request }: { linkId: string; request: UpdateHostInvitationLinkRequest }) => updateHostInvitationLink(linkId, request, context),
-    onSuccess: () => invalidateHostInvitationLinks(client, context),
   });
 }

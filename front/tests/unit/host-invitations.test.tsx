@@ -1,7 +1,10 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { HostInvitationsActions } from "@/features/host/model/host-invitation-actions";
+import type {
+  HostInvitationsActions,
+  RegisteredHostInvitationsActions,
+} from "@/features/host/model/host-invitation-actions";
 import HostInvitations from "@/features/host/ui/host-invitations";
 import { createHostInvitationsActions } from "@/features/host";
 import type { HostInvitationListItem, HostInvitationListPage } from "@/features/host/api/host-contracts";
@@ -56,17 +59,59 @@ const hostInvitationsTestActions = {
     const response = await hostInvitationsTestActions.listInvitations(page);
     return hostInvitationsTestActions.parseInvitationList(response);
   },
+  publishInvitations: () => undefined,
   parseInvitation: async (response) => response.json(),
   parseInvitationList: async (response) => response.json(),
 } satisfies HostInvitationsActions;
 
 type HostInvitationsProps = Parameters<typeof HostInvitations>[0];
 
+function registerTestInvitationActions(actions: HostInvitationsActions): RegisteredHostInvitationsActions {
+  return {
+    listInvitations: actions.listInvitations,
+    parseInvitationList: actions.parseInvitationList,
+    createInvitation: async (request) => {
+      const response = await actions.createInvitation(request);
+      if (!response.ok) {
+        const failure = new Error(`create-invitation-${response.status}`) as Error & {
+          status: number;
+          publishUi: (publish: (error: Error) => void) => "published";
+        };
+        failure.status = response.status;
+        failure.publishUi = (publish) => (publish(failure), "published");
+        throw failure;
+      }
+      const created = await actions.parseInvitation(response);
+      const refreshed = await actions.refreshInvitations({ limit: 50 });
+      actions.publishInvitations(refreshed, { limit: 50 });
+      const result = { created, refreshed };
+      return { ...result, publishUi: (publish) => (publish(result), "published") };
+    },
+    revokeInvitation: async (invitationId) => {
+      const response = await actions.revokeInvitation(invitationId);
+      if (!response.ok) {
+        const failure = new Error(`revoke-invitation-${response.status}`) as Error & {
+          status: number;
+          publishUi: (publish: (error: Error) => void) => "published";
+        };
+        failure.status = response.status;
+        failure.publishUi = (publish) => (publish(failure), "published");
+        throw failure;
+      }
+      const revoked = await actions.parseInvitation(response);
+      const refreshed = await actions.refreshInvitations({ limit: 50 });
+      actions.publishInvitations(refreshed, { limit: 50 });
+      const result = { revoked, refreshed };
+      return { ...result, publishUi: (publish) => (publish(result), "published") };
+    },
+  };
+}
+
 function HostInvitationsForTest({
   actions,
   ...props
 }: Omit<HostInvitationsProps, "actions"> & { actions?: HostInvitationsActions }) {
-  return <HostInvitations {...props} actions={actions ?? hostInvitationsTestActions} />;
+  return <HostInvitations {...props} actions={registerTestInvitationActions(actions ?? hostInvitationsTestActions)} />;
 }
 
 function deferred<T>() {

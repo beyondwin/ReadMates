@@ -21,6 +21,7 @@ import { hostSessionKeys } from "./host-session-queries";
 import {
   hostWorkboxKeys,
   hostWorkboxPageQuery,
+  publishHostWorkboxComposition,
   useDeferHostWorkboxItemMutation,
   useRemoveHostWorkboxDeferralMutation,
 } from "./host-workbox-queries";
@@ -85,7 +86,7 @@ describe("host workbox query identity", () => {
 });
 
 describe("host workbox deferral invalidation", () => {
-  it("returns the original PUT receipt and invalidates every workbox page plus current composition", async () => {
+  it("returns the original PUT receipt and publishes invalidation only when the owner accepts", async () => {
     const receipt: HostWorkboxDeferralReceipt = {
       key: "SCHEDULE_UNSEEN:session-1:r7",
       deferredUntil: "2026-08-31T09:00:00Z",
@@ -104,6 +105,8 @@ describe("host workbox deferral invalidation", () => {
     });
 
     expect(returned).toBe(receipt);
+    expect(invalidateSpy).not.toHaveBeenCalled();
+    await publishHostWorkboxComposition(client, context);
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostWorkboxKeys.scope(context) });
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: hostSessionKeys.operatingRoomCurrent(context),
@@ -128,6 +131,8 @@ describe("host workbox deferral invalidation", () => {
       await result.current.mutateAsync("MEMBER_APPROVAL:member-1:g1");
     });
 
+    expect(invalidateSpy).not.toHaveBeenCalled();
+    await publishHostWorkboxComposition(client, otherContext);
     expect(removeHostWorkboxDeferral).toHaveBeenCalledWith(
       "MEMBER_APPROVAL:member-1:g1",
       otherContext,

@@ -22,7 +22,30 @@ type BoundaryRuleId =
   | "readmates-api-compat"
   | "feature-components-public";
 
-const legacyBoundaryExceptions = [] satisfies Array<{
+const legacyFeatureUiRouterPaths = [
+  "features/archive/ui/archive-link.tsx",
+  "features/auth/ui/auth-link.tsx",
+  "features/feedback/ui/feedback-link.tsx",
+  "features/host/ui/session-editor/session-editor-links.tsx",
+  "features/notifications/ui/member-notifications-page.tsx",
+  "features/platform-admin/ui/admin-alarm-bar.tsx",
+  "features/platform-admin/ui/admin-audit-ledger.tsx",
+  "features/platform-admin/ui/admin-clubs-ledger.tsx",
+  "features/platform-admin/ui/admin-health-card.tsx",
+  "features/platform-admin/ui/admin-health-grid.tsx",
+  "features/platform-admin/ui/admin-operations-inspector.tsx",
+  "features/platform-admin/ui/admin-target-ledger-inline.tsx",
+  "features/platform-admin/ui/support-access-grants-panel.tsx",
+  "features/public/ui/public-link.tsx",
+] as const;
+
+const legacyBoundaryExceptions = legacyFeatureUiRouterPaths.map((sourcePath) => ({
+  sourcePath,
+  importPath: routerPackage,
+  ruleId: "feature-ui" as const,
+  reason: "Existing router-coupled presentation predates the route-supplied link boundary.",
+  removeWhen: "The owning route supplies current location and navigation rendering.",
+})) satisfies Array<{
   sourcePath: string;
   importPath: string;
   ruleId: BoundaryRuleId;
@@ -256,7 +279,7 @@ function getImportedFeatureName(projectPath: string) {
 }
 
 function isFeatureLayerImport(projectPath: string, layer: string) {
-  return new RegExp(`^features/[^/]+/${layer}(?:/|$)`).test(projectPath);
+  return new RegExp(`^features/[^/]+/(?:[^/]+/)*${layer}(?:/|$)`).test(projectPath);
 }
 
 function isSharedApiImport(projectPath: string) {
@@ -275,6 +298,10 @@ function isFeatureModelFile(relativePath: string) {
   return /^features\/[^/]+\/model\//.test(relativePath);
 }
 
+function isTestSourceFile(relativePath: string) {
+  return /\.(?:test|ct)\.[^.]+$/.test(relativePath);
+}
+
 function isFeatureQueriesFile(relativePath: string) {
   return /^features\/[^/]+\/queries\//.test(relativePath);
 }
@@ -284,7 +311,7 @@ function isFeatureComponentsFile(relativePath: string) {
 }
 
 function isFeatureUiFile(relativePath: string) {
-  return /^features\/[^/]+\/ui\//.test(relativePath);
+  return /^features\/(?:[^/]+\/)+ui\//.test(relativePath);
 }
 
 function isFeatureRouteFile(relativePath: string) {
@@ -332,15 +359,14 @@ function addImportViolation(
   ruleId: BoundaryRuleId,
   reason: string,
 ) {
-  if (importSpecifier.projectPath !== null) {
-    const legacyException = findLegacyBoundaryException(sourceFile, importSpecifier.projectPath, ruleId);
+  const exceptionImportPath = importSpecifier.projectPath ?? importSpecifier.rawSpecifier;
+  const legacyException = findLegacyBoundaryException(sourceFile, exceptionImportPath, ruleId);
 
-    if (legacyException !== undefined) {
-      consumedLegacyExceptions.add(
-        legacyExceptionKey(legacyException.sourcePath, legacyException.importPath, legacyException.ruleId),
-      );
-      return;
-    }
+  if (legacyException !== undefined) {
+    consumedLegacyExceptions.add(
+      legacyExceptionKey(legacyException.sourcePath, legacyException.importPath, legacyException.ruleId),
+    );
+    return;
   }
 
   violations.push(`${sourceFile.displayPath} imports ${formatImportSpecifier(importSpecifier)}: ${reason}`);
@@ -427,6 +453,13 @@ function isFeatureUiBoundaryImport(sourceFile: SourceFile, projectPath: string |
     isFeatureLayerImport(projectPath, "route") ||
     projectPath.startsWith("src/pages/") ||
     projectPath.startsWith("src/app/")
+  );
+}
+
+function isFeatureUiRouterImport(sourceFile: SourceFile, rawSpecifier: string) {
+  return isFeatureUiFile(sourceFile.relativePath) && (
+    rawSpecifier === routerPackage || rawSpecifier.startsWith(`${routerPackage}/`) ||
+    rawSpecifier === legacyRouterPackage || rawSpecifier.startsWith(`${legacyRouterPackage}/`)
   );
 }
 
@@ -605,6 +638,63 @@ describe("frontend architecture boundaries", () => {
     expect(isFeatureQueriesBoundaryImport(sourceFile, apiImport.projectPath)).toBe(false);
   });
 
+  it("detects forbidden execution imports and fetch in deeply nested feature UI", () => {
+    const sourceFile: SourceFile = {
+      absolutePath: "/unused/features/host/aigen/ui/defaults/unsafe-panel.tsx",
+      displayPath: "front/features/host/aigen/ui/defaults/unsafe-panel.tsx",
+      relativePath: "features/host/aigen/ui/defaults/unsafe-panel.tsx",
+    };
+    const forbidden = [
+      "@/features/host/queries/host-session-queries",
+      "@/features/host/api/host-api",
+      "@/features/host/aigen/queries/aigen-job-queries",
+      "@/features/host/aigen/api/aigen-api",
+      "@/features/host/route/host-meeting-workspace-route",
+      "@/src/app/global-space-transition",
+      "@/src/pages/host-page",
+    ];
+
+    expect(isFeatureUiFile(sourceFile.relativePath)).toBe(true);
+    for (const specifier of forbidden) {
+      expect(isFeatureUiBoundaryImport(sourceFile, normalizeImportSpecifier(sourceFile, specifier).projectPath)).toBe(true);
+    }
+    expect(isFeatureUiRouterImport(sourceFile, "react-router")).toBe(true);
+    expect(/\bfetch\s*\(/.test("export const run = () => fetch('/api/unsafe');")).toBe(true);
+  });
+
+  it.each([
+    "features/platform-admin/ui/admin-layout-nav.tsx",
+    "features/host/aigen/ui/defaults/unsafe-panel.tsx",
+  ])("rejects router imports from top-level and nested feature UI: %s", (relativePath) => {
+    const sourceFile: SourceFile = {
+      absolutePath: `/unused/${relativePath}`,
+      displayPath: `front/${relativePath}`,
+      relativePath,
+    };
+
+    expect(isFeatureUiRouterImport(sourceFile, "react-router")).toBe(true);
+    expect(isFeatureUiRouterImport(sourceFile, "react-router/dom")).toBe(true);
+    expect(isFeatureUiRouterImport(sourceFile, legacyRouterPackage)).toBe(true);
+  });
+
+  it("allows deeply nested feature UI to remain callback-only presentation", () => {
+    const sourceFile: SourceFile = {
+      absolutePath: "/unused/features/host/aigen/ui/defaults/safe-panel.tsx",
+      displayPath: "front/features/host/aigen/ui/defaults/safe-panel.tsx",
+      relativePath: "features/host/aigen/ui/defaults/safe-panel.tsx",
+    };
+
+    const presentationImports = [
+      "@/features/host/aigen/model/aigen-review-state",
+      "@/features/host/aigen/ui/aigen-presentation-types",
+      "@/shared/ui/button",
+    ];
+
+    for (const specifier of presentationImports) {
+      expect(isFeatureUiBoundaryImport(sourceFile, normalizeImportSpecifier(sourceFile, specifier).projectPath)).toBe(false);
+    }
+  });
+
   it("keeps shared, feature route, feature model, and feature UI dependencies inside their allowed boundaries", () => {
     assertLegacyBoundaryExceptionsAreUnique();
 
@@ -619,6 +709,10 @@ describe("frontend architecture boundaries", () => {
         const importSpecifier = normalizeImportSpecifier(sourceFile, specifier);
 
         if (isDesignSystemImport(importSpecifier.rawSpecifier)) {
+          continue;
+        }
+
+        if (isTestSourceFile(sourceFile.relativePath)) {
           continue;
         }
 
@@ -668,6 +762,17 @@ describe("frontend architecture boundaries", () => {
           );
         }
 
+        if (isFeatureUiRouterImport(sourceFile, importSpecifier.rawSpecifier)) {
+          addImportViolation(
+            violations,
+            consumedLegacyExceptions,
+            sourceFile,
+            importSpecifier,
+            "feature-ui",
+            "feature UI files must receive routing state and callbacks from route composition.",
+          );
+        }
+
         if (isFeatureRouteBoundaryImport(sourceFile, importSpecifier.projectPath)) {
           addImportViolation(
             violations,
@@ -703,7 +808,7 @@ describe("frontend architecture boundaries", () => {
         }
       }
 
-      if (isFeatureUiFile(sourceFile.relativePath) && /\bfetch\s*\(/.test(source)) {
+      if (!isTestSourceFile(sourceFile.relativePath) && isFeatureUiFile(sourceFile.relativePath) && /\bfetch\s*\(/.test(source)) {
         violations.push(
           `${sourceFile.displayPath} contains direct fetch(...): feature UI files must call through the route/API boundary.`,
         );

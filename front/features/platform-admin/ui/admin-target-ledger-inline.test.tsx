@@ -51,7 +51,7 @@ describe("AdminTargetLedgerInline", () => {
       "운영자가 보류함 · 보류됨",
     ]);
     expect(LEDGER_CSS).toMatch(/\.ledger-inline[\s\S]*\.li time[\s\S]*font-family:\s*var\(--f-mono\)/);
-    expect(screen.getByRole("link", { name: "전체 기입 보기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "전체 처리 기록 보기" })).toHaveAttribute(
       "href",
       "/admin/audit?target=club-reading-sai",
     );
@@ -77,7 +77,7 @@ describe("AdminTargetLedgerInline", () => {
 
     expect(container.querySelectorAll(".ledger-inline .li")).toHaveLength(0);
     expect(screen.queryByText("신호가 처음 감지됨 · 미확인")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "전체 기입 보기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "전체 처리 기록 보기" })).toHaveAttribute(
       "href",
       "/admin/audit?target=case-notification",
     );

@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter, useLocation, useNavigate } from "react-router";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ReadmatesTransportError } from "@/shared/api/errors";
 import type {
@@ -188,6 +188,7 @@ function LocationProbe() {
     <>
       <output aria-label="current location">{location.pathname}{location.search}</output>
       <button type="button" onClick={() => navigate(-1)}>뒤로</button>
+      <button type="button" onClick={() => navigate(1)}>앞으로</button>
     </>
   );
 }
@@ -203,8 +204,31 @@ function renderRoute(client: QueryClient, initialEntry = "/admin/today") {
   );
 }
 
+function renderNavigableRoute(client: QueryClient, initialEntry = "/admin/today") {
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <Routes>
+          <Route path="/admin/today" element={<><AdminTodayRoute /><LocationProbe /></>} />
+          <Route path="/admin/audit" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(private readonly callback: ResizeObserverCallback) {}
+    observe = (target: Element) => {
+      this.callback(
+        [{ target, contentRect: { width: 1200 } } as ResizeObserverEntry],
+        this as unknown as ResizeObserver,
+      );
+    };
+    disconnect = vi.fn();
+  });
   operationsApi.fetchList.mockResolvedValue(listResponse());
   operationsApi.fetchDetail.mockResolvedValue(detailResponse());
   vi.mocked(fetchPlatformAdminCapabilities).mockResolvedValue(ownerCapabilities);
@@ -221,6 +245,27 @@ describe("AdminTodayRoute", () => {
     expect(screen.getByRole("group", { name: "작업" })).toHaveClass("admin-action-dock");
     expect(screen.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ })).toHaveAttribute("aria-pressed", "true");
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
+  });
+
+  it.each([
+    [null, "/admin/audit"],
+    ["club-reading-sai", "/admin/audit?target=club-reading-sai"],
+  ] as const)("follows the route-owned audit destination for club id %s", async (clubId, destination) => {
+    const user = userEvent.setup();
+    const item = operationCase({ clubId });
+    renderNavigableRoute(seededClient([item]), "/admin/today?case=case-notification");
+
+    await user.click(await screen.findByRole("link", { name: "전체 처리 기록 보기" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("current location")).toHaveTextContent(destination);
+    });
+    const location = screen.getByLabelText("current location").textContent ?? "";
+    const parsed = new URL(location, "https://readmates.example");
+    expect(parsed.pathname).toBe("/admin/audit");
+    expect(parsed.searchParams.get("target")).toBe(clubId);
+    expect(parsed.searchParams.get("target")).not.toBe("case-notification");
+    expect(parsed.searchParams.get("target")).not.toBe("NOTIFICATION");
   });
 
   it("preserves a visible selected case when a filter changes", async () => {
@@ -244,8 +289,8 @@ describe("AdminTodayRoute", () => {
     );
 
     expect(await screen.findByText("현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "해결 확인" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "확인함" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "처리함" })).not.toBeInTheDocument();
   });
 
   it("recovers from a 409 by announcing refresh-required copy and refetching detail", async () => {
@@ -259,7 +304,7 @@ describe("AdminTodayRoute", () => {
     const client = seededClient();
     renderRoute(client, "/admin/today?case=case-notification");
 
-    await user.click(await screen.findByRole("button", { name: "확인 처리" }));
+    await user.click(await screen.findByRole("button", { name: "확인함" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "최신 상태를 다시 불러왔습니다. 내용을 확인한 뒤 다시 시도해 주세요.",
@@ -283,13 +328,13 @@ describe("AdminTodayRoute", () => {
 
     renderRoute(client, "/admin/today?case=case-notification");
 
-    expect(await screen.findAllByText("현재 상태 · 확인됨")).toHaveLength(2);
-    expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
+    expect(await screen.findAllByText("현재 상태 · 확인함")).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "확인함" })).not.toBeInTheDocument();
     expect(screen.getByRole("group", { name: "작업" }).closest("[data-state]")).toHaveAttribute(
       "data-state",
       "stale",
     );
-    expect(screen.getByRole("button", { name: "보류" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "잠시 미룸" })).toBeDisabled();
     expect(operationsApi.snooze).not.toHaveBeenCalled();
   });
 
@@ -341,7 +386,7 @@ describe("AdminTodayRoute", () => {
     );
     renderRoute(seededClient(), "/admin/today?case=case-notification");
 
-    await user.click(await screen.findByRole("button", { name: "해결 확인" }));
+    await user.click(await screen.findByRole("button", { name: "처리함" }));
     await user.click(screen.getByRole("button", { name: "신호 재검증 후 해결" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -405,8 +450,8 @@ describe("AdminTodayRoute", () => {
       "현재 역할로 운영 케이스를 확인할 수 없습니다. 권한을 확인해 주세요.",
     );
     expect(screen.queryByRole("region", { name: "운영 케이스 큐" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "해결 확인" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "확인함" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "처리함" })).not.toBeInTheDocument();
   });
 
   it("removes stale lifecycle actions when a mutation is denied", async () => {
@@ -416,20 +461,20 @@ describe("AdminTodayRoute", () => {
     );
     renderRoute(seededClient(), "/admin/today?case=case-notification");
 
-    await user.click(await screen.findByRole("button", { name: "확인 처리" }));
+    await user.click(await screen.findByRole("button", { name: "확인함" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "상태 변경 권한이 더 이상 유효하지 않습니다. 새로고침 후 권한을 확인해 주세요.",
     );
-    expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "해결 확인" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "확인함" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "처리함" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /알림 전달 실패/ }));
 
     expect(screen.getByRole("alert")).toHaveTextContent(
       "상태 변경 권한이 더 이상 유효하지 않습니다. 새로고침 후 권한을 확인해 주세요.",
     );
-    expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "확인함" })).not.toBeInTheDocument();
   });
 
   it("renders forbidden without fetching cases when VIEW_TODAY is missing", async () => {
@@ -542,7 +587,7 @@ describe("AdminTodayRoute", () => {
     operationsApi.fetchDetail.mockResolvedValue(detailResponse(acknowledged));
     renderRoute(seededClient(), "/admin/today?case=case-notification");
 
-    await user.click(await screen.findByRole("button", { name: "확인 처리" }));
+    await user.click(await screen.findByRole("button", { name: "확인함" }));
 
     expect(await screen.findByText("케이스 상태를 반영했습니다.")).toBeInTheDocument();
     expect(operationsApi.acknowledge).toHaveBeenCalledTimes(1);
@@ -571,7 +616,7 @@ describe("AdminTodayRoute", () => {
     });
     renderRoute(seededClient(), "/admin/today?case=case-notification");
 
-    await user.click(await screen.findByRole("button", { name: "확인 처리" }));
+    await user.click(await screen.findByRole("button", { name: "확인함" }));
     expect(await screen.findByText("케이스 상태를 반영했습니다.")).toBeInTheDocument();
 
     await waitFor(() => {
@@ -581,11 +626,10 @@ describe("AdminTodayRoute", () => {
       );
     });
     expect(screen.queryByText("상태를 반영하고 있습니다.")).not.toBeInTheDocument();
-    const hold = screen.getByRole("button", { name: "보류" });
+    const hold = screen.getByRole("button", { name: "잠시 미룸" });
     expect(hold).toBeEnabled();
     await user.click(hold);
-    await user.type(screen.getByLabelText("보류 사유"), "후속 관찰");
-    await user.click(screen.getByRole("button", { name: "보류 확정" }));
+    await user.click(screen.getByRole("button", { name: "미루기" }));
 
     await waitFor(() => {
       expect(operationsApi.snooze).toHaveBeenCalledWith(
@@ -615,7 +659,7 @@ describe("AdminTodayRoute", () => {
     );
     renderRoute(seededClient(), "/admin/today?case=case-notification");
 
-    await user.click(await screen.findByRole("button", { name: "확인 처리" }));
+    await user.click(await screen.findByRole("button", { name: "확인함" }));
 
     await waitFor(() => {
       expect(screen.getByRole("group", { name: "작업" }).closest("[data-state]")).toHaveAttribute(
@@ -649,7 +693,7 @@ describe("AdminTodayRoute", () => {
       ),
     );
     renderRoute(client, "/admin/today?case=case-notification");
-    await user.click(await screen.findByRole("button", { name: "확인 처리" }));
+    await user.click(await screen.findByRole("button", { name: "확인함" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "현재 역할로 운영 케이스를 확인할 수 없습니다. 권한을 확인해 주세요.",
@@ -747,7 +791,7 @@ describe("AdminTodayRoute", () => {
     const client = seededClient([selected]);
     renderRoute(client, "/admin/today?case=case-notification");
 
-    expect(await screen.findByRole("button", { name: "확인 처리" })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: "확인함" })).toBeDisabled();
     expect(screen.getByRole("group", { name: "작업" }).closest("[data-state]")).toHaveAttribute(
       "data-state",
       "stale",
@@ -764,11 +808,11 @@ describe("AdminTodayRoute", () => {
     );
 
     expect(await screen.findByText("현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "확인함" })).not.toBeInTheDocument();
     expect(operationsApi.acknowledge).not.toHaveBeenCalled();
   });
 
-  it("cannot mutate when SUPPORT allowedActions stay empty even if the role is labeled OWNER", async () => {
+  it("does not reconstruct omitted lifecycle actions from an OWNER role", async () => {
     const client = seededClient([operationCase({ allowedActions: [] })]);
     seedCapabilities(client, {
       ...ownerCapabilities,
@@ -779,8 +823,8 @@ describe("AdminTodayRoute", () => {
     renderRoute(client, "/admin/today?case=case-notification");
 
     expect(await screen.findByText("현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "해결 확인" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "확인함" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "처리함" })).not.toBeInTheDocument();
     expect(operationsApi.acknowledge).not.toHaveBeenCalled();
     expect(operationsApi.resolve).not.toHaveBeenCalled();
   });
@@ -805,7 +849,7 @@ describe("AdminTodayRoute", () => {
     );
     renderRoute(seededClient(), "/admin/today?case=case-notification");
 
-    await user.click(await screen.findByRole("button", { name: "확인 처리" }));
+    await user.click(await screen.findByRole("button", { name: "확인함" }));
 
     expect(screen.queryByText("케이스 상태를 반영했습니다.")).not.toBeInTheDocument();
     expect(operationsApi.acknowledge).toHaveBeenCalledTimes(1);
@@ -826,7 +870,7 @@ describe("AdminTodayRoute", () => {
     const client = seededClient();
     renderRoute(client, "/admin/today?case=case-notification");
 
-    await user.click(await screen.findByRole("button", { name: "확인 처리" }));
+    await user.click(await screen.findByRole("button", { name: "확인함" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("명령 응답을 확인하지 못했습니다.");
     expect(screen.getByRole("group", { name: "작업" }).closest("[data-state]")).toHaveAttribute(
@@ -866,7 +910,7 @@ describe("AdminTodayRoute", () => {
     const client = seededClient([operationCase(), second]);
     renderRoute(client, "/admin/today?case=case-notification");
 
-    await user.click(await screen.findByRole("button", { name: "확인 처리" }));
+    await user.click(await screen.findByRole("button", { name: "확인함" }));
     await user.click(screen.getByRole("button", { name: /클럽 설정이 필요합니다/ }));
 
     await act(async () => {
@@ -898,11 +942,14 @@ describe("AdminTodayRoute", () => {
 
   it("uses a mobile list/detail URL and restores row focus after Back", async () => {
     const user = userEvent.setup();
-    vi.stubGlobal("matchMedia", vi.fn().mockImplementation(() => ({
-      matches: true,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    })));
+    let resize: ResizeObserverCallback | null = null;
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(callback: ResizeObserverCallback) { resize = callback; }
+      observe = (target: Element) => {
+        resize?.([{ target, contentRect: { width: 390 } } as ResizeObserverEntry], {} as ResizeObserver);
+      };
+      disconnect = vi.fn();
+    });
     renderRoute(seededClient(), "/admin/today?case=case-notification");
 
     expect(await screen.findByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
@@ -916,17 +963,21 @@ describe("AdminTodayRoute", () => {
     });
     expect(screen.getByRole("button", { name: "목록으로" })).toHaveFocus();
 
-    await user.click(screen.getByRole("button", { name: "목록으로" }));
+    await user.click(screen.getByRole("button", { name: "뒤로" }));
 
     await waitFor(() => {
       expect(screen.getByLabelText("current location")).not.toHaveTextContent("mode=detail");
     });
     expect(screen.getByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ })).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "앞으로" }));
+    await waitFor(() => expect(screen.getByLabelText("current location")).toHaveTextContent("mode=detail"));
+    expect(screen.getByRole("button", { name: "목록으로" })).toHaveFocus();
     vi.unstubAllGlobals();
   });
 
-  it("advances to the next case after a mocked resolve success", async () => {
+  it("keeps a resolve result in the current detail until the operator explicitly chooses next", async () => {
     const user = userEvent.setup();
     const cases = [
       operationCase({
@@ -975,16 +1026,19 @@ describe("AdminTodayRoute", () => {
     renderRoute(seededClient(cases), "/admin/today?case=case-b");
 
     expect(await screen.findByText("케이스 2 / 4")).toBeInTheDocument();
-    await user.click(await screen.findByRole("button", { name: "해결 확인" }));
+    await user.click(await screen.findByRole("button", { name: "처리함" }));
     await user.click(screen.getByRole("button", { name: "신호 재검증 후 해결" }));
 
+    expect(await screen.findByText("케이스 상태를 반영했습니다.")).toBeInTheDocument();
+    expect(screen.getByText("케이스 2 / 4")).toBeInTheDocument();
+    expect(screen.getByLabelText("current location")).toHaveTextContent("case=case-b");
+    await user.click(screen.getByRole("button", { name: "다음 ›" }));
     expect(await screen.findByText("케이스 3 / 4")).toBeInTheDocument();
     expect(screen.getByLabelText("current location")).toHaveTextContent("case=case-c");
-    expect(screen.getByRole("button", { name: /클럽 설정이 필요합니다/ })).toHaveAttribute("aria-pressed", "true");
     expect(operationsApi.resolve).toHaveBeenCalledWith("case-b", 3);
   });
 
-  it("advances to the next case after a mocked snooze success", async () => {
+  it("keeps a snooze result in the current detail and sends only the selected timestamp", async () => {
     const user = userEvent.setup();
     const cases = [
       operationCase({
@@ -1033,13 +1087,13 @@ describe("AdminTodayRoute", () => {
     renderRoute(seededClient(cases), "/admin/today?case=case-b");
 
     expect(await screen.findByText("케이스 2 / 4")).toBeInTheDocument();
-    await user.click(await screen.findByRole("button", { name: "보류" }));
-    await user.type(screen.getByLabelText("보류 사유"), "후속 관찰");
-    await user.click(screen.getByRole("button", { name: "보류 확정" }));
+    await user.click(await screen.findByRole("button", { name: "잠시 미룸" }));
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "미루기" }));
 
-    expect(await screen.findByText("케이스 3 / 4")).toBeInTheDocument();
-    expect(screen.getByLabelText("current location")).toHaveTextContent("case=case-c");
-    expect(screen.getByRole("button", { name: /클럽 설정이 필요합니다/ })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByText("케이스 상태를 반영했습니다.")).toBeInTheDocument();
+    expect(screen.getByText("케이스 2 / 4")).toBeInTheDocument();
+    expect(screen.getByLabelText("current location")).toHaveTextContent("case=case-b");
     expect(operationsApi.snooze).toHaveBeenCalledWith(
       "case-b",
       3,
@@ -1047,7 +1101,7 @@ describe("AdminTodayRoute", () => {
     );
   });
 
-  it("returns focus to the queue summary after resolving the last case", async () => {
+  it("keeps the final resolve result on the current case", async () => {
     const user = userEvent.setup();
     const last = operationCase({ id: "case-last" });
     const resolved = operationCase({
@@ -1066,18 +1120,16 @@ describe("AdminTodayRoute", () => {
     renderRoute(seededClient([last]), "/admin/today?case=case-last");
 
     expect(await screen.findByText("케이스 1 / 1")).toBeInTheDocument();
-    await user.click(await screen.findByRole("button", { name: "해결 확인" }));
+    await user.click(await screen.findByRole("button", { name: "처리함" }));
     await user.click(screen.getByRole("button", { name: "신호 재검증 후 해결" }));
 
-    await waitFor(() => {
-      expect(screen.getByLabelText("운영 케이스 요약")).toHaveFocus();
-    });
+    expect(await screen.findByText("케이스 상태를 반영했습니다.")).toBeInTheDocument();
     expect(screen.getByLabelText("current location")).toHaveTextContent("case=case-last");
     expect(screen.getByRole("button", { name: "다음 ›" })).toBeDisabled();
     expect(operationsApi.resolve).toHaveBeenCalledWith("case-last", 3);
   });
 
-  it("returns focus to the queue summary after ignoring the last case", async () => {
+  it("keeps the final snooze result on the current case", async () => {
     const user = userEvent.setup();
     const last = operationCase({ id: "case-last" });
     const snoozed = operationCase({
@@ -1096,13 +1148,10 @@ describe("AdminTodayRoute", () => {
     renderRoute(seededClient([last]), "/admin/today?case=case-last");
 
     expect(await screen.findByText("케이스 1 / 1")).toBeInTheDocument();
-    await user.click(await screen.findByRole("button", { name: "무시" }));
-    await user.type(screen.getByLabelText("무시 사유"), "중복 신호로 판단");
-    await user.click(screen.getByRole("button", { name: "무시 확정" }));
+    await user.click(await screen.findByRole("button", { name: "잠시 미룸" }));
+    await user.click(screen.getByRole("button", { name: "미루기" }));
 
-    await waitFor(() => {
-      expect(screen.getByLabelText("운영 케이스 요약")).toHaveFocus();
-    });
+    expect(await screen.findByText("케이스 상태를 반영했습니다.")).toBeInTheDocument();
     expect(screen.getByLabelText("current location")).toHaveTextContent("case=case-last");
     expect(operationsApi.snooze).toHaveBeenCalledWith(
       "case-last",

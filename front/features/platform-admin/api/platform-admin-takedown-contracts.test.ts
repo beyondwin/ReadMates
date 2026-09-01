@@ -1,83 +1,42 @@
 import { describe, expect, it } from "vitest";
 import {
-  parseAdminTakedownConvergence,
   parseAdminTakedownPreview,
   parseAdminTakedownReceipt,
 } from "./platform-admin-takedown-contracts";
-
-const target = {
-  clubId: "10000000-0000-4000-8000-000000000001",
-  sessionId: "20000000-0000-4000-8000-000000000002",
-  publicationId: "30000000-0000-4000-8000-000000000003",
-};
+import previewFixture from "../../../tests/unit/__fixtures__/platform-admin-takedown-preview.server.json";
+import receiptFixture from "../../../tests/unit/__fixtures__/platform-admin-takedown-receipt.server.json";
 
 describe("platform-admin public takedown contracts", () => {
-  it("parses an exact preview target with current surfaces, generation, and limitation", () => {
-    expect(parseAdminTakedownPreview({
-      schema: "admin.public_takedown.preview.v1",
-      previewId: "40000000-0000-4000-8000-000000000004",
-      expiresAt: "2026-08-26T04:05:00Z",
-      ...target,
-      targetGeneration: 17,
-      currentSurfaces: ["PUBLIC_CLUB", "PUBLIC_SESSION"],
-      limitationCode: "STORED_OR_OFFLINE_COPY_MAY_REMAIN",
-    })).toMatchObject({ targetGeneration: 17, currentSurfaces: ["PUBLIC_CLUB", "PUBLIC_SESSION"] });
+  it("strictly parses the server-shaped preview activation contract", () => {
+    expect(parseAdminTakedownPreview(previewFixture)).toMatchObject({
+      confirmEnabled: false,
+      activationBoundary: "PROTECTED_CACHE_SAFETY_EVIDENCE_REQUIRED",
+      remoteCopyLimitation: expect.stringContaining("원격으로 삭제할 수 없습니다"),
+    });
   });
 
   it("parses immutable receipt identity without a raw operator reason", () => {
-    const receipt = parseAdminTakedownReceipt({
-      schema: "admin.public_takedown.receipt.v1",
-      receiptId: "50000000-0000-4000-8000-000000000005",
-      convergenceId: "60000000-0000-4000-8000-000000000006",
-      ...target,
-      originResult: "DENIED",
-      committedGeneration: 18,
-      committedClubGeneration: 9,
-      reasonCategory: "PRIVACY",
-      createdAt: "2026-08-26T04:01:00Z",
-      limitationCode: "STORED_OR_OFFLINE_COPY_MAY_REMAIN",
-    });
+    const receipt = parseAdminTakedownReceipt(receiptFixture);
 
     expect(receipt.receiptId).toBe("50000000-0000-4000-8000-000000000005");
     expect(receipt).not.toHaveProperty("reason");
+    expect(receipt).not.toHaveProperty("committedClubGeneration");
+    expect(receipt).not.toHaveProperty("limitationCode");
+    expect(receipt).toMatchObject({
+      reasonRedacted: true,
+      bffEvictionOutcome: "NOT_STARTED",
+      cdnPurgeOutcome: "QUEUED",
+      browserRevalidationOutcome: "BOUNDED_BY_CACHE_POLICY",
+      remoteCopyLimitation: expect.stringContaining("원격으로 삭제할 수 없습니다"),
+    });
   });
 
-  it.each(["SAFETY", "OTHER"])("rejects noncanonical reason category %s", (reasonCategory) => {
-    expect(() => parseAdminTakedownReceipt({
-      schema: "admin.public_takedown.receipt.v1",
-      receiptId: "50000000-0000-4000-8000-000000000005",
-      convergenceId: "60000000-0000-4000-8000-000000000006",
-      ...target,
-      originResult: "DENIED",
-      committedGeneration: 18,
-      committedClubGeneration: 9,
-      reasonCategory,
-      createdAt: "2026-08-26T04:01:00Z",
-      limitationCode: "STORED_OR_OFFLINE_COPY_MAY_REMAIN",
-    })).toThrow();
+  it.each(["PRIVACY", "SECURITY", "LEGAL", "CONTENT_POLICY", "OTHER"])("rejects non-server reason category %s", (reasonCategory) => {
+    expect(() => parseAdminTakedownReceipt({ ...receiptFixture, reasonCategory })).toThrow();
   });
 
-  it("rejects unknown fields and malformed convergence attempts", () => {
-    expect(() => parseAdminTakedownPreview({
-      schema: "admin.public_takedown.preview.v1",
-      previewId: "40000000-0000-4000-8000-000000000004",
-      expiresAt: "2026-08-26T04:05:00Z",
-      ...target,
-      targetGeneration: 17,
-      currentSurfaces: [],
-      limitationCode: "STORED_OR_OFFLINE_COPY_MAY_REMAIN",
-      privateBody: "must not cross the contract",
-    })).toThrow();
-
-    expect(() => parseAdminTakedownConvergence({
-      schema: "admin.public_takedown.convergence.v1",
-      convergenceId: "60000000-0000-4000-8000-000000000006",
-      originResult: "DENIED",
-      committedGeneration: 18,
-      status: "FAILED",
-      lastAttemptAt: "2026-08-26T04:02:00Z",
-      retryable: true,
-      attempts: [{ attemptNo: 0, status: "FAILED", observedAt: "bad-date", resultCategory: "RAW_PROVIDER_ERROR" }],
-    })).toThrow();
+  it("rejects invented client fields on both strict server DTOs", () => {
+    expect(() => parseAdminTakedownPreview({ ...previewFixture, limitationCode: "INVENTED" })).toThrow();
+    expect(() => parseAdminTakedownReceipt({ ...receiptFixture, committedClubGeneration: 9 })).toThrow();
   });
 });

@@ -12,6 +12,9 @@ import {
   stageHostAuthorityNavigation,
 } from "@/features/host/model/host-authority-navigation";
 import { HostAuthorityLossController } from "./host-authority-loss-controller";
+import type { HostAuthorityLossEvent } from "@/shared/api/host-authority-event";
+import type { HostSensitiveStorage } from "@/features/host/storage/host-sensitive-storage";
+import { useOptionalGlobalSpaceTransitionController } from "./global-space-transition-controller";
 
 const workspaceLabels: Record<ClubWorkspace, string> = {
   member: "멤버 공간",
@@ -37,19 +40,16 @@ const defaultTransitionStore: WorkspaceRouteTransitionStore = {
 export function AppRouteSecurityController({
   workspace,
   transitionStore = defaultTransitionStore,
+  onBeforeHostAuthorityPurge,
+  hostAuthorityStorage,
 }: {
   workspace: ClubWorkspace;
   transitionStore?: WorkspaceRouteTransitionStore;
+  onBeforeHostAuthorityPurge?: (event: HostAuthorityLossEvent) => void;
+  hostAuthorityStorage?: HostSensitiveStorage;
 }) {
   const location = useLocation();
   const [announcement, setAnnouncement] = useState("");
-  const handleAuthorityLoss = useCallback((
-    code: HostSecurityPurgeCode,
-    targetPathname: string,
-    handoffId: string,
-  ) => {
-    stageHostAuthorityNavigation({ code, targetPathname, handoffId });
-  }, []);
 
   useEffect(() => {
     const href = `${location.pathname}${location.search}${location.hash}`;
@@ -85,12 +85,45 @@ export function AppRouteSecurityController({
 
   return (
     <div data-app-route-security-controller>
-      <HostAuthorityLossController onHandled={handleAuthorityLoss} />
+      <AppHostAuthorityLossBridge
+        storage={hostAuthorityStorage}
+        onBeforeHostAuthorityPurge={onBeforeHostAuthorityPurge}
+      />
       {announcement ? (
         <span className="rm-sr-only" role="status" aria-live="polite" aria-atomic="true">
           {announcement}
         </span>
       ) : null}
     </div>
+  );
+}
+
+export function AppHostAuthorityLossBridge({
+  storage,
+  onBeforeHostAuthorityPurge,
+}: {
+  storage?: HostSensitiveStorage;
+  onBeforeHostAuthorityPurge?: (event: HostAuthorityLossEvent) => void;
+}) {
+  const globalTransition = useOptionalGlobalSpaceTransitionController();
+  const handleAuthorityLoss = useCallback((
+    code: HostSecurityPurgeCode,
+    targetPathname: string,
+    handoffId: string,
+  ) => {
+    stageHostAuthorityNavigation({ code, targetPathname, handoffId });
+  }, []);
+  const handleBeforePurge = useCallback((event: HostAuthorityLossEvent) => {
+    globalTransition?.invalidateForHostAuthorityLoss(event);
+    onBeforeHostAuthorityPurge?.(event);
+  }, [globalTransition, onBeforeHostAuthorityPurge]);
+
+  return (
+    <HostAuthorityLossController
+      storage={storage}
+      onBeforePurge={handleBeforePurge}
+      resolveSafeTarget={globalTransition?.resolveHostAuthorityLossTarget}
+      onHandled={handleAuthorityLoss}
+    />
   );
 }

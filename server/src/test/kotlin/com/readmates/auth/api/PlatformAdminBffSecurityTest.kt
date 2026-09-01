@@ -29,13 +29,19 @@ import com.readmates.aigen.application.port.`in`.ListAiOpsJobsUseCase
 import com.readmates.aigen.application.port.`in`.PreviewAiOpsAdminCommandUseCase
 import com.readmates.aigen.application.port.`in`.RetryAiOpsJobCommitUseCase
 import com.readmates.auth.adapter.`in`.security.CurrentMemberWebConfig
+import com.readmates.auth.adapter.`in`.web.AuthMeController
+import com.readmates.auth.application.model.AuthAccessProjection
 import com.readmates.auth.application.model.AuthenticatedMemberSnapshot
 import com.readmates.auth.application.model.AuthoritySynthesisRequest
 import com.readmates.auth.application.model.AuthoritySynthesisResult
+import com.readmates.auth.application.model.AvailableSpacesV1
 import com.readmates.auth.application.model.IssuedAuthSession
 import com.readmates.auth.application.model.JoinedClubSummary
+import com.readmates.auth.application.model.ProductSpaceKind
+import com.readmates.auth.application.model.RecommendedSpace
 import com.readmates.auth.application.model.StoredAuthSession
 import com.readmates.auth.application.port.`in`.ManageAuthSessionUseCase
+import com.readmates.auth.application.port.`in`.ResolveAuthAccessProjectionUseCase
 import com.readmates.auth.application.port.`in`.ResolveAuthenticatedPrincipalUseCase
 import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
 import com.readmates.auth.application.port.`in`.SynthesizeAuthoritiesUseCase
@@ -132,6 +138,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request
@@ -192,6 +199,26 @@ class PlatformAdminBffSecurityTest(
         identities.nonAdmin()
         exactRequest().andExpect { status { isForbidden() } }
         assertThat(identities.platformAdminLookups).contains(NON_ADMIN_ID)
+    }
+
+    @Test
+    fun `platform-only auth me uses one v1 access projection and keeps the legacy admin destination`() {
+        identities.admin(PlatformAdminRole.OWNER)
+
+        mockMvc
+            .get("/api/auth/me") {
+                cookie(Cookie(SESSION_COOKIE, SESSION_TOKEN))
+                header(BffSecretFilter.BFF_SECRET_HEADER, "test-bff-secret")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.authenticated") { value(true) }
+                jsonPath("$.availableSpaces.version") { value(1) }
+                jsonPath("$.availableSpaces.kinds[0]") { value("PLATFORM") }
+                jsonPath("$.availableSpaces.clubs.length()") { value(0) }
+                jsonPath("$.recommendedAppEntryUrl") { value("/admin") }
+            }
+
+        assertThat(identities.accessProjectionLookups).containsExactly(identities.sessionUserId)
     }
 
     @Test
@@ -785,6 +812,7 @@ class PlatformAdminAuditSearchInvocations {
     AiGenerationOpsController::class,
     AiGenerationErrorHandler::class,
     PlatformAdminErrorHandler::class,
+    AuthMeController::class,
     SharedApplicationErrorHandler::class,
 )
 class PlatformAdminBffSecurityHarnessConfiguration {
@@ -880,6 +908,25 @@ class PlatformAdminBffSecurityHarnessConfiguration {
             ): CurrentMember? = null
 
             override fun listJoinedClubs(userId: UUID): List<JoinedClubSummary> = emptyList()
+        }
+
+    @Bean
+    fun authAccessProjection(identities: PlatformAdminSecurityIdentities): ResolveAuthAccessProjectionUseCase =
+        object : ResolveAuthAccessProjectionUseCase {
+            override fun resolve(userId: UUID): AuthAccessProjection {
+                identities.accessProjectionLookups += userId
+                val admin = identities.admin?.takeIf { userId == identities.sessionUserId }
+                return AuthAccessProjection(
+                    joinedClubs = emptyList(),
+                    platformAdmin = admin,
+                    availableSpaces =
+                        AvailableSpacesV1(
+                            kinds = if (admin != null) listOf(ProductSpaceKind.PLATFORM) else emptyList(),
+                            clubs = emptyList(),
+                        ),
+                    recommendedSpace = admin?.let { RecommendedSpace(ProductSpaceKind.PLATFORM) },
+                )
+            }
         }
 
     @Bean
@@ -1412,12 +1459,14 @@ class PlatformAdminSecurityIdentities {
     var sessionUserId: UUID = USER_ID
     var sessionActive: Boolean = true
     val platformAdminLookups = mutableListOf<UUID>()
+    val accessProjectionLookups = mutableListOf<UUID>()
 
     fun reset() {
         admin = null
         sessionUserId = USER_ID
         sessionActive = true
         platformAdminLookups.clear()
+        accessProjectionLookups.clear()
     }
 
     fun admin(role: PlatformAdminRole) {

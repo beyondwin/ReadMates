@@ -2,40 +2,20 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import previewFixture from "../../../tests/unit/__fixtures__/platform-admin-takedown-preview.server.json";
+import receiptFixture from "../../../tests/unit/__fixtures__/platform-admin-takedown-receipt.server.json";
+import {
+  parseAdminTakedownPreview,
+  parseAdminTakedownReceipt,
+} from "../api/platform-admin-takedown-contracts";
 import type { AdminTakedownState } from "../model/platform-admin-takedown-model";
 import { AdminPublicTakedownWorkbench } from "./admin-public-takedown-workbench";
 
-const LEDGER_CSS = readFileSync(
-  path.resolve("features/platform-admin/ui/admin-editorial-ledger.css"),
-  "utf8",
-);
-
-const preview = {
-  schema: "admin.public_takedown.preview.v1" as const,
-  previewId: "40000000-0000-4000-8000-000000000004",
-  expiresAt: "2026-08-26T04:05:00Z",
-  clubId: "10000000-0000-4000-8000-000000000001",
-  sessionId: "20000000-0000-4000-8000-000000000002",
-  publicationId: "30000000-0000-4000-8000-000000000003",
-  targetGeneration: 17,
-  currentSurfaces: ["PUBLIC_CLUB", "PUBLIC_SESSION"],
-  limitationCode: "STORED_OR_OFFLINE_COPY_MAY_REMAIN" as const,
-};
-
-const receipt = {
-  schema: "admin.public_takedown.receipt.v1" as const,
-  receiptId: "50000000-0000-4000-8000-000000000005",
-  convergenceId: "60000000-0000-4000-8000-000000000006",
-  clubId: preview.clubId,
-  sessionId: preview.sessionId,
-  publicationId: preview.publicationId,
-  originResult: "DENIED" as const,
-  committedGeneration: 18,
-  committedClubGeneration: 9,
-  reasonCategory: "PRIVACY",
-  createdAt: "2026-08-26T04:01:00Z",
-  limitationCode: "STORED_OR_OFFLINE_COPY_MAY_REMAIN" as const,
-};
+const EMERGENCY_CSS = readFileSync(path.resolve("features/platform-admin/ui/admin-emergency-lane.css"), "utf8");
+const LEGACY_LEDGER_CSS = readFileSync(path.resolve("features/platform-admin/ui/admin-editorial-ledger.css"), "utf8");
+const blockedPreview = parseAdminTakedownPreview(previewFixture);
+const enabledPreview = { ...blockedPreview, confirmEnabled: true, activationBoundary: "ACTIVE" };
+const receipt = parseAdminTakedownReceipt(receiptFixture);
 
 function renderWorkbench(state: AdminTakedownState, overrides = {}) {
   const props = {
@@ -43,9 +23,13 @@ function renderWorkbench(state: AdminTakedownState, overrides = {}) {
     state,
     pending: false,
     error: null,
+    desktopHandoff: {
+      href: "/admin/public-takedown",
+      status: "idle" as const,
+      onCopy: vi.fn(),
+    },
     onPreview: vi.fn(),
     onConfirm: vi.fn(),
-    onRetryConvergence: vi.fn(),
     ...overrides,
   };
   return { ...render(<AdminPublicTakedownWorkbench {...props} />), props };
@@ -54,106 +38,98 @@ function renderWorkbench(state: AdminTakedownState, overrides = {}) {
 describe("AdminPublicTakedownWorkbench", () => {
   it("denies a capability-less actor without rendering the emergency mutation form", () => {
     renderWorkbench({ kind: "idle" }, { canOperate: false });
-    expect(screen.getByText("운영 · 긴급 공개 회수")).toBeInTheDocument();
-    expect(screen.getByText("긴급 회수 권한이 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("이 작업을 실행할 권한이 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByText(/OWNER|OPERATOR|capability/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "대상 확인" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
   });
 
-  it("shows exact target, current surfaces, generation, limitation, and one primary confirm", () => {
-    const { props, container } = renderWorkbench({ kind: "preview", preview });
-    expect(screen.getByText("운영 · 긴급 공개 회수")).toBeInTheDocument();
-    expect(screen.getByText(preview.clubId)).toBeInTheDocument();
-    expect(screen.getByText(preview.sessionId)).toBeInTheDocument();
-    expect(screen.getByText(preview.publicationId)).toBeInTheDocument();
-    expect(screen.getByText("17")).toBeInTheDocument();
-    expect(screen.getByText("PUBLIC_CLUB")).toBeInTheDocument();
-    expect(screen.getByText("PUBLIC_SESSION")).toBeInTheDocument();
-    expect(screen.getByText(/저장하거나 오프라인으로 보관한 사본/)).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "PRIVACY · 개인정보" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "SECURITY · 보안" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "LEGAL · 법적 요청" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "CONTENT_POLICY · 콘텐츠 정책" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: /SAFETY|OTHER/ })).not.toBeInTheDocument();
-    expect(container.querySelectorAll(".btn-primary")).toHaveLength(1);
+  it("keeps compact desktop handoff primary without hiding the direct safe workflow", () => {
+    const { props } = renderWorkbench({ kind: "idle" });
+    const handoff = screen.getByRole("region", { name: "데스크톱에서 이어서 처리" });
+    const workflow = screen.getByRole("region", { name: "이 기기에서 직접 처리" });
+    expect(handoff.compareDocumentPosition(workflow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "데스크톱용 주소 복사" }));
+    expect(props.desktopHandoff.onCopy).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("link", { name: "이 기기에서 계속 검토" })).toHaveAttribute(
+      "href",
+      "#takedown-direct-workflow",
+    );
+    expect(screen.getByLabelText("클럽 ID")).toBeInTheDocument();
+  });
 
+  it("honors server confirmEnabled=false while keeping its raw activation boundary technical", () => {
+    const { props } = renderWorkbench({ kind: "preview", preview: blockedPreview });
+    expect(screen.getByText(blockedPreview.remoteCopyLimitation)).toBeInTheDocument();
+    expect(screen.getByText("안전 활성화 조건이 아직 충족되지 않았습니다.")).toBeInTheDocument();
+    const technical = screen.getByRole("group", { name: "기술 정보" });
+    expect(technical).toHaveTextContent(blockedPreview.activationBoundary);
+    expect(screen.getByRole("button", { name: "긴급 회수 확인" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "긴급 회수 확인" }));
-    expect(screen.getByRole("alert")).toHaveTextContent("회수 사유를 입력해 주세요.");
     expect(props.onConfirm).not.toHaveBeenCalled();
+  });
 
+  it("translates all four server reason categories and confirms normalized input", () => {
+    const { props } = renderWorkbench({ kind: "preview", preview: enabledPreview });
+    expect(screen.getByRole("option", { name: "개인정보" })).toHaveValue("PRIVATE_DATA");
+    expect(screen.getByRole("option", { name: "법적 요청" })).toHaveValue("LEGAL_REQUEST");
+    expect(screen.getByRole("option", { name: "보안 사고" })).toHaveValue("SECURITY_INCIDENT");
+    expect(screen.getByRole("option", { name: "공공 안전" })).toHaveValue("PUBLIC_SAFETY");
+    expect(screen.queryByRole("option", { name: /PRIVATE_DATA|LEGAL_REQUEST|SECURITY_INCIDENT|PUBLIC_SAFETY/ })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("회수 사유"), { target: { value: "  개인정보 삭제 요청 확인  " } });
     fireEvent.click(screen.getByRole("button", { name: "긴급 회수 확인" }));
-    expect(props.onConfirm).toHaveBeenCalledWith({ reasonCategory: "PRIVACY", reason: "개인정보 삭제 요청 확인" });
+    expect(props.onConfirm).toHaveBeenCalledWith({ reasonCategory: "PRIVATE_DATA", reason: "개인정보 삭제 요청 확인" });
   });
 
-  it("renders an immutable receipt separately from the convergence timeline", () => {
+  it("renders immutable server receipt outcomes without convergence GET or retry UI", () => {
+    renderWorkbench({ kind: "origin-denied", receipt });
+    const region = screen.getByRole("region", { name: "변경 불가 회수 영수증" });
+    expect(region).toHaveTextContent("원본 공개 경로를 차단했습니다.");
+    expect(region).toHaveTextContent("회수 사유 원문은 영수증에 남기지 않았습니다.");
+    expect(region).toHaveTextContent(receipt.remoteCopyLimitation);
+    const technical = screen.getByRole("group", { name: "기술 정보" });
+    expect(technical).toHaveTextContent(receipt.receiptId);
+    expect(technical).toHaveTextContent(receipt.bffEvictionOutcome);
+    expect(technical).toHaveTextContent(receipt.cdnPurgeOutcome);
+    expect(technical).toHaveTextContent(receipt.browserRevalidationOutcome);
+    const timeline = screen.getByRole("region", { name: "명령 기록" });
+    expect(timeline).toHaveTextContent("브라우저 앞단 캐시 회수는 아직 시작되지 않았습니다.");
+    expect(timeline).toHaveTextContent("공개 캐시 회수가 대기열에 등록되었습니다.");
+    expect(timeline).toHaveTextContent("브라우저 캐시는 정책이 허용하는 범위에서 다시 확인됩니다.");
+    expect(timeline).not.toHaveTextContent(/NOT_STARTED|QUEUED|BOUNDED_BY_CACHE_POLICY/);
+    expect(screen.queryByRole("button", { name: /전파.*시도/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "전파 수렴 타임라인" })).not.toBeInTheDocument();
+  });
+
+  it("fails closed when a future server receipt outcome is not recognized", () => {
     renderWorkbench({
-      kind: "convergence-failed",
-      receipt,
-      convergence: {
-        schema: "admin.public_takedown.convergence.v1",
-        convergenceId: receipt.convergenceId,
-        originResult: "DENIED",
-        committedGeneration: 18,
-        status: "FAILED",
-        lastAttemptAt: "2026-08-26T04:02:00Z",
-        retryable: true,
-        attempts: [{ attemptNo: 1, status: "FAILED", observedAt: "2026-08-26T04:02:00Z", resultCategory: "TEMPORARY_FAILURE" }],
+      kind: "origin-denied",
+      receipt: {
+        ...receipt,
+        bffEvictionOutcome: "FUTURE_BFF_OUTCOME",
+        cdnPurgeOutcome: "FUTURE_CDN_OUTCOME",
+        browserRevalidationOutcome: "FUTURE_BROWSER_OUTCOME",
       },
     });
-
-    expect(screen.getByRole("region", { name: "변경 불가 회수 영수증" })).toHaveTextContent(receipt.receiptId);
-    expect(screen.getByRole("region", { name: "전파 수렴 타임라인" })).toHaveTextContent("시도 1");
-    expect(screen.getAllByText("원본 접근 차단 완료")).toHaveLength(2);
-    expect(screen.getByRole("button", { name: "전파 다시 시도" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "긴급 회수 확인" })).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "명령 기록" })).toHaveTextContent(receipt.receiptId);
-    expect(document.querySelector(".admin-safe-action-dock")).toHaveAttribute("data-level", "L3");
-  });
-
-  it("renders an L3 receipt timeline with convergence only after an actual receipt", () => {
-    const { rerender } = renderWorkbench({ kind: "preview", preview });
-
-    expect(document.querySelector(".admin-safe-action-dock")).toHaveAttribute("data-level", "L3");
-    expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
-    expect(screen.queryByText("공개 반영 추적")).not.toBeInTheDocument();
-
-    rerender(
-      <AdminPublicTakedownWorkbench
-        canOperate
-        state={{
-          kind: "origin-denied",
-          receipt,
-          convergence: {
-            schema: "admin.public_takedown.convergence.v1",
-            convergenceId: receipt.convergenceId,
-            originResult: "DENIED",
-            committedGeneration: 18,
-            status: "PENDING",
-            lastAttemptAt: "2026-08-26T04:01:01Z",
-            retryable: false,
-            attempts: [{ attemptNo: 1, status: "PENDING", observedAt: "2026-08-26T04:01:01Z", resultCategory: null }],
-          },
-        }}
-        pending={false}
-        error={null}
-        onPreview={vi.fn()}
-        onConfirm={vi.fn()}
-        onRetryConvergence={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByRole("region", { name: "명령 기록" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "전파 수렴 타임라인" })).toHaveTextContent("시도 1");
+    const timeline = screen.getByRole("region", { name: "명령 기록" });
+    expect(timeline).toHaveTextContent("브라우저 앞단 캐시 결과를 확인해야 합니다.");
+    expect(timeline).toHaveTextContent("공개 캐시 결과를 확인해야 합니다.");
+    expect(timeline).toHaveTextContent("브라우저 캐시 결과를 확인해야 합니다.");
+    expect(timeline).not.toHaveTextContent(/FUTURE_.*_OUTCOME/);
+    expect(screen.queryByRole("button", { name: /전파.*시도/ })).not.toBeInTheDocument();
   });
 
   it("locks 44px targets and reduced motion in the scoped takedown stylesheet", () => {
-    expect(LEDGER_CSS).toMatch(/\.admin-public-takedown[\s\S]*min-height:\s*44px/);
-    expect(LEDGER_CSS).toContain(".admin-public-takedown");
-    expect(LEDGER_CSS).toContain(":focus-visible");
-    expect(LEDGER_CSS).toMatch(
-      /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.admin-public-takedown[\s\S]*animation-duration:\s*0\.01ms/,
-    );
-    expect(LEDGER_CSS).not.toMatch(/backdrop-filter|linear-gradient/);
+    expect(EMERGENCY_CSS).toMatch(/\.admin-emergency-lane[\s\S]*min-height:\s*44px/);
+    expect(EMERGENCY_CSS).toContain(":focus-visible");
+    expect(EMERGENCY_CSS).toMatch(/@media \(max-width:\s*768px\)[\s\S]*\.admin-emergency-lane__compact-handoff[\s\S]*display:\s*grid/);
+    expect(EMERGENCY_CSS).toMatch(/@media \(prefers-reduced-motion: reduce\)[\s\S]*\.admin-emergency-lane[\s\S]*animation-duration:\s*0\.01ms/);
+    expect(EMERGENCY_CSS).not.toMatch(/backdrop-filter|linear-gradient/);
+  });
+
+  it("keeps emergency takedown selectors under one stylesheet owner", () => {
+    expect(LEGACY_LEDGER_CSS).not.toMatch(/\.admin-public-takedown\b/);
+    expect(EMERGENCY_CSS).toContain(".admin-emergency-lane");
+    expect(EMERGENCY_CSS).toContain("var(--warning-line)");
+    expect(EMERGENCY_CSS).toContain("var(--focus-ring-soft)");
   });
 });

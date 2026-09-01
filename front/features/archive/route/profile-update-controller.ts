@@ -1,14 +1,21 @@
 import { useCallback, useRef, useState } from "react";
-import type { MemberProfileResponse, MyPageResponse } from "@/features/archive/api/archive-contracts";
+import { useQueryClient } from "@tanstack/react-query";
+import type { MemberProfileErrorCode, MyPageResponse } from "@/features/archive/api/archive-contracts";
 import { profileSaveErrorMessage } from "@/features/archive/model/archive-model";
 import {
   type EditableMemberProfile,
+  type ProfileSaveResult,
   profileFailureField,
   ProfileUpdateFailure,
 } from "@/features/archive/model/profile-update";
-import { useUpdateMyProfileMutation } from "@/features/archive/queries/profile-queries";
+import { publishUpdatedProfile, useUpdateMyProfileMutation } from "@/features/archive/queries/profile-queries";
 import { isReadmatesApiError } from "@/shared/api/errors";
 import { normalizeBookClubAvatarKey } from "@/shared/ui/book-club-avatar";
+import {
+  isTransitionOwnerObsoleteError,
+  publishTransitionAction,
+  useTransitionSafetyOwner,
+} from "@/shared/ui/use-transition-safety-owner";
 
 type ProfileUpdateControllerInput = {
   sourceProfile: MyPageResponse;
@@ -47,15 +54,17 @@ export function useProfileUpdateController({
   onRevalidate,
 }: ProfileUpdateControllerInput): {
   profile: MyPageResponse;
-  saveProfile: (profile: EditableMemberProfile) => Promise<MemberProfileResponse>;
+  saveProfile: (profile: EditableMemberProfile) => Promise<ProfileSaveResult>;
 } {
+  const queryClient = useQueryClient();
+  const transitionOwner = useTransitionSafetyOwner("member-profile-update");
   const { mutateAsync: updateMyProfile } = useUpdateMyProfileMutation(clubSlug ? { clubSlug } : undefined);
   const [savedState, setSavedState] = useState<{
     clubSlug: string | null | undefined;
     override: SavedProfileOverride;
   } | null>(null);
   const latestRequestGeneration = useRef(0);
-  const savedOverride = savedState?.clubSlug === clubSlug ? savedState.override : null;
+  const savedOverride = savedState && savedState.clubSlug === clubSlug ? savedState.override : null;
   const source = editableProfile(sourceProfile);
 
   const sourceIsAuthoritative = savedOverride !== null && profilesEqual(source, savedOverride.saved);
@@ -68,47 +77,57 @@ export function useProfileUpdateController({
     ? { ...sourceProfile, ...savedOverride.saved }
     : sourceProfile;
 
-  const saveProfile = useCallback(async (editable: EditableMemberProfile) => {
+  const saveProfile = useCallback(async (editable: EditableMemberProfile): Promise<ProfileSaveResult> => {
     const code = canEditProfile ? null : "MEMBERSHIP_NOT_ALLOWED" as const;
     if (code) {
       throw new ProfileUpdateFailure(profileSaveErrorMessage(code), code, "form");
     }
     const requestGeneration = latestRequestGeneration.current + 1;
     latestRequestGeneration.current = requestGeneration;
+    const operationId = `profile-update-${globalThis.crypto.randomUUID()}`;
+    const handle = transitionOwner.begin(operationId, "L1", async () => ({ operationId, outcome: "still-unknown" }));
 
     try {
       const updated = await updateMyProfile(editable);
-      if (requestGeneration !== latestRequestGeneration.current) return updated;
-      const saved = editableProfile(updated as MyPageResponse);
-      await onProfileUpdated();
-      if (requestGeneration !== latestRequestGeneration.current) return updated;
-      setSavedState((currentState) => {
-        const current = currentState?.clubSlug === clubSlug ? currentState.override : null;
-        return {
-          clubSlug,
-          override: {
-            source: editableProfile(sourceProfile),
-            saved,
-            generation: requestGeneration,
-            staleSources: current
-              ? [...current.staleSources, { ...current.saved, generation: current.generation }]
-              : [],
-          },
-        };
+      if (await handle.settle("succeeded") !== "accepted") return { status: "obsolete" };
+      if (requestGeneration !== latestRequestGeneration.current) return { status: "obsolete" };
+      const saved = editableProfile(updated);
+      await publishTransitionAction(handle, "cache", () => publishUpdatedProfile(queryClient));
+      await publishTransitionAction(handle, "receiptCallback", onProfileUpdated);
+      if (requestGeneration !== latestRequestGeneration.current) return { status: "obsolete" };
+      await publishTransitionAction(handle, "ui", () => {
+        setSavedState((currentState) => {
+          const current = currentState && currentState.clubSlug === clubSlug ? currentState.override : null;
+          return {
+            clubSlug,
+            override: {
+              source: editableProfile(sourceProfile),
+              saved,
+              generation: requestGeneration,
+              staleSources: current
+                ? [...current.staleSources, { ...current.saved, generation: current.generation }]
+                : [],
+            },
+          };
+        });
+        onRevalidate();
       });
-      onRevalidate();
-      return updated;
+      return { status: "accepted", profile: updated };
     } catch (error) {
+      if (isTransitionOwnerObsoleteError(error)) return { status: "obsolete" };
+      if (await handle.settle("failed") !== "accepted") return { status: "obsolete" };
       if (error instanceof ProfileUpdateFailure) throw error;
-      const errorCode = isReadmatesApiError(error) ? error.code : null;
+      const errorCode = isReadmatesApiError(error) ? error.code as MemberProfileErrorCode : null;
       throw new ProfileUpdateFailure(
         profileSaveErrorMessage(errorCode),
         errorCode,
         profileFailureField(errorCode),
         { cause: error },
       );
+    } finally {
+      handle.completePublication();
     }
-  }, [canEditProfile, clubSlug, onProfileUpdated, onRevalidate, sourceProfile, updateMyProfile]);
+  }, [canEditProfile, clubSlug, onProfileUpdated, onRevalidate, queryClient, sourceProfile, transitionOwner, updateMyProfile]);
 
   return { profile, saveProfile };
 }

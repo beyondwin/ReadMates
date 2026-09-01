@@ -139,6 +139,7 @@ import java.util.concurrent.atomic.AtomicReference
         "readmates.aigen.kafka.enabled=true",
         "readmates.redis.enabled=true",
         "readmates.aigen.provider-calls.request-timeout=1s",
+        "management.tracing.export.enabled=true",
     ],
 )
 @Tag("integration")

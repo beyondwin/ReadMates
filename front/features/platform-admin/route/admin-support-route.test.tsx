@@ -2,6 +2,12 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, RouterProvider, useLocation } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import type { TransitionSafetyRegistrationPort } from "@/shared/model/global-space";
+import {
+  createGlobalSpaceTransitionCoordinator,
+  createRetiredReceiptCapsuleRegistry,
+} from "@/src/app/global-space-transition";
+import { SpaceTransitionSafetyProvider } from "@/shared/ui/space-transition-safety-context";
 import type {
   AdminSupportGrantLedgerItem,
   AdminSupportSearchResult,
@@ -13,6 +19,7 @@ import {
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { platformAdminSupportLedgerInfiniteQuery } from "@/features/platform-admin/queries/platform-admin-support-queries";
 import { AdminSupportRoute } from "./admin-support-route";
+import type { AdminSupportReceiptCapsule } from "./admin-support-receipt-capsule";
 
 vi.mock("@/features/platform-admin/api/platform-admin-support-api", () => ({
   searchAdminSupportSubjects: vi.fn(),
@@ -76,7 +83,11 @@ function memoryStorage(): Storage {
   };
 }
 
-function renderRoute(options: { canManage?: boolean; pages?: AdminSupportGrantLedgerItem[][] } = {}) {
+function renderRoute(options: {
+  canManage?: boolean;
+  pages?: AdminSupportGrantLedgerItem[][];
+  transitionPort?: TransitionSafetyRegistrationPort;
+} = {}) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity }, mutations: { retry: false } },
   });
@@ -107,14 +118,17 @@ function renderRoute(options: { canManage?: boolean; pages?: AdminSupportGrantLe
     },
   ], { initialEntries: ["/admin/support?clubId=club-1"] });
 
+  const route = (
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  );
   return {
     client,
     router,
-    ...render(
-      <QueryClientProvider client={client}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>,
-    ),
+    ...render(options.transitionPort
+      ? <SpaceTransitionSafetyProvider port={options.transitionPort}>{route}</SpaceTransitionSafetyProvider>
+      : route),
   };
 }
 
@@ -163,7 +177,7 @@ describe("AdminSupportRoute", () => {
       grantExpiresAt: "2026-08-25T12:00:00Z",
       reasonCategory: "MEMBER_ASSISTANCE",
       notePresent: true,
-      impactCodes: ["GRANT_SUPPORT_ACCESS"],
+      impactCodes: ["SUPPORT_ACCESS_WILL_BECOME_ACTIVE"],
       expiresAt: "2026-08-25T10:10:00Z",
       fingerprintPrefix: "00112233",
     });
@@ -191,8 +205,17 @@ describe("AdminSupportRoute", () => {
     fireEvent.click(await screen.findByRole("button", { name: /지원 대상/ }));
     fireEvent.change(screen.getByLabelText("선택 사유"), { target: { value: "MEMBER_ASSISTANCE" } });
     fireEvent.change(screen.getByLabelText("검토 시에만 확인하는 사유 메모 (저장되지 않음)"), { target: { value: "raw private note" } });
+    fireEvent.change(screen.getByLabelText("만료 시각"), { target: { value: "2026-08-25T12:00" } });
     fireEvent.click(screen.getByRole("button", { name: "발급 검토" }));
-    expect(await screen.findByText(/GRANT_SUPPORT_ACCESS/)).toBeInTheDocument();
+    expect(await screen.findByText(/SUPPORT_ACCESS_WILL_BECOME_ACTIVE/)).toBeInTheDocument();
+    expect(previewAdminSupportGrant).toHaveBeenCalledWith({
+      clubId: "club-1",
+      granteeSubjectId: target.subjectId,
+      scope: "HOST_SUPPORT_READ",
+      expiresAt: "2026-08-25T03:00:00.000Z",
+      reasonCategory: "MEMBER_ASSISTANCE",
+      note: "raw private note",
+    });
     expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "지원 접근 발급" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("같은 요청");
@@ -204,6 +227,17 @@ describe("AdminSupportRoute", () => {
     const calls = vi.mocked(confirmAdminSupportGrant).mock.calls;
     expect(calls).toHaveLength(2);
     expect(calls[0]?.[0].idempotencyKey).toBe(calls[1]?.[0].idempotencyKey);
+    expect(calls[0]?.[0]).toEqual({
+      clubId: "club-1",
+      granteeSubjectId: target.subjectId,
+      scope: "HOST_SUPPORT_READ",
+      expiresAt: "2026-08-25T03:00:00.000Z",
+      reasonCategory: "MEMBER_ASSISTANCE",
+      note: "raw private note",
+      previewId: "preview-1",
+      idempotencyKey: expect.any(String),
+      confirmed: true,
+    });
     const receipt = screen.getByLabelText("명령 영수증");
     expect(within(receipt).getByText(/회원 지원/)).toBeInTheDocument();
     expect(within(receipt).getByText(/검토 시 사유 메모 사용/)).toBeInTheDocument();
@@ -229,6 +263,94 @@ describe("AdminSupportRoute", () => {
     expect(screen.getByRole("searchbox", { name: "지원 대상 검색" })).toHaveValue("");
   });
 
+  it("drops a late create confirmation after unmount and authority loss without replay or publication", async () => {
+    vi.mocked(searchAdminSupportSubjects).mockResolvedValue([target]);
+    vi.mocked(previewAdminSupportGrant).mockResolvedValue({
+      previewId: "preview-1",
+      commandType: "CREATE",
+      grantId: null,
+      clubId: "club-1",
+      scope: "HOST_SUPPORT_READ",
+      grantExpiresAt: "2026-08-25T12:00:00Z",
+      reasonCategory: "MEMBER_ASSISTANCE",
+      notePresent: true,
+      impactCodes: ["SUPPORT_ACCESS_WILL_BECOME_ACTIVE"],
+      expiresAt: "2026-08-25T10:10:00Z",
+      fingerprintPrefix: "00112233",
+    });
+    const receipt = {
+      receiptId: "receipt-late",
+      previewId: "preview-1",
+      commandType: "CREATE" as const,
+      grantId: grant.grantId,
+      clubId: "club-1",
+      scope: "HOST_SUPPORT_READ" as const,
+      grantExpiresAt: "2026-08-25T12:00:00Z",
+      reasonCategory: "MEMBER_ASSISTANCE" as const,
+      notePresent: true,
+      beforeStatus: "ABSENT",
+      afterStatus: "ACTIVE",
+      outcome: "SUCCEEDED",
+      createdAt: "2026-08-25T10:00:00Z",
+    };
+    const late = deferred<typeof receipt>();
+    vi.mocked(confirmAdminSupportGrant).mockReturnValue(late.promise);
+    const registry = createRetiredReceiptCapsuleRegistry();
+    const coordinator = createGlobalSpaceTransitionCoordinator({ registry });
+    const beginPending = vi.spyOn(coordinator, "beginPending");
+    const { client, router, unmount } = renderRoute({ transitionPort: coordinator });
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "지원 대상 검색" }), { target: { value: "private name" } });
+    fireEvent.click(screen.getByRole("button", { name: "검색" }));
+    fireEvent.click(await screen.findByRole("button", { name: /지원 대상/ }));
+    fireEvent.change(screen.getByLabelText("검토 시에만 확인하는 사유 메모 (저장되지 않음)"), { target: { value: "late private note" } });
+    fireEvent.change(screen.getByLabelText("만료 시각"), { target: { value: "2026-08-25T12:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "발급 검토" }));
+    await screen.findByRole("button", { name: "지원 접근 발급" });
+    fireEvent.click(screen.getByRole("button", { name: "지원 접근 발급" }));
+    await waitFor(() => expect(confirmAdminSupportGrant).toHaveBeenCalledTimes(1));
+
+    const registration = beginPending.mock.calls[0]?.[0];
+    expect(registration?.recovery.kind).toBe("receipt");
+    if (!registration || registration.recovery.kind !== "receipt") throw new Error("receipt recovery required");
+    const capsule = registration.recovery.capsule as AdminSupportReceiptCapsule;
+    const handle = beginPending.mock.results[0]!.value;
+    const publishAccepted = vi.spyOn(handle, "publishAccepted");
+    const invalidateQueries = vi.spyOn(client, "invalidateQueries");
+    const localWrite = vi.spyOn(window.localStorage, "setItem");
+    const sessionWrite = vi.spyOn(window.sessionStorage, "setItem");
+    expect(capsule.retainedRequest()).toMatchObject({
+      previewId: "preview-1",
+      reasonCategory: "MEMBER_ASSISTANCE",
+      note: "late private note",
+      idempotencyKey: expect.any(String),
+      confirmed: true,
+    });
+
+    unmount();
+    expect(registry.size()).toBe(1);
+    coordinator.invalidateForAuthorityLoss();
+    late.resolve(receipt);
+    await act(() => late.promise);
+    await waitFor(() => expect(registry.size()).toBe(0));
+
+    expect(confirmAdminSupportGrant).toHaveBeenCalledTimes(1);
+    expect(capsule.replayCount()).toBe(0);
+    expect(capsule.retainedRequest()).toBeNull();
+    await expect(handle.reconcile()).resolves.toEqual({
+      operationId: registration.operationId,
+      outcome: "authority-lost",
+    });
+    expect(publishAccepted).not.toHaveBeenCalled();
+    expect(invalidateQueries).not.toHaveBeenCalled();
+    expect(client.getQueryData(platformAdminSupportLedgerInfiniteQuery({ clubId: "club-1" }).queryKey)).toBeUndefined();
+    expect(router.state.location.pathname).toBe("/admin/support");
+    expect(screen.queryByText("receipt-late")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(localWrite).not.toHaveBeenCalled();
+    expect(sessionWrite).not.toHaveBeenCalled();
+  });
+
   it("previews revoke and preserves the same identity while its result is ambiguous", async () => {
     vi.mocked(previewAdminSupportGrantRevoke).mockResolvedValue({
       previewId: "revoke-preview-1",
@@ -239,7 +361,7 @@ describe("AdminSupportRoute", () => {
       grantExpiresAt: grant.expiresAt,
       reasonCategory: "MEMBER_ASSISTANCE",
       notePresent: false,
-      impactCodes: ["REVOKE_SUPPORT_ACCESS"],
+      impactCodes: ["SUPPORT_ACCESS_WILL_BE_REVOKED"],
       expiresAt: "2026-08-25T10:10:00Z",
       fingerprintPrefix: "00112233",
     });
@@ -264,7 +386,7 @@ describe("AdminSupportRoute", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "권한 취소 검토" }));
     fireEvent.click(screen.getByRole("button", { name: "취소 검토" }));
-    expect(await screen.findByText("REVOKE_SUPPORT_ACCESS")).toBeInTheDocument();
+    expect(await screen.findByText("SUPPORT_ACCESS_WILL_BE_REVOKED")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "취소 확정" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("같은 요청");
     fireEvent.click(screen.getByRole("button", { name: "취소 확정" }));
@@ -326,7 +448,7 @@ describe("AdminSupportRoute", () => {
       grantExpiresAt: "2026-08-25T12:00:00Z",
       reasonCategory: "MEMBER_ASSISTANCE",
       notePresent: false,
-      impactCodes: ["GRANT_SUPPORT_ACCESS"],
+      impactCodes: ["SUPPORT_ACCESS_WILL_BECOME_ACTIVE"],
       expiresAt: "2026-08-25T10:10:00Z",
       fingerprintPrefix: "00112233",
     });
@@ -369,3 +491,9 @@ describe("AdminSupportRoute", () => {
     await waitFor(() => expect(ledgerRows()).toHaveLength(1));
   });
 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((next) => { resolve = next; });
+  return { promise, resolve };
+}

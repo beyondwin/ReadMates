@@ -22,6 +22,7 @@ vi.mock("react-router", async (importOriginal) => ({
 }));
 
 vi.mock("@/features/archive/queries/profile-queries", () => ({
+  publishUpdatedProfile: vi.fn().mockResolvedValue(undefined),
   useUpdateMyProfileMutation: () => ({ mutateAsync: mutations.profile }),
 }));
 

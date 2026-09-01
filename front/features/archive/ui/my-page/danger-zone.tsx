@@ -4,7 +4,7 @@ import { scopedPublicLinkTarget } from "@/shared/routing/scoped-app-link-target"
 export function DangerZone({
   onLeaveMembership,
 }: {
-  onLeaveMembership: () => Promise<void>;
+  onLeaveMembership: () => Promise<"accepted" | "obsolete">;
 }) {
   const confirmationId = useId();
   const [leaveOpen, setLeaveOpen] = useState(false);
@@ -26,7 +26,8 @@ export function DangerZone({
     setLeaveError(null);
 
     try {
-      await onLeaveMembership();
+      const result = await onLeaveMembership();
+      if (result === "obsolete") return;
       setLeaveMessage("탈퇴 처리되었습니다.");
       globalThis.location.href = scopedPublicLinkTarget(globalThis.location.pathname, "/about");
     } catch {
