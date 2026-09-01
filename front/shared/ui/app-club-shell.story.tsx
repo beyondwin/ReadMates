@@ -2,8 +2,6 @@ import type { ReactNode } from "react";
 import type { ClubShellLinkProps, PrimaryNavigationItem } from "../model/app-club-shell";
 import { AppClubShell } from "./app-club-shell";
 import { GlobalSpaceSwitcher } from "./global-space-switcher";
-// Host-scoped chrome lives in feature CSS; production host routes import it via shell primitives.
-import "@/features/host/ui/shell/host-shell.css";
 
 function StoryLink({ to, replace: _replace, state: _state, children, ...props }: ClubShellLinkProps) {
   void _replace;

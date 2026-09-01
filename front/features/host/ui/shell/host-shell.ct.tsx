@@ -1,15 +1,14 @@
 import { expect, test } from "@playwright/experimental-ct-react";
 import { expectLocatorGeometry } from "@/tests/e2e/support/approved-mockup-contract";
-import { AppClubShellHostStory } from "@/shared/ui/app-club-shell.story";
 import "./host-shell.css";
-import { HostShellPrimitivesStory } from "./host-shell.story";
+import { AppClubShellHostChromeStory, HostShellPrimitivesStory } from "./host-shell.story";
 
 test("host AppClubShell matches approved 1536 geometry", async ({ mount, page }) => {
   await page.setViewportSize({ width: 1536, height: 1024 });
   const shell = await mount(
-    <AppClubShellHostStory>
+    <AppClubShellHostChromeStory>
       <main><h1>운영실</h1></main>
-    </AppClubShellHostStory>,
+    </AppClubShellHostChromeStory>,
   );
 
   await expectLocatorGeometry(shell.locator(".topnav"), { x: 0, y: 0, width: 1536, height: 90 }, 4);
@@ -18,9 +17,9 @@ test("host AppClubShell matches approved 1536 geometry", async ({ mount, page })
 test("host AppClubShell keeps a fixed mobile primary region at 390", async ({ mount, page }) => {
   await page.setViewportSize({ width: 390, height: 832 });
   const shell = await mount(
-    <AppClubShellHostStory>
+    <AppClubShellHostChromeStory>
       <main><h1>운영실</h1></main>
-    </AppClubShellHostStory>,
+    </AppClubShellHostChromeStory>,
   );
 
   await expect(shell.locator('[data-club-shell-region="mobile-primary"]')).toBeVisible();

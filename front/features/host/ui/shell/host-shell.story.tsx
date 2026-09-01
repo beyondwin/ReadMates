@@ -1,6 +1,13 @@
+import type { ReactNode } from "react";
+import { AppClubShellHostStory } from "@/shared/ui/app-club-shell.story";
 import { HostPrimaryNavigation } from "./host-primary-navigation";
 import { HostUtilityActions } from "./host-utility-actions";
 import { HostWorkspaceSwitcher } from "./host-workspace-switcher";
+import "./host-shell.css";
+
+export function AppClubShellHostChromeStory({ children }: { children: ReactNode }) {
+  return <AppClubShellHostStory>{children}</AppClubShellHostStory>;
+}
 
 const destinations = [
   { id: "operating-room" as const, href: "/app/host", current: true },
