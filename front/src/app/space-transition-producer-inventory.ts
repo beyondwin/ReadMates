@@ -400,11 +400,14 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
       type CallableScope = Map<string, EagerRuntimeFunction | null>;
       type BindingValue = {
         expression?: ts.Expression;
-        definitelyNonUndefined: boolean;
+        presence: "definitely-defined" | "definitely-undefined" | "unknown";
       };
       const executedBodies = new Set<EagerRuntimeFunction>();
       const activeCalls = new Set<EagerRuntimeFunction>();
-      const unknownBindingValue: BindingValue = { definitelyNonUndefined: false };
+      const definitelyUndefinedBindingValue: BindingValue = {
+        presence: "definitely-undefined",
+      };
+      const unknownBindingValue: BindingValue = { presence: "unknown" };
 
       const addBindingNames = (
         scope: CallableScope,
@@ -466,10 +469,19 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
         return { found: false, callable: null };
       };
 
-      const bindingValueFromExpression = (expression: ts.Expression): BindingValue => ({
-        expression,
-        definitelyNonUndefined: isDefinitelyNonUndefinedExpression(expression),
-      });
+      const bindingValueFromExpression = (expression: ts.Expression): BindingValue => {
+        const candidate = unwrapTransparentExpression(expression);
+        const isDefinitelyUndefined = ts.isVoidExpression(candidate)
+          || (ts.isIdentifier(candidate) && candidate.text === "undefined");
+        return {
+          expression,
+          presence: isDefinitelyUndefined
+            ? "definitely-undefined"
+            : isDefinitelyNonUndefinedExpression(expression)
+              ? "definitely-defined"
+              : "unknown",
+        };
+      };
 
       const staticPropertyName = (name: ts.PropertyName): string | null => {
         if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) {
@@ -518,11 +530,13 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
             return bindingValueFromExpression(property.name);
           }
           if (ts.isMethodDeclaration(property)) {
-            return { definitelyNonUndefined: true };
+            return { presence: "definitely-defined" };
           }
           return unknownBindingValue;
         }
-        return unknownBindingValue;
+        return mayHaveLaterOverride
+          ? unknownBindingValue
+          : definitelyUndefinedBindingValue;
       };
 
       const arrayBindingValue = (source: BindingValue, index: number): BindingValue => {
@@ -534,13 +548,14 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
           if (ts.isSpreadElement(element)) return unknownBindingValue;
           if (offset !== index) continue;
           return ts.isOmittedExpression(element)
-            ? unknownBindingValue
+            ? definitelyUndefinedBindingValue
             : bindingValueFromExpression(element);
         }
-        return unknownBindingValue;
+        return definitelyUndefinedBindingValue;
       };
 
       const isDefinitelyNonBindingSource = (source: BindingValue): boolean => {
+        if (source.presence === "definitely-undefined") return true;
         if (!source.expression) return false;
         const expression = unwrapTransparentExpression(source.expression);
         return expression.kind === ts.SyntaxKind.NullKeyword
@@ -559,12 +574,15 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
           const value = ts.isObjectBindingPattern(name)
             ? objectBindingValue(source, candidate)
             : arrayBindingValue(source, index);
-          const defaultMayExecute = !value.definitelyNonUndefined;
+          const defaultMayExecute = value.presence !== "definitely-defined";
+          const suppliedValueMayBeSelected = value.presence !== "definitely-undefined";
           if (candidate.initializer && defaultMayExecute) {
             visit(candidate.initializer, scopes);
           }
           if (ts.isIdentifier(candidate.name)) continue;
-          visitBindingDefaults(candidate.name, value, scopes);
+          if (suppliedValueMayBeSelected) {
+            visitBindingDefaults(candidate.name, value, scopes);
+          }
           if (candidate.initializer && defaultMayExecute) {
             visitBindingDefaults(
               candidate.name,

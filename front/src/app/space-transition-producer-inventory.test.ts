@@ -507,6 +507,17 @@ describe("space transition mutation-producer inventory", () => {
       "array binding with an explicitly undefined element",
       "const eager = (([value = classifiedWrite()]) => value)([undefined]);",
     ],
+    [
+      "outer object default that still leaves the inner value missing",
+      "const { nested: { value = classifiedWrite() } = {} } = {};",
+    ],
+    [
+      "unknown object source whose supplied path can leave the inner value missing",
+      `
+        const maybeSource = Math.random() > 0.5 ? { nested: {} } : {};
+        const { nested: { value = classifiedWrite() } = { value: "provided" } } = maybeSource;
+      `,
+    ],
   ])("detects a classified write in %s", (_kind, initializer) => {
     const { inventory, sources } = classifiedWriteConsumerFixture(`
       import { classifiedWrite } from "@/features/example/api/classified-write";
@@ -550,6 +561,14 @@ describe("space transition mutation-producer inventory", () => {
     [
       "IIFE array binding with a defined element",
       "const eager = (([value = classifiedWrite()]) => value)([\"provided\"]);",
+    ],
+    [
+      "selected outer object default with a defined inner property",
+      "const { nested: { value = classifiedWrite() } = { value: \"provided\" } } = {};",
+    ],
+    [
+      "selected outer array default with a defined inner element",
+      "const [[value = classifiedWrite()] = [\"provided\"]] = [];",
     ],
   ])("keeps the default dormant for %s", (_kind, initializer) => {
     const { inventory, sources } = classifiedWriteConsumerFixture(`
