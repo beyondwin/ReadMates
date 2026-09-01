@@ -395,6 +395,35 @@ describe("space transition mutation-producer inventory", () => {
     });
   });
 
+  it.each([
+    ["arrow IIFE", "const eager = (() => classifiedWrite())();"],
+    ["function-expression IIFE", "const eager = (function () { return classifiedWrite(); })();"],
+    [
+      "parenthesized type-wrapped arrow IIFE",
+      "const eager = (((() => classifiedWrite()) as () => unknown))();",
+    ],
+    [
+      "parenthesized satisfies-wrapped function IIFE",
+      "const eager = (((function () { return classifiedWrite(); }) satisfies () => unknown))();",
+    ],
+  ])("detects a classified write in a directly invoked %s", (_kind, initializer) => {
+    const { inventory, sources } = classifiedWriteConsumerFixture(`
+      import { classifiedWrite } from "@/features/example/api/classified-write";
+      ${initializer}
+    `);
+
+    expect(auditMutationProducerInventory(
+      sources,
+      buildMountedProductionPaths(sources, ["src/main.tsx"]),
+      inventory,
+    )).toMatchObject({
+      unclassifiedPaths: ["features/example/route/rogue-route.ts"],
+      modifyEntriesWithMissingMountedOwners: [
+        "features/example/api/classified-write.ts->features/example/route/rogue-route.ts",
+      ],
+    });
+  });
+
   it("detects a classified write reached by an anonymous default function export", () => {
     const { inventory, sources } = classifiedWriteConsumerFixture(`
       import { classifiedWrite } from "@/features/example/api/classified-write";
@@ -414,9 +443,18 @@ describe("space transition mutation-producer inventory", () => {
   });
 
   it.each([
-    ["function", "function dormant() { return classifiedWrite(); }"],
-    ["arrow", "const dormant = () => classifiedWrite();"],
-  ])("keeps a non-exported dormant %s body out of module execution", (_kind, declaration) => {
+    ["function declaration", "function dormant() { return classifiedWrite(); }"],
+    ["stored arrow", "const dormant = () => classifiedWrite();"],
+    ["stored function expression", "const dormant = function () { return classifiedWrite(); };"],
+    [
+      "passed arrow",
+      "function retain(callback: () => unknown) { return callback; } const dormant = retain(() => classifiedWrite());",
+    ],
+    [
+      "passed function expression",
+      "function retain(callback: () => unknown) { return callback; } const dormant = retain(function () { return classifiedWrite(); });",
+    ],
+  ])("keeps a non-invoked %s body out of module execution", (_kind, declaration) => {
     const { inventory, sources } = classifiedWriteConsumerFixture(`
       import { classifiedWrite } from "@/features/example/api/classified-write";
       ${declaration}

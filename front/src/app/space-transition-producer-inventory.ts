@@ -256,6 +256,20 @@ function isTopLevelExecutionStatement(statement: ts.Statement): boolean {
     || ts.isExportAssignment(statement);
 }
 
+function unwrapTransparentExpression(expression: ts.Expression): ts.Expression {
+  let current = expression;
+  while (
+    ts.isParenthesizedExpression(current)
+    || ts.isAsExpression(current)
+    || ts.isTypeAssertionExpression(current)
+    || ts.isNonNullExpression(current)
+    || ts.isSatisfiesExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
 function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): ProductionSymbolGraph {
   const edges = new Map<string, Set<string>>();
   const writeEdges = new Map<string, Set<string>>();
@@ -357,9 +371,18 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
 
     const addEagerRuntimeReferences = (from: string, root: ts.Node) => {
       const visit = (candidate: ts.Node) => {
+        if (ts.isCallExpression(candidate)) {
+          const invoked = unwrapTransparentExpression(candidate.expression);
+          if (ts.isArrowFunction(invoked) || ts.isFunctionExpression(invoked)) {
+            visit(invoked.body);
+            for (const argument of candidate.arguments) visit(argument);
+            return;
+          }
+        }
         if (ts.isTypeNode(candidate)
           || ts.isArrowFunction(candidate)
           || ts.isFunctionExpression(candidate)
+          || ts.isFunctionDeclaration(candidate)
           || ts.isClassExpression(candidate)
           || ts.isMethodDeclaration(candidate)
           || ts.isGetAccessorDeclaration(candidate)
