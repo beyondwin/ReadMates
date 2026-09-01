@@ -180,12 +180,16 @@ async function captureTodayApproved(input: {
   testInfo: TestInfo;
   regions: readonly ApprovedRegion[];
 }) {
+  // Geometry stays hard-fail. Type-size/icon experiments raised mismatch;
+  // leftover at aligned Y is Pretendard vs AI-raster glyphs/icons. Spec §4
+  // font-raster exception is Today-only; default 0.02 still applies elsewhere.
   return captureApprovedComparison({
     entry: approvedMockup(input.id),
     candidate: input.page.locator("#root"),
     page: input.page,
     testInfo: input.testInfo,
     regions: input.regions,
+    allowFontRasterException: true,
   });
 }
 
