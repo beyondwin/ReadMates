@@ -95,6 +95,8 @@ front/playwright/.cache/
 .orchestrator/
 .codex-orchestrator/
 .waygent/
+.remember/
+.impeccable/
 .server-config/
 output/
 # Protected host rollout manifests and attestation bundles are CI artifacts only.
