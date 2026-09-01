@@ -26,6 +26,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Fixed
 
+- **전환 authority·정적 분석 fail-closed 보강:** 실제 `GlobalSpaceTransitionController`가 accepted publication의 current-generation probe를 `useTransitionSafetyOwner`까지 필수 전달해 host/platform 권한 상실이 async await 중 발생해도 원 요청을 재실행하거나 cache·refetch·UI·receipt/copy/navigation/return-target/session-storage를 발행하지 않습니다. Mutation producer inventory는 eager top-level initializer와 anonymous default export를 추적하되 dormant function/arrow body는 실행으로 보지 않습니다. Admin primary-language 검사는 127/128 alias depth exhaustion과 injected contract filename 충돌을 명시적으로 차단하고, action 기술 정보에는 lifecycle 변환 전 값을 보존합니다.
 - **릴리즈 게이트 안정성:** 호스트 운영실 서비스·조회 fixture의 Detekt 책임 경계를 동작 변경 없이 분리했습니다. Testcontainers 전체 lane은 Java 25의 Spring/Kotlin class metadata 누적을 bounded worker·context cache와 integration 전용 heap으로 제한하고, 일반 test context에서는 tracing을 끄되 tracing 계약만 명시적으로 opt-in합니다. 알림 stale lease 회수는 `SKIP LOCKED`로 선점한 exact delivery만 갱신해 동시 claim의 deadlock을 피하고, avatar CT는 이미지 decode polling과 단일 raster 검사를 분리해 Linux renderer 부하에서도 같은 투명도 계약을 검증합니다.
 - **오늘 큐 작업 후 진행:** 잠시 미룸·처리함 성공 뒤에는 다음 케이스로 넘어가고 마지막 항목이면 큐 요약으로 포커스를 돌립니다. 화면 행동은 서버 `allowedActions`와 wire contract에 있는 의미만 사용합니다.
 - **호스트·관리자 leftover 권위:** Analytics CSV는 export capability가 없으면 버튼을 보여 주지 않고, 알림 replay는 응답 손실을 `unknown-outcome`으로 표시하며 같은 명령만 재확인합니다. 미종료 모임은 노트 게시 가능처럼 쓰지 않고, 관리자 workbench 권한은 역할 이름이 아니라 호출자가 넘긴 permission입니다. 사용하지 않는 Meeting Folio header와 host-dashboard-mobile CSS를 제거했습니다.
@@ -63,7 +64,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Verification
 
-- 서버 PR gate와 MySQL/Testcontainers 1,422건, Docker Chromium component 104건, frontend lint/test/build와 focused/full E2E, public release candidate 검증을 fresh canonical command로 통과했습니다. Chrome 실제 200% zoom에서 DPR 2→4, CSS viewport 1728→864, 수평 overflow 없음과 보이는 focus target을 확인했습니다. 5명 초보 운영자 30초 이해 연구, VoiceOver/Safari·NVDA/Chrome 수동 screen-reader 순서, 로컬 gitleaks는 `not measured`이고 repository public-safety scanner는 통과했습니다. Provider 호출, 실제 이메일 발송, production mutation, deploy는 수행하지 않았습니다.
+- 이번 whole-branch 보정은 actual controller/owner host·platform authority-loss 35건, mutation inventory 37건, primary-language/admin status 59건, owner/coordinator/host-ledger/admin route 47건을 focused GREEN으로 확인했습니다. Frontend lint는 error 0건(기존 Fast Refresh warning 2건), full Vitest는 449 files·4,193 tests, production build는 807 modules로 통과했고 public release candidate와 repository fallback public-safety check도 통과했습니다. 이 보정에서 server, MySQL/Testcontainers, Docker component, E2E는 다시 실행하지 않았으므로 새 최종 증거로 주장하지 않습니다. 5명 초보 운영자 30초 이해 연구와 VoiceOver/Safari·NVDA/Chrome 수동 screen-reader 순서는 계속 `not measured`입니다. 로컬 gitleaks는 사용할 수 없어 fallback path/content check만 실행했으며 완전한 secret scan으로 주장하지 않습니다. Provider 호출, 실제 이메일 발송, production mutation, deploy는 수행하지 않았습니다.
 
 ## v2.4.1 - 2026-08-17
 

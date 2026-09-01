@@ -107,7 +107,7 @@ export function useTransitionSafetyOwner(
       releaseTimer = globalThis.setTimeout(releaseLocally, 0);
     };
     const isPublicationCurrent = () => !released
-      && (handle.isAcceptedPublicationCurrent?.() ?? true);
+      && handle.isAcceptedPublicationCurrent();
     const wrapped: TransitionOwnerHandle = {
       generation: handle.generation,
       isAcceptedPublicationCurrent: handle.isAcceptedPublicationCurrent,

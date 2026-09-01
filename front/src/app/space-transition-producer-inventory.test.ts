@@ -32,6 +32,43 @@ function productionSources(): Map<string, string> {
 
 const mountedOwners = buildMountedProductionPaths(productionSources(), ["src/main.tsx"]);
 
+function classifiedWriteConsumerFixture(consumerSource: string) {
+  const sources = new Map([
+    ["src/main.tsx", `
+      import "@/features/example/route/write-owner";
+      import "@/features/example/route/rogue-route";
+    `],
+    ["features/example/api/classified-write.ts", `
+      export function classifiedWrite() {
+        return fetch("/write", { method: "POST" });
+      }
+    `],
+    ["features/example/route/write-owner.ts", `
+      import { classifiedWrite } from "../api/classified-write";
+      export function WriteOwner() { return classifiedWrite(); }
+    `],
+    ["features/example/route/rogue-route.ts", consumerSource],
+  ]);
+  const inventory: MutationProducerClassification[] = [
+    {
+      path: "features/example/route/write-owner.ts",
+      classification: "register",
+      ownerPaths: ["features/example/route/write-owner.ts"],
+      recoveryClass: "L1",
+      evidenceTokens: ["registered"],
+    },
+    {
+      path: "features/example/api/classified-write.ts",
+      exportName: "classifiedWrite",
+      classification: "modify",
+      ownerPaths: ["features/example/route/write-owner.ts"],
+      recoveryClass: "L1",
+      evidenceTokens: ["transport"],
+    },
+  ];
+  return { inventory, sources };
+}
+
 describe("space transition mutation-producer inventory", () => {
   it("classifies every current mounted producer and exported out-of-domain write", () => {
     expect(SPACE_TRANSITION_PRODUCER_INVENTORY).toHaveLength(97);
@@ -337,6 +374,65 @@ describe("space transition mutation-producer inventory", () => {
       modifyEntriesWithMissingMountedOwners: [
         "features/auth/api/auth-api.ts->features/example/route/rogue-route.ts",
       ],
+    });
+  });
+
+  it("detects an eager top-level variable initializer that invokes a classified write", () => {
+    const { inventory, sources } = classifiedWriteConsumerFixture(`
+      import { classifiedWrite } from "@/features/example/api/classified-write";
+      const eager = classifiedWrite();
+    `);
+
+    expect(auditMutationProducerInventory(
+      sources,
+      buildMountedProductionPaths(sources, ["src/main.tsx"]),
+      inventory,
+    )).toMatchObject({
+      unclassifiedPaths: ["features/example/route/rogue-route.ts"],
+      modifyEntriesWithMissingMountedOwners: [
+        "features/example/api/classified-write.ts->features/example/route/rogue-route.ts",
+      ],
+    });
+  });
+
+  it("detects a classified write reached by an anonymous default function export", () => {
+    const { inventory, sources } = classifiedWriteConsumerFixture(`
+      import { classifiedWrite } from "@/features/example/api/classified-write";
+      export default function () { return classifiedWrite(); }
+    `);
+
+    expect(auditMutationProducerInventory(
+      sources,
+      buildMountedProductionPaths(sources, ["src/main.tsx"]),
+      inventory,
+    )).toMatchObject({
+      unclassifiedPaths: ["features/example/route/rogue-route.ts"],
+      modifyEntriesWithMissingMountedOwners: [
+        "features/example/api/classified-write.ts->features/example/route/rogue-route.ts",
+      ],
+    });
+  });
+
+  it.each([
+    ["function", "function dormant() { return classifiedWrite(); }"],
+    ["arrow", "const dormant = () => classifiedWrite();"],
+  ])("keeps a non-exported dormant %s body out of module execution", (_kind, declaration) => {
+    const { inventory, sources } = classifiedWriteConsumerFixture(`
+      import { classifiedWrite } from "@/features/example/api/classified-write";
+      ${declaration}
+    `);
+
+    expect(auditMutationProducerInventory(
+      sources,
+      buildMountedProductionPaths(sources, ["src/main.tsx"]),
+      inventory,
+    )).toEqual({
+      unclassifiedPaths: [],
+      unclassifiedExportedWrites: [],
+      unreachableExportsWithMountedImports: [],
+      modifyEntriesWithoutMountedOwner: [],
+      modifyEntriesWithMissingMountedOwners: [],
+      verifiedLeavesWithForbiddenPublication: [],
     });
   });
 

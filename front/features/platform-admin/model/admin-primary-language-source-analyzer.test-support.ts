@@ -32,8 +32,11 @@ export function analyzeAdminPrimaryLanguageSource(
   };
 
   const inspectStatic = (node: ts.Node) => {
-    const term = findBannedPrimaryTerm(node, checker);
-    if (term) report(node, `primary copy contains ${term}`);
+    const inspection = inspectStaticPrimaryCopy(node, checker);
+    if (inspection.term) report(node, `primary copy contains ${inspection.term}`);
+    else if (inspection.depthExhausted) {
+      report(node, "primary copy static resolution depth exhausted");
+    }
   };
 
   const inspectDisclosureCandidateAttributes = (attributes: ts.JsxAttributes) => {
@@ -100,9 +103,12 @@ function createSourceContext(source: string, fileName: string): {
   const contractSource = `declare module "${TECHNICAL_DISCLOSURE_MODULE}" {
     export function ${TECHNICAL_DISCLOSURE_NAME}(props: unknown): unknown;
   }`;
+  const contractFileName = fileName === TECHNICAL_DISCLOSURE_CONTRACT_FILE
+    ? "__admin-technical-disclosure-contract-injected.d.ts"
+    : TECHNICAL_DISCLOSURE_CONTRACT_FILE;
   const sourceFile = ts.createSourceFile(fileName, source, options.target!, true, ts.ScriptKind.TSX);
   const contractSourceFile = ts.createSourceFile(
-    TECHNICAL_DISCLOSURE_CONTRACT_FILE,
+    contractFileName,
     contractSource,
     options.target!,
     true,
@@ -110,19 +116,19 @@ function createSourceContext(source: string, fileName: string): {
   );
   const sourceFiles = new Map([
     [fileName, sourceFile],
-    [TECHNICAL_DISCLOSURE_CONTRACT_FILE, contractSourceFile],
+    [contractFileName, contractSourceFile],
   ]);
   const host = ts.createCompilerHost(options, true);
   host.fileExists = (requestedFileName) => sourceFiles.has(requestedFileName);
   host.readFile = (requestedFileName) => {
     if (requestedFileName === fileName) return source;
-    if (requestedFileName === TECHNICAL_DISCLOSURE_CONTRACT_FILE) return contractSource;
+    if (requestedFileName === contractFileName) return contractSource;
     return undefined;
   };
   host.getSourceFile = (requestedFileName) => sourceFiles.get(requestedFileName);
   host.writeFile = () => undefined;
   const program = ts.createProgram({
-    rootNames: [fileName, TECHNICAL_DISCLOSURE_CONTRACT_FILE],
+    rootNames: [fileName, contractFileName],
     options,
     host,
   });
@@ -236,13 +242,23 @@ function resolveAliasedSymbol(symbol: ts.Symbol, checker: ts.TypeChecker): ts.Sy
 type StaticStringResolution = Readonly<{
   exact: string | null;
   fragments: ReadonlySet<string>;
+  depthExhausted: boolean;
 }>;
 
-function findBannedPrimaryTerm(node: ts.Node, checker: ts.TypeChecker): typeof BANNED_PRIMARY_TERMS[number] | null {
+function inspectStaticPrimaryCopy(
+  node: ts.Node,
+  checker: ts.TypeChecker,
+): Readonly<{
+  term: typeof BANNED_PRIMARY_TERMS[number] | null;
+  depthExhausted: boolean;
+}> {
   const resolution = resolveStaticString(node, checker);
-  return BANNED_PRIMARY_TERMS.find(
-    (candidate) => [...resolution.fragments].some((fragment) => fragment.includes(candidate)),
-  ) ?? null;
+  return {
+    term: BANNED_PRIMARY_TERMS.find(
+      (candidate) => [...resolution.fragments].some((fragment) => fragment.includes(candidate)),
+    ) ?? null,
+    depthExhausted: resolution.depthExhausted,
+  };
 }
 
 function resolveStaticString(
@@ -251,7 +267,7 @@ function resolveStaticString(
   seenBindings = new Set<ts.Symbol>(),
   depth = 0,
 ): StaticStringResolution {
-  if (depth >= MAX_STATIC_RESOLUTION_DEPTH) return emptyStaticStringResolution();
+  if (depth >= MAX_STATIC_RESOLUTION_DEPTH) return emptyStaticStringResolution(true);
   if (ts.isStringLiteralLike(node) || ts.isJsxText(node)) return completeStaticStringResolution(node.text);
   if (ts.isJsxExpression(node)) {
     return node.expression
@@ -293,8 +309,10 @@ function resolveStaticString(
   if (ts.isTemplateExpression(node)) {
     let exact: string | null = node.head.text;
     const fragments = new Set<string>([node.head.text]);
+    let depthExhausted = false;
     for (const span of node.templateSpans) {
       const expression = resolveStaticString(span.expression, checker, new Set(seenBindings), depth + 1);
+      depthExhausted ||= expression.depthExhausted;
       for (const fragment of expression.fragments) fragments.add(fragment);
       fragments.add(span.literal.text);
       exact = exact == null || expression.exact == null
@@ -302,7 +320,7 @@ function resolveStaticString(
         : exact + expression.exact + span.literal.text;
     }
     if (exact != null) fragments.add(exact);
-    return { exact, fragments };
+    return { exact, fragments, depthExhausted };
   }
   return emptyStaticStringResolution();
 }
@@ -319,11 +337,11 @@ function staticBindingInitializer(declaration: ts.Declaration): ts.Expression | 
 }
 
 function completeStaticStringResolution(value: string): StaticStringResolution {
-  return { exact: value, fragments: new Set([value]) };
+  return { exact: value, fragments: new Set([value]), depthExhausted: false };
 }
 
-function emptyStaticStringResolution(): StaticStringResolution {
-  return { exact: null, fragments: new Set() };
+function emptyStaticStringResolution(depthExhausted = false): StaticStringResolution {
+  return { exact: null, fragments: new Set(), depthExhausted };
 }
 
 function mergeStaticStringResolutions(resolutions: readonly StaticStringResolution[]): StaticStringResolution {
@@ -331,7 +349,9 @@ function mergeStaticStringResolutions(resolutions: readonly StaticStringResoluti
   const fragments = new Set<string>();
   const exactValues = new Set<string>();
   let allExact = true;
+  let depthExhausted = false;
   for (const resolution of resolutions) {
+    depthExhausted ||= resolution.depthExhausted;
     for (const fragment of resolution.fragments) fragments.add(fragment);
     if (resolution.exact == null) {
       allExact = false;
@@ -341,7 +361,7 @@ function mergeStaticStringResolutions(resolutions: readonly StaticStringResoluti
   }
   const exact = allExact && exactValues.size === 1 ? [...exactValues][0]! : null;
   if (exact != null) fragments.add(exact);
-  return { exact, fragments };
+  return { exact, fragments, depthExhausted };
 }
 
 function mergeStaticStringFragments(
@@ -351,7 +371,11 @@ function mergeStaticStringFragments(
 ): StaticStringResolution {
   const fragments = new Set([...left.fragments, ...right.fragments]);
   if (exact != null) fragments.add(exact);
-  return { exact, fragments };
+  return {
+    exact,
+    fragments,
+    depthExhausted: left.depthExhausted || right.depthExhausted,
+  };
 }
 
 function isRawPrimaryExpression(

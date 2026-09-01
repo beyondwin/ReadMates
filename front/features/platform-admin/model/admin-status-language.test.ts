@@ -15,6 +15,14 @@ import {
 } from "./admin-status-language";
 import { analyzeAdminPrimaryLanguageSource } from "./admin-primary-language-source-analyzer.test-support";
 
+function sourceWithPrimaryCopyAliases(aliasCount: number): string {
+  const declarations = ["const alias0 = 'Today';"];
+  for (let index = 1; index <= aliasCount; index += 1) {
+    declarations.push(`const alias${index} = alias${index - 1};`);
+  }
+  return `export const View = () => { ${declarations.join(" ")} return <p>{alias${aliasCount}}</p>; }`;
+}
+
 describe("admin-status-language", () => {
   it("네 운영 축을 route나 영문 제품명이 아닌 운영자 언어로 고정한다", () => {
     expect(adminNavigationLanguage("today").primaryText).toBe("오늘 할 일");
@@ -40,6 +48,16 @@ describe("admin-status-language", () => {
     expect(adminOperationActionLanguage("MERGE").primaryText).toBe(ADMIN_UNKNOWN_PRIMARY_TEXT);
     expect(adminOperationActionLanguage("toString").primaryText).toBe(ADMIN_UNKNOWN_PRIMARY_TEXT);
   });
+
+  it.each(["ACKNOWLEDGE", "SNOOZE", "RESOLVE", "MERGE", "toString"])(
+    "케이스 action %s의 기술 정보에는 lifecycle 정규화 전 원문을 보존한다",
+    (action) => {
+      expect(adminOperationActionLanguage(action).technicalDisclosure).toEqual({
+        label: "기술 값",
+        value: action,
+      });
+    },
+  );
 
   it("platform role은 권한 추론이 아닌 명시적 detail 라벨로만 번역한다", () => {
     expect(adminPlatformRoleLanguage("OWNER").primaryText).toBe("소유자");
@@ -117,6 +135,15 @@ describe("admin-status-language", () => {
        export const View = ({ job }: any) => <Tech items={[{ label: '작업 상태', value: job.status }]} />`,
     );
     expect(analysis).toEqual({ violations: [], technicalDisclosureCount: 1 });
+  });
+
+  it("still analyzes forbidden primary copy when the source uses the old disclosure contract filename", () => {
+    expect(analyzeAdminPrimaryLanguageSource(
+      "export const View = () => <h1>Today</h1>",
+      "__admin-technical-disclosure-contract.d.ts",
+    ).violations).toEqual([
+      expect.objectContaining({ reason: "primary copy contains Today" }),
+    ]);
   });
 
   it("recognizes the exact canonical disclosure export through a namespace import", () => {
@@ -277,6 +304,16 @@ describe("admin-status-language", () => {
     );
     expect(analysis.violations).toEqual([
       expect.objectContaining({ reason: "primary copy contains Today" }),
+    ]);
+  });
+
+  it.each([
+    [126, "primary copy contains Today"],
+    [127, "primary copy static resolution depth exhausted"],
+    [128, "primary copy static resolution depth exhausted"],
+  ])("fails closed when primary copy crosses %i lexical aliases", (aliasCount, reason) => {
+    expect(analyzeAdminPrimaryLanguageSource(sourceWithPrimaryCopyAliases(aliasCount)).violations).toEqual([
+      expect.objectContaining({ reason }),
     ]);
   });
 

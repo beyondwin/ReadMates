@@ -101,7 +101,9 @@ export function adminOperationActionLanguage(value: string): AdminSemanticLangua
     ? CASE_ACTION_LIFECYCLE[value as keyof typeof CASE_ACTION_LIFECYCLE]
     : undefined;
   return lifecycle
-    ? adminCaseLifecycleLanguage(lifecycle)
+    ? mapAdminSemanticLanguage(value, {
+        [value]: adminCaseLifecycleLanguage(lifecycle).primaryText,
+      })
     : mapAdminSemanticLanguage(value, {});
 }
 

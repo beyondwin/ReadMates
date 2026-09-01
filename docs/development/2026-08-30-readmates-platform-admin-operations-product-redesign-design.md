@@ -2,8 +2,8 @@
 
 - 날짜: 2026-08-30
 - 표면: Platform admin (`/admin/**`) + 전역 공간 전환
-- 상태: 설계 승인, 구현 전
-- ADR impact: **supersede** — ADR-0050이 ADR-0047을, ADR-0051이 ADR-0026을 대체한다. 두 신규 ADR은 구현 전이므로 `Proposed`다.
+- 상태: 구현됨 (`not measured` 항목은 §13의 후속 검증으로 유지)
+- ADR impact: **supersede** — ADR-0050이 ADR-0047을, ADR-0051이 ADR-0026을 대체한다. 두 ADR은 구현·자동 검증·active architecture 정합성 확인 뒤 `Accepted`다.
 - 관련: ADR-0019, ADR-0030, ADR-0035, ADR-0037, ADR-0039, ADR-0040, ADR-0045, ADR-0050, ADR-0051
 - 시안: `design/mockups/2026-08-30-admin-operations-redesign/`
 

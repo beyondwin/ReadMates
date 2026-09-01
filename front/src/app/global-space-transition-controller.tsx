@@ -216,6 +216,7 @@ export function GlobalSpaceTransitionController({
       };
       const trackedHandle: PendingHandle = {
         generation: coordinatorHandle.generation,
+        isAcceptedPublicationCurrent: coordinatorHandle.isAcceptedPublicationCurrent,
         async settle(result) {
           const outcome = await coordinatorHandle.settle(result);
           if (outcome === "accepted") removeTrackedHandle(trackedHandle);

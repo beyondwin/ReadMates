@@ -230,6 +230,7 @@ type ProductionSymbolGraph = {
 const localSymbol = (path: string, name: string) => `${path}::${name}`;
 const exportedSymbol = (path: string, name: string) => `${path}#${name}`;
 const MODULE_EXECUTION_SYMBOL = "<module-execution>";
+const DEFAULT_EXPORT_LOCAL_SYMBOL = "<default-export>";
 
 function addSymbolEdge(edges: Map<string, Set<string>>, from: string, to: string) {
   const targets = edges.get(from) ?? new Set<string>();
@@ -274,9 +275,12 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
       path.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
     );
     const declarations = new Map<string, ts.Node>();
+    const eagerVariableInitializers: ts.Expression[] = [];
     const imports = new Map<string, { providerPath: string; importedName: string }>();
     const exportedModifier = (node: ts.Node) => ts.canHaveModifiers(node)
       && Boolean(ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword));
+    const defaultModifier = (node: ts.Node) => ts.canHaveModifiers(node)
+      && Boolean(ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword));
 
     for (const statement of sourceFile.statements) {
       if (ts.isImportDeclaration(statement)
@@ -302,13 +306,17 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
           }
         }
       }
-      if (ts.isFunctionDeclaration(statement) && statement.name && statement.body) {
-        declarations.set(statement.name.text, statement);
+      if (ts.isFunctionDeclaration(statement) && statement.body) {
+        if (statement.name) declarations.set(statement.name.text, statement);
+        else if (exportedModifier(statement) && defaultModifier(statement)) {
+          declarations.set(DEFAULT_EXPORT_LOCAL_SYMBOL, statement);
+        }
       }
       if (ts.isVariableStatement(statement)) {
         for (const declaration of statement.declarationList.declarations) {
           if (ts.isIdentifier(declaration.name) && declaration.initializer) {
             declarations.set(declaration.name.text, declaration);
+            eagerVariableInitializers.push(declaration.initializer);
           }
         }
       }
@@ -316,7 +324,9 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
 
     const moduleExecutionStatements = sourceFile.statements.filter(isTopLevelExecutionStatement);
     const localNames = new Set(declarations.keys());
-    if (moduleExecutionStatements.length > 0) localNames.add(MODULE_EXECUTION_SYMBOL);
+    if (moduleExecutionStatements.length > 0 || eagerVariableInitializers.length > 0) {
+      localNames.add(MODULE_EXECUTION_SYMBOL);
+    }
     localsByPath.set(path, localNames);
     const pathExports = exportsByPath.get(path) ?? new Set<string>();
     exportsByPath.set(path, pathExports);
@@ -345,6 +355,36 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
       visit(root);
     };
 
+    const addEagerRuntimeReferences = (from: string, root: ts.Node) => {
+      const visit = (candidate: ts.Node) => {
+        if (ts.isTypeNode(candidate)
+          || ts.isArrowFunction(candidate)
+          || ts.isFunctionExpression(candidate)
+          || ts.isClassExpression(candidate)
+          || ts.isMethodDeclaration(candidate)
+          || ts.isGetAccessorDeclaration(candidate)
+          || ts.isSetAccessorDeclaration(candidate)) {
+          return;
+        }
+        if (ts.isPropertyAccessExpression(candidate) && ts.isIdentifier(candidate.expression)) {
+          const binding = imports.get(candidate.expression.text);
+          if (binding?.importedName === "*") {
+            addSymbolEdge(edges, from, exportedSymbol(binding.providerPath, candidate.name.text));
+          }
+        } else if (ts.isIdentifier(candidate)) {
+          const binding = imports.get(candidate.text);
+          if (binding && binding.importedName !== "*") {
+            addSymbolEdge(edges, from, exportedSymbol(binding.providerPath, binding.importedName));
+          } else if (declarations.has(candidate.text)) {
+            addSymbolEdge(edges, from, localSymbol(path, candidate.text));
+            addSymbolEdge(writeEdges, from, localSymbol(path, candidate.text));
+          }
+        }
+        ts.forEachChild(candidate, visit);
+      };
+      visit(root);
+    };
+
     for (const [name, declaration] of declarations) {
       const from = localSymbol(path, name);
       if (HTTP_WRITE_METHOD_PATTERN.test(declaration.getText(sourceFile))
@@ -354,22 +394,28 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
       addRuntimeReferences(from, declaration, name);
     }
 
-    if (moduleExecutionStatements.length > 0) {
+    if (moduleExecutionStatements.length > 0 || eagerVariableInitializers.length > 0) {
       const moduleExecution = localSymbol(path, MODULE_EXECUTION_SYMBOL);
       executableRoots.add(moduleExecution);
       for (const statement of moduleExecutionStatements) {
         addRuntimeReferences(moduleExecution, statement);
       }
+      for (const initializer of eagerVariableInitializers) {
+        addEagerRuntimeReferences(moduleExecution, initializer);
+      }
     }
 
     for (const statement of sourceFile.statements) {
       if ((ts.isFunctionDeclaration(statement) || ts.isVariableStatement(statement)) && exportedModifier(statement)) {
-        if (ts.isFunctionDeclaration(statement) && statement.name) {
-          pathExports.add(statement.name.text);
-          const exported = exportedSymbol(path, statement.name.text);
+        if (ts.isFunctionDeclaration(statement)) {
+          const localName = statement.name?.text ?? DEFAULT_EXPORT_LOCAL_SYMBOL;
+          const exportedName = defaultModifier(statement) ? "default" : statement.name?.text;
+          if (!exportedName) continue;
+          pathExports.add(exportedName);
+          const exported = exportedSymbol(path, exportedName);
           executableRoots.add(exported);
-          addSymbolEdge(edges, exported, localSymbol(path, statement.name.text));
-          addSymbolEdge(writeEdges, exported, localSymbol(path, statement.name.text));
+          addSymbolEdge(edges, exported, localSymbol(path, localName));
+          addSymbolEdge(writeEdges, exported, localSymbol(path, localName));
         } else if (ts.isVariableStatement(statement)) {
           for (const declaration of statement.declarationList.declarations) {
             if (!ts.isIdentifier(declaration.name)) continue;

@@ -44,6 +44,7 @@ function renderRouteWithObsoleteOwner() {
     beginPending: vi.fn(() => ({
       generation: 1,
       settle: vi.fn(async () => "obsolete" as const),
+      isAcceptedPublicationCurrent: vi.fn(() => false),
       publishAccepted: vi.fn(() => "rejected" as const),
       unregister: vi.fn(),
       reconcile: vi.fn(async () => ({ operationId: "leave", outcome: "still-unknown" as const })),

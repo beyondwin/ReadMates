@@ -6,7 +6,11 @@ import { useEffect, type PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useSpaceTransitionSafetyRegistration } from "@/shared/ui/space-transition-safety-context";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
-import type { PendingHandle, TransitionSafetyRegistrationPort } from "@/shared/model/global-space";
+import type {
+  PendingHandle,
+  TransitionPublicationSurface,
+  TransitionSafetyRegistrationPort,
+} from "@/shared/model/global-space";
 import { signalHostAuthorityLoss } from "@/shared/api/host-authority-event";
 import { hostSensitiveStorage } from "@/features/host/storage/host-sensitive-storage";
 import { hostClubQueryPrefix } from "@/features/host/queries/host-state-purge";
@@ -244,10 +248,10 @@ describe("AdminTransitionBoundary", () => {
     const latePublicationSurfaces = [
       "cache",
       "ui",
-      "receipt",
+      "receiptCallback",
       "navigation",
       "returnTarget",
-    ] as const;
+    ] as const satisfies readonly TransitionPublicationSurface[];
     const latePublications = latePublicationSurfaces.map((surface) => ({
       surface,
       publish: vi.fn(),

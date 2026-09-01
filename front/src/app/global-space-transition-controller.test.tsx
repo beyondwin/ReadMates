@@ -16,6 +16,12 @@ import { fetchArchiveSessions, fetchNoteSessions } from "@/features/archive/api/
 import { fetchHostSessionDetail } from "@/features/host/api/host-api";
 import { globalSpaceReturnTargetStorageKey } from "./global-space-continuity";
 import {
+  TransitionOwnerObsoleteError,
+  isTransitionOwnerObsoleteError,
+  publishTransitionAction,
+  useTransitionSafetyOwner,
+} from "@/shared/ui/use-transition-safety-owner";
+import {
   GlobalSpaceTransitionController,
   globalSpaceTransitionEpochKey,
   useGlobalSpaceTransitionController,
@@ -220,8 +226,97 @@ function Harness({
       >
         다른 클럽 권한 즉시 무효화
       </button>
+      <button type="button" onClick={controller.invalidateForPlatformAuthorityLoss}>
+        플랫폼 권한 즉시 무효화
+      </button>
     </>
   );
+}
+
+type AcceptedPublicationResult = Readonly<{
+  publication: "obsolete" | "published" | "unexpected-error";
+  reconciliation: RecoveryObservation;
+}>;
+
+function AcceptedAsyncPublicationHarness({
+  gate,
+  onAwait,
+  onComplete,
+  onOriginalRequest,
+  onReplay,
+  publications,
+}: {
+  gate: Promise<void>;
+  onAwait: () => void;
+  onComplete: (result: AcceptedPublicationResult) => void;
+  onOriginalRequest: () => void;
+  onReplay: () => void;
+  publications: Readonly<{
+    cache: () => void;
+    refetch: () => void;
+    ui: () => void;
+    receiptCallback: () => void;
+    successCopy: () => void;
+    errorCopy: () => void;
+    navigation: () => void;
+    returnTarget: () => void;
+    sessionStorage: () => void;
+  }>;
+}) {
+  const owner = useTransitionSafetyOwner("accepted-async-publication-owner");
+
+  const run = async () => {
+    onOriginalRequest();
+    const handle = owner.begin(
+      "accepted-async-publication-operation",
+      "L1",
+      async () => {
+        onReplay();
+        return {
+          operationId: "accepted-async-publication-operation",
+          outcome: "still-unknown",
+        };
+      },
+    );
+    const settlement = await handle.settle("succeeded");
+    if (settlement !== "accepted") {
+      onComplete({
+        publication: "unexpected-error",
+        reconciliation: await handle.reconcile(),
+      });
+      return;
+    }
+
+    try {
+      await publishTransitionAction(handle, "cache", async () => {
+        onAwait();
+        await gate;
+        if (!handle.isPublicationCurrent()) throw new TransitionOwnerObsoleteError();
+        publications.cache();
+        publications.refetch();
+        publications.ui();
+        publications.receiptCallback();
+        publications.successCopy();
+        publications.errorCopy();
+        publications.navigation();
+        publications.returnTarget();
+        publications.sessionStorage();
+      });
+      onComplete({
+        publication: "published",
+        reconciliation: await handle.reconcile(),
+      });
+    } catch (error) {
+      onComplete({
+        publication: isTransitionOwnerObsoleteError(error)
+          ? "obsolete"
+          : "unexpected-error",
+        reconciliation: await handle.reconcile(),
+      });
+    }
+  };
+
+  return <button type="button" onClick={() => void run()}>비동기 발행 시작</button>;
 }
 
 function renderController(input: {
@@ -237,6 +332,7 @@ function renderController(input: {
   navigateTransition?: TransitionNavigation;
   onResult?: (result: SpaceTransitionRequestResult) => void;
   onSettled?: (status: string) => void;
+  acceptedPublication?: React.ComponentProps<typeof AcceptedAsyncPublicationHarness>;
 } = {}) {
   const controllerAuth = input.auth ?? authWithSpaces(["PLATFORM", "CLUBS"]);
   const queryClient = input.queryClient ?? new QueryClient({
@@ -256,6 +352,9 @@ function renderController(input: {
           navigateTransition={input.navigateTransition}
         >
           <Harness onPort={input.onPort} onResult={input.onResult} onSettled={input.onSettled} />
+          {input.acceptedPublication
+            ? <AcceptedAsyncPublicationHarness {...input.acceptedPublication} />
+            : null}
         </GlobalSpaceTransitionController>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -298,6 +397,73 @@ afterEach(() => {
 });
 
 describe("GlobalSpaceTransitionController", () => {
+  it.each([
+    [
+      "host",
+      "/clubs/reading-sai/app/host",
+      authWithSpaces(["PLATFORM", "CLUBS"], ["MEMBER", "HOST"]),
+      "호스트 권한 즉시 무효화",
+    ],
+    [
+      "platform",
+      "/admin/today",
+      authWithSpaces(["PLATFORM", "CLUBS"], ["MEMBER", "HOST"]),
+      "플랫폼 권한 즉시 무효화",
+    ],
+  ])("fences an accepted %s publication when authority is revoked mid-await", async (
+    _space,
+    initialEntry,
+    auth,
+    revokeButton,
+  ) => {
+    const publicationGate = deferred<void>();
+    const publicationAwaited = deferred<void>();
+    const completion = deferred<AcceptedPublicationResult>();
+    const originalRequest = vi.fn();
+    const replay = vi.fn();
+    const publications = {
+      cache: vi.fn(),
+      refetch: vi.fn(),
+      ui: vi.fn(),
+      receiptCallback: vi.fn(),
+      successCopy: vi.fn(),
+      errorCopy: vi.fn(),
+      navigation: vi.fn(),
+      returnTarget: vi.fn(),
+      sessionStorage: vi.fn(),
+    };
+    renderController({
+      initialEntry,
+      auth,
+      acceptedPublication: {
+        gate: publicationGate.promise,
+        onAwait: publicationAwaited.resolve,
+        onComplete: completion.resolve,
+        onOriginalRequest: originalRequest,
+        onReplay: replay,
+        publications,
+      },
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "비동기 발행 시작" }));
+    await publicationAwaited.promise;
+    await userEvent.click(screen.getByRole("button", { name: revokeButton }));
+    publicationGate.resolve();
+
+    await expect(completion.promise).resolves.toEqual({
+      publication: "obsolete",
+      reconciliation: {
+        operationId: "accepted-async-publication-operation",
+        outcome: "authority-lost",
+      },
+    });
+    expect(originalRequest).toHaveBeenCalledTimes(1);
+    expect(replay).not.toHaveBeenCalled();
+    for (const publication of Object.values(publications)) {
+      expect(publication).not.toHaveBeenCalled();
+    }
+  });
+
   it("coordinates clean navigation from the legacy unscoped member route", async () => {
     renderController({ initialEntry: "/app" });
 
