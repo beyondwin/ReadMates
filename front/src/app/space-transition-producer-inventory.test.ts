@@ -406,6 +406,10 @@ describe("space transition mutation-producer inventory", () => {
       "parenthesized satisfies-wrapped function IIFE",
       "const eager = (((function () { return classifiedWrite(); }) satisfies () => unknown))();",
     ],
+    [
+      "nested arrow IIFE",
+      "const eager = (() => (() => classifiedWrite())())();",
+    ],
   ])("detects a classified write in a directly invoked %s", (_kind, initializer) => {
     const { inventory, sources } = classifiedWriteConsumerFixture(`
       import { classifiedWrite } from "@/features/example/api/classified-write";
@@ -421,6 +425,144 @@ describe("space transition mutation-producer inventory", () => {
       modifyEntriesWithMissingMountedOwners: [
         "features/example/api/classified-write.ts->features/example/route/rogue-route.ts",
       ],
+    });
+  });
+
+  it.each([
+    [
+      "omitted arrow parameter",
+      "const eager = ((value = classifiedWrite()) => value)();",
+    ],
+    [
+      "omitted function parameter",
+      "const eager = (function (value = classifiedWrite()) { return value; })();",
+    ],
+    [
+      "possibly undefined arrow parameter",
+      `
+        const maybeUndefined = Math.random() > 0.5 ? undefined : "provided";
+        const eager = ((value = classifiedWrite()) => value)(maybeUndefined);
+      `,
+    ],
+    [
+      "possibly undefined function parameter",
+      `
+        const maybeUndefined = Math.random() > 0.5 ? undefined : "provided";
+        const eager = (function (value = classifiedWrite()) { return value; })(maybeUndefined);
+      `,
+    ],
+  ])("detects a classified write in an immediately invoked %s default", (_kind, initializer) => {
+    const { inventory, sources } = classifiedWriteConsumerFixture(`
+      import { classifiedWrite } from "@/features/example/api/classified-write";
+      ${initializer}
+    `);
+
+    expect(auditMutationProducerInventory(
+      sources,
+      buildMountedProductionPaths(sources, ["src/main.tsx"]),
+      inventory,
+    )).toMatchObject({
+      unclassifiedPaths: ["features/example/route/rogue-route.ts"],
+      modifyEntriesWithMissingMountedOwners: [
+        "features/example/api/classified-write.ts->features/example/route/rogue-route.ts",
+      ],
+    });
+  });
+
+  it.each([
+    [
+      "named function",
+      `
+        const eager = (() => {
+          function invokeWrite() { return classifiedWrite(); }
+          return invokeWrite();
+        })();
+      `,
+    ],
+    [
+      "const arrow",
+      `
+        const eager = (() => {
+          const invokeWrite = () => classifiedWrite();
+          return invokeWrite();
+        })();
+      `,
+    ],
+  ])("detects a classified write in an invoked IIFE-local %s", (_kind, initializer) => {
+    const { inventory, sources } = classifiedWriteConsumerFixture(`
+      import { classifiedWrite } from "@/features/example/api/classified-write";
+      ${initializer}
+    `);
+
+    expect(auditMutationProducerInventory(
+      sources,
+      buildMountedProductionPaths(sources, ["src/main.tsx"]),
+      inventory,
+    )).toMatchObject({
+      unclassifiedPaths: ["features/example/route/rogue-route.ts"],
+      modifyEntriesWithMissingMountedOwners: [
+        "features/example/api/classified-write.ts->features/example/route/rogue-route.ts",
+      ],
+    });
+  });
+
+  it.each([
+    [
+      "non-invoked named function",
+      `
+        const eager = (() => {
+          function dormant() { return classifiedWrite(); }
+          return "clean";
+        })();
+      `,
+    ],
+    [
+      "non-invoked const arrow",
+      `
+        const eager = (() => {
+          const dormant = () => classifiedWrite();
+          return "clean";
+        })();
+      `,
+    ],
+    [
+      "definitely provided arrow default",
+      "const eager = ((value = classifiedWrite()) => value)(\"provided\");",
+    ],
+    [
+      "definitely provided function default",
+      "const eager = (function (value = classifiedWrite()) { return value; })(\"provided\");",
+    ],
+    [
+      "direct generator creation",
+      "const deferred = (function* () { classifiedWrite(); })();",
+    ],
+    [
+      "IIFE-local generator creation",
+      `
+        const eager = (() => {
+          function* deferred() { classifiedWrite(); }
+          return deferred();
+        })();
+      `,
+    ],
+  ])("keeps %s out of module execution", (_kind, initializer) => {
+    const { inventory, sources } = classifiedWriteConsumerFixture(`
+      import { classifiedWrite } from "@/features/example/api/classified-write";
+      ${initializer}
+    `);
+
+    expect(auditMutationProducerInventory(
+      sources,
+      buildMountedProductionPaths(sources, ["src/main.tsx"]),
+      inventory,
+    )).toEqual({
+      unclassifiedPaths: [],
+      unclassifiedExportedWrites: [],
+      unreachableExportsWithMountedImports: [],
+      modifyEntriesWithoutMountedOwner: [],
+      modifyEntriesWithMissingMountedOwners: [],
+      verifiedLeavesWithForbiddenPublication: [],
     });
   });
 

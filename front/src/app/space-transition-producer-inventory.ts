@@ -270,6 +270,34 @@ function unwrapTransparentExpression(expression: ts.Expression): ts.Expression {
   return current;
 }
 
+type EagerRuntimeFunction = ts.ArrowFunction | ts.FunctionExpression | ts.FunctionDeclaration;
+
+function isGeneratorRuntimeFunction(candidate: EagerRuntimeFunction): boolean {
+  return !ts.isArrowFunction(candidate) && Boolean(candidate.asteriskToken);
+}
+
+function isDefinitelyNonUndefinedExpression(expression: ts.Expression): boolean {
+  const candidate = unwrapTransparentExpression(expression);
+  return ts.isStringLiteral(candidate)
+    || ts.isNumericLiteral(candidate)
+    || ts.isBigIntLiteral(candidate)
+    || ts.isNoSubstitutionTemplateLiteral(candidate)
+    || ts.isTemplateExpression(candidate)
+    || ts.isRegularExpressionLiteral(candidate)
+    || ts.isObjectLiteralExpression(candidate)
+    || ts.isArrayLiteralExpression(candidate)
+    || ts.isArrowFunction(candidate)
+    || ts.isFunctionExpression(candidate)
+    || ts.isClassExpression(candidate)
+    || ts.isNewExpression(candidate)
+    || ts.isJsxElement(candidate)
+    || ts.isJsxSelfClosingElement(candidate)
+    || ts.isJsxFragment(candidate)
+    || candidate.kind === ts.SyntaxKind.TrueKeyword
+    || candidate.kind === ts.SyntaxKind.FalseKeyword
+    || candidate.kind === ts.SyntaxKind.NullKeyword;
+}
+
 function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): ProductionSymbolGraph {
   const edges = new Map<string, Set<string>>();
   const writeEdges = new Map<string, Set<string>>();
@@ -370,24 +398,109 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
     };
 
     const addEagerRuntimeReferences = (from: string, root: ts.Node) => {
-      const visit = (candidate: ts.Node) => {
+      type CallableScope = Map<string, EagerRuntimeFunction | null>;
+      const executedBodies = new Set<EagerRuntimeFunction>();
+      const activeCalls = new Set<EagerRuntimeFunction>();
+
+      const addBindingNames = (
+        scope: CallableScope,
+        name: ts.BindingName,
+        callable: EagerRuntimeFunction | null,
+      ) => {
+        if (ts.isIdentifier(name)) {
+          scope.set(name.text, callable);
+          return;
+        }
+        for (const element of name.elements) {
+          if (ts.isBindingElement(element)) addBindingNames(scope, element.name, null);
+        }
+      };
+
+      const collectCallableScope = (callable: EagerRuntimeFunction): CallableScope => {
+        const scope: CallableScope = new Map();
+        if (ts.isFunctionExpression(callable) && callable.name) {
+          scope.set(callable.name.text, callable);
+        }
+        for (const parameter of callable.parameters) addBindingNames(scope, parameter.name, null);
+
+        const collect = (candidate: ts.Node) => {
+          if (ts.isFunctionDeclaration(candidate)) {
+            if (candidate.name && candidate.body) scope.set(candidate.name.text, candidate);
+            return;
+          }
+          if (ts.isVariableDeclaration(candidate)) {
+            const initializer = candidate.initializer
+              ? unwrapTransparentExpression(candidate.initializer)
+              : null;
+            const localCallable = initializer
+              && (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer))
+              ? initializer
+              : null;
+            addBindingNames(scope, candidate.name, localCallable);
+          }
+          if (ts.isArrowFunction(candidate)
+            || ts.isFunctionExpression(candidate)
+            || ts.isClassDeclaration(candidate)
+            || ts.isClassExpression(candidate)
+            || ts.isMethodDeclaration(candidate)
+            || ts.isGetAccessorDeclaration(candidate)
+            || ts.isSetAccessorDeclaration(candidate)
+            || ts.isConstructorDeclaration(candidate)) {
+            return;
+          }
+          ts.forEachChild(candidate, collect);
+        };
+
+        if (callable.body) collect(callable.body);
+        return scope;
+      };
+
+      const resolveLocalCallable = (name: string, scopes: readonly CallableScope[]) => {
+        for (const scope of scopes) {
+          if (scope.has(name)) return { found: true, callable: scope.get(name) ?? null };
+        }
+        return { found: false, callable: null };
+      };
+
+      const visit = (candidate: ts.Node, scopes: readonly CallableScope[] = []) => {
         if (ts.isCallExpression(candidate)) {
           const invoked = unwrapTransparentExpression(candidate.expression);
           if (ts.isArrowFunction(invoked) || ts.isFunctionExpression(invoked)) {
-            visit(invoked.body);
-            for (const argument of candidate.arguments) visit(argument);
+            for (const argument of candidate.arguments) visit(argument, scopes);
+            execute(invoked, candidate.arguments, scopes);
             return;
           }
+          if (ts.isIdentifier(invoked)) {
+            const local = resolveLocalCallable(invoked.text, scopes);
+            if (local.found) {
+              for (const argument of candidate.arguments) visit(argument, scopes);
+              if (local.callable) execute(local.callable, candidate.arguments, scopes);
+              return;
+            }
+          }
+          visit(candidate.expression, scopes);
+          for (const argument of candidate.arguments) visit(argument, scopes);
+          return;
         }
         if (ts.isTypeNode(candidate)
           || ts.isArrowFunction(candidate)
           || ts.isFunctionExpression(candidate)
           || ts.isFunctionDeclaration(candidate)
+          || ts.isClassDeclaration(candidate)
           || ts.isClassExpression(candidate)
           || ts.isMethodDeclaration(candidate)
           || ts.isGetAccessorDeclaration(candidate)
-          || ts.isSetAccessorDeclaration(candidate)) {
+          || ts.isSetAccessorDeclaration(candidate)
+          || ts.isConstructorDeclaration(candidate)) {
           return;
+        }
+        if (ts.isVariableDeclaration(candidate)) {
+          if (candidate.initializer) visit(candidate.initializer, scopes);
+          return;
+        }
+        if (ts.isIdentifier(candidate)) {
+          const local = resolveLocalCallable(candidate.text, scopes);
+          if (local.found) return;
         }
         if (ts.isPropertyAccessExpression(candidate) && ts.isIdentifier(candidate.expression)) {
           const binding = imports.get(candidate.expression.text);
@@ -403,8 +516,31 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
             addSymbolEdge(writeEdges, from, localSymbol(path, candidate.text));
           }
         }
-        ts.forEachChild(candidate, visit);
+        ts.forEachChild(candidate, (child) => visit(child, scopes));
       };
+
+      const execute = (
+        callable: EagerRuntimeFunction,
+        arguments_: readonly ts.Expression[],
+        outerScopes: readonly CallableScope[],
+      ) => {
+        if (!callable.body || isGeneratorRuntimeFunction(callable) || activeCalls.has(callable)) return;
+        const localScope = collectCallableScope(callable);
+        const scopes = [localScope, ...outerScopes];
+        for (const [index, parameter] of callable.parameters.entries()) {
+          if (!parameter.initializer) continue;
+          const argument = arguments_[index];
+          if (!argument || !isDefinitelyNonUndefinedExpression(argument)) {
+            visit(parameter.initializer, scopes);
+          }
+        }
+        if (executedBodies.has(callable)) return;
+        executedBodies.add(callable);
+        activeCalls.add(callable);
+        visit(callable.body, scopes);
+        activeCalls.delete(callable);
+      };
+
       visit(root);
     };
 
@@ -421,7 +557,7 @@ function analyzeProductionSymbolGraph(sources: ReadonlyMap<string, string>): Pro
       const moduleExecution = localSymbol(path, MODULE_EXECUTION_SYMBOL);
       executableRoots.add(moduleExecution);
       for (const statement of moduleExecutionStatements) {
-        addRuntimeReferences(moduleExecution, statement);
+        addEagerRuntimeReferences(moduleExecution, statement);
       }
       for (const initializer of eagerVariableInitializers) {
         addEagerRuntimeReferences(moduleExecution, initializer);
