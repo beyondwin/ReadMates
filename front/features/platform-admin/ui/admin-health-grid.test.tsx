@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -12,10 +12,12 @@ import type {
 import { AdminHealthGrid } from "@/features/platform-admin/ui/admin-health-grid";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 
-const LEDGER_CSS = readFileSync(
-  path.resolve("features/platform-admin/ui/admin-editorial-ledger.css"),
-  "utf8",
+const SERVICE_STATUS_CSS_PATH = path.resolve(
+  "features/platform-admin/ui/admin-service-status.css",
 );
+const SERVICE_STATUS_CSS = existsSync(SERVICE_STATUS_CSS_PATH)
+  ? readFileSync(SERVICE_STATUS_CSS_PATH, "utf8")
+  : "";
 
 const HEALTH_SNAPSHOT: PlatformHealthSnapshot = {
   schema: "platform.health_snapshot.v1",
@@ -93,6 +95,18 @@ const HEALTH_SNAPSHOT: PlatformHealthSnapshot = {
       lastCheckedAt: "2026-05-26T00:00:00Z",
       source: "PROMETHEUS",
       drill: { kind: "ADMIN_ROUTE", target: "/admin/ai-ops" },
+      reason: null,
+      deployStrip: null,
+    },
+    {
+      id: "outbound-resilience",
+      title: "Outbound resilience",
+      status: "OK",
+      metric: { value: 0, unit: "open circuits", label: "current" },
+      thresholds: { warn: 1, crit: 1 },
+      lastCheckedAt: "2026-05-26T00:00:00Z",
+      source: "IN_PROCESS",
+      drill: null,
       reason: null,
       deployStrip: null,
     },
@@ -187,7 +201,7 @@ describe("AdminHealthGrid", () => {
     expect(screen.getByText("서비스 상태")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "서비스 건강" })).toHaveClass("admin-page-frame");
     expect(screen.getByRole("region", { name: "서비스 신호" })).toHaveClass("admin-evidence-ledger");
-    expect(screen.getByText("정상 갱신 완료")).toBeInTheDocument();
+    expect(screen.getByText("현재 자료로 확인했습니다.")).toBeInTheDocument();
     expect(container.querySelector(".admin-case-docket")).toBeNull();
     expect(container.querySelector(".admin-action-dock")).toBeNull();
     expect(container.querySelector(".admin-safe-action-dock")).toBeNull();
@@ -196,24 +210,21 @@ describe("AdminHealthGrid", () => {
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });
 
-  it("renders six health cards plus a separate deploy strip from the seven-card snapshot", () => {
+  it("shows only actual abnormal sources and keeps all normal known sources in one quiet list", () => {
     renderGrid();
 
     expect(screen.getByTestId("admin-health-grid")).toHaveAttribute("data-page-state", "partial");
-    expect(screen.getByRole("heading", { name: "Kafka consumer lag" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "AI 작업 대기열" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Redis" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Outbox backlog" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "DB pool" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Notification dispatch success" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "AI provider availability" })).not.toBeInTheDocument();
-    const okSignals = screen.getByText("정상 신호").closest("details");
-    expect(okSignals).not.toBeNull();
-    expect(within(okSignals as HTMLElement).getByText("Outbox backlog")).toBeInTheDocument();
-    expect(within(okSignals as HTMLElement).getByText("DB pool")).toBeInTheDocument();
-    expect(within(okSignals as HTMLElement).getByText("Notification dispatch success")).toBeInTheDocument();
-    expect(within(okSignals as HTMLElement).getByText("AI provider availability")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "알림 대기열" })).not.toBeInTheDocument();
+    const normalSources = screen.getByRole("region", { name: "정상 범위 서비스" });
+    expect(within(normalSources).getByText("알림 대기열")).toBeInTheDocument();
+    expect(within(normalSources).getByText("데이터베이스 연결")).toBeInTheDocument();
+    expect(within(normalSources).getByText("알림 전송")).toBeInTheDocument();
+    expect(within(normalSources).getByText("AI 제공자")).toBeInTheDocument();
+    expect(within(normalSources).getByText("외부 연결 보호")).toBeInTheDocument();
+    expect(normalSources.querySelector(".admin-health-card__pill--ok")).toBeNull();
     expect(screen.getByRole("heading", { name: "최근에 바뀐 것" })).toBeInTheDocument();
-    expect(screen.getByText(/readmates-api:dev-20260526/)).toBeInTheDocument();
   });
 
   it("labels generated-at separately from the actual last successful refresh", () => {
@@ -243,10 +254,10 @@ describe("AdminHealthGrid", () => {
   });
 
   it.each([
-    ["FRESH", 0, "정상 갱신 완료"],
-    ["REFRESHING", 12, "서버에서 갱신 중"],
-    ["STALE", 125, "마지막 정상 갱신 2분 5초 전"],
-    ["UNAVAILABLE", 0, "정상 갱신 이력 없음"],
+    ["FRESH", 0, "현재 자료로 확인했습니다."],
+    ["REFRESHING", 12, "새 상태를 확인하고 있습니다."],
+    ["STALE", 125, "마지막 확인 자료가 2분 5초 전입니다."],
+    ["UNAVAILABLE", 0, "최근 상태 자료를 확인할 수 없습니다."],
   ] as const)("renders the %s state from server metadata", (refreshState, staleAgeSeconds, copy) => {
     renderGrid({
       snapshot: {
@@ -263,7 +274,7 @@ describe("AdminHealthGrid", () => {
   it("shows transport activity without replacing the fresh server state", () => {
     renderGrid({ fetching: true });
 
-    expect(screen.getByText("정상 갱신 완료")).toBeInTheDocument();
+    expect(screen.getByText("현재 자료로 확인했습니다.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "요청 중" })).toBeDisabled();
   });
 
@@ -275,8 +286,8 @@ describe("AdminHealthGrid", () => {
     const redis = screen.getByRole("article", { name: "Redis" });
     expect(within(redis).getByText("확인 불가")).toBeInTheDocument();
     expect(within(redis).queryByText("정상")).not.toBeInTheDocument();
-    expect(screen.queryByRole("article", { name: "Outbox backlog" })).not.toBeInTheDocument();
-    expect(within(screen.getByText("정상 신호").closest("details") as HTMLElement).getByText("Outbox backlog")).toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: "알림 대기열" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "정상 범위 서비스" })).getByText("알림 대기열")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "최근에 바뀐 것" })).toBeInTheDocument();
   });
 
@@ -292,7 +303,7 @@ describe("AdminHealthGrid", () => {
     });
 
     expect(screen.getByTestId("admin-health-grid")).toHaveAttribute("data-page-state", "unavailable");
-    expect(screen.getByRole("heading", { name: "Outbox backlog" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "알림 대기열" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Redis" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "최근에 바뀐 것" })).toBeInTheDocument();
     expect(screen.getAllByText("확인 불가").length).toBeGreaterThan(1);
@@ -333,8 +344,8 @@ describe("AdminHealthGrid", () => {
     expect(screen.queryByText("일부만 확인됨")).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(within(screen.getByRole("article", { name: "Redis" })).getAllByText("사용 안 함")).toHaveLength(2);
-    expect(within(screen.getByRole("article", { name: "Kafka consumer lag" })).getAllByText("사용 안 함")).toHaveLength(2);
-    expect(within(screen.getByRole("article", { name: "AI provider availability" })).getAllByText("사용 안 함")).toHaveLength(2);
+    expect(within(screen.getByRole("article", { name: "AI 작업 대기열" })).getAllByText("사용 안 함")).toHaveLength(2);
+    expect(within(screen.getByRole("article", { name: "AI 제공자" })).getAllByText("사용 안 함")).toHaveLength(2);
     expect(within(screen.getByRole("article", { name: "Redis" })).queryByText("확인 불가")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Redis 다시 확인" })).not.toBeInTheDocument();
   });
@@ -354,7 +365,7 @@ describe("AdminHealthGrid", () => {
     expect(screen.getByRole("heading", { name: "사용 안 함" })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(document.querySelector(".admin-health-card__pill--ok")).toBeNull();
-    expect(screen.getByRole("heading", { name: "Outbox backlog" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "알림 대기열" })).toBeInTheDocument();
   });
 
   it("shows missing deploy ledger evidence without a success history", () => {
@@ -374,7 +385,14 @@ describe("AdminHealthGrid", () => {
     });
 
     expect(screen.getByRole("heading", { name: "최근에 바뀐 것" })).toBeInTheDocument();
-    expect(screen.getByText("배포 원장을 확인할 수 없습니다.")).toBeInTheDocument();
+    const deploy = screen.getByRole("region", { name: "최근에 바뀐 것" });
+    expect(within(deploy).getByText("상태를 확인할 수 없습니다")).toBeInTheDocument();
+    expect(within(deploy).getByText("원천에서 상태 자료를 받지 못했습니다.")).toBeInTheDocument();
+    expect(within(deploy).getByText("최근 변경의 적용 상태를 확인하기 어렵습니다.")).toBeInTheDocument();
+    expect(within(deploy).getByText("배포 기록을 다시 확인하세요.")).toBeInTheDocument();
+    expect(within(deploy).getByText("배포 원장을 확인할 수 없습니다.")).toBeInTheDocument();
+    const technical = within(deploy).getByRole("group", { name: "기술 정보" });
+    expect(within(technical).getByText("ledger_unavailable")).toBeInTheDocument();
     expect(screen.queryByText(/readmates-api:dev-20260526/)).not.toBeInTheDocument();
     expect(document.querySelector(".admin-health-deploy-strip__dot--ok")).toBeNull();
   });
@@ -418,15 +436,16 @@ describe("AdminHealthGrid", () => {
     expect(screen.queryByTestId("admin-health-skeleton")).not.toBeInTheDocument();
   });
 
-  it("locks 44px targets and reduced motion in the scoped health ledger stylesheet", () => {
-    expect(LEDGER_CSS).toMatch(/\.admin-health-grid[\s\S]*min-height:\s*44px/);
-    expect(LEDGER_CSS).toContain(".admin-health-grid");
-    expect(LEDGER_CSS).toContain("prefers-reduced-motion");
-    expect(LEDGER_CSS).toContain(":focus-visible");
-    expect(LEDGER_CSS).toMatch(
-      /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.admin-health-grid[\s\S]*animation-duration:\s*0\.01ms/,
+  it("locks 44px targets, 1240px containment, responsive wrapping, and reduced motion in the service stylesheet", () => {
+    expect(SERVICE_STATUS_CSS).toMatch(/\.admin-service-status[\s\S]*max-width:\s*1240px/);
+    expect(SERVICE_STATUS_CSS).toMatch(/\.admin-service-status[\s\S]*min-height:\s*44px/);
+    expect(SERVICE_STATUS_CSS).toContain("overflow-wrap: anywhere");
+    expect(SERVICE_STATUS_CSS).toContain("prefers-reduced-motion");
+    expect(SERVICE_STATUS_CSS).toContain(":focus-visible");
+    expect(SERVICE_STATUS_CSS).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.admin-service-status[\s\S]*animation-duration:\s*0\.01ms/,
     );
-    expect(LEDGER_CSS).not.toMatch(/backdrop-filter|linear-gradient/);
+    expect(SERVICE_STATUS_CSS).not.toMatch(/backdrop-filter|linear-gradient/);
   });
 
   it("renders an all-ok snapshot as one narrative, names in details, and no percent readings", () => {
@@ -446,23 +465,25 @@ describe("AdminHealthGrid", () => {
       ),
     });
 
-    const narrative = screen.getByText("모든 신호 정상.");
+    const narrative = screen.getByText("모든 서비스가 정상 범위입니다. 현재 자료로 확인했습니다.");
     expect(narrative.tagName).toBe("P");
     expect(screen.queryByText(/마지막 이상은/)).not.toBeInTheDocument();
     expect(screen.queryByText(/\d+ ?%/)).not.toBeInTheDocument();
     expect(screen.queryByRole("article", { name: "Outbox backlog" })).not.toBeInTheDocument();
     expect(screen.queryByRole("article", { name: "Notification dispatch success" })).not.toBeInTheDocument();
 
-    const okSignals = screen.getByText("정상 신호").closest("details");
-    expect(okSignals).not.toBeNull();
-    expect(within(okSignals as HTMLElement).getByText("Outbox backlog")).toBeInTheDocument();
-    expect(within(okSignals as HTMLElement).getByText("Kafka consumer lag")).toBeInTheDocument();
-    expect(within(okSignals as HTMLElement).getByText("Redis")).toBeInTheDocument();
-    expect(within(okSignals as HTMLElement).getByText("DB pool")).toBeInTheDocument();
-    expect(within(okSignals as HTMLElement).getByText("Notification dispatch success")).toBeInTheDocument();
-    expect(within(okSignals as HTMLElement).getByText("AI provider availability")).toBeInTheDocument();
-    expect(within(okSignals as HTMLElement).queryByText(/\d+ ?%/)).not.toBeInTheDocument();
-    expect(within(okSignals as HTMLElement).queryByText("42 rows")).not.toBeInTheDocument();
+    const okSignals = screen.getByRole("region", { name: "정상 범위 서비스" });
+    expect(within(okSignals).getByText("알림 대기열")).toBeInTheDocument();
+    expect(within(okSignals).getByText("AI 작업 대기열")).toBeInTheDocument();
+    expect(within(okSignals).getByText("Redis")).toBeInTheDocument();
+    expect(within(okSignals).getByText("데이터베이스 연결")).toBeInTheDocument();
+    expect(within(okSignals).getByText("알림 전송")).toBeInTheDocument();
+    expect(within(okSignals).getByText("AI 제공자")).toBeInTheDocument();
+    expect(within(okSignals).getByText("외부 연결 보호")).toBeInTheDocument();
+    expect(within(okSignals).queryByText(/\d+ ?%/)).not.toBeInTheDocument();
+    expect(within(okSignals).queryByText("42 rows")).not.toBeInTheDocument();
+    expect(okSignals.querySelector(".admin-health-card__pill--ok")).toBeNull();
+    expect(document.querySelector(".admin-health-card__pill--ok")).toBeNull();
   });
 
   it("renders the single deviation card immediately after the narrative, with its reading", () => {
@@ -488,11 +509,12 @@ describe("AdminHealthGrid", () => {
       ),
     });
 
-    const narrative = screen.getByText("Kafka consumer lag 주의.");
-    const article = screen.getByRole("article", { name: "Kafka consumer lag" });
+    const narrative = screen.getByText("주의해서 살펴볼 서비스가 1곳 있습니다. 현재 자료로 확인했습니다.");
+    const article = screen.getByRole("article", { name: "AI 작업 대기열" });
     expect(narrative.nextElementSibling).toContainElement(article);
-    expect(within(article).getByText("75.00%")).toBeInTheDocument();
-    expect(screen.queryByRole("article", { name: "Outbox backlog" })).not.toBeInTheDocument();
+    expect(within(article).getByText("관측값이 주의 범위에 들어왔습니다.")).toBeInTheDocument();
+    expect(article.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("75.00%");
+    expect(screen.queryByRole("article", { name: "알림 대기열" })).not.toBeInTheDocument();
   });
 
   it("names the deploy strip 최근에 바뀐 것", () => {
@@ -555,7 +577,8 @@ describe("AdminHealthGrid", () => {
       });
 
       const deploy = screen.getByRole("region", { name: "최근에 바뀐 것" });
-      expect(within(deploy).getByText("정상")).toBeInTheDocument();
+      expect(within(deploy).getByText("1건")).toBeInTheDocument();
+      expect(within(deploy).getByText(refreshState === "STALE" ? "오래됨" : "확인 불가")).toBeInTheDocument();
       expect(deploy.querySelector(".admin-health-card__pill--ok")).toBeNull();
       expect(deploy.querySelector(".admin-health-card__pill--last-known")).not.toBeNull();
       expect(deploy.querySelector(".admin-health-deploy-strip__dot--ok")).toBeNull();

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { DeployAttemptStripEntry } from "@/features/platform-admin/model/platform-admin-health-model";
 import { AdminHealthDeployStrip } from "@/features/platform-admin/ui/admin-health-deploy-strip";
@@ -53,9 +53,10 @@ describe("AdminHealthDeployStrip", () => {
       />,
     );
 
-    expect(screen.getByText(/성공/)).toBeInTheDocument();
-    expect(screen.getByText(/실패/)).toBeInTheDocument();
-    expect(screen.getByText(/진행 중/)).toBeInTheDocument();
+    expect(screen.getByText("배포 성공")).toBeInTheDocument();
+    expect(screen.getByText("배포 실패")).toBeInTheDocument();
+    expect(screen.getByText("배포 진행 중")).toBeInTheDocument();
+    expect(document.querySelector(".admin-health-deploy-strip__dot--ok")).toBeNull();
   });
 
   it("keeps last-known-good rows without current-green evidence or action chrome", () => {
@@ -70,13 +71,24 @@ describe("AdminHealthDeployStrip", () => {
     expect(document.querySelector(".admin-receipt-timeline")).toBeNull();
   });
 
-  it("uses attempt id, image tag, and started timestamp as visible row context", () => {
+  it("keeps attempt id and image tag inside technical disclosure", () => {
     const { container } = render(<AdminHealthDeployStrip evidenceState="ok" entries={[entry()]} />);
 
-    expect(screen.getByText(/deploy-dev-001/)).toBeInTheDocument();
-    expect(screen.getByText(/readmates-api:dev-20260526/)).toBeInTheDocument();
+    const row = screen.getByRole("listitem");
+    expect(within(row).getByText("배포 성공")).toBeInTheDocument();
+    const disclosure = within(row).getByRole("group", { name: "기술 정보" });
+    expect(within(disclosure).getByText("deploy-dev-001")).toBeInTheDocument();
+    expect(within(disclosure).getByText("readmates-api:dev-20260526")).toBeInTheDocument();
+    expect(row.querySelector(".admin-health-deploy-strip__title")?.textContent).toBe("배포 성공");
     const startedAt = container.querySelector("time");
     expect(startedAt).toHaveAttribute("datetime", "2026-05-26T00:00:00Z");
     expect(startedAt?.textContent).toContain("2026");
+  });
+
+  it("does not render an invalid started timestamp as NaN", () => {
+    render(<AdminHealthDeployStrip evidenceState="ok" entries={[entry({ startedAt: "not-a-date" })]} />);
+
+    expect(screen.getByText("시각 확인 불가")).toBeInTheDocument();
+    expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
   });
 });

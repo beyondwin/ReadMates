@@ -10,10 +10,23 @@ export type PlatformHealthRefreshState = "FRESH" | "REFRESHING" | "STALE" | "UNA
 export type HealthEvidenceState = "ok" | "warn" | "crit" | "unavailable" | "disabled" | "empty";
 export type HealthPageState = "ready" | "partial" | "unavailable" | "disabled";
 
+export const HEALTH_CARD_IDS = [
+  "db_pool",
+  "redis",
+  "kafka_consumer_lag",
+  "outbox_backlog",
+  "notification_dispatch_success",
+  "ai_provider_availability",
+  "outbound-resilience",
+  "deploy_attempts_strip",
+] as const;
+
+export type KnownHealthCardId = (typeof HEALTH_CARD_IDS)[number];
+
 export const HEALTH_PAGE_HEADING = "서비스 건강";
 export const HEALTH_PAGE_DESCRIPTION =
-  "서비스·큐·AI 가용성·outbox·배포 신호를 근거와 함께 봅니다.";
-export const HEALTH_OK_SIGNALS_LABEL = "정상 신호";
+  "서비스의 현재 상태와 다음 확인 항목을 한곳에서 봅니다.";
+export const HEALTH_OK_SIGNALS_LABEL = "정상 범위 서비스";
 export const DEPLOY_ATTEMPTS_CARD_ID = "deploy_attempts_strip";
 
 export type HealthLastIncident = {
@@ -75,6 +88,65 @@ export type HealthFailedSource = {
   detail: string;
 };
 
+export type HealthCardOperatorView = {
+  knownSource: boolean;
+  label: string;
+  evidence: HealthEvidenceState;
+  stateSentence: string;
+  reason: string;
+  impact: string | null;
+  nextAction: string | null;
+};
+
+type HealthSourceGuidance = {
+  label: string;
+  impact: string;
+  nextAction: string;
+};
+
+const HEALTH_SOURCE_GUIDANCE: Record<KnownHealthCardId, HealthSourceGuidance> = {
+  db_pool: {
+    label: "데이터베이스 연결",
+    impact: "서비스 요청 처리가 대기할 수 있습니다.",
+    nextAction: "연결 대기가 줄어드는지 새로 확인하세요.",
+  },
+  redis: {
+    label: "Redis",
+    impact: "임시 저장 기능을 쓰는 작업이 느려지거나 제한될 수 있습니다.",
+    nextAction: "오류 수가 더 늘어나는지 새로 확인하세요.",
+  },
+  kafka_consumer_lag: {
+    label: "AI 작업 대기열",
+    impact: "AI 작업 전달이 늦어질 수 있습니다.",
+    nextAction: "대기량이 줄어드는지 새로 확인하세요.",
+  },
+  outbox_backlog: {
+    label: "알림 대기열",
+    impact: "알림 처리가 늦어질 수 있습니다.",
+    nextAction: "알림 상태에서 대기 항목을 확인하세요.",
+  },
+  notification_dispatch_success: {
+    label: "알림 전송",
+    impact: "일부 알림이 늦게 도착할 수 있습니다.",
+    nextAction: "알림 상태에서 전송 결과를 확인하세요.",
+  },
+  ai_provider_availability: {
+    label: "AI 제공자",
+    impact: "AI 요약 작업이 늦어지거나 실패할 수 있습니다.",
+    nextAction: "AI 작업에서 제공자 상태를 확인하세요.",
+  },
+  "outbound-resilience": {
+    label: "외부 연결 보호",
+    impact: "외부 서비스와 연결하는 작업이 멈출 수 있습니다.",
+    nextAction: "차단된 연결이 닫히는지 새로 확인하세요.",
+  },
+  deploy_attempts_strip: {
+    label: "배포 기록",
+    impact: "최근 변경의 적용 상태를 확인하기 어렵습니다.",
+    nextAction: "배포 기록을 다시 확인하세요.",
+  },
+};
+
 const SOURCE_LABEL: Record<HealthCardSource, string> = {
   IN_PROCESS: "프로세스",
   PROMETHEUS: "Prometheus",
@@ -94,8 +166,18 @@ export function isDisabledHealthReason(reason: string | null): boolean {
   return reason != null && (reason === "disabled" || reason.endsWith("_disabled"));
 }
 
+export function isNoDataHealthReason(reason: string | null): boolean {
+  return reason === "no_data";
+}
+
+export function isKnownHealthCardId(id: string): id is KnownHealthCardId {
+  return Object.prototype.hasOwnProperty.call(HEALTH_SOURCE_GUIDANCE, id);
+}
+
 export function healthCardEvidenceState(card: HealthCard): HealthEvidenceState {
+  if (!isKnownHealthCardId(card.id)) return "unavailable";
   if (isDisabledHealthReason(card.reason)) return "disabled";
+  if (isNoDataHealthReason(card.reason)) return "empty";
   if (card.status === "UNKNOWN") return "unavailable";
   if (card.id === DEPLOY_ATTEMPTS_CARD_ID) {
     if (card.deployStrip == null) return "unavailable";
@@ -120,6 +202,45 @@ export function healthFreshnessLabel(refreshState: PlatformHealthRefreshState): 
   return adminHealthFreshnessLanguage(refreshState).primaryText;
 }
 
+export function healthStatusSentence(status: HealthCardStatus): string {
+  switch (status) {
+    case "OK":
+      return "현재 정상 범위입니다.";
+    case "WARN":
+      return "주의해서 살펴봐야 합니다.";
+    case "CRIT":
+      return "지금 확인이 필요합니다.";
+    case "UNKNOWN":
+      return "상태를 확인할 수 없습니다";
+  }
+}
+
+export function healthCardOperatorView(card: HealthCard): HealthCardOperatorView {
+  const evidence = healthCardEvidenceState(card);
+  if (!isKnownHealthCardId(card.id)) {
+    return {
+      knownSource: false,
+      label: "알 수 없는 서비스",
+      evidence: "unavailable",
+      stateSentence: "상태를 확인할 수 없습니다",
+      reason: "등록되지 않은 상태 원천입니다.",
+      impact: null,
+      nextAction: null,
+    };
+  }
+
+  const guidance = HEALTH_SOURCE_GUIDANCE[card.id];
+  return {
+    knownSource: true,
+    label: guidance.label,
+    evidence,
+    stateSentence: healthEvidenceSentence(evidence, card.status),
+    reason: healthReasonSentence(evidence),
+    impact: guidance.impact,
+    nextAction: guidance.nextAction,
+  };
+}
+
 export function healthPrimaryReading(card: HealthCard): string {
   const evidence = healthCardEvidenceState(card);
   if (evidence === "disabled") return adminHealthAvailabilityLanguage("DISABLED").primaryText;
@@ -141,9 +262,9 @@ export function formatHealthMetricValue(value: number, unit: string): string {
 
 export function healthDrillLabel(card: HealthCard): string | null {
   if (!card.drill) return null;
-  if (card.drill.target.startsWith("/admin/notifications")) return "알림 운영에서 자세히 보기";
-  if (card.drill.target.startsWith("/admin/ai-ops")) return "AI 작업에서 자세히 보기";
-  return "자세히 보기";
+  if (card.drill.target.startsWith("/admin/notifications")) return "알림 상태 열기";
+  if (card.drill.target.startsWith("/admin/ai-ops")) return "AI 작업 열기";
+  return "관련 상태 열기";
 }
 
 export function canRetryHealthCard(card: HealthCard): boolean {
@@ -180,13 +301,13 @@ export function isLastKnownHealthEvidence(
 export function formatRefreshStateLabel(snapshot: PlatformHealthSnapshot): string {
   switch (snapshot.refreshState) {
     case "FRESH":
-      return "정상 갱신 완료";
+      return "현재 자료로 확인했습니다.";
     case "REFRESHING":
-      return "서버에서 갱신 중";
+      return "새 상태를 확인하고 있습니다.";
     case "STALE":
-      return `마지막 정상 갱신 ${formatAge(snapshot.staleAgeSeconds)} 전`;
+      return `마지막 확인 자료가 ${formatAge(snapshot.staleAgeSeconds)} 전입니다.`;
     case "UNAVAILABLE":
-      return "정상 갱신 이력 없음";
+      return "최근 상태 자료를 확인할 수 없습니다.";
   }
 }
 
@@ -237,15 +358,80 @@ export function partitionHealthServiceCards(cards: readonly HealthCard[]): {
 export function formatHealthNarrative(
   cards: readonly HealthCard[],
   lastIncident?: HealthLastIncident | null,
+  refreshState: PlatformHealthRefreshState = "FRESH",
 ): string {
   const { deviations } = partitionHealthServiceCards(cards);
-  if (deviations.length > 0) {
-    return deviations
-      .map((card) => `${card.title} ${healthEvidenceLabel(healthCardEvidenceState(card))}.`)
-      .join(" ");
-  }
+  const summary = healthPageSummary(deviations, cards, refreshState);
   const resolved = formatResolvedIncident(lastIncident);
-  return resolved ? `모든 신호 정상. 마지막 이상은 ${resolved} (해소됨).` : "모든 신호 정상.";
+  return resolved && deviations.length === 0 && refreshState === "FRESH"
+    ? `${summary} 마지막 이상은 ${resolved} (해소됨).`
+    : summary;
+}
+
+function healthPageSummary(
+  deviations: readonly HealthCard[],
+  cards: readonly HealthCard[],
+  refreshState: PlatformHealthRefreshState,
+): string {
+  if (refreshState === "UNAVAILABLE") {
+    return "최근 상태 자료를 확인할 수 없어 정상 여부를 확정할 수 없습니다.";
+  }
+  if (refreshState === "STALE" && deviations.length === 0) {
+    return "현재 확인된 서비스는 정상 범위지만 자료가 오래되었습니다.";
+  }
+
+  const evidence = deviations.map(healthCardEvidenceState);
+  const prefix = evidence.includes("crit")
+    ? `지금 확인이 필요한 서비스가 ${evidence.filter((state) => state === "crit").length}곳 있습니다.`
+    : evidence.includes("warn")
+      ? `주의해서 살펴볼 서비스가 ${evidence.filter((state) => state === "warn").length}곳 있습니다.`
+      : evidence.includes("unavailable")
+        ? "일부 서비스 상태를 확인할 수 없습니다."
+        : evidence.includes("empty")
+          ? "일부 서비스는 아직 판단할 자료가 없습니다."
+          : evidence.includes("disabled") && cards.every((card) => healthCardEvidenceState(card) === "disabled")
+            ? "현재 사용 중인 상태 원천이 없습니다."
+            : "모든 서비스가 정상 범위입니다.";
+
+  const freshness = refreshState === "REFRESHING"
+    ? "새 상태를 확인하고 있습니다."
+    : "현재 자료로 확인했습니다.";
+  return `${prefix} ${freshness}`;
+}
+
+function healthEvidenceSentence(
+  evidence: HealthEvidenceState,
+  status: HealthCardStatus,
+): string {
+  switch (evidence) {
+    case "disabled":
+      return "현재 운영 설정에서 사용하지 않습니다.";
+    case "empty":
+      return "아직 판단할 자료가 없습니다.";
+    case "unavailable":
+      return "상태를 확인할 수 없습니다";
+    case "ok":
+    case "warn":
+    case "crit":
+      return healthStatusSentence(status);
+  }
+}
+
+function healthReasonSentence(evidence: HealthEvidenceState): string {
+  switch (evidence) {
+    case "ok":
+      return "관측값이 정상 범위에 있습니다.";
+    case "warn":
+      return "관측값이 주의 범위에 들어왔습니다.";
+    case "crit":
+      return "관측값이 위험 범위에 들어왔습니다.";
+    case "unavailable":
+      return "원천에서 상태 자료를 받지 못했습니다.";
+    case "disabled":
+      return "현재 운영 설정에서 사용하지 않는 원천입니다.";
+    case "empty":
+      return "원천에 아직 판단할 관측 자료가 없습니다.";
+  }
 }
 
 function formatResolvedIncident(lastIncident?: HealthLastIncident | null): string | null {
@@ -258,12 +444,15 @@ function formatResolvedIncident(lastIncident?: HealthLastIncident | null): strin
 export function healthFailedSources(cards: readonly HealthCard[]): HealthFailedSource[] {
   return cards
     .filter((card) => healthCardEvidenceState(card) === "unavailable")
-    .map((card) => ({
-      id: card.id,
-      label: card.title,
-      available: false as const,
-      detail: card.reason ?? "확인 불가",
-    }));
+    .map((card) => {
+      const view = healthCardOperatorView(card);
+      return {
+        id: card.id,
+        label: view.label,
+        available: false as const,
+        detail: view.stateSentence,
+      };
+    });
 }
 
 function formatAge(seconds: number): string {
