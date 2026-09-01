@@ -14,6 +14,8 @@ import { AdminEvidenceLedger } from "./admin-evidence-ledger";
 import { AdminPageContext } from "./admin-page-context";
 import { AdminReceiptTimeline } from "./admin-receipt-timeline";
 import { AdminSafeActionDock, type AdminSafeActionState } from "./admin-action-dock";
+import { AdminTechnicalDisclosure } from "@/features/platform-admin/ui/admin-technical-disclosure";
+import "./admin-service-status.css";
 
 export type AdminNotificationsPageProps = {
   snapshot: AdminNotificationOperationsSnapshot | null;
@@ -66,13 +68,15 @@ export function AdminNotificationsPage({
 }: AdminNotificationsPageProps) {
   const confirmDisabled = !replayPreview || !replayReason.trim() || !canReplay || busy;
   const dockState = replayDockState({ canReplay, busy, replayResult, unknownOutcome });
+  const overview = notificationOverview(snapshot);
 
   return (
     <section className="admin-notifications">
       <AdminPageContext
         eyebrow={ADMIN_COPY.eyebrow.notifications}
         heading={ADMIN_COPY.heading.delivery}
-        freshness={snapshot ? `생성 ${formatTimestamp(snapshot.generatedAt)}` : "요약을 불러오지 못함"}
+        description={overview.operatorSentence}
+        freshness={snapshot ? `최근 집계 ${formatTimestamp(snapshot.generatedAt)}` : "최근 집계 시각 없음"}
         authority={canReplay ? "재처리 가능" : "재처리 권한 없음"}
       >
         {focus ? <FocusBanner focus={focus} /> : null}
@@ -92,18 +96,32 @@ export function AdminNotificationsPage({
         <div className="admin-notifications__grid">
           <section className="admin-notifications__panel" aria-labelledby="admin-notifications-failures-title">
             <h2 id="admin-notifications-failures-title" className="h3 editorial">{ADMIN_COPY.heading.failureClusters}</h2>
+            <p className="admin-service-detail__next-action">{overview.nextSafeAction}</p>
             {snapshot?.failureClusters.length ? (
               <ul className="admin-notifications__cluster-list">
-                {snapshot.failureClusters.map((cluster) => (
-                  <li key={`${cluster.status}-${cluster.safeErrorCode}`}>
-                    <span>{failureClusterSentence(cluster, events, deliveries)}</span>
-                    <strong>{cluster.count}</strong>
-                    <em>{deliveryLedgerStatusLabel(cluster.status)}</em>
-                  </li>
-                ))}
+                {snapshot.failureClusters.map((cluster) => {
+                  const evidence = failureClusterEvidence(cluster, events, deliveries);
+                  return (
+                    <li key={`${cluster.status}-${cluster.safeErrorCode}`} aria-label={`${evidence.clubLabel} 알림 전달 실패 ${cluster.count}건`}>
+                      <div>
+                        <span>{evidence.clubLabel} 알림 전달 실패</span>
+                        <p className="small muted">최근 확인 {cluster.latestAt ? formatTimestamp(cluster.latestAt) : "시각 없음"}</p>
+                        <AdminTechnicalDisclosure
+                          items={[
+                            { label: "알림 유형 코드", value: evidence.eventType },
+                            { label: "오류 코드", value: cluster.safeErrorCode },
+                            { label: "상태 코드", value: cluster.status },
+                          ]}
+                        />
+                      </div>
+                      <strong>{cluster.count}</strong>
+                      <em>{deliveryLedgerStatusLabel(cluster.status)}</em>
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
-              <p className="muted">집계된 실패 cluster가 없습니다.</p>
+              <p className="muted">같은 원인으로 묶인 최근 실패가 없습니다.</p>
             )}
           </section>
 
@@ -121,12 +139,17 @@ export function AdminNotificationsPage({
                 {Object.entries(replayPreview.estimatedByStatus).map(([status, count]) => (
                   <span key={status} className="platform-admin-domain-status">{deliveryLedgerStatusLabel(status)} {count}</span>
                 ))}
-                {replayPreview.warnings.map((warning) => (
-                  <span key={warning} className="admin-notifications__safe-code">{warning}</span>
-                ))}
+                {replayPreview.warnings.length > 0 ? (
+                  <>
+                    <p className="small">확인할 주의 사항이 있습니다.</p>
+                    <AdminTechnicalDisclosure
+                      items={[{ label: "주의 코드", value: replayPreview.warnings.join(", ") }]}
+                    />
+                  </>
+                ) : null}
               </div>
             ) : (
-              <p className="muted">실패/Dead delivery를 확인한 뒤 사유를 남기고 재처리합니다.</p>
+              <p className="muted">실패한 배달을 확인한 뒤 사유를 남기고 재발송합니다.</p>
             )}
             <label className="admin-notifications__reason">
               <span>처리 사유</span>
@@ -135,11 +158,11 @@ export function AdminNotificationsPage({
                 disabled={!canReplay || busy || reasonLocked || unknownOutcome}
                 onChange={(event) => onReplayReasonChange(event.currentTarget.value)}
                 rows={3}
-                placeholder="예: 공급자 복구 후 실패 delivery 재처리"
+                placeholder="예: 전달 서비스 복구 후 실패 항목 재발송"
               />
             </label>
             <AdminSafeActionDock
-              level="L2"
+              level="L3"
               authority={canReplay ? "allowed" : "denied"}
               state={dockState}
               reason={
@@ -174,11 +197,11 @@ export function AdminNotificationsPage({
           label="발송 대기 장부"
           count={events.length > 0 ? events.length : undefined}
           state={events.length > 0 ? "ready" : "empty"}
-          title={events.length > 0 ? undefined : "표시할 outbox event가 없습니다."}
+          title={events.length > 0 ? undefined : "표시할 발송 요청이 없습니다."}
           controls={
             hasMoreEvents ? (
               <button type="button" className="btn btn-quiet btn-sm" disabled={loadingMoreEvents} onClick={() => void onLoadMoreEvents?.()}>
-                {loadingMoreEvents ? "불러오는 중" : "Outbox 더 보기"}
+                {loadingMoreEvents ? "불러오는 중" : "발송 요청 더 보기"}
               </button>
             ) : null
           }
@@ -188,11 +211,18 @@ export function AdminNotificationsPage({
               {events.map((item) => (
                 <article key={item.eventId} className="admin-notifications__row">
                   <div>
-                    <p className="admin-notifications__row-title">{item.club.name} · {item.eventType}</p>
-                    {ledgerRowMeta(item.attemptCount, item.nextAttemptAt, item.updatedAt, item.source)}
+                    <p className="admin-notifications__row-title">{item.club.name} · 알림 발송 요청</p>
+                    {ledgerRowMeta(item.attemptCount, item.nextAttemptAt, item.updatedAt, sourceLabel(item.source))}
+                    <AdminTechnicalDisclosure
+                      items={[
+                        { label: "발송 요청 식별자", value: item.eventId },
+                        { label: "알림 유형 코드", value: item.eventType },
+                        { label: "생성 경로 코드", value: item.source },
+                        { label: "오류 코드", value: item.safeErrorCode },
+                      ]}
+                    />
                   </div>
                   <span className="platform-admin-domain-status">{deliveryLedgerStatusLabel(item.status)}</span>
-                  {item.safeErrorCode ? <span className="admin-notifications__safe-code">{item.safeErrorCode}</span> : null}
                 </article>
               ))}
             </div>
@@ -203,11 +233,11 @@ export function AdminNotificationsPage({
           label="배달 장부"
           count={deliveries.length > 0 ? deliveries.length : undefined}
           state={deliveries.length > 0 ? "ready" : "empty"}
-          title={deliveries.length > 0 ? undefined : "표시할 delivery가 없습니다."}
+          title={deliveries.length > 0 ? undefined : "표시할 배달 내역이 없습니다."}
           controls={
             hasMoreDeliveries ? (
               <button type="button" className="btn btn-quiet btn-sm" disabled={loadingMoreDeliveries} onClick={() => void onLoadMoreDeliveries?.()}>
-                {loadingMoreDeliveries ? "불러오는 중" : "Delivery 더 보기"}
+                {loadingMoreDeliveries ? "불러오는 중" : "배달 내역 더 보기"}
               </button>
             ) : null
           }
@@ -218,12 +248,20 @@ export function AdminNotificationsPage({
                 <article key={item.deliveryId} className="admin-notifications__row">
                   <div>
                     <p className="admin-notifications__row-title">
-                      {item.club.name} · {item.channel} · {item.maskedRecipient ?? "recipient masked"}
+                      {item.club.name} · {channelLabel(item.channel)} · {item.maskedRecipient ?? "수신자 비공개"}
                     </p>
                     {ledgerRowMeta(item.attemptCount, null, item.updatedAt)}
+                    <AdminTechnicalDisclosure
+                      items={[
+                        { label: "배달 식별자", value: item.deliveryId },
+                        { label: "발송 요청 식별자", value: item.eventId },
+                        { label: "채널 코드", value: item.channel },
+                        { label: "상태 코드", value: item.status },
+                        { label: "오류 코드", value: item.safeErrorCode },
+                      ]}
+                    />
                   </div>
                   <span className="platform-admin-domain-status">{deliveryLedgerStatusLabel(item.status)}</span>
-                  {item.safeErrorCode ? <span className="admin-notifications__safe-code">{item.safeErrorCode}</span> : null}
                 </article>
               ))}
             </div>
@@ -236,19 +274,21 @@ export function AdminNotificationsPage({
 
 function ReplayReceipt({ result }: { result: AdminNotificationReplayConfirmResult }) {
   const availability = result.effectAvailability === "DISABLED" ? " · 현재 비활성" : "";
-  const skipped = Object.entries(result.skippedReasonCounts).map(([reason, count]) => (
-    <p key={reason} className="small muted">{reason} {count}</p>
-  ));
+  const skippedReasons = Object.entries(result.skippedReasonCounts)
+    .map(([reason, count]) => `${reason} ${count}`)
+    .join(", ");
   return (
     <AdminReceiptTimeline
-      level="L2"
+      level="L3"
       receiptId={`영수증 ${result.receiptId}`}
       entries={[
         {
           key: "replay",
           label: `재처리 ${result.replayedCount}건 · 건너뜀 ${result.skippedCount}건`,
           state: "succeeded",
-          detail: skipped.length > 0 ? <>{skipped}</> : undefined,
+          detail: skippedReasons ? (
+            <AdminTechnicalDisclosure items={[{ label: "건너뜀 사유 코드", value: skippedReasons }]} />
+          ) : undefined,
         },
         {
           key: "effect",
@@ -261,6 +301,7 @@ function ReplayReceipt({ result }: { result: AdminNotificationReplayConfirmResul
                 : "pending",
         },
       ]}
+      convergence={<p>후속 배달 효과 · {effectLabel(result.effectStatus)}{availability}</p>}
     />
   );
 }
@@ -301,23 +342,54 @@ function Metric({ label, value }: { label: string; value: number }) {
 function FocusBanner({ focus }: { focus: string }) {
   const copy =
     focus === "outbox_backlog"
-      ? "Health outbox backlog에서 이동했습니다. 실패 cluster와 pending event를 먼저 확인하세요."
+      ? "서비스 상태의 발송 대기 신호에서 이동했습니다. 실패 묶음과 대기 중인 발송 요청을 먼저 확인하세요."
       : focus === "notification_dispatch_success"
-        ? "Notification dispatch 상태에서 이동했습니다. 최근 성공과 실패 분포를 함께 확인하세요."
-        : "Health drill-down에서 이동했습니다.";
+        ? "알림 전달 상태에서 이동했습니다. 최근 성공과 실패 분포를 함께 확인하세요."
+        : "서비스 상태 상세에서 이동했습니다.";
   return <p className="admin-notifications__focus">{copy}</p>;
 }
 
-function failureClusterSentence(
+function failureClusterEvidence(
   cluster: AdminNotificationOperationsSnapshot["failureClusters"][number],
   events: AdminNotificationOutboxEvent[],
   deliveries: AdminNotificationDelivery[],
-): string {
+): { clubLabel: string; eventType: string | null } {
   const matchingEvent = events.find((item) => item.safeErrorCode === cluster.safeErrorCode);
   const matchingDelivery = deliveries.find((item) => item.safeErrorCode === cluster.safeErrorCode);
-  const club = matchingEvent?.club.name ?? matchingDelivery?.club.name;
-  const eventType = matchingEvent?.eventType;
-  return [club, eventType, cluster.safeErrorCode].filter((part): part is string => Boolean(part)).join(" · ");
+  return {
+    clubLabel: matchingEvent?.club.name ?? matchingDelivery?.club.name ?? "여러 클럽",
+    eventType: matchingEvent?.eventType ?? null,
+  };
+}
+
+function notificationOverview(snapshot: AdminNotificationOperationsSnapshot | null) {
+  if (!snapshot) {
+    return {
+      operatorSentence: "알림 전달 상태를 확인할 수 없습니다.",
+      nextSafeAction: "잠시 뒤 다시 확인하세요.",
+    };
+  }
+  const outboxFailures = snapshot.outboxSummary.failed + snapshot.outboxSummary.dead;
+  const deliveryFailures = snapshot.deliverySummary.failed + snapshot.deliverySummary.dead;
+  const relayDelays = snapshot.relaySummary.stalePublishing + snapshot.relaySummary.staleSending;
+  if (outboxFailures + deliveryFailures + relayDelays === 0) {
+    return {
+      operatorSentence: "지금 확인할 알림 전달 이상은 없습니다.",
+      nextSafeAction: "새 실패 신호가 생기기 전에는 별도 조치가 필요하지 않습니다.",
+    };
+  }
+  return {
+    operatorSentence: `발송 실패 ${outboxFailures}건, 배달 실패 ${deliveryFailures}건, 중계 지연 ${relayDelays}건을 확인해야 합니다.`,
+    nextSafeAction: "같은 원인의 실패와 자동 재시도 상태를 확인한 뒤 필요한 항목만 수동 재발송하세요.",
+  };
+}
+
+function sourceLabel(source: AdminNotificationOutboxEvent["source"]) {
+  return source === "MANUAL" ? "수동 요청" : "자동 요청";
+}
+
+function channelLabel(channel: AdminNotificationDelivery["channel"]) {
+  return channel === "EMAIL" ? "이메일 배달" : "앱 안 알림";
 }
 
 function ledgerRowMeta(

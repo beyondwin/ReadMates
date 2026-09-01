@@ -94,12 +94,12 @@ describe("AdminSafeActionDock", () => {
     expect(onPrimary).toHaveBeenCalledOnce();
   });
 
-  it("keeps an L2 unknown-outcome same-intent primary clickable", async () => {
+  it.each(["L2", "L3"] as const)("keeps an %s unknown-outcome same-intent primary clickable", async (level) => {
     const onPrimary = vi.fn();
     const user = userEvent.setup();
     render(
       <AdminSafeActionDock
-        level="L2"
+        level={level}
         authority="allowed"
         state="unknown-outcome"
         reason="명령 응답을 확인하지 못했습니다. 같은 명령으로 다시 시도할 수 있습니다."

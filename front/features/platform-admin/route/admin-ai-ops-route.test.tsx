@@ -177,20 +177,21 @@ describe("AdminAiOpsRoute", () => {
 
   it("selecting a failure code pushes the errorCode filter to the URL", async () => {
     renderRoute();
-    await userEvent.click(screen.getByRole("button", { name: /PROVIDER_RATE_LIMITED/ }));
+    await userEvent.click(screen.getByRole("button", { name: "이 원인의 작업 보기 · 2건" }));
     expect(await screen.findByRole("button", { name: "전체 보기" })).toBeInTheDocument();
   });
 
   it("renders the active filter banner when navigated with an errorCode", () => {
     renderRoute("/admin/ai-ops?errorCode=PROVIDER_RATE_LIMITED");
     const banner = screen.getByRole("status");
-    expect(within(banner).getByText(/PROVIDER_RATE_LIMITED/)).toBeInTheDocument();
+    expect(within(banner).getByText("선택한 실패 원인의 작업만 보는 중")).toBeInTheDocument();
+    expect(banner.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("PROVIDER_RATE_LIMITED");
     expect(within(banner).getByRole("button", { name: "전체 보기" })).toBeInTheDocument();
   });
 
   it("flattens cursor pages without rendering a duplicate boundary job", () => {
     renderRoute("/admin/ai-ops", { pages: [[runningJob], [runningJob, { ...runningJob, jobId: "job-2" }]] });
-    expect(screen.getAllByText(/한강 독서회/)).toHaveLength(2);
+    expect(screen.getAllByText(/한강 독서회/, { selector: ".platform-admin-ai-ops__job-title" })).toHaveLength(2);
   });
 
   it("uses authoritative capabilities instead of inferring mutations from role", () => {
@@ -203,7 +204,7 @@ describe("AdminAiOpsRoute", () => {
     renderRoute("/admin/ai-ops", { pages: [[runningJob]], summaryError: new TypeError("network failed") });
 
     expect(await screen.findByRole("alert")).toHaveTextContent("일부 AI 작업 데이터를 불러오지 못했습니다.");
-    expect(screen.getByText(/한강 독서회/)).toBeInTheDocument();
+    expect(screen.getByText(/한강 독서회/, { selector: ".platform-admin-ai-ops__job-title" })).toBeInTheDocument();
     expect(screen.queryByText("$0.0000")).not.toBeInTheDocument();
     expect(screen.queryByText("최근 실패 코드 없음")).not.toBeInTheDocument();
   });
@@ -286,7 +287,7 @@ describe("AdminAiOpsRoute", () => {
     });
 
     expect(screen.queryByRole("dialog", { name: "강제 취소 확인" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "작업 job-1 강제 취소" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "이 작업 강제 취소" })).not.toBeInTheDocument();
     act(() => {
       queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, {
         schemaVersion: 1,
@@ -302,8 +303,8 @@ describe("AdminAiOpsRoute", () => {
   it("opens a safe deep-linked drill-down without placing content in the URL", () => {
     renderRoute("/admin/ai-ops?jobId=job-1", { pages: [[runningJob]], job: runningJob });
     const dialog = screen.getByRole("dialog", { name: "AI 작업 상세" });
-    expect(within(dialog).getByText(/job-1/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/revision 7/)).toBeInTheDocument();
+    expect(dialog.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("job-1");
+    expect(dialog.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("revision 7");
   });
 
   it("retries an ambiguous confirmation with the exact same idempotency request", async () => {
@@ -337,7 +338,7 @@ describe("AdminAiOpsRoute", () => {
     renderRoute("/admin/ai-ops", { pages: [[runningJob]] });
 
     await userEvent.click(screen.getByRole("button", { name: "강제 취소 검토" }));
-    await userEvent.click(await screen.findByRole("button", { name: "작업 job-1 강제 취소" }));
+    await userEvent.click(await screen.findByRole("button", { name: "이 작업 강제 취소" }));
     await userEvent.click(await screen.findByRole("button", { name: "같은 명령으로 다시 확인" }));
 
     await waitFor(() => expect(confirmForceCancelPlatformAdminAiJob).toHaveBeenCalledTimes(2));
@@ -373,7 +374,7 @@ describe("AdminAiOpsRoute", () => {
     const { queryClient } = renderRoute("/admin/ai-ops", { pages: [[runningJob]] });
 
     await userEvent.click(screen.getByRole("button", { name: "강제 취소 검토" }));
-    await userEvent.click(await screen.findByRole("button", { name: "작업 job-1 강제 취소" }));
+    await userEvent.click(await screen.findByRole("button", { name: "이 작업 강제 취소" }));
 
     await waitFor(() => {
       expect(confirmForceCancelPlatformAdminAiJob).toHaveBeenCalledTimes(1);

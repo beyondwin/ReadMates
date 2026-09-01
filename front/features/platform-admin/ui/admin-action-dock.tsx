@@ -63,7 +63,7 @@ export function AdminSafeActionDock({
   status,
 }: AdminSafeActionDockProps) {
   const locked = authority === "denied"
-    || (LOCKED_STATES.has(state) && !(level === "L2" && state === "unknown-outcome"));
+    || (LOCKED_STATES.has(state) && !((level === "L2" || level === "L3") && state === "unknown-outcome"));
   return (
     <div
       className="admin-safe-action-dock"

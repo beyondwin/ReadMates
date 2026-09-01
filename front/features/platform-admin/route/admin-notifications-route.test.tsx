@@ -214,7 +214,7 @@ describe("AdminNotificationsRoute", () => {
 
     expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
-    expect(screen.getByText(/Health outbox backlog/)).toBeInTheDocument();
+    expect(screen.getByText(/서비스 상태의 발송 대기 신호/)).toBeInTheDocument();
   });
 
   it("flattens multiple cursor pages and removes a duplicate boundary event", () => {

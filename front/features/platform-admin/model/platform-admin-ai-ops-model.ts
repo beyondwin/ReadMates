@@ -7,6 +7,7 @@ import type {
   PlatformAdminAiOpsFilters,
   PlatformAdminAiOpsJob,
   PlatformAdminAiOpsJobListResponse,
+  PlatformAdminAiOpsSummaryResponse,
 } from "@/features/platform-admin/model/platform-admin-domain-types";
 
 export type AiOpsJobFilter = {
@@ -94,6 +95,91 @@ export const AI_OPS_COST_WINDOWS: AiOpsCostWindow[] = ["7d", "30d", "90d"];
 
 export const AI_OPS_DEFAULT_WINDOW: AiOpsCostWindow = "30d";
 
+export type AiOpsServiceDetail = {
+  operatorSentence: string;
+  latestObservedAt: string | null;
+  nextSafeAction: string;
+};
+
+export type AiOpsJobNarrative = {
+  operatorSentence: string;
+  nextSafeAction: string;
+  cleanupSentence: string | null;
+};
+
+export function buildAiOpsServiceDetail(
+  summary: Pick<
+    PlatformAdminAiOpsSummaryResponse,
+    "activeJobCount" | "failedLast24h" | "staleCandidateCount"
+  > | null,
+  jobs: PlatformAdminAiOpsJob[],
+): AiOpsServiceDetail {
+  const latestObservedAt = latestAiOpsObservation(jobs);
+  if (!summary) {
+    return {
+      operatorSentence: jobs.length > 0
+        ? "AI 처리 집계는 확인할 수 없지만 최근 작업 기록은 확인할 수 있습니다."
+        : "AI 처리 상태를 확인할 수 없습니다.",
+      latestObservedAt,
+      nextSafeAction: "잠시 뒤 집계를 다시 확인하고, 표시된 작업은 최근 갱신 시각을 기준으로 판단하세요.",
+    };
+  }
+
+  const attention: string[] = [];
+  if (summary.failedLast24h > 0) {
+    attention.push(`최근 24시간 실패 ${summary.failedLast24h}건`);
+  }
+  if (summary.staleCandidateCount > 0) {
+    attention.push(`오래 멈춘 작업 ${summary.staleCandidateCount}건`);
+  }
+  if (attention.length > 0) {
+    return {
+      operatorSentence: `${joinKoreanList(attention)}을 먼저 확인하세요.`,
+      latestObservedAt,
+      nextSafeAction: "실패 원인을 좁힌 뒤 멈춘 작업의 최신 상태와 허용된 복구 방법을 확인하세요.",
+    };
+  }
+  if (summary.activeJobCount > 0) {
+    return {
+      operatorSentence: `AI 처리 ${summary.activeJobCount}건이 진행 중이며 최근 24시간 실패는 없습니다.`,
+      latestObservedAt,
+      nextSafeAction: "최근 갱신 시각이 오래되지 않았다면 처리가 끝날 때까지 기다리세요.",
+    };
+  }
+  return {
+    operatorSentence: "지금 확인할 AI 처리 이상은 없습니다.",
+    latestObservedAt,
+    nextSafeAction: "새 이상 신호가 생기기 전에는 별도 조치가 필요하지 않습니다.",
+  };
+}
+
+export function buildAiOpsJobNarrative(
+  job: Pick<
+    PlatformAdminAiOpsJob,
+    "club" | "status" | "staleCandidate" | "cleanupPending" | "availableActions"
+  >,
+): AiOpsJobNarrative {
+  const club = job.club.name ?? job.club.slug ?? "선택한 클럽";
+  const operatorSentence = job.staleCandidate
+    ? `${club}의 AI 처리가 오래 멈춰 있습니다.`
+    : job.status === "FAILED"
+      ? `${club}의 AI 처리가 실패했습니다.`
+      : job.status === "SUCCEEDED" || job.status === "COMPLETED"
+        ? `${club}의 AI 처리가 완료되었습니다.`
+        : `${club}의 AI 처리가 ${aiOpsJobStatusLanguage(job.status).primaryText}입니다.`;
+  const nextSafeAction = job.availableActions.includes("RETRY_COMMIT")
+    ? "최신 상태를 확인한 뒤 저장 복구를 검토할 수 있습니다."
+    : job.availableActions.includes("FORCE_CANCEL")
+      ? "최신 상태를 확인한 뒤 강제 취소를 검토할 수 있습니다."
+      : "실패 원인과 최근 갱신 시각을 확인하세요.";
+  const cleanupSentence = job.cleanupPending == null
+    ? null
+    : job.cleanupPending
+      ? "임시 데이터 정리가 남아 있습니다."
+      : "임시 데이터 정리가 끝났습니다.";
+  return { operatorSentence, nextSafeAction, cleanupSentence };
+}
+
 export function aiOpsWindowFromSearchParams(params: URLSearchParams): AiOpsCostWindow {
   const raw = params.get("window");
   return AI_OPS_COST_WINDOWS.includes(raw as AiOpsCostWindow) ? (raw as AiOpsCostWindow) : AI_OPS_DEFAULT_WINDOW;
@@ -161,4 +247,21 @@ function elapsedMinutes(value: string, now: Date): number | null {
     return null;
   }
   return Math.max(0, Math.floor((now.getTime() - parsed) / 60_000));
+}
+
+function latestAiOpsObservation(jobs: PlatformAdminAiOpsJob[]): string | null {
+  let latest: { value: string; millis: number } | null = null;
+  for (const job of jobs) {
+    const millis = Date.parse(job.lastUpdatedAt);
+    if (Number.isNaN(millis)) continue;
+    if (!latest || millis > latest.millis) {
+      latest = { value: job.lastUpdatedAt, millis };
+    }
+  }
+  return latest?.value ?? null;
+}
+
+function joinKoreanList(parts: string[]): string {
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")}과 ${parts.at(-1)}`;
 }
