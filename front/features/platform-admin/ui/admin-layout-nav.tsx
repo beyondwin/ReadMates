@@ -11,6 +11,7 @@ export type AdminNavigationLinkRenderProps = {
   href: string;
   className: string;
   ariaCurrent?: "page";
+  ariaLabel?: string;
   style?: CSSProperties;
   children: ReactNode;
 };
@@ -43,6 +44,7 @@ export function AdminLayoutNav({
       aria-label={ariaLabel}
       data-layout={compact ? "compact" : "wide"}
     >
+      <p className="admin-layout-nav__eyebrow">운영</p>
       {areas.length > 0 ? (
         <ul className="admin-layout-nav__areas">
           {areas.map((area) => {
@@ -83,6 +85,7 @@ export function AdminLayoutNav({
           ))}
         </ul>
       ) : null}
+      <button type="button" className="admin-layout-nav__logout" aria-label="로그아웃" />
     </nav>
   );
 }

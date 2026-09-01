@@ -112,11 +112,11 @@ export function AdminOperationsInspector({
       evidence={
         <div className="admin-operations-inspector">
           <section className="admin-operations-inspector__section">
-            <h3>무슨 일인가</h3>
+            <h3>무슨 일이 있었나요?</h3>
             <p className="admin-operation-wrap">{selectedCase.summary.description}</p>
           </section>
           <section className="admin-operations-inspector__section">
-            <h3>왜 중요한가</h3>
+            <h3>영향 범위</h3>
             <p>{selectedCase.impactLabel}</p>
             <p className="admin-operations-inspector__state-line">
               <span>심각도 · {selectedCase.severityLabel}</span>
@@ -125,35 +125,42 @@ export function AdminOperationsInspector({
             </p>
           </section>
           <section className="admin-operations-inspector__section">
-            <h3>확인한 근거</h3>
-            <dl className="admin-operations-inspector__facts">
-              <div>
-                <dt>관측 출처</dt>
-                <dd>{selectedCase.sourceLabel}</dd>
-              </div>
-              <div>
-                <dt>관측 시각</dt>
-                <dd>{freshness}</dd>
-              </div>
-              <div>
-                <dt>감지 기준</dt>
-                <dd>{detectionCriterion(selectedCase.summaryCode)}</dd>
-              </div>
-              <div>
-                <dt>최초 관측</dt>
-                <dd>{selectedCase.ageLabel}</dd>
-              </div>
-            </dl>
+            <h3>확인된 내용</h3>
+            {selectedCase.evidenceLines && selectedCase.evidenceLines.length > 0 ? (
+              <ul className="admin-operations-inspector__evidence-list">
+                {selectedCase.evidenceLines.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            ) : (
+              <dl className="admin-operations-inspector__facts">
+                <div>
+                  <dt>관측 출처</dt>
+                  <dd>{selectedCase.sourceLabel}</dd>
+                </div>
+                <div>
+                  <dt>관측 시각</dt>
+                  <dd>{freshness}</dd>
+                </div>
+                <div>
+                  <dt>감지 기준</dt>
+                  <dd>{detectionCriterion(selectedCase.summaryCode)}</dd>
+                </div>
+                <div>
+                  <dt>최초 관측</dt>
+                  <dd>{selectedCase.ageLabel}</dd>
+                </div>
+              </dl>
+            )}
             <Link className="btn btn-secondary admin-operations-inspector__detail-link admin-operation-control--touch" to={selectedCase.detailHref}>
               {SOURCE_DETAIL_LABELS[selectedCase.sourceType] ?? "운영 상세에서 확인"}
             </Link>
-            <AdminTechnicalDisclosure
-              items={[
-                { label: "케이스 식별자", value: selectedCase.id },
-                { label: "관측 출처 식별자", value: selectedCase.sourceType },
-                { label: "클럽 식별자", value: selectedCase.clubId },
-              ]}
-            />
+          </section>
+          <section className="admin-operations-inspector__section">
+            <h3>권장 처리</h3>
+            <p className="admin-operation-wrap">
+              {selectedCase.recommendation ?? detectionCriterion(selectedCase.summaryCode)}
+            </p>
           </section>
         </div>
       }
@@ -170,7 +177,7 @@ export function AdminOperationsInspector({
       }
       actions={
         <div className="admin-operations-inspector__lifecycle" aria-label="케이스 상태 관리">
-          <h3 className="h3">다음 행동</h3>
+          <h3 className="h3">처리 방법</h3>
           {detailLoading ? <p role="status">최신 상태를 확인하고 있습니다.</p> : null}
           {detailUnavailable && !permissionDenied ? (
             <p role="alert">상세 이력을 불러오지 못했습니다. 목록 정보는 계속 확인할 수 있습니다.</p>
@@ -192,6 +199,14 @@ export function AdminOperationsInspector({
               현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.
             </p>
           )}
+          <AdminTechnicalDisclosure
+            summary="기술 정보 펼치기"
+            items={[
+              { label: "케이스 식별자", value: selectedCase.id },
+              { label: "관측 출처 식별자", value: selectedCase.sourceType },
+              { label: "클럽 식별자", value: selectedCase.clubId },
+            ]}
+          />
         </div>
       }
     />

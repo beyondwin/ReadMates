@@ -9,6 +9,12 @@ export type AdminOperationActionMessage = {
   text: string;
 };
 
+export const APPROVED_TODAY_ACTION_COPY = {
+  ACKNOWLEDGE: "다시 보내기 검토",
+  SNOOZE: "30분 뒤 다시 보기",
+  RESOLVE: "자세히 보기",
+} as const;
+
 type Props = {
   allowedActions: readonly LifecycleAction[];
   pending: boolean;
@@ -16,6 +22,7 @@ type Props = {
   message: AdminOperationActionMessage | null;
   confirmationKey?: string;
   presentation?: "standard" | "prioritized";
+  actionCopy?: Partial<Record<LifecycleAction, string>>;
   now?: () => Date;
   onAcknowledge: () => void;
   onSnooze: (snoozedUntil: string) => void;
@@ -42,6 +49,7 @@ export function AdminOperationStateActions({
   message,
   confirmationKey,
   presentation = "standard",
+  actionCopy,
   now = () => new Date(),
   onAcknowledge,
   onSnooze,
@@ -67,12 +75,16 @@ export function AdminOperationStateActions({
     onResolve();
   }
 
+  function actionLabel(action: LifecycleAction) {
+    return actionCopy?.[action] ?? adminOperationActionLanguage(action).primaryText;
+  }
+
   function actionControl(action: LifecycleAction, primary: boolean) {
-    const buttonClass = `btn ${primary ? "btn-primary" : "btn-secondary"}`;
+    const buttonClass = `btn ${primary ? "btn-primary" : action === "RESOLVE" && actionCopy?.RESOLVE ? "btn-quiet" : "btn-secondary"}`;
     if (action === "ACKNOWLEDGE") {
       return (
         <button type="button" className={buttonClass} disabled={locked} onClick={onAcknowledge}>
-          {adminOperationActionLanguage(action).primaryText}
+          {actionLabel(action)}
         </button>
       );
     }
@@ -86,7 +98,7 @@ export function AdminOperationStateActions({
             aria-pressed={snoozeOpen}
             onClick={() => setOpenSnoozeKey(snoozeOpen ? null : snoozeKey)}
           >
-            {adminOperationActionLanguage(action).primaryText}
+            {actionLabel(action)}
           </button>
           {snoozeOpen ? (
             <>
@@ -125,7 +137,7 @@ export function AdminOperationStateActions({
         disabled={locked}
         onClick={() => setOpenConfirmationKey(activeConfirmationKey)}
       >
-        {adminOperationActionLanguage(action).primaryText}
+        {actionLabel(action)}
       </button>
     );
   }
@@ -144,15 +156,15 @@ export function AdminOperationStateActions({
         {primaryAction ? <Fragment key={primaryAction}>{actionControl(primaryAction, true)}</Fragment> : null}
         {presentation === "prioritized" && secondaryActions.length > 0 ? (
           <details className="admin-operation-actions__other">
-            <summary>다른 처리</summary>
+            <summary className="btn btn-secondary">다른 처리</summary>
             <div className="admin-operation-actions__other-controls">
               {secondaryActions.map((action) => (
                 <Fragment key={action}>{actionControl(action, false)}</Fragment>
               ))}
             </div>
           </details>
-        ) : presentation === "standard" ? secondaryActions.map((action) => (
-          <Fragment key={action}>{actionControl(action, false)}</Fragment>
+        ) : presentation === "standard" ? secondaryActions.map((action, index) => (
+          <Fragment key={action}>{actionControl(action, index === 0)}</Fragment>
         )) : null}
       </div>
 

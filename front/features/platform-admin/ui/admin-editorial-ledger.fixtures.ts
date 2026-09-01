@@ -183,8 +183,11 @@ function todayCase(input: {
   id?: string;
   description?: string;
   scopeLabel?: string;
+  mobileMetaLabel?: string;
   impactLabel?: string;
   ageLabel?: string;
+  evidenceLines?: readonly string[];
+  recommendation?: string;
   sourceType?: AdminOperationCaseView["sourceType"];
   summaryCode?: AdminOperationCaseView["summaryCode"];
   sourceLabel?: string;
@@ -225,6 +228,9 @@ function todayCase(input: {
     impactLabel: input.impactLabel ?? "영향 2건",
     ageLabel: input.ageLabel ?? "2시간 전",
     scopeLabel: input.scopeLabel,
+    mobileMetaLabel: input.mobileMetaLabel,
+    evidenceLines: input.evidenceLines,
+    recommendation: input.recommendation,
   };
 }
 
@@ -328,8 +334,11 @@ const APPROVED_TODAY_CASES: readonly AdminOperationCaseView[] = [
     title: "알림 전달 지연",
     description: "일부 안내가 늦게 전달되고 있습니다.",
     scopeLabel: "클럽 2곳 · 멤버 6명",
+    mobileMetaLabel: "클럽 2곳 · 멤버 6명 · 10분 전",
     impactLabel: "클럽 2곳 · 멤버 6명",
     ageLabel: "10분 전",
+    evidenceLines: ["데이터 손실 없음", "마지막 정상 전달 13:52"],
+    recommendation: "중복 발송을 확인한 뒤 실패한 안내만 다시 보냅니다.",
   }),
   todayCase({
     allowedActions: TODAY_L1_ALLOWED_ACTIONS,
@@ -337,6 +346,7 @@ const APPROVED_TODAY_CASES: readonly AdminOperationCaseView[] = [
     title: "공개 기록 확인",
     description: "새로 생성된 공개 기록을 확인하세요.",
     scopeLabel: "처리 필요: 새로 생성된 공개 기록 1건",
+    mobileMetaLabel: "기록 1건 · 35분 전",
     impactLabel: "기록 1건",
     ageLabel: "35분 전",
     sourceType: "CLUB_READINESS",
@@ -349,6 +359,7 @@ const APPROVED_TODAY_CASES: readonly AdminOperationCaseView[] = [
     title: "요약 결과 확인",
     description: "요약 결과를 확인하세요.",
     scopeLabel: "처리 필요: 요약 결과 3건",
+    mobileMetaLabel: "결과 3건 · 1시간 전",
     impactLabel: "결과 3건",
     ageLabel: "1시간 전",
     sourceType: "AI_JOB",

@@ -3453,6 +3453,8 @@
   grid-template-rows: auto 1fr;
   height: 100vh;
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .admin-shell:has(.admin-today-ledger) .admin-shell__body {
@@ -3467,17 +3469,9 @@
 }
 
 .admin-shell:has(.admin-today-ledger) .admin-shell__wordmark {
-  font-size: 0;
-  line-height: 0;
-}
-
-.admin-shell:has(.admin-today-ledger) .admin-shell__wordmark::after {
-  content: "ReadMates";
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-  color: var(--ink-900);
+  letter-spacing: -0.03em;
 }
 
 .admin-shell:has(.admin-today-ledger) .admin-breadcrumb,
@@ -3505,7 +3499,11 @@
   overflow: hidden;
 }
 
-.admin-shell:has(.admin-today-ledger[data-content-layout="split"]) .admin-alarm-bar > * {
+.admin-shell:has(.admin-today-ledger[data-content-layout="split"]) .admin-alarm-bar__live,
+.admin-shell:has(.admin-today-ledger[data-content-layout="split"]) .admin-alarm-bar__secondary,
+.admin-shell:has(.admin-today-ledger[data-content-layout="split"]) .admin-alarm-bar__today,
+.admin-shell:has(.admin-today-ledger[data-content-layout="split"]) .admin-alarm-bar__asof,
+.admin-shell:has(.admin-today-ledger[data-content-layout="split"]) .admin-alarm-bar__separator {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -3513,28 +3511,43 @@
   clip: rect(0 0 0 0);
 }
 
-.admin-shell:has(.admin-today-ledger[data-content-layout="split"]) .admin-alarm-bar::before {
-  content: "";
-  width: 18px;
-  height: 18px;
-  margin-right: 8px;
-  background-color: var(--ok);
-  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><circle cx='12' cy='12' r='9'/><path d='M8 12.5 11 15.5 16.5 9'/></svg>") center / contain no-repeat;
-  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><circle cx='12' cy='12' r='9'/><path d='M8 12.5 11 15.5 16.5 9'/></svg>") center / contain no-repeat;
-}
-
-.admin-shell:has(.admin-today-ledger[data-content-layout="split"]) .admin-alarm-bar::after {
-  content: "서비스는 정상이며, 확인할 일이 3건 있습니다.";
+.admin-shell:has(.admin-today-ledger) .admin-alarm-bar__banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: var(--ink-800);
   font-size: 14px;
   font-weight: 600;
   line-height: 1.4;
 }
 
-.admin-shell:has(.admin-today-ledger) .admin-layout-nav::before {
-  content: "운영";
-  display: block;
-  padding: 0 10px 10px;
+.admin-shell:has(.admin-today-ledger) .admin-alarm-bar__banner::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  background-color: var(--ok);
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><circle cx='12' cy='12' r='9'/><path d='M8 12.5 11 15.5 16.5 9'/></svg>") center / contain no-repeat;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><circle cx='12' cy='12' r='9'/><path d='M8 12.5 11 15.5 16.5 9'/></svg>") center / contain no-repeat;
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-shell__nav {
+  display: flex;
+  height: calc(100vh - 86px);
+  min-height: 0;
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-layout-nav {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: 22px;
+  height: 100%;
+  min-height: 0;
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-layout-nav__eyebrow {
+  margin: 0 0 16px;
+  padding: 0 10px;
   color: var(--text-3);
   font-size: 12px;
   font-weight: 700;
@@ -3543,15 +3556,16 @@
 .admin-shell:has(.admin-today-ledger) .admin-layout-nav__item {
   justify-content: flex-start;
   gap: 10px;
+  min-height: 56px;
   border-bottom: 0;
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 16px 12px;
 }
 
 .admin-shell:has(.admin-today-ledger) .admin-layout-nav__item::before {
   content: "";
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   flex: none;
   background-color: currentColor;
   -webkit-mask-repeat: no-repeat;
@@ -3583,29 +3597,111 @@
 }
 
 .admin-shell:has(.admin-today-ledger) .admin-layout-nav__item--active {
-  background: var(--bg-sub);
-  color: var(--ink-900);
+  background: #1b2430;
+  color: #f7f3ea;
   font-weight: 800;
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-layout-nav__areas > li:nth-child(1) .admin-layout-nav__item--active::before,
+.admin-shell:has(.admin-today-ledger) .admin-layout-nav__item--active::before {
+  background-color: transparent;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='10' fill='%23f7f3ea'/><path d='M7 12.2 10.4 15.5 17 8.5' fill='none' stroke='%231b2430' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-layout-nav__logout {
+  display: flex;
+  align-items: center;
+  margin-top: auto;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px 8px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-layout-nav__logout::before {
+  content: "";
+  width: 22px;
+  height: 22px;
+  background-color: var(--text-2);
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><path d='M10 5H6.5A1.5 1.5 0 0 0 5 6.5v11A1.5 1.5 0 0 0 6.5 19H10'/><path d='M10 12h9'/><path d='M16 8.5 19.5 12 16 15.5'/></svg>") center / contain no-repeat;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><path d='M10 5H6.5A1.5 1.5 0 0 0 5 6.5v11A1.5 1.5 0 0 0 6.5 19H10'/><path d='M10 12h9'/><path d='M16 8.5 19.5 12 16 15.5'/></svg>") center / contain no-repeat;
 }
 
 .admin-shell:has(.admin-today-ledger) .admin-layout-nav__count {
   margin-left: auto;
+  color: var(--text-3);
+  font-weight: 700;
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-layout-nav__item--active .admin-layout-nav__count {
+  color: #c5ccd6;
 }
 
 .admin-shell:has(.admin-today-ledger[data-content-layout="split"]) .admin-shell__space-control {
   display: none;
 }
 
+.admin-shell__account-action-short {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
 .admin-shell:has(.admin-today-ledger) .admin-shell__account-control .btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-width: 44px;
   min-height: 44px;
-  width: 44px;
-  overflow: hidden;
-  font-size: 0;
+  width: auto;
+  overflow: visible;
   color: transparent;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--bg-sub);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-shell__account-action-label,
+.admin-shell:has(.admin-today-ledger) .admin-shell__account-action-short {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-shell__account-control .btn::before {
+  content: "";
+  box-sizing: border-box;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink-800);
+  background-color: transparent;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231b2430' stroke-width='1.8'><circle cx='12' cy='8' r='3.2'/><path d='M5.5 19c.8-3.4 3.2-5.2 6.5-5.2S16.7 15.6 17.5 19'/></svg>");
+  background-position: center 6px;
+  background-repeat: no-repeat;
+  background-size: 18px 18px;
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-shell__account-control .btn::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--ink-800);
+  border-bottom: 1.5px solid var(--ink-800);
+  transform: rotate(45deg) translateY(-2px);
 }
 
 .admin-shell:has(.admin-today-ledger) .admin-shell__space-control .rm-global-space-switcher__trigger {
@@ -3633,6 +3729,7 @@
 }
 
 .admin-today-ledger .admin-operations-queue {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -3642,25 +3739,32 @@
 
 .admin-today-ledger .admin-operations-queue__header {
   align-items: center;
-  padding: 28px 32px 12px;
+  padding: 35px 32px 28px;
   border-bottom: 0;
 }
 
 .admin-today-ledger .admin-operations-queue__header .h3 {
-  font-size: 22px;
-  line-height: 1.25;
+  font-size: 24px;
+  line-height: 1.2;
   font-weight: 700;
 }
 
-.admin-today-ledger .admin-operations-queue__header span {
+.admin-today-ledger .admin-operations-queue__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--text-3);
-  font-size: 0;
+  font-size: 13px;
   font-weight: 600;
 }
 
-.admin-today-ledger .admin-operations-queue__header span::after {
-  content: "최신순";
-  font-size: 13px;
+.admin-today-ledger .admin-operations-queue__sort::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
 }
 
 .admin-today-ledger .admin-operations-queue__list {
@@ -3686,7 +3790,7 @@
 }
 
 .admin-today-ledger .admin-operations-queue__row[aria-pressed="true"] {
-  background: var(--warn-soft);
+  background: color-mix(in oklch, var(--warn) 11%, var(--surface));
   box-shadow: inset 3px 0 0 var(--warn);
 }
 
@@ -3696,34 +3800,40 @@
 
 .admin-today-ledger .admin-operations-queue__headline {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-columns: 28px minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
 }
 
-.admin-today-ledger .admin-operations-queue__headline::before {
-  content: "!";
+.admin-today-ledger .admin-operations-queue__badge {
   width: 28px;
   height: 28px;
   display: grid;
   place-items: center;
-  border: 1.5px solid var(--warn);
   border-radius: 50%;
-  color: var(--warn);
-  font-size: 13px;
+  background: #e39b2d;
+  color: #fff;
+  font-size: 14px;
   font-weight: 800;
   line-height: 1;
 }
 
 .admin-today-ledger .admin-operations-queue__headline strong {
   color: var(--ink-900);
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
   line-height: 1.4;
 }
 
 .admin-today-ledger .admin-operations-queue__severity {
   display: none;
+}
+
+.admin-today-ledger .admin-operations-queue__age {
+  color: var(--text-3);
+  font-size: var(--type-size-supporting);
+  font-weight: 500;
 }
 
 .admin-today-ledger .admin-operations-queue__context {
@@ -3736,51 +3846,80 @@
   line-height: 1.45;
 }
 
-.admin-today-ledger .admin-operations-queue__context span:nth-child(n + 2):not(:last-child) {
+.admin-today-ledger .admin-operations-queue__mobile-meta {
   display: none;
 }
 
-.admin-today-ledger .admin-operations-queue__context span:last-child {
-  position: absolute;
-  top: 24px;
-  right: 32px;
+.admin-today-ledger .admin-operations-queue__context span:not(.admin-operations-queue__scope):not(.admin-operations-queue__mobile-meta) {
+  display: none;
 }
 
 .admin-today-ledger .admin-operations-queue__controls {
+  position: absolute;
   order: 3;
+  width: 1px;
+  height: 1px;
   margin: 0;
-  padding: 0 32px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
 }
 
 .admin-today-ledger .admin-today-controls > summary {
   display: flex;
   align-items: center;
   min-height: 44px;
-  color: transparent;
   font-size: var(--type-size-supporting);
   font-weight: 650;
   cursor: pointer;
 }
 
 .admin-today-ledger .admin-case-docket {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   gap: 0;
   height: 100%;
   min-height: 0;
   overflow: auto;
-  padding: 28px 40px 32px;
+  padding: 35px 40px 24px;
   border: 0;
   border-radius: 0;
   background: var(--surface);
 }
 
-.admin-today-ledger .admin-case-docket__actions::after {
-  content: "기술 정보 펼치기";
+.admin-today-ledger .admin-case-docket [data-admin-technical-disclosure] {
+  width: 100%;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.admin-today-ledger .admin-case-docket [data-admin-technical-disclosure] > summary {
   display: flex;
   align-items: center;
+  gap: 8px;
+  width: 100%;
   min-height: 44px;
-  margin-top: 12px;
   color: var(--text-3);
   font-size: 13px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.admin-today-ledger .admin-case-docket [data-admin-technical-disclosure] > summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-today-ledger .admin-case-docket [data-admin-technical-disclosure] > summary::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  margin-top: -4px;
 }
 
 .admin-today-ledger .admin-operations-inspector {
@@ -3804,10 +3943,11 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 0 0 18px;
+  margin: 0 0 46px;
   color: var(--ink-900);
-  font-size: 22px;
-  font-weight: 750;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
   line-height: 1.3;
 }
 
@@ -3817,17 +3957,17 @@
   height: 32px;
   display: grid;
   place-items: center;
-  border: 1.5px solid var(--warn);
   border-radius: 50%;
-  color: var(--warn);
-  font-size: 15px;
+  background: #e39b2d;
+  color: #fff;
+  font-size: 16px;
   font-weight: 800;
   line-height: 1;
 }
 
 .admin-today-ledger .admin-operations-inspector__section {
-  gap: 8px;
-  padding-block: 18px;
+  gap: 10px;
+  padding-block: 32px;
   border-top: 1px solid var(--line);
 }
 
@@ -3839,50 +3979,22 @@
 .admin-today-ledger .admin-operations-inspector__section > h3,
 .admin-today-ledger .admin-operations-inspector__lifecycle > .h3,
 .admin-today-ledger .admin-operations-inspector__history h3 {
-  position: relative;
   margin: 0;
-  color: transparent;
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.4;
-}
-
-.admin-today-ledger .admin-operations-inspector__section:nth-child(1) > h3::after,
-.admin-today-ledger .admin-operations-inspector__section:nth-child(2) > h3::after,
-.admin-today-ledger .admin-operations-inspector__section:nth-child(3) > h3::after,
-.admin-today-ledger .admin-operations-inspector__lifecycle > .h3::after {
-  position: absolute;
-  left: 0;
-  top: 0;
   color: var(--ink-900);
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
   line-height: 1.4;
-  white-space: nowrap;
-}
-
-.admin-today-ledger .admin-operations-inspector__section:nth-child(1) > h3::after {
-  content: "무슨 일이 있었나요?";
-}
-
-.admin-today-ledger .admin-operations-inspector__section:nth-child(2) > h3::after {
-  content: "영향 범위";
-}
-
-.admin-today-ledger .admin-operations-inspector__section:nth-child(3) > h3::after {
-  content: "확인된 내용";
-}
-
-.admin-today-ledger .admin-operations-inspector__lifecycle > .h3::after {
-  content: "처리 방법";
 }
 
 .admin-today-ledger .admin-operations-inspector__section > p,
 .admin-today-ledger .admin-operations-inspector__facts dd {
   margin: 0;
   color: var(--text-2);
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.6;
 }
 
 .admin-today-ledger .admin-operations-inspector__state-line,
@@ -3896,66 +4008,79 @@
   clip: rect(0 0 0 0);
 }
 
-.admin-today-ledger [data-admin-technical-disclosure] {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
+.admin-today-ledger .admin-operations-inspector__evidence-list {
+  margin: 0;
+  padding: 0 0 0 1.15em;
+  color: var(--text-2);
+  font-size: 16px;
+  line-height: 1.85;
 }
 
 .admin-today-ledger .admin-operations-inspector__lifecycle {
-  gap: 12px;
-  padding-top: 18px;
+  gap: 16px;
+  padding-top: 27px;
   border-top: 1px solid var(--line);
 }
 
-.admin-today-ledger .admin-operations-inspector__section:nth-child(3)::after {
-  content: "•  데이터 손실 없음\A•  마지막 정상 전달 13:52";
+.admin-today-ledger .admin-case-docket__actions {
   display: block;
-  margin-top: 4px;
-  color: var(--text-2);
-  font-size: 15px;
-  line-height: 1.8;
-  white-space: pre-line;
+  width: 100%;
+  margin-top: 0;
 }
 
-.admin-today-ledger .admin-operations-inspector__lifecycle::before {
-  content: "권장 처리\A중복 발송을 확인한 뒤 실패한 안내만 다시 보냅니다.";
+.admin-today-ledger[data-content-layout="split"] .admin-safe-action-dock,
+.admin-today-ledger[data-content-layout="split"] .admin-action-dock,
+.admin-today-ledger[data-content-layout="split"] .admin-action-dock__primary,
+.admin-today-ledger[data-content-layout="split"] .admin-operation-actions {
   display: block;
-  margin-bottom: 18px;
-  color: var(--text-2);
-  font-size: 15px;
-  font-weight: 400;
-  line-height: 1.55;
-  white-space: pre-line;
+  width: 100%;
 }
 
 .admin-today-ledger[data-content-layout="split"] .admin-operation-actions__controls {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  flex-wrap: nowrap;
+  align-items: center;
+  width: 100%;
+  gap: 28px;
 }
 
 .admin-today-ledger[data-content-layout="split"] .admin-operation-actions__controls .btn-primary,
-.admin-today-ledger button.btn.btn-primary {
-  min-width: 180px !important;
-  min-height: 44px !important;
-  padding: 0 22px;
-  background: #1b2430 !important;
-  border-color: #1b2430 !important;
+.admin-today-ledger[data-content-layout="split"] .admin-operation-actions__controls > .btn:first-child {
+  box-sizing: border-box;
+  width: 224px !important;
+  min-width: 224px !important;
+  max-width: 224px !important;
+  min-height: 58px !important;
+  padding: 0 16px;
+  border-radius: 8px;
+  background: #0a2947 !important;
+  border-color: #0a2947 !important;
   color: #f7f3ea !important;
+  font-size: 15px;
+  font-weight: 650;
 }
 
 .admin-today-ledger[data-content-layout="split"] .admin-operation-actions__controls .btn-secondary {
-  min-height: 44px;
-  padding: 0 18px;
+  box-sizing: border-box;
+  width: 219px;
+  min-width: 219px;
+  max-width: 219px;
+  min-height: 58px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 650;
 }
 
-.admin-today-ledger[data-content-layout="split"] .admin-operation-actions__controls .btn:nth-of-type(3) {
+.admin-today-ledger[data-content-layout="split"] .admin-operation-actions__controls .btn:last-child {
+  margin-left: 76px;
   border: 0;
   background: transparent;
   color: var(--text-2);
+  min-width: 0;
+  min-height: 58px;
+  padding: 0 8px;
+  font-size: 15px;
 }
 
 .admin-today-ledger[data-content-layout="flow"] .admin-operations-queue__row[aria-pressed="true"] {
@@ -3981,6 +4106,11 @@
   min-height: 44px;
   color: var(--text-3);
   font-size: var(--type-size-supporting);
+  list-style: none;
+}
+
+.admin-today-ledger [data-admin-technical-disclosure] > summary::-webkit-details-marker {
+  display: none;
 }
 
 .admin-operation-mobile-detail {
@@ -3992,9 +4122,9 @@
   align-items: center;
   gap: 8px;
   width: calc(100% + 40px);
-  min-height: 52px;
-  margin: 0 -20px 8px;
-  padding: 0 20px;
+  min-height: 56px;
+  margin: 8px -20px 0;
+  padding: 26px 20px 12px;
   border: 0;
   border-bottom: 1px solid var(--line);
   background: var(--surface);
@@ -4019,8 +4149,18 @@
   }
 
   .admin-today-ledger .admin-operations-queue__row {
-    min-height: 94px;
-    padding: 22px 28px 22px 0;
+    min-height: 98px;
+    gap: 6px;
+    padding: 18px 28px 18px 0;
+  }
+
+  .admin-today-ledger .admin-operations-queue__badge {
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border: 1.5px solid #e39b2d;
+    color: #e39b2d;
+    font-size: 16px;
   }
 
   .admin-today-ledger .admin-operations-queue__row::after {
@@ -4035,20 +4175,42 @@
     transform: translateY(-50%) rotate(45deg);
   }
 
-  .admin-today-ledger .admin-operations-queue__context span:last-child {
-    position: static;
+  .admin-today-ledger .admin-operations-queue__headline {
+    grid-template-columns: 28px minmax(0, 1fr);
   }
 
-  .admin-today-ledger .admin-operations-queue__context span:last-child::before {
-    content: " · ";
+  .admin-today-ledger .admin-operations-queue__age,
+  .admin-today-ledger .admin-operations-queue__scope {
+    display: none;
   }
 
-  .admin-today-ledger .admin-operations-queue__controls {
-    padding: 4px 0 12px;
+  .admin-today-ledger .admin-operations-queue__mobile-meta {
+    display: block;
+  }
+
+  .admin-today-ledger .admin-operations-queue__context {
+    padding-left: 40px;
   }
 
   .admin-today-ledger .admin-case-docket {
-    padding: 8px 0 24px;
+    padding: 8px 0 16px;
+  }
+
+  .admin-today-ledger .admin-case-docket [data-admin-technical-disclosure] {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 0;
+  }
+
+  .admin-today-ledger .admin-case-docket [data-admin-technical-disclosure] > summary {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .admin-today-ledger .admin-case-docket [data-admin-technical-disclosure] > summary::after {
+    margin-top: 0;
+    transform: rotate(45deg);
   }
 
   .admin-today-controls:not([open]) .admin-today-controls__body {
@@ -4064,7 +4226,7 @@
   .admin-shell:has(.admin-today-ledger) .admin-shell__body {
     width: 100%;
     gap: 0;
-    padding: 0 0 72px;
+    padding: 0 0 96px;
   }
 
   .admin-shell:has(.admin-today-ledger) .admin-shell__nav {
@@ -4085,12 +4247,27 @@
     min-width: 52px;
     min-height: 36px;
     padding: 0 12px;
+    overflow: visible;
+    color: var(--ink-900);
+    border: 1px solid var(--line);
     border-radius: 8px;
-    font-size: 0;
+    background: var(--surface);
+    font-size: 13px;
+    font-weight: 650;
   }
 
+  .admin-shell:has(.admin-today-ledger) .admin-shell__account-control .btn::before,
   .admin-shell:has(.admin-today-ledger) .admin-shell__account-control .btn::after {
-    content: "계정";
+    display: none;
+  }
+
+  .admin-shell:has(.admin-today-ledger) .admin-shell__account-action-short {
+    display: inline;
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
     color: var(--ink-900);
     font-size: 13px;
     font-weight: 650;
@@ -4104,6 +4281,16 @@
     grid-template-rows: 1fr;
   }
 
+  .admin-shell:has(.admin-operation-mobile-detail .admin-case-docket) .admin-shell__body,
+  .admin-shell:has(.admin-operation-mobile-detail .admin-case-docket) .admin-shell__main {
+    padding-top: 0;
+    margin-top: 0;
+  }
+
+  .admin-operation-mobile-detail__back {
+    margin-top: 0;
+  }
+
   .admin-shell:has(.admin-today-ledger) .admin-alarm-bar {
     position: static;
     left: auto;
@@ -4111,14 +4298,14 @@
     display: flex;
     align-items: center;
     height: auto;
-    margin: 12px 0 4px;
-    padding: 12px 14px;
+    margin: 8px 0 24px;
+    padding: 18px 16px;
     border: 0;
-    border-radius: 10px;
+    border-radius: 12px;
     background: var(--bg-sub);
   }
 
-  .admin-shell:has(.admin-today-ledger) .admin-alarm-bar > * {
+  .admin-shell:has(.admin-today-ledger) .admin-alarm-bar > :not(.admin-alarm-bar__banner) {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -4126,22 +4313,14 @@
     clip: rect(0 0 0 0);
   }
 
-  .admin-shell:has(.admin-today-ledger) .admin-alarm-bar::before {
-    content: "";
-    width: 18px;
-    height: 18px;
-    margin-right: 8px;
-    background-color: var(--ok);
-    -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><circle cx='12' cy='12' r='9'/><path d='M8 12.5 11 15.5 16.5 9'/></svg>") center / contain no-repeat;
-    mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><circle cx='12' cy='12' r='9'/><path d='M8 12.5 11 15.5 16.5 9'/></svg>") center / contain no-repeat;
-  }
-
-  .admin-shell:has(.admin-today-ledger) .admin-alarm-bar::after {
-    content: "서비스는 정상이며, 확인할 일이 3건 있습니다.";
+  .admin-shell:has(.admin-today-ledger) .admin-alarm-bar__banner {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
     color: var(--ink-800);
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
-    line-height: 1.4;
+    line-height: 1.5;
   }
 
   .admin-page-frame:has(.admin-operation-mobile-detail .admin-case-docket) .admin-alarm-bar,
@@ -4159,8 +4338,9 @@
 
   .admin-today-ledger[data-content-layout="flow"] .admin-page-frame__header h1,
   .admin-page-frame:has(.admin-today-ledger[data-content-layout="flow"]) h1 {
-    margin: 4px 0 8px;
-    font-size: 24px;
+    margin: 4px 0 2px;
+    font-size: 28px;
+    font-weight: 700;
     line-height: 1.25;
   }
 
@@ -4169,30 +4349,93 @@
     padding: 0;
   }
 
+  .admin-today-ledger[data-content-layout="flow"] .admin-action-dock,
+  .admin-today-ledger[data-content-layout="flow"] .admin-safe-action-dock {
+    position: static;
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .admin-today-ledger[data-content-layout="flow"] .admin-operations-inspector__section {
+    gap: 8px;
+    padding-block: 13px;
+  }
+
+  .admin-today-ledger[data-content-layout="flow"] .admin-operations-inspector__lifecycle {
+    gap: 10px;
+    padding-top: 19px;
+  }
+
+  .admin-today-ledger[data-content-layout="flow"] .admin-case-docket__title {
+    margin: 26px 0 24px;
+    font-size: 22px;
+  }
+
+  .admin-today-ledger[data-content-layout="flow"] .admin-operation-actions[data-presentation="prioritized"] .admin-operation-actions__controls {
+    display: grid;
+    gap: 10px;
+  }
+
   .admin-today-ledger[data-content-layout="flow"] .admin-operation-actions[data-presentation="prioritized"] .admin-operation-actions__controls .btn-primary {
     width: 100%;
-    min-height: 48px;
-    background: #1b2430;
-    border-color: #1b2430;
+    min-width: 0 !important;
+    min-height: 44px !important;
+    background: #0a2947;
+    border-color: #0a2947;
     color: #f7f3ea;
   }
 
+  .admin-today-ledger[data-content-layout="flow"] .admin-operation-actions__other {
+    width: 100%;
+  }
+
+  .admin-today-ledger[data-content-layout="flow"] .admin-operation-actions__other > summary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 44px;
+    list-style: none;
+    box-sizing: border-box;
+  }
+
+  .admin-today-ledger[data-content-layout="flow"] .admin-operation-actions__other > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .admin-shell:has(.admin-today-ledger) .admin-shell__space-control .rm-global-space-switcher__trigger {
+    border: 0;
+    background: transparent;
+    padding: 0 4px;
+    box-shadow: none;
+  }
+
   .admin-mobile-navigation {
-    min-height: 64px;
+    min-height: 100px;
+    padding-bottom: 0;
   }
 
   .admin-mobile-navigation__link {
     flex-direction: column;
-    gap: 4px;
-    min-height: 64px !important;
-    padding-top: 8px !important;
-    font-size: 11px;
+    gap: 6px;
+    min-height: 100px !important;
+    padding-top: 10px !important;
+    padding-bottom: 14px !important;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .admin-mobile-navigation__link--active {
+    background: var(--surface);
   }
 
   .admin-mobile-navigation__link::before {
     content: "";
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     background-color: currentColor;
     -webkit-mask-repeat: no-repeat;
     mask-repeat: no-repeat;
@@ -4223,10 +4466,10 @@
   }
 }
 
-.admin-today-ledger button.btn.btn-primary {
-  min-width: 180px !important;
-  min-height: 44px !important;
-  background: #1b2430 !important;
-  border-color: #1b2430 !important;
+.admin-today-ledger[data-content-layout="split"] button.btn.btn-primary {
+  min-width: 224px !important;
+  min-height: 58px !important;
+  background: #0a2947 !important;
+  border-color: #0a2947 !important;
   color: #f7f3ea !important;
 }

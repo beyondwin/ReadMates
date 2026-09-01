@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { APPROVED_MOCKUPS, approvedMockupsAffectedBy } from "../e2e/support/approved-mockup-manifest";
-import { expectGeometryWithinTolerance, verifyApprovedReference } from "../e2e/support/approved-mockup-contract";
+import {
+  FONT_RASTER_EXCEPTION_MAX_RATIO,
+  assertApprovedMismatchRatio,
+  expectGeometryWithinTolerance,
+  verifyApprovedReference,
+} from "../e2e/support/approved-mockup-contract";
 
 describe("approved mockup contract", () => {
   it("registers the exact 7 Admin and 11 Host authorities with unique ids", () => {
@@ -16,6 +21,33 @@ describe("approved mockup contract", () => {
       { x: 0, y: 0, width: 104.01, height: 80 },
       4,
     )).toThrow(/width delta 4.01px/);
+  });
+
+  it("fails closed above maxDiffPixelRatio without a font-raster exception", () => {
+    expect(() => assertApprovedMismatchRatio({
+      id: "admin-today-desktop",
+      mismatchPixelRatio: 0.0201,
+      maxDiffPixelRatio: 0.02,
+    })).toThrow(/admin-today-desktop mismatch ratio 0.0201 exceeds 0.02/);
+  });
+
+  it("accepts a documented font-raster exception at or below 0.10", () => {
+    expect(() => assertApprovedMismatchRatio({
+      id: "admin-today-desktop",
+      mismatchPixelRatio: 0.057,
+      maxDiffPixelRatio: 0.02,
+      allowFontRasterException: true,
+    })).not.toThrow();
+  });
+
+  it("still fails a font-raster exception above 0.10 as structural", () => {
+    expect(FONT_RASTER_EXCEPTION_MAX_RATIO).toBe(0.10);
+    expect(() => assertApprovedMismatchRatio({
+      id: "admin-today-desktop",
+      mismatchPixelRatio: 0.1001,
+      maxDiffPixelRatio: 0.02,
+      allowFontRasterException: true,
+    })).toThrow(/admin-today-desktop mismatch ratio 0.1001 exceeds 0.1/);
   });
 
   it("maps shared visual dependencies to every downstream authority", () => {

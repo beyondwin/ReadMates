@@ -622,7 +622,7 @@ describe("AdminShellLayout", () => {
 
   it("keeps the operating wordmark without exposing a raw capability role badge", () => {
     renderShell("/admin/today");
-    expect(screen.getByText("ReadMates · 운영")).toBeInTheDocument();
+    expect(screen.getByText("ReadMates")).toBeInTheDocument();
     expect(screen.queryByText("OWNER", { exact: true })).not.toBeInTheDocument();
   });
 

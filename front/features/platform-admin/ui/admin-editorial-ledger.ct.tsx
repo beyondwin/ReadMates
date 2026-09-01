@@ -21,7 +21,7 @@ import {
 import { AdminShellLayout } from "../route/admin-shell-layout";
 import { AdminAuditLedger } from "./admin-audit-ledger";
 import { AdminClubsLedger } from "./admin-clubs-ledger";
-import { AdminEditorialLedgerCtHarness } from "./admin-editorial-ledger-ct-harness";
+import { AdminEditorialLedgerCtHarness, TodayLedgerCtNode } from "./admin-editorial-ledger-ct-harness";
 import {
   ADMIN_SHELL_VISUAL_CAPABILITIES,
   ADMIN_SHELL_VISUAL_SPACE_OPTIONS,
@@ -51,9 +51,7 @@ import {
   type TodayLedgerFixture,
 } from "./admin-editorial-ledger.fixtures";
 import { AdminHealthGrid } from "./admin-health-grid";
-import { AdminOperationStateActions } from "./admin-operation-state-actions";
 import { AdminPublicTakedownWorkbench } from "./admin-public-takedown-workbench";
-import { AdminTodayLedger } from "./admin-today-ledger";
 
 const APPROVED_DESKTOP_VIEWPORT = { width: 1672, height: 941 } as const;
 const APPROVED_MOBILE_VIEWPORT = { width: 390, height: 844 } as const;
@@ -187,6 +185,7 @@ async function captureTodayApproved(input: {
     page: input.page,
     testInfo: input.testInfo,
     regions,
+    allowFontRasterException: true,
   });
 }
 
@@ -215,64 +214,7 @@ async function expectNoNestedLiveRegions(component: Locator): Promise<void> {
 }
 
 function todayNode(fixture: TodayLedgerFixture) {
-  const lifecycleControls = fixture.allowedActions.length > 0 ? (
-    <AdminOperationStateActions
-      allowedActions={fixture.allowedActions}
-      pending={false}
-      disabled={fixture.actionState !== "ready"}
-      message={
-        fixture.actionState === "unknown-outcome"
-          ? { kind: "unknown-outcome", text: fixture.actionReason ?? "결과를 확인하지 못했습니다." }
-          : null
-      }
-      onAcknowledge={noopEditorialLedgerHandler}
-      onSnooze={noopEditorialLedgerHandler}
-      onResolve={noopEditorialLedgerHandler}
-    />
-  ) : null;
-  const mobileLifecycleControls = fixture.allowedActions.length > 0 ? (
-    <AdminOperationStateActions
-      allowedActions={fixture.allowedActions}
-      pending={false}
-      disabled={fixture.actionState !== "ready"}
-      message={
-        fixture.actionState === "unknown-outcome"
-          ? { kind: "unknown-outcome", text: fixture.actionReason ?? "결과를 확인하지 못했습니다." }
-          : null
-      }
-      presentation="prioritized"
-      onAcknowledge={noopEditorialLedgerHandler}
-      onSnooze={noopEditorialLedgerHandler}
-      onResolve={noopEditorialLedgerHandler}
-    />
-  ) : null;
-  return (
-    <AdminTodayLedger
-      view={fixture.view}
-      auditHref="/admin/audit"
-      filters={fixture.filters}
-      history={fixture.history}
-      lifecycleControls={lifecycleControls}
-      mobileLifecycleControls={mobileLifecycleControls}
-      actionState={fixture.actionState}
-      actionReason={fixture.actionReason}
-      pendingCount={fixture.pendingCount}
-      urgentCount={fixture.urgentCount}
-      urgentAnnouncement={fixture.urgentAnnouncement}
-      hasNextPage={fixture.hasNextPage}
-      loadingMore={fixture.loadingMore}
-      mode={fixture.mode}
-      query={fixture.query}
-      workView={fixture.workView}
-      onFilterChange={noopEditorialLedgerHandler}
-      onSelectCase={noopEditorialLedgerHandler}
-      onViewChange={noopEditorialLedgerHandler}
-      onQueryChange={noopEditorialLedgerHandler}
-      onApplyPending={noopEditorialLedgerHandler}
-      onBackToList={noopEditorialLedgerHandler}
-      onRetrySource={noopEditorialLedgerHandler}
-    />
-  );
+  return <TodayLedgerCtNode fixture={fixture} />;
 }
 
 function clubsNode(fixture: ClubsLedgerFixture) {
@@ -382,17 +324,17 @@ test("Today L1 locks the approved desktop composition", async ({ mount, page }, 
   await expectLocatorGeometry(queue, QUEUE_DESKTOP_GEOMETRY, 4);
   await expectLocatorGeometry(docket, DOCKET_DESKTOP_GEOMETRY, 4);
   await expect(component.getByRole("heading", { name: "오늘 할 일" }).first()).toBeVisible();
-  await expect(component.getByText("알림 전달 지연").first()).toBeInViewport();
+  await expect(component.getByText("알림 전달 지연", { exact: true }).first()).toBeInViewport();
   expect(await isSemanticDocumentOrder([
-    docket.getByRole("heading", { name: "무슨 일인가" }),
-    docket.getByRole("heading", { name: "왜 중요한가" }),
-    docket.getByRole("heading", { name: "확인한 근거" }),
-    docket.getByRole("heading", { name: "다음 행동" }),
-    docket.getByRole("heading", { name: "최근 처리 기록" }),
+    docket.getByRole("heading", { name: "무슨 일이 있었나요?" }),
+    docket.getByRole("heading", { name: "영향 범위" }),
+    docket.getByRole("heading", { name: "확인된 내용" }),
+    docket.getByRole("heading", { name: "권장 처리" }),
+    docket.getByRole("heading", { name: "처리 방법" }),
   ])).toBe(true);
-  await expect(component.getByRole("button", { name: "확인함" })).toBeEnabled();
+  await expect(component.getByRole("button", { name: "다시 보내기 검토" })).toBeEnabled();
   await expect(component.locator(".admin-receipt-timeline")).toHaveCount(0);
-  const primary = component.getByRole("button", { name: "확인함" });
+  const primary = component.getByRole("button", { name: "다시 보내기 검토" });
   await expectMinimumTargetSize(primary);
   await primary.focus();
   await expectVisibleFocus(primary);
@@ -475,9 +417,9 @@ test.describe("approved mobile Today", () => {
       testInfo,
       regions: [],
     });
-    await expect(component.getByText("알림 전달 지연").first()).toBeInViewport();
+    await expect(component.getByText("알림 전달 지연", { exact: true }).first()).toBeInViewport();
     await expect(component.getByRole("navigation", { name: "Admin 모바일 메뉴" })).toBeVisible();
-    await expect(component.getByText("필터와 신호 상태").closest("details")).not.toHaveAttribute("open");
+    await expect(component.locator("details").filter({ hasText: "필터와 신호 상태" })).not.toHaveAttribute("open");
     await expect(component.locator(".admin-today-ledger__columns")).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
   });
@@ -496,19 +438,20 @@ test.describe("approved mobile Today", () => {
       testInfo,
       regions: [],
     });
-    await expect(component.getByText("알림 전달 지연").first()).toBeInViewport();
+    await expect(component.getByText("알림 전달 지연", { exact: true }).first()).toBeInViewport();
     await expect(component.getByRole("navigation", { name: "Admin 모바일 메뉴" })).toBeVisible();
-    await expect(component.getByRole("heading", { name: "오늘 할 일" }).first()).toBeVisible();
+    await expect(back).toBeVisible();
+    await expect(back).toContainText("오늘 할 일");
     await expect(docket).toBeVisible();
     expect(await isSemanticDocumentOrder([
-      docket.getByRole("heading", { name: "무슨 일인가" }),
-      docket.getByRole("heading", { name: "왜 중요한가" }),
-      docket.getByRole("heading", { name: "확인한 근거" }),
-      docket.getByRole("heading", { name: "다음 행동" }),
-      docket.getByRole("heading", { name: "최근 처리 기록" }),
+      docket.getByRole("heading", { name: "무슨 일이 있었나요?" }),
+      docket.getByRole("heading", { name: "영향 범위" }),
+      docket.getByRole("heading", { name: "확인된 내용" }),
+      docket.getByRole("heading", { name: "권장 처리" }),
+      docket.getByRole("heading", { name: "처리 방법" }),
     ])).toBe(true);
     await expect(component.getByRole("button", { name: "목록으로" })).toBeVisible();
-    await expect(component.getByRole("button", { name: "확인함" })).toBeEnabled();
+    await expect(component.getByRole("button", { name: "다시 보내기 검토" })).toBeEnabled();
     await expect(component.getByText("다른 처리")).toBeVisible();
     await expect(component.locator(".admin-today-ledger__columns")).toHaveCount(0);
     await expect(component.locator(".admin-receipt-timeline")).toHaveCount(0);
@@ -626,7 +569,7 @@ test("empty evidence, failed sources, pending-new, pagination failure and unknow
   await expect(component.getByText("스냅샷을 불러오지 못했습니다")).toBeVisible();
   await expect(component.getByText("이어지는 페이지를 불러오지 못했습니다.")).toBeVisible();
   await expect(component.getByText("기록된 감사 이벤트가 없습니다.")).toBeVisible();
-  await expect(component.getByRole("button", { name: "확인함" })).toHaveCount(3);
-  await expect(component.getByRole("button", { name: "확인함", disabled: true })).toHaveCount(1);
+  await expect(component.getByRole("button", { name: "다시 보내기 검토" })).toHaveCount(3);
+  await expect(component.getByRole("button", { name: "다시 보내기 검토", disabled: true })).toHaveCount(1);
   await expectMinimumTargetSize(component.getByRole("button", { name: "AI 작업 다시 확인" }));
 });

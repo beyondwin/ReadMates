@@ -420,6 +420,11 @@
   cursor: pointer;
   color: var(--text-2);
   font-weight: 700;
+  list-style: none;
+}
+
+.admin-operation-actions__other > summary::-webkit-details-marker {
+  display: none;
 }
 
 .admin-operation-actions__other-controls {

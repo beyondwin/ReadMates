@@ -5,15 +5,17 @@ export type AdminTechnicalDisclosureItem = Readonly<{
 
 export function AdminTechnicalDisclosure({
   items,
+  summary = "기술 정보",
 }: {
   items: readonly AdminTechnicalDisclosureItem[];
+  summary?: string;
 }) {
   const visibleItems = items.filter((item) => item.value != null && item.value !== "");
   if (visibleItems.length === 0) return null;
 
   return (
     <details data-admin-technical-disclosure aria-label="기술 정보">
-      <summary>기술 정보</summary>
+      <summary>{summary}</summary>
       <dl>
         {visibleItems.map((item) => (
           <div key={`${item.label}-${item.value}`}>
