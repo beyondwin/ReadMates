@@ -1,8 +1,12 @@
 package com.readmates.aigen.config
 
+import io.opentelemetry.sdk.trace.export.SpanExporter
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.springframework.boot.autoconfigure.AutoConfigurations
 import org.springframework.boot.env.YamlPropertySourceLoader
+import org.springframework.boot.micrometer.tracing.opentelemetry.autoconfigure.otlp.OtlpTracingAutoConfiguration
+import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.core.env.MutablePropertySources
 import org.springframework.core.io.FileSystemResource
 import org.springframework.mock.env.MockEnvironment
@@ -61,11 +65,23 @@ class SpringAiDependencyContractTest {
     }
 
     @Test
-    fun `test runtime disables tracing unless a tracing contract opts in`() {
-        val environment = loadYamlEnvironment("src/test/resources/application.yml")
+    fun `test runtime disables Boot tracing export auto configuration`() {
+        tracingExportContext().run { context ->
+            assertThat(context).doesNotHaveBean(SpanExporter::class.java)
+            assertThat(context.environment.getProperty("management.tracing.export.enabled")).isEqualTo("false")
+            assertThat(context.environment.getProperty("management.tracing.enabled")).isNull()
+        }
+    }
 
-        assertThat(environment.getProperty("management.tracing.enabled")).isEqualTo("false")
-        assertThat(environment.getProperty("management.tracing.export.otlp.enabled")).isEqualTo("false")
+    @Test
+    fun `tracing contract can opt into Boot tracing export auto configuration`() {
+        tracingExportContext()
+            .withPropertyValues("management.tracing.export.enabled=true")
+            .run { context ->
+                assertThat(context).hasSingleBean(SpanExporter::class.java)
+                assertThat(context.getBean(SpanExporter::class.java).javaClass.name)
+                    .isEqualTo("io.opentelemetry.exporter.otlp.http.trace.OtlpHttpSpanExporter")
+            }
     }
 
     private fun loadApplicationEnvironment() = loadYamlEnvironment("src/main/resources/application.yml")
@@ -78,4 +94,18 @@ class SpringAiDependencyContractTest {
             propertySources.forEach(environment.propertySources::addLast)
         }
     }
+
+    private fun tracingExportContext(): ApplicationContextRunner =
+        ApplicationContextRunner()
+            .withConfiguration(AutoConfigurations.of(OtlpTracingAutoConfiguration::class.java))
+            .withInitializer { context ->
+                listOf(
+                    "test-application.yml" to "src/test/resources/application.yml",
+                    "application.yml" to "src/main/resources/application.yml",
+                ).forEach { (name, path) ->
+                    YamlPropertySourceLoader()
+                        .load(name, FileSystemResource(Path.of(path)))
+                        .forEach(context.environment.propertySources::addLast)
+                }
+            }
 }

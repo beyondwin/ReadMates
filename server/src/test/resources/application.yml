@@ -51,10 +51,8 @@ spring:
 
 management:
   tracing:
-    enabled: false
     export:
-      otlp:
-        enabled: false
+      enabled: false
   otlp:
     metrics:
       export:
