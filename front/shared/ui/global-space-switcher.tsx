@@ -312,10 +312,10 @@ export function GlobalSpaceSwitcher({
           ) : null}
           <div id={menuId} role="menu" aria-label="ReadMates 공간 전환">
             {level === "root" ? (
-              <>
-                <p className="rm-global-space-switcher__section-label">범위 선택</p>
-                <div className="rm-global-space-switcher__root-list">
-                  {platformOption ? (
+              <div className="rm-global-space-switcher__root-list">
+                {platformOption ? (
+                  <>
+                    <p className="rm-global-space-switcher__section-label">현재 범위</p>
                     <button
                       ref={(node) => { itemRefs.current[0] = node; }}
                       type="button"
@@ -334,8 +334,11 @@ export function GlobalSpaceSwitcher({
                       </span>
                       {currentKind === "platform" ? <span className="rm-global-space-switcher__current">현재 범위</span> : null}
                     </button>
-                  ) : null}
-                  {groups.length > 0 ? (
+                  </>
+                ) : null}
+                {groups.length > 0 ? (
+                  <>
+                    <p className="rm-global-space-switcher__section-label">이동할 범위</p>
                     <button
                       ref={(node) => { itemRefs.current[platformOption ? 1 : 0] = node; }}
                       type="button"
@@ -357,9 +360,9 @@ export function GlobalSpaceSwitcher({
                         <SelectorChevron />
                       </span>
                     </button>
-                  ) : null}
-                </div>
-              </>
+                  </>
+                ) : null}
+              </div>
             ) : (
               <div className="rm-global-space-switcher__club-section" role="group" aria-label="내 클럽">
                 {groups.map((group) => (

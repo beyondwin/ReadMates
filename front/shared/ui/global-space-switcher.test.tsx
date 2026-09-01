@@ -119,9 +119,11 @@ describe("GlobalSpaceSwitcher", () => {
     const platformItem = within(menu).getByRole("menuitemradio", { name: "플랫폼 운영" });
     const clubsItem = within(menu).getByRole("menuitem", { name: "내 클럽" });
 
-    expect(within(menu).getByText("범위 선택", { selector: ".rm-global-space-switcher__section-label" }))
+    expect(within(menu).getByText("현재 범위", { selector: ".rm-global-space-switcher__section-label" }))
       .toBeInTheDocument();
-    expect(within(menu).queryByText("현재 범위", { selector: ".rm-global-space-switcher__section-label" }))
+    expect(within(menu).getByText("이동할 범위", { selector: ".rm-global-space-switcher__section-label" }))
+      .toBeInTheDocument();
+    expect(within(menu).queryByText("범위 선택", { selector: ".rm-global-space-switcher__section-label" }))
       .not.toBeInTheDocument();
     expect(platformItem).toHaveAttribute("aria-checked", String(currentKind === "platform"));
     if (currentKind === "clubs") {

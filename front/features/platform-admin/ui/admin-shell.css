@@ -118,8 +118,8 @@
   top: 0;
   z-index: 20;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 24px;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 16px 24px;
   align-items: center;
   min-height: 86px;
   border-bottom: 1px solid var(--line);
@@ -152,6 +152,11 @@
   min-width: 0;
 }
 
+.admin-shell__space-control .rm-global-space-switcher__trigger {
+  min-width: 44px;
+  min-height: 44px;
+}
+
 .admin-shell__account-control {
   display: flex;
   align-items: center;
@@ -173,8 +178,8 @@
 }
 
 .admin-shell__space-control .rm-global-space-switcher__menu {
-  left: auto;
-  right: 0;
+  left: 0;
+  right: auto;
 }
 
 .admin-shell__account-control [role="alert"] {

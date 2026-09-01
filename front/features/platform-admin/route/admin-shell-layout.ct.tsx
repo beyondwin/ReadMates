@@ -33,6 +33,7 @@ function shellFixture(
   outlet: ReactNode,
   routePath = "today",
   currentNavigationOwner: "today" | "clubs" | "service" | "records" = "today",
+  workspaceAccountLabel = "운영자",
 ) {
   return (
     <MemoryRouter initialEntries={[`/admin/${routePath}`]}>
@@ -41,7 +42,7 @@ function shellFixture(
           path="/admin"
           element={
             <AdminShellLayout
-              workspaceAccountLabel="운영자"
+              workspaceAccountLabel={workspaceAccountLabel}
               spaceSwitcher={
                 <GlobalSpaceSwitcher
                   currentIdentity={{ productSpace: "platform" }}
@@ -259,6 +260,7 @@ async function mountApprovedShell(
   mount: (component: ReactElement) => Promise<Locator>,
   page: Page,
   outlet: ReactNode,
+  workspaceAccountLabel = "김운영",
 ) {
   await page.setViewportSize(APPROVED_DESKTOP_VIEWPORT);
   await page.emulateMedia({ colorScheme: "light" });
@@ -273,7 +275,7 @@ async function mountApprovedShell(
       }
     `,
   });
-  const component = await mount(shellFixture(outlet));
+  const component = await mount(shellFixture(outlet, "today", "today", workspaceAccountLabel));
   await page.evaluate(() => document.fonts.ready);
   await expectReducedMotion(page);
   await expectNoHorizontalOverflow(page);
@@ -291,6 +293,9 @@ test("space menu keeps platform and club choices inside the production shell", a
   await expect(platform).toHaveAttribute("aria-checked", "true");
   await expect(clubs).toBeVisible();
   await expect(menu).not.toContainText(/OWNER|OPERATOR|SUPPORT|ACTIVE|SUSPENDED/);
+  await expect(menu.getByText("현재 범위", { exact: true }).first()).toBeVisible();
+  await expect(menu.getByText("이동할 범위")).toBeVisible();
+  await expect(component.getByText("김운영")).toBeVisible();
   await expectMinimumTargetSize(platform);
   await expectMinimumTargetSize(clubs);
   await expectNoHorizontalOverflow(page);
@@ -298,6 +303,8 @@ test("space menu keeps platform and club choices inside the production shell", a
   const regions = [
     await regionFromLocator(component.locator(".admin-shell__header"), "header", HEADER_DESKTOP_GEOMETRY, 4),
     await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4),
+    await regionFromLocator(component.locator(".rm-global-space-switcher__trigger"), "switcher", { x: 188, y: 19, width: 160, height: 48 }, 2),
+    await regionFromLocator(component.locator(".rm-global-space-switcher__menu"), "menu", { x: 188, y: 75, width: 360, height: 244 }, 4),
   ];
   await captureApprovedComparison({
     entry: approvedMockup("admin-space-switcher-desktop"),

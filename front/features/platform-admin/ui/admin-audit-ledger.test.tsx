@@ -89,8 +89,7 @@ describe("AdminAuditLedger", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "운영 처리 기록" })).toBeInTheDocument();
-    expect(screen.getByText("처리 기록")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "처리 기록" })).toBeInTheDocument();
     const notificationRow = screen.getByRole("button", { name: /알림 재처리를 확정했습니다/ });
     expect(notificationRow).toBeInTheDocument();
     await user.click(notificationRow);
@@ -300,6 +299,7 @@ describe("AdminAuditLedger", () => {
         onCloseDetail={vi.fn()}
         onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()} />,
     );
+    document.querySelector("details.admin-audit__disclosure")?.setAttribute("open", "");
     expect(screen.getByLabelText("시작 시각")).toBeInTheDocument();
     expect(screen.getByLabelText("종료 시각")).toBeInTheDocument();
     expect(screen.getByLabelText("클럽 ID")).toBeInTheDocument();
@@ -336,7 +336,7 @@ describe("AdminAuditLedger", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "운영 처리 기록" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "처리 기록" })).toBeInTheDocument();
     const row = screen.getByRole("button", { name: /소유자 · 알림 재처리 대상에 알림 재처리를 확정했습니다/ });
     const fields = [...row.querySelectorAll<HTMLElement>("[data-audit-row-field]")];
     expect(fields.map((field) => field.dataset.auditRowField)).toEqual(["time", "actor", "action", "outcome"]);

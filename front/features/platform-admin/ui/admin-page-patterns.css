@@ -299,10 +299,6 @@
     min-height: 44px;
   }}
 
-.admin-shell:has(.admin-today-ledger) .admin-shell__space-control {
-  display: block !important;
-}
-
 .admin-clubs-ledger .admin-page-frame__action .btn,
 .admin-clubs-ledger .admin-page-frame__action a {
   min-width: 44px;

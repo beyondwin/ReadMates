@@ -19,14 +19,135 @@
   padding: 0 0 16px;
 }
 
+.admin-audit__find,
+.admin-audit__disclosure > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.admin-audit__title {
+  margin: 0 0 12px;
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 750;
+}
+
+.admin-audit__find {
+  gap: 12px;
+  margin: 0 0 12px;
+}
+
+.admin-audit__find .label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.admin-audit__find input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+}
+
+.admin-audit__disclosure > summary {
+  cursor: pointer;
+}
+
+.admin-audit__identity,
+.admin-audit__operation,
+.admin-audit__metadata,
+.admin-audit__back,
+.admin-audit .admin-evidence-ledger__header {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.admin-audit__row-title {
+  font-weight: 700;
+}
+
+.admin-audit__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  width: 100%;
+  padding: 16px 24px;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.admin-audit__row-title {
+  grid-column: 1;
+}
+
+.admin-audit__row-status {
+  grid-column: 2;
+  grid-row: 1;
+  color: var(--text-3);
+}
+
+.admin-audit__row-main {
+  grid-column: 1 / -1;
+  color: var(--text-3);
+  font-size: var(--type-size-supporting);
+}
+
+.admin-audit__row-time,
+.admin-audit__row-extra {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.admin-audit__more {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.admin-audit__docket-kicker {
+  margin: 0 0 8px;
+  color: var(--text-3);
+}
+
+.admin-audit__docket-fields {
+  display: grid;
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.admin-audit__docket-fields dt {
+  color: var(--text-3);
+  font-weight: 700;
+}
+
 .admin-audit .admin-audit__row[aria-pressed="true"] {
   background: var(--warn-soft);
   box-shadow: inset 3px 0 0 var(--warn);
 }
 
 .admin-audit .admin-audit__body {
+  display: grid;
+  grid-template-columns: minmax(340px, 559fr) minmax(420px, 853fr);
   gap: 0;
   border-top: 1px solid var(--line);
+}
+
+.admin-audit__list {
+  min-width: 0;
+  padding: 24px 24px 0;
+  border-right: 1px solid var(--line);
 }
 
 .admin-audit .admin-audit__detail {

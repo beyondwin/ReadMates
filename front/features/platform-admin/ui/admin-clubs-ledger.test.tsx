@@ -64,11 +64,12 @@ describe("AdminClubsLedger", () => {
   it("composes page context, work-view filters, and an evidence ledger", () => {
     const { container } = renderLedger();
 
-    expect(screen.getByRole("heading", { name: "클럽" })).toBeInTheDocument();
-    expect(screen.getByText("운영 · 클럽")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "클럽 찾기" })).toBeInTheDocument();
     expect(screen.queryByText("Club registry")).toBeNull();
+    expect(screen.getByRole("tab", { name: /전체/ })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "선택한 클럽" })).toBeInTheDocument();
     expect(
-      screen.getByRole("searchbox", { name: "클럽 검색" }),
+      screen.getByRole("searchbox", { name: "클럽 검색", hidden: true }),
     ).toHaveValue("alpha");
     expect(screen.getByRole("link", { name: "새 클럽" })).toHaveAttribute(
       "href",
@@ -196,6 +197,8 @@ describe("AdminClubsLedger", () => {
     );
     expect(scroller.scrollTop).toBe(240);
 
+    const filters = container.querySelector("details.admin-club-management__filters");
+    filters?.setAttribute("open", "");
     screen.getByRole("searchbox", { name: "클럽 검색" }).focus();
     scroller.scrollTop = 12;
 

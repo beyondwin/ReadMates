@@ -136,6 +136,7 @@ export type ClubsLedgerFixture = {
   hasNextPage: boolean;
   loadingMore: boolean;
   loadMoreError: boolean;
+  tabCounts?: { all: number; attention: number; operating: number };
 };
 
 export type HealthLedgerFixture = {
@@ -456,6 +457,7 @@ function clubsFixture(input: {
   pageState?: ClubsLedgerFixture["pageState"];
   hasNextPage?: boolean;
   loadMoreError?: boolean;
+  tabCounts?: ClubsLedgerFixture["tabCounts"];
 }): ClubsLedgerFixture {
   const clubs = input.clubs ? [...input.clubs] : [criticalClub(), healthyClub()];
   return {
@@ -471,6 +473,7 @@ function clubsFixture(input: {
     hasNextPage: input.hasNextPage ?? false,
     loadingMore: false,
     loadMoreError: input.loadMoreError ?? false,
+    tabCounts: input.tabCounts,
   };
 }
 
@@ -540,29 +543,50 @@ function approvedClub(input: {
 
 export const clubsTabletLedger = clubsFixture({
   capabilities: CLUBS_CREATE_CAPABILITIES,
+  tabCounts: { all: 24, attention: 2, operating: 22 },
   clubs: [
-    approvedClub({
-      clubId: "club-sentences",
-      name: "문장과 사람들",
-      href: "/admin/clubs/club-sentences?returnTo=%2Fadmin%2Fclubs&focusId=club-sentences&scrollTop=0",
-      currentState: "10분 전",
-      requiredAction: "설정 확인 필요",
-      recentSignal: "공개 범위 설정을 다시 확인해 주세요.",
-      emphasis: "actionable",
-      slug: "sentences",
-      visibility: "PRIVATE",
-    }),
-    approvedClub({
-      clubId: "club-saturday",
-      name: "토요일의 책",
-      href: "/admin/clubs/club-saturday?returnTo=%2Fadmin%2Fclubs&focusId=club-saturday&scrollTop=0",
-      currentState: "운영 중",
-      requiredAction: null,
-      recentSignal: "35분 전",
-      emphasis: "quiet",
-      slug: "saturday-book",
-      visibility: "PUBLIC",
-    }),
+    {
+      ...approvedClub({
+        clubId: "club-sentences",
+        name: "문장과 사람들",
+        href: "/admin/clubs/club-sentences?returnTo=%2Fadmin%2Fclubs&focusId=club-sentences&scrollTop=0",
+        currentState: "운영 중",
+        requiredAction: "설정 확인 필요",
+        recentSignal: "공개 범위 설정을 다시 확인해 주세요.",
+        emphasis: "actionable",
+        slug: "sentences",
+        visibility: "PRIVATE",
+      }),
+      operationsFacts: {
+        hostsLabel: "호스트 2명",
+        membersLabel: "멤버 18명",
+        recordsLabel: "공개 기록 6건",
+        domainLabel: "도메인 정상",
+        reviewLabel: "공개 범위 설정을 다시 확인해 주세요.",
+        ageLabel: "10분 전",
+      },
+    },
+    {
+      ...approvedClub({
+        clubId: "club-saturday",
+        name: "토요일의 책",
+        href: "/admin/clubs/club-saturday?returnTo=%2Fadmin%2Fclubs&focusId=club-saturday&scrollTop=0",
+        currentState: "운영 중",
+        requiredAction: null,
+        recentSignal: "35분 전",
+        emphasis: "quiet",
+        slug: "saturday-book",
+        visibility: "PUBLIC",
+      }),
+      operationsFacts: {
+        hostsLabel: "호스트 1명",
+        membersLabel: "멤버 9명",
+        recordsLabel: "공개 기록 3건",
+        domainLabel: "도메인 정상",
+        reviewLabel: "운영 중",
+        ageLabel: "35분 전",
+      },
+    },
   ],
 });
 
@@ -602,13 +626,13 @@ const HEALTH_SNAPSHOT: PlatformHealthSnapshot = {
     healthCard({
       id: "outbox_backlog",
       title: "Outbox backlog",
+      status: "WARN",
       metric: { value: 42, unit: "rows", label: "pending" },
       drill: { kind: "ADMIN_ROUTE", target: "/admin/notifications?focus=outbox_backlog" },
     }),
     healthCard({
       id: "kafka_consumer_lag",
       title: EDITORIAL_LEDGER_LONG_HEALTH_TITLE,
-      status: "WARN",
       metric: { value: 75, unit: "records", label: "max across partitions" },
       thresholds: { warn: 50, crit: 500 },
       source: "PROMETHEUS",
@@ -692,7 +716,7 @@ function auditItem(overrides: Partial<AdminAuditLedgerItem> & Pick<AdminAuditLed
 
 const REVIEW_PAGE: AdminAuditLedgerPage = {
   generatedAt: GENERATED_AT,
-  filters: { range: "7d" },
+  filters: { range: "24h" },
   summary: { visibleCount: 3, sourceUnavailableCount: 0, metadataUnavailableCount: 0, unavailableSources: [] },
   nextCursor: "cursor-2",
   items: [
@@ -760,6 +784,7 @@ export const reviewAuditEmptyEvidence: ReviewAuditFixture = {
   capabilities: [...AUDIT_REVIEW_CAPABILITIES],
   page: {
     ...REVIEW_PAGE,
+    filters: { range: "7d" },
     summary: { visibleCount: 0, sourceUnavailableCount: 0, metadataUnavailableCount: 0, unavailableSources: [] },
     nextCursor: null,
     items: [],

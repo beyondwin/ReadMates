@@ -57,6 +57,9 @@ const APPROVED_DESKTOP_VIEWPORT = { width: 1672, height: 941 } as const;
 const APPROVED_MOBILE_VIEWPORT = { width: 390, height: 844 } as const;
 const HEADER_DESKTOP_GEOMETRY = { x: 0, y: 0, width: 1672, height: 86 } as const;
 const NAV_DESKTOP_GEOMETRY = { x: 0, y: 86, width: 260, height: 855 } as const;
+const LEDGER_LIST_GEOMETRY = { x: 260, y: 154, width: 559, height: 787 } as const;
+const LEDGER_DOCKET_GEOMETRY = { x: 819, y: 154, width: 853, height: 787 } as const;
+const SERVICE_TABLE_GEOMETRY = { x: 292, y: 154, width: 1348, height: 763 } as const;
 const QUEUE_DESKTOP_GEOMETRY = { x: 260, y: 86, width: 559, height: 855 } as const;
 const DOCKET_DESKTOP_GEOMETRY = { x: 819, y: 86, width: 853, height: 855 } as const;
 const HEADER_MOBILE_GEOMETRY = { x: 0, y: 0, width: 390, height: 70 } as const;
@@ -243,7 +246,7 @@ async function captureOperationsApproved(input: {
   testInfo: TestInfo;
   regions: readonly ApprovedRegion[];
 }) {
-  // Geometry stays hard-fail. After hairline ledgers and mockup copy,
+  // Geometry stays hard-fail. After first-viewport IA/copy/disclosure match,
   // leftover vs 0.02 is Pretendard/icon halo on AI-rasterized Admin PNGs.
   return captureApprovedComparison({
     entry: approvedMockup(input.id),
@@ -297,6 +300,7 @@ function clubsNode(fixture: ClubsLedgerFixture) {
       hasNextPage={fixture.hasNextPage}
       loadingMore={fixture.loadingMore}
       loadMoreError={fixture.loadMoreError}
+      tabCounts={fixture.tabCounts}
       onSearchChange={noopEditorialLedgerHandler}
       onFilterChange={noopEditorialLedgerHandler}
       onRetry={noopEditorialLedgerHandler}
@@ -322,7 +326,7 @@ function reviewNode(fixture: ReviewAuditFixture) {
   return (
     <AdminAuditLedger
       page={fixture.page}
-      filters={{ range: "7d" }}
+      filters={{ range: fixture.page.filters.range === "24h" ? "24h" : "7d" }}
       loading={false}
       error={null}
       nextPageError={fixture.nextPageError}
@@ -422,9 +426,22 @@ test("Clubs locks the approved desktop ledger", async ({ mount, page }, testInfo
     }),
   );
   const firstRow = component.getByRole("link", { name: "문장과 사람들" });
+  await expect(component.getByRole("heading", { name: "클럽 찾기" })).toBeVisible();
+  await expect(component.getByRole("region", { name: "클럽 관리 목록" })).toBeVisible();
+  await expect(component.getByRole("region", { name: "선택한 클럽" })).toBeVisible();
+  await expect(firstRow).toBeVisible();
+  await expect(component.getByText("설정 확인 필요", { exact: true })).toBeVisible();
+  await expect(component.getByRole("tab", { name: /전체/ })).toBeVisible();
+  await expect(component.locator("details.admin-club-management__filters")).not.toHaveAttribute("open");
+  await expect(component.getByRole("link", { name: EDITORIAL_LEDGER_LONG_CLUB_NAME })).toHaveCount(0);
+  const create = component.getByRole("link", { name: "새 클럽" });
+  await expect(create).toBeVisible();
   const regions = [
     await regionFromLocator(component.locator(".admin-shell__header"), "header", HEADER_DESKTOP_GEOMETRY, 4),
     await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4),
+    await regionFromLocator(component.locator(".admin-club-management__finder"), "finder", LEDGER_LIST_GEOMETRY, 2),
+    await regionFromLocator(component.locator(".admin-club-management__docket"), "docket", LEDGER_DOCKET_GEOMETRY, 2),
+    await regionFromLocator(firstRow, "first-row", { x: 284, y: 290, width: 87, height: 44 }, 2),
   ];
   await captureOperationsApproved({
     id: "admin-clubs-desktop",
@@ -433,12 +450,6 @@ test("Clubs locks the approved desktop ledger", async ({ mount, page }, testInfo
     testInfo,
     regions,
   });
-  await expect(component.getByRole("heading", { name: "클럽", exact: true })).toBeVisible();
-  await expect(component.getByRole("region", { name: "클럽 관리 목록" })).toBeVisible();
-  await expect(firstRow).toBeVisible();
-  await expect(component.getByRole("link", { name: EDITORIAL_LEDGER_LONG_CLUB_NAME })).toHaveCount(0);
-  const create = component.getByRole("link", { name: "새 클럽" });
-  await expect(create).toBeVisible();
   await expectMinimumTargetSize(create);
   await create.focus();
   await expectVisibleFocus(create);
@@ -458,10 +469,20 @@ test("Service health locks the approved desktop ledger", async ({ mount, page },
       attentionCount: 1,
     }),
   );
-  const firstRow = component.getByRole("heading", { name: "AI 작업 대기열" });
+  const firstRow = component.getByText("알림", { exact: true }).first();
+  await expect(component.getByText("대체로 정상이며, 알림 전달을 확인해야 합니다.")).toBeVisible();
+  await expect(component.getByRole("columnheader", { name: "서비스" })).toBeVisible();
+  await expect(firstRow).toBeVisible();
+  await expect(component.getByRole("link", { name: "실패한 안내만 다시 보내기" })).toBeVisible();
+  await expect(component.locator(".admin-case-docket")).toHaveCount(0);
+  await expect(component.locator(".admin-action-dock")).toHaveCount(0);
+  await expect(component.locator(".admin-receipt-timeline")).toHaveCount(0);
+  const refresh = component.getByRole("button", { name: "새로고침" });
   const regions = [
     await regionFromLocator(component.locator(".admin-shell__header"), "header", HEADER_DESKTOP_GEOMETRY, 4),
     await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4),
+    await regionFromLocator(component.locator(".admin-service-status__table"), "table", SERVICE_TABLE_GEOMETRY, 2),
+    await regionFromLocator(component.locator(".admin-service-status__attention").first(), "attention-row", { x: 292, y: 302, width: 1348, height: 73 }, 2),
   ];
   await captureOperationsApproved({
     id: "admin-service-desktop",
@@ -470,13 +491,6 @@ test("Service health locks the approved desktop ledger", async ({ mount, page },
     testInfo,
     regions,
   });
-  await expect(component.getByRole("heading", { name: "서비스 건강" })).toBeVisible();
-  await expect(component.getByRole("region", { name: "서비스 신호" })).toBeVisible();
-  await expect(firstRow).toBeVisible();
-  await expect(component.locator(".admin-case-docket")).toHaveCount(0);
-  await expect(component.locator(".admin-action-dock")).toHaveCount(0);
-  await expect(component.locator(".admin-receipt-timeline")).toHaveCount(0);
-  const refresh = component.getByRole("button", { name: "새로고침" });
   await expectMinimumTargetSize(refresh);
   await refresh.focus();
   await expectVisibleFocus(refresh);
@@ -497,10 +511,20 @@ test("Review audit locks the approved desktop ledger", async ({ mount, page }, t
       attentionCount: 0,
     }),
   );
-  const firstRow = component.getByRole("button", { name: /알림 재처리를 확정했습니다/ });
+  const firstRow = component.getByRole("button", { name: /알림 다시 보내기 완료|알림 재처리를 확정했습니다/ });
+  await expect(component.getByRole("heading", { name: "처리 기록", exact: true })).toBeVisible();
+  await expect(component.getByRole("searchbox", { name: "기록 찾기" })).toBeVisible();
+  await expect(component.locator("details.admin-audit__disclosure")).not.toHaveAttribute("open");
+  await expect(component.getByText("선택한 기록")).toBeVisible();
+  await expect(component.getByRole("region", { name: "감사 이벤트 상세" })).toBeVisible();
+  await expect(firstRow).toBeVisible();
+  await expect(component.getByRole("searchbox", { name: "민감 대상 검색" })).toHaveCount(0);
   const regions = [
     await regionFromLocator(component.locator(".admin-shell__header"), "header", HEADER_DESKTOP_GEOMETRY, 4),
     await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4),
+    await regionFromLocator(component.locator(".admin-audit__list"), "list", LEDGER_LIST_GEOMETRY, 2),
+    await regionFromLocator(component.locator(".admin-audit__detail"), "docket", LEDGER_DOCKET_GEOMETRY, 2),
+    await regionFromLocator(firstRow, "first-row", { x: 284, y: 325, width: 510, height: 58 }, 2),
   ];
   await captureOperationsApproved({
     id: "admin-records-desktop",
@@ -509,11 +533,6 @@ test("Review audit locks the approved desktop ledger", async ({ mount, page }, t
     testInfo,
     regions,
   });
-  await expect(component.getByRole("heading", { name: "운영 처리 기록", exact: true })).toBeVisible();
-  await expect(component.getByRole("heading", { name: "알림 재처리를 확정했습니다." })).toBeVisible();
-  await expect(component.getByRole("region", { name: "감사 이벤트 상세" })).toBeVisible();
-  await expect(firstRow).toBeVisible();
-  await expect(component.getByRole("searchbox", { name: "민감 대상 검색" })).toHaveCount(0);
   await expectMinimumTargetSize(firstRow);
   await firstRow.focus();
   await expectVisibleFocus(firstRow);
