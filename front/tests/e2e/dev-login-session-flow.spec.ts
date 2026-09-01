@@ -46,13 +46,20 @@ async function expectCanonicalHostDashboard(page: Page) {
 
 async function openCurrentMeetingFromDashboard(page: Page) {
   await expectCanonicalHostDashboard(page);
-  const meetingHref = await page
+  const meetingLink = page
     .getByRole("group", { name: "현재 모임" })
-    .getByRole("link", { name: "모임 정보" })
-    .getAttribute("href");
-  expect(meetingHref).toBeTruthy();
-  await page.goto(new URL(meetingHref!, page.url()).pathname);
+    .getByRole("link", { name: "모임 정보" });
+  await expect(meetingLink).toBeVisible();
+  await expect(meetingLink).toHaveAttribute("href", hostMeetingPath);
+  await meetingLink.focus();
+  await expect(meetingLink).toBeFocused();
+  await meetingLink.click();
   await expectCanonicalMeetingUrl(page);
+  expect(new URL(page.url()).searchParams.get("section")).toBe("basic");
+  const meetingInfo = page.getByRole("dialog", { name: "모임 정보" });
+  await expect(meetingInfo).toBeVisible();
+  await meetingInfo.getByRole("button", { name: "접기" }).click();
+  await expect(meetingInfo).toBeHidden();
 }
 
 async function fillNewMeetingBasics(
@@ -119,6 +126,8 @@ async function confirmLifecycle(page: Page, name: string, pathIncludes: string) 
         }
         await attendanceSheet.getByRole("button", { name: "접기" }).click();
         await expect(attendanceSheet).toBeHidden();
+        await page.reload();
+        await expect(primaryActions).toBeVisible();
       }
     }
     const trigger = primaryActions.getByRole("button", { name: triggerName });

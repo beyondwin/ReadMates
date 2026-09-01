@@ -4,6 +4,7 @@ import {
   hostSessionDetailResponse,
   isHostSessionDetailRequest,
   routeHostEditorShell,
+  withServerScheduleSeenSummary,
 } from "./aigen-test-fixtures";
 import {
   expectMinimumTargetSize,
@@ -22,7 +23,7 @@ function meeting(): HostSessionDetailResponse {
   const year = meetingDate.getFullYear();
   const month = String(meetingDate.getMonth() + 1).padStart(2, "0");
   const day = String(meetingDate.getDate()).padStart(2, "0");
-  return {
+  return withServerScheduleSeenSummary({
     ...hostSessionDetailResponse(SESSION_ID),
     title: "긴 한글 모임 제목과 a deliberately long English meeting title",
     date: `${year}-${month}-${day}`,
@@ -40,7 +41,7 @@ function meeting(): HostSessionDetailResponse {
       scheduleSeenAt: index % 2 === 0 ? "2026-08-29T01:02:03Z" : null,
       scheduleSeenState: index % 2 === 0 ? "CURRENT" as const : "UNSEEN" as const,
     })),
-  };
+  });
 }
 
 async function json(route: Route, body: unknown, status = 200) {

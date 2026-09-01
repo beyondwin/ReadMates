@@ -5,6 +5,7 @@ import {
   hostSessionDetailResponse,
   isHostSessionDetailRequest,
   routeHostEditorShell,
+  withServerScheduleSeenSummary,
 } from "./aigen-test-fixtures";
 
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
@@ -19,7 +20,7 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
 }
 
 function sessionResponse(): HostSessionDetailResponse {
-  return {
+  return withServerScheduleSeenSummary({
     ...hostSessionDetailResponse(SESSION_ID),
     visibility: "MEMBER",
     publication: {
@@ -59,7 +60,7 @@ function sessionResponse(): HostSessionDetailResponse {
       fileName: LONG_FEEDBACK_FILE,
       uploadedAt: "2026-05-16T12:00:00Z",
     },
-  };
+  });
 }
 
 function hostFeedbackDocumentPreviewResponse() {

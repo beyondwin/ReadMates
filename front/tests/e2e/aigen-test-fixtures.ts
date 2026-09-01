@@ -340,8 +340,36 @@ export function groundedSucceededJob(jobId: string, revision = 1): AiGenerationJ
   };
 }
 
-export function hostSessionDetailResponse(sessionId: string): HostSessionDetailResponse {
+export function withServerScheduleSeenSummary(
+  detail: HostSessionDetailResponse,
+): HostSessionDetailResponse {
+  const eligible = detail.attendees.filter((attendee) => attendee.participationStatus === "ACTIVE");
+  if (detail.state !== "OPEN" || eligible.length === 0) {
+    return {
+      ...detail,
+      scheduleSeenAvailability: "UNAVAILABLE",
+      scheduleSeenSummary: {
+        currentCount: null,
+        staleCount: null,
+        unseenCount: null,
+        eligibleCount: null,
+      },
+    };
+  }
   return {
+    ...detail,
+    scheduleSeenAvailability: "AVAILABLE",
+    scheduleSeenSummary: {
+      currentCount: eligible.filter((attendee) => attendee.scheduleSeenState === "CURRENT").length,
+      staleCount: eligible.filter((attendee) => attendee.scheduleSeenState === "STALE").length,
+      unseenCount: eligible.filter((attendee) => attendee.scheduleSeenState === "UNSEEN").length,
+      eligibleCount: eligible.length,
+    },
+  };
+}
+
+export function hostSessionDetailResponse(sessionId: string): HostSessionDetailResponse {
+  return withServerScheduleSeenSummary({
     sessionId,
     sessionNumber: 7,
     title: "E2E 세션",
@@ -360,12 +388,12 @@ export function hostSessionDetailResponse(sessionId: string): HostSessionDetailR
     publication: null,
     state: "OPEN",
     scheduleRevision: 1,
-    scheduleSeenAvailability: "AVAILABLE",
+    scheduleSeenAvailability: "UNAVAILABLE",
     scheduleSeenSummary: {
-      currentCount: 0,
-      staleCount: 0,
-      unseenCount: 0,
-      eligibleCount: 0,
+      currentCount: null,
+      staleCount: null,
+      unseenCount: null,
+      eligibleCount: null,
     },
     versions: {
       sessionRevision: 1,
@@ -383,5 +411,5 @@ export function hostSessionDetailResponse(sessionId: string): HostSessionDetailR
       fileName: null,
       uploadedAt: null,
     },
-  };
+  });
 }
