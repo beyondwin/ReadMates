@@ -92,7 +92,7 @@ export function HostOperatingRoomPage({
   }
 
   return (
-    <main className="rm-host-operating-room">
+    <main className="rm-host-operating-room" data-phase={view.phase}>
       <CurrentMeetingHeader
         meeting={view.meeting}
         dDayLabel={dDayLabel}

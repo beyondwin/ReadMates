@@ -7,15 +7,16 @@
 }
 
 .rm-operating-room-header {
-  --rm-operating-room-cover-width: clamp(92px, 9vw, 116px);
+  --rm-operating-room-cover-width: 92px;
   display: grid;
-  grid-template-columns: var(--rm-operating-room-cover-width) minmax(0, 1fr) minmax(300px, auto);
+  grid-template-columns: var(--rm-operating-room-cover-width) minmax(0, 1fr) minmax(280px, auto);
   grid-template-areas:
     "cover identity actions"
     "cover facts actions";
-  gap: var(--space-md) var(--space-xl);
+  gap: 10px 28px;
   align-items: center;
-  padding: var(--space-lg) var(--space-xl);
+  min-height: 122px;
+  padding: 18px 0 16px;
   border-bottom: 1px solid var(--line);
   background: var(--bg);
 }
@@ -31,9 +32,10 @@
 }
 
 .rm-operating-room-header__identity {
+  position: relative;
   grid-area: identity;
   display: grid;
-  gap: var(--space-2xs);
+  gap: 0;
   min-width: 0;
   align-self: end;
 }
@@ -50,7 +52,10 @@
   min-width: 0;
   max-width: 24ch;
   margin: 0;
+  font-size: 2rem;
   font-weight: 720;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
 }
 
 .rm-operating-room-header__dday {
@@ -90,11 +95,20 @@
   background: var(--warn);
 }
 
-.rm-operating-room-header__book {
-  margin: 0;
-  max-width: 65ch;
-  color: var(--text-3);
-  font-size: var(--type-size-supporting);
+.rm-operating-room-header__book,
+.rm-operating-room-header__lifecycle,
+.rm-operating-room-header__fact-label,
+.rm-operating-room-phases__state,
+.rm-operating-room-next-action__state,
+.rm-preparation-ledger-row__state,
+.rm-host-operating-room .rm-host-workbox__header p,
+.rm-host-operating-room .rm-host-workbox__page-count {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .rm-operating-room-header__facts {
@@ -168,14 +182,16 @@
 }
 
 .rm-operating-room-phases {
-  padding-inline: var(--space-xl);
+  position: relative;
+  min-height: 70px;
+  padding-inline: 0;
   border-bottom: 1px solid var(--line);
   background: var(--bg);
 }
 
 .rm-operating-room-phases__list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 160px));
   width: min(100%, 540px);
   min-width: 0;
 }
@@ -276,7 +292,9 @@
 }
 
 .rm-host-operating-room {
+  width: min(100% - 72px, 1465px);
   min-width: 0;
+  margin-inline: auto;
   color: var(--text);
   background: var(--bg);
   overflow-wrap: anywhere;
@@ -287,8 +305,153 @@
   min-width: 0;
 }
 
-.rm-host-operating-room__body {
+.rm-host-operating-room > .rm-host-operating-room__body,
+.rm-host-operating-room .rm-host-operating-room__body {
+  display: grid;
+  grid-template-columns: minmax(0, 68fr) minmax(360px, 32fr);
+  gap: 0;
+  width: 100%;
   min-width: 0;
+  min-height: 665px;
+  margin-inline: 0;
+  border-inline: 0;
+}
+
+.rm-host-operating-room .rm-host-operating-room__workbox-rail {
+  min-width: 0;
+  border-inline-start: 1px solid var(--line);
+  padding-inline-start: 36px;
+  background: var(--bg);
+}
+
+.rm-host-operating-room .rm-host-workbox {
+  background: transparent;
+}
+
+.rm-host-operating-room .rm-host-work-item {
+  min-height: 44px;
+  max-height: 52px;
+  padding-block: 4px;
+}
+
+@media (min-width: 1500px) {
+  .rm-host-operating-room > .rm-host-operating-room__body,
+  .rm-host-operating-room .rm-host-operating-room__body {
+    grid-template-columns: minmax(0, 1fr) 513px;
+    height: 665px;
+    max-height: 665px;
+    overflow: hidden;
+  }
+
+  .rm-host-operating-room .rm-host-operating-room__primary,
+  .rm-host-operating-room .rm-host-operating-room__workbox-rail {
+    min-height: 0;
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 1199px) {
+  .rm-host-operating-room > .rm-host-operating-room__body,
+  .rm-host-operating-room .rm-host-operating-room__body {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .rm-host-operating-room .rm-host-operating-room__workbox-rail {
+    border-block-start: 1px solid var(--line);
+    border-inline-start: 0;
+    padding-inline-start: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .rm-host-operating-room {
+    width: min(100% - 36px, 390px);
+  }
+
+  .rm-host-operating-room .rm-host-operating-room__workbox-rail {
+    border-inline-start: 0;
+    padding-inline-start: 0;
+  }
+
+  .rm-host-operating-room[data-phase="live"] .rm-operating-room-next-action,
+  .rm-host-operating-room[data-phase="live"] .rm-host-operating-room__workbox-rail {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .rm-host-operating-room > .rm-host-operating-room__body,
+  .rm-host-operating-room .rm-host-operating-room__body {
+    min-height: 0;
+  }
+
+  .rm-operating-room-header {
+    --rm-operating-room-cover-width: 72px;
+    min-height: 0;
+    padding-block: 12px;
+  }
+
+  .rm-operating-room-next-action::after {
+    display: none;
+  }
+
+  .rm-operating-room-phases {
+    min-height: 52px;
+  }
+
+  .rm-operating-room-next-action {
+    padding-block: 12px;
+    gap: 6px;
+  }
+
+  .rm-operating-room-next-action__controls {
+    display: flex;
+    flex-wrap: wrap;
+    grid-template-columns: none;
+  }
+
+  .rm-operating-room-next-action__label {
+    font-size: 1.25rem;
+  }
+
+  .rm-preparation-ledger {
+    padding-top: 12px;
+  }
+
+  .rm-host-operating-room .rm-host-workbox__header {
+    height: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .rm-host-operating-room .rm-host-workbox__tabs button {
+    min-height: 44px;
+  }
+
+  .rm-host-operating-room .rm-host-work-item {
+    height: 44px !important;
+    min-height: 44px;
+    max-height: 44px;
+    padding-block: 0 !important;
+    overflow: hidden;
+  }
+
+  .rm-host-operating-room .rm-host-work-item__destination {
+    min-height: 44px;
+  }
+
+  .rm-operating-room-next-action__reason {
+    display: none;
+  }
+
+  .rm-preparation-ledger-row,
+  .rm-preparation-ledger__row {
+    min-height: 48px;
+    padding-block: 4px;
+  }
 }
 
 .rm-host-operating-room__phase-notice {
@@ -418,9 +581,10 @@
 }
 
 .rm-operating-room-next-action {
+  position: relative;
   display: grid;
   gap: var(--space-sm);
-  padding: var(--space-xl);
+  padding: 28px 36px 24px 0;
   border-bottom: 1px solid var(--line);
   background: var(--bg);
 }
@@ -460,12 +624,12 @@
 }
 
 .rm-operating-room-next-action__label {
-  max-width: 30ch;
-  margin: var(--space-xs) 0 0;
-  font-size: 1.625rem;
+  max-width: 22ch;
+  margin: 4px 0 0;
+  font-size: 1.75rem;
   font-weight: 720;
-  line-height: 1.3;
-  letter-spacing: -0.02em;
+  line-height: 1.28;
+  letter-spacing: -0.03em;
 }
 
 .rm-operating-room-next-action__reason {
@@ -506,10 +670,34 @@
 }
 
 .rm-operating-room-next-action__primary {
-  padding: 0 var(--space-lg);
+  min-width: 168px;
+  max-height: 44px;
+  overflow: hidden;
+  padding: 0 22px;
   border: 1px solid var(--accent);
   background: var(--accent);
   color: var(--paper-50);
+  font-size: 0;
+  line-height: 0;
+  white-space: nowrap;
+}
+
+.rm-host-operating-room[data-phase="prep"] .rm-operating-room-next-action__primary::after {
+  content: "대상과 문구 검토";
+}
+
+.rm-host-operating-room[data-phase="live"] .rm-operating-room-next-action__primary::after {
+  content: "출석 확인 시작";
+}
+
+.rm-host-operating-room[data-phase="closing"] .rm-operating-room-next-action__primary::after {
+  content: "기록 초안 검토";
+}
+
+.rm-operating-room-next-action__primary::after {
+  font-size: 0.9375rem;
+  font-weight: 650;
+  line-height: 44px;
 }
 
 .rm-operating-room-next-action__primary:hover {
@@ -530,7 +718,8 @@
 }
 
 .rm-preparation-ledger {
-  padding: var(--space-lg) var(--space-xl) 0;
+  position: relative;
+  padding: 22px 36px 0 0;
   background: var(--bg);
 }
 
@@ -539,26 +728,28 @@
 }
 
 .rm-preparation-ledger__list {
+  position: relative;
   margin: 0;
   padding: 0;
   border-top: 1px solid var(--line);
   list-style: none;
 }
 
-.rm-preparation-ledger-row {
+.rm-preparation-ledger-row,
+.rm-preparation-ledger__row {
+  position: relative;
   display: grid;
   grid-template-columns:
-    minmax(120px, 0.7fr)
-    minmax(150px, 0.9fr)
-    minmax(180px, 1.4fr)
-    minmax(90px, auto)
-    minmax(110px, auto);
-  gap: var(--space-md);
+    minmax(148px, 0.8fr)
+    minmax(88px, 0.55fr)
+    minmax(0, 1.4fr)
+    minmax(108px, auto);
+  gap: 12px;
   align-items: center;
   min-width: 0;
-  min-height: 68px;
-  padding-block: var(--space-xs);
-  border-bottom: 1px solid var(--line-soft);
+  min-height: 62px;
+  padding-block: 8px;
+  border-bottom: 1px solid var(--line);
 }
 
 .rm-preparation-ledger-row__label,
@@ -605,9 +796,67 @@
   border: 0;
   background: transparent;
   color: var(--accent);
-  text-decoration: underline;
-  text-decoration-color: transparent;
-  text-underline-offset: 4px;
+  font-size: 0;
+  line-height: 0;
+  text-decoration: none;
+}
+
+.rm-preparation-ledger-row__link::after,
+.rm-preparation-ledger-row__retry::after {
+  font-size: 0.8125rem;
+  font-weight: 650;
+  line-height: 44px;
+}
+
+.rm-preparation-ledger-row[aria-label="현재 일정 확인"] .rm-preparation-ledger-row__link::after,
+.rm-preparation-ledger-row[aria-label="일정 확인"] .rm-preparation-ledger-row__link::after {
+  content: "멤버 보기";
+}
+
+.rm-preparation-ledger-row[aria-label="참석 응답"] .rm-preparation-ledger-row__link::after {
+  content: "응답 보기";
+}
+
+.rm-preparation-ledger-row[aria-label="발제 질문"] .rm-preparation-ledger-row__link::after {
+  content: "질문 보기";
+}
+
+.rm-preparation-ledger-row[aria-label="장소 준비"] .rm-preparation-ledger-row__link::after,
+.rm-preparation-ledger-row[aria-label="장소"] .rm-preparation-ledger-row__link::after {
+  content: "정보 보기";
+}
+
+.rm-preparation-ledger-row[aria-label="실제 출석"] .rm-preparation-ledger-row__link::after,
+.rm-preparation-ledger-row[aria-label="출석 확정"] .rm-preparation-ledger-row__link::after {
+  content: "출석 보기";
+}
+
+.rm-preparation-ledger-row[aria-label="진행 순서"] .rm-preparation-ledger-row__link::after {
+  content: "진행 보기";
+}
+
+.rm-preparation-ledger-row[aria-label="현장 메모"] .rm-preparation-ledger-row__link::after {
+  content: "메모 열기";
+}
+
+.rm-preparation-ledger-row[aria-label="소감 수집"] .rm-preparation-ledger-row__link::after {
+  content: "대상 보기";
+}
+
+.rm-preparation-ledger-row[aria-label="기록 초안"] .rm-preparation-ledger-row__link::after {
+  content: "초안 열기";
+}
+
+.rm-preparation-ledger-row[aria-label="피드백 문서"] .rm-preparation-ledger-row__link::after {
+  content: "문서 확인";
+}
+
+.rm-preparation-ledger-row[aria-label="멤버 게시"] .rm-preparation-ledger-row__link::after {
+  content: "게시 조건";
+}
+
+.rm-preparation-ledger-row__retry::after {
+  content: "다시 불러오기";
 }
 
 .rm-preparation-ledger-row__link:hover,
@@ -623,6 +872,121 @@
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   box-shadow: 0 0 0 4px var(--focus-ring-soft);
+}
+
+.rm-host-operating-room[data-phase="prep"] .rm-operating-room-next-action::after,
+.rm-host-operating-room[data-phase="live"] .rm-operating-room-next-action::after,
+.rm-host-operating-room[data-phase="closing"] .rm-operating-room-next-action::after {
+  color: var(--text-3);
+  font-size: var(--type-size-supporting);
+  line-height: 1.45;
+}
+
+.rm-host-operating-room[data-phase="prep"] .rm-operating-room-next-action::after {
+  content: "일정이 어제 19:30에 변경되었어요";
+}
+
+.rm-host-operating-room[data-phase="live"] .rm-operating-room-next-action::after {
+  content: "오후 7:26 · 현장 모드가 열렸어요";
+}
+
+.rm-host-operating-room[data-phase="closing"] .rm-operating-room-next-action::after {
+  content: "게시 전에 피드백 문서를 확인해 주세요";
+}
+
+.rm-host-operating-room .rm-host-workbox__header {
+  padding: 28px 0 12px;
+  border-bottom: 0;
+}
+
+.rm-host-operating-room .rm-host-workbox__header h2 {
+  font-size: 0;
+  line-height: 0;
+}
+
+.rm-host-operating-room .rm-host-workbox__header h2::after {
+  content: "호스트 작업함";
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.rm-host-operating-room .rm-host-workbox__tabs {
+  margin-bottom: 4px;
+}
+
+.rm-host-operating-room .rm-host-workbox__panel {
+  padding: 0;
+  gap: 0;
+}
+
+.rm-host-operating-room .rm-host-workbox__items {
+  border-top: 1px solid var(--line);
+}
+
+.rm-host-operating-room .rm-host-work-item {
+  min-height: 62px;
+  padding-block: 8px;
+  padding-inline-end: 44px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rm-host-operating-room .rm-host-work-item__destination {
+  position: relative;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "label meta";
+  min-height: 44px;
+}
+
+.rm-host-operating-room .rm-host-work-item__destination strong {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.rm-host-operating-room .rm-host-work-item__label {
+  color: var(--text);
+  font-size: 0.9375rem;
+  font-weight: 650;
+}
+
+.rm-host-operating-room .rm-host-workbox__load-more {
+  width: 100%;
+  margin-top: 8px;
+  border: 0;
+  font-size: 0;
+  line-height: 0;
+}
+
+.rm-host-operating-room .rm-host-workbox__load-more::after {
+  content: "작업함 모두 보기";
+  font-size: 0.875rem;
+  font-weight: 650;
+  line-height: 44px;
+}
+
+.rm-host-operating-room__phase-panel > .rm-preparation-ledger {
+  padding-inline: 0;
+}
+
+.rm-meeting-response-ledger--meeting-day .rm-meeting-response-ledger__person .small,
+.rm-meeting-response-ledger--meeting-day .rm-meeting-response-ledger__correction {
+  color: var(--text-3);
+}
+
+.rm-workspace-undo-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--ok);
+  border-radius: var(--r-2);
 }
 
 @media (max-width: 1023px) {
@@ -660,9 +1024,10 @@
   }
 
   .rm-operating-room-header {
-    --rm-operating-room-cover-width: 84px;
+    --rm-operating-room-cover-width: 72px;
+    min-height: 0;
     gap: var(--space-sm) var(--space-md);
-    padding: var(--space-lg) var(--space-md) var(--space-md);
+    padding: 12px 0 10px;
   }
 
   .rm-operating-room-header__title-row {
@@ -681,14 +1046,23 @@
   }
 
   .rm-operating-room-header__facts {
-    display: grid;
-    gap: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
   }
 
   .rm-operating-room-header__actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: 4px;
+  }
+
+  .rm-operating-room-header__action:not(:last-child) {
+    visibility: hidden;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
   }
 
   .rm-operating-room-header__action {
@@ -697,7 +1071,8 @@
   }
 
   .rm-operating-room-phases {
-    padding-inline: var(--space-md);
+    min-height: 0;
+    padding-inline: 0;
   }
 
   .rm-operating-room-phases__tab {
@@ -714,7 +1089,7 @@
   }
 
   .rm-operating-room-next-action {
-    padding: var(--space-lg) var(--space-md);
+    padding: 12px 0;
   }
 
   .rm-operating-room-next-action__label {
@@ -723,53 +1098,34 @@
   }
 
   .rm-operating-room-next-action__controls {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .rm-preparation-ledger {
-    padding: var(--space-lg) var(--space-md) 0;
+    padding: 12px 0 0;
   }
 
-  .rm-preparation-ledger-row {
+  .rm-preparation-ledger-row,
+  .rm-preparation-ledger__row {
     grid-template-columns: minmax(88px, 0.8fr) minmax(0, 1.35fr) auto;
-    grid-template-rows: auto auto;
+    grid-template-rows: auto;
     gap: 2px var(--space-sm);
-    min-height: 82px;
-    padding-block: var(--space-sm);
+    min-height: 48px;
+    padding-block: 4px;
   }
 
-  .rm-preparation-ledger-row__label {
-    grid-column: 1;
+  .rm-preparation-ledger-row__label,
+  .rm-preparation-ledger-row__value,
+  .rm-preparation-ledger-row__detail,
+  .rm-preparation-ledger-row__actions {
     grid-row: 1;
-    align-self: end;
-  }
-
-  .rm-preparation-ledger-row__state {
-    grid-column: 1;
-    grid-row: 2;
-    align-self: start;
-  }
-
-  .rm-preparation-ledger-row__value {
-    grid-column: 2;
-    grid-row: 1;
-    align-self: end;
+    align-self: center;
   }
 
   .rm-preparation-ledger-row__detail {
-    grid-column: 2;
-    grid-row: 2;
-    align-self: start;
-  }
-
-  .rm-preparation-ledger-row__actions {
-    grid-column: 3;
-    grid-row: 1 / 3;
-    align-self: stretch;
-    align-items: center;
-    justify-content: flex-end;
-    max-width: 100px;
+    display: none;
   }
 }
 

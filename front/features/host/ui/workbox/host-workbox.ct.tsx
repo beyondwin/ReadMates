@@ -73,6 +73,7 @@ for (const viewport of [
       if (viewport.width === 1440) {
         expect(Math.abs((primary!.width / (primary!.width + workbox!.width)) - 0.68)).toBeLessThan(0.04);
         expect(workbox!.x).toBeGreaterThan(primary!.x);
+        expect(workbox!.width).toBeGreaterThanOrEqual(360);
       } else {
         expect(workbox!.y).toBeGreaterThanOrEqual(primary!.y + primary!.height);
       }

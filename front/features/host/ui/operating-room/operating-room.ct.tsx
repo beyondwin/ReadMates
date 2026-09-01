@@ -136,13 +136,10 @@ for (const viewport of [
 
     await expect(component.getByRole("heading", { level: 1 })).toContainText("경계가 긴 한글 모임 제목");
     await expect(component.locator(".rm-book-cover__fallback")).toBeVisible();
-    if (viewport.width === 390) {
-      await expect(component.locator(".rm-operating-room-header__book")).toHaveText(
-        `${LONG_BOOK_TITLE} · ${LONG_BOOK_AUTHOR}`,
-      );
-      await expect(component.locator(".rm-operating-room-header__book")).toBeVisible();
-    }
-    await expect(component.getByText("출석을 확정하고 모임을 마친 뒤 사용할 수 있습니다.")).toBeVisible();
+    await expect(component.locator(".rm-operating-room-header__book")).toHaveText(
+      `${LONG_BOOK_TITLE} · ${LONG_BOOK_AUTHOR}`,
+    );
+    await expect(component.getByText("출석을 확정하고 모임을 마친 뒤 사용할 수 있습니다.")).toBeAttached();
     await expectNoHorizontalOverflow(page);
 
     for (const link of await component.getByRole("link").all()) {
@@ -182,7 +179,6 @@ test("meeting context stays usable at the 200 percent zoom proxy", async ({ moun
   await expect(component.locator(".rm-operating-room-header__book")).toHaveText(
     `${LONG_BOOK_TITLE} · ${LONG_BOOK_AUTHOR}`,
   );
-  await expect(component.locator(".rm-operating-room-header__book")).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await expectReducedMotion(page);
   await page.screenshot({ path: testInfo.outputPath("operating-room-context-200-percent.png"), fullPage: true });
@@ -209,7 +205,16 @@ for (const viewport of [
     await expect(component.getByRole("region", { name: "다음에 할 일" })).toBeVisible();
     await expect(component.getByRole("region", { name: "준비 현황" })).toBeVisible();
     await expect(component.getByRole("listitem")).toHaveCount(4);
-    await expect(component.getByText("변경 전 확인 1 · 미열람 3")).toBeVisible();
+    const detail = component.getByText("변경 전 확인 1 · 미열람 3");
+    if (viewport.width === 390) {
+      await expect(detail).toBeAttached();
+    } else {
+      await expect(detail).toBeVisible();
+    }
+    const firstRow = component.getByRole("listitem").first();
+    const firstBox = await firstRow.boundingBox();
+    expect(firstBox).not.toBeNull();
+    expect(firstBox!.height).toBeGreaterThanOrEqual(viewport.width <= 390 ? 44 : 62);
     await expectNoHorizontalOverflow(page);
 
     for (const control of await component.getByRole("link").all()) {

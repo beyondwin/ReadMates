@@ -320,13 +320,75 @@ button.rm-host-workspace-switcher__choice {
   background: var(--paper-50);
 }
 
+.rm-app-club-shell[data-workspace="host"] .topnav-global-context > a.row > span {
+  display: grid;
+  gap: 0;
+}
+
+.rm-app-club-shell[data-workspace="host"] .topnav-global-context > a.row > span > .editorial {
+  font-size: 0;
+  line-height: 0;
+}
+
+.rm-app-club-shell[data-workspace="host"] .topnav-global-context > a.row > span > .editorial::after {
+  content: "ReadMates";
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1;
+}
+
+.rm-app-club-shell[data-workspace="host"] .topnav-global-context > a.row > span > .tiny {
+  display: none;
+}
+
+.rm-app-club-shell[data-workspace="host"] .rm-host-utility-actions__item {
+  gap: 6px;
+}
+
+.rm-app-club-shell[data-workspace="host"] .m-hdr-heading {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
 @media (max-width: 767px) {
   .rm-app-club-shell[data-workspace="host"] [data-club-shell-region="mobile-primary"] {
-    position: fixed;
+    position: fixed !important;
     inset: auto 0 0;
     z-index: 40;
     width: 100%;
     min-height: calc(var(--m-nav-h) + var(--m-safe-bottom));
+  }
+
+  .rm-app-club-shell[data-workspace="host"] [data-club-shell-region="mobile-spine"] {
+    position: absolute;
+    inset: var(--m-safe-top) 8px auto auto;
+    z-index: 45;
+    width: auto;
+    min-height: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .rm-app-club-shell[data-workspace="host"] .m-hdr {
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .rm-app-club-shell[data-workspace="host"] .m-hdr-side--left,
+  .rm-app-club-shell[data-workspace="host"] .m-hdr-brand {
+    display: none;
+  }
+
+  .rm-app-club-shell[data-workspace="host"] [data-club-shell-region="mobile-context"] {
+    position: sticky;
+    top: 0;
+    padding-inline-end: 52px;
   }
 }
 
