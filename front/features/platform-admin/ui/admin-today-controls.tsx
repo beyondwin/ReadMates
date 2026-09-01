@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
 import { adminCaseLifecycleLanguage } from "@/features/platform-admin/model/admin-status-language";
 import type { AdminOperationWorkView } from "@/features/platform-admin/model/platform-admin-operations-model";
@@ -29,8 +29,13 @@ export type AdminTodayControlsProps = {
 };
 
 export function AdminTodayControls({ defaultOpen = false, children, ...props }: AdminTodayControlsProps) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <details className="admin-today-controls" open={defaultOpen || undefined}>
+    <details
+      className="admin-today-controls"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
       <summary>필터와 신호 상태</summary>
       <div className="admin-today-controls__body">
         <AdminWorkViewBar

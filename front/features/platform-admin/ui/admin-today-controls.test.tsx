@@ -34,6 +34,34 @@ describe("AdminTodayControls", () => {
     expect(within(secondary).getByRole("combobox", { name: "상태 필터", hidden: true })).not.toBeVisible();
   });
 
+  it("starts open when defaultOpen is set and stays collapsed across rerenders", async () => {
+    const user = userEvent.setup();
+    const props = {
+      workViews,
+      activeView: "briefing",
+      query: "",
+      filters: { state: "open" as const, severity: "", source: "", assignee: "" },
+      onViewChange: vi.fn(),
+      onQueryChange: vi.fn(),
+      onFilterChange: vi.fn(),
+    };
+
+    const { rerender } = render(<AdminTodayControls defaultOpen {...props} />);
+    const secondary = screen.getByText("필터와 신호 상태").closest("details")!;
+    expect(secondary).toHaveAttribute("open");
+    expect(within(secondary).getByRole("combobox", { name: "상태 필터" })).toBeVisible();
+
+    await user.click(screen.getByText("필터와 신호 상태"));
+    expect(secondary).not.toHaveAttribute("open");
+
+    rerender(<AdminTodayControls defaultOpen pendingCount={1} {...props} />);
+    expect(screen.getByText("필터와 신호 상태").closest("details")).not.toHaveAttribute("open");
+
+    rerender(<AdminTodayControls defaultOpen={false} {...props} />);
+    rerender(<AdminTodayControls defaultOpen {...props} />);
+    expect(screen.getByText("필터와 신호 상태").closest("details")).not.toHaveAttribute("open");
+  });
+
   it("reports work view, loaded-only search, and filters through callbacks only", async () => {
     const onViewChange = vi.fn();
     const onQueryChange = vi.fn();

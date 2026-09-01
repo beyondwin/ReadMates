@@ -323,11 +323,38 @@ describe("AdminTodayLedger", () => {
   it("distinguishes a filtered empty queue from a true empty queue", async () => {
     const user = userEvent.setup();
     const onClearFilters = vi.fn();
-    render(
+    const renderEmptyFiltered = (refreshing = false) => (
       <MemoryRouter>
         <AdminTodayLedger
           view={emptyView}
           filters={{ state: "open", severity: "", source: "", assignee: "" }}
+          history={[]}
+          lifecycleControls={null}
+          refreshing={refreshing}
+          onFilterChange={vi.fn()}
+          onSelectCase={vi.fn()}
+          onClearFilters={onClearFilters}
+        />
+      </MemoryRouter>
+    );
+    const { rerender } = render(renderEmptyFiltered());
+
+    expect(screen.getByText("조건에 맞는 운영 케이스가 없습니다")).toBeInTheDocument();
+    expect(screen.getByText("필터를 바꾸면 다른 케이스를 볼 수 있습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("지금은 처리할 운영 케이스가 없습니다")).not.toBeInTheDocument();
+    const secondary = screen.getByText("필터와 신호 상태").closest("details")!;
+    expect(secondary).toHaveAttribute("open");
+
+    await user.click(screen.getByText("필터와 신호 상태"));
+    expect(secondary).not.toHaveAttribute("open");
+    rerender(renderEmptyFiltered(true));
+    expect(screen.getByText("필터와 신호 상태").closest("details")).not.toHaveAttribute("open");
+
+    rerender(
+      <MemoryRouter>
+        <AdminTodayLedger
+          view={emptyView}
+          filters={{ state: "", severity: "", source: "", assignee: "" }}
           history={[]}
           lifecycleControls={null}
           onFilterChange={vi.fn()}
@@ -336,11 +363,9 @@ describe("AdminTodayLedger", () => {
         />
       </MemoryRouter>,
     );
+    rerender(renderEmptyFiltered());
+    expect(screen.getByText("필터와 신호 상태").closest("details")).not.toHaveAttribute("open");
 
-    expect(screen.getByText("조건에 맞는 운영 케이스가 없습니다")).toBeInTheDocument();
-    expect(screen.getByText("필터를 바꾸면 다른 케이스를 볼 수 있습니다.")).toBeInTheDocument();
-    expect(screen.queryByText("지금은 처리할 운영 케이스가 없습니다")).not.toBeInTheDocument();
-    expect(screen.getByText("필터와 신호 상태").closest("details")).toHaveAttribute("open");
     await user.click(screen.getByRole("button", { name: "필터 지우기" }));
     expect(onClearFilters).toHaveBeenCalledTimes(1);
   });
