@@ -24,7 +24,7 @@ import {
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { AdminAuditLedger } from "@/features/platform-admin/ui/admin-audit-ledger";
 
-const GENERIC_ERROR = "감사 ledger를 처리하지 못했습니다. 다시 시도해 주세요.";
+const GENERIC_ERROR = "처리 기록을 불러오지 못했습니다. 다시 시도해 주세요.";
 
 type SensitiveSearchRequest = { requestSequence: number; sensitiveTarget: string };
 

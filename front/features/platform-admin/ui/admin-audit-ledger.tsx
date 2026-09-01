@@ -4,8 +4,11 @@ import { ADMIN_COPY, auditOutcomeLabel } from "@/features/platform-admin/model/a
 import {
   buildAdminAuditOperationSummary,
   adminAuditActorPrimaryLabel,
+  adminAuditReasonLabel,
+  adminAuditTargetPrimaryLabel,
+  buildAdminAuditLedgerRow,
   formatAdminAuditOccurredAt,
-  formatAdminAuditLedgerSentenceBody,
+  isAdminAuditTechnicalMetadata,
   shouldShowAdminAuditDetailValue,
   type AdminAuditActionCategory,
   type AdminAuditActorRole,
@@ -189,22 +192,13 @@ export function AdminAuditLedger({
           >
             <div ref={rowsRef} className="admin-audit__rows" aria-label="운영 기입 목록" tabIndex={-1}>
               {page && page.items.length > 0 ? page.items.map((item) => (
-                <button
+                <AuditRow
                   key={item.id}
-                  type="button"
-                  data-audit-row={item.id}
-                  aria-pressed={selected?.id === item.id}
-                  className="admin-audit__row"
-                  onClick={() => onSelect(item)}
+                  item={item}
+                  selected={selected?.id === item.id}
+                  onSelect={() => onSelect(item)}
                   onKeyDown={(event) => handleRowKeyDown(event, item)}
-                >
-                  <span className="admin-audit__row-main">
-                    <time className="admin-audit__row-time" dateTime={item.occurredAt}>
-                      {formatAdminAuditOccurredAt(item.occurredAt)}
-                    </time>
-                    {` · ${formatAdminAuditLedgerSentenceBody(item)}`}
-                  </span>
-                </button>
+                />
               )) : null}
               {nextPageError ? (
                 <div className="admin-audit__more-error" role="alert">
@@ -223,6 +217,46 @@ export function AdminAuditLedger({
         </div>
       </AdminPageContext>
     </div>
+  );
+}
+
+function AuditRow({
+  item,
+  selected,
+  onSelect,
+  onKeyDown,
+}: {
+  item: AdminAuditLedgerItem;
+  selected: boolean;
+  onSelect: () => void;
+  onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
+}) {
+  const row = buildAdminAuditLedgerRow(item);
+  return (
+    <button
+      type="button"
+      data-audit-row={item.id}
+      aria-pressed={selected}
+      className="admin-audit__row"
+      onClick={onSelect}
+      onKeyDown={onKeyDown}
+    >
+      <span className="admin-audit__row-main">
+        <time
+          className="admin-audit__row-time"
+          dateTime={item.occurredAt}
+          data-audit-row-field="time"
+        >
+          {row.occurredAt}
+        </time>
+        <span> · </span>
+        <span data-audit-row-field="actor">{row.actor}</span>
+        <span> · </span>
+        <span data-audit-row-field="action">{row.action}</span>
+        <span> · </span>
+        <span data-audit-row-field="outcome">{row.result}</span>
+      </span>
+    </button>
   );
 }
 
@@ -272,25 +306,23 @@ function AuditDetail({ item, onBack }: { item: AdminAuditLedgerItem | null; onBa
   if (!item) {
     return <aside className="admin-audit__detail" aria-label="감사 이벤트 상세" role="region"><p className="muted">이벤트를 선택하세요.</p></aside>;
   }
-  const safeMetadata = item.safeMetadata.filter((entry) => shouldShowAdminAuditDetailValue(entry.label, entry.value));
+  const visibleMetadata = item.safeMetadata.filter((entry) => shouldShowAdminAuditDetailValue(entry.label, entry.value));
+  const technicalMetadata = visibleMetadata.filter(isAdminAuditTechnicalMetadata);
+  const safeMetadata = visibleMetadata.filter((entry) => !isAdminAuditTechnicalMetadata(entry));
   const operationSummary = buildAdminAuditOperationSummary(item);
+  const row = buildAdminAuditLedgerRow(item);
   return (
     <aside className="admin-audit__detail" aria-label="감사 이벤트 상세" role="region">
       <button type="button" className="btn btn-quiet btn-sm admin-audit__back" onClick={onBack}>목록으로</button>
       <h2 className="h3 editorial">{item.summary}</h2>
-      <p className="tiny muted">{item.sourceTable} · {item.actionType}</p>
       <dl className="admin-audit__identity">
-        <div><dt>행위자</dt><dd>{adminAuditActorPrimaryLabel(item.actor)}</dd></div>
-        <div><dt>대상</dt><dd>{item.target.label}</dd></div>
-        {item.target.clubId ? <div><dt>클럽</dt><dd>{item.target.clubId}</dd></div> : null}
+        <div><dt>시각</dt><dd>{row.occurredAt}</dd></div>
+        <div><dt>누가</dt><dd>{adminAuditActorPrimaryLabel(item.actor)}</dd></div>
+        <div><dt>대상</dt><dd>{adminAuditTargetPrimaryLabel(item)}</dd></div>
+        <div><dt>무엇을 했나</dt><dd>{item.summary}</dd></div>
+        <div><dt>결과</dt><dd>{row.result}</dd></div>
+        <div><dt>사유</dt><dd>{adminAuditReasonLabel(item)}</dd></div>
       </dl>
-      <AdminTechnicalDisclosure
-        items={[
-          { label: "행위자 역할 코드", value: item.actor.role },
-          { label: "AI 작업 식별자", value: item.target.jobId },
-          { label: "이벤트 식별자", value: item.target.eventId },
-        ]}
-      />
       <div className={`admin-audit__operation admin-audit__operation--${operationSummary.state.toLowerCase()}`}>
         <span className="admin-audit__operation-label">운영 판단</span>
         <strong>{operationSummary.label}</strong>
@@ -300,6 +332,20 @@ function AuditDetail({ item, onBack }: { item: AdminAuditLedgerItem | null; onBa
       {safeMetadata.length > 0 ? <dl className="admin-audit__metadata">{safeMetadata.map((entry) => <div key={`${entry.label}-${entry.value}`}><dt>{entry.label}</dt><dd>{entry.value}</dd></div>)}</dl> : null}
       {item.metadataState === "UNAVAILABLE" ? <p className="muted">세부 정보를 안전하게 표시할 수 없습니다.</p> : null}
       {item.metadataState === "EMPTY" ? <p className="muted">안전하게 표시할 추가 세부 정보가 없습니다.</p> : null}
+      <AdminTechnicalDisclosure
+        items={[
+          { label: "처리 기록 식별자", value: item.id },
+          { label: "원본 저장소", value: item.sourceTable },
+          { label: "원본 행동", value: item.actionType },
+          { label: "원본 결과", value: item.outcome },
+          { label: "행위자 역할 코드", value: item.actor.role },
+          { label: "클럽 식별자", value: item.target.clubId },
+          { label: "사용자 식별자", value: item.target.userId },
+          { label: "AI 작업 식별자", value: item.target.jobId },
+          { label: "이벤트 식별자", value: item.target.eventId },
+          ...technicalMetadata.map((entry) => ({ label: entry.label, value: entry.value })),
+        ]}
+      />
     </aside>
   );
 }

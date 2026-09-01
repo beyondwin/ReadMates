@@ -1,4 +1,3 @@
-import { auditOutcomeLabel } from "@/features/platform-admin/model/admin-copy";
 import {
   adminAuditActorRoleLanguage,
   adminAuditOutcomeLanguage,
@@ -68,6 +67,13 @@ export type AdminAuditLedgerItem = {
   summary: string;
   safeMetadata: Array<{ label: string; value: string; kind: string }>;
   metadataState: AdminAuditMetadataState;
+};
+
+export type AdminAuditLedgerRow = {
+  occurredAt: string;
+  actor: string;
+  action: string;
+  result: string;
 };
 
 const RANGES: AdminAuditRange[] = ["24h", "7d", "30d", "90d"];
@@ -146,12 +152,25 @@ export function adminAuditShareSafeIdentifier(value: string | null): string | nu
 }
 
 export function adminAuditReasonLabel(item: AdminAuditLedgerItem): string {
+  const reasonRedacted = item.safeMetadata.some(
+    (meta) => meta.label.toLowerCase() === "reasonredacted" && meta.value.toLowerCase() === "true",
+  );
+  if (reasonRedacted) return "사유 내용은 보호되어 표시되지 않습니다.";
+
   const entry = item.safeMetadata.find((meta) => {
     const label = meta.label.toLowerCase();
     return label === "reason" || label === "reasontext" || label === "note";
   });
   const value = entry?.value.trim() ?? "";
-  return value || "사유 없음";
+  if (value) return `기록된 사유: ${value}`;
+
+  const reasonPresent = item.safeMetadata.find((meta) => meta.label.toLowerCase() === "reasonpresent");
+  if (reasonPresent?.value.toLowerCase() === "true") return "사유가 기록되어 있습니다.";
+
+  const reasonCategory = item.safeMetadata.find((meta) => meta.label.toLowerCase() === "reasoncategory");
+  if (reasonCategory?.value.trim()) return "사유 분류가 기록되어 있습니다.";
+
+  return "기록된 사유 정보가 없습니다.";
 }
 
 export function formatAdminAuditOccurredAt(value: string): string {
@@ -168,11 +187,41 @@ export function formatAdminAuditOccurredAt(value: string): string {
 }
 
 export function formatAdminAuditLedgerSentenceBody(item: AdminAuditLedgerItem): string {
-  return `${adminAuditActorPrimaryLabel(item.actor)}가 ${item.target.label}에 ${item.summary} · 사유: ${adminAuditReasonLabel(item)} · ${auditOutcomeLabel(item.outcome)}`;
+  const row = buildAdminAuditLedgerRow(item);
+  return `${row.actor} · ${row.action} · ${row.result}`;
 }
 
 export function formatAdminAuditLedgerSentence(item: AdminAuditLedgerItem): string {
-  return `${formatAdminAuditOccurredAt(item.occurredAt)} · ${formatAdminAuditLedgerSentenceBody(item)}`;
+  const row = buildAdminAuditLedgerRow(item);
+  return `${row.occurredAt} · ${row.actor} · ${row.action} · ${row.result}`;
+}
+
+export function buildAdminAuditLedgerRow(item: AdminAuditLedgerItem): AdminAuditLedgerRow {
+  return {
+    occurredAt: formatAdminAuditOccurredAt(item.occurredAt),
+    actor: adminAuditActorPrimaryLabel(item.actor),
+    action: `${adminAuditTargetPrimaryLabel(item)}에 ${item.summary}`,
+    result: isPendingConvergenceAuditItem(item) ? "진행 중" : labelAdminAuditOutcome(item.outcome),
+  };
+}
+
+export function adminAuditTargetPrimaryLabel(item: AdminAuditLedgerItem): string {
+  const label = item.target.label.trim();
+  if (label === "AI job") return "AI 작업";
+  if (label === "Replay preview") return "알림 재처리 대상";
+  if (label && !isAuditIdentifierLabel(item, label)) return label;
+  if (item.target.jobId) return "AI 작업";
+  if (item.target.userId) return "대상 사용자";
+  if (item.target.clubId) return "대상 클럽";
+  if (item.target.eventId) return "대상 이벤트";
+  return "대상";
+}
+
+export function isAdminAuditTechnicalMetadata(entry: { label: string; kind: string }): boolean {
+  const label = entry.label.toLowerCase();
+  const kind = entry.kind.toLowerCase();
+  return kind === "id" || kind === "reference" || kind === "fingerprint"
+    || label.endsWith("id") || label.includes("hash");
 }
 
 export function labelAdminAuditOutcome(outcome: AdminAuditOutcome): string {
@@ -282,6 +331,26 @@ export function buildAdminAuditOperationSummary(item: AdminAuditLedgerItem): Adm
     nextLabel: null,
   };
 }
+
+function isPendingConvergenceAuditItem(item: AdminAuditLedgerItem): boolean {
+  if (!CONVERGENCE_SOURCE_TABLES.has(item.sourceTable)) return false;
+  return item.safeMetadata.some((entry) => {
+    const label = entry.label.toLowerCase();
+    return (label === "state" || label === "outcome") && entry.value === "PENDING";
+  });
+}
+
+function isAuditIdentifierLabel(item: AdminAuditLedgerItem, label: string): boolean {
+  return [item.id, item.target.clubId, item.target.userId, item.target.jobId, item.target.eventId]
+    .some((identifier) => identifier != null && identifier === label);
+}
+
+const CONVERGENCE_SOURCE_TABLES = new Set([
+  "platform_admin_club_command_convergence_events",
+  "admin_service_command_convergence_events:notification",
+  "admin_service_command_convergence_events:ai",
+  "public_convergence_events",
+]);
 
 function enumParam<T extends string>(value: string | null, allowed: readonly T[]): T | null {
   return value && allowed.includes(value as T) ? (value as T) : null;

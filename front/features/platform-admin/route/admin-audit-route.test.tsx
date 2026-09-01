@@ -205,4 +205,12 @@ describe("AdminAuditRoute", () => {
     await user.click(screen.getByRole("button", { name: "이어 불러오기 재시도" }));
     expect(await screen.findByRole("button", { name: /복구 이벤트/ })).toBeInTheDocument();
   });
+
+  it("describes an unavailable ledger in operator language while preserving the source filter", async () => {
+    vi.mocked(fetchAdminAuditLedger).mockRejectedValueOnce(new Error("unavailable"));
+    renderRoute("/admin/audit?sourceSlice=S5");
+
+    expect(await screen.findByText("처리 기록을 불러오지 못했습니다. 다시 시도해 주세요.")).toBeInTheDocument();
+    expect(fetchAdminAuditLedger).toHaveBeenCalledWith({ range: "7d", sourceSlice: "S5" }, undefined);
+  });
 });

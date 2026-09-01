@@ -3,8 +3,11 @@ import {
   adminAuditFiltersFromSearchParams,
   adminAuditSearchFromFilters,
   aiOpsDrilldownForAuditItem,
+  buildAdminAuditLedgerRow,
   buildAdminAuditOperationSummary,
+  formatAdminAuditOccurredAt,
   formatAdminAuditLedgerSentence,
+  adminAuditReasonLabel,
   adminAuditActorPrimaryLabel,
   mergeAdminAuditLedgerPages,
   labelAdminAuditOutcome,
@@ -122,25 +125,63 @@ function auditItem(overrides: Partial<AdminAuditLedgerItem> = {}): AdminAuditLed
 }
 
 describe("formatAdminAuditLedgerSentence", () => {
-  it("renders one sentence with 사유 없음 when reason metadata is absent", () => {
-    const sentence = formatAdminAuditLedgerSentence(auditItem({
+  it("renders the exact time, actor, target action, and result order without primary identifiers", () => {
+    const item = auditItem({
       actor: { userId: "admin-1", role: "OWNER", displayLabel: "OWNER" },
       target: { clubId: "club-1", userId: null, jobId: null, eventId: "preview-1", label: "Replay preview" },
       summary: "알림 재처리가 확정되었습니다.",
       outcome: "SUCCESS",
-      safeMetadata: [{ label: "selectionHashPrefix", value: "aaaaaaaa", kind: "fingerprint" }],
-    }));
+      safeMetadata: [
+        { label: "receiptId", value: "receipt-1", kind: "id" },
+        { label: "selectionHashPrefix", value: "aaaaaaaa", kind: "fingerprint" },
+      ],
+    });
 
-    expect(sentence).toContain("소유자가 Replay preview에 알림 재처리가 확정되었습니다.");
-    expect(sentence).not.toContain("OWNER");
-    expect(sentence).toContain("사유: 사유 없음");
-    expect(sentence).toContain("완료");
-    expect(sentence).not.toContain("preview-1");
-    expect(sentence).not.toContain("ADMIN_AI_OPS_RETRY_COMMIT");
+    expect(buildAdminAuditLedgerRow(item)).toEqual({
+      occurredAt: formatAdminAuditOccurredAt(item.occurredAt),
+      actor: "소유자",
+      action: "알림 재처리 대상에 알림 재처리가 확정되었습니다.",
+      result: "완료",
+    });
+    expect(formatAdminAuditLedgerSentence(item)).toBe(
+      `${formatAdminAuditOccurredAt(item.occurredAt)} · 소유자 · 알림 재처리 대상에 알림 재처리가 확정되었습니다. · 완료`,
+    );
+    expect(formatAdminAuditLedgerSentence(item)).not.toContain("OWNER");
+    expect(formatAdminAuditLedgerSentence(item)).not.toContain("사유");
+    expect(formatAdminAuditLedgerSentence(item)).not.toContain("preview-1");
+    expect(formatAdminAuditLedgerSentence(item)).not.toContain("receipt-1");
+    expect(formatAdminAuditLedgerSentence(item)).not.toContain("ADMIN_AI_OPS_RETRY_COMMIT");
   });
 
-  it("labels a DENIED outcome as 차단", () => {
-    expect(formatAdminAuditLedgerSentence(auditItem({ outcome: "DENIED" }))).toContain("차단");
+  it("uses 진행 중 only for an actual convergence PENDING source", () => {
+    const convergence = auditItem({
+      sourceTable: "admin_service_command_convergence_events:ai",
+      outcome: "PREPARED",
+      safeMetadata: [{ label: "state", value: "PENDING", kind: "code" }],
+    });
+    const ordinaryPrepared = auditItem({
+      sourceTable: "ai_generation_audit_log",
+      outcome: "PREPARED",
+      safeMetadata: [{ label: "status", value: "PENDING", kind: "code" }],
+    });
+    const convergenceWithoutPending = auditItem({
+      sourceTable: "public_convergence_events",
+      outcome: "PREPARED",
+      safeMetadata: [{ label: "state", value: "SUCCEEDED", kind: "code" }],
+    });
+
+    expect(buildAdminAuditLedgerRow(convergence).result).toBe("진행 중");
+    expect(buildAdminAuditLedgerRow(ordinaryPrepared).result).toBe("실행 전 준비됨");
+    expect(buildAdminAuditLedgerRow(convergenceWithoutPending).result).toBe("실행 전 준비됨");
+  });
+
+  it("states when no reason information was recorded without inventing one", () => {
+    expect(adminAuditReasonLabel(auditItem())).toBe("기록된 사유 정보가 없습니다.");
+    expect(
+      adminAuditReasonLabel(
+        auditItem({ safeMetadata: [{ label: "reasonRedacted", value: "true", kind: "boolean" }] }),
+      ),
+    ).toBe("사유 내용은 보호되어 표시되지 않습니다.");
   });
 });
 
