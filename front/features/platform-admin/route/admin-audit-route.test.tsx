@@ -15,18 +15,25 @@ vi.mock("@/features/platform-admin/api/platform-admin-audit-api", () => ({
   searchAdminAuditLedger: vi.fn(),
 }));
 
-function item(id: string, summary = id): AdminAuditLedgerItem {
+function item(id: string, actionType = "AI_COMMAND_RETRY_COMMIT"): AdminAuditLedgerItem {
+  const actionCategory = actionType.startsWith("CLUB_")
+    ? "CLUB_LIFECYCLE"
+    : actionType.startsWith("SUPPORT_")
+      ? "SUPPORT"
+      : actionType.startsWith("ADMIN_NOTIFICATION_")
+        ? "NOTIFICATION"
+        : "AI_OPS";
   return {
     id,
     occurredAt: "2026-08-25T00:00:00Z",
-    sourceSlice: "S6",
+    sourceSlice: actionCategory === "CLUB_LIFECYCLE" ? "S3" : actionCategory === "SUPPORT" ? "S4" : actionCategory === "NOTIFICATION" ? "S5" : "S6",
     sourceTable: "platform_audit_events",
-    actionCategory: "AI_OPS",
-    actionType: "ADMIN_AI_OPS_RETRY_COMMIT",
+    actionCategory,
+    actionType,
     outcome: "SUCCESS",
     actor: { userId: "admin-1", role: "OWNER", displayLabel: "OWNER" },
-    target: { clubId: "club-1", userId: null, jobId: "job-1", eventId: null, label: "AI job" },
-    summary,
+    target: { clubId: "club-1", userId: null, jobId: actionCategory === "AI_OPS" ? "job-1" : null, eventId: null, label: actionCategory === "AI_OPS" ? "AI job" : "club-1" },
+    summary: id,
     safeMetadata: [],
     metadataState: "AVAILABLE",
   };
@@ -73,24 +80,24 @@ function renderRoute(initialEntry = "/admin/audit?sourceSlice=S6") {
 }
 
 beforeEach(() => {
-  vi.mocked(fetchAdminAuditLedger).mockReset().mockResolvedValue(page([item("event-1", "첫 이벤트")], null));
-  vi.mocked(searchAdminAuditLedger).mockReset().mockResolvedValue(page([item("private-hit", "검색 결과")], null));
+  vi.mocked(fetchAdminAuditLedger).mockReset().mockResolvedValue(page([item("event-1")], null));
+  vi.mocked(searchAdminAuditLedger).mockReset().mockResolvedValue(page([item("private-hit", "ADMIN_NOTIFICATION_REPLAY_CONFIRMED")], null));
 });
 
 describe("AdminAuditRoute", () => {
   it("loads additional pages, deduplicates their boundary, and keeps the selected row", async () => {
     vi.mocked(fetchAdminAuditLedger)
-      .mockResolvedValueOnce(page([item("event-1", "첫 이벤트"), item("boundary", "경계 이벤트")], "cursor-1", ["source-a"]))
-      .mockResolvedValueOnce(page([item("boundary", "경계 이벤트"), item("event-2", "다음 이벤트")], null, ["source-a"]));
+      .mockResolvedValueOnce(page([item("event-1"), item("boundary", "CLUB_ACTIVATED")], "cursor-1", ["source-a"]))
+      .mockResolvedValueOnce(page([item("boundary", "CLUB_ACTIVATED"), item("event-2", "SUPPORT_ACCESS_GRANT_REVOKED")], null, ["source-a"]));
     const user = userEvent.setup();
     const { container } = renderRoute();
 
-    await user.click(await screen.findByRole("button", { name: /경계 이벤트/ }));
+    await user.click(await screen.findByRole("button", { name: /클럽을 활성화했습니다/ }));
     await user.click(screen.getByRole("button", { name: "더 보기" }));
 
-    await screen.findByRole("button", { name: /다음 이벤트/ });
-    expect(screen.getAllByRole("button", { name: /경계 이벤트/ })).toHaveLength(1);
-    expect(screen.getByRole("region", { name: "감사 이벤트 상세" })).toHaveTextContent("경계 이벤트");
+    await screen.findByRole("button", { name: /지원 접근 권한을 회수했습니다/ });
+    expect(screen.getAllByRole("button", { name: /클럽을 활성화했습니다/ })).toHaveLength(1);
+    expect(screen.getByRole("region", { name: "감사 이벤트 상세" })).toHaveTextContent("클럽을 활성화했습니다");
     expect(screen.getByLabelText("location")).toHaveTextContent("event=boundary");
     expect(screen.getByLabelText("location")).toHaveTextContent("mode=detail");
     expect(fetchAdminAuditLedger).toHaveBeenLastCalledWith(
@@ -112,7 +119,7 @@ describe("AdminAuditRoute", () => {
     await user.type(input, "private.member@example.com");
     await user.click(screen.getByRole("button", { name: "대상 검색" }));
 
-    await screen.findByRole("button", { name: /검색 결과/ });
+    await screen.findByRole("button", { name: /알림 재처리를 확정했습니다/ });
     expect(searchAdminAuditLedger).toHaveBeenCalledWith(
       { range: "7d", sourceSlice: "S6" },
       "private.member@example.com",
@@ -129,7 +136,7 @@ describe("AdminAuditRoute", () => {
     const { queryClient } = renderRoute();
     await user.type(await screen.findByRole("searchbox", { name: "민감 대상 검색" }), "private@example.com");
     await user.click(screen.getByRole("button", { name: "대상 검색" }));
-    await screen.findByRole("button", { name: /검색 결과/ });
+    await screen.findByRole("button", { name: /알림 재처리를 확정했습니다/ });
 
     act(() => {
       queryClient.setQueryData(platformAdminKeys.capabilities(), {
@@ -142,7 +149,7 @@ describe("AdminAuditRoute", () => {
     });
 
     await waitFor(() => expect(screen.queryByRole("searchbox", { name: "민감 대상 검색" })).not.toBeInTheDocument());
-    expect(screen.queryByRole("button", { name: /검색 결과/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /알림 재처리를 확정했습니다/ })).not.toBeInTheDocument();
     const sensitiveCache = queryClient.getQueriesData({ queryKey: [...platformAdminAuditKeys.all, "sensitive"] });
     expect(JSON.stringify(sensitiveCache)).not.toContain("private@example.com");
     expect(sensitiveCache.every(([key]) => (key as readonly unknown[]).at(-1) === 0)).toBe(true);
@@ -153,16 +160,16 @@ describe("AdminAuditRoute", () => {
     const user = userEvent.setup();
     renderRoute("/admin/audit?sourceSlice=S6&event=event-1&mode=detail");
 
-    expect(await screen.findByRole("button", { name: /첫 이벤트/ })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("button", { name: /AI 작업 반영을 다시 시도했습니다/ })).toHaveAttribute("aria-pressed", "true");
     const detail = screen.getByRole("region", { name: "감사 이벤트 상세" });
-    expect(detail).toHaveTextContent("첫 이벤트");
+    expect(detail).toHaveTextContent("AI 작업 반영을 다시 시도했습니다");
     expect(document.querySelector(".admin-audit__body")).toHaveAttribute("data-detail-open", "true");
 
     await user.click(screen.getByRole("button", { name: "목록으로" }));
 
     expect(screen.getByLabelText("location")).toHaveTextContent("event=event-1");
     expect(screen.getByLabelText("location")).not.toHaveTextContent("mode=detail");
-    expect(screen.getByRole("button", { name: /첫 이벤트/ })).toHaveFocus();
+    expect(screen.getByRole("button", { name: /AI 작업 반영을 다시 시도했습니다/ })).toHaveFocus();
     expect(document.querySelector(".admin-audit__body")).toHaveAttribute("data-detail-open", "false");
   });
 
@@ -171,7 +178,7 @@ describe("AdminAuditRoute", () => {
     const { queryClient } = renderRoute();
     await user.type(await screen.findByRole("searchbox", { name: "민감 대상 검색" }), "private.member@example.com");
     await user.click(screen.getByRole("button", { name: "대상 검색" }));
-    await user.click(await screen.findByRole("button", { name: /검색 결과/ }));
+    await user.click(await screen.findByRole("button", { name: /알림 재처리를 확정했습니다/ }));
 
     expect(screen.getByLabelText("location")).toHaveTextContent("event=private-hit");
     expect(screen.getByLabelText("location")).not.toHaveTextContent("private.member@example.com");
@@ -192,18 +199,18 @@ describe("AdminAuditRoute", () => {
 
   it("retains prior rows and offers a focused retry when load more fails", async () => {
     vi.mocked(fetchAdminAuditLedger)
-      .mockResolvedValueOnce(page([item("event-1", "보존 이벤트")], "cursor-1"))
+      .mockResolvedValueOnce(page([item("event-1", "CLUB_SUSPENDED")], "cursor-1"))
       .mockRejectedValueOnce(new Error("continuation unavailable"))
-      .mockResolvedValueOnce(page([item("event-2", "복구 이벤트")], null));
+      .mockResolvedValueOnce(page([item("event-2", "CLUB_RESTORED")], null));
     const user = userEvent.setup();
     renderRoute();
-    await screen.findByRole("button", { name: /보존 이벤트/ });
+    await screen.findByRole("button", { name: /클럽을 일시 중지했습니다/ });
     await user.click(screen.getByRole("button", { name: "더 보기" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("기존 기록은 유지되었습니다");
-    expect(screen.getByRole("button", { name: /보존 이벤트/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /클럽을 일시 중지했습니다/ })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "이어 불러오기 재시도" }));
-    expect(await screen.findByRole("button", { name: /복구 이벤트/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /클럽을 복구했습니다/ })).toBeInTheDocument();
   });
 
   it("describes an unavailable ledger in operator language while preserving the source filter", async () => {

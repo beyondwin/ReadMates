@@ -12,6 +12,8 @@ import {
   mergeAdminAuditLedgerPages,
   labelAdminAuditOutcome,
   labelAdminAuditActorRole,
+  labelAdminAuditActionCategory,
+  labelAdminAuditSourceSlice,
   shouldShowAdminAuditDetailValue,
 } from "./platform-admin-audit-model";
 import type { AdminAuditLedgerItem } from "./platform-admin-audit-model";
@@ -72,6 +74,32 @@ describe("platform-admin-audit-model", () => {
     ]);
   });
 
+  it("translates every visible filter option while preserving the wire enum separately", () => {
+    expect(([
+      "NOTIFICATION",
+      "SUPPORT",
+      "CLUB_LIFECYCLE",
+      "AI_OPS",
+      "AUTH_SECURITY",
+      "PLATFORM_ADMIN",
+    ] as const).map(labelAdminAuditActionCategory)).toEqual([
+      "알림",
+      "지원 접근",
+      "클럽 운영",
+      "AI 작업",
+      "인증·보안",
+      "플랫폼 운영",
+    ]);
+    expect((["S3", "S4", "S5", "S6", "PLATFORM", "CLUB"] as const).map(labelAdminAuditSourceSlice)).toEqual([
+      "클럽 운영",
+      "지원 접근",
+      "알림",
+      "AI 작업",
+      "플랫폼",
+      "클럽",
+    ]);
+  });
+
   it("preserves every nonempty human actor label and translates only exact role fallbacks", () => {
     expect(adminAuditActorPrimaryLabel({ role: "OWNER", displayLabel: "OWNER" })).toBe("소유자");
     expect(adminAuditActorPrimaryLabel({ role: "OPERATOR", displayLabel: "운영 담당자" })).toBe("운영 담당자 · 운영자");
@@ -113,7 +141,7 @@ function auditItem(overrides: Partial<AdminAuditLedgerItem> = {}): AdminAuditLed
     sourceSlice: "S6",
     sourceTable: "platform_audit_events",
     actionCategory: "AI_OPS",
-    actionType: "ADMIN_AI_OPS_RETRY_COMMIT",
+    actionType: "AI_COMMAND_RETRY_COMMIT",
     outcome: "SUCCESS",
     actor: { userId: "admin-1", role: "OWNER", displayLabel: "OWNER" },
     target: { clubId: "club-1", userId: null, jobId: "job-1", eventId: null, label: "AI job" },
@@ -127,6 +155,9 @@ function auditItem(overrides: Partial<AdminAuditLedgerItem> = {}): AdminAuditLed
 describe("formatAdminAuditLedgerSentence", () => {
   it("renders the exact time, actor, target action, and result order without primary identifiers", () => {
     const item = auditItem({
+      sourceSlice: "S5",
+      actionCategory: "NOTIFICATION",
+      actionType: "ADMIN_NOTIFICATION_REPLAY_CONFIRMED",
       actor: { userId: "admin-1", role: "OWNER", displayLabel: "OWNER" },
       target: { clubId: "club-1", userId: null, jobId: null, eventId: "preview-1", label: "Replay preview" },
       summary: "알림 재처리가 확정되었습니다.",
@@ -140,17 +171,97 @@ describe("formatAdminAuditLedgerSentence", () => {
     expect(buildAdminAuditLedgerRow(item)).toEqual({
       occurredAt: formatAdminAuditOccurredAt(item.occurredAt),
       actor: "소유자",
-      action: "알림 재처리 대상에 알림 재처리가 확정되었습니다.",
+      action: "알림 재처리 대상에 알림 재처리를 확정했습니다.",
       result: "완료",
     });
     expect(formatAdminAuditLedgerSentence(item)).toBe(
-      `${formatAdminAuditOccurredAt(item.occurredAt)} · 소유자 · 알림 재처리 대상에 알림 재처리가 확정되었습니다. · 완료`,
+      `${formatAdminAuditOccurredAt(item.occurredAt)} · 소유자 · 알림 재처리 대상에 알림 재처리를 확정했습니다. · 완료`,
     );
     expect(formatAdminAuditLedgerSentence(item)).not.toContain("OWNER");
     expect(formatAdminAuditLedgerSentence(item)).not.toContain("사유");
     expect(formatAdminAuditLedgerSentence(item)).not.toContain("preview-1");
     expect(formatAdminAuditLedgerSentence(item)).not.toContain("receipt-1");
-    expect(formatAdminAuditLedgerSentence(item)).not.toContain("ADMIN_AI_OPS_RETRY_COMMIT");
+    expect(formatAdminAuditLedgerSentence(item)).not.toContain("AI_COMMAND_RETRY_COMMIT");
+  });
+
+  it("maps representative server-shaped audit evidence without using raw summaries as primary copy", () => {
+    const supportDomain = auditItem({
+      sourceSlice: "S4",
+      sourceTable: "platform_admin_support_command_receipts",
+      actionCategory: "SUPPORT",
+      actionType: "SUPPORT_ACCESS_GRANT_CREATED",
+      target: { clubId: "club-1", userId: null, jobId: null, eventId: "receipt-1", label: "사용자 숨김" },
+      summary: "SUPPORT 감사 증거가 기록되었습니다.",
+      safeMetadata: [{ label: "scope", value: "METADATA_READ", kind: "code" }],
+    });
+    const supportPlatform = auditItem({
+      sourceSlice: "S4",
+      sourceTable: "platform_audit_events",
+      actionCategory: "SUPPORT",
+      actionType: "SUPPORT_ACCESS_GRANT_CREATED",
+      target: { clubId: "club-1", userId: null, jobId: null, eventId: null, label: "사용자 숨김" },
+      summary: "support grant가 생성되었습니다.",
+    });
+    const replayPreview = auditItem({
+      sourceSlice: "S5",
+      sourceTable: "admin_notification_replay_previews",
+      actionCategory: "NOTIFICATION",
+      actionType: "ADMIN_NOTIFICATION_REPLAY_PREVIEW_PREPARED",
+      target: { clubId: "club-1", userId: null, jobId: null, eventId: "preview-1", label: "Replay preview" },
+      summary: "알림 재처리 대상이 미리 확인되었습니다.",
+      outcome: "PREPARED",
+    });
+    const platformAdmin = auditItem({
+      sourceSlice: "PLATFORM",
+      sourceTable: "platform_audit_events",
+      actionCategory: "PLATFORM_ADMIN",
+      actionType: "ADMIN_CLUB_METADATA_UPDATED",
+      target: { clubId: "club-1", userId: null, jobId: null, eventId: null, label: "대상 없음" },
+      summary: "platform admin 이벤트가 기록되었습니다.",
+    });
+
+    expect(buildAdminAuditLedgerRow(supportDomain).action).toBe("지원 접근 대상에 지원 접근 권한을 부여했습니다.");
+    expect(buildAdminAuditLedgerRow(supportPlatform).action).toBe("지원 접근 대상에 지원 접근 권한을 부여했습니다.");
+    expect(buildAdminAuditLedgerRow(replayPreview).action).toBe("알림 재처리 대상에 재처리 대상을 미리 확인했습니다.");
+    expect(buildAdminAuditLedgerRow(platformAdmin).action).toBe("대상 클럽에 클럽 기본 정보를 수정했습니다.");
+    for (const item of [supportDomain, supportPlatform, replayPreview, platformAdmin]) {
+      expect(buildAdminAuditLedgerRow(item).action).not.toContain(item.summary);
+    }
+  });
+
+  it.each([
+    ["ADMIN_NOTIFICATION_REPLAY_PREVIEW_PREPARED", "PREPARED", "재처리 대상을 미리 확인했습니다."],
+    ["ADMIN_NOTIFICATION_REPLAY_PREVIEW_CONSUMED", "SUCCESS", "재처리 미리보기를 사용했습니다."],
+    ["ADMIN_NOTIFICATION_REPLAY_PREVIEW_LEGACY", "UNKNOWN", "이전 재처리 미리보기 증거를 기록했습니다."],
+  ] as const)("maps server preview variant %s", (actionType, outcome, expectedAction) => {
+    const item = auditItem({
+      sourceSlice: "S5",
+      sourceTable: "admin_notification_replay_previews",
+      actionCategory: "NOTIFICATION",
+      actionType,
+      outcome,
+      target: { clubId: "club-1", userId: null, jobId: null, eventId: "preview-1", label: "Replay preview" },
+      summary: "알림 재처리 preview 증거가 기록되었습니다.",
+    });
+
+    expect(buildAdminAuditLedgerRow(item).action).toBe(`알림 재처리 대상에 ${expectedAction}`);
+    expect(buildAdminAuditLedgerRow(item).action).not.toContain("preview");
+  });
+
+  it("fails closed for unknown action evidence and never promotes its raw summary", () => {
+    const unknown = auditItem({
+      sourceSlice: "PLATFORM",
+      sourceTable: "platform_audit_events",
+      actionCategory: "PLATFORM_ADMIN",
+      actionType: "FUTURE_UNRECOGNIZED_ACTION",
+      target: { clubId: null, userId: null, jobId: null, eventId: null, label: "대상 없음" },
+      summary: "future raw summary MUST_NOT_BE_PRIMARY",
+      outcome: "UNKNOWN",
+    });
+
+    expect(buildAdminAuditLedgerRow(unknown).action).toBe("플랫폼 운영 대상의 처리 내용을 확인해야 합니다.");
+    expect(formatAdminAuditLedgerSentence(unknown)).not.toContain("future raw summary");
+    expect(formatAdminAuditLedgerSentence(unknown)).not.toContain("FUTURE_UNRECOGNIZED_ACTION");
   });
 
   it("uses 진행 중 only for an actual convergence PENDING source", () => {

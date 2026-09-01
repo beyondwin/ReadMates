@@ -197,30 +197,59 @@ export function formatAdminAuditLedgerSentence(item: AdminAuditLedgerItem): stri
 }
 
 export function buildAdminAuditLedgerRow(item: AdminAuditLedgerItem): AdminAuditLedgerRow {
+  const target = adminAuditTargetPrimaryLabel(item);
+  const action = adminAuditActionPrimaryLabel(item);
   return {
     occurredAt: formatAdminAuditOccurredAt(item.occurredAt),
     actor: adminAuditActorPrimaryLabel(item.actor),
-    action: `${adminAuditTargetPrimaryLabel(item)}에 ${item.summary}`,
+    action: action ? `${target}에 ${action}` : `${target}의 처리 내용을 확인해야 합니다.`,
     result: isPendingConvergenceAuditItem(item) ? "진행 중" : labelAdminAuditOutcome(item.outcome),
   };
 }
 
 export function adminAuditTargetPrimaryLabel(item: AdminAuditLedgerItem): string {
+  if (item.actionType.startsWith("SUPPORT_ACCESS_GRANT_")) return "지원 접근 대상";
+  if (item.actionType.startsWith("ADMIN_NOTIFICATION_REPLAY_")) return "알림 재처리 대상";
+  if (item.actionType === "EMERGENCY_PUBLIC_TAKEDOWN_CONFIRMED"
+    || item.actionType === "PUBLIC_TAKEDOWN_CONVERGENCE") return "공개 기록";
+  if (item.actionType.startsWith("OPERATION_CASE_")) return "운영 케이스";
+  if (item.actionType.startsWith("CLUB_") || item.actionType === "ADMIN_CLUB_METADATA_UPDATED") return "대상 클럽";
+  if (item.actionType.startsWith("AI_") || item.actionCategory === "AI_OPS") return "AI 작업";
+
   const label = item.target.label.trim();
   if (label === "AI job") return "AI 작업";
   if (label === "Replay preview") return "알림 재처리 대상";
-  if (label && !isAuditIdentifierLabel(item, label)) return label;
+  if (label && label !== "대상 없음" && !isAuditIdentifierLabel(item, label)) return label;
   if (item.target.jobId) return "AI 작업";
   if (item.target.userId) return "대상 사용자";
   if (item.target.clubId) return "대상 클럽";
   if (item.target.eventId) return "대상 이벤트";
+  if (item.actionCategory === "PLATFORM_ADMIN") return "플랫폼 운영 대상";
+  if (item.actionCategory === "AUTH_SECURITY") return "인증·보안 대상";
+  if (item.actionCategory === "NOTIFICATION") return "알림 처리 대상";
+  if (item.actionCategory === "SUPPORT") return "지원 접근 대상";
+  if (item.actionCategory === "CLUB_LIFECYCLE") return "대상 클럽";
   return "대상";
+}
+
+export function adminAuditActionPrimaryLabel(item: AdminAuditLedgerItem): string | null {
+  const exact = ADMIN_AUDIT_ACTION_LABELS[item.actionType];
+  if (exact) return exact;
+  if (item.actionType.startsWith("OPERATION_CASE_")) return "운영 케이스 상태를 기록했습니다.";
+  if (item.actionType.startsWith("CLUB_COMMAND_")) return "클럽 운영 명령을 기록했습니다.";
+  if (item.actionType.startsWith("CLUB_CONVERGENCE_")) return "클럽 운영 반영 상태를 기록했습니다.";
+  if (item.actionType.startsWith("AI_COMMAND_")) return "AI 작업 명령을 기록했습니다.";
+  if (item.actionType.startsWith("SERVICE_CONVERGENCE_")) {
+    if (item.actionCategory === "NOTIFICATION") return "알림 처리 반영 상태를 기록했습니다.";
+    if (item.actionCategory === "AI_OPS") return "AI 작업 반영 상태를 기록했습니다.";
+  }
+  return null;
 }
 
 export function isAdminAuditTechnicalMetadata(entry: { label: string; kind: string }): boolean {
   const label = entry.label.toLowerCase();
   const kind = entry.kind.toLowerCase();
-  return kind === "id" || kind === "reference" || kind === "fingerprint"
+  return kind === "id" || kind === "reference" || kind === "fingerprint" || kind === "code" || kind === "boolean"
     || label.endsWith("id") || label.includes("hash");
 }
 
@@ -237,6 +266,17 @@ export function labelAdminAuditSourceSlice(sourceSlice: AdminAuditSourceSlice): 
     PLATFORM: "플랫폼",
     CLUB: "클럽",
   }[sourceSlice];
+}
+
+export function labelAdminAuditActionCategory(category: AdminAuditActionCategory): string {
+  return {
+    NOTIFICATION: "알림",
+    SUPPORT: "지원 접근",
+    CLUB_LIFECYCLE: "클럽 운영",
+    AI_OPS: "AI 작업",
+    AUTH_SECURITY: "인증·보안",
+    PLATFORM_ADMIN: "플랫폼 운영",
+  }[category];
 }
 
 export function labelAdminAuditActorRole(role: AdminAuditActorRole): string {
@@ -351,6 +391,26 @@ const CONVERGENCE_SOURCE_TABLES = new Set([
   "admin_service_command_convergence_events:ai",
   "public_convergence_events",
 ]);
+
+const ADMIN_AUDIT_ACTION_LABELS: Readonly<Record<string, string>> = {
+  SUPPORT_ACCESS_GRANT_CREATED: "지원 접근 권한을 부여했습니다.",
+  SUPPORT_ACCESS_GRANT_REVOKED: "지원 접근 권한을 회수했습니다.",
+  ADMIN_NOTIFICATION_REPLAY_CONFIRMED: "알림 재처리를 확정했습니다.",
+  ADMIN_NOTIFICATION_REPLAY_PREVIEW_PREPARED: "재처리 대상을 미리 확인했습니다.",
+  ADMIN_NOTIFICATION_REPLAY_PREVIEW_CONSUMED: "재처리 미리보기를 사용했습니다.",
+  ADMIN_NOTIFICATION_REPLAY_PREVIEW_LEGACY: "이전 재처리 미리보기 증거를 기록했습니다.",
+  EMERGENCY_PUBLIC_TAKEDOWN_CONFIRMED: "긴급 공개 회수의 원본 차단을 기록했습니다.",
+  PUBLIC_TAKEDOWN_CONVERGENCE: "긴급 공개 회수의 반영 상태를 기록했습니다.",
+  CLUB_ACTIVATED: "클럽을 활성화했습니다.",
+  CLUB_SUSPENDED: "클럽을 일시 중지했습니다.",
+  CLUB_RESTORED: "클럽을 복구했습니다.",
+  CLUB_ARCHIVED: "클럽을 보관 처리했습니다.",
+  ADMIN_CLUB_METADATA_UPDATED: "클럽 기본 정보를 수정했습니다.",
+  AI_GENERATION_AUDIT: "AI 작업 감사 증거를 기록했습니다.",
+  AI_COMMAND_RETRY_COMMIT: "AI 작업 반영을 다시 시도했습니다.",
+  AI_COMMAND_FORCE_CANCEL: "AI 작업을 강제로 중단했습니다.",
+  FEEDBACK_DOCUMENT_PUBLISHED: "피드백 문서 공개를 기록했습니다.",
+};
 
 function enumParam<T extends string>(value: string | null, allowed: readonly T[]): T | null {
   return value && allowed.includes(value as T) ? (value as T) : null;

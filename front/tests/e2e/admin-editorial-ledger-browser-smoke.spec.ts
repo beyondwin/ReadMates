@@ -115,9 +115,9 @@ test("Audit URL owns the review docket", async ({ page }) => {
   await page.goto("/admin/audit");
   await expectReducedMotion(page);
 
-  await expect(page.getByRole("heading", { name: "운영 기입" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "운영 처리 기록" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
-  await page.getByRole("button", { name: /support grant가 생성되었습니다/ }).click();
+  await page.getByRole("button", { name: /지원 접근 권한을 부여했습니다/ }).click();
   await expect(page).toHaveURL(/event=platform_audit_events%3Aevent-2|event=platform_audit_events:event-2/);
   await expect(page).toHaveURL(/mode=detail/);
   await expect(page.getByRole("region", { name: "감사 이벤트 상세" })).toBeVisible();
@@ -127,7 +127,7 @@ test("Audit URL owns the review docket", async ({ page }) => {
   await expectMinimumTargetSize(back);
   await back.click();
   await expect(page).not.toHaveURL(/mode=detail/);
-  await expect(page.getByRole("button", { name: /support grant가 생성되었습니다/ })).toBeFocused();
+  await expect(page.getByRole("button", { name: /지원 접근 권한을 부여했습니다/ })).toBeFocused();
 });
 
 test("Notifications L2 replay requires exact REPLAY_NOTIFICATIONS", async ({ page }) => {

@@ -4,11 +4,15 @@ import { ADMIN_COPY, auditOutcomeLabel } from "@/features/platform-admin/model/a
 import {
   buildAdminAuditOperationSummary,
   adminAuditActorPrimaryLabel,
+  adminAuditActionPrimaryLabel,
   adminAuditReasonLabel,
   adminAuditTargetPrimaryLabel,
   buildAdminAuditLedgerRow,
   formatAdminAuditOccurredAt,
   isAdminAuditTechnicalMetadata,
+  labelAdminAuditActionCategory,
+  labelAdminAuditActorRole,
+  labelAdminAuditSourceSlice,
   shouldShowAdminAuditDetailValue,
   type AdminAuditActionCategory,
   type AdminAuditActorRole,
@@ -136,9 +140,9 @@ export function AdminAuditLedger({
                 <label>시작 시각<input type="datetime-local" value={toLocalDateTime(filters.from)} onChange={(event) => onFilterChange({ ...filters, from: toUtcInstant(event.currentTarget.value), range: undefined })} /></label>
                 <label>종료 시각<input type="datetime-local" value={toLocalDateTime(filters.to)} onChange={(event) => onFilterChange({ ...filters, to: toUtcInstant(event.currentTarget.value), range: undefined })} /></label>
                 <label>클럽 ID<input value={filters.clubId ?? ""} onChange={(event) => onFilterChange({ ...filters, clubId: event.currentTarget.value || null })} /></label>
-                <FilterSelect label="행위자 역할" value={filters.actorRole} values={ACTOR_ROLES} onChange={(value) => onFilterChange({ ...filters, actorRole: value as AdminAuditActorRole | null })} />
-                <FilterSelect label="소스 영역" value={filters.sourceSlice} values={SOURCE_SLICES} onChange={(value) => onFilterChange({ ...filters, sourceSlice: value as AdminAuditSourceSlice | null })} />
-                <FilterSelect label="행동 분류" value={filters.actionCategory} values={ACTION_CATEGORIES} onChange={(value) => onFilterChange({ ...filters, actionCategory: value as AdminAuditActionCategory | null })} />
+                <FilterSelect label="행위자 역할" value={filters.actorRole} values={ACTOR_ROLES} labels={ACTOR_ROLES.map(labelAdminAuditActorRole)} onChange={(value) => onFilterChange({ ...filters, actorRole: value as AdminAuditActorRole | null })} />
+                <FilterSelect label="소스 영역" value={filters.sourceSlice} values={SOURCE_SLICES} labels={SOURCE_SLICES.map(labelAdminAuditSourceSlice)} onChange={(value) => onFilterChange({ ...filters, sourceSlice: value as AdminAuditSourceSlice | null })} />
+                <FilterSelect label="행동 분류" value={filters.actionCategory} values={ACTION_CATEGORIES} labels={ACTION_CATEGORIES.map(labelAdminAuditActionCategory)} onChange={(value) => onFilterChange({ ...filters, actionCategory: value as AdminAuditActionCategory | null })} />
                 <FilterSelect label="결과" value={filters.outcome} values={OUTCOMES} labels={OUTCOMES.map(auditOutcomeLabel)} onChange={(value) => onFilterChange({ ...filters, outcome: value as AdminAuditOutcome | null })} />
                 <button type="button" className="btn btn-quiet btn-sm admin-audit__reset" onClick={() => onFilterChange({ range: "7d" })}>필터 초기화</button>
               </fieldset>
@@ -164,7 +168,7 @@ export function AdminAuditLedger({
             state={ledgerState}
             title={
               ledgerState === "loading"
-                ? "운영 기입을 불러오는 중입니다."
+                ? "처리 기록을 불러오는 중입니다."
                 : ledgerState === "unavailable"
                   ? error
                   : ledgerState === "empty"
@@ -190,7 +194,7 @@ export function AdminAuditLedger({
                 : undefined
             }
           >
-            <div ref={rowsRef} className="admin-audit__rows" aria-label="운영 기입 목록" tabIndex={-1}>
+            <div ref={rowsRef} className="admin-audit__rows" aria-label="처리 기록 목록" tabIndex={-1}>
               {page && page.items.length > 0 ? page.items.map((item) => (
                 <AuditRow
                   key={item.id}
@@ -311,15 +315,16 @@ function AuditDetail({ item, onBack }: { item: AdminAuditLedgerItem | null; onBa
   const safeMetadata = visibleMetadata.filter((entry) => !isAdminAuditTechnicalMetadata(entry));
   const operationSummary = buildAdminAuditOperationSummary(item);
   const row = buildAdminAuditLedgerRow(item);
+  const action = adminAuditActionPrimaryLabel(item) ?? "처리 내용을 확인해야 합니다.";
   return (
     <aside className="admin-audit__detail" aria-label="감사 이벤트 상세" role="region">
       <button type="button" className="btn btn-quiet btn-sm admin-audit__back" onClick={onBack}>목록으로</button>
-      <h2 className="h3 editorial">{item.summary}</h2>
+      <h2 className="h3 editorial">{action}</h2>
       <dl className="admin-audit__identity">
         <div><dt>시각</dt><dd>{row.occurredAt}</dd></div>
         <div><dt>누가</dt><dd>{adminAuditActorPrimaryLabel(item.actor)}</dd></div>
         <div><dt>대상</dt><dd>{adminAuditTargetPrimaryLabel(item)}</dd></div>
-        <div><dt>무엇을 했나</dt><dd>{item.summary}</dd></div>
+        <div><dt>무엇을 했나</dt><dd>{action}</dd></div>
         <div><dt>결과</dt><dd>{row.result}</dd></div>
         <div><dt>사유</dt><dd>{adminAuditReasonLabel(item)}</dd></div>
       </dl>
@@ -337,6 +342,7 @@ function AuditDetail({ item, onBack }: { item: AdminAuditLedgerItem | null; onBa
           { label: "처리 기록 식별자", value: item.id },
           { label: "원본 저장소", value: item.sourceTable },
           { label: "원본 행동", value: item.actionType },
+          { label: "원본 설명", value: item.summary },
           { label: "원본 결과", value: item.outcome },
           { label: "행위자 역할 코드", value: item.actor.role },
           { label: "클럽 식별자", value: item.target.clubId },

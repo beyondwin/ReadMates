@@ -13,7 +13,6 @@ import { AdminAuditLedger } from "./admin-audit-ledger";
 import { AdminClubsLedger } from "./admin-clubs-ledger";
 import { AdminEditorialLedgerCtHarness } from "./admin-editorial-ledger-ct-harness";
 import {
-  EDITORIAL_LEDGER_LONG_AUDIT_SUMMARY,
   EDITORIAL_LEDGER_LONG_CLUB_NAME,
   EDITORIAL_LEDGER_LONG_TODAY_TITLE,
   clubsEmptyEvidence,
@@ -282,7 +281,7 @@ test("Review audit locks the 390 mobile docket composition", async ({ mount, pag
     VISUAL_AUTHORITY_VIEWPORTS.mobile,
   );
   await expect(component.getByRole("heading", { name: "운영 처리 기록", exact: true })).toBeVisible();
-  await expect(component.getByRole("heading", { name: EDITORIAL_LEDGER_LONG_AUDIT_SUMMARY })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "알림 재처리를 확정했습니다." })).toBeVisible();
   await expect(component.getByRole("region", { name: "감사 이벤트 상세" })).toBeVisible();
   const back = component.getByRole("button", { name: "목록으로" });
   await expectMinimumTargetSize(back);
