@@ -35,13 +35,13 @@ test("Today L1 uses explicit allowedActions rather than role", async ({ page }) 
   await expect(page.getByRole("heading", { name: "오늘의 운영 케이스" })).toBeVisible();
   await expect(page.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
   await expect(page.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "확인 처리" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "확인함" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "해결 확인" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "1시간 보류" })).toHaveCount(0);
   await expect(page.locator(".admin-receipt-timeline")).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 
-  const acknowledge = page.getByRole("button", { name: "확인 처리" });
+  const acknowledge = page.getByRole("button", { name: "확인함" });
   await acknowledge.focus();
   await expectVisibleFocus(acknowledge);
   await expectMinimumTargetSize(acknowledge);
@@ -96,7 +96,7 @@ test("Health is read-only evidence without commands", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "서비스 건강" })).toBeVisible();
   await expect(page.getByRole("region", { name: "서비스 신호" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Kafka consumer lag" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "AI 작업 대기열" })).toBeVisible();
   await expect(page.locator(".admin-case-docket")).toHaveCount(0);
   await expect(page.locator(".admin-action-dock")).toHaveCount(0);
   await expect(page.locator(".admin-receipt-timeline")).toHaveCount(0);
@@ -139,7 +139,7 @@ test("Notifications L2 replay requires exact REPLAY_NOTIFICATIONS", async ({ pag
   await page.goto("/admin/notifications");
   await expectReducedMotion(page);
 
-  await expect(page.getByRole("heading", { name: "배달 원장" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "알림 전달 상태" })).toBeVisible();
   await expect(page.getByText("현재 권한으로는 재처리를 실행할 수 없습니다.")).toBeVisible();
   await expect(page.getByRole("button", { name: "대상 확인" })).toBeDisabled();
   await page.getByRole("button", { name: "대상 확인" }).click({ force: true });

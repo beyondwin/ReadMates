@@ -246,7 +246,9 @@ async function waitForDraftSaved(page: Page) {
 
 async function openRecordWorkspace(page: Page) {
   const panel = page.locator("#workspace-panel-records");
-  await page.getByRole("navigation", { name: "관련 작업" }).getByRole("link", { name: "모임 기록" }).click();
+  if (!await panel.isVisible().catch(() => false)) {
+    await page.getByRole("navigation", { name: "관련 작업" }).getByRole("link", { name: "모임 기록" }).click();
+  }
   await expect(page).toHaveURL(/\?section=records/);
   await expect(panel).toBeVisible();
   await expect(page.getByLabel("공개 요약")).toBeVisible();

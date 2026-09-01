@@ -359,8 +359,17 @@ export function hostSessionDetailResponse(sessionId: string): HostSessionDetailR
     visibility: "HOST_ONLY",
     publication: null,
     state: "OPEN",
+    scheduleRevision: 1,
+    scheduleSeenAvailability: "AVAILABLE",
+    scheduleSeenSummary: {
+      currentCount: 0,
+      staleCount: 0,
+      unseenCount: 0,
+      eligibleCount: 0,
+    },
     versions: {
       sessionRevision: 1,
+      scheduleRevision: 1,
       exposureRevision: 0,
       participantSetRevision: 0,
       recordDraftRevision: null,

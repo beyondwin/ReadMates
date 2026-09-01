@@ -83,19 +83,13 @@ test("public to Google fixture login to host smoke flow", async ({ page }) => {
   await page.goto("/app/host");
   await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/clubs\/reading-sai\/app\/host(\/sessions\/[^/]+)?$/);
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
-  await expect(page.getByRole("heading", { name: "오늘", level: 1 })).toBeVisible();
-  await expect(page.getByRole("link", { name: /지금 다루는 모임 열기|모임 목록/ }).first()).toBeVisible();
+  await expect(page.getByRole("group", { name: "현재 모임" })).toBeVisible();
   await expect(page.locator("[data-app-route-security-controller]")).toHaveCount(1);
-  await expect(page.locator('.desktop-only .rm-club-selector > summary')).toContainText("읽는사이");
-  const hostWorkspaceSelector = page.locator('.desktop-only .rm-workspace-selector');
-  await expect(hostWorkspaceSelector.locator("summary")).toContainText("호스트 공간");
-  await hostWorkspaceSelector.locator("summary").click();
-  await expect(hostWorkspaceSelector.locator('.rm-context-selector__item[aria-current="page"]')).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
-  await expect(hostWorkspaceSelector.getByRole("link", { name: "호스트 공간" })).toHaveCount(0);
-  await expect(hostWorkspaceSelector.getByRole("link", { name: "멤버 공간" })).toBeVisible();
+  await expect(page.locator('[data-global-space-switcher]')).toHaveCount(0);
+  await expect(page.getByText("현재 공간 내 클럽, 읽는사이 호스트로 운영", { exact: true })).toHaveCount(2);
+  await expect(
+    page.getByRole("navigation", { name: "호스트 유틸리티" }).getByRole("link", { name: "멤버 시야" }),
+  ).toHaveAttribute("href", "/clubs/reading-sai/app");
 
   await page.goto(`/app/feedback/${seededFeedbackSessionId}/print`);
   await expect(page.getByRole("heading", { name: /독서모임 1차 피드백/ })).toBeVisible();
@@ -119,7 +113,8 @@ test("host activates viewer into full member", async ({ page }) => {
   await page.goto("/app/host/members");
 
   const pendingZone = page.getByRole("region", { name: "가입 승인 대기" });
-  const viewerRow = pendingZone.getByRole("article").filter({ hasText: viewerEmail });
+  const displayName = viewerEmail.split("@")[0] ?? viewerEmail;
+  const viewerRow = pendingZone.getByRole("article").filter({ hasText: displayName });
   await expect(viewerRow).toContainText("둘러보기 멤버");
 
   const activateResponse = page.waitForResponse(
@@ -130,7 +125,6 @@ test("host activates viewer into full member", async ({ page }) => {
 
   await expect(page.getByRole("status")).toContainText("정식 멤버로 전환했습니다.");
   await expect(page.getByRole("region", { name: "가입 승인 대기" })).toHaveCount(0);
-  const displayName = viewerEmail.split("@")[0] ?? viewerEmail;
   await page.getByRole("tab", { name: "활성 멤버" }).click();
   await expect(page.getByRole("row").filter({ hasText: displayName })).toContainText("활동");
 

@@ -751,21 +751,17 @@ test("scoped account navigation preserves local avatar identity across mobile an
   await expect(page).toHaveURL(`${APP_BASE}/me`);
 
   await page.setViewportSize({ width: 320, height: 700 });
-  const memberWorkspaceSelector = page.locator(".rm-club-shell-mobile-context .rm-workspace-selector");
-  await memberWorkspaceSelector.locator("summary").click();
-  const memberWorkspaceNavigation = memberWorkspaceSelector.getByRole("navigation", { name: "공간 선택" });
-  await expect(memberWorkspaceNavigation.getByRole("link", { name: "호스트 공간" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /공간 전환/ })).toHaveCount(0);
+  await expect(page.getByText("현재 공간 내 클럽, 읽는사이 멤버로 보기", { exact: true })).toHaveCount(2);
   const narrowAccount = page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` });
   await expect(narrowAccount).toBeVisible();
   await expectAvatarRoleSize(narrowAccount.locator(".rm-avatar-chip"), "navigation", 36);
   await page.screenshot({ path: testInfo.outputPath("320-member-header.png"), fullPage: true });
-  await memberWorkspaceNavigation.getByRole("link", { name: "호스트 공간" }).click();
+  await page.goto(`${APP_BASE}/host`);
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 15_000 }).toMatch(/\/app\/host(\/sessions\/[^/]+)?$/);
   const hostHeader = page.getByRole("banner");
-  const hostWorkspaceSelector = page.locator(".rm-club-shell-mobile-context .rm-workspace-selector");
-  await hostWorkspaceSelector.locator("summary").click();
-  await expect(hostWorkspaceSelector.getByRole("navigation", { name: "공간 선택" }).getByRole("link", { name: "멤버 공간" })).toBeVisible();
-  await hostWorkspaceSelector.locator("summary").click();
+  await expect(page.getByRole("button", { name: /공간 전환/ })).toHaveCount(0);
+  await expect(page.getByText("현재 공간 내 클럽, 읽는사이 호스트로 운영", { exact: true })).toHaveCount(2);
   await expect(hostHeader.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` })).toBeVisible();
   await hostHeader.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` }).click();
   await expect(page.getByRole("dialog", { name: MEMBER_NAME }).getByRole("button", { name: "로그아웃" })).toBeVisible();

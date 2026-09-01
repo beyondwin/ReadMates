@@ -464,34 +464,22 @@ export function GlobalSpaceTransitionController({
       const targetIdentity = sameClubMember ?? latestAvailable[0];
       if (!targetIdentity) return safeProjectionFallback(latest);
 
-      const currentLocation = locationRef.current;
-      const sourceIdentity = identityFromLocation(currentLocation.pathname, normalizedAuth)
-        ?? targetIdentity;
-      const targetCandidate = readUnvalidatedReturnTarget(continuityStorage, targetIdentity)
-        ?? representativeSpaceReturnTarget(targetIdentity);
+      // Authority loss must land on the representative route. Restoring a remembered
+      // detail can bypass the signed handoff/announcement contract while the old
+      // authority-sensitive route is being purged.
+      const targetCandidate = representativeSpaceReturnTarget(targetIdentity);
       const validation = await routeValidationLoader(
         targetIdentity,
         latest,
         targetCandidate,
         new AbortController().signal,
       );
-      const lastSafeTarget = continuity.read(targetIdentity, validation);
-      const destination = resolveGlobalSpaceDestination({
-        currentIdentity: sourceIdentity,
-        targetIdentity,
-        currentTarget: returnTargetFromLocation(currentLocation),
-        lastSafeTarget,
-        availableIdentities: latestAvailable,
-        correspondence: "unavailable",
-        reason: "authority-loss",
-      });
-      if (!destination) return safeProjectionFallback(latest);
-      const target = sanitizeGlobalSpaceReturnTarget(targetIdentity, destination.target, validation);
+      const target = sanitizeGlobalSpaceReturnTarget(targetIdentity, targetCandidate, validation);
       return `${target.pathname}${target.search}${target.hash}`;
     } catch {
       return safeProjectionFallback(latest);
     }
-  }, [continuity, continuityStorage, loadFreshProjection, normalizedAuth, routeValidationLoader]);
+  }, [continuity, loadFreshProjection, routeValidationLoader]);
 
   const value = useMemo<GlobalSpaceTransitionControllerValue>(() => ({
     registrationPort,

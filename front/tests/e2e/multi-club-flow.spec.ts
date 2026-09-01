@@ -57,7 +57,7 @@ test("bare app entry replaces to the shared session's current club", async ({ pa
   expect(authState.currentMembership.role).toBe("MEMBER");
 });
 
-test("club switcher changes club context while preserving independent roles", async ({ page }) => {
+test("URL-authoritative club navigation changes context while preserving independent roles", async ({ page }) => {
   await loginWithGoogleFixture(page, "host@example.com");
 
   await page.goto("/clubs/reading-sai/app/host/sessions?cursor=source-cursor#source-modal");
@@ -71,9 +71,8 @@ test("club switcher changes club context while preserving independent roles", as
   expect(readingSaiAuth.currentMembership.clubSlug).toBe("reading-sai");
   expect(readingSaiAuth.currentMembership.role).toBe("HOST");
 
-  const appHeader = page.getByRole("banner");
-  await appHeader.getByLabel("현재 클럽 읽는사이").click();
-  await appHeader.getByRole("navigation", { name: "클럽 선택" }).getByRole("link", { name: "샘플 북클럽" }).click();
+  await expect(page.getByRole("button", { name: /공간 전환/ })).toHaveCount(0);
+  await page.goto("/clubs/sample-book-club/app/archive");
 
   await expect(page).toHaveURL(/\/clubs\/sample-book-club\/app\/archive$/);
   expect(new URL(page.url()).search).toBe("");
@@ -98,8 +97,7 @@ test("canonical workspace URLs survive direct entry, reload, resize, and role-sw
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/]+)?$/);
   await page.setViewportSize({ width: 1280, height: 900 });
 
-  await page.getByRole("banner").locator(".rm-workspace-selector__trigger").click();
-  await page.getByRole("banner").getByRole("link", { name: "멤버 공간" }).click();
+  await page.getByRole("navigation", { name: "호스트 유틸리티" }).getByRole("link", { name: "멤버 시야" }).click();
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app$/);
   await page.goBack();
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/]+)?$/);
@@ -107,7 +105,7 @@ test("canonical workspace URLs survive direct entry, reload, resize, and role-sw
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app$/);
 });
 
-test("same-meeting role switching keeps an authorized canonical meeting object", async ({ page }) => {
+test("direct same-meeting host entry keeps an authorized canonical meeting object", async ({ page }) => {
   await loginWithGoogleFixture(page, "host@example.com");
   const sessionId = runMysql(`
 select sessions.id
@@ -119,13 +117,7 @@ limit 1;
 `).trim().split("\n").at(-1)!;
 
   await page.goto(`/clubs/reading-sai/app/sessions/${sessionId}`);
-  const workspaceSelector = page.getByRole("banner");
-  await workspaceSelector.locator(".rm-workspace-selector__trigger").click();
-  await expect(workspaceSelector.getByRole("link", { name: "호스트 공간" })).toHaveAttribute(
-    "href",
-    `/clubs/reading-sai/app/host/sessions/${sessionId}`,
-  );
-  await workspaceSelector.getByRole("link", { name: "호스트 공간" }).click();
+  await page.goto(`/clubs/reading-sai/app/host/sessions/${sessionId}`);
   await expect(page).toHaveURL(`/clubs/reading-sai/app/host/sessions/${sessionId}`);
 });
 
@@ -143,13 +135,7 @@ limit 1;
   try {
     runMysql(`update sessions set state = 'OPEN', updated_at = utc_timestamp(6) where id = '${sessionId}';`);
     await page.goto(`/clubs/reading-sai/app/host/sessions/${sessionId}`);
-    const workspaceSelector = page.getByRole("banner");
-    await workspaceSelector.locator(".rm-workspace-selector__trigger").click();
-    await expect(workspaceSelector.getByRole("link", { name: "멤버 공간" })).toHaveAttribute(
-      "href",
-      `/clubs/reading-sai/app/sessions/${sessionId}`,
-    );
-    await workspaceSelector.getByRole("link", { name: "멤버 공간" }).click();
+    await page.getByRole("navigation", { name: "호스트 유틸리티" }).getByRole("link", { name: "멤버 시야" }).click();
     await expect(page).toHaveURL("/clubs/reading-sai/app/archive");
   } finally {
     runMysql(`update sessions set state = 'PUBLISHED', updated_at = utc_timestamp(6) where id = '${sessionId}';`);
@@ -184,9 +170,7 @@ limit 1;
 test("revoked host authority replaces the host route with the member-safe route", async ({ page }) => {
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto("/clubs/reading-sai/app");
-  const workspaceSelector = page.getByRole("banner");
-  await workspaceSelector.locator(".rm-workspace-selector__trigger").click();
-  await workspaceSelector.getByRole("link", { name: "호스트 공간" }).click();
+  await page.goto("/clubs/reading-sai/app/host");
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/]+)?$/);
 
   runMysql(`

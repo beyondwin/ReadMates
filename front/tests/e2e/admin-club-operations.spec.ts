@@ -224,23 +224,24 @@ test("owner views aggregate club operations without host-owned commands", async 
     page.getByRole("heading", { name: "읽는사이", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "읽는사이 운영 스냅샷" }),
+    page.getByRole("heading", { name: "운영 영향 요약" }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "클로징 확인 필요" }),
   ).toBeVisible();
   await expect(page.getByText("미완료 2 · 차단 1 · 준비 1")).toBeVisible();
-  await expect(page.getByText("No.07 · 페인트")).toBeVisible();
-  await expect(page.getByText("2026-06-18")).toBeVisible();
-  await expect(page.getByText("피드백 문서 확인 필요")).toBeVisible();
+  await expect(page.getByText("확인 대상 2건")).toBeVisible();
+  await expect(page.getByText("No.07 · 페인트")).toHaveCount(0);
+  await expect(page.getByText("2026-06-18")).toHaveCount(0);
+  await expect(page.getByText("피드백 문서 확인 필요")).toHaveCount(0);
   await expect(
-    page.getByRole("link", { name: "호스트 클로징 보드" }).first(),
+    page.getByRole("link", { name: "클럽 운영 화면에서 확인" }),
   ).toHaveAttribute(
     "href",
-    "/clubs/reading-sai/app/host/sessions/session-7/closing",
+    "/clubs/reading-sai/app",
   );
   await expect(page.getByText("접근 발급")).toBeVisible();
-  await expect(page.getByRole("link", { name: "알림 ledger" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "알림 상태 확인" })).toHaveAttribute(
     "href",
     `/admin/notifications?clubId=${CLUB_ID}`,
   );
@@ -268,7 +269,8 @@ test("owner views club operations closing risks without mobile horizontal overfl
   await expect(
     page.getByRole("heading", { name: "클로징 확인 필요" }),
   ).toBeVisible();
-  await expect(page.getByText("No.07 · 페인트")).toBeVisible();
+  await expect(page.getByText("확인 대상 2건")).toBeVisible();
+  await expect(page.getByText("No.07 · 페인트")).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 });
 

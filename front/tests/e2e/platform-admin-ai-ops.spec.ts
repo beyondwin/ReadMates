@@ -174,8 +174,8 @@ test("platform owner sees retry-commit affordance on a committing job", async ({
   await page.goto("/admin/ai-ops");
 
   await expect(page.getByText("Stuck Volume")).toBeVisible();
-  await expect(page.getByText("revision 2 · cleanup pending")).toBeVisible();
-  await expect(page.getByRole("button", { name: "커밋 복구 검토" })).toBeVisible();
+  await expect(page.getByText("임시 데이터 정리가 남아 있습니다.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "저장 복구 검토" })).toBeVisible();
 });
 
 test("platform owner without MANAGE_AI_OPERATIONS cannot force cancel", async ({ page }) => {
@@ -185,7 +185,7 @@ test("platform owner without MANAGE_AI_OPERATIONS cannot force cancel", async ({
 
   await expect(page.getByRole("heading", { name: "AI 작업" })).toBeVisible();
   await expect(page.getByRole("button", { name: "강제 취소 검토" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "커밋 복구 검토" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "저장 복구 검토" })).toHaveCount(0);
 });
 
 test("platform support cannot retry-commit", async ({ page }) => {
@@ -194,7 +194,7 @@ test("platform support cannot retry-commit", async ({ page }) => {
   await page.goto("/admin/ai-ops");
 
   await expect(page.getByText("Stuck Volume")).toBeVisible();
-  await expect(page.getByRole("button", { name: "커밋 복구 검토" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "저장 복구 검토" })).toHaveCount(0);
 });
 
 test("cost window toggle updates the rendered trend", async ({ page }) => {
@@ -202,14 +202,14 @@ test("cost window toggle updates the rendered trend", async ({ page }) => {
 
   await page.goto("/admin/ai-ops");
 
-  const windowGroup = page.getByRole("group", { name: "cost window" });
+  const windowGroup = page.getByRole("group", { name: "비용 기간" });
   await expect(windowGroup).toBeVisible();
 
-  const trend = page.getByLabel("cost trend");
+  const trend = page.getByRole("region", { name: "비용 참고" });
   await expect(trend.getByText("$2.0000")).toBeVisible();
-  await expect(trend.getByLabel("cost trend direction")).toHaveText("▲");
+  await expect(trend).toContainText("▲ 직전 $1.0000");
 
-  await windowGroup.getByRole("button", { name: "7d" }).click();
+  await windowGroup.getByRole("button", { name: "7일" }).click();
 
   await expect(page).toHaveURL(/window=7d/);
   await expect(trend.getByText("데이터 부족")).toBeVisible();

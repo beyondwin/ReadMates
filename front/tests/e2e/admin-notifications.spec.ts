@@ -149,12 +149,14 @@ test("owner operates admin notification ledgers and replay", async ({ page }) =>
 
   await page.goto("/admin/notifications?focus=outbox_backlog");
 
-  await expect(page.getByRole("heading", { name: "배달 원장" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "알림 전달 상태" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await expectMinimumTargetSize(page.getByRole("button", { name: "대상 확인" }));
-  await expect(page.getByText(/Health outbox backlog/)).toBeVisible();
+  await expect(page.getByText(/서비스 상태의 발송 대기 신호/)).toBeVisible();
   await expect(page.getByText("발송 대기", { exact: true })).toBeVisible();
-  await expect(page.getByText(/SESSION_REMINDER_DUE/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "발송 대기 장부" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "배달 장부" })).toBeVisible();
+  await expect(page.getByText(/SESSION_REMINDER_DUE/).first()).not.toBeVisible();
   await expect(page.getByText(/m\*\*\*@example.com/)).toBeVisible();
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
 

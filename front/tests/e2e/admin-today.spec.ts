@@ -116,6 +116,14 @@ async function routePlatformAdminToday(page: Page, role: PlatformAdminRole): Pro
     domainsRequiringAction: [],
   }));
   await page.route("**/api/bff/api/admin/clubs", (route) => json(route, 200, { items: [] }));
+  await page.route("**/api/bff/api/admin/health/snapshot**", (route) => json(route, 200, {
+    schema: "platform.health_snapshot.v1",
+    generatedAt: GENERATED_AT,
+    lastSuccessfulAt: GENERATED_AT,
+    refreshState: "FRESH",
+    staleAgeSeconds: 0,
+    cards: [],
+  }));
   await page.route("**/api/bff/api/admin/operations/cases**", (route) => {
     const pathname = new URL(route.request().url()).pathname;
     if (pathname.endsWith("/cases/case-notification")) {

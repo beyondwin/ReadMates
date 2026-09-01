@@ -86,6 +86,18 @@ async function routePlatformAdminHostWorkspace(page: Page) {
             primaryHost: null,
           },
         ],
+        availableSpaces: {
+          version: 1,
+          kinds: ["PLATFORM", "CLUBS"],
+          clubs: [
+            {
+              clubId: "club-reading-sai",
+              clubSlug: "reading-sai",
+              clubName: "읽는사이",
+              perspectives: ["MEMBER", "HOST"],
+            },
+          ],
+        },
         platformAdmin: { userId: "platform-owner-user", email: "owner@example.com", role: "OWNER" },
         recommendedAppEntryUrl: "/admin",
       }),
@@ -145,6 +157,13 @@ async function routePlatformAdminHostWorkspace(page: Page) {
       }),
     });
   });
+  await page.route("**/api/bff/api/host/operating-room/current?clubSlug=reading-sai", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ currentMeeting: null }),
+    });
+  });
   await page.route("**/api/bff/api/host/sessions?**", async (route) => {
     await route.fulfill({
       status: 200,
@@ -201,18 +220,15 @@ function adminShellSuite() {
     await page.goto("/admin");
     await expect(page).toHaveURL(/\/admin\/today(?:\?.*)?$/);
     await expect(page.getByRole("heading", { name: "오늘의 운영 케이스" })).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByRole("link", { name: "오늘" })).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByRole("link", { name: "클럽" })).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByText("파이프라인", { exact: true })).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByText("원장", { exact: true })).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByText("서비스", { exact: true })).toHaveCount(0);
-    await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByText("검토", { exact: true })).toHaveCount(0);
-    await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByRole("link", { name: "긴급 공개 회수" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "오늘 할 일", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "클럽 관리", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "서비스 상태", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "처리 기록", exact: true })).toBeVisible();
     await expect(page.getByText("Command")).toHaveCount(0);
     await expect(page.getByRole("link", { name: "사건" })).toHaveCount(0);
     await expect(page.getByRole("banner").getByRole("link", { name: "새 클럽" })).toHaveCount(0);
 
-    await page.getByRole("link", { name: "클럽", exact: true }).click();
+    await page.getByRole("link", { name: "클럽 관리", exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/clubs$/);
 
     await page.getByRole("main").getByRole("link", { name: "새 클럽" }).click();
@@ -232,10 +248,9 @@ function adminShellSuite() {
     await page.goto("/admin/analytics");
     await expect(page.getByRole("heading", { name: "분석 부록" })).toBeVisible();
     await expect(page.getByText(/준비 중 · S8/)).toHaveCount(0);
-    await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByRole("link", { name: "분석 부록" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+    await expect(
+      page.getByRole("navigation", { name: "현재 위치" }),
+    ).toContainText("분석 부록");
   });
 
   test("platform admin with host membership can open host workspace from the admin header", async ({ page }) => {
@@ -246,14 +261,15 @@ function adminShellSuite() {
     await page.goto("/admin");
     await expect(page).toHaveURL(/\/admin\/today$/);
 
-    await page.getByRole("button", { name: "내 공간" }).click();
-    await page.getByRole("menuitem", { name: "읽는사이 호스트 공간" }).click();
+    await page.getByRole("button", { name: "공간 전환, 현재 플랫폼 운영" }).click();
+    await page.getByRole("menuitem", { name: "내 클럽" }).click();
+    await page.getByRole("menuitemradio", { name: "읽는사이 호스트로 운영" }).click();
 
     await expect.poll(() => new URL(page.url()).pathname).toMatch(
       /\/clubs\/reading-sai\/app\/host(\/sessions\/[^/]+)?$/,
     );
     expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
-    await expect(page.getByRole("heading", { name: /지금 다루는 모임|아직 열린 모임이 없습니다/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /지금 다루는 모임|현재 운영할 모임이 없습니다/ })).toBeVisible();
   });
 }
 

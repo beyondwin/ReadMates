@@ -36,6 +36,9 @@ function sessionResponse(): HostSessionDetailResponse {
         attendanceStatus: "ATTENDED",
         participationStatus: "ACTIVE",
         attendanceRevision: 1,
+        seenScheduleRevision: 1,
+        scheduleSeenAt: "2026-08-29T01:02:03Z",
+        scheduleSeenState: "CURRENT",
       },
       {
         membershipId: "member-b",
@@ -46,6 +49,9 @@ function sessionResponse(): HostSessionDetailResponse {
         attendanceStatus: "ATTENDED",
         participationStatus: "ACTIVE",
         attendanceRevision: 1,
+        seenScheduleRevision: 1,
+        scheduleSeenAt: "2026-08-29T01:02:03Z",
+        scheduleSeenState: "CURRENT",
       },
     ],
     feedbackDocument: {

@@ -197,6 +197,7 @@ const HEALTH_SNAPSHOT: PlatformHealthSnapshotResponse = {
 
 test("operator views /admin/health grid", async ({ page }) => {
   await routePlatformAdminShell(page, "OWNER");
+  await page.unroute("**/api/bff/api/admin/health/snapshot**");
   await page.route("**/api/bff/api/admin/health/snapshot", async (route) => {
     await json(route, 200, HEALTH_SNAPSHOT);
   });
@@ -227,29 +228,29 @@ test("operator views /admin/health grid", async ({ page }) => {
   await expect(page.locator(".admin-case-docket")).toHaveCount(0);
   await expect(page.locator(".admin-action-dock")).toHaveCount(0);
   await expect(page.locator(".admin-receipt-timeline")).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Kafka consumer lag" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "AI 작업 대기열" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Redis" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Outbox backlog" })).toHaveCount(0);
-  await expect(page.getByText("정상 신호")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "알림 대기열" })).toHaveCount(0);
+  await expect(page.getByText("정상 범위 서비스").first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "최근에 바뀐 것" })).toBeVisible();
-  await expect(page.getByText("readmates-api:dev-20260526")).toBeVisible();
+  await expect(page.getByText("readmates-api:dev-20260526")).not.toBeVisible();
   await expect(
     page.locator("article", { hasText: "Redis" }).getByText("redis_metrics_unavailable"),
-  ).toBeVisible();
-  await page.getByText("정상 신호").click();
-  await expect(page.getByRole("link", { name: "Outbox backlog" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Outbox backlog" })).toHaveAttribute(
+  ).not.toBeVisible();
+  await page.getByText("정상 범위 서비스").first().click();
+  await expect(page.getByRole("link", { name: "알림 대기열" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "알림 대기열" })).toHaveAttribute(
     "href",
     "/admin/notifications?focus=outbox_backlog",
   );
-  await page.getByRole("link", { name: "Outbox backlog" }).click();
+  await page.getByRole("link", { name: "알림 대기열" }).click();
   await expect(page).toHaveURL(/\/admin\/notifications\?focus=outbox_backlog/);
-  await expect(page.getByText(/Health outbox backlog/)).toBeVisible();
+  await expect(page.getByText(/서비스 상태의 발송 대기 신호/)).toBeVisible();
   await page.goto("/admin/health");
   await expect(page.getByRole("button", { name: "새로고침" })).toBeVisible();
   await page.getByRole("button", { name: "새로고침" }).click();
-  await page.getByText("정상 신호").click();
-  await expect(page.getByRole("link", { name: "AI provider availability" })).toHaveAttribute(
+  await page.getByText("정상 범위 서비스").first().click();
+  await expect(page.getByRole("link", { name: "AI 제공자" })).toHaveAttribute(
     "href",
     "/admin/ai-ops",
   );
@@ -260,12 +261,12 @@ const HEALTH_REFRESH_FIXTURES = [
   {
     name: "stale with server age",
     snapshot: { ...HEALTH_SNAPSHOT, refreshState: "STALE" as const, staleAgeSeconds: 125 },
-    expected: "마지막 정상 갱신 2분 5초 전",
+    expected: "마지막 확인 자료가 2분 5초 전입니다.",
   },
   {
     name: "refreshing with last known good cards",
     snapshot: { ...HEALTH_SNAPSHOT, refreshState: "REFRESHING" as const, staleAgeSeconds: 12 },
-    expected: "서버에서 갱신 중",
+    expected: "새 상태를 확인하고 있습니다.",
   },
   {
     name: "unavailable before first success",
@@ -275,13 +276,14 @@ const HEALTH_REFRESH_FIXTURES = [
       refreshState: "UNAVAILABLE" as const,
       staleAgeSeconds: 0,
     },
-    expected: "정상 갱신 이력 없음",
+    expected: "최근 상태 자료를 확인할 수 없습니다.",
   },
 ] as const;
 
 for (const fixture of HEALTH_REFRESH_FIXTURES) {
   test(`operator sees ${fixture.name} metadata without losing cards`, async ({ page }) => {
     await routePlatformAdminShell(page, "OWNER");
+    await page.unroute("**/api/bff/api/admin/health/snapshot**");
     await page.route("**/api/bff/api/admin/health/snapshot", async (route) => {
       await json(route, 200, fixture.snapshot);
     });
@@ -289,7 +291,7 @@ for (const fixture of HEALTH_REFRESH_FIXTURES) {
     await page.goto("/admin/health");
 
     await expect(page.getByText(fixture.expected, { exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Kafka consumer lag" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "AI 작업 대기열" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "최근에 바뀐 것" })).toBeVisible();
   });
 }

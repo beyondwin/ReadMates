@@ -993,6 +993,34 @@ describe("GlobalSpaceTransitionController", () => {
     }), expect.anything());
   });
 
+  it("uses the representative safe route instead of a remembered member detail after host authority loss", async () => {
+    const latest = authWithSpaces(["CLUBS"]);
+    const observedStorage = observableStorage();
+    observedStorage.storage.setItem(
+      globalSpaceReturnTargetStorageKey(member),
+      JSON.stringify({
+        pathname: "/clubs/reading-sai/app/archive",
+        search: "",
+        hash: "",
+        focusId: null,
+        scrollTop: 0,
+      }),
+    );
+    renderController({
+      initialEntry: "/clubs/reading-sai/app/host/sessions/session-7",
+      auth: latest,
+      loadLatestProjection: async () => latest,
+      loadRouteValidation: async () => context(),
+      storage: observedStorage.storage,
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "호스트 권한 회수" }));
+
+    await waitFor(() => expect(screen.getByLabelText("authority-target")).toHaveTextContent(
+      /^\/clubs\/reading-sai\/app$/,
+    ));
+  });
+
   it("uses the authenticated safe fallback when authority-loss projection refresh rejects", async () => {
     renderController({
       initialEntry: "/clubs/reading-sai/app/host",
