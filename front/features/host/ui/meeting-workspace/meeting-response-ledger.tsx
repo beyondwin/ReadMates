@@ -1,4 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { AvatarChip } from "@/shared/ui/avatar-chip";
 import {
   beginHostMeetingFilterCommit,
   commitHostMeetingAttendanceRow,
@@ -12,13 +13,14 @@ import "./meeting-response-ledger.css";
 
 type Response = "GOING" | "NOT_GOING" | "UNSURE" | "NO_RESPONSE";
 export type MeetingAttendance = "ATTENDED" | "ABSENT" | "UNKNOWN";
-export type MeetingResponseLedgerPresentation = "default" | "meetingDay";
+export type MeetingResponseLedgerPresentation = "default" | "meetingDay" | "attendanceBoard";
 type MeetingDayFilter = "pending" | "arrived" | "all";
 
 export type MeetingResponseLedgerRow = {
   membershipId: string;
   displayName: string;
   secondaryLabel: string;
+  avatarKey?: string | null;
   response: Response;
   attendance: MeetingAttendance;
   attendanceRevision: number;
@@ -31,6 +33,7 @@ export type MeetingResponseLedgerAttendeeInput = {
   membershipId: string;
   displayName: string;
   accountName?: string | null;
+  avatarKey?: string | null;
   rsvpStatus: "NO_RESPONSE" | "GOING" | "MAYBE" | "DECLINED";
   attendanceStatus: MeetingAttendance;
   attendanceRevision: number;
@@ -59,13 +62,27 @@ export function MeetingResponseLedger({
   onBulkAttendanceChange,
   presentation = "default",
   pendingUndo = null,
+  agendaHref = null,
 }: {
   rows: ReadonlyArray<MeetingResponseLedgerRow>;
   onAttendanceChange: (membershipId: string, attendance: MeetingAttendance) => void;
   onBulkAttendanceChange: (membershipIds: ReadonlyArray<string>, attendance: MeetingAttendance) => void;
   presentation?: MeetingResponseLedgerPresentation;
   pendingUndo?: WorkspacePendingUndo | null;
+  agendaHref?: string | null;
 }) {
+  if (presentation === "attendanceBoard") {
+    return (
+      <AttendanceBoardLedger
+        rows={rows}
+        onAttendanceChange={onAttendanceChange}
+        onBulkAttendanceChange={onBulkAttendanceChange}
+        pendingUndo={pendingUndo}
+        agendaHref={agendaHref}
+      />
+    );
+  }
+
   if (presentation === "meetingDay") {
     return (
       <MeetingDayResponseLedger
@@ -83,6 +100,138 @@ export function MeetingResponseLedger({
       onAttendanceChange={onAttendanceChange}
       onBulkAttendanceChange={onBulkAttendanceChange}
     />
+  );
+}
+
+const attendanceBoardChoices = [
+  { attendance: "ATTENDED" as const, label: "참석" },
+  { attendance: "ABSENT" as const, label: "불참" },
+  { attendance: "UNKNOWN" as const, label: "미확인" },
+] as const;
+
+function rsvpFactLabel(response: Response): string {
+  if (response === "GOING") return "참석 응답";
+  if (response === "NOT_GOING") return "불참 응답";
+  if (response === "UNSURE") return "미정 응답";
+  return "미응답";
+}
+
+function AttendanceBoardLedger({
+  rows,
+  onAttendanceChange,
+  onBulkAttendanceChange,
+  pendingUndo,
+  agendaHref,
+}: {
+  rows: ReadonlyArray<MeetingResponseLedgerRow>;
+  onAttendanceChange: (membershipId: string, attendance: MeetingAttendance) => void;
+  onBulkAttendanceChange: (membershipIds: ReadonlyArray<string>, attendance: MeetingAttendance) => void;
+  pendingUndo: WorkspacePendingUndo | null;
+  agendaHref: string | null;
+}) {
+  const pendingIds = useMemo(
+    () => rows.filter((row) => isPendingAttendance(row.attendance)).map((row) => row.membershipId),
+    [rows],
+  );
+  const counts = useMemo(() => ({
+    pending: pendingIds.length,
+    attended: rows.filter((row) => row.attendance === "ATTENDED").length,
+    all: rows.length,
+  }), [pendingIds.length, rows]);
+
+  useLayoutEffect(() => {
+    commitHostMeetingAttendanceRow(rows);
+  }, [rows]);
+
+  const boardUndo = pendingUndo
+    ? { ...pendingUndo, undoLabel: pendingUndo.undoLabel ?? "실행 취소" }
+    : null;
+
+  return (
+    <section
+      className="rm-meeting-response-ledger rm-meeting-response-ledger--attendance-board"
+      aria-labelledby="meeting-day-attendance-title"
+    >
+      <div className="rm-meeting-response-ledger__head">
+        <p className="rm-meeting-response-ledger__eyebrow">현장 운영</p>
+        <div className="rm-meeting-response-ledger__title-row">
+          <h2 id="meeting-day-attendance-title" className="h2 editorial">출석 확인</h2>
+          {agendaHref ? (
+            <a className="rm-meeting-response-ledger__agenda" href={agendaHref}>진행 순서 보기</a>
+          ) : null}
+        </div>
+        <p className="rm-meeting-response-ledger__summary">
+          실제 출석 {counts.attended} / {counts.all} · 확인 필요 {counts.pending}
+        </p>
+        <p className="rm-meeting-response-ledger__note">참석 응답과 실제 출석은 별개로 기록해요.</p>
+      </div>
+
+      {rows.length === 0 ? (
+        <p role="status" className="rm-meeting-panel-state">조건에 맞는 참여자가 없습니다.</p>
+      ) : (
+        <ul className="rm-meeting-response-ledger__rows">
+          {rows.map((row) => (
+            <li key={row.membershipId} className="rm-meeting-response-ledger__row rm-meeting-response-ledger__row--board">
+              <div className="rm-meeting-response-ledger__person">
+                {row.avatarKey ? (
+                  <AvatarChip
+                    avatarKey={row.avatarKey}
+                    name={row.displayName}
+                    label=""
+                    sizeRole="roster"
+                  />
+                ) : null}
+                <span className="rm-meeting-response-ledger__person-copy">
+                  <strong>{row.displayName}</strong>
+                  <span className="small muted">{rsvpFactLabel(row.response)}</span>
+                </span>
+              </div>
+              <div
+                className="rm-meeting-response-ledger__attendance-group"
+                role="group"
+                aria-label={`${row.displayName} 실제 출석`}
+              >
+                {attendanceBoardChoices.map((choice) => (
+                  <button
+                    key={choice.attendance}
+                    type="button"
+                    className="rm-meeting-response-ledger__attendance-choice"
+                    data-attendance={choice.attendance}
+                    aria-label={`${row.displayName} ${choice.label}`}
+                    aria-pressed={row.attendance === choice.attendance}
+                    disabled={row.writeState === "saving"}
+                    onClick={() => {
+                      if (row.attendance === choice.attendance) return;
+                      onAttendanceChange(row.membershipId, choice.attendance);
+                    }}
+                  >
+                    {choice.label}
+                  </button>
+                ))}
+              </div>
+              {row.writeState === "saving" ? <span role="status" className="small">저장 중</span> : null}
+              {row.writeState === "error" ? <span role="alert" className="small">저장하지 못했습니다. 다시 선택해 주세요.</span> : null}
+              {row.writeState === "conflict" ? <span role="alert" className="small">최신 출석 상태와 충돌했습니다. 새로 확인해 주세요.</span> : null}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {counts.pending > 0 ? (
+        <div className="rm-meeting-response-ledger__bulk rm-meeting-response-ledger__bulk--meeting-day">
+          <button
+            type="button"
+            className="btn btn-quiet"
+            onClick={() => onBulkAttendanceChange(pendingIds, "ATTENDED")}
+          >
+            나머지 {counts.pending}명 모두 참석으로 표시
+          </button>
+        </div>
+      ) : null}
+
+      <p className="rm-meeting-response-ledger__save-hint">선택하면 바로 저장돼요.</p>
+      <WorkspaceUndoBar pendingUndo={boardUndo} />
+    </section>
   );
 }
 

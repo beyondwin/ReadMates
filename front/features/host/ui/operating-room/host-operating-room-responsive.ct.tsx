@@ -20,6 +20,7 @@ import {
   expectVisibleFocus,
 } from "@/tests/e2e/support/visual-authority-contract";
 import { MeetingResponseLedger } from "../meeting-workspace/meeting-response-ledger";
+import { PhaseStatusLedger } from "./phase-status-ledger";
 import { HostPrimaryNavigation } from "../shell/host-primary-navigation";
 import { HostUtilityActions } from "../shell/host-utility-actions";
 import { HostWorkspaceSwitcher } from "../shell/host-workspace-switcher";
@@ -441,25 +442,7 @@ function phaseStatusLedger(
     action: string;
   }[],
 ) {
-  return (
-    <section className="rm-preparation-ledger" aria-label={title}>
-      <h2>{title}</h2>
-      <ol className="rm-preparation-ledger__list">
-        {rows.map((row) => (
-          <li key={row.label} className="rm-preparation-ledger-row" aria-label={row.label}>
-            <span className="rm-preparation-ledger-row__label">{row.label}</span>
-            <span className="rm-preparation-ledger-row__value">{row.value}</span>
-            <span className="rm-preparation-ledger-row__detail">{row.detail}</span>
-            <span className="rm-preparation-ledger-row__actions">
-              <a href={row.href} className="rm-preparation-ledger-row__link" aria-label={`${row.label} 자세히 보기`}>
-                {row.action}
-              </a>
-            </span>
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
+  return <PhaseStatusLedger title={title} rows={rows} LinkComponent={Link} />;
 }
 
 function approvedOperatingRoom(input: {
@@ -619,14 +602,54 @@ const closingStatusRows = [
 ] as const;
 
 const liveAttendees = [
-  { membershipId: "m-1", displayName: "박서윤", rsvpStatus: "GOING" as const, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 },
-  { membershipId: "m-2", displayName: "김도윤", rsvpStatus: "GOING" as const, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 },
-  { membershipId: "m-3", displayName: "이하린", rsvpStatus: "NO_RESPONSE" as const, attendanceStatus: "UNKNOWN" as const, attendanceRevision: 1 },
-  { membershipId: "m-4", displayName: "정우진", rsvpStatus: "DECLINED" as const, attendanceStatus: "ABSENT" as const, attendanceRevision: 1 },
-  { membershipId: "m-5", displayName: "최아연", rsvpStatus: "GOING" as const, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 },
-  { membershipId: "m-6", displayName: "오민재", rsvpStatus: "NO_RESPONSE" as const, attendanceStatus: "UNKNOWN" as const, attendanceRevision: 1 },
-  { membershipId: "m-7", displayName: "한지수", rsvpStatus: "GOING" as const, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 },
+  { membershipId: "m-1", displayName: "박서윤", avatarKey: "mushroom-green-book", rsvpStatus: "GOING" as const, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 },
+  { membershipId: "m-2", displayName: "김도윤", avatarKey: "apple-green-book", rsvpStatus: "GOING" as const, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 },
+  { membershipId: "m-3", displayName: "이하린", avatarKey: "banana-green-book", rsvpStatus: "NO_RESPONSE" as const, attendanceStatus: "UNKNOWN" as const, attendanceRevision: 1 },
+  { membershipId: "m-4", displayName: "정우진", avatarKey: "mushroom-green-book", rsvpStatus: "DECLINED" as const, attendanceStatus: "ABSENT" as const, attendanceRevision: 1 },
+  { membershipId: "m-5", displayName: "최아연", avatarKey: "apple-green-book", rsvpStatus: "GOING" as const, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 },
+  { membershipId: "m-6", displayName: "오민재", avatarKey: "banana-green-book", rsvpStatus: "NO_RESPONSE" as const, attendanceStatus: "UNKNOWN" as const, attendanceRevision: 1 },
+  { membershipId: "m-7", displayName: "한지수", avatarKey: "mushroom-green-book", rsvpStatus: "GOING" as const, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 },
 ];
+
+function approvedAttendanceBoard() {
+  return (
+    <MeetingResponseLedger
+      presentation="attendanceBoard"
+      agendaHref="/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=agenda"
+      rows={liveAttendees.map((attendee) => ({
+        membershipId: attendee.membershipId,
+        displayName: attendee.displayName,
+        secondaryLabel: attendee.displayName,
+        response: attendee.rsvpStatus === "GOING"
+          ? "GOING"
+          : attendee.rsvpStatus === "DECLINED"
+            ? "NOT_GOING"
+            : "NO_RESPONSE",
+        attendance: attendee.attendanceStatus,
+        attendanceRevision: attendee.attendanceRevision,
+        questionCount: null,
+        recentResponseLabel: null,
+      }))}
+      onAttendanceChange={() => undefined}
+      onBulkAttendanceChange={() => undefined}
+      pendingUndo={{
+        description: "출석 8명 저장됨",
+        onUndo: () => undefined,
+        onOpenHistory: () => undefined,
+        onDismiss: () => undefined,
+      }}
+    />
+  );
+}
+
+function approvedLiveContent() {
+  return (
+    <>
+      {phaseStatusLedger("현장 현황", liveStatusRows)}
+      {approvedAttendanceBoard()}
+    </>
+  );
+}
 
 function prepApprovedView() {
   return approvedOperatingRoom({
@@ -758,7 +781,7 @@ test("live locks the approved desktop operating room", async ({ mount, page }, t
   const component = await mountApproved(
     mount,
     page,
-    liveApprovedView(phaseStatusLedger("현장 현황", liveStatusRows)),
+    liveApprovedView(approvedLiveContent()),
     APPROVED_DESKTOP_VIEWPORT,
   );
   await expect(component.getByRole("region", { name: "다음에 할 일" })).toContainText("아직 출석을 확인하지 않은 3명이 있어요");
@@ -796,6 +819,14 @@ test("prep locks the approved mobile operating room", async ({ mount, page }, te
   const workbox = component.getByRole("complementary", { name: "클럽 작업함" });
   const bottomNav = component.locator('[data-club-shell-region="mobile-primary"]');
   await expect(nextAction).toBeVisible();
+  await expect(nextAction).toContainText("대상과 문구를 확인한 뒤 직접 보내세요. 자동 발송하지 않아요.");
+  expect(await nextAction.evaluate((node) => getComputedStyle(node, "::after").content)).toContain(
+    "일정이 어제 19:30에 변경되었어요",
+  );
+  await expect(preparation.getByText("변경 전 확인 1 · 미열람 3")).toBeVisible();
+  await expect(preparation.getByText("참석 7 · 불참 2 · 미응답 3")).toBeVisible();
+  await expect(preparation.getByText("2명은 아직 작성 전")).toBeVisible();
+  await expect(preparation.getByText("을지로 북살롱 예약 확인")).toBeVisible();
   await expect(preparation.getByRole("listitem")).toHaveCount(4);
   await expect(workbox.getByRole("listitem")).toHaveCount(4);
   await expect(workbox.getByRole("combobox", { name: /보류 기간/ })).toHaveCount(0);
@@ -828,53 +859,63 @@ test("live locks the approved mobile attendance board", async ({ mount, page }, 
   const component = await mountApproved(
     mount,
     page,
-    liveApprovedView(
-      <MeetingResponseLedger
-        presentation="meetingDay"
-        rows={liveAttendees.map((attendee) => ({
-          membershipId: attendee.membershipId,
-          displayName: attendee.displayName,
-          secondaryLabel: attendee.displayName,
-          response: attendee.rsvpStatus === "GOING"
-            ? "GOING"
-            : attendee.rsvpStatus === "DECLINED"
-              ? "NOT_GOING"
-              : "NO_RESPONSE",
-          attendance: attendee.attendanceStatus,
-          attendanceRevision: attendee.attendanceRevision,
-          questionCount: null,
-          recentResponseLabel: null,
-        }))}
-        onAttendanceChange={() => undefined}
-        onBulkAttendanceChange={() => undefined}
-        pendingUndo={{
-          description: "출석 8명 저장됨",
-          onUndo: () => undefined,
-          onOpenHistory: () => undefined,
-          onDismiss: () => undefined,
-        }}
-      />,
-    ),
+    liveApprovedView(approvedLiveContent()),
     APPROVED_MOBILE_VIEWPORT,
   );
-  await component.getByRole("button", { name: /전체/ }).click();
-  await page.addStyleTag({
-    content: [
-      ".rm-meeting-response-ledger__segments { display: none !important; }",
-      ".rm-meeting-response-ledger__checkin-action { display: none !important; }",
-      ".rm-meeting-response-ledger__correction > span { display: none !important; }",
-      ".rm-workspace-undo-bar__actions button:nth-child(n+2) { display: none !important; }",
-      ".rm-host-operating-room[data-phase='live'] .rm-operating-room-next-action { display: none !important; }",
-    ].join(""),
-  });
   await expect(component.getByRole("heading", { name: "출석 확인" })).toBeVisible();
-  await expect(component.getByLabel("박서윤 실제 출석")).toHaveValue("ATTENDED");
-  await expect(component.getByLabel("이하린 실제 출석")).toHaveValue("UNKNOWN");
-  await expect(component.getByText("미응답 응답").first()).toBeVisible();
-  await expect(component.getByRole("button", { name: "되돌리기" })).toBeVisible();
+  await expect(component.getByRole("button", { name: "박서윤 참석" })).toHaveAttribute("aria-pressed", "true");
+  await expect(component.getByRole("button", { name: "박서윤 불참" })).toBeVisible();
+  await expect(component.getByRole("button", { name: "박서윤 미확인" })).toBeVisible();
+  await expect(component.getByRole("button", { name: "이하린 미확인" })).toHaveAttribute("aria-pressed", "true");
+  await expect(component.getByText("미응답").first()).toBeVisible();
+  await expect(component.getByRole("button", { name: "나머지 2명 모두 참석으로 표시" })).toBeVisible();
+  await expect(component.getByText("선택하면 바로 저장돼요.")).toBeVisible();
+  await expect(component.getByRole("button", { name: "실행 취소" })).toBeVisible();
   await expect(component.getByText("출석 8명 저장됨")).toBeVisible();
-  await page.addStyleTag({
-    content: ".rm-meeting-response-ledger__correction { display: none !important; }",
-  });
   await captureHostApproved({ id: "host-live-mobile", page, testInfo, regions: [] });
+});
+
+test("empty operating room primary stays readable without a phase overlay", async ({ mount, page }) => {
+  await page.setViewportSize(APPROVED_DESKTOP_VIEWPORT);
+  const component = await mount(
+    <HostOperatingRoomPage
+      view={{
+        meeting: null,
+        phases: [],
+        phase: "prep",
+        nextAction: {
+          kind: "create-meeting",
+          state: "actionable",
+          workItemKey: null,
+          label: "첫 모임 만들기",
+          reason: "운영실에서 준비할 첫 모임을 만드세요.",
+          href: "/clubs/reading-sai/app/host/sessions/new",
+        },
+        preparation: [],
+        partialFailures: [],
+        closing: null,
+      }}
+      dDayLabel={null}
+      headerLinks={null}
+      phaseLinks={[]}
+      phaseNormalizationReason={null}
+      optionalFailureMessages={[]}
+      recovery={null}
+      liveContent={null}
+      closingContent={null}
+      workboxContent={<aside>작업함</aside>}
+      createMeetingHref="/clubs/reading-sai/app/host/sessions/new"
+      onPhaseChange={() => undefined}
+      onRetryPreparation={() => undefined}
+      onRetryOptional={() => undefined}
+      nextActionPending={false}
+      onDeferNextAction={() => undefined}
+    />,
+  );
+  const primary = component.locator("a.rm-operating-room-next-action__primary");
+  await expect(primary).toBeVisible();
+  await expect(primary).toHaveText("첫 모임 만들기");
+  const fontSize = await primary.evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize));
+  expect(fontSize).toBeGreaterThan(10);
+  expect(await primary.evaluate((node) => getComputedStyle(node, "::after").content)).toBe("none");
 });

@@ -53,6 +53,7 @@ export function meetingResponseLedgerRowsFromAttendees(
       membershipId: attendee.membershipId,
       displayName: attendee.displayName,
       secondaryLabel: attendee.accountName?.trim() || attendee.displayName,
+      avatarKey: attendee.avatarKey,
       response: mapRsvpToLedgerResponse(attendee.rsvpStatus),
       attendance: attendee.attendanceStatus,
       attendanceRevision: attendee.attendanceRevision,

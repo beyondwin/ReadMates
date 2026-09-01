@@ -189,13 +189,12 @@ test("prep, live attendance receipt and undo, and closing stay on one scoped cur
   await page.getByRole("tab", { name: /현장/ }).click();
   await expectOperatingRoomContext(page, "live");
   const attendance = page.getByRole("region", { name: "출석 확인" });
-  await attendance.getByRole("button", { name: /^전체/ }).click();
 
   const absentResponse = page.waitForResponse((response) => (
     response.request().method() === "POST"
       && response.url().includes(`/host/sessions/${SESSION_ID}/attendance`)
   ));
-  await attendance.getByLabel("합성 멤버 실제 출석").selectOption("ABSENT");
+  await attendance.getByRole("button", { name: "합성 멤버 불참" }).click();
   expect((await absentResponse).status()).toBe(200);
   await expect.poll(memberResponseAndAttendance).toBe("DECLINED|ABSENT");
   await expectOperatingRoomContext(page, "live");
@@ -205,7 +204,7 @@ test("prep, live attendance receipt and undo, and closing stay on one scoped cur
       && response.url().includes(`/host/sessions/${SESSION_ID}/changes/`)
       && response.url().includes("/restore")
   ));
-  await page.getByRole("button", { name: "되돌리기" }).click();
+  await page.getByRole("button", { name: "실행 취소" }).click();
   expect((await undoResponse).status()).toBe(200);
   await expect.poll(memberResponseAndAttendance).toBe("DECLINED|UNKNOWN");
   await expectOperatingRoomContext(page, "live");
@@ -240,7 +239,7 @@ test("prep, live attendance receipt and undo, and closing stay on one scoped cur
 
   await page.goto(`${HOST_PATH}?phase=closing`);
   await expectOperatingRoomContext(page, "closing");
-  await expect(page.getByRole("region", { name: "장부 마감 체크리스트" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "마감 현황" })).toBeVisible();
   const recordReview = page.getByRole("link", { name: "기록 패키지 검토" }).first();
   await expect(recordReview).toHaveAttribute(
     "href",

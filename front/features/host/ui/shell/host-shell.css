@@ -361,6 +361,8 @@ button.rm-host-workspace-switcher__choice {
     z-index: 40;
     width: 100%;
     min-height: calc(var(--m-nav-h) + var(--m-safe-bottom));
+    background: var(--paper-50);
+    border-block-start: 1px solid var(--line);
   }
 
   .rm-app-club-shell[data-workspace="host"] [data-club-shell-region="mobile-spine"] {

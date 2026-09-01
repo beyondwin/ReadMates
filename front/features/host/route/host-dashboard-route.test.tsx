@@ -660,7 +660,7 @@ describe("HostDashboardRoute", () => {
     routeMocks.detailRefetchData = meetingDetail;
     const { router } = renderRoute("/clubs/reading-sai/app/host?phase=live&from=notice");
 
-    await user.click(await screen.findByRole("button", { name: /지후/ }));
+    await user.click(await screen.findByRole("button", { name: "지후 참석" }));
     expect(await screen.findByRole("alert", { name: "출석 변경 충돌" })).toBeVisible();
     await user.click(screen.getByRole("tab", { name: /준비실/ }));
 
@@ -675,14 +675,15 @@ describe("HostDashboardRoute", () => {
     const user = userEvent.setup();
     renderRoute("/clubs/reading-sai/app/host?phase=live");
 
-    const attendance = await screen.findByRole("region", { name: "출석 확인" });
-    await user.click(within(attendance).getByRole("button", { name: /지후/ }));
+    expect(await screen.findByRole("region", { name: "현장 현황" })).toBeVisible();
+    const attendance = screen.getByRole("region", { name: "출석 확인" });
+    await user.click(within(attendance).getByRole("button", { name: "지후 참석" }));
     expect(routeMocks.updateAttendance).toHaveBeenCalledWith({
       sessionId: "session-7",
       attendance: [{ membershipId: "member-1", attendanceStatus: "ATTENDED" }],
     });
 
-    await user.click(await screen.findByRole("button", { name: "되돌리기" }));
+    await user.click(await screen.findByRole("button", { name: "실행 취소" }));
     await waitFor(() => expect(routeMocks.restoreChange).toHaveBeenCalledWith({
       sessionId: "session-7",
       changeId: "change-1",
@@ -703,14 +704,14 @@ describe("HostDashboardRoute", () => {
     }));
 
     expect(await screen.findByRole("tab", { name: /마감실/ })).toHaveAttribute("aria-selected", "true");
-    const checklist = screen.getByRole("region", { name: "장부 마감 체크리스트" });
+    const checklist = screen.getByRole("region", { name: "마감 현황" });
     expect(checklist).toHaveTextContent("출석 확정");
     expect(checklist).toHaveTextContent("기록 초안");
     expect(screen.getByRole("link", { name: "기록 패키지 검토" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7/edit?records=json",
     );
-    expect(within(checklist).getByRole("link", { name: "확인하기" })).toHaveAttribute(
+    expect(within(checklist).getByRole("link", { name: "기록 초안 자세히 보기" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7?section=records",
     );
@@ -777,7 +778,7 @@ describe("HostDashboardRoute", () => {
     };
     renderRoute("/clubs/reading-sai/app/host?phase=live");
 
-    await user.click(await screen.findByRole("button", { name: /지후/ }));
+    await user.click(await screen.findByRole("button", { name: "지후 참석" }));
 
     const comparison = await screen.findByRole("alert", { name: "출석 변경 충돌" });
     expect(routeMocks.refetchDetail).toHaveBeenCalledTimes(1);
@@ -797,7 +798,7 @@ describe("HostDashboardRoute", () => {
     routeMocks.detailRefetchData = meetingDetail;
     renderRoute("/clubs/reading-sai/app/host?phase=live");
 
-    await user.click(await screen.findByRole("button", { name: /지후/ }));
+    await user.click(await screen.findByRole("button", { name: "지후 참석" }));
 
     const unknown = await screen.findByRole("status", { name: "출석 변경 결과 확인" });
     expect(unknown).toHaveTextContent("같은 변경을 다시 보내지 않습니다");
@@ -816,7 +817,7 @@ describe("HostDashboardRoute", () => {
     routeMocks.updateAttendance.mockRejectedValueOnce({ status: 409, code: "REVISION_CONFLICT" });
     routeMocks.detailRefetchData = meetingDetail;
     renderRoute("/clubs/reading-sai/app/host?phase=live");
-    await user.click(await screen.findByRole("button", { name: /지후/ }));
+    await user.click(await screen.findByRole("button", { name: "지후 참석" }));
     expect(await screen.findByRole("alert", { name: "출석 변경 충돌" })).toBeVisible();
 
     const unsubscribe = subscribeHostAuthorityLoss((event) => {
@@ -843,7 +844,7 @@ describe("HostDashboardRoute", () => {
     routeMocks.detailRefetchData = meetingDetail;
     const { router } = renderRoute("/clubs/reading-sai/app/host?phase=live");
 
-    await user.click(await screen.findByRole("button", { name: /지후/ }));
+    await user.click(await screen.findByRole("button", { name: "지후 참석" }));
     expect(await screen.findByRole("alert", { name: "출석 변경 충돌" })).toBeVisible();
 
     const nextMeeting: HostSessionDetailResponse = {
@@ -874,9 +875,9 @@ describe("HostDashboardRoute", () => {
     await screen.findByRole("heading", { name: "여덟 번째 독서모임" });
     expect(screen.queryByRole("alert", { name: "출석 변경 충돌" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "내 선택으로 다시 저장" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /지후/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "지후 참석" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /민수/ }));
+    await user.click(screen.getByRole("button", { name: "민수 참석" }));
     expect(routeMocks.updateAttendance).toHaveBeenCalledTimes(1);
     expect(routeMocks.updateAttendance).toHaveBeenCalledWith({
       sessionId: "session-8",

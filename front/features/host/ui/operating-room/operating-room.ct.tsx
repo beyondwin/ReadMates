@@ -206,11 +206,7 @@ for (const viewport of [
     await expect(component.getByRole("region", { name: "준비 현황" })).toBeVisible();
     await expect(component.getByRole("listitem")).toHaveCount(4);
     const detail = component.getByText("변경 전 확인 1 · 미열람 3");
-    if (viewport.width === 390) {
-      await expect(detail).toBeAttached();
-    } else {
-      await expect(detail).toBeVisible();
-    }
+    await expect(detail).toBeVisible();
     const firstRow = component.getByRole("listitem").first();
     const firstBox = await firstRow.boundingBox();
     expect(firstBox).not.toBeNull();

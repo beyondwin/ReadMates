@@ -24,7 +24,9 @@ import type { HostWorkboxItem } from "@/features/host/api/host-workbox-contracts
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import { mergeCoherentWorkboxPages } from "@/features/host/model/host-workbox-page-chain";
 import {
+  buildClosingPhaseStatusRows,
   buildHostOperatingRoomView,
+  buildLivePhaseStatusRows,
   type HostMeetingPhase,
   type HostAuthoritativeWorkItem,
   type HostOperatingRoomSource,
@@ -70,7 +72,7 @@ import {
   HostOperatingRoomPage,
   type AttendanceRecoveryView,
 } from "@/features/host/ui/operating-room/host-operating-room-page";
-import { SessionClosingBoard } from "@/features/host/ui/session-closing-board";
+import { PhaseStatusLedger } from "@/features/host/ui/operating-room/phase-status-ledger";
 import { HostWorkbox } from "@/features/host/ui/workbox/host-workbox";
 import type { HostWorkboxDeferralOption } from "@/features/host/ui/workbox/host-work-item";
 import type { WorkspacePendingUndo } from "@/features/host/ui/session-workspace/workspace-undo-bar";
@@ -494,21 +496,33 @@ export function HostDashboardRoute({
     : null;
 
   const liveContent = selectedDetail ? (
-    <MeetingResponseLedger
-      presentation="meetingDay"
-      rows={meetingResponseLedgerRowsFromAttendees(selectedDetail.attendees, activeAttendanceWriteStates)}
-      onAttendanceChange={(membershipId, attendance) => {
-        void commitAttendance([membershipId], attendance);
-      }}
-      onBulkAttendanceChange={(membershipIds, attendance) => {
-        void commitAttendance(membershipIds, attendance);
-      }}
-      pendingUndo={pendingUndo}
-    />
+    <>
+      <PhaseStatusLedger
+        title="현장 현황"
+        rows={buildLivePhaseStatusRows(selectedDetail, paths.hostBasePath)}
+        LinkComponent={LinkComponent}
+      />
+      <MeetingResponseLedger
+        presentation="attendanceBoard"
+        agendaHref={hostSessionHref(paths.hostBasePath, selectedDetail.sessionId, "?section=agenda")}
+        rows={meetingResponseLedgerRowsFromAttendees(selectedDetail.attendees, activeAttendanceWriteStates)}
+        onAttendanceChange={(membershipId, attendance) => {
+          void commitAttendance([membershipId], attendance);
+        }}
+        onBulkAttendanceChange={(membershipIds, attendance) => {
+          void commitAttendance(membershipIds, attendance);
+        }}
+        pendingUndo={pendingUndo}
+      />
+    </>
   ) : null;
 
   const closingContent = view.closing ? (
-    <SessionClosingBoard view={view.closing} LinkComponent={LinkComponent} embedded />
+    <PhaseStatusLedger
+      title="마감 현황"
+      rows={buildClosingPhaseStatusRows(view.closing)}
+      LinkComponent={LinkComponent}
+    />
   ) : (
     <p className="rm-host-operating-room__phase-state" role="alert">
       마감 상태를 불러오지 못했습니다. 준비된 다른 운영 정보는 그대로 유지됩니다.
