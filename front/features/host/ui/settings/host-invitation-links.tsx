@@ -77,8 +77,8 @@ export function HostInvitationLinks({
     {loading ? <p role="status">초대 링크를 불러오는 중입니다.</p> : null}
     {error ? <div role="alert"><p>{error}</p><button type="button" onClick={onRetry}>다시 시도</button></div> : null}
     {!loading && !error && links.length === 0 ? <p className="muted">아직 만든 링크가 없습니다.</p> : null}
-    <div className="stack">{links.map((item) => <article className="surface stack" key={item.linkId}>
-      <div className="cluster"><strong>{item.name}</strong><span className="badge">{item.status}</span><span className="small muted">revision {item.revision}</span></div>
+    <div className="stack">{links.map((item) => <article className="rm-host-editorial-ledger__row" key={item.linkId}>
+      <div className="rm-host-editorial-ledger__row-copy"><strong>{item.name}</strong><span className="badge">{item.status}</span><span className="small muted">revision {item.revision}</span></div>
       <p className="small muted">사용 {item.usedCount}/{item.maxUses} · 만료 {new Date(item.expiresAt).toLocaleDateString("ko-KR")}</p>
       <div className="cluster">
         {(item.status === "ACTIVE" || item.status === "PAUSED") ? <button type="button" className="btn-quiet" onClick={() => onToggle(item)}>{item.status === "ACTIVE" ? "링크 일시정지" : "링크 다시 시작"}</button> : null}

@@ -57,18 +57,18 @@
   border-top: 1px solid var(--line);
 }
 
-.rm-host-person__facts dl {
+.rm-host-person__facts dl,
+.rm-host-person__facts {
   display: grid;
   gap: 0;
-  margin: var(--space-md) 0;
 }
 
-.rm-host-person__facts dl > div {
+.rm-host-person__facts > div {
   display: grid;
   grid-template-columns: 120px minmax(0, 1fr);
   gap: var(--space-sm);
   padding: var(--space-sm) 0;
-  border-bottom: 1px solid var(--line-soft, var(--line));
+  border-bottom: 1px solid var(--line);
 }
 
 .rm-host-person__facts dt {
@@ -131,7 +131,7 @@
   }
 
   .rm-host-person__attendance li,
-  .rm-host-person__facts dl > div {
+  .rm-host-person__facts > div {
     grid-template-columns: minmax(0, 1fr);
   }
 }

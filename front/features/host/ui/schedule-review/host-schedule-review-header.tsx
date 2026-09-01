@@ -15,12 +15,14 @@ export function HostScheduleReviewHeader({
   sessionNumber,
   bookTitle,
   scheduleRevision,
+  unreadMemberCount,
   LinkComponent = DefaultLink,
 }: {
   returnHref: string;
   sessionNumber: number;
   bookTitle: string;
   scheduleRevision: number;
+  unreadMemberCount?: number;
   LinkComponent?: ComponentType<HostScheduleReviewLinkProps>;
 }) {
   return (
@@ -28,6 +30,7 @@ export function HostScheduleReviewHeader({
       <LinkComponent to={returnHref} className="rm-schedule-review__return">운영실로 돌아가기</LinkComponent>
       <h1>일정 미열람 검토</h1>
       <p>{sessionNumber}회 · {bookTitle} · 일정 {scheduleRevision}판</p>
+      {unreadMemberCount != null ? <p>미열람 {unreadMemberCount}명 · 미리보기 뒤에만 직접 보냅니다.</p> : null}
     </header>
   );
 }

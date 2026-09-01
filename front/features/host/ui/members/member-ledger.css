@@ -25,15 +25,15 @@
 }
 
 .rm-host-member-ledger tbody td {
-  padding: 0 10px;
-  border-bottom: 1px solid var(--line-soft, var(--line));
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
   vertical-align: middle;
   font-size: 14px;
 }
 
 .rm-host-member-ledger__row {
-  min-height: 44px;
-  height: 44px;
+  min-height: 62px;
+  height: auto;
 }
 
 .rm-host-member-ledger__row:hover,
@@ -177,7 +177,7 @@
     column-gap: var(--space-sm, 10px);
     row-gap: 4px;
     height: auto;
-    min-height: 44px;
+    min-height: 62px;
     padding: 12px 2px;
   }
 

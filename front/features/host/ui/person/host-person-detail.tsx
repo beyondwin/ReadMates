@@ -84,18 +84,30 @@ export function HostPersonDetail({
       <div className="rm-host-person__body">
         <section className="rm-host-person__facts" aria-labelledby="person-current-title">
           <h2 id="person-current-title">현재 상태</h2>
-          <dl>
-            <div><dt>최근 접속</dt><dd>{coarseClubAccessLabel(person.lastClubAccessAt, now)}</dd></div>
-            <div>
-              <dt>현재 일정</dt>
-              <dd>
-                {person.currentSchedule
-                  ? `일정 ${person.currentSchedule.scheduleRevision}판 · ${hostMeetingLifecycleLabel(person.currentSchedule.state)} · ${localDateTime(person.currentSchedule.scheduledAt)}`
-                  : "현재 일정 없음"}
-              </dd>
-            </div>
-            <div><dt>참석 응답</dt><dd>{person.currentRsvp ? rsvpLabels[person.currentRsvp] : "현재 응답 없음"}</dd></div>
-          </dl>
+          <div>
+            <dt>최근 접속</dt>
+            <dd>{coarseClubAccessLabel(person.lastClubAccessAt, now)}</dd>
+          </div>
+          <div>
+            <dt>현재 일정</dt>
+            <dd>
+              {person.currentSchedule
+                ? `일정 ${person.currentSchedule.scheduleRevision}판 · ${hostMeetingLifecycleLabel(person.currentSchedule.state)} · ${localDateTime(person.currentSchedule.scheduledAt)}`
+                : "현재 일정 없음"}
+            </dd>
+          </div>
+          <div>
+            <dt>참석 응답</dt>
+            <dd>{person.currentRsvp ? rsvpLabels[person.currentRsvp] : "현재 응답 없음"}</dd>
+          </div>
+          <div>
+            <dt>실제 출석</dt>
+            <dd>
+              {attendanceItems[0]
+                ? attendanceLabels[attendanceItems[0].attendanceStatus]
+                : "출석 미확인"}
+            </dd>
+          </div>
           <p className="small">페이지 열람 기록은 수집하지 않습니다.</p>
         </section>
 

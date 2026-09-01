@@ -246,10 +246,10 @@ export function HostMeetingList({
                 tabIndex={-1}
                 className="h1 editorial rm-meeting-toc__heading"
               >
-                모임
+                일정과 모임
               </h1>
               <p className="small rm-meeting-toc__lede">
-                다가오는 모임과 지난 모임을 차례로 확인합니다.
+                다가오는 일정과 지난 모임을 한 흐름에서 관리하세요.
               </p>
             </div>
             {showCreate ? (

@@ -91,6 +91,8 @@
   margin: var(--space-xs) 0;
   overflow-wrap: anywhere;
   text-wrap: balance;
+  font-size: clamp(2.25rem, 4.5vw, 3.5rem);
+  letter-spacing: -0.04em;
 }
 
 .rm-meeting-toc__lede {
@@ -192,11 +194,14 @@
 .rm-meeting-toc__row {
   position: relative;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-sm);
-  min-height: 46px;
-  padding: 10px 2px 8px;
-  border-bottom: 1px solid var(--line-soft, var(--line));
+  min-height: 62px;
+  padding: 12px 2px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
 }
 
 .rm-meeting-toc__no {
@@ -289,7 +294,7 @@
     align-items: start;
     column-gap: var(--space-sm);
     row-gap: 4px;
-    min-height: 44px;
+    min-height: 62px;
     padding: 12px 2px;
   }
 
