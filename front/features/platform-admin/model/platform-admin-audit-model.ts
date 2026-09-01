@@ -393,6 +393,8 @@ const CONVERGENCE_SOURCE_TABLES = new Set([
 ]);
 
 const ADMIN_AUDIT_ACTION_LABELS: Readonly<Record<string, string>> = {
+  SUPPORT_ACCESS_GRANT_CREATE: "지원 접근 권한을 부여했습니다.",
+  SUPPORT_ACCESS_GRANT_REVOKE: "지원 접근 권한을 회수했습니다.",
   SUPPORT_ACCESS_GRANT_CREATED: "지원 접근 권한을 부여했습니다.",
   SUPPORT_ACCESS_GRANT_REVOKED: "지원 접근 권한을 회수했습니다.",
   ADMIN_NOTIFICATION_REPLAY_CONFIRMED: "알림 재처리를 확정했습니다.",

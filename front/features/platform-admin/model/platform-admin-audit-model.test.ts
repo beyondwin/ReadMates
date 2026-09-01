@@ -185,22 +185,26 @@ describe("formatAdminAuditLedgerSentence", () => {
   });
 
   it("maps representative server-shaped audit evidence without using raw summaries as primary copy", () => {
-    const supportDomain = auditItem({
+    const supportReceiptCreate = auditItem({
       sourceSlice: "S4",
       sourceTable: "platform_admin_support_command_receipts",
       actionCategory: "SUPPORT",
-      actionType: "SUPPORT_ACCESS_GRANT_CREATED",
+      actionType: "SUPPORT_ACCESS_GRANT_CREATE",
       target: { clubId: "club-1", userId: null, jobId: null, eventId: "receipt-1", label: "사용자 숨김" },
       summary: "SUPPORT 감사 증거가 기록되었습니다.",
-      safeMetadata: [{ label: "scope", value: "METADATA_READ", kind: "code" }],
+      safeMetadata: [
+        { label: "commandType", value: "CREATE", kind: "code" },
+        { label: "scope", value: "METADATA_READ", kind: "code" },
+      ],
     });
-    const supportPlatform = auditItem({
+    const supportReceiptRevoke = auditItem({
       sourceSlice: "S4",
-      sourceTable: "platform_audit_events",
+      sourceTable: "platform_admin_support_command_receipts",
       actionCategory: "SUPPORT",
-      actionType: "SUPPORT_ACCESS_GRANT_CREATED",
-      target: { clubId: "club-1", userId: null, jobId: null, eventId: null, label: "사용자 숨김" },
-      summary: "support grant가 생성되었습니다.",
+      actionType: "SUPPORT_ACCESS_GRANT_REVOKE",
+      target: { clubId: "club-1", userId: null, jobId: null, eventId: "receipt-2", label: "사용자 숨김" },
+      summary: "SUPPORT 감사 증거가 기록되었습니다.",
+      safeMetadata: [{ label: "commandType", value: "REVOKE", kind: "code" }],
     });
     const replayPreview = auditItem({
       sourceSlice: "S5",
@@ -220,13 +224,30 @@ describe("formatAdminAuditLedgerSentence", () => {
       summary: "platform admin 이벤트가 기록되었습니다.",
     });
 
-    expect(buildAdminAuditLedgerRow(supportDomain).action).toBe("지원 접근 대상에 지원 접근 권한을 부여했습니다.");
-    expect(buildAdminAuditLedgerRow(supportPlatform).action).toBe("지원 접근 대상에 지원 접근 권한을 부여했습니다.");
+    expect(buildAdminAuditLedgerRow(supportReceiptCreate).action).toBe("지원 접근 대상에 지원 접근 권한을 부여했습니다.");
+    expect(buildAdminAuditLedgerRow(supportReceiptRevoke).action).toBe("지원 접근 대상에 지원 접근 권한을 회수했습니다.");
     expect(buildAdminAuditLedgerRow(replayPreview).action).toBe("알림 재처리 대상에 재처리 대상을 미리 확인했습니다.");
     expect(buildAdminAuditLedgerRow(platformAdmin).action).toBe("대상 클럽에 클럽 기본 정보를 수정했습니다.");
-    for (const item of [supportDomain, supportPlatform, replayPreview, platformAdmin]) {
+    for (const item of [supportReceiptCreate, supportReceiptRevoke, replayPreview, platformAdmin]) {
       expect(buildAdminAuditLedgerRow(item).action).not.toContain(item.summary);
     }
+  });
+
+  it.each([
+    ["SUPPORT_ACCESS_GRANT_CREATED", "support grant가 생성되었습니다.", "지원 접근 권한을 부여했습니다."],
+    ["SUPPORT_ACCESS_GRANT_REVOKED", "support grant가 회수되었습니다.", "지원 접근 권한을 회수했습니다."],
+  ] as const)("keeps the platform-event support mapping %s separate from receipt actions", (actionType, summary, expected) => {
+    const platformEvent = auditItem({
+      sourceSlice: "S4",
+      sourceTable: "platform_audit_events",
+      actionCategory: "SUPPORT",
+      actionType,
+      target: { clubId: "club-1", userId: null, jobId: null, eventId: null, label: "사용자 숨김" },
+      summary,
+    });
+
+    expect(buildAdminAuditLedgerRow(platformEvent).action).toBe(`지원 접근 대상에 ${expected}`);
+    expect(buildAdminAuditLedgerRow(platformEvent).action).not.toContain(summary);
   });
 
   it.each([
