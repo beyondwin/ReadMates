@@ -1,7 +1,16 @@
 import { expect, test } from "@playwright/experimental-ct-react";
-import type { Locator, Page } from "@playwright/test";
+import type { Locator, Page, TestInfo } from "@playwright/test";
 import type { ReactElement } from "react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, Route, Routes } from "react-router";
+import { GlobalSpaceSwitcher } from "@/shared/ui/global-space-switcher";
+import {
+  approvedMockup,
+  captureApprovedComparison,
+  expectGeometryWithinTolerance,
+  expectLocatorGeometry,
+  isSemanticDocumentOrder,
+  type ApprovedRegion,
+} from "@/tests/e2e/support/approved-mockup-contract";
 import {
   VISUAL_AUTHORITY_VIEWPORTS,
   expectMinimumTargetSize,
@@ -9,13 +18,15 @@ import {
   expectReducedMotion,
   expectVisibleFocus,
 } from "@/tests/e2e/support/visual-authority-contract";
+import { AdminShellLayout } from "../route/admin-shell-layout";
 import { AdminAuditLedger } from "./admin-audit-ledger";
 import { AdminClubsLedger } from "./admin-clubs-ledger";
 import { AdminEditorialLedgerCtHarness } from "./admin-editorial-ledger-ct-harness";
 import {
+  ADMIN_SHELL_VISUAL_CAPABILITIES,
+  ADMIN_SHELL_VISUAL_SPACE_OPTIONS,
   EDITORIAL_LEDGER_LONG_CLUB_NAME,
   EDITORIAL_LEDGER_LONG_TAKEDOWN_LIMITATION,
-  EDITORIAL_LEDGER_LONG_TODAY_TITLE,
   clubsEmptyEvidence,
   clubsPaginationFailure,
   clubsTabletLedger,
@@ -44,6 +55,11 @@ import { AdminOperationStateActions } from "./admin-operation-state-actions";
 import { AdminPublicTakedownWorkbench } from "./admin-public-takedown-workbench";
 import { AdminTodayLedger } from "./admin-today-ledger";
 
+const APPROVED_DESKTOP_VIEWPORT = { width: 1672, height: 941 } as const;
+const APPROVED_MOBILE_VIEWPORT = { width: 390, height: 844 } as const;
+const QUEUE_DESKTOP_GEOMETRY = { x: 260, y: 86, width: 559, height: 855 } as const;
+const DOCKET_DESKTOP_GEOMETRY = { x: 819, y: 86, width: 853, height: 855 } as const;
+
 async function mountEditorial(
   mount: (component: ReactElement) => Promise<Locator>,
   page: Page,
@@ -61,6 +77,117 @@ async function mountEditorial(
   await expectNoNestedLiveRegions(component);
   await expectNoHorizontalOverflow(page);
   return component;
+}
+
+function todayShellFixture(outlet: ReactElement) {
+  return (
+    <MemoryRouter initialEntries={["/admin/today"]}>
+      <Routes>
+        <Route
+          path="/admin"
+          element={
+            <AdminShellLayout
+              workspaceAccountLabel="운영자"
+              spaceSwitcher={
+                <GlobalSpaceSwitcher
+                  currentIdentity={{ productSpace: "platform" }}
+                  options={ADMIN_SHELL_VISUAL_SPACE_OPTIONS}
+                  onSelect={async () => ({ status: "selected" })}
+                />
+              }
+              spaceControlEpoch={0}
+              capabilities={ADMIN_SHELL_VISUAL_CAPABILITIES}
+              currentNavigationOwner="today"
+              routePath="today"
+              breadcrumbExtra={null}
+              alarm={{
+                summary: {
+                  attention: { count: 3, headline: "알림 전달 지연" },
+                  unacknowledged: 3,
+                  serviceState: "ok",
+                  asOf: "2026-08-26T10:00:00Z",
+                },
+                state: "ready",
+              }}
+              accountBusy={false}
+              accountError={null}
+              onOtherAccountLogin={() => undefined}
+              outletContext={{ authorityEpoch: 0 }}
+            />
+          }
+        >
+          <Route path="*" element={outlet} />
+        </Route>
+      </Routes>
+    </MemoryRouter>
+  );
+}
+
+async function mountTodayApproved(
+  mount: (component: ReactElement) => Promise<Locator>,
+  page: Page,
+  fixture: TodayLedgerFixture,
+  viewport: { width: number; height: number },
+) {
+  await page.setViewportSize(viewport);
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.addStyleTag({
+    content: `
+      html, body, #root {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        overflow: hidden !important;
+      }
+    `,
+  });
+  const component = await mount(todayShellFixture(todayNode(fixture)));
+  await page.evaluate(() => document.fonts.ready);
+  await expectReducedMotion(page);
+  await expectNoNestedLiveRegions(component);
+  await expectNoHorizontalOverflow(page);
+  return component;
+}
+
+async function regionFromLocator(
+  locator: Locator,
+  name: string,
+  expected: ApprovedRegion["expected"],
+  toleranceCssPx: 2 | 4,
+): Promise<ApprovedRegion> {
+  const actual = await locator.boundingBox();
+  if (!actual) throw new Error(`${name} has no bounding box`);
+  return {
+    name,
+    actual: { x: actual.x, y: actual.y, width: actual.width, height: actual.height },
+    expected,
+    toleranceCssPx,
+  };
+}
+
+async function captureTodayApproved(input: {
+  id: "admin-today-desktop" | "admin-today-mobile" | "admin-work-detail-mobile";
+  candidate: Locator;
+  page: Page;
+  testInfo: TestInfo;
+  regions: readonly ApprovedRegion[];
+}) {
+  let regions = input.regions;
+  try {
+    for (const region of regions) {
+      expectGeometryWithinTolerance(region.actual, region.expected, region.toleranceCssPx);
+    }
+  } catch {
+    regions = [];
+  }
+  return captureApprovedComparison({
+    entry: approvedMockup(input.id),
+    candidate: input.page.locator("#root"),
+    page: input.page,
+    testInfo: input.testInfo,
+    regions,
+  });
 }
 
 async function expectNoNestedLiveRegions(component: Locator): Promise<void> {
@@ -231,24 +358,42 @@ function takedownNode(state: typeof emergencyTakedownIdle | typeof emergencyTake
   );
 }
 
-test("Today L1 locks the 1440 wide editorial composition", async ({ mount, page }) => {
+test("Today L1 locks the approved desktop composition", async ({ mount, page }, testInfo) => {
+  test.setTimeout(90_000);
   expect(todayDesktopLedger.capabilities).toEqual(["VIEW_TODAY"]);
   expect(todayDesktopLedger.allowedActions).toEqual(["ACKNOWLEDGE", "SNOOZE", "RESOLVE"]);
-  const component = await mountEditorial(
-    mount,
+  const component = await mountTodayApproved(mount, page, todayDesktopLedger, APPROVED_DESKTOP_VIEWPORT);
+  const queue = component.getByRole("region", { name: "운영 케이스 큐" });
+  const docket = component.getByRole("region", { name: "운영 케이스 상세" });
+  const regions: ApprovedRegion[] = [];
+  try {
+    regions.push(await regionFromLocator(queue, "queue", QUEUE_DESKTOP_GEOMETRY, 4));
+    regions.push(await regionFromLocator(docket, "docket", DOCKET_DESKTOP_GEOMETRY, 4));
+  } catch {
+    // Capture still runs so RED writes candidate/overlay/diff/report.
+  }
+  await captureTodayApproved({
+    id: "admin-today-desktop",
+    candidate: component,
     page,
-    todayNode(todayDesktopLedger),
-    VISUAL_AUTHORITY_VIEWPORTS.desktopWide,
-  );
-  await expect(component.getByRole("heading", { name: "오늘의 운영 케이스" })).toBeVisible();
-  await expect(component.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
-  await expect(component.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
-  await expect(component.getByRole("heading", { name: EDITORIAL_LEDGER_LONG_TODAY_TITLE })).toBeVisible();
+    testInfo,
+    regions,
+  });
+  await expectLocatorGeometry(queue, QUEUE_DESKTOP_GEOMETRY, 4);
+  await expectLocatorGeometry(docket, DOCKET_DESKTOP_GEOMETRY, 4);
+  await expect(component.getByRole("heading", { name: "오늘 할 일" }).first()).toBeVisible();
+  await expect(component.getByText("알림 전달 지연").first()).toBeInViewport();
+  expect(await isSemanticDocumentOrder([
+    docket.getByRole("heading", { name: "무슨 일인가" }),
+    docket.getByRole("heading", { name: "왜 중요한가" }),
+    docket.getByRole("heading", { name: "확인한 근거" }),
+    docket.getByRole("heading", { name: "다음 행동" }),
+    docket.getByRole("heading", { name: "최근 처리 기록" }),
+  ])).toBe(true);
   await expect(component.getByRole("button", { name: "확인함" })).toBeEnabled();
   await expect(component.locator(".admin-receipt-timeline")).toHaveCount(0);
   const primary = component.getByRole("button", { name: "확인함" });
   await expectMinimumTargetSize(primary);
-  await expect(component).toHaveScreenshot("editorial-ledger-today-1440.png");
   await primary.focus();
   await expectVisibleFocus(primary);
 });
@@ -312,26 +457,65 @@ test("Review audit locks the 390 mobile docket composition", async ({ mount, pag
   await expectVisibleFocus(back);
 });
 
-test("Today case detail locks the 320 mobile composition", async ({ mount, page }) => {
-  expect(todayMobileCaseDetail.allowedActions).toEqual(["ACKNOWLEDGE", "SNOOZE", "RESOLVE"]);
-  const component = await mountEditorial(
-    mount,
-    page,
-    todayNode(todayMobileCaseDetail),
-    VISUAL_AUTHORITY_VIEWPORTS.mobileNarrow,
-  );
-  await expect(component.getByRole("heading", { name: "오늘의 운영 케이스" })).toBeVisible();
-  await expect(component.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
-  await expect(component.getByRole("button", { name: "목록으로" })).toBeVisible();
-  await expect(component.getByRole("button", { name: "확인함" })).toBeEnabled();
-  await expect(component.getByText("다른 처리")).toBeVisible();
-  await expect(component.locator(".admin-today-ledger__columns")).toHaveCount(0);
-  await expect(component.locator(".admin-receipt-timeline")).toHaveCount(0);
-  const back = component.getByRole("button", { name: "목록으로" });
-  await expectMinimumTargetSize(back);
-  await expect(component).toHaveScreenshot("editorial-ledger-case-detail-320.png");
-  await back.focus();
-  await expectVisibleFocus(back);
+test.describe("approved mobile Today", () => {
+  test.use({ deviceScaleFactor: 2 });
+
+  test("Today mobile list locks the approved 390 composition", async ({ mount, page }, testInfo) => {
+    test.setTimeout(90_000);
+    const component = await mountTodayApproved(
+      mount,
+      page,
+      { ...todayDesktopLedger, mode: "list" },
+      APPROVED_MOBILE_VIEWPORT,
+    );
+    await captureTodayApproved({
+      id: "admin-today-mobile",
+      candidate: component,
+      page,
+      testInfo,
+      regions: [],
+    });
+    await expect(component.getByText("알림 전달 지연").first()).toBeInViewport();
+    await expect(component.getByRole("navigation", { name: "Admin 모바일 메뉴" })).toBeVisible();
+    await expect(component.getByText("필터와 신호 상태").closest("details")).not.toHaveAttribute("open");
+    await expect(component.locator(".admin-today-ledger__columns")).toHaveCount(0);
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("Today case detail locks the approved 390 composition", async ({ mount, page }, testInfo) => {
+    test.setTimeout(90_000);
+    expect(todayMobileCaseDetail.allowedActions).toEqual(["ACKNOWLEDGE", "SNOOZE", "RESOLVE"]);
+    const component = await mountTodayApproved(mount, page, todayMobileCaseDetail, APPROVED_MOBILE_VIEWPORT);
+    const docket = component.getByRole("region", { name: "운영 케이스 상세" });
+    const back = component.getByRole("button", { name: "목록으로" });
+    await back.evaluate((element) => element.blur());
+    await captureTodayApproved({
+      id: "admin-work-detail-mobile",
+      candidate: component,
+      page,
+      testInfo,
+      regions: [],
+    });
+    await expect(component.getByText("알림 전달 지연").first()).toBeInViewport();
+    await expect(component.getByRole("navigation", { name: "Admin 모바일 메뉴" })).toBeVisible();
+    await expect(component.getByRole("heading", { name: "오늘 할 일" }).first()).toBeVisible();
+    await expect(docket).toBeVisible();
+    expect(await isSemanticDocumentOrder([
+      docket.getByRole("heading", { name: "무슨 일인가" }),
+      docket.getByRole("heading", { name: "왜 중요한가" }),
+      docket.getByRole("heading", { name: "확인한 근거" }),
+      docket.getByRole("heading", { name: "다음 행동" }),
+      docket.getByRole("heading", { name: "최근 처리 기록" }),
+    ])).toBe(true);
+    await expect(component.getByRole("button", { name: "목록으로" })).toBeVisible();
+    await expect(component.getByRole("button", { name: "확인함" })).toBeEnabled();
+    await expect(component.getByText("다른 처리")).toBeVisible();
+    await expect(component.locator(".admin-today-ledger__columns")).toHaveCount(0);
+    await expect(component.locator(".admin-receipt-timeline")).toHaveCount(0);
+    await expectMinimumTargetSize(back);
+    await back.focus();
+    await expectVisibleFocus(back);
+  });
 });
 
 test("Emergency takedown keeps the blocked L3 review calm at 1440", async ({ mount, page }) => {

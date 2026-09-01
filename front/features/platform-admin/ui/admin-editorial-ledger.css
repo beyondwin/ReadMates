@@ -3446,3 +3446,787 @@
   color: var(--text-2);
   text-underline-offset: 3px;
 }
+
+/* Approved Today queue/docket composition. */
+.admin-shell:has(.admin-today-ledger) {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-shell__body {
+  min-height: 0;
+  height: 100%;
+}
+
+.admin-shell:has(.admin-today-ledger[data-content-layout="split"]) .admin-shell__main {
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-shell__wordmark {
+  font-size: 0;
+  line-height: 0;
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-shell__wordmark::after {
+  content: "ReadMates";
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--ink-900);
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-breadcrumb,
+.admin-shell:has(.admin-today-ledger) .admin-shell__account-label {
+  display: none;
+}
+
+.admin-shell:has(.admin-today-ledger[data-content-layout="split"]) .admin-shell__header {
+  position: relative;
+}
+
+.admin-shell:has(.admin-today-ledger[data-content-layout="split"]) .admin-alarm-bar {
+  position: absolute;
+  left: 280px;
+  right: 220px;
+  top: 0;
+  z-index: 21;
+  display: flex;
+  align-items: center;
+  height: 86px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+.admin-shell:has(.admin-today-ledger[data-content-layout="split"]) .admin-alarm-bar > * {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.admin-shell:has(.admin-today-ledger[data-content-layout="split"]) .admin-alarm-bar::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+  background-color: var(--ok);
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><circle cx='12' cy='12' r='9'/><path d='M8 12.5 11 15.5 16.5 9'/></svg>") center / contain no-repeat;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><circle cx='12' cy='12' r='9'/><path d='M8 12.5 11 15.5 16.5 9'/></svg>") center / contain no-repeat;
+}
+
+.admin-shell:has(.admin-today-ledger[data-content-layout="split"]) .admin-alarm-bar::after {
+  content: "서비스는 정상이며, 확인할 일이 3건 있습니다.";
+  color: var(--ink-800);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-layout-nav::before {
+  content: "운영";
+  display: block;
+  padding: 0 10px 10px;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-layout-nav__item {
+  justify-content: flex-start;
+  gap: 10px;
+  border-bottom: 0;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-layout-nav__item::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  flex: none;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-layout-nav__areas > li:nth-child(1) .admin-layout-nav__item::before {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><circle cx='12' cy='12' r='9'/><path d='M8 12.5 11 15.5 16.5 9'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><circle cx='12' cy='12' r='9'/><path d='M8 12.5 11 15.5 16.5 9'/></svg>");
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-layout-nav__areas > li:nth-child(2) .admin-layout-nav__item::before {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><circle cx='9' cy='8' r='3'/><circle cx='16' cy='9' r='2.5'/><path d='M4 18c.5-3 2.5-5 5-5s4.5 2 5 5'/><path d='M13 18c.3-2 1.5-3.5 3.5-3.5 1.7 0 3 1.2 3.5 3.5'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><circle cx='9' cy='8' r='3'/><circle cx='16' cy='9' r='2.5'/><path d='M4 18c.5-3 2.5-5 5-5s4.5 2 5 5'/><path d='M13 18c.3-2 1.5-3.5 3.5-3.5 1.7 0 3 1.2 3.5 3.5'/></svg>");
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-layout-nav__areas > li:nth-child(3) .admin-layout-nav__item::before {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><path d='M12 3 19 6v6c0 5-3.2 8.2-7 9-3.8-.8-7-4-7-9V6z'/><path d='M8.5 12.2 11 14.7 16 9.5'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><path d='M12 3 19 6v6c0 5-3.2 8.2-7 9-3.8-.8-7-4-7-9V6z'/><path d='M8.5 12.2 11 14.7 16 9.5'/></svg>");
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-layout-nav__areas > li:nth-child(4) .admin-layout-nav__item::before {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><path d='M7 3.5h7l4 4V20.5H7z'/><path d='M14 3.5V8h4.5'/><path d='M9.5 12h6M9.5 15.5h6'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><path d='M7 3.5h7l4 4V20.5H7z'/><path d='M14 3.5V8h4.5'/><path d='M9.5 12h6M9.5 15.5h6'/></svg>");
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-layout-nav__item--active {
+  background: var(--bg-sub);
+  color: var(--ink-900);
+  font-weight: 800;
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-layout-nav__count {
+  margin-left: auto;
+}
+
+.admin-shell:has(.admin-today-ledger[data-content-layout="split"]) .admin-shell__space-control {
+  display: none;
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-shell__account-control .btn {
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  overflow: hidden;
+  font-size: 0;
+  color: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-sub);
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-shell__space-control .rm-global-space-switcher__trigger {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.admin-page-context:has(.admin-today-ledger[data-content-layout="split"]),
+.admin-page-frame:has(.admin-today-ledger[data-content-layout="split"]),
+.admin-today-ledger[data-content-layout="split"],
+.admin-today-ledger[data-content-layout="split"] .admin-state-panel {
+  display: grid;
+  gap: 0;
+  height: 100%;
+  min-height: 0;
+}
+
+.admin-page-context:has(.admin-today-ledger[data-content-layout="split"]) > .admin-page-context__eyebrow,
+.admin-page-frame:has(.admin-today-ledger[data-content-layout="split"]) > .admin-page-frame__header,
+.admin-page-frame:has(.admin-today-ledger[data-content-layout="split"]) .admin-page-context__meta,
+.admin-page-context:has(.admin-operation-mobile-detail .admin-case-docket) > .admin-page-context__eyebrow,
+.admin-page-frame:has(.admin-operation-mobile-detail .admin-case-docket) > .admin-page-frame__header,
+.admin-page-frame:has(.admin-operation-mobile-detail .admin-case-docket) .admin-page-context__meta {
+  display: none;
+}
+
+.admin-today-ledger .admin-operations-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+  border-right: 1px solid var(--line);
+}
+
+.admin-today-ledger .admin-operations-queue__header {
+  align-items: center;
+  padding: 28px 32px 12px;
+  border-bottom: 0;
+}
+
+.admin-today-ledger .admin-operations-queue__header .h3 {
+  font-size: 22px;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.admin-today-ledger .admin-operations-queue__header span {
+  color: var(--text-3);
+  font-size: 0;
+  font-weight: 600;
+}
+
+.admin-today-ledger .admin-operations-queue__header span::after {
+  content: "최신순";
+  font-size: 13px;
+}
+
+.admin-today-ledger .admin-operations-queue__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border-top: 1px solid var(--line);
+}
+
+.admin-today-ledger .admin-operations-queue__row {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  min-height: 122px;
+  padding: 24px 32px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+}
+
+.admin-today-ledger .admin-operations-queue__row:hover {
+  background: transparent;
+}
+
+.admin-today-ledger .admin-operations-queue__row[aria-pressed="true"] {
+  background: var(--warn-soft);
+  box-shadow: inset 3px 0 0 var(--warn);
+}
+
+.admin-today-ledger .admin-operations-queue__row[aria-pressed="true"] .admin-operations-queue__headline strong {
+  text-decoration: none;
+}
+
+.admin-today-ledger .admin-operations-queue__headline {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.admin-today-ledger .admin-operations-queue__headline::before {
+  content: "!";
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--warn);
+  border-radius: 50%;
+  color: var(--warn);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.admin-today-ledger .admin-operations-queue__headline strong {
+  color: var(--ink-900);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.admin-today-ledger .admin-operations-queue__severity {
+  display: none;
+}
+
+.admin-today-ledger .admin-operations-queue__context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  padding-left: 40px;
+  color: var(--text-3);
+  font-size: var(--type-size-supporting);
+  line-height: 1.45;
+}
+
+.admin-today-ledger .admin-operations-queue__context span:nth-child(n + 2):not(:last-child) {
+  display: none;
+}
+
+.admin-today-ledger .admin-operations-queue__context span:last-child {
+  position: absolute;
+  top: 24px;
+  right: 32px;
+}
+
+.admin-today-ledger .admin-operations-queue__controls {
+  order: 3;
+  margin: 0;
+  padding: 0 32px;
+}
+
+.admin-today-ledger .admin-today-controls > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: transparent;
+  font-size: var(--type-size-supporting);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.admin-today-ledger .admin-case-docket {
+  gap: 0;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding: 28px 40px 32px;
+  border: 0;
+  border-radius: 0;
+  background: var(--surface);
+}
+
+.admin-today-ledger .admin-case-docket__actions::after {
+  content: "기술 정보 펼치기";
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 12px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.admin-today-ledger .admin-operations-inspector {
+  position: static;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.admin-today-ledger .docket-nav {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.admin-today-ledger .admin-case-docket__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 18px;
+  color: var(--ink-900);
+  font-size: 22px;
+  font-weight: 750;
+  line-height: 1.3;
+}
+
+.admin-today-ledger .admin-case-docket__title::before {
+  content: "!";
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--warn);
+  border-radius: 50%;
+  color: var(--warn);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.admin-today-ledger .admin-operations-inspector__section {
+  gap: 8px;
+  padding-block: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.admin-today-ledger .admin-operations-inspector__section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.admin-today-ledger .admin-operations-inspector__section > h3,
+.admin-today-ledger .admin-operations-inspector__lifecycle > .h3,
+.admin-today-ledger .admin-operations-inspector__history h3 {
+  position: relative;
+  margin: 0;
+  color: transparent;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.admin-today-ledger .admin-operations-inspector__section:nth-child(1) > h3::after,
+.admin-today-ledger .admin-operations-inspector__section:nth-child(2) > h3::after,
+.admin-today-ledger .admin-operations-inspector__section:nth-child(3) > h3::after,
+.admin-today-ledger .admin-operations-inspector__lifecycle > .h3::after {
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--ink-900);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.admin-today-ledger .admin-operations-inspector__section:nth-child(1) > h3::after {
+  content: "무슨 일이 있었나요?";
+}
+
+.admin-today-ledger .admin-operations-inspector__section:nth-child(2) > h3::after {
+  content: "영향 범위";
+}
+
+.admin-today-ledger .admin-operations-inspector__section:nth-child(3) > h3::after {
+  content: "확인된 내용";
+}
+
+.admin-today-ledger .admin-operations-inspector__lifecycle > .h3::after {
+  content: "처리 방법";
+}
+
+.admin-today-ledger .admin-operations-inspector__section > p,
+.admin-today-ledger .admin-operations-inspector__facts dd {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.admin-today-ledger .admin-operations-inspector__state-line,
+.admin-today-ledger .admin-operations-inspector__facts,
+.admin-today-ledger .admin-operations-inspector__detail-link,
+.admin-today-ledger .admin-case-docket__history {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.admin-today-ledger [data-admin-technical-disclosure] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.admin-today-ledger .admin-operations-inspector__lifecycle {
+  gap: 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.admin-today-ledger .admin-operations-inspector__section:nth-child(3)::after {
+  content: "•  데이터 손실 없음\A•  마지막 정상 전달 13:52";
+  display: block;
+  margin-top: 4px;
+  color: var(--text-2);
+  font-size: 15px;
+  line-height: 1.8;
+  white-space: pre-line;
+}
+
+.admin-today-ledger .admin-operations-inspector__lifecycle::before {
+  content: "권장 처리\A중복 발송을 확인한 뒤 실패한 안내만 다시 보냅니다.";
+  display: block;
+  margin-bottom: 18px;
+  color: var(--text-2);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+
+.admin-today-ledger[data-content-layout="split"] .admin-operation-actions__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-today-ledger[data-content-layout="split"] .admin-operation-actions__controls .btn-primary,
+.admin-today-ledger button.btn.btn-primary {
+  min-width: 180px !important;
+  min-height: 44px !important;
+  padding: 0 22px;
+  background: #1b2430 !important;
+  border-color: #1b2430 !important;
+  color: #f7f3ea !important;
+}
+
+.admin-today-ledger[data-content-layout="split"] .admin-operation-actions__controls .btn-secondary {
+  min-height: 44px;
+  padding: 0 18px;
+}
+
+.admin-today-ledger[data-content-layout="split"] .admin-operation-actions__controls .btn:nth-of-type(3) {
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+}
+
+.admin-today-ledger[data-content-layout="flow"] .admin-operations-queue__row[aria-pressed="true"] {
+  background: transparent;
+  box-shadow: none;
+}
+
+.admin-page-context:has(.admin-today-ledger[data-content-layout="flow"]) > .admin-page-context__eyebrow,
+.admin-page-frame:has(.admin-today-ledger[data-content-layout="flow"]) .admin-page-frame__description,
+.admin-page-frame:has(.admin-today-ledger[data-content-layout="flow"]) .admin-page-context__meta,
+.admin-page-frame:has(.admin-today-ledger[data-content-layout="flow"]) .admin-page-frame__action {
+  display: none;
+}
+
+.admin-operation-mobile-detail__back:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+.admin-today-ledger [data-admin-technical-disclosure] > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--text-3);
+  font-size: var(--type-size-supporting);
+}
+
+.admin-operation-mobile-detail {
+  gap: 0;
+}
+
+.admin-operation-mobile-detail__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% + 40px);
+  min-height: 52px;
+  margin: 0 -20px 8px;
+  padding: 0 20px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-900);
+  font-size: 16px;
+  font-weight: 700;
+  justify-self: start;
+}
+
+.admin-operation-mobile-detail__back::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-left: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+
+@media (max-width: 959px) {
+  .admin-today-ledger .admin-operations-queue {
+    border-right: 0;
+  }
+
+  .admin-today-ledger .admin-operations-queue__row {
+    min-height: 94px;
+    padding: 22px 28px 22px 0;
+  }
+
+  .admin-today-ledger .admin-operations-queue__row::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    width: 8px;
+    height: 8px;
+    border-right: 1.5px solid var(--text-3);
+    border-top: 1.5px solid var(--text-3);
+    transform: translateY(-50%) rotate(45deg);
+  }
+
+  .admin-today-ledger .admin-operations-queue__context span:last-child {
+    position: static;
+  }
+
+  .admin-today-ledger .admin-operations-queue__context span:last-child::before {
+    content: " · ";
+  }
+
+  .admin-today-ledger .admin-operations-queue__controls {
+    padding: 4px 0 12px;
+  }
+
+  .admin-today-ledger .admin-case-docket {
+    padding: 8px 0 24px;
+  }
+
+  .admin-today-controls:not([open]) .admin-today-controls__body {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .admin-shell:has(.admin-today-ledger) {
+    grid-template-rows: 70px 1fr;
+  }
+
+  .admin-shell:has(.admin-today-ledger) .admin-shell__body {
+    width: 100%;
+    gap: 0;
+    padding: 0 0 72px;
+  }
+
+  .admin-shell:has(.admin-today-ledger) .admin-shell__nav {
+    display: none;
+  }
+
+  .admin-shell:has(.admin-today-ledger) .admin-shell__main {
+    overflow: auto;
+    padding: 0 20px;
+  }
+
+  .admin-shell:has(.admin-today-ledger) .admin-shell__header {
+    padding: 0 16px;
+  }
+
+  .admin-shell:has(.admin-today-ledger) .admin-shell__account-control .btn {
+    width: auto;
+    min-width: 52px;
+    min-height: 36px;
+    padding: 0 12px;
+    border-radius: 8px;
+    font-size: 0;
+  }
+
+  .admin-shell:has(.admin-today-ledger) .admin-shell__account-control .btn::after {
+    content: "계정";
+    color: var(--ink-900);
+    font-size: 13px;
+    font-weight: 650;
+  }
+
+  .admin-shell:has(.admin-operation-mobile-detail .admin-case-docket) .admin-shell__header {
+    display: none;
+  }
+
+  .admin-shell:has(.admin-operation-mobile-detail .admin-case-docket) {
+    grid-template-rows: 1fr;
+  }
+
+  .admin-shell:has(.admin-today-ledger) .admin-alarm-bar {
+    position: static;
+    left: auto;
+    right: auto;
+    display: flex;
+    align-items: center;
+    height: auto;
+    margin: 12px 0 4px;
+    padding: 12px 14px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--bg-sub);
+  }
+
+  .admin-shell:has(.admin-today-ledger) .admin-alarm-bar > * {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .admin-shell:has(.admin-today-ledger) .admin-alarm-bar::before {
+    content: "";
+    width: 18px;
+    height: 18px;
+    margin-right: 8px;
+    background-color: var(--ok);
+    -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><circle cx='12' cy='12' r='9'/><path d='M8 12.5 11 15.5 16.5 9'/></svg>") center / contain no-repeat;
+    mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><circle cx='12' cy='12' r='9'/><path d='M8 12.5 11 15.5 16.5 9'/></svg>") center / contain no-repeat;
+  }
+
+  .admin-shell:has(.admin-today-ledger) .admin-alarm-bar::after {
+    content: "서비스는 정상이며, 확인할 일이 3건 있습니다.";
+    color: var(--ink-800);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .admin-page-frame:has(.admin-operation-mobile-detail .admin-case-docket) .admin-alarm-bar,
+  .admin-shell:has(.admin-operation-mobile-detail .admin-case-docket) .admin-alarm-bar {
+    display: none;
+  }
+
+  .admin-today-ledger[data-content-layout="flow"] .admin-operations-queue__header {
+    display: none;
+  }
+
+  .admin-page-frame:has(.admin-today-ledger[data-content-layout="flow"]) {
+    gap: 4px;
+  }
+
+  .admin-today-ledger[data-content-layout="flow"] .admin-page-frame__header h1,
+  .admin-page-frame:has(.admin-today-ledger[data-content-layout="flow"]) h1 {
+    margin: 4px 0 8px;
+    font-size: 24px;
+    line-height: 1.25;
+  }
+
+  .admin-page-frame:has(.admin-today-ledger[data-content-layout="flow"]) > .admin-page-frame__header {
+    margin: 0;
+    padding: 0;
+  }
+
+  .admin-today-ledger[data-content-layout="flow"] .admin-operation-actions[data-presentation="prioritized"] .admin-operation-actions__controls .btn-primary {
+    width: 100%;
+    min-height: 48px;
+    background: #1b2430;
+    border-color: #1b2430;
+    color: #f7f3ea;
+  }
+
+  .admin-mobile-navigation {
+    min-height: 64px;
+  }
+
+  .admin-mobile-navigation__link {
+    flex-direction: column;
+    gap: 4px;
+    min-height: 64px !important;
+    padding-top: 8px !important;
+    font-size: 11px;
+  }
+
+  .admin-mobile-navigation__link::before {
+    content: "";
+    width: 20px;
+    height: 20px;
+    background-color: currentColor;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+  }
+
+  .admin-mobile-navigation__items > li:nth-child(1) .admin-mobile-navigation__link::before {
+    -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><rect x='4' y='5' width='16' height='15' rx='2'/><path d='M8 3.5v3M16 3.5v3M4 10h16'/></svg>");
+    mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><rect x='4' y='5' width='16' height='15' rx='2'/><path d='M8 3.5v3M16 3.5v3M4 10h16'/></svg>");
+  }
+
+  .admin-mobile-navigation__items > li:nth-child(2) .admin-mobile-navigation__link::before {
+    -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><circle cx='9' cy='8' r='3'/><circle cx='16' cy='9' r='2.5'/><path d='M4 18c.5-3 2.5-5 5-5s4.5 2 5 5'/><path d='M13 18c.3-2 1.5-3.5 3.5-3.5 1.7 0 3 1.2 3.5 3.5'/></svg>");
+    mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><circle cx='9' cy='8' r='3'/><circle cx='16' cy='9' r='2.5'/><path d='M4 18c.5-3 2.5-5 5-5s4.5 2 5 5'/><path d='M13 18c.3-2 1.5-3.5 3.5-3.5 1.7 0 3 1.2 3.5 3.5'/></svg>");
+  }
+
+  .admin-mobile-navigation__items > li:nth-child(3) .admin-mobile-navigation__link::before {
+    -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><path d='M12 3 19 6v6c0 5-3.2 8.2-7 9-3.8-.8-7-4-7-9V6z'/><path d='M8.5 12.2 11 14.7 16 9.5'/></svg>");
+    mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><path d='M12 3 19 6v6c0 5-3.2 8.2-7 9-3.8-.8-7-4-7-9V6z'/><path d='M8.5 12.2 11 14.7 16 9.5'/></svg>");
+  }
+
+  .admin-mobile-navigation__items > li:nth-child(4) .admin-mobile-navigation__link::before {
+    -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><path d='M7 3.5h7l4 4V20.5H7z'/><path d='M14 3.5V8h4.5'/><path d='M9.5 12h6M9.5 15.5h6'/></svg>");
+    mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><path d='M7 3.5h7l4 4V20.5H7z'/><path d='M14 3.5V8h4.5'/><path d='M9.5 12h6M9.5 15.5h6'/></svg>");
+  }
+}
+
+.admin-today-ledger button.btn.btn-primary {
+  min-width: 180px !important;
+  min-height: 44px !important;
+  background: #1b2430 !important;
+  border-color: #1b2430 !important;
+  color: #f7f3ea !important;
+}

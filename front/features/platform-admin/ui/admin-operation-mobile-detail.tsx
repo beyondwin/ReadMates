@@ -92,14 +92,15 @@ export function AdminOperationMobileDetail({
         <button
           ref={backButtonRef}
           type="button"
-          className="btn btn-secondary admin-operation-mobile-detail__back admin-operation-control--touch"
+          className="admin-operation-mobile-detail__back admin-operation-control--touch"
+          aria-label="목록으로"
           onClick={() => {
             restoreSelectionRef.current = true;
             if (onBack) onBack();
             else setDetailCaseId(null);
           }}
         >
-          목록으로
+          <span aria-hidden="true">오늘 할 일</span>
         </button>
         <AdminOperationsInspector
           selectedCase={view.selectedCase}

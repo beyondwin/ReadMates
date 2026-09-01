@@ -181,14 +181,22 @@ function todayCase(input: {
   allowedActions: readonly TodayLifecycleAction[];
   title?: string;
   id?: string;
+  description?: string;
+  scopeLabel?: string;
+  impactLabel?: string;
+  ageLabel?: string;
+  sourceType?: AdminOperationCaseView["sourceType"];
+  summaryCode?: AdminOperationCaseView["summaryCode"];
+  sourceLabel?: string;
 }): AdminOperationCaseView {
+  const sourceType = input.sourceType ?? "NOTIFICATION";
   return {
     id: input.id ?? "case-notification",
-    sourceType: "NOTIFICATION",
+    sourceType,
     clubId: null,
     state: "OPEN",
     severity: "CRITICAL",
-    summaryCode: "NOTIFICATION_DELIVERY_FAILURE",
+    summaryCode: input.summaryCode ?? "NOTIFICATION_DELIVERY_FAILURE",
     firstObservedAt: "2026-08-26T08:00:00Z",
     lastObservedAt: "2026-08-26T09:55:00Z",
     snoozedUntil: null,
@@ -200,7 +208,7 @@ function todayCase(input: {
     detailHref: "/admin/notifications?focus=delivery",
     allowedActions: [...input.allowedActions],
     source: {
-      sourceType: "NOTIFICATION",
+      sourceType,
       status: "AVAILABLE",
       generatedAt: GENERATED_AT,
       lastSuccessfulAt: GENERATED_AT,
@@ -208,13 +216,15 @@ function todayCase(input: {
     },
     summary: {
       title: input.title ?? EDITORIAL_LEDGER_LONG_TODAY_TITLE,
-      description: "같은 원인의 실패가 여러 지역에서 반복되고 있습니다. Review the delivery ledger, confirm the latest authoritative observation, and keep the current case open until the operator deliberately chooses the next item.",
+      description: input.description
+        ?? "같은 원인의 실패가 여러 지역에서 반복되고 있습니다. Review the delivery ledger, confirm the latest authoritative observation, and keep the current case open until the operator deliberately chooses the next item.",
     },
     severityLabel: "긴급",
     stateLabel: "미확인",
-    sourceLabel: "알림",
-    impactLabel: "영향 2건",
-    ageLabel: "2시간 전",
+    sourceLabel: input.sourceLabel ?? "알림",
+    impactLabel: input.impactLabel ?? "영향 2건",
+    ageLabel: input.ageLabel ?? "2시간 전",
+    scopeLabel: input.scopeLabel,
   };
 }
 
@@ -274,13 +284,11 @@ function todayFixture(input: TodayFixtureInput): TodayLedgerFixture {
       selectionFellBack: false,
       sources,
       mobileSummary: {
-        open: items.length > 0 ? "활성 1건" : "활성 0건",
-        critical: items.length > 0 ? "긴급 1건" : "긴급 0건",
-        assignedToMe: items.length > 0 ? "내 담당 1건" : "내 담당 0건",
+        open: `활성 ${items.length}건`,
+        critical: `긴급 ${items.length}건`,
+        assignedToMe: `내 담당 ${items.length}건`,
         snoozed: "보류 0건",
-        label: items.length > 0
-          ? "활성 1건 · 긴급 1건 · 내 담당 1건 · 보류 0건"
-          : "활성 0건 · 긴급 0건 · 내 담당 0건 · 보류 0건",
+        label: `활성 ${items.length}건 · 긴급 ${items.length}건 · 내 담당 ${items.length}건 · 보류 0건`,
       },
       allSourcesAvailable,
       sourceStatusLabel: allSourcesAvailable ? "전체 신호 정상" : "일부 신호 확인 불가",
@@ -313,14 +321,54 @@ function todayFixture(input: TodayFixtureInput): TodayLedgerFixture {
   };
 }
 
+const APPROVED_TODAY_CASES: readonly AdminOperationCaseView[] = [
+  todayCase({
+    allowedActions: TODAY_L1_ALLOWED_ACTIONS,
+    id: "case-notification-delay",
+    title: "알림 전달 지연",
+    description: "일부 안내가 늦게 전달되고 있습니다.",
+    scopeLabel: "클럽 2곳 · 멤버 6명",
+    impactLabel: "클럽 2곳 · 멤버 6명",
+    ageLabel: "10분 전",
+  }),
+  todayCase({
+    allowedActions: TODAY_L1_ALLOWED_ACTIONS,
+    id: "case-public-record",
+    title: "공개 기록 확인",
+    description: "새로 생성된 공개 기록을 확인하세요.",
+    scopeLabel: "처리 필요: 새로 생성된 공개 기록 1건",
+    impactLabel: "기록 1건",
+    ageLabel: "35분 전",
+    sourceType: "CLUB_READINESS",
+    summaryCode: "CLUB_READY_TO_PUBLISH",
+    sourceLabel: "클럽 준비",
+  }),
+  todayCase({
+    allowedActions: TODAY_L1_ALLOWED_ACTIONS,
+    id: "case-summary-result",
+    title: "요약 결과 확인",
+    description: "요약 결과를 확인하세요.",
+    scopeLabel: "처리 필요: 요약 결과 3건",
+    impactLabel: "결과 3건",
+    ageLabel: "1시간 전",
+    sourceType: "AI_JOB",
+    summaryCode: "AI_JOB_STALE",
+    sourceLabel: "AI 작업",
+  }),
+];
+
 export const todayDesktopLedger = todayFixture({
   capabilities: TODAY_VIEW_CAPABILITIES,
   allowedActions: TODAY_L1_ALLOWED_ACTIONS,
+  items: APPROVED_TODAY_CASES,
+  selectedCase: APPROVED_TODAY_CASES[0],
 });
 
 export const todayMobileCaseDetail = todayFixture({
   capabilities: TODAY_VIEW_CAPABILITIES,
   allowedActions: TODAY_L1_ALLOWED_ACTIONS,
+  items: APPROVED_TODAY_CASES,
+  selectedCase: APPROVED_TODAY_CASES[0],
   mode: "detail",
 });
 
