@@ -8,6 +8,7 @@ import {
   hostSessionDetailResponse,
   isHostSessionDetailRequest,
   routeHostEditorShell,
+  withServerScheduleSeenSummary,
 } from "../e2e/aigen-test-fixtures";
 import {
   sumDecodedJsonResponseBytes,
@@ -20,11 +21,12 @@ const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const PATH = `/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}`;
 
 function syntheticMeeting(attendanceStatus: "UNKNOWN" | "ABSENT" = "UNKNOWN"): HostSessionDetailResponse {
-  return {
-    ...hostSessionDetailResponse(SESSION_ID),
+  const base = hostSessionDetailResponse(SESSION_ID);
+  return withServerScheduleSeenSummary({
+    ...base,
     title: "500명 합성 성능 모임",
     versions: {
-      ...hostSessionDetailResponse(SESSION_ID).versions,
+      ...base.versions,
       participantSetRevision: 3,
     },
     attendanceSnapshotId: "synthetic-attendance-snapshot",
@@ -37,8 +39,11 @@ function syntheticMeeting(attendanceStatus: "UNKNOWN" | "ABSENT" = "UNKNOWN"): H
       attendanceStatus: index === 0 ? attendanceStatus : index % 3 === 0 ? "UNKNOWN" as const : "ATTENDED" as const,
       participationStatus: "ACTIVE" as const,
       attendanceRevision: index === 0 && attendanceStatus === "ABSENT" ? 2 : 1,
+      seenScheduleRevision: index % 2 === 0 ? 1 : null,
+      scheduleSeenAt: index % 2 === 0 ? "2026-08-29T01:02:03Z" : null,
+      scheduleSeenState: index % 2 === 0 ? "CURRENT" as const : "UNSEEN" as const,
     })),
-  };
+  });
 }
 
 async function json(route: Route, body: unknown, status = 200) {
@@ -113,8 +118,14 @@ test("five cold 500-member runs stay within the host workspace budgets", async (
 
     await cdp.send("HeapProfiler.collectGarbage");
     const heapBefore = await cdp.send("Runtime.getHeapUsage");
-    await page.getByRole("link", { name: /참석 응답/ }).click();
-    await expect(page.locator(".rm-meeting-response-ledger__row")).toHaveCount(500);
+    await page
+      .getByRole("navigation", { name: "관련 작업" })
+      .getByRole("link", { name: "참석 응답", exact: true })
+      .click();
+    const responsesSheet = page.getByRole("dialog", { name: "참석 응답" });
+    await expect(responsesSheet).toBeVisible();
+    const responseRows = responsesSheet.locator(".rm-meeting-response-ledger__row");
+    await expect(responseRows).toHaveCount(500);
     await cdp.send("HeapProfiler.collectGarbage");
     const heapAfter = await cdp.send("Runtime.getHeapUsage");
     const decodedResponses = await page.evaluate(() => (
@@ -122,13 +133,15 @@ test("five cold 500-member runs stay within the host workspace budgets", async (
     ).__readmatesDecodedJsonResponses);
     const decodedJsonBytes = sumDecodedJsonResponseBytes(decodedResponses);
 
-    await page.getByRole("searchbox", { name: "참여자 검색" }).fill("합성 독자 500");
-    await expect(page.locator(".rm-meeting-response-ledger__row")).toHaveCount(1);
+    await responsesSheet.getByRole("searchbox", { name: "참여자 검색" }).fill("합성 독자 500");
+    await expect(responseRows).toHaveCount(1);
     const inputToRafCommitMs = await measure(page, HOST_MEETING_PERFORMANCE_METRICS.inputToRafCommit);
 
-    await page.getByRole("searchbox", { name: "참여자 검색" }).fill("");
-    await expect(page.locator(".rm-meeting-response-ledger__row")).toHaveCount(500);
-    await page.getByRole("combobox", { name: "합성 독자 001 실제 출석" }).selectOption("ABSENT");
+    await responsesSheet.getByRole("searchbox", { name: "참여자 검색" }).fill("");
+    await expect(responseRows).toHaveCount(500);
+    await responsesSheet
+      .getByRole("combobox", { name: "합성 독자 001 실제 출석" })
+      .selectOption("ABSENT");
     const authoritativeSaveToRowCommitMs = await measure(
       page,
       HOST_MEETING_PERFORMANCE_METRICS.authoritativeSaveToRowCommit,
