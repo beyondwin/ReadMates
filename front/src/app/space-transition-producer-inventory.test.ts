@@ -70,6 +70,8 @@ function classifiedWriteConsumerFixture(consumerSource: string) {
 }
 
 describe("space transition mutation-producer inventory", () => {
+  // This repository-wide AST audit parses the mounted production graph repeatedly;
+  // V8 coverage instrumentation adds enough overhead to exceed Vitest's 5s default.
   it("classifies every current mounted producer and exported out-of-domain write", () => {
     expect(SPACE_TRANSITION_PRODUCER_INVENTORY).toHaveLength(105);
     expect(SPACE_TRANSITION_PRODUCER_INVENTORY.reduce<Record<string, number>>(
@@ -92,7 +94,7 @@ describe("space transition mutation-producer inventory", () => {
       modifyEntriesWithMissingMountedOwners: [],
       verifiedLeavesWithForbiddenPublication: [],
     });
-  });
+  }, 10_000);
 
   it("requires evidence and a mounted registering owner for every modified factory", () => {
     for (const entry of SPACE_TRANSITION_PRODUCER_INVENTORY) {
