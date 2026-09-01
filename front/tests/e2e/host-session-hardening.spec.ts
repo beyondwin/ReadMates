@@ -806,6 +806,7 @@ test("operating room selects the closing meeting and records lists the full set 
   await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/app\/host\/?$/);
   const currentMeeting = page.getByRole("group", { name: "현재 모임" });
   await expect(currentMeeting.getByRole("heading", { name: /주의 마감 초안/ })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "클럽 작업함" })).toBeVisible();
 
   await page.getByRole("navigation", { name: "호스트 주 메뉴" }).getByRole("link", { name: "기록" }).click();
   await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/app\/host\/records$/);

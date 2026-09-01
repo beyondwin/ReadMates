@@ -109,7 +109,7 @@ class HostOperatingRoomCandidateDbTest(
 
     @Test
     fun `draft schedule availability requires member visibility and an active participant snapshot`() {
-        insertScheduleAvailabilityScenarios()
+        insertScheduleAvailabilityCandidates()
 
         val candidates =
             queries.loadHostOperatingRoomCandidates(
@@ -130,7 +130,7 @@ class HostOperatingRoomCandidateDbTest(
         )
     }
 
-    private fun insertScheduleAvailabilityScenarios() {
+    private fun insertScheduleAvailabilityCandidates() {
         insertSession(
             "311",
             101,

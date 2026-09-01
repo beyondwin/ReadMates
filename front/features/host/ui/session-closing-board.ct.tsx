@@ -232,15 +232,33 @@ async function mountEmbeddedClosing(
   return component;
 }
 
-async function assertEmbeddedClosing(component: Locator, page: Page) {
+async function assertEmbeddedClosing(
+  component: Locator,
+  page: Page,
+  view: SessionClosingBoardView,
+) {
   await expect(component.getByRole("region", { name: "장부 마감 체크리스트" })).toBeVisible();
   await expect(component.getByText("장부 마감")).toBeVisible();
   await expect(component.getByRole("heading", { level: 1 })).toHaveCount(0);
   await expect(component.getByText("이번 모임 다음 조치")).toHaveCount(0);
-  await expect(component.getByText("마감 증거")).toHaveCount(0);
-  await expect(component.getByText("호스트 문서 / 멤버 회고 / 공개 기록")).toHaveCount(0);
+  await expect(component.getByRole("region", { name: "마감 증거" })).toBeVisible();
+  await expect(component.getByText("호스트 문서 / 멤버 회고 / 공개 기록")).toBeVisible();
   await expect(component.locator(".rm-host-closing-board__checklist-item")).toHaveCount(5);
+  await expect(component.locator(".rm-host-closing-board__surface")).toHaveCount(view.surfaces.length);
+  await expect(component.locator(".rm-host-closing-board__evidence > div")).toHaveCount(view.evidence.length);
   await expectNoHorizontalOverflow(page);
+
+  for (const surface of view.surfaces) {
+    const surfaceItem = component.locator(".rm-host-closing-board__surface").filter({ hasText: surface.title });
+    await expect(surfaceItem).toHaveCount(1);
+    await expect(surfaceItem.getByText(surface.detail, { exact: true })).toBeVisible();
+    const destination = surfaceItem.getByRole("link", { name: surface.actionLabel });
+    if (surface.href) {
+      await expect(destination).toHaveAttribute("href", surface.href);
+    } else {
+      await expect(destination).toHaveCount(0);
+    }
+  }
 
   for (const copy of await component.locator(".rm-host-closing-board__checklist-item .small").all()) {
     const fontSize = await copy.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
@@ -254,36 +272,36 @@ async function assertEmbeddedClosing(component: Locator, page: Page) {
 
 test("Embedded closing checklist locks blocked state at 1440", async ({ mount, page }) => {
   const component = await mountEmbeddedClosing(mount, page, blockedView, VISUAL_AUTHORITY_VIEWPORTS.desktopWide);
-  await assertEmbeddedClosing(component, page);
+  await assertEmbeddedClosing(component, page, blockedView);
   await expect(component).toHaveScreenshot("host-closing-embedded-blocked-1440.png");
 });
 
 test("Embedded closing checklist locks published state at 900", async ({ mount, page }) => {
   const component = await mountEmbeddedClosing(mount, page, publishedView, VISUAL_AUTHORITY_VIEWPORTS.tablet);
-  await assertEmbeddedClosing(component, page);
+  await assertEmbeddedClosing(component, page, publishedView);
   await expect(component).toHaveScreenshot("host-closing-embedded-published-900.png");
 });
 
 test("Embedded closing checklist locks blocked state at 768", async ({ mount, page }) => {
   const component = await mountEmbeddedClosing(mount, page, blockedView, VISUAL_AUTHORITY_VIEWPORTS.tabletNarrow);
-  await assertEmbeddedClosing(component, page);
+  await assertEmbeddedClosing(component, page, blockedView);
   await expect(component).toHaveScreenshot("host-closing-embedded-blocked-768.png");
 });
 
 test("Embedded closing checklist locks published state at 390", async ({ mount, page }) => {
   const component = await mountEmbeddedClosing(mount, page, publishedView, VISUAL_AUTHORITY_VIEWPORTS.mobile);
-  await assertEmbeddedClosing(component, page);
+  await assertEmbeddedClosing(component, page, publishedView);
   await expect(component).toHaveScreenshot("host-closing-embedded-published-390.png");
 });
 
 test("Embedded closing checklist locks blocked state at 320", async ({ mount, page }) => {
   const component = await mountEmbeddedClosing(mount, page, blockedView, VISUAL_AUTHORITY_VIEWPORTS.mobileNarrow);
-  await assertEmbeddedClosing(component, page);
+  await assertEmbeddedClosing(component, page, blockedView);
   await expect(component).toHaveScreenshot("host-closing-embedded-blocked-320.png");
 });
 
 test("Embedded closing checklist stays inside the 1024 viewport matrix", async ({ mount, page }) => {
   const component = await mountEmbeddedClosing(mount, page, publishedView, VISUAL_AUTHORITY_VIEWPORTS.desktop);
-  await assertEmbeddedClosing(component, page);
+  await assertEmbeddedClosing(component, page, publishedView);
   expect(await page.evaluate(() => window.innerWidth)).toBe(1024);
 });

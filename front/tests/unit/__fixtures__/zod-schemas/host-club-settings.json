@@ -1,0 +1,11 @@
+{
+  "clubId": "00000000-0000-0000-0000-000000000101",
+  "clubSlug": "reading-sai",
+  "name": "Public fixture club",
+  "approvalPolicy": "INVITE_ONLY",
+  "defaultTimezone": "Asia/Seoul",
+  "scheduleReminderEnabled": true,
+  "recordPublicationDefault": "MEMBER",
+  "revision": 0,
+  "status": "ACTIVE"
+}

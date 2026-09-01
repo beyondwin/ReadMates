@@ -71,7 +71,7 @@ function classifiedWriteConsumerFixture(consumerSource: string) {
 
 describe("space transition mutation-producer inventory", () => {
   it("classifies every current mounted producer and exported out-of-domain write", () => {
-    expect(SPACE_TRANSITION_PRODUCER_INVENTORY).toHaveLength(97);
+    expect(SPACE_TRANSITION_PRODUCER_INVENTORY).toHaveLength(105);
     expect(SPACE_TRANSITION_PRODUCER_INVENTORY.reduce<Record<string, number>>(
       (counts, candidate) => ({
         ...counts,
@@ -79,8 +79,8 @@ describe("space transition mutation-producer inventory", () => {
       }),
       {},
     )).toEqual({
-      register: 28,
-      modify: 36,
+      register: 30,
+      modify: 42,
       "verified-no-change": 24,
       "out-of-domain": 9,
     });

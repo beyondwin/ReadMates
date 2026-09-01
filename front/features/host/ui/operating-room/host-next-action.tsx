@@ -15,6 +15,7 @@ const DefaultLink: ComponentType<NextActionLinkProps> = ({ to, children, ...prop
 
 export type HostNextActionProps = {
   action: HostNextActionView;
+  pending?: boolean;
   onDefer?: (workItemKey: string) => void;
   LinkComponent?: ComponentType<NextActionLinkProps>;
 };
@@ -29,13 +30,13 @@ const stateLabels: Record<HostNextActionView["state"], string> = {
 
 export function HostNextAction({
   action,
+  pending = false,
   onDefer,
   LinkComponent = DefaultLink,
 }: HostNextActionProps) {
   const deferKey = action.state === "actionable" ? action.workItemKey : null;
-  const deferAction = deferKey !== null && onDefer
-    ? () => onDefer(deferKey)
-    : null;
+  const canDefer = deferKey !== null && onDefer;
+  const deferAction = canDefer && !pending ? () => onDefer(deferKey) : undefined;
   const primaryLabel = action.state === "deferred" ? `이어서 ${action.label}` : action.label;
   const primaryHref = action.state === "none" ? null : action.href;
 
@@ -62,13 +63,14 @@ export function HostNextAction({
           >
             {primaryLabel}
           </LinkComponent>
-          {deferAction ? (
+          {canDefer ? (
             <button
               className="rm-operating-room-next-action__defer"
               type="button"
+              disabled={pending}
               onClick={deferAction}
             >
-              내일 09:00까지 보류
+              {pending ? "보류 중" : "내일 09:00까지 보류"}
             </button>
           ) : null}
         </div>

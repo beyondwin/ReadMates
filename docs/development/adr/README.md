@@ -72,10 +72,13 @@ Routine refactor, component-local layout, reversible implementation detail은 AD
 | [0045](0045-host-admin-focus-deck-editorial-ledger-composition.md) | 호스트·플랫폼 관리자 composition을 Focus Deck·Editorial Operations Ledger로 고정 | Accepted | 2026-08-26 | product, design, platform ops, front |
 | [0046](0046-host-triage-home-meeting-diary-composition.md) | 호스트 워크스페이스를 오늘 트리아지 + 모임 다이어리로 재구성 | Superseded by ADR-0048 | 2026-08-27 | product, design, front |
 | [0047](0047-admin-case-desk-narrative-composition.md) | 플랫폼 어드민을 케이스 데스크 + 운영 서사로 재구성 | Superseded by ADR-0050 | 2026-08-27 | product, design, platform ops, front |
-| [0048](0048-host-lifecycle-operating-room-composition.md) | 호스트 워크스페이스를 모임 생애주기 운영실 + 작업함으로 구성 | Proposed | 2026-08-29 | product, design, front |
-| [0049](0049-schedule-revision-seen-state.md) | 일정 revision 확인을 접속·참석 응답·실제 출석과 분리 | Proposed | 2026-08-29 | product, server, front, privacy |
+| [0048](0048-host-lifecycle-operating-room-composition.md) | 호스트 워크스페이스를 모임 생애주기 운영실 + 작업함으로 구성 | Accepted | 2026-09-01 | product, design, front |
+| [0049](0049-schedule-revision-seen-state.md) | 일정 revision 확인을 접속·참석 응답·실제 출석과 분리 | Accepted | 2026-09-01 | product, server, front, privacy |
 | [0050](0050-platform-admin-today-operations-desk.md) | 플랫폼 어드민을 오늘 할 일 중심 운영 데스크로 재구성 | Accepted | 2026-08-30 | product, design, platform ops, front |
 | [0051](0051-global-platform-and-club-space-transition.md) | 전역 공간을 플랫폼 운영·내 클럽 두 축으로 고정 | Accepted | 2026-08-30 | product, front, server, security |
+| [0052](0052-oci-capacity-and-recovery-guardrails.md) | OCI 용량과 복구 guardrail | Proposed | 2026-08-30 | ops, security |
+
+ADR-0048/0049는 Stage 5 전체 gate와 최종 acceptance evidence가 각 결정의 named criteria를 충족해 `Accepted`다. 구현 근거와 배포·외부 서비스·수동 보조기술의 미측정 범위는 각 ADR의 `검증` 및 잔여 검증 절에서 관리한다.
 
 ## 상태 범례
 

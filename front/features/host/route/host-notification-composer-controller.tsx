@@ -193,6 +193,9 @@ function ReadyComposerController({
     sessionId: request.sessionId,
     eventType: request.eventType,
     contentRevision: request.contentRevision,
+    scheduleRevision: initialOptions.session?.scheduleRevision ?? 0,
+    subject: template.defaultSubject,
+    body: template.defaultBody,
     recipientMode: recipientModeFromAudience(template.defaultAudience),
     requestedChannels: template.defaultChannels,
     selectedMembershipIds: [],
@@ -216,6 +219,9 @@ function ReadyComposerController({
         sessionId: request.sessionId,
         eventType: request.eventType,
         contentRevision: request.contentRevision,
+        scheduleRevision: initialOptions.session?.scheduleRevision ?? 0,
+        subject: template.defaultSubject,
+        body: template.defaultBody,
         recipientMode: recipientModeFromAudience(template.defaultAudience),
         requestedChannels: template.defaultChannels,
         selectedMembershipIds: [],
@@ -224,7 +230,7 @@ function ReadyComposerController({
       setError(null);
       setSearch("");
     },
-  }), [context.clubSlug, request.contentRevision, request.eventType, request.sessionId, template.defaultAudience, template.defaultChannels]);
+  }), [context.clubSlug, initialOptions.session?.scheduleRevision, request.contentRevision, request.eventType, request.sessionId, template.defaultAudience, template.defaultBody, template.defaultChannels, template.defaultSubject]);
 
   const disableCurrentTemplate = () => {
     setOptions((current) => ({
@@ -247,6 +253,28 @@ function ReadyComposerController({
     const code = mutationError && typeof mutationError === "object" && "code" in mutationError
       ? String((mutationError as { code?: unknown }).code ?? "")
       : "";
+    if (code === "MANUAL_NOTIFICATION_PREVIEW_STALE") {
+      client.removeQueries({
+        queryKey: hostNotificationKeys.manualOptionsRoot(context),
+      });
+      setPreview(null);
+      void client.fetchQuery(hostNotificationManualOptionsQuery({
+        sessionId: request.sessionId,
+        page: { limit: MEMBER_PAGE_LIMIT },
+      }, context)).then((nextOptions) => {
+        const nextTemplate = nextOptions.templates.find(
+          (item) => item.eventType === request.eventType,
+        );
+        if (nextTemplate?.enabled && nextTemplate.contentRevision === request.contentRevision) {
+          setOptions(nextOptions);
+          setDraft((current) => ({
+            ...current,
+            scheduleRevision: nextOptions.session?.scheduleRevision ?? 0,
+          }));
+        }
+      }).catch(() => undefined);
+      return "미리보기 이후 일정 또는 수신 대상이 변경되었습니다. 최신 정보로 새 미리보기를 만들어 주세요.";
+    }
     if (
       code === "MANUAL_NOTIFICATION_CONTENT_STALE"
       || code === "MANUAL_NOTIFICATION_STATE_INVALID"
@@ -258,7 +286,7 @@ function ReadyComposerController({
       disableCurrentTemplate();
       setPreview(null);
       return code === "MANUAL_NOTIFICATION_RECIPIENTS_CHANGED"
-        ? "미리보기 이후 수신 대상이 변경되었습니다. 최신 저장 결과에서 작성기를 다시 열어 주세요."
+        ? "미리보기 이후 일정 또는 수신 대상이 변경되었습니다. 최신 정보로 새 미리보기를 만들어 주세요."
         : "알림 내용 또는 모임 상태가 변경되었습니다. 최신 저장 결과에서 작성기를 다시 열어 주세요.";
     }
     if (

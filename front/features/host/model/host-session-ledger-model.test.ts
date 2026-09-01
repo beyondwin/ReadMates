@@ -4,6 +4,7 @@ import {
   hostSessionLedgerActionLabel,
   hostSessionLedgerBadges,
   hostSessionLedgerModifiedAtLabel,
+  dedupeHostSessionLedgerItems,
   hostSessionTrashDeletedAtLabel,
   hostSessionTrashRemainingCopy,
   normalizeHostSessionLedgerFilters,
@@ -115,6 +116,14 @@ describe("host session ledger model", () => {
       "CLOSED",
     ]);
     expect(page.summary.needsAttentionCount).toBe(9);
+  });
+
+  it("deduplicates exact session ids across opaque continuation pages while preserving first order", () => {
+    const first = ledgerItem("session-1", "CLOSED", false);
+    const duplicate = { ...first, title: "duplicate continuation" };
+    const second = ledgerItem("session-2", "PUBLISHED", true);
+
+    expect(dedupeHostSessionLedgerItems([first, duplicate, second])).toEqual([first, second]);
   });
 });
 

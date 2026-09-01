@@ -90,17 +90,17 @@ test("canonical workspace URLs survive direct entry, reload, resize, and role-sw
   await loginWithGoogleFixture(page, "host@example.com");
 
   await page.goto("/clubs/reading-sai/app/host");
-  await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/]+)?$/);
+  await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/?#]+)?(?:\?.*)?$/);
   await page.reload();
-  await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/]+)?$/);
+  await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/?#]+)?(?:\?.*)?$/);
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/]+)?$/);
+  await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/?#]+)?(?:\?.*)?$/);
   await page.setViewportSize({ width: 1280, height: 900 });
 
   await page.getByRole("navigation", { name: "호스트 유틸리티" }).getByRole("link", { name: "멤버 시야" }).click();
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app$/);
   await page.goBack();
-  await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/]+)?$/);
+  await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/?#]+)?(?:\?.*)?$/);
   await page.goForward();
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app$/);
 });

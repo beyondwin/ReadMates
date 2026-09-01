@@ -66,4 +66,42 @@ class MemberApprovalServiceTest {
             )
         }
     }
+
+    @Test
+    fun `viewer rejection records one immutable lifecycle receipt after the transition`() {
+        val store = mock(MemberApprovalStorePort::class.java)
+        val projection = mock(AuthPublicProjectionMutationPort::class.java)
+        val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+        val hostMembershipId = UUID.fromString("00000000-0000-0000-0000-000000000201")
+        val membershipId = UUID.fromString("00000000-0000-0000-0000-000000000202")
+        val host =
+            ClubActor(
+                userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
+                membershipId = hostMembershipId,
+                clubId = clubId,
+                clubSlug = "reading-sai",
+                capabilities = setOf(ClubCapability.MANAGE_MEMBERS),
+            )
+        val row =
+            ViewerMemberRow(
+                membershipId,
+                UUID.fromString("00000000-0000-0000-0000-000000000102"),
+                "viewer@example.com",
+                "Viewer",
+                "Viewer Account",
+                null,
+                MembershipStatus.INACTIVE,
+                OffsetDateTime.parse("2026-01-01T00:00:00Z"),
+            )
+        `when`(store.deactivateViewer(clubId, membershipId)).thenReturn(true)
+        `when`(store.findMemberForHost(clubId, membershipId)).thenReturn(row)
+
+        MemberApprovalService(store, projection).deactivateViewer(host, membershipId)
+
+        inOrder(store).apply {
+            verify(store).deactivateViewer(clubId, membershipId)
+            verify(store).recordViewerRejection(clubId, hostMembershipId, membershipId)
+            verify(store).deleteClubAccess(clubId, membershipId)
+        }
+    }
 }

@@ -1,0 +1,16 @@
+6426af7cfbec5eff5bc056b345cbaf84f1a07cd159b2b00a2718fa2b9ed1815e  .superpowers/sdd/2026-08-29-host-workbox-ledgers-stage4/stage4-review-fix-1-brief.md
+e5f6474080e23e90772cc633522123cf5e0c359741ae9e080f685c98e3f509ed  .superpowers/sdd/2026-08-29-host-workbox-ledgers-stage4/stage4-review-fix-1-report.md
+68bdfa13a91a1e9f25a0d6fb54ac2ccecabdd4b2a5a4189c2fddfcd03f42bb80  front/features/host/api/host-person-api.test.ts
+767f91f73974aa4e43aeaa92a81d44ef5a6cd84d40c33c2126714ad19c1497e4  front/features/host/api/host-person-api.ts
+ac02ea058ab8a24c2513bcb44da6beae0dc3f7ff8c809f67813fc92b61b7b2c1  front/features/host/queries/host-person-queries.test.ts
+46f8273de55e433036656e6109aa8c37321f917b8ec61fd671b6166830604b10  front/features/host/queries/host-person-queries.ts
+6a492f52228184e5f380710fe1849d6e9523c926cfe86cd4d96721b5bebbf1ab  front/features/host/route/host-schedule-review-route.test.tsx
+1f253ea848a6af8d069585d51c31805ec1021cdd1a0f05bd77867bff26da2f3a  front/features/host/route/host-schedule-review-route.tsx
+38b35fcc28a72aaed369bde40c4be63723e47c202f13b6b124573d046352c7ce  server/src/main/kotlin/com/readmates/club/application/service/HostClubSettingsService.kt
+6dfc6dfb868ed63ff68fb74ad63f9bc89822f0c8d9edeb8d47b02f29bd4e50ee  server/src/main/kotlin/com/readmates/hostworkspace/adapter/in/web/HostPersonDetailController.kt
+738f55cfa0f860c53a3c023f0f8f932863f6e9c9b25cb4267546f9451729564e  server/src/main/kotlin/com/readmates/hostworkspace/adapter/in/web/HostWorkboxController.kt
+79642fca35fb82ac37079670cf0e02ec87a53bdd890bb6cb9b07487adbdbcd02  server/src/test/kotlin/com/readmates/club/application/service/HostClubSettingsConcurrencyDbTest.kt
+37d973909824907c375cc75904c86c6bd7b0d2185827745a6e2d5a7f0d201e74  server/src/test/kotlin/com/readmates/club/application/service/HostClubSettingsServiceTest.kt
+e99d22bc9c6da1632ec39558297a81380a940996d1ffe2fa63a2912d005cc7bc  server/src/test/kotlin/com/readmates/hostworkspace/adapter/in/web/HostWorkboxCursorCodecTest.kt
+72785cfedbca8140ebddff1e6e90d58f19ce1eae98f4109f1a41a5086aeea04d  server/src/test/kotlin/com/readmates/hostworkspace/api/HostPersonDetailControllerTest.kt
+c9599e1695fbea6259f5ef0ff131eae4972de041f542fe91ef6dab4e9d661359  server/src/test/kotlin/com/readmates/hostworkspace/api/HostWorkboxControllerTest.kt

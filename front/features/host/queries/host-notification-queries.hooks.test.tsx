@@ -51,6 +51,9 @@ const confirmRequest: ManualNotificationConfirmRequest = {
   excludedMembershipIds: [],
   includedMembershipIds: [],
   sendMode: "NOW",
+  scheduleRevision: 7,
+  subject: "모임 알림",
+  body: "모임 일정을 확인해 주세요.",
   previewId: "preview-1",
   resendConfirmed: false,
 };

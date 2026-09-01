@@ -50,13 +50,13 @@ describe("HostRecordsRouteElement", () => {
       {
         path: "/clubs/:clubSlug/app/host/records",
         loader: () => ({
-          view: "meeting" as const,
-          page: { items: [recordItem()], nextCursor: null },
-          pastPage: {
-            items: [],
+          filters: { view: "active", search: "", state: null, recordStatus: null, needsAttention: null },
+          page: {
+            items: [recordItem()],
             nextCursor: null,
-            summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+            summary: { needsAttentionCount: 1, incompletePublishedCount: 0, draftCount: 0 },
           },
+          trashPage: null,
         }),
         element: <HostRecordsRouteElement />,
       },
@@ -74,7 +74,10 @@ describe("HostRecordsRouteElement", () => {
       </QueryClientProvider>,
     );
 
-    await user.click(await screen.findByRole("link", { name: "기록의 책" }));
+    expect(await screen.findByRole("heading", { name: "기록" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "기록 장부 요약" })).toHaveTextContent("확인 필요 1건");
+    expect(screen.queryByRole("heading", { name: "다가오는 모임" })).not.toBeInTheDocument();
+    await user.click((await screen.findAllByRole("link", { name: "No.7 이어서 수정" }))[0]!);
 
     expect(screen.getByRole("status", { name: "상세 위치" })).toHaveTextContent(JSON.stringify({
       pathname: "/clubs/reading-sai/app/host/sessions/session-7",

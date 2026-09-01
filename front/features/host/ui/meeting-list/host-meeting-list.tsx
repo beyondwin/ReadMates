@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { HostLinkComponent, HostLinkProps } from "@/features/host/ui/host-link-types";
 import type { HostMeetingTocSections } from "@/features/host/model/host-meeting-list-model";
 import { MeetingTocRow } from "./meeting-toc-row";
@@ -73,6 +73,118 @@ function TocSection({
   );
 }
 
+type CalendarRow = HostMeetingTocSections["upcoming"]["rows"][number] & {
+  source: "upcoming" | "past";
+};
+
+function calendarMonthLabel(month: string) {
+  const match = /^(\d{4})-(\d{2})$/.exec(month);
+  return match ? `${Number(match[1])}년 ${Number(match[2])}월` : month;
+}
+
+function CalendarView({
+  sections,
+  loadingMoreUpcoming,
+  loadingMorePast,
+  onLoadMoreUpcoming,
+  onLoadMorePast,
+  errorMessage,
+  pastErrorMessage,
+  onRetry,
+  onRetryPast,
+  LinkComponent,
+}: {
+  sections: HostMeetingTocSections;
+  loadingMoreUpcoming: boolean;
+  loadingMorePast: boolean;
+  onLoadMoreUpcoming: () => void;
+  onLoadMorePast: () => void;
+  errorMessage: string | null;
+  pastErrorMessage: string | null;
+  onRetry?: () => void;
+  onRetryPast?: () => void;
+  LinkComponent: HostLinkComponent;
+}) {
+  const rows: CalendarRow[] = [
+    ...sections.upcoming.rows.map((row) => ({ ...row, source: "upcoming" as const })),
+    ...sections.past.rows.map((row) => ({ ...row, source: "past" as const })),
+  ].sort((left, right) => left.date.localeCompare(right.date) || left.id.localeCompare(right.id));
+  const groups = new Map<string, Map<string, CalendarRow[]>>();
+  for (const row of rows) {
+    const month = /^\d{4}-\d{2}/.exec(row.date)?.[0] ?? row.date;
+    const monthRows = groups.get(month) ?? new Map<string, CalendarRow[]>();
+    monthRows.set(row.date, [...(monthRows.get(row.date) ?? []), row]);
+    groups.set(month, monthRows);
+  }
+  const incomplete = Boolean(sections.upcoming.nextCursor || sections.past.nextCursor);
+
+  return (
+    <div className="rm-meeting-calendar" role="tabpanel" aria-label="달력">
+      {incomplete ? (
+        <p className="small rm-meeting-calendar__disclosure">
+          현재 불러온 모임만 표시합니다. 더 있는 서버 페이지는 아래에서 이어서 불러올 수 있습니다.
+        </p>
+      ) : null}
+      {errorMessage ? (
+        <div className="rm-meeting-toc__section-state" role="alert">
+          <p className="small">{errorMessage}</p>
+          {onRetry ? <button type="button" className="btn btn-ghost btn-sm" onClick={onRetry}>다시 시도</button> : null}
+        </div>
+      ) : null}
+      {pastErrorMessage ? (
+        <div className="rm-meeting-toc__section-state" role="alert">
+          <p className="small">{pastErrorMessage}</p>
+          {onRetryPast ? <button type="button" className="btn btn-ghost btn-sm" onClick={onRetryPast}>다시 시도</button> : null}
+        </div>
+      ) : null}
+      {groups.size === 0 && !errorMessage && !pastErrorMessage ? (
+        <p className="small rm-meeting-toc__section-empty">달력에 표시할 모임이 없습니다.</p>
+      ) : null}
+      {[...groups.entries()].map(([month, dates]) => (
+        <section key={month} className="rm-meeting-calendar__month" aria-labelledby={`meeting-month-${month}`}>
+          <h2 id={`meeting-month-${month}`} className="rm-meeting-toc__section-title">
+            {calendarMonthLabel(month)}
+          </h2>
+          {[...dates.entries()].map(([date, dateRows]) => (
+            <div key={date} className="rm-meeting-calendar__date">
+              <time className="mono rm-meeting-calendar__date-label" dateTime={date}>{date}</time>
+              <ol className="rm-meeting-toc__list" aria-label={`${date} 모임`}>
+                {dateRows.map((row) => (
+                  <MeetingTocRow key={`${row.source}:${row.id}`} row={row} LinkComponent={LinkComponent} />
+                ))}
+              </ol>
+            </div>
+          ))}
+        </section>
+      ))}
+      <div className="rm-meeting-calendar__continuations">
+        {sections.upcoming.nextCursor ? (
+          <button
+            type="button"
+            className="btn btn-ghost rm-meeting-toc__more"
+            aria-label="다가오는 모임 더 보기"
+            disabled={loadingMoreUpcoming}
+            onClick={onLoadMoreUpcoming}
+          >
+            {loadingMoreUpcoming ? "불러오는 중" : "다가오는 모임 더 보기"}
+          </button>
+        ) : null}
+        {sections.past.nextCursor ? (
+          <button
+            type="button"
+            className="btn btn-ghost rm-meeting-toc__more"
+            aria-label="지난 모임 더 보기"
+            disabled={loadingMorePast}
+            onClick={onLoadMorePast}
+          >
+            {loadingMorePast ? "불러오는 중" : "지난 모임 더 보기"}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function HostMeetingList({
   sections,
   onLoadMoreUpcoming,
@@ -107,6 +219,7 @@ export function HostMeetingList({
   onRetryPast?: () => void;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const [view, setView] = useState<"list" | "calendar">("list");
   const previousFocusRevision = useRef(focusHeadingRevision);
   const isEmpty = !pastErrorMessage
     && !errorMessage
@@ -152,6 +265,26 @@ export function HostMeetingList({
         <p className="sr-only" role="status" aria-live="polite">
           {announcement}
         </p>
+        <div className="rm-meeting-toc__view-tabs" role="tablist" aria-label="모임 보기 방식">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "list"}
+            className="btn btn-quiet btn-sm"
+            onClick={() => setView("list")}
+          >
+            목록
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "calendar"}
+            className="btn btn-quiet btn-sm"
+            onClick={() => setView("calendar")}
+          >
+            달력
+          </button>
+        </div>
         {loading ? (
           <div className="rm-empty-state rm-meeting-toc__state" role="status">
             모임을 불러오는 중
@@ -163,8 +296,21 @@ export function HostMeetingList({
               첫 모임 만들기
             </LinkComponent>
           </div>
+        ) : view === "calendar" ? (
+          <CalendarView
+            sections={sections}
+            loadingMoreUpcoming={loadingMoreUpcoming}
+            loadingMorePast={loadingMorePast}
+            onLoadMoreUpcoming={onLoadMoreUpcoming}
+            onLoadMorePast={onLoadMorePast}
+            errorMessage={errorMessage}
+            pastErrorMessage={pastErrorMessage}
+            onRetry={onRetry}
+            onRetryPast={onRetryPast}
+            LinkComponent={LinkComponent}
+          />
         ) : (
-          <>
+          <div role="tabpanel" aria-label="목록" className="rm-meeting-toc__list-panel">
             <TocSection
               title="다가오는 모임"
               rows={sections.upcoming.rows}
@@ -192,7 +338,7 @@ export function HostMeetingList({
                 휴지통
               </LinkComponent>
             </div>
-          </>
+          </div>
         )}
       </section>
     </main>

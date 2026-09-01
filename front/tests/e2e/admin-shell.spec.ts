@@ -143,6 +143,33 @@ async function routePlatformAdminHostWorkspace(page: Page) {
       body: JSON.stringify({ currentSession: null }),
     });
   });
+  await page.route("**/api/bff/api/host/operating-room/current?clubSlug=reading-sai", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ currentMeeting: null }),
+    });
+  });
+  await page.route("**/api/bff/api/host/workbox?**", async (route) => {
+    const state = new URL(route.request().url()).searchParams.get("state") ?? "NOW";
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        state,
+        evaluatedAt: "2026-08-29T01:02:03Z",
+        sourceAvailability: [
+          { type: "SCHEDULE_UNSEEN", state: "AVAILABLE" },
+          { type: "MEMBER_APPROVAL", state: "AVAILABLE" },
+          { type: "RECORD_CLOSING", state: "AVAILABLE" },
+          { type: "INVITATION_EXPIRY", state: "AVAILABLE" },
+          { type: "NOTIFICATION_FAILURE", state: "AVAILABLE" },
+        ],
+        items: [],
+        nextCursor: null,
+      }),
+    });
+  });
   await page.route("**/api/bff/api/host/dashboard?clubSlug=reading-sai", async (route) => {
     await route.fulfill({
       status: 200,
@@ -270,6 +297,7 @@ function adminShellSuite() {
     );
     expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
     await expect(page.getByRole("heading", { name: /지금 다루는 모임|현재 운영할 모임이 없습니다/ })).toBeVisible();
+    await expect(page.getByRole("complementary", { name: "클럽 작업함" })).toBeVisible();
   });
 }
 

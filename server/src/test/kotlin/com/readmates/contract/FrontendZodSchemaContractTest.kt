@@ -18,6 +18,14 @@ import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.`in`.CommitGenerationResult
 import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.hostworkspace.adapter.`in`.web.HostWorkboxDeferralReceiptResponse
+import com.readmates.hostworkspace.adapter.`in`.web.HostWorkboxItemResponse
+import com.readmates.hostworkspace.adapter.`in`.web.HostWorkboxPageResponse
+import com.readmates.hostworkspace.application.model.HostWorkItemType
+import com.readmates.hostworkspace.application.model.HostWorkSourceAvailability
+import com.readmates.hostworkspace.application.model.HostWorkSourceAvailabilityState
+import com.readmates.hostworkspace.application.model.HostWorkboxReceiptSummary
+import com.readmates.hostworkspace.application.model.HostWorkboxState
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.assertj.core.api.Assertions.assertThat
@@ -41,6 +49,7 @@ import org.springframework.test.web.servlet.post
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import java.nio.file.Paths
+import java.time.OffsetDateTime
 import java.util.UUID
 
 /**
@@ -105,6 +114,33 @@ class FrontendZodSchemaContractTest
                     .response.contentAsString
 
             assertJsonShapeMatches(response, "host-session-detail.json")
+        }
+
+        @Test
+        fun `host person detail response matches strict zod schema fixture`() {
+            val response =
+                mockMvc
+                    .get("/api/host/people/00000000-0000-0000-0000-000000000206") {
+                        with(user("host@example.com"))
+                    }.andExpect { status { isOk() } }
+                    .andReturn()
+                    .response
+                    .contentAsString
+
+            assertJsonShapeMatches(response, "host-person-detail.json")
+        }
+
+        @Test
+        fun `host club settings response matches strict zod schema fixture`() {
+            val response =
+                mockMvc
+                    .get("/api/host/club-settings") { with(user("host@example.com")) }
+                    .andExpect { status { isOk() } }
+                    .andReturn()
+                    .response.contentAsString
+
+            assertJsonShapeMatches(response, "host-club-settings.json")
+            assertThat(response.lowercase()).doesNotContain("email", "oauth", "provider", "token")
         }
 
         @Test
@@ -214,6 +250,151 @@ class FrontendZodSchemaContractTest
                     .response.contentAsString
 
             assertJsonShapeMatches(response, "host-notification-delivery-list.json")
+        }
+
+        @Test
+        fun `host workbox page and deferral receipt match strict zod fixtures`() {
+            val page =
+                HostWorkboxPageResponse(
+                    state = HostWorkboxState.NOW,
+                    evaluatedAt = OffsetDateTime.parse("2026-08-30T09:00:00Z"),
+                    sourceAvailability =
+                        listOf(
+                            HostWorkSourceAvailability(
+                                HostWorkItemType.SCHEDULE_UNSEEN,
+                                HostWorkSourceAvailabilityState.AVAILABLE,
+                            ),
+                        ),
+                    items =
+                        listOf(
+                            HostWorkboxItemResponse(
+                                key = "SCHEDULE_UNSEEN:session-1:r7",
+                                type = HostWorkItemType.SCHEDULE_UNSEEN,
+                                state = HostWorkboxState.NOW,
+                                title = "일정 확인",
+                                description = "확인이 필요한 멤버가 있어요.",
+                                count = 1,
+                                dueAt = OffsetDateTime.parse("2026-08-31T09:00:00Z"),
+                                deferredUntil = null,
+                                resolvedAt = null,
+                                destinationHref = "/app/host/sessions/session-1/schedule-review",
+                                receiptSummary = HostWorkboxReceiptSummary("SCHEDULE_REMINDER", "PENDING", 1),
+                            ),
+                        ),
+                    nextCursor = null,
+                )
+            val receipt =
+                HostWorkboxDeferralReceiptResponse(
+                    "SCHEDULE_UNSEEN:session-1:r7",
+                    OffsetDateTime.parse("2026-08-31T09:00:00Z"),
+                )
+
+            assertJsonShapeMatches(objectMapper.writeValueAsString(page), "host-workbox-page.json")
+            assertJsonShapeMatches(
+                objectMapper.writeValueAsString(receipt),
+                "host-workbox-deferral-receipt.json",
+            )
+        }
+
+        @Test
+        fun `manual notification options preview confirm and dispatch responses match zod fixtures`() {
+            try {
+                val selection = manualNotificationSelection()
+                val previewId = previewManualNotification(selection)
+                confirmManualNotification(selection, previewId)
+                assertManualNotificationDispatchList()
+            } finally {
+                jdbcTemplate.update(
+                    "delete from notification_manual_dispatches where club_id = ? and session_id = ?",
+                    "00000000-0000-0000-0000-000000000001",
+                    seededHostSessionId,
+                )
+                jdbcTemplate.update(
+                    "delete from notification_manual_dispatch_previews where club_id = ?",
+                    "00000000-0000-0000-0000-000000000001",
+                )
+                jdbcTemplate.update(
+                    "delete from notification_event_outbox where club_id = ? and dedupe_key like 'manual:%'",
+                    "00000000-0000-0000-0000-000000000001",
+                )
+            }
+        }
+
+        private fun manualNotificationSelection(): String {
+            val options =
+                mockMvc
+                    .get("/api/host/notifications/manual/options") {
+                        with(user("host@example.com"))
+                        param("sessionId", seededHostSessionId)
+                    }.andExpect { status { isOk() } }
+                    .andReturn()
+                    .response.contentAsString
+            assertJsonShapeMatches(options, "manual-notification-options.json")
+            val optionsNode = objectMapper.readTree(options)
+            val template =
+                optionsNode.get("templates").first {
+                    it.get("eventType").asString() == "FEEDBACK_DOCUMENT_PUBLISHED"
+                }
+            return """
+                {
+                  "sessionId": "$seededHostSessionId",
+                  "eventType": "FEEDBACK_DOCUMENT_PUBLISHED",
+                  "contentRevision": "${template.get("contentRevision").asString()}",
+                  "scheduleRevision": ${optionsNode.at("/session/scheduleRevision").asLong()},
+                  "subject": "계약 미리보기 제목",
+                  "body": "계약 미리보기 본문",
+                  "audience": "CONFIRMED_ATTENDEES",
+                  "requestedChannels": "IN_APP"
+                }
+                """.trimIndent()
+        }
+
+        private fun previewManualNotification(selection: String): String {
+            val preview =
+                mockMvc
+                    .post("/api/host/notifications/manual/preview") {
+                        with(user("host@example.com"))
+                        contentType = MediaType.APPLICATION_JSON
+                        content = selection
+                    }.andExpect { status { isOk() } }
+                    .andReturn()
+                    .response.contentAsString
+            assertJsonShapeMatches(preview, "manual-notification-preview.json")
+            return objectMapper.readTree(preview).get("previewId").asString()
+        }
+
+        private fun confirmManualNotification(
+            selection: String,
+            previewId: String,
+        ) {
+            val command =
+                objectMapper.readTree(selection).properties().associate { it.key to it.value } +
+                    mapOf(
+                        "previewId" to objectMapper.valueToTree<JsonNode>(previewId),
+                        "resendConfirmed" to objectMapper.valueToTree<JsonNode>(false),
+                    )
+            val confirm =
+                mockMvc
+                    .post("/api/host/notifications/manual") {
+                        with(user("host@example.com"))
+                        contentType = MediaType.APPLICATION_JSON
+                        content = objectMapper.writeValueAsString(command)
+                    }.andExpect { status { isOk() } }
+                    .andReturn()
+                    .response.contentAsString
+            assertJsonShapeMatches(confirm, "manual-notification-confirm.json")
+        }
+
+        private fun assertManualNotificationDispatchList() {
+            val dispatches =
+                mockMvc
+                    .get("/api/host/notifications/manual/dispatches") {
+                        with(user("host@example.com"))
+                        param("sessionId", seededHostSessionId)
+                    }.andExpect { status { isOk() } }
+                    .andReturn()
+                    .response.contentAsString
+            assertJsonShapeMatches(dispatches, "manual-notification-dispatch-list.json")
         }
 
         @Test
@@ -337,6 +518,51 @@ class FrontendZodSchemaContractTest
             assertThat(attendees.getValue("멤버2").get("scheduleSeenState").asString()).isEqualTo("UNSEEN")
             assertThat(attendees.getValue("멤버5").get("participationStatus").asString()).isEqualTo("REMOVED")
             assertThat(attendees.getValue("멤버5").get("scheduleSeenState").asString()).isEqualTo("STALE")
+            assertPrivacySafe(response)
+        }
+
+        @Test
+        @Sql(
+            statements = [
+                CLEANUP_CONTRACT_HOST_SCHEDULE_SEEN_SQL,
+                INSERT_CONTRACT_HOST_SCHEDULE_SEEN_SESSION_SQL,
+                INSERT_CONTRACT_HOST_SCHEDULE_SEEN_PARTICIPANTS_SQL,
+            ],
+            executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+        )
+        @Sql(
+            statements = [CLEANUP_CONTRACT_HOST_SCHEDULE_SEEN_SQL],
+            executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+        )
+        fun `qualifying future draft detail preserves complete schedule seen counts`() {
+            jdbcTemplate.update(
+                """
+                update sessions
+                set state = 'DRAFT',
+                    visibility = 'MEMBER',
+                    access_scope = 'GUEST_READABLE',
+                    participant_set_revision = 1,
+                    session_date = '2999-09-20'
+                where id = ?
+                """.trimIndent(),
+                CONTRACT_HOST_SCHEDULE_SEEN_SESSION_ID,
+            )
+
+            val response =
+                mockMvc
+                    .get("/api/host/sessions/$CONTRACT_HOST_SCHEDULE_SEEN_SESSION_ID") {
+                        with(user("host@example.com"))
+                    }.andExpect { status { isOk() } }
+                    .andReturn()
+                    .response.contentAsString
+
+            val detail = objectMapper.readTree(response)
+            assertThat(detail.path("state").asString()).isEqualTo("DRAFT")
+            assertThat(detail.path("scheduleSeenAvailability").asString()).isEqualTo("AVAILABLE")
+            assertThat(detail.path("scheduleSeenSummary").path("currentCount").asInt()).isEqualTo(1)
+            assertThat(detail.path("scheduleSeenSummary").path("staleCount").asInt()).isEqualTo(1)
+            assertThat(detail.path("scheduleSeenSummary").path("unseenCount").asInt()).isEqualTo(1)
+            assertThat(detail.path("scheduleSeenSummary").path("eligibleCount").asInt()).isEqualTo(3)
             assertPrivacySafe(response)
         }
 

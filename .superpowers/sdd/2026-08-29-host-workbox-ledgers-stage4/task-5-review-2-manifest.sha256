@@ -1,0 +1,2 @@
+654fbffb5b1bf10c09cdcda387f7ba36f0cc52d5d624a3ff86cbfd6e76d75fa2  server/src/main/kotlin/com/readmates/sessionclosing/adapter/out/persistence/JdbcHostRecordClosingWorkSourceAdapter.kt
+21ac8a6cc1791f6f6d91c5192d8b028a46fc0630ff90f53a10f1642d21c4ac52  server/src/test/kotlin/com/readmates/hostworkspace/adapter/out/source/JdbcHostWorkSourceAuthorityTest.kt

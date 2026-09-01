@@ -3,12 +3,12 @@ import type { QueryClient } from "@tanstack/react-query";
 import { redirect, type LoaderFunction, type LoaderFunctionArgs, type RouteObject } from "react-router";
 import { requireHostLoaderAuth } from "@/features/host/route/host-loader-auth";
 import { HostRouteError } from "@/features/host/route/host-route-error";
-import { AppRouteLayout } from "@/src/app/layouts/app-route-layout";
+import { CanonicalHostCompatibilityRoute } from "@/src/app/host-routes/canonical-host-compatibility-route";
 import { memoizeRouteModule } from "@/src/app/routes/route-module-loader";
 import { ClubHostAppRouteLayout } from "@/src/app/layouts/club-app-route-layout";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
-import { RequireHost } from "@/src/app/route-guards";
-import { canonicalizeCompatibilityEntry, resolveUnavailableDetailTarget } from "@/src/app/workspace-route-model";
+import type { HostCompatibilityLoaderData } from "@/src/app/route-continuity";
+import { resolveUnavailableDetailTarget } from "@/src/app/workspace-route-model";
 import { readLastSafeWorkspaceTarget } from "@/src/app/workspace-route-continuity";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
 import { HOST_ROUTE_PATHS } from "@/shared/routing/host-route-destinations";
@@ -25,16 +25,7 @@ async function canonicalHostCompatibilityLoader(args: LoaderFunctionArgs) {
   if (!clubSlug) {
     throw redirect("/app");
   }
-
-  const url = new URL(args.request.url);
-  throw redirect(
-    canonicalizeCompatibilityEntry({
-      pathname: url.pathname,
-      search: url.search,
-      hash: url.hash,
-      currentClubSlug: clubSlug,
-    }),
-  );
+  return { hostCompatibilityClubSlug: clubSlug } satisfies HostCompatibilityLoaderData;
 }
 
 function scopedHostRoute({
@@ -98,16 +89,20 @@ function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
       },
     }),
     scopedHostRoute({
+      path: HOST_ROUTE_PATHS.personDetail,
+      errorElement: <HostRouteError />,
+      fallback: <ReadmatesRouteLoading label="사람 정보를 불러오는 중" variant="host" />,
+      load: async () => ({
+        Component: (await import("@/src/app/host-routes/person-detail-route-element")).HostPersonDetailRouteElement,
+      }),
+    }),
+    scopedHostRoute({
       path: HOST_ROUTE_PATHS.members,
       errorElement: <HostRouteError />,
       fallback: <ReadmatesRouteLoading label="멤버 목록을 불러오는 중" variant="host" />,
-      load: async () => {
-        const [{ HostMembersRouteElement: Component }, { hostMembersLoaderFactory }] = await Promise.all([
-          import("@/src/app/host-routes/members-route-element"),
-          import("@/features/host/route/host-members-data"),
-        ]);
-        return { Component, loader: hostMembersLoaderFactory(queryClient) };
-      },
+      load: async () => ({
+        Component: (await import("@/src/app/host-routes/members-redirect-element")).HostMembersRedirectElement,
+      }),
     }),
     scopedHostRoute({
       path: HOST_ROUTE_PATHS.invitations,
@@ -154,11 +149,11 @@ function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
       errorElement: <HostRouteError />,
       fallback: <ReadmatesRouteLoading label="기록 목록을 불러오는 중" variant="host" />,
       load: async () => {
-        const [{ HostRecordsRouteElement: Component }, { hostMeetingListLoaderFactory }] = await Promise.all([
+        const [{ HostRecordsRouteElement: Component }, { hostSessionLedgerLoaderFactory }] = await Promise.all([
           import("@/src/app/host-routes/records-route-element"),
-          import("@/features/host/route/host-meeting-list-data"),
+          import("@/features/host/route/host-session-ledger-data"),
         ]);
-        return { Component, loader: hostMeetingListLoaderFactory(queryClient) };
+        return { Component, loader: hostSessionLedgerLoaderFactory(queryClient) };
       },
     }),
     scopedHostRoute({
@@ -181,6 +176,14 @@ function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
       fallback: <ReadmatesRouteLoading label="모임 후 화면을 불러오는 중" variant="host" />,
       load: async () => ({
         Component: (await import("@/src/app/host-routes/session-closing-route-element")).HostSessionClosingRouteElement,
+      }),
+    }),
+    scopedHostRoute({
+      path: HOST_ROUTE_PATHS.scheduleReview,
+      errorElement: <HostRouteError />,
+      fallback: <ReadmatesRouteLoading label="일정 미열람 검토를 불러오는 중" variant="host" />,
+      load: async () => ({
+        Component: (await import("@/src/app/host-routes/schedule-review-route-element")).HostScheduleReviewRouteElement,
       }),
     }),
     scopedHostRoute({
@@ -258,18 +261,21 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
       },
     },
     {
+      path: HOST_ROUTE_PATHS.personDetail,
+      errorElement: <HostRouteError />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="사람 정보를 불러오는 중" variant="host" />,
+      lazy: async () => {
+        const { HostPersonDetailRouteElement } = await import("@/src/app/host-routes/person-detail-route-element");
+        return { Component: HostPersonDetailRouteElement, loader: requireHostLoaderAuth };
+      },
+    },
+    {
       path: HOST_ROUTE_PATHS.members,
       errorElement: <HostRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 목록을 불러오는 중" variant="host" />,
       lazy: async () => {
-        const [{ HostMembersRouteElement }, { hostMembersLoaderFactory }] = await Promise.all([
-          import("@/src/app/host-routes/members-route-element"),
-          import("@/features/host/route/host-members-data"),
-        ]);
-        return {
-          Component: HostMembersRouteElement,
-          loader: hostMembersLoaderFactory(queryClient),
-        };
+        const { HostMembersRedirectElement } = await import("@/src/app/host-routes/members-redirect-element");
+        return { Component: HostMembersRedirectElement };
       },
     },
     {
@@ -325,13 +331,13 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
       errorElement: <HostRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="기록 목록을 불러오는 중" variant="host" />,
       lazy: async () => {
-        const [{ HostRecordsRouteElement }, { hostMeetingListLoaderFactory }] = await Promise.all([
+        const [{ HostRecordsRouteElement }, { hostSessionLedgerLoaderFactory }] = await Promise.all([
           import("@/src/app/host-routes/records-route-element"),
-          import("@/features/host/route/host-meeting-list-data"),
+          import("@/features/host/route/host-session-ledger-data"),
         ]);
         return {
           Component: HostRecordsRouteElement,
-          loader: hostMeetingListLoaderFactory(queryClient),
+          loader: hostSessionLedgerLoaderFactory(queryClient),
         };
       },
     },
@@ -360,6 +366,15 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
       lazy: async () => {
         const { HostSessionClosingRouteElement } = await import("@/src/app/host-routes/session-closing-route-element");
         return { Component: HostSessionClosingRouteElement };
+      },
+    },
+    {
+      path: HOST_ROUTE_PATHS.scheduleReview,
+      errorElement: <HostRouteError />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="일정 미열람 검토를 불러오는 중" variant="host" />,
+      lazy: async () => {
+        const { HostScheduleReviewRouteElement } = await import("@/src/app/host-routes/schedule-review-route-element");
+        return { Component: HostScheduleReviewRouteElement, loader: requireHostLoaderAuth };
       },
     },
     {
@@ -419,11 +434,7 @@ export function hostRoutes(queryClient: QueryClient): RouteObject[] {
     {
       id: "app-host",
       path: "/app/host",
-      element: (
-        <RequireHost>
-          <AppRouteLayout />
-        </RequireHost>
-      ),
+      element: <CanonicalHostCompatibilityRoute />,
       loader: canonicalHostCompatibilityLoader,
       errorElement: <RouteErrorBoundary variant="host" />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="모임 운영 권한을 확인하는 중" variant="host" />,

@@ -35,6 +35,17 @@ describe("LIGHTHOUSE_ROUTE_INVENTORY", () => {
     expect(adminRoutes.every((route) => route.auth === "admin")).toBe(true);
   });
 
+  it("inventories the scoped host person detail without using an account identifier", () => {
+    const route = LIGHTHOUSE_ROUTE_INVENTORY.find((candidate) => candidate.id === "host-person-detail");
+
+    expect(route).toMatchObject({
+      group: "host",
+      auth: "host",
+      path: expect.stringContaining("/app/host/people/"),
+    });
+    expect(route?.path).not.toContain("user-");
+  });
+
   it("filters by group route id and limit", () => {
     const filtered = filterRoutes(LIGHTHOUSE_ROUTE_INVENTORY, {
       group: "public",

@@ -98,6 +98,10 @@ import {
   parseHostMemberListPage,
   parseHostNotificationDeliveryListResponse,
   parseHostInvitationListPage,
+  parseManualNotificationConfirmResponse,
+  parseManualNotificationDispatchListResponse,
+  parseManualNotificationOptionsResponse,
+  parseManualNotificationPreviewResponse,
   parseSessionImportPreviewResponse,
 } from "./host-contracts";
 import { normalizeHostSessionScheduleDefaults } from "../model/host-schedule-defaults-state";
@@ -254,7 +258,7 @@ export function fetchManualNotificationOptions(
     `/api/host/notifications/manual/options${search ? `?${search}` : ""}`,
     undefined,
     context,
-  );
+  ).then(parseManualNotificationOptionsResponse);
 }
 
 export function fetchManualNotificationDispatches(
@@ -278,7 +282,7 @@ export function fetchManualNotificationDispatches(
     `/api/host/notifications/manual/dispatches${search ? `?${search}` : ""}`,
     undefined,
     context,
-  );
+  ).then(parseManualNotificationDispatchListResponse);
 }
 
 export function previewManualNotification(
@@ -289,7 +293,7 @@ export function previewManualNotification(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
-  }, context);
+  }, context).then(parseManualNotificationPreviewResponse);
 }
 
 export function confirmManualNotification(
@@ -300,7 +304,7 @@ export function confirmManualNotification(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
-  }, context);
+  }, context).then(parseManualNotificationConfirmResponse);
 }
 
 export function fetchHostNotificationDetail(id: string, context: ExplicitHostApiContext) {

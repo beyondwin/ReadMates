@@ -1,0 +1,12 @@
+[Unit]
+Description=Monthly ReadMates Docker image cleanup
+Documentation=https://github.com/readmates/web/blob/main/docs/operations/runbooks/capacity-guardrails.md
+
+[Timer]
+OnCalendar=monthly
+Persistent=true
+RandomizedDelaySec=4h
+Unit=readmates-docker-image-prune.service
+
+[Install]
+WantedBy=timers.target

@@ -13,6 +13,7 @@ import { hostNotificationKeys } from "./host-notification-queries";
 import { hostSessionKeys } from "./host-session-queries";
 import { hostSessionRecordKeys } from "./host-session-record-query-keys";
 import { hostSessionRecoveryKeys } from "./host-session-recovery-queries";
+import { hostWorkboxKeys } from "./host-workbox-queries";
 import { registerHostRequest } from "@/shared/api/host-authority-event";
 import { readmatesFetch } from "@/shared/api/client";
 
@@ -54,6 +55,7 @@ describe("purgeClubHostState", () => {
       hostInvitationKeys.list(undefined, exactContext),
       hostNotificationKeys.summary(exactContext),
       hostClubOperationsKeys.snapshot(exactContext),
+      hostWorkboxKeys.page({ state: "DEFERRED", cursor: "next-1", limit: 20 }, exactContext),
       aiJobKeys.detail("session-7", "job-2", exactContext),
       aiClubKeys.capabilities(exactContext),
     ];
@@ -77,7 +79,10 @@ describe("purgeClubHostState", () => {
 
   it("does not let an in-flight response resurrect a purged club query", async () => {
     const client = queryClient();
-    const key = [...hostClubQueryPrefix("reading-sai"), "session", "session-1"] as const;
+    const key = hostWorkboxKeys.page(
+      { state: "NOW", cursor: "opaque-next", limit: 20 },
+      { clubSlug: "reading-sai" },
+    );
     let resolve!: (value: { secret: string }) => void;
     const pending = new Promise<{ secret: string }>((done) => {
       resolve = done;

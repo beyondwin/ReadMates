@@ -28,15 +28,17 @@ async function createDraftAndPublishNextBook(
   const bookTitle = `Next Book Composer ${suffix}`;
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto(HOST_PATH);
-  await expect(page).toHaveURL(/\/app\/host\/sessions\/(?!new(?:\/|$))[^/]+\/?(?:\?|$)/);
-  await page.getByRole("button", { name: "모임 마치기" }).locator("visible=true").click();
+  const currentMeeting = page.getByRole("group", { name: "현재 모임" });
+  await expect(currentMeeting).toBeVisible();
+  const meetingHref = await currentMeeting.getByRole("link", { name: "모임 정보" }).getAttribute("href");
+  expect(meetingHref).toBeTruthy();
+  await page.goto(new URL(meetingHref!, page.url()).pathname);
+  await page.getByRole("region", { name: "지금 할 일" }).getByRole("button", { name: "모임 마치기" }).click();
   await page.getByRole("dialog", { name: "모임 마치기" }).getByRole("button", { name: "모임 마치기" }).click();
   await expect(page.getByText("기록 정리 중")).toBeVisible();
-  await page.goto(HOST_PATH);
-  const addMeeting = page.getByRole("button", { name: /모임 하나 더|첫 모임 만들기/ });
-  await expect(addMeeting).toBeVisible();
-  await addMeeting.click();
-  await page.getByRole("button", { name: "모임 하나 더" }).click();
+  await page.goto(`${HOST_PATH}/sessions/new`);
+  await expect(page.getByRole("heading", { level: 1, name: "새 모임 만들기" })).toBeVisible();
+  await page.getByLabel("모임 제목").fill(`새 모임 · ${bookTitle}`);
   await page.getByLabel("책 제목").fill(bookTitle);
   await page.getByLabel("저자").fill("Public Fixture Author");
   await page.getByLabel("모임 날짜").fill("2026-08-20");
@@ -45,22 +47,27 @@ async function createDraftAndPublishNextBook(
       response.request().method() === "POST"
       && /\/api\/bff\/api\/host\/sessions\/?(?:\?|$)/.test(response.url()),
   );
-  await page.getByRole("button", { name: "목록에 넣기" }).click();
-  expect((await created).ok()).toBe(true);
-  await expect(page.getByText(bookTitle).first()).toBeVisible();
+  await page.getByRole("button", { name: "모임 초안 저장" }).click();
+  const createdResponse = await created;
+  expect(createdResponse.ok()).toBe(true);
+  const sessionId = ((await createdResponse.json()) as { sessionId: string }).sessionId;
+  await expect(page.getByRole("heading", { name: "모임 초안을 저장했습니다" })).toBeVisible();
 
-  const visibilityResponse = page.waitForResponse(
-    (response) =>
-      response.request().method() === "PATCH"
-      && response.url().includes("/host/sessions/")
-      && response.url().includes("/access-scope"),
-  );
-  await page.getByRole("switch", { name: `${bookTitle} 게스트와 멤버에게 보이기` }).click({ force: true });
-  const saved = await visibilityResponse;
-  expect(saved.status(), await saved.text()).toBe(200);
-  const sessionId = new URL(saved.url()).pathname.split("/").at(-2) ?? "";
-  expect(sessionId).not.toBe("");
-  await expect(page.getByRole("dialog", { name: "알림 보내기" })).toBeVisible();
+  const visibilityStatus = await page.evaluate(async (id) => {
+    const response = await fetch(`/api/bff/api/host/sessions/${id}/access-scope`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "X-Readmates-Client-Contract": "v3",
+      },
+      body: JSON.stringify({ accessScope: "GUEST_READABLE" }),
+    });
+    return response.status;
+  }, sessionId);
+  expect(visibilityStatus).toBe(200);
+  await page.goto(`${HOST_PATH}/notifications?sessionId=${encodeURIComponent(sessionId)}&eventType=NEXT_BOOK_PUBLISHED`);
+  await expect(page.getByRole("heading", { level: 1, name: "알림 발송 작업대" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: "다음 책 확정" })).toBeChecked();
 
   expect(await readNotificationEventCount(sessionId, "NEXT_BOOK_PUBLISHED")).toBe(0);
   expect(countManualNotificationEventsForSession(sessionId, "NEXT_BOOK_PUBLISHED")).toBe(0);
@@ -70,23 +77,28 @@ async function createDraftAndPublishNextBook(
 test.beforeEach(resetNextBookComposerState);
 test.afterEach(resetNextBookComposerState);
 
-test.describe.skip("next-book composer requires dashboard upcoming list", () => {
-test("closing the first-publication composer with Escape never confirms", async ({ page }) => {
+test.describe("next-book composer follows the canonical meeting list", () => {
+test("closing the canonical next-book preview with Escape never confirms", async ({ page }) => {
   const sessionId = await createDraftAndPublishNextBook(page, "Escape");
 
+  await page.getByRole("button", { name: "미리보기 열기" }).click();
+  await expect(page.getByRole("dialog", { name: "발송 전 확인" })).toBeVisible();
   await page.keyboard.press("Escape");
 
-  await expect(page.getByRole("dialog", { name: "알림 보내기" })).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "발송 전 확인" })).toBeHidden();
   expect(countManualNotificationEventsForSession(sessionId, "NEXT_BOOK_PUBLISHED")).toBe(0);
   expect(await readNotificationEventCount(sessionId, "NEXT_BOOK_PUBLISHED")).toBe(0);
 });
 
-test("skipping the first-publication composer never confirms", async ({ page }) => {
+test("dismissing the canonical next-book preview never confirms", async ({ page }) => {
   const sessionId = await createDraftAndPublishNextBook(page, "Skip");
 
-  await page.getByRole("button", { name: "이번에는 보내지 않기" }).click();
+  await page.getByRole("button", { name: "미리보기 열기" }).click();
+  const preview = page.getByRole("dialog", { name: "발송 전 확인" });
+  await expect(preview).toBeVisible();
+  await preview.getByRole("button", { name: "닫기" }).click();
 
-  await expect(page.getByRole("dialog", { name: "알림 보내기" })).toBeHidden();
+  await expect(preview).toBeHidden();
   expect(countManualNotificationEventsForSession(sessionId, "NEXT_BOOK_PUBLISHED")).toBe(0);
   expect(await readNotificationEventCount(sessionId, "NEXT_BOOK_PUBLISHED")).toBe(0);
 });
@@ -94,8 +106,8 @@ test("skipping the first-publication composer never confirms", async ({ page }) 
 test("confirm creates exactly one dispatch and retry remains one", async ({ page }) => {
   const sessionId = await createDraftAndPublishNextBook(page, "Confirm");
 
-  await page.getByRole("button", { name: "알림 미리보기" }).click();
-  await expect(page.getByRole("region", { name: "발송 전 확인" })).toBeVisible();
+  await page.getByRole("button", { name: "미리보기 열기" }).click();
+  await expect(page.getByRole("dialog", { name: "발송 전 확인" })).toBeVisible();
   expect(countManualNotificationEventsForSession(sessionId, "NEXT_BOOK_PUBLISHED")).toBe(0);
   expect(await readNotificationEventCount(sessionId, "NEXT_BOOK_PUBLISHED")).toBe(0);
 
@@ -111,7 +123,7 @@ test("confirm creates exactly one dispatch and retry remains one", async ({ page
       && response.url().includes("/host/notifications/manual")
       && !response.url().includes("/preview"),
   );
-  await page.getByRole("button", { name: "발송 확인" }).click();
+  await page.getByRole("button", { name: /명에게 알림 발송$/ }).click();
   const request = await confirmRequest;
   const response = await confirmResponse;
   expect(response.status(), await response.text()).toBe(200);

@@ -1,0 +1,12 @@
+{
+  "clubSlug": "reading-sai",
+  "clubName": "Public fixture club",
+  "status": "PENDING",
+  "expiresAt": "2026-09-30T00:00:00Z",
+  "canAccept": true,
+  "invitationType": "EMAIL",
+  "canonicalPath": "/clubs/reading-sai/invite/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "email": "member@example.test",
+  "name": "Public fixture member",
+  "emailHint": "m***@example.test"
+}

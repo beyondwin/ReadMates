@@ -153,6 +153,38 @@ export function HostNotificationComposer({
         </p>
       ) : null}
 
+      <fieldset
+        disabled={busy}
+        className="stack"
+        style={{ "--stack": "10px", border: 0, padding: 0, margin: 0 } as CSSProperties}
+      >
+        <legend className="label">알림 문구</legend>
+        <label className="stack" style={{ "--stack": "6px" } as CSSProperties}>
+          <span className="label">알림 제목</span>
+          <input
+            className="input"
+            aria-label="알림 제목"
+            maxLength={200}
+            value={draft.subject}
+            onChange={(event) => updateDraft({ subject: event.currentTarget.value })}
+          />
+        </label>
+        <label className="stack" style={{ "--stack": "6px" } as CSSProperties}>
+          <span className="label">알림 본문</span>
+          <textarea
+            className="input"
+            aria-label="알림 본문"
+            rows={5}
+            maxLength={4_000}
+            value={draft.body}
+            onChange={(event) => updateDraft({ body: event.currentTarget.value })}
+          />
+        </label>
+        <p className="tiny muted" style={{ margin: 0 }}>
+          미리보기에는 지금 입력한 문구가 그대로 고정됩니다.
+        </p>
+      </fieldset>
+
       <fieldset disabled={busy} style={{ border: 0, padding: 0, margin: 0 }}>
         <legend className="label">
           알림 대상

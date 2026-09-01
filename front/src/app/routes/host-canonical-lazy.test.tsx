@@ -33,6 +33,9 @@ function installCanonicalRouteMocks() {
   vi.doMock("@/features/host/route/host-meeting-list-data", () => ({
     hostMeetingListLoaderFactory: () => async () => null,
   }));
+  vi.doMock("@/features/host/route/host-session-ledger-data", () => ({
+    hostSessionLedgerLoaderFactory: () => async () => null,
+  }));
 }
 
 afterEach(() => {
@@ -46,6 +49,7 @@ afterEach(() => {
   vi.doUnmock("@/src/app/host-routes/settings-route-element");
   vi.doUnmock("@/features/host/route/host-members-data");
   vi.doUnmock("@/features/host/route/host-meeting-list-data");
+  vi.doUnmock("@/features/host/route/host-session-ledger-data");
 });
 
 describe("canonical host lazy route boundaries", () => {

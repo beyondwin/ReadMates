@@ -1,0 +1,5 @@
+1733229f43621b4351764af4ca7889d0cb45ccc573c3f6f2cc1eea464fe79ecf  .superpowers/sdd/2026-08-29-host-responsive-closeout-stage5/task-4-gate-fix-1-brief.md
+54fa8f0f58697e613e3b8c3518266999944053f26f235e1e1d8250e9139dc6f9  front/tests/unit/spa-layout.test.tsx
+dfa362aaa611c389dd94d54c85b5cd5fee67186dd3c335ebc984c4b697adb142  front/features/auth/ui/account-menu.tsx
+531800db5de8973971096c306b2c855570c81d94c31f8ff7ef91129d4e9ee6da  front/features/auth/ui/account-menu.test.tsx
+b8010ab86e823d27f8b55b7889a05da08ad022d17dd4c1ba0fa42b78368f1ceb  front/tests/e2e/support/visual-authority-contract.test.ts

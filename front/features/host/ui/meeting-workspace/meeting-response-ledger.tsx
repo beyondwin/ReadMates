@@ -182,6 +182,22 @@ function MeetingDayResponseLedger({
                     {arrived ? "도착함" : "도착"}
                   </span>
                 </button>
+                <label className="rm-meeting-response-ledger__correction">
+                  <span>실제 출석</span>
+                  <select
+                    aria-label={`${row.displayName} 실제 출석`}
+                    value={row.attendance}
+                    disabled={row.writeState === "saving"}
+                    onChange={(event) => onAttendanceChange(
+                      row.membershipId,
+                      event.currentTarget.value as MeetingAttendance,
+                    )}
+                  >
+                    <option value="UNKNOWN">확인 전</option>
+                    <option value="ATTENDED">출석</option>
+                    <option value="ABSENT">불참</option>
+                  </select>
+                </label>
                 {row.writeState === "saving" ? <span role="status" className="small">저장 중</span> : null}
                 {row.writeState === "error" ? <span role="alert" className="small">저장하지 못했습니다. 다시 선택해 주세요.</span> : null}
                 {row.writeState === "conflict" ? <span role="alert" className="small">최신 출석 상태와 충돌했습니다. 새로 확인해 주세요.</span> : null}

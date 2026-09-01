@@ -74,7 +74,7 @@ describe("MeetingResponseLedger", () => {
     expect(onBulkAttendanceChange).toHaveBeenCalledWith(["a", "b"], "ATTENDED");
   });
 
-  it("meetingDay presentation filters to not-yet, one-tap commits ATTENDED, bulks the rest, and shows undo", async () => {
+  it("meetingDay presentation keeps one-tap arrival while exposing all actual-attendance corrections, bulk, and undo", async () => {
     const user = userEvent.setup();
     const onAttendanceChange = vi.fn();
     const onBulkAttendanceChange = vi.fn();
@@ -100,13 +100,23 @@ describe("MeetingResponseLedger", () => {
     expect(within(segments).getByRole("button", { name: "전체 4" })).toHaveAttribute("aria-pressed", "false");
 
     expect(screen.getAllByRole("listitem")).toHaveLength(2);
-    expect(screen.queryByLabelText(/실제 출석/)).not.toBeInTheDocument();
+    const pendingAttendance = screen.getByLabelText("지후 실제 출석");
+    expect(within(pendingAttendance).getByRole("option", { name: "확인 전" })).toBeInTheDocument();
+    expect(within(pendingAttendance).getByRole("option", { name: "출석" })).toBeInTheDocument();
+    expect(within(pendingAttendance).getByRole("option", { name: "불참" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /저장/ })).not.toBeInTheDocument();
 
     const pendingRow = screen.getByRole("button", { name: /지후/ });
     expect(pendingRow).toHaveClass("rm-meeting-response-ledger__checkin");
     await user.click(pendingRow);
     expect(onAttendanceChange).toHaveBeenCalledWith("pending-1", "ATTENDED");
+
+    await user.selectOptions(pendingAttendance, "ABSENT");
+    expect(onAttendanceChange).toHaveBeenCalledWith("pending-1", "ABSENT");
+
+    await user.click(within(segments).getByRole("button", { name: "전체 4" }));
+    await user.selectOptions(screen.getByLabelText("서연 실제 출석"), "UNKNOWN");
+    expect(onAttendanceChange).toHaveBeenCalledWith("arrived-1", "UNKNOWN");
 
     await user.click(screen.getByRole("button", { name: "나머지 2명 모두 참석" }));
     expect(onBulkAttendanceChange).toHaveBeenCalledWith(["pending-1", "pending-2"], "ATTENDED");

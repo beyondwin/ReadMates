@@ -104,6 +104,42 @@ data class ClosingOverall(
     val primaryAction: ClosingPrimaryAction,
 )
 
+fun SessionClosingSnapshot.closingDecision(): ClosingOverall {
+    val sessionClosed = state in setOf("CLOSED", "PUBLISHED")
+    val recordSaved = SessionRecordReadinessPolicy.recordSaved(summaryPublished, highlightCount, oneLinerCount)
+    val feedbackReady = feedbackDocumentState == FeedbackDocumentClosingState.AVAILABLE
+    val feedbackBlocked = feedbackDocumentState == FeedbackDocumentClosingState.INVALID
+    val notificationSent = latestNotificationEvent?.status == NotificationClosingStatus.PUBLISHED
+    val publicApplicable = recordVisibility == SessionRecordVisibility.PUBLIC
+    val publicReady = publicApplicable && publicVisible && publicRecordHref != null
+    return when {
+        feedbackBlocked -> closingOverall(ClosingOverallState.BLOCKED, ClosingPrimaryAction.IMPORT_RECORDS)
+        !sessionClosed -> closingOverall(ClosingOverallState.IN_PROGRESS, ClosingPrimaryAction.CLOSE_SESSION)
+        !recordSaved -> closingOverall(ClosingOverallState.IN_PROGRESS, ClosingPrimaryAction.IMPORT_RECORDS)
+        !feedbackReady -> closingOverall(ClosingOverallState.IN_PROGRESS, ClosingPrimaryAction.IMPORT_RECORDS)
+        !notificationSent -> closingOverall(ClosingOverallState.READY, ClosingPrimaryAction.SEND_NOTIFICATION)
+        publicApplicable && !publicReady ->
+            closingOverall(ClosingOverallState.READY, ClosingPrimaryAction.PUBLISH_RECORDS)
+        publicReady -> closingOverall(ClosingOverallState.PUBLISHED, ClosingPrimaryAction.REVIEW_PUBLIC_PAGE)
+        else -> closingOverall(ClosingOverallState.READY, ClosingPrimaryAction.NONE)
+    }
+}
+
+private fun closingOverall(
+    state: ClosingOverallState,
+    primaryAction: ClosingPrimaryAction,
+) = ClosingOverall(state, state.displayLabel, primaryAction)
+
+private val ClosingOverallState.displayLabel: String
+    get() =
+        when (this) {
+            ClosingOverallState.BLOCKED -> "Blocked"
+            ClosingOverallState.IN_PROGRESS -> "In progress"
+            ClosingOverallState.READY -> "Ready"
+            ClosingOverallState.PUBLISHED -> "Published"
+            ClosingOverallState.NOT_STARTED -> "Not started"
+        }
+
 data class ClosingChecklistItem(
     val id: ClosingChecklistId,
     val state: ClosingChecklistState,

@@ -21,6 +21,7 @@ const options: ManualNotificationOptionsResponse = {
     state: "OPEN",
     visibility: "MEMBER",
     feedbackDocumentUploaded: false,
+    scheduleRevision: 7,
   },
   templates: [
     {
@@ -32,6 +33,8 @@ const options: ManualNotificationOptionsResponse = {
       defaultAudience: "ALL_ACTIVE_MEMBERS",
       allowedAudiences: ["ALL_ACTIVE_MEMBERS", "SESSION_PARTICIPANTS"],
       defaultChannels: "BOTH",
+      defaultSubject: "모임 전날 리마인더",
+      defaultBody: "내일 모임 준비를 확인해 주세요.",
     },
     {
       eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
@@ -42,6 +45,8 @@ const options: ManualNotificationOptionsResponse = {
       defaultAudience: "CONFIRMED_ATTENDEES",
       allowedAudiences: ["CONFIRMED_ATTENDEES"],
       defaultChannels: "BOTH",
+      defaultSubject: "피드백 문서 등록 안내",
+      defaultBody: "피드백 문서를 확인해 주세요.",
     },
   ],
   members: { items: [], nextCursor: null },
@@ -66,6 +71,9 @@ const sessions: HostSessionListItem[] = [{
 const previewFixture: ManualNotificationPreviewResponse = {
   previewId: "preview-1",
   expiresAt: "2026-07-25T12:10:00+09:00",
+  scheduleRevision: 7,
+  targetSnapshotHash: "b".repeat(64),
+  contentHash: "c".repeat(64),
   template: {
     eventType: "SESSION_REMINDER_DUE",
     label: "모임 전날 리마인더",
@@ -297,6 +305,9 @@ describe("ManualNotificationWorkbench", () => {
       excludedMembershipIds: [],
       includedMembershipIds: [],
       sendMode: "NOW",
+      scheduleRevision: 7,
+      subject: "모임 전날 리마인더",
+      body: "내일 모임 준비를 확인해 주세요.",
     });
   });
 });

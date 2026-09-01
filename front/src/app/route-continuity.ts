@@ -1,4 +1,5 @@
 import {
+  readAppReturnTarget,
   readmatesReturnState,
   type ReadmatesReturnState,
   type ReadmatesReturnTarget,
@@ -58,6 +59,55 @@ export const hostRecordsReturnTarget: ReadmatesReturnTarget = {
 
 export const hostDashboardReturnTarget = hostOperatingRoomReturnTarget;
 
+const invalidCompatibilityReturnTarget: ReadmatesReturnTarget = {
+  href: "",
+  label: "",
+};
+
+const hostCompatibilityDestinations = {
+  members: { segment: "people", hash: null },
+  invitations: { segment: "settings", hash: "#invitations" },
+  operations: { segment: "", hash: null },
+} as const;
+
+export function hostCompatibilityRedirectTarget({
+  pathname,
+  search = "",
+  hash = "",
+  currentClubSlug,
+}: {
+  pathname: string;
+  search?: string;
+  hash?: string;
+  currentClubSlug?: string;
+}) {
+  const match = /^(?<root>\/app\/host|\/clubs\/[^/]+\/app\/host)\/(?<legacy>members|invitations|operations)$/.exec(pathname);
+  if (!match?.groups) {
+    return null;
+  }
+
+  const legacy = match.groups.legacy as keyof typeof hostCompatibilityDestinations;
+  const destination = hostCompatibilityDestinations[legacy];
+  const targetRoot = match.groups.root === "/app/host" && currentClubSlug
+    ? `/clubs/${encodeURIComponent(currentClubSlug)}/app/host`
+    : match.groups.root;
+  const targetPathname = destination.segment
+    ? `${targetRoot}/${destination.segment}`
+    : targetRoot;
+  return `${targetPathname}${search}${destination.hash ?? hash}`;
+}
+
+export type HostCompatibilityLoaderData = {
+  hostCompatibilityClubSlug: string;
+};
+
+export function hostCompatibilityRedirectState(state: unknown, targetPathname: string) {
+  const returnTarget = readAppReturnTarget(state, targetPathname, invalidCompatibilityReturnTarget);
+  return returnTarget === invalidCompatibilityReturnTarget
+    ? null
+    : readmatesReturnState(returnTarget);
+}
+
 export type HostRouteDestinationInventoryEntry = {
   owner: string;
   kind:
@@ -97,6 +147,7 @@ export const HOST_ROUTE_DESTINATION_INVENTORY: readonly HostRouteDestinationInve
   { owner: "host-record-detail", kind: "detail", href: HOST_ROUTE_HREFS.sessionDetail, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.sessionDetail), lifecycle: "CLOSED", returnHref: HOST_ROUTE_HREFS.records },
   { owner: "host-session-edit", kind: "detail", href: HOST_ROUTE_HREFS.sessionEdit, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.sessionEdit), lifecycle: null, returnHref: HOST_ROUTE_HREFS.meetings },
   { owner: "host-session-closing", kind: "detail", href: HOST_ROUTE_HREFS.sessionClosing, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.sessionClosing), lifecycle: "CLOSED", returnHref: HOST_ROUTE_HREFS.records },
+  { owner: "host-schedule-review", kind: "detail", href: HOST_ROUTE_HREFS.scheduleReview, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.scheduleReview), lifecycle: "OPEN", returnHref: HOST_ROUTE_HREFS.operatingRoom },
   { owner: "host-feedback-document", kind: "detail", href: HOST_ROUTE_HREFS.feedbackDocument, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.feedbackDocument), lifecycle: "CLOSED", returnHref: HOST_ROUTE_HREFS.records },
   { owner: "host-trash-compatibility", kind: "compatibility", href: HOST_ROUTE_HREFS.trashCompatibility, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.trashCompatibility), lifecycle: null },
   { owner: "member-today", kind: "member-primary", href: "/app", scopedHref: "/clubs/:slug/app", lifecycle: null },

@@ -1,0 +1,6 @@
+e4cf46bc9b16763596f4ad83f1cf4397ecc846cc2ed81fae6c5267b9a738cfc2  .superpowers/sdd/2026-08-29-host-responsive-closeout-stage5/whole-branch-review-fix-1-brief.md
+e71b6269d312c027760e06e00078946a6be3cb6437776862f52d840967683014  server/src/main/kotlin/com/readmates/hostworkspace/adapter/out/source/InvitationExpiryWorkSourceAdapter.kt
+a59f6b84a055cc75f6c102add8bfeda49db7cfc3b048b2e96e3d1a1ddd9c1110  server/src/main/kotlin/com/readmates/hostworkspace/adapter/out/source/NotificationFailureWorkSourceAdapter.kt
+25bdc83b2ce2d33de4ec96315ea81797104f6645e75d8eedb1a788f8fb313829  server/src/test/kotlin/com/readmates/hostworkspace/adapter/out/source/HostWorkSourceAdaptersTest.kt
+72557a8c5f26b92680d63a32b9c64d627bd27e3d402658e27334e545c8ae8183  front/src/app/host-route-destination-inventory.test.ts
+6e43ce5d0c5c5d37e3799de9ffe2e42f02124b084d5ac897912c02365490cdd5  .superpowers/sdd/2026-08-29-host-responsive-closeout-stage5/whole-branch-review-fix-1-report.md

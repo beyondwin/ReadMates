@@ -1,0 +1,4 @@
+fb2157c74d8e39e22080c7ff6c1b8472fe534d28b9150210c7a42b08aa140c45  front/features/host/model/host-workbox-page-chain.ts
+b15c2b9bbf82e549af4182304d5914fde8d5260fd264f4e02b338dc254232d77  front/features/host/route/host-dashboard-route.test.tsx
+55a95d4729121762850351a7bb7d6be63090c30f212a95088ee704bc6428f35e  front/features/host/route/host-dashboard-route.tsx
+21a0dfb3ff5f9e650ab4a89e9490b07434eaf5ce55925e09b7c69775a0f00a20  front/tests/e2e/host-workbox-stage4.spec.ts

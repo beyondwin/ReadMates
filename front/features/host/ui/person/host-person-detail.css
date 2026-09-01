@@ -1,0 +1,145 @@
+.rm-host-person {
+  min-width: 0;
+  padding: var(--space-xl) max(var(--space-md), calc((100vw - 1120px) / 2)) var(--space-2xl);
+  color: var(--ink-900);
+}
+
+.rm-host-person__header,
+.rm-host-person__body {
+  min-width: 0;
+}
+
+.rm-host-person__return {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--text-2);
+  text-underline-offset: 3px;
+}
+
+.rm-host-person__identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) 0 var(--space-lg);
+  border-bottom: 1px solid var(--line);
+}
+
+.rm-host-person__identity h1,
+.rm-host-person__identity p,
+.rm-host-person h2,
+.rm-host-person p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.rm-host-person__identity h1 {
+  font-size: clamp(1.75rem, 4vw, 2.75rem);
+}
+
+.rm-host-person__identity p {
+  margin-top: var(--space-xs);
+  color: var(--text-2);
+}
+
+.rm-host-person__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.6fr);
+  gap: var(--space-xl);
+  padding-top: var(--space-lg);
+}
+
+.rm-host-person__facts,
+.rm-host-person__attendance,
+.rm-host-person__management {
+  min-width: 0;
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--line);
+}
+
+.rm-host-person__facts dl {
+  display: grid;
+  gap: 0;
+  margin: var(--space-md) 0;
+}
+
+.rm-host-person__facts dl > div {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--line-soft, var(--line));
+}
+
+.rm-host-person__facts dt {
+  color: var(--text-3);
+}
+
+.rm-host-person__facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.rm-host-person__attendance {
+  grid-column: 1;
+}
+
+.rm-host-person__attendance ol {
+  margin: var(--space-sm) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rm-host-person__attendance li {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(150px, 1fr) auto;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--line-soft, var(--line));
+}
+
+.rm-host-person__management {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: start;
+}
+
+.rm-host-person__management p {
+  margin: var(--space-sm) 0;
+  color: var(--text-2);
+}
+
+.rm-host-person :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px var(--focus-ring-soft);
+}
+
+@media (max-width: 720px) {
+  .rm-host-person {
+    padding-inline: var(--space-md);
+  }
+
+  .rm-host-person__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rm-host-person__attendance,
+  .rm-host-person__management {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .rm-host-person__attendance li,
+  .rm-host-person__facts dl > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rm-host-person,
+  .rm-host-person * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

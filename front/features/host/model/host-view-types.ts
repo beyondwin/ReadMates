@@ -176,6 +176,8 @@ export type ManualNotificationTemplateOption = {
   defaultAudience: ManualNotificationAudience;
   allowedAudiences: ManualNotificationAudience[];
   defaultChannels: ManualNotificationRequestedChannels;
+  defaultSubject: string;
+  defaultBody: string;
 };
 
 export type ManualNotificationMemberOption = {
@@ -185,7 +187,7 @@ export type ManualNotificationMemberOption = {
   role: MemberRole;
   membershipStatus: MembershipStatus;
   sessionParticipationStatus: SessionParticipationStatus | null;
-  attendanceStatus: AttendanceStatus | null;
+  attendanceStatus: AttendanceStatus | "CONFIRMED" | null;
   emailEligibility: ManualNotificationEligibility;
   inAppEligibility: ManualNotificationEligibility;
 };
@@ -205,6 +207,7 @@ export type ManualNotificationSessionSummary = {
   state: string;
   visibility: string;
   feedbackDocumentUploaded: boolean;
+  scheduleRevision: number;
 };
 
 export type ManualNotificationDispatchListItem = {
@@ -236,6 +239,9 @@ export type ManualNotificationSelectionRequest = {
   excludedMembershipIds: string[];
   includedMembershipIds: string[];
   sendMode: ManualNotificationSendMode;
+  scheduleRevision: number;
+  subject: string;
+  body: string;
 };
 
 export type HostNotificationPolicyResponse = {
@@ -252,6 +258,9 @@ export type ManualNotificationPreviewRequest = ManualNotificationSelectionReques
 export type ManualNotificationPreviewResponse = {
   previewId: string;
   expiresAt: string;
+  scheduleRevision: number;
+  targetSnapshotHash: string;
+  contentHash: string;
   template: {
     eventType: HostNotificationEventType;
     label: string;

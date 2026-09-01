@@ -7,6 +7,9 @@ import { ManualNotificationPreviewConfirmation } from "./manual-notification-pre
 const previewFixture: ManualNotificationPreviewResponse = {
   previewId: "preview-counts",
   expiresAt: "2030-01-01T00:00:00+09:00",
+  scheduleRevision: 7,
+  targetSnapshotHash: "b".repeat(64),
+  contentHash: "c".repeat(64),
   template: {
     eventType: "SESSION_REMINDER_DUE",
     label: "모임 전날 리마인더",

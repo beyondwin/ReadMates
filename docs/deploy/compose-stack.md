@@ -24,6 +24,8 @@ Docker와 Compose plugin은 VM에서 한 번 설치합니다.
 ssh -i ~/.ssh/readmates_oci ubuntu@VM_PUBLIC_IP 'bash -s' < deploy/oci/04-install-docker.sh
 ```
 
+디스크 보존 정책은 [capacity guardrails runbook](../operations/runbooks/capacity-guardrails.md)을 따른다. 관측 stack의 Prometheus는 기간(30일)과 데이터 크기(1GB)를 함께 제한하며, Docker image와 APT cache 정리는 systemd timer로 실행한다. 실제 VM 주소, 알림 수신처, OCI resource identifier는 Git에 기록하지 않는다.
+
 ## Preflight Stop Rules
 
 아래 조건이 맞지 않으면 `05-deploy-compose-stack.sh`를 실행하지 않습니다.

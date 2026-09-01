@@ -10,7 +10,7 @@
 
 **Spec:** ADR-0048, design §3–5/8–9, approved desktop 07–14 and mobile 15–17.
 
-ADR impact: implement ADR-0048 shell portion; remains Proposed.
+ADR impact: update — ADR-0048
 
 ## Global Constraints
 

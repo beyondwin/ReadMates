@@ -5,6 +5,7 @@ export const READING_SAI_FIXTURES = {
   slug: "reading-sai",
   publicSessionId: "00000000-0000-0000-0000-000000000301",
   memberSessionId: "00000000-0000-0000-0000-000000000301",
+  hostMembershipId: "00000000-0000-0000-0000-000000000101",
 } as const;
 
 const scopedClubPath = `/clubs/${READING_SAI_FIXTURES.slug}`;
@@ -36,6 +37,7 @@ export const LIGHTHOUSE_ROUTE_INVENTORY: LighthouseRouteDefinition[] = [
   { id: "member-feedback-print", group: "member", path: `${feedbackPath}/print`, mode: "snapshot", auth: "member", description: "Feedback print document", expectedText: "피드백" },
   { id: "host-dashboard", group: "host", path: `${scopedClubPath}/app/host`, mode: "timespan", auth: "host", description: "Host dashboard", expectedText: "운영" },
   { id: "host-members", group: "host", path: `${scopedClubPath}/app/host/members`, mode: "snapshot", auth: "host", description: "Host members ledger", expectedText: "멤버" },
+  { id: "host-person-detail", group: "host", path: `${scopedClubPath}/app/host/people/${READING_SAI_FIXTURES.hostMembershipId}`, mode: "snapshot", auth: "host", description: "Host privacy-safe person detail", expectedText: "최근 접속" },
   { id: "host-invitations", group: "host", path: `${scopedClubPath}/app/host/invitations`, mode: "snapshot", auth: "host", description: "Host invitations ledger", expectedText: "초대" },
   { id: "host-notifications", group: "host", path: `${scopedClubPath}/app/host/notifications`, mode: "snapshot", auth: "host", description: "Host notifications ledger", expectedText: "알림" },
   { id: "host-new-session", group: "host", path: `${scopedClubPath}/app/host/sessions/new`, mode: "snapshot", auth: "host", description: "Host session editor create route", expectedText: "세션" },

@@ -4,6 +4,7 @@ import { useLoaderData, useLocation, useNavigate, useParams, useSearchParams } f
 import type { HostSessionRecordLedgerPage, HostSessionTrashPage } from "@/features/host/api/host-contracts";
 import { hostMeetingHref } from "@/features/host/model/host-meeting-ledger-model";
 import {
+  dedupeHostSessionLedgerItems,
   hostSessionTrashDeletedAtLabel,
   hostSessionTrashRemainingCopy,
   normalizeHostSessionLedgerFilters,
@@ -104,7 +105,7 @@ export function HostSessionLedgerRoute({
   const [restoreState, setRestoreState] = useState<Record<string, Partial<HostSessionLedgerTrashItem>>>({});
   const visiblePage = basePage && appended?.base === basePage
     ? {
-        items: [...basePage.items, ...appended.items],
+        items: dedupeHostSessionLedgerItems([...basePage.items, ...appended.items]),
         nextCursor: appended.nextCursor,
       }
     : basePage;
@@ -295,6 +296,7 @@ export function HostSessionLedgerRoute({
         <p className="sr-only" role="status" aria-live="polite">{listAnnouncement}</p>
         <HostSessionLedger
           items={visiblePage?.items ?? []}
+          summary={basePage?.summary}
           trashItems={trashItems}
           filters={filters}
           nextCursor={(trashView ? visibleTrashPage?.nextCursor : visiblePage?.nextCursor) ?? null}
@@ -319,7 +321,7 @@ export function HostSessionLedgerRoute({
           }}
           trashHref="/app/host/sessions?view=trash"
           activeHref="/app/host/records"
-          recordReturnHref={scopedAppLinkTarget(location.pathname, "/app/host/records")}
+          recordReturnHref={`${location.pathname}${location.search}${location.hash}`}
           LinkComponent={LinkComponent}
         />
       </section>

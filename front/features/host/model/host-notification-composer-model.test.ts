@@ -16,6 +16,9 @@ describe("host notification composer model", () => {
       sessionId: "session-1",
       eventType: "SESSION_RECORD_UPDATED",
       contentRevision,
+      scheduleRevision: 7,
+      subject: "기록 수정 안내",
+      body: "수정된 기록을 확인해 주세요.",
       recipientMode: "RECOMMENDED",
       requestedChannels: "BOTH",
       selectedMembershipIds: [],
@@ -27,6 +30,9 @@ describe("host notification composer model", () => {
       sessionId: "session-1",
       eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
       contentRevision,
+      scheduleRevision: 7,
+      subject: "피드백 문서 안내",
+      body: "피드백 문서를 확인해 주세요.",
       recipientMode: "SELECTED_MEMBERS",
       requestedChannels: "EMAIL",
       selectedMembershipIds: ["member-c", "member-a", "member-b"],
@@ -40,6 +46,9 @@ describe("host notification composer model", () => {
       excludedMembershipIds: [],
       includedMembershipIds: [],
       sendMode: "NOW",
+      scheduleRevision: 7,
+      subject: "피드백 문서 안내",
+      body: "피드백 문서를 확인해 주세요.",
     });
   });
 
@@ -48,6 +57,9 @@ describe("host notification composer model", () => {
       sessionId: "session-1",
       eventType: "NEXT_BOOK_PUBLISHED",
       contentRevision,
+      scheduleRevision: 7,
+      subject: "다음 책 안내",
+      body: "다음 책을 확인해 주세요.",
       recipientMode: "ALL_ACTIVE_MEMBERS",
       requestedChannels: "IN_APP",
       selectedMembershipIds: ["member-a"],
@@ -59,9 +71,37 @@ describe("host notification composer model", () => {
       sessionId: "session-1",
       eventType: "SESSION_RECORD_UPDATED",
       contentRevision,
+      scheduleRevision: 7,
+      subject: "기록 수정 안내",
+      body: "수정된 기록을 확인해 주세요.",
       recipientMode: "SELECTED_MEMBERS",
       requestedChannels: "BOTH",
       selectedMembershipIds: [],
     })).toBe(false);
+  });
+
+  it("binds exact editable copy and schedule revision and rejects invalid copy", () => {
+    const validDraft = {
+      sessionId: "session-1",
+      eventType: "SESSION_RECORD_UPDATED" as const,
+      contentRevision,
+      scheduleRevision: 7,
+      subject: "호스트가 고친 제목",
+      body: "첫 줄\n둘째 줄",
+      recipientMode: "RECOMMENDED" as const,
+      requestedChannels: "BOTH" as const,
+      selectedMembershipIds: [],
+    };
+
+    expect(composerCanPreview(validDraft)).toBe(true);
+    expect(buildComposerSelection(validDraft)).toEqual(expect.objectContaining({
+      scheduleRevision: 7,
+      subject: "호스트가 고친 제목",
+      body: "첫 줄\n둘째 줄",
+    }));
+    expect(composerCanPreview({ ...validDraft, subject: "   " })).toBe(false);
+    expect(composerCanPreview({ ...validDraft, body: "" })).toBe(false);
+    expect(composerCanPreview({ ...validDraft, subject: "가".repeat(201) })).toBe(false);
+    expect(composerCanPreview({ ...validDraft, body: "나".repeat(4_001) })).toBe(false);
   });
 });

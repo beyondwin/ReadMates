@@ -1,0 +1,17 @@
+aa42ad624ded7384f8ca3074c1acc5de7dc13e5b8879f54348093236fbd41874  .superpowers/sdd/2026-08-29-host-responsive-closeout-stage5/task-4-gate-fix-3-brief.md
+199987402fe8efb7b2ae4aac53f04e44d71d13ea3ccbdf3f31cbfc3d291497e0  front/src/styles/globals.css
+1eb1406ae7c79273f082f634a702180568c8a39c047020ce7ee59aa8dd18ee26  front/tests/e2e/account-navigation-avatars.spec.ts
+e9d399c6ec01281c34afc7524f7cf79a84cfde1393fad4a4c8c88782098fe78a  front/tests/e2e/admin-shell.spec.ts
+333b1b80ae752d2edd97e6169729979f522893293e4cf4bc7ba47e97200a1f1f  front/tests/e2e/aigen-test-fixtures.ts
+4c6e011662271e3f7fb96a155507321a42ff7610e1e3581502dd3ff25bd78825  front/tests/e2e/dev-login-session-flow.spec.ts
+b7162d2efdca46f5a78b89efd59df2842853f3ca18144f3b6f32e4bf9eb280df  front/tests/e2e/google-auth-invite-flow.spec.ts
+8ab2a091957565b2cc665282466a1ea68bd2900bd6001fafe34301cca48c5d1f  front/tests/e2e/host-club-operations.spec.ts
+3b2d52f941ed78ba45d67bc225342dd9d078598b871d2752b609f9ada215d67c  front/tests/e2e/host-meeting-workspace-browser-smoke.spec.ts
+cf3b8916203337ac4a1f146db666df69096acb07abc265836cdf713d55156445  front/tests/e2e/host-next-book-notification-composer.spec.ts
+925d8754aa89851ac38ab577b4eb642d68609d99d6e4387068d8e84e537d9ee9  front/tests/e2e/host-session-hardening.spec.ts
+ce7f960d3678ccdb8d8c3053d516a7ab714b137a974801f3b28e589e7623a82b  front/tests/e2e/host-session-record-preview.spec.ts
+00057411c67f928ed904d89387421595d8facbd992469f6aa63feaa9a0cf8858  front/tests/e2e/member-reading-momentum.spec.ts
+d4edb79d0db7861a21429edb0e8caf1cad006f14fe929399b383289325161038  front/tests/e2e/multi-club-flow.spec.ts
+a19fd29548d2911dbd5cf1e4b18a836e98922c06239cfca1905c24b37f35c903  front/tests/e2e/public-auth-member-host.spec.ts
+cbec88e8bedd4a88f856cead6bea770d3ec947e0ad2aaaf090e94f3cc8a3d266  front/tests/e2e/readmates-e2e-db.ts
+e7dc263519623b347e16ab355fcee5895c7fe1ee706211263ef1d6bda5053720  front/tests/e2e/responsive-navigation-chrome.spec.ts

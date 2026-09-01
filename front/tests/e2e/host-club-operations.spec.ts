@@ -104,6 +104,7 @@ async function expectNoHostPrivateSentinels(page: Page): Promise<void> {
 async function expectHostMeetingLedgerPublicSafe(page: Page): Promise<void> {
   await expect(page.getByRole("group", { name: "현재 모임" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "모임 운영 단계" })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "클럽 작업함" })).toBeVisible();
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
   await expectNoHostPrivateSentinels(page);
 }

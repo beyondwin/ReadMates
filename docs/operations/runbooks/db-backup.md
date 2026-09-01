@@ -8,7 +8,7 @@ Readmates production MySQL backup은 OCI MySQL HeatWave에서 `mysqldump`로 추
 
 필수:
 - `READMATES_EXPORT_BUCKET` — 예: `readmates-db-exports`
-- `OCI_NAMESPACE` — 예: `ax5hfpscso8v`
+- `OCI_NAMESPACE` — Object Storage namespace (예: `<object-storage-namespace>`)
 - `READMATES_DB_HOST` — HeatWave private endpoint hostname
 
 선택:
@@ -106,14 +106,14 @@ cat ./readmates-pre-v1.X.Y-<TS>.sql.gz.sha256
 # 4. Object Storage 업로드 (sha256 + tag metadata 동봉).
 SHA="$(shasum -a 256 ./readmates-pre-v1.X.Y-<TS>.sql.gz | awk '{print $1}')"
 oci os object put \
-  --namespace-name ax5hfpscso8v \
+  --namespace-name <object-storage-namespace> \
   --bucket-name readmates-db-exports \
   --name "mysql/readmates-pre-v1.X.Y-<TS>.sql.gz" \
   --file ./readmates-pre-v1.X.Y-<TS>.sql.gz \
   --metadata "{\"sha256\":\"$SHA\",\"tag\":\"pre-v1.X.Y\"}" \
   --force
 oci os object put \
-  --namespace-name ax5hfpscso8v \
+  --namespace-name <object-storage-namespace> \
   --bucket-name readmates-db-exports \
   --name "mysql/readmates-pre-v1.X.Y-<TS>.sql.gz.sha256" \
   --file ./readmates-pre-v1.X.Y-<TS>.sql.gz.sha256 \
@@ -124,13 +124,13 @@ oci os object put \
 
 ```bash
 oci os object list \
-  --namespace-name ax5hfpscso8v \
+  --namespace-name <object-storage-namespace> \
   --bucket-name readmates-db-exports \
   --prefix mysql/readmates- \
   --query 'data[*].name' --output json
 
 oci os object head \
-  --namespace-name ax5hfpscso8v \
+  --namespace-name <object-storage-namespace> \
   --bucket-name readmates-db-exports \
   --name "mysql/readmates-pre-v1.X.Y-<TS>.sql.gz"
 # 응답의 opc-meta-sha256 값이 .sql.gz.sha256 파일의 hash와 일치하는지 확인.
@@ -144,13 +144,13 @@ oci os object head \
 
 ```bash
 oci os object get \
-  --namespace-name ax5hfpscso8v \
+  --namespace-name <object-storage-namespace> \
   --bucket-name readmates-db-exports \
   --name "mysql/readmates-pre-v1.X.Y-<TS>.sql.gz" \
   --file ./restore.sql.gz
 
 oci os object get \
-  --namespace-name ax5hfpscso8v \
+  --namespace-name <object-storage-namespace> \
   --bucket-name readmates-db-exports \
   --name "mysql/readmates-pre-v1.X.Y-<TS>.sql.gz.sha256" \
   --file ./restore.sql.gz.sha256
@@ -168,7 +168,7 @@ ACTUAL="$(shasum -a 256 ./restore.sql.gz | awk '{print $1}')"
 
 ```bash
 oci os object head \
-  --namespace-name ax5hfpscso8v \
+  --namespace-name <object-storage-namespace> \
   --bucket-name readmates-db-exports \
   --name "mysql/readmates-pre-v1.X.Y-<TS>.sql.gz" \
   | jq -r '."opc-meta-sha256"'

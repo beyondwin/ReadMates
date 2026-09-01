@@ -27,6 +27,7 @@ data class ManualNotificationSessionContext(
     val feedbackDocumentVersion: Int? = null,
     val sessionRecordContentRevision: String? = null,
     val participantSetRevision: Long = 0,
+    val scheduleRevision: Long = 0,
 )
 
 fun ManualNotificationSessionContext.contentRevision(eventType: NotificationEventType): String? =
@@ -66,6 +67,13 @@ data class ManualNotificationPreviewRecord(
     val hostMembershipId: UUID,
     val selectionHash: String,
     val targetSnapshotHash: String?,
+    val scheduleRevision: Long = 0,
+    val targetSnapshotRevision: String = "",
+    val targetMembershipIds: List<UUID> = emptyList(),
+    val eligibilityFingerprint: String = "",
+    val subject: String = "",
+    val body: String = "",
+    val contentHash: String = "",
     val expiresAt: OffsetDateTime,
 )
 
@@ -109,6 +117,7 @@ enum class ManualNotificationConfirmRejection {
     CONTENT_REVISION_STALE,
     RECIPIENT_INVALID,
     RECIPIENTS_CHANGED,
+    PREVIEW_STALE,
     AUDIENCE_EMPTY,
 }
 
@@ -138,6 +147,15 @@ fun ManualNotificationTargetSnapshot.snapshotHash(): String =
             add(emailMembershipIds.sorted())
             if (audienceRevision.isNotEmpty()) add(audienceRevision)
         }.joinToString("|"),
+    )
+
+fun ManualNotificationTargetSnapshot.targetSnapshotRevision(): String =
+    Sha256.hex(
+        listOf(
+            "manual-notification-target-snapshot-revision-v1",
+            "audienceRevision=$audienceRevision",
+            "targetMembershipIds=${targetMembershipIds.sorted().joinToString(",")}",
+        ).joinToString("|"),
     )
 
 fun ManualNotificationSessionContext.manualDispatchDisabledReason(eventType: NotificationEventType): String? =
@@ -214,6 +232,22 @@ interface ManualNotificationDispatchPort {
         targetSnapshotHash: String,
         expiresAt: OffsetDateTime,
     ): UUID
+
+    @Suppress("LongParameterList")
+    fun insertPreview(
+        clubId: UUID,
+        hostMembershipId: UUID,
+        selectionHash: String,
+        targetSnapshotHash: String,
+        scheduleRevision: Long,
+        targetSnapshotRevision: String,
+        targetMembershipIds: List<UUID>,
+        eligibilityFingerprint: String,
+        subject: String,
+        body: String,
+        contentHash: String,
+        expiresAt: OffsetDateTime,
+    ): UUID = insertPreview(clubId, hostMembershipId, selectionHash, targetSnapshotHash, expiresAt)
 
     fun findPreview(
         id: UUID,

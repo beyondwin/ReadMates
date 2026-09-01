@@ -39,6 +39,12 @@
 
 모바일 세 파일은 Codex built-in image generation의 `precise-object-edit` 경로로 갱신한 portrait PNG이며 RGB, alpha 없음으로 검증했다. 세 파일은 866×1846으로 통일하고 Pretendard Variable, 실제 북클럽 아바타, 390px 화면의 한 손 조작과 하단 safe-area를 공통 계약으로 사용한다.
 
+### Code-native 구현 근거
+
+07–17 PNG는 승인된 디자인 참고 자산이며 runtime proof가 아니다. 현재 responsive·interaction 근거는 [운영실 CT](../../../front/features/host/ui/operating-room/host-operating-room-responsive.ct.tsx), [모임 생애주기 CT](../../../front/features/host/ui/meeting-workspace/host-lifecycle-responsive.ct.tsx), [호스트 shell CT](../../../front/features/host/ui/shell/host-shell.ct.tsx), [route continuity E2E](../../../front/tests/e2e/host-lifecycle-route-continuity.spec.ts), [authority-loss E2E](../../../front/tests/e2e/host-authority-loss.spec.ts), [workbox E2E](../../../front/tests/e2e/host-workbox-stage4.spec.ts)에 있다. 접근성 근거는 [bounded DOM/ARIA helper](../../../front/tests/e2e/support/visual-authority-contract.ts)를 사용한 코드 기반 검사이며 axe/axe-core나 수동 VoiceOver·NVDA 전체 검증으로 확대 해석하지 않는다.
+
+위 근거는 repository-local synthetic fixture만 사용하고 production/private member data를 포함하지 않는다. CT/E2E screenshot·trace는 저장소 권위로 보존하지 않았으며, PNG 자체를 구현 완료 증거로 승격하지 않는다.
+
 아래 01–06 시안은 ADR-0046의 과거 구현 맥락을 보존하는 역사 참고 자료입니다. ADR-0048 구현의 시각 권위로 사용하지 않습니다.
 
 `docs/development/2026-08-27-readmates-host-triage-diary-redesign-design.md`의 참고 시안입니다.
@@ -48,7 +54,7 @@
 - 시안 일부는 4탭 내비와 "멤버와 준비 중" 상태 라벨을 쓰지만, 스펙은 3탭과 §5 용어 사전을 확정했습니다.
 - 시안의 멤버 썸네일이 실제 catalog와 다르면 역사적 자리표시자로만 해석한다. 실제 구현은 기존 북클럽 아트워크 아바타 시스템(공유 `AvatarChip`, `rm-avatar-chip--artwork`)을 그대로 사용한다.
 
-구현 후 시각 권위는 tracked CT 스크린샷 재잠금으로 넘어갑니다.
+현재 runtime 근거는 위 code-native CT/E2E 절이며, 아래 역사 PNG는 runtime proof로 승격하지 않습니다.
 
 모든 데이터는 가상 인물·예시 값입니다. HTML은 `design/system/src/styles/tokens.css`에서 복사한 실제 디자인 토큰을 사용하므로 브라우저로 열면 그대로 확인할 수 있습니다(폰트는 CDN 로드).
 

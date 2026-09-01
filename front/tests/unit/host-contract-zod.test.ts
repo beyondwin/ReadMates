@@ -122,6 +122,49 @@ const validHostSessionListItem = {
 // ---- DEV mode tests -----------------------------------------------------------
 
 describe("host-contract zod validators (DEV mode)", () => {
+  it("strictly parses all manual notification responses and rejects extra copy history", async () => {
+    const {
+      ManualNotificationConfirmResponseSchema,
+      ManualNotificationDispatchListResponseSchema,
+      ManualNotificationOptionsResponseSchema,
+      ManualNotificationPreviewResponseSchema,
+    } = await import("@/features/host/api/host-contracts");
+    const options = {
+      session: {
+        sessionId: "session-1", sessionNumber: 1, bookTitle: "Book", date: null,
+        state: "OPEN", visibility: "MEMBER", feedbackDocumentUploaded: false, scheduleRevision: 7,
+      },
+      templates: [{
+        eventType: "SESSION_REMINDER_DUE", contentRevision: "a".repeat(64), label: "리마인더",
+        enabled: true, disabledReason: null, defaultAudience: "ALL_ACTIVE_MEMBERS",
+        allowedAudiences: ["ALL_ACTIVE_MEMBERS"], defaultChannels: "BOTH",
+        defaultSubject: "제목", defaultBody: "본문",
+      }],
+      members: { items: [], nextCursor: null },
+      recentDispatches: [],
+    };
+    const preview = {
+      previewId: "preview-1", expiresAt: "2026-08-30T00:00:00Z", scheduleRevision: 7,
+      targetSnapshotHash: "b".repeat(64), contentHash: "c".repeat(64),
+      template: { eventType: "SESSION_REMINDER_DUE", label: "리마인더", subject: "제목", bodyPreview: "본문" },
+      audience: { baseGroup: "ALL_ACTIVE_MEMBERS", baseCount: 1, excludedCount: 0, includedCount: 0, finalTargetCount: 1 },
+      channels: { requested: "BOTH", inAppEligibleCount: 1, emailEligibleCount: 1, emailSkippedByPreferenceCount: 0, emailMissingCount: 0 },
+      duplicates: { requiresResendConfirmation: false, recentDispatches: [] }, warnings: [],
+    };
+    const confirm = {
+      manualDispatchId: "dispatch-1", eventId: "event-1", status: "PENDING", createdAt: "2026-08-30T00:00:00Z",
+      summary: { targetCount: 1, requestedChannels: "BOTH", expectedInAppCount: 1, expectedEmailCount: 1 },
+    };
+    const dispatches = { items: [], nextCursor: null };
+
+    expect(ManualNotificationOptionsResponseSchema.parse(options).session?.scheduleRevision).toBe(7);
+    expect(ManualNotificationPreviewResponseSchema.parse(preview).template.subject).toBe("제목");
+    expect(ManualNotificationConfirmResponseSchema.parse(confirm).status).toBe("PENDING");
+    expect(ManualNotificationDispatchListResponseSchema.parse(dispatches).items).toEqual([]);
+    expect(ManualNotificationPreviewResponseSchema.safeParse({ ...preview, rawProviderBody: "금지" }).success).toBe(false);
+    expect(ManualNotificationDispatchListResponseSchema.safeParse({ items: [{ customCopy: "금지" }], nextCursor: null }).success).toBe(false);
+  });
+
   it("parses a non-baseline schedule revision across host detail projection receipt and reconciliation", async () => {
     const {
       HostMutationReceiptSchema,

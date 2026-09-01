@@ -44,7 +44,7 @@ const members = [
     role: "MEMBER",
     membershipStatus: "ACTIVE",
     sessionParticipationStatus: "ACTIVE",
-    attendanceStatus: "CONFIRMED",
+    attendanceStatus: "UNKNOWN",
     emailEligibility: "ELIGIBLE",
     inAppEligibility: "ELIGIBLE",
   },
@@ -55,7 +55,7 @@ const members = [
     role: "MEMBER",
     membershipStatus: "ACTIVE",
     sessionParticipationStatus: "ACTIVE",
-    attendanceStatus: "CONFIRMED",
+    attendanceStatus: "UNKNOWN",
     emailEligibility: "ELIGIBLE",
     inAppEligibility: "ELIGIBLE",
   },
@@ -75,6 +75,7 @@ function optionsPage(
       state: "OPEN",
       visibility: "MEMBER",
       feedbackDocumentUploaded: true,
+      scheduleRevision: 7,
     },
     templates: [{
       eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
@@ -85,6 +86,8 @@ function optionsPage(
       defaultAudience: "CONFIRMED_ATTENDEES",
       allowedAudiences: ["ALL_ACTIVE_MEMBERS", "CONFIRMED_ATTENDEES", "SELECTED_MEMBERS"],
       defaultChannels: "BOTH",
+      defaultSubject: "피드백 문서가 공개됐습니다",
+      defaultBody: "모임의 피드백 문서를 확인해 주세요.",
     }],
     members: { items: [...items], nextCursor },
     recentDispatches: [],
@@ -94,6 +97,9 @@ function optionsPage(
 const preview: ManualNotificationPreviewResponse = {
   previewId: "preview-1",
   expiresAt: "2026-07-23T20:10:00+09:00",
+  scheduleRevision: 7,
+  targetSnapshotHash: "c".repeat(64),
+  contentHash: "d".repeat(64),
   template: {
     eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
     label: "피드백 문서 공개",
@@ -273,7 +279,7 @@ describe("HostNotificationComposerController", () => {
     await userEvent.click(await screen.findByRole("button", { name: "알림 미리보기" }));
     expect(await screen.findByRole("region", { name: "발송 전 확인" })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("radio", { name: "앱 알림" }));
+    await userEvent.clear(screen.getByRole("textbox", { name: "알림 제목" }));
     expect(screen.queryByRole("region", { name: "발송 전 확인" })).not.toBeInTheDocument();
   });
 
@@ -321,6 +327,36 @@ describe("HostNotificationComposerController", () => {
     await userEvent.click(await screen.findByRole("button", { name: "발송 확인" }));
 
     await waitFor(() => expect(onConfirmed).toHaveBeenCalledWith(confirmResponse));
+    expect(confirmManualNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        previewId: preview.previewId,
+        scheduleRevision: 7,
+        subject: preview.template.subject,
+        body: preview.template.bodyPreview,
+      }),
+      { clubSlug: "reading-sai" },
+    );
+  });
+
+  it("clears stale preview, refreshes schedule evidence, and never sends automatically", async () => {
+    vi.mocked(confirmManualNotification).mockRejectedValueOnce({
+      code: "MANUAL_NOTIFICATION_PREVIEW_STALE",
+    });
+    vi.mocked(fetchManualNotificationOptions)
+      .mockResolvedValueOnce(optionsPage())
+      .mockResolvedValueOnce({
+        ...optionsPage(),
+        session: { ...optionsPage().session!, scheduleRevision: 8 },
+      });
+    renderController();
+
+    await userEvent.click(await screen.findByRole("button", { name: "알림 미리보기" }));
+    await userEvent.click(await screen.findByRole("button", { name: "발송 확인" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("최신 정보로 새 미리보기를 만들어 주세요");
+    expect(screen.queryByRole("region", { name: "발송 전 확인" })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "알림 미리보기" })).toBeEnabled());
+    expect(confirmManualNotification).toHaveBeenCalledTimes(1);
   });
 
   it("does not call onConfirmed when confirm fails", async () => {

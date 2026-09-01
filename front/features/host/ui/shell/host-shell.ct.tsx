@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/experimental-ct-react";
 import { HostShellPrimitivesStory } from "./host-shell.story";
 
 for (const testCase of [
-  { width: 390, height: 844, mode: "mobile" as const },
-  { width: 1440, height: 900, mode: "desktop" as const },
+  ...[390, 767].map((width) => ({ width, height: 844, mode: "mobile" as const })),
+  ...[768, 1024, 1199, 1200, 1440].map((width) => ({ width, height: 900, mode: "desktop" as const })),
 ]) {
   test(`host shell primitives stay operable at ${testCase.width}px`, async ({ mount, page }) => {
     await page.setViewportSize({ width: testCase.width, height: testCase.height });

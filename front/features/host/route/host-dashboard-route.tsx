@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useLoaderData,
   useLocation,
@@ -19,13 +19,18 @@ import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import type { HostSessionDetailResponse } from "@/features/host/api/host-contracts";
 import type { HostSessionChangeReceipt } from "@/features/host/api/host-session-recovery-contracts";
+import type { HostWorkboxState } from "@/features/host/api/host-workbox-contracts";
+import type { HostWorkboxItem } from "@/features/host/api/host-workbox-contracts";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
+import { mergeCoherentWorkboxPages } from "@/features/host/model/host-workbox-page-chain";
 import {
   buildHostOperatingRoomView,
   type HostMeetingPhase,
+  type HostAuthoritativeWorkItem,
   type HostOperatingRoomSource,
   type HostOperatingRoomView,
 } from "@/features/host/model/host-operating-room-model";
+import { buildHostWorkboxView } from "@/features/host/model/host-workbox-model";
 import type { SessionClosingStatusInput } from "@/features/host/model/session-closing-model";
 import {
   hostSessionChangeUndoDescription,
@@ -42,6 +47,13 @@ import {
   publishRestoredHostSessionChange,
   useRestoreHostSessionChangeMutation,
 } from "@/features/host/queries/host-session-recovery-queries";
+import { hostNotificationHealthQuery } from "@/features/host/queries/host-notification-queries";
+import {
+  hostWorkboxPageQuery,
+  publishHostWorkboxComposition,
+  useDeferHostWorkboxItemMutation,
+  useRemoveHostWorkboxDeferralMutation,
+} from "@/features/host/queries/host-workbox-queries";
 import { registerHostSensitiveState } from "@/features/host/storage/host-sensitive-storage";
 import type { HostLinkComponent } from "@/features/host/ui/host-link-types";
 import {
@@ -59,6 +71,8 @@ import {
   type AttendanceRecoveryView,
 } from "@/features/host/ui/operating-room/host-operating-room-page";
 import { SessionClosingBoard } from "@/features/host/ui/session-closing-board";
+import { HostWorkbox } from "@/features/host/ui/workbox/host-workbox";
+import type { HostWorkboxDeferralOption } from "@/features/host/ui/workbox/host-work-item";
 import type { WorkspacePendingUndo } from "@/features/host/ui/session-workspace/workspace-undo-bar";
 import { formatSessionKicker } from "@/shared/ui/readmates-display";
 import { publishTransitionAction, TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
@@ -124,6 +138,39 @@ export function HostDashboardRoute({
   const navigate = useNavigate();
   const revalidator = useRevalidator();
   const sessionId = loaderData.operatingRoom.currentMeeting?.sessionId ?? null;
+  const [workboxState, setWorkboxState] = useState<HostWorkboxState>("NOW");
+  const [workboxCursors, setWorkboxCursors] = useState<readonly (string | null)[]>([null]);
+  const [workboxGeneration, setWorkboxGeneration] = useState<string | null>(null);
+  const [workboxPendingKey, setWorkboxPendingKey] = useState<string | null>(null);
+  const workboxMutationKeyRef = useRef<string | null>(null);
+  const [workboxRowError, setWorkboxRowError] = useState<{ key: string; message: string } | null>(null);
+  const [notificationRetry, setNotificationRetry] = useState<{
+    failureKey: string;
+    state: "retrying" | "recovered";
+  } | null>(null);
+
+  const nowWorkboxQuery = useQuery({
+    ...hostWorkboxPageQuery({ state: "NOW", limit: 20 }, context),
+    retry: false,
+  });
+  const workboxQueries = useQueries({
+    queries: workboxCursors.map((cursor) => ({
+      ...hostWorkboxPageQuery({ state: workboxState, cursor, limit: 20 }, context),
+      retry: false,
+    })),
+  });
+  const rootWorkboxPage = workboxQueries[0]?.data?.state === workboxState
+    ? workboxQueries[0].data
+    : undefined;
+  const nextWorkboxGeneration = rootWorkboxPage
+    ? `${workboxState}:${rootWorkboxPage.evaluatedAt}`
+    : null;
+  if (workboxGeneration !== nextWorkboxGeneration) {
+    setWorkboxGeneration(nextWorkboxGeneration);
+    setWorkboxCursors([null]);
+  }
+  const deferWorkboxMutation = useDeferHostWorkboxItemMutation(context);
+  const removeWorkboxDeferralMutation = useRemoveHostWorkboxDeferralMutation(context);
 
   const detailQuery = useQuery({
     ...hostSessionDetailQuery(sessionId ?? "", context),
@@ -212,8 +259,11 @@ export function HostDashboardRoute({
     questions: { state: "absent" },
     closing: closingSource,
     pendingOutcome: null,
-    authoritativeWorkItems: [],
-  }), [closingSource, paths.hostBasePath, requestedPhase, selectedDetail]);
+    authoritativeWorkItems: authoritativeOperatingRoomItems(
+      nowWorkboxQuery.data?.items,
+      selectedDetail?.sessionId ?? null,
+    ),
+  }), [closingSource, nowWorkboxQuery.data?.items, paths.hostBasePath, requestedPhase, selectedDetail]);
 
   const view = useMemo<HostOperatingRoomView>(() => {
     if (activeAttendanceConflict) {
@@ -266,7 +316,7 @@ export function HostDashboardRoute({
   }, [location.hash, location.pathname, location.search]);
 
   useEffect(() => {
-    if (!view.meeting || requestedPhase === view.phase) return;
+    if (requestedPhase === view.phase || (!view.meeting && requestedPhase === null)) return;
     void navigate(phaseHref(view.phase), {
       replace: true,
       state: withPhaseReason(location.state, phaseNormalizationMessage(requestedPhase, view)),
@@ -466,6 +516,14 @@ export function HostDashboardRoute({
   );
 
   const optionalFailureMessages = uniqueFailureMessages(loaderData, view);
+  const notificationFailure = loaderData.notificationHealth.state === "failed"
+    ? loaderData.notificationHealth.error
+    : null;
+  const notificationFailureKey = notificationFailure
+    ? `${context.clubSlug}:${notificationFailure.message}`
+    : null;
+  const notificationRecovered = notificationRetry?.failureKey === notificationFailureKey
+    && notificationRetry.state === "recovered";
   const recovery: AttendanceRecoveryView | null = activeAttendanceConflict ? {
     kind: "conflict",
     intendedLabel: attendanceLabel(activeAttendanceConflict.attendance),
@@ -496,6 +554,102 @@ export function HostDashboardRoute({
   const dDayLabel = view.meeting
     ? formatSessionKicker(view.meeting.sessionNumber, view.meeting.date).split(" · ")[1] ?? null
     : null;
+  const loadedWorkboxPage = useMemo(
+    () => mergeCoherentWorkboxPages(
+      rootWorkboxPage,
+      workboxQueries.flatMap((query) => query.data?.state === workboxState ? [query.data] : []),
+    ),
+    [rootWorkboxPage, workboxQueries, workboxState],
+  );
+  const workboxView = loadedWorkboxPage ? buildHostWorkboxView(loadedWorkboxPage) : null;
+  const workboxLoading = workboxQueries.some((query) => query.isPending || query.isFetching);
+  const workboxError = workboxQueries.some((query) => query.isError);
+
+  const deferWorkItem = useCallback(async (
+    workItemKey: string,
+    option: HostWorkboxDeferralOption,
+  ) => {
+    if (workboxMutationKeyRef.current !== null) return;
+    workboxMutationKeyRef.current = workItemKey;
+    setWorkboxPendingKey(workItemKey);
+    setWorkboxRowError(null);
+    const operationId = `host-workbox:defer:${workItemKey}`;
+    const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
+    try {
+      await deferWorkboxMutation.mutateAsync({
+        key: workItemKey,
+        deferredUntil: deferredUntilForOption(option),
+      });
+      if (await handle.settle("succeeded") !== "accepted") return;
+      await publishTransitionAction(handle, "cache", () => publishHostWorkboxComposition(queryClient, context));
+      await publishTransitionAction(handle, "ui", () => setWorkboxPendingKey((current) => current === workItemKey ? null : current));
+    } catch (error) {
+      if (error instanceof TransitionOwnerObsoleteError) return;
+      if (await handle.settle("failed") !== "accepted") return;
+      await publishTransitionAction(handle, "errorCopy", () => setWorkboxRowError({
+        key: workItemKey,
+        message: "작업을 보류하지 못했습니다. 항목을 유지한 채 다시 시도할 수 있습니다.",
+      }));
+      await publishTransitionAction(handle, "ui", () => setWorkboxPendingKey((current) => current === workItemKey ? null : current));
+    } finally {
+      if (workboxMutationKeyRef.current === workItemKey) {
+        workboxMutationKeyRef.current = null;
+      }
+      handle.completePublication();
+    }
+  }, [context, deferWorkboxMutation, queryClient, transitionOwner]);
+
+  const undoWorkItemDeferral = useCallback(async (workItemKey: string) => {
+    if (workboxMutationKeyRef.current !== null) return;
+    workboxMutationKeyRef.current = workItemKey;
+    setWorkboxPendingKey(workItemKey);
+    setWorkboxRowError(null);
+    const operationId = `host-workbox:remove-deferral:${workItemKey}`;
+    const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
+    try {
+      await removeWorkboxDeferralMutation.mutateAsync(workItemKey);
+      if (await handle.settle("succeeded") !== "accepted") return;
+      await publishTransitionAction(handle, "cache", () => publishHostWorkboxComposition(queryClient, context));
+      await publishTransitionAction(handle, "ui", () => setWorkboxPendingKey((current) => current === workItemKey ? null : current));
+    } catch (error) {
+      if (error instanceof TransitionOwnerObsoleteError) return;
+      if (await handle.settle("failed") !== "accepted") return;
+      await publishTransitionAction(handle, "errorCopy", () => setWorkboxRowError({
+        key: workItemKey,
+        message: "보류를 해제하지 못했습니다. 항목을 유지한 채 다시 시도할 수 있습니다.",
+      }));
+      await publishTransitionAction(handle, "ui", () => setWorkboxPendingKey((current) => current === workItemKey ? null : current));
+    } finally {
+      if (workboxMutationKeyRef.current === workItemKey) {
+        workboxMutationKeyRef.current = null;
+      }
+      handle.completePublication();
+    }
+  }, [context, queryClient, removeWorkboxDeferralMutation, transitionOwner]);
+
+  const workboxContent = (
+    <HostWorkbox
+      state={workboxState}
+      view={workboxView}
+      loading={workboxLoading}
+      error={workboxError ? "작업함을 불러오지 못했습니다." : null}
+      pendingKey={workboxPendingKey}
+      rowError={workboxRowError}
+      onStateChange={(nextState) => {
+        setWorkboxState(nextState);
+        setWorkboxCursors([null]);
+        setWorkboxRowError(null);
+      }}
+      onRetry={() => { void Promise.all(workboxQueries.map((query) => query.refetch())); }}
+      onLoadMore={(cursor) => {
+        setWorkboxCursors((current) => current.includes(cursor) ? current : [...current, cursor]);
+        setWorkboxRowError(null);
+      }}
+      onDefer={(key, option) => { void deferWorkItem(key, option); }}
+      onUndoDeferral={(key) => { void undoWorkItemDeferral(key); }}
+      LinkComponent={LinkComponent}
+    />
+  );
 
   return (
     <HostOperatingRoomPage
@@ -505,9 +659,32 @@ export function HostDashboardRoute({
       phaseLinks={phaseLinks}
       phaseNormalizationReason={phaseReasonFromState(location.state)}
       optionalFailureMessages={optionalFailureMessages}
+      optionalFailureActions={notificationFailure && !notificationRecovered ? [{
+        key: "notification-health",
+        message: notificationFailure.message,
+        label: notificationRetry?.failureKey === notificationFailureKey
+          && notificationRetry.state === "retrying"
+          ? "알림 상태 불러오는 중"
+          : "알림 상태 다시 불러오기",
+        busy: notificationRetry?.failureKey === notificationFailureKey
+          && notificationRetry.state === "retrying",
+        onRetry: () => {
+          if (!notificationFailureKey) return;
+          setNotificationRetry({ failureKey: notificationFailureKey, state: "retrying" });
+          void queryClient.fetchQuery({
+            ...hostNotificationHealthQuery(context),
+            staleTime: 0,
+          }).then(() => {
+            setNotificationRetry({ failureKey: notificationFailureKey, state: "recovered" });
+          }).catch(() => {
+            setNotificationRetry(null);
+          });
+        },
+      }] : []}
       recovery={recovery}
       liveContent={liveContent}
       closingContent={closingContent}
+      workboxContent={workboxContent}
       createMeetingHref={paths.newMeetingHref}
       onPhaseChange={(phase) => {
         void navigate(phaseHref(phase), { state: withoutPhaseReason(location.state) });
@@ -517,9 +694,43 @@ export function HostDashboardRoute({
         revalidator.revalidate();
       }}
       onRetryOptional={() => revalidator.revalidate()}
+      nextActionPending={view.nextAction.workItemKey !== null
+        && workboxPendingKey === view.nextAction.workItemKey}
+      onDeferNextAction={(workItemKey) => { void deferWorkItem(workItemKey, "TOMORROW"); }}
       LinkComponent={LinkComponent}
     />
   );
+}
+
+function authoritativeOperatingRoomItems(
+  items: readonly HostWorkboxItem[] | undefined,
+  sessionId: string | null,
+): readonly HostAuthoritativeWorkItem[] {
+  if (!sessionId) return [];
+  return (items ?? []).flatMap((item): HostAuthoritativeWorkItem[] => {
+    const expectedSuffix = item.type === "SCHEDULE_UNSEEN"
+      ? "schedule-review"
+      : item.type === "RECORD_CLOSING"
+        ? "closing"
+        : null;
+    if (!expectedSuffix || !destinationTargetsSession(item.destinationHref, sessionId, expectedSuffix)) {
+      return [];
+    }
+    return [{
+      kind: item.type === "SCHEDULE_UNSEEN" ? "schedule-seen" : "closing",
+      workItemKey: item.key,
+      state: item.state === "DEFERRED" ? "deferred" : "actionable",
+    }];
+  });
+}
+
+function destinationTargetsSession(
+  destinationHref: string,
+  sessionId: string,
+  suffix: "schedule-review" | "closing",
+): boolean {
+  const pathname = new URL(destinationHref, "https://readmates.local").pathname;
+  return pathname.endsWith(`/sessions/${encodeURIComponent(sessionId)}/${suffix}`);
 }
 
 function closingSourceFromLoader(
@@ -549,7 +760,6 @@ function uniqueFailureMessages(
   for (const source of [
     loaderData.recordAttention,
     loaderData.clubOperations,
-    loaderData.notificationHealth,
   ]) {
     if (source.state === "failed") messages.push(source.error.message);
   }
@@ -614,6 +824,18 @@ function todayIsoDate(now = new Date()): string {
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function deferredUntilForOption(
+  option: HostWorkboxDeferralOption,
+  now = new Date(),
+): string {
+  const days = option === "TOMORROW" ? 1 : option === "THREE_DAYS" ? 3 : 7;
+  const result = new Date(now);
+  result.setDate(result.getDate() + days);
+  result.setHours(9, 0, 0, 0);
+  if (result.getTime() <= now.getTime()) result.setDate(result.getDate() + 1);
+  return result.toISOString();
 }
 
 function attendanceLabel(attendance: MeetingAttendance): string {

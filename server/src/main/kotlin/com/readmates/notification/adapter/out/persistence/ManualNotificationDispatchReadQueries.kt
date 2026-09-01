@@ -36,6 +36,7 @@ internal class ManualNotificationDispatchReadQueries(
                   sessions.state,
                   sessions.visibility,
                   sessions.participant_set_revision,
+                  sessions.schedule_revision,
                   exists(
                     select 1
                     from session_feedback_documents

@@ -117,6 +117,7 @@ const hostSessionEditorTestActions = {
         cache: "no-store",
       },
     ),
+  reloadSession: async () => hostSessionDetailContractFixture,
   readCreatedSessionId: async (response) => {
     const body = await response.json() as { sessionId: string };
     return body.sessionId;
@@ -805,6 +806,63 @@ describe("HostSessionEditor", () => {
     const feedback = await screen.findByRole("status");
     expect(feedback).toHaveTextContent("저장되었습니다.");
     expect(saveButton.closest("form")).toContainElement(feedback);
+  });
+
+  it("preserves a conflicted schedule, compares the newest values, and retries only after explicit confirmation", async () => {
+    const user = userEvent.setup();
+    const saveSession = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ code: "REVISION_CONFLICT" }), {
+        status: 409,
+        headers: { "Content-Type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    const reloadSession = vi.fn().mockResolvedValue({
+      ...session,
+      date: "2025-12-03",
+      startTime: "21:00",
+      locationLabel: "새 장소",
+    });
+
+    render(
+      <HostSessionEditorForTest
+        session={session}
+        initialLocation={{ panel: "basic", source: "manual" }}
+        actions={{
+          ...hostSessionEditorTestActions,
+          saveSession,
+          reloadSession,
+        } as HostSessionEditorActions}
+      />,
+    );
+
+    await user.clear(screen.getByLabelText("모임 날짜"));
+    await user.type(screen.getByLabelText("모임 날짜"), "2025-12-10");
+    await user.clear(screen.getByLabelText("시작 시간"));
+    await user.type(screen.getByLabelText("시작 시간"), "20:30");
+    await user.clear(screen.getByLabelText("장소"));
+    await user.type(screen.getByLabelText("장소"), "내가 선택한 장소");
+    await user.click(screen.getByRole("button", { name: "기본 정보 저장" }));
+
+    const conflict = await screen.findByRole("alert", { name: "일정 변경 충돌" });
+    expect(reloadSession).toHaveBeenCalledWith(session.sessionId);
+    expect(screen.getByLabelText("모임 날짜")).toHaveValue("2025-12-10");
+    expect(screen.getByLabelText("시작 시간")).toHaveValue("20:30");
+    expect(screen.getByLabelText("장소")).toHaveValue("내가 선택한 장소");
+    expect(within(conflict).getByText(/내 입력 2025-12-10/)).toBeVisible();
+    expect(within(conflict).getByText(/최신 값 2025-12-03/)).toBeVisible();
+    expect(within(conflict).getByText(/내 입력 20:30/)).toBeVisible();
+    expect(within(conflict).getByText(/최신 값 21:00/)).toBeVisible();
+    expect(saveSession).toHaveBeenCalledTimes(1);
+
+    await user.click(within(conflict).getByRole("button", { name: "내 일정으로 다시 저장" }));
+
+    await waitFor(() => expect(saveSession).toHaveBeenCalledTimes(2));
+    expect(saveSession.mock.calls[1]?.[1]).toMatchObject({
+      date: "2025-12-10",
+      startTime: "20:30",
+      locationLabel: "내가 선택한 장소",
+    });
+    expect(await screen.findByRole("status")).toHaveTextContent("저장되었습니다.");
   });
 
   it("keeps attendance writes independent from the basic form submit", async () => {

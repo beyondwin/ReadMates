@@ -1,0 +1,11 @@
+[Unit]
+Description=Prune unused ReadMates Docker images
+Documentation=https://github.com/readmates/web/blob/main/docs/operations/runbooks/capacity-guardrails.md
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# Images referenced by any container are retained. The age filter keeps a
+# short rollback window while preventing unbounded accumulation between runs.
+ExecStart=/usr/bin/docker image prune -a --force --filter until=168h

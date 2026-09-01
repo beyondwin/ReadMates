@@ -12,6 +12,7 @@ import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { isMembershipPending, memberActionPendingReason } from "./member-action-rules";
 import { clubAccessMeta, formatMembershipTenure, rosterStatusLabels } from "./member-list-helpers";
 import type { HostMemberLifecyclePath } from "./types";
+import type { HostMembersLinkComponent } from "./types";
 import "./member-ledger.css";
 
 function statusBadgeClass(status: MembershipStatus) {
@@ -236,6 +237,8 @@ export function MemberList({
   renderActions,
   renderOverflow,
   renderCurrentSessionBadge = currentSessionBadge,
+  personHref,
+  LinkComponent,
 }: {
   members: HostMemberListItem[];
   emptyText: string;
@@ -244,6 +247,8 @@ export function MemberList({
   renderActions: (member: HostMemberListItem) => ReactNode;
   renderOverflow?: (member: HostMemberListItem) => ReactNode;
   renderCurrentSessionBadge?: (member: HostMemberListItem) => { label: string; className: string };
+  personHref?: (membershipId: string) => string;
+  LinkComponent?: HostMembersLinkComponent;
 }) {
   if (members.length === 0) {
     return (
@@ -289,7 +294,16 @@ export function MemberList({
                       label=""
                       sizeRole="member"
                     />
-                    <h2 className="h4 editorial">{member.displayName}</h2>
+                    <h2 className="h4 editorial">
+                      {personHref && LinkComponent ? (
+                        <LinkComponent
+                          to={personHref(member.membershipId)}
+                          className="rm-host-member-ledger__person-link"
+                        >
+                          {member.displayName}
+                        </LinkComponent>
+                      ) : member.displayName}
+                    </h2>
                     {member.role === "HOST" ? <span className="badge badge-accent badge-dot">호스트</span> : null}
                   </div>
                 </td>

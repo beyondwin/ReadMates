@@ -10,7 +10,7 @@
 
 **Spec:** ADR-0049, design §6–7, approved host mockups 07/14/17.
 
-ADR impact: **implement ADR-0049**; 상태는 Stage 5까지 Proposed.
+ADR impact: update — ADR-0049
 
 ## Global Constraints
 

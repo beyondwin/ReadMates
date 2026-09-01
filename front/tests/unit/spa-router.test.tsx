@@ -586,6 +586,7 @@ describe("SPA router", () => {
       if (url === "/api/bff/api/invitations/raw-token") {
         return Promise.resolve(
           jsonResponse({
+            invitationType: "EMAIL",
             clubName: "읽는사이",
             clubSlug: "reading-sai",
             canonicalPath: "/clubs/reading-sai/invite/raw-token",
@@ -621,6 +622,7 @@ describe("SPA router", () => {
       if (url === "/api/bff/api/clubs/reading-sai/invitations/raw-token") {
         return Promise.resolve(
           jsonResponse({
+            invitationType: "EMAIL",
             clubName: "읽는사이",
             clubSlug: "reading-sai",
             canonicalPath: "/clubs/reading-sai/invite/raw-token",

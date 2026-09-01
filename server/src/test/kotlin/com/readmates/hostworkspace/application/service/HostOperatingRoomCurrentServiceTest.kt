@@ -7,7 +7,6 @@ import com.readmates.hostworkspace.application.model.HostOperatingRoomCandidate
 import com.readmates.hostworkspace.application.model.HostOperatingRoomCandidateState
 import com.readmates.hostworkspace.application.model.HostOperatingRoomClosingRequirement
 import com.readmates.hostworkspace.application.model.HostOperatingRoomClosingRequirementResult
-import com.readmates.hostworkspace.application.model.HostOperatingRoomClosingRequirementResult.Available
 import com.readmates.hostworkspace.application.model.HostOperatingRoomSelection
 import com.readmates.hostworkspace.application.port.out.HostOperatingRoomCandidateSourcePort
 import com.readmates.hostworkspace.application.port.out.HostOperatingRoomClosingRequirementSourcePort
@@ -140,6 +139,9 @@ private fun candidate(
     scheduleSeenAvailable: Boolean,
 ) = HostOperatingRoomCandidate(uuid(id), state, scheduleSeenAvailable)
 
-private fun available(requirement: HostOperatingRoomClosingRequirement) = Available(requirement)
+private typealias AvailableClosingRequirement = HostOperatingRoomClosingRequirementResult.Available
+
+private fun available(requirement: HostOperatingRoomClosingRequirement): AvailableClosingRequirement =
+    AvailableClosingRequirement(requirement)
 
 private fun uuid(suffix: String): UUID = UUID.fromString("00000000-0000-0000-0000-${suffix.padStart(12, '0')}")

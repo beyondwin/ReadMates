@@ -106,4 +106,9 @@ interface HostInvitationStorePort {
     )
 
     fun findCurrentMember(membershipId: UUID): CurrentMember?
+
+    fun findActiveMembership(
+        clubId: UUID,
+        userId: UUID,
+    ): CurrentMember?
 }

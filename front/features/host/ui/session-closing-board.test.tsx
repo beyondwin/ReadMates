@@ -91,16 +91,25 @@ describe("SessionClosingBoard", () => {
     expect(screen.getByText("최근 멤버 알림")).toBeVisible();
   });
 
-  it("embeds without page chrome for the diary records step", () => {
+  it("embeds canonical checklist, readiness evidence, and public destinations without page chrome", () => {
     render(<SessionClosingBoard view={view} embedded />);
 
     expect(screen.queryByRole("heading", { name: "No.07 · E2E Book" })).toBeNull();
     expect(screen.queryByText("이번 모임 다음 조치")).toBeNull();
-    expect(screen.queryByText("마감 증거")).toBeNull();
     expect(screen.getByRole("region", { name: "장부 마감 체크리스트" })).toBeVisible();
     expect(screen.getByText("장부 마감")).toBeVisible();
     expect(screen.getByText("출석 확정")).toBeVisible();
     expect(screen.getByText("소감 수집")).toBeVisible();
+    expect(screen.getByText("마감 증거")).toBeVisible();
+    expect(screen.getByText("공개 요약")).toBeVisible();
+    expect(screen.getByRole("link", { name: "멤버 회고 확인" })).toHaveAttribute(
+      "href",
+      "/clubs/club-a/app/sessions/s1",
+    );
+    expect(screen.getByRole("link", { name: "공개 기록 확인" })).toHaveAttribute(
+      "href",
+      "/clubs/club-a/sessions/s1",
+    );
   });
 
   it("shows honest surface copy when member and public links are missing", () => {

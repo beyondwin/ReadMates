@@ -566,7 +566,129 @@ class HostNotificationControllerTest(
             assertThat(reminder.get("contentRevision").asText()).isEqualTo(REMINDER_REVISION)
             assertThat(reminder.get("defaultAudience").asText()).isEqualTo("ALL_ACTIVE_MEMBERS")
             assertThat(reminder.get("defaultChannels").asText()).isEqualTo("BOTH")
+            assertThat(reminder.get("defaultSubject").asText()).isNotBlank()
+            assertThat(reminder.get("defaultBody").asText()).isNotBlank()
             assertThat(reminder.get("allowedAudiences").toString()).contains("SELECTED_MEMBERS")
+            assertThat(
+                tools.jackson.databind
+                    .ObjectMapper()
+                    .readTree(response)
+                    .at("/session/scheduleRevision")
+                    .asLong(),
+            ).isGreaterThanOrEqualTo(0)
+        }
+    }
+
+    @Test
+    fun `host preview freezes exact editable copy and invalid copy persists nothing`() {
+        withTemporarySessionState("OPEN", "MEMBER") {
+            val scheduleRevision = currentScheduleRevision()
+            val beforeEvents = manualEventCount()
+            val beforePreviews = manualPreviewCount()
+            val response =
+                mockMvc
+                    .post("/api/host/notifications/manual/preview") {
+                        with(user("host@example.com"))
+                        contentType = MediaType.APPLICATION_JSON
+                        content =
+                            """
+                            {
+                              "sessionId": "00000000-0000-0000-0000-000000000301",
+                              "eventType": "SESSION_REMINDER_DUE",
+                              "contentRevision": "$REMINDER_REVISION",
+                              "scheduleRevision": $scheduleRevision,
+                              "subject": "  호스트가 고친 제목  ",
+                              "body": "호스트가 고친 본문",
+                              "audience": "ALL_ACTIVE_MEMBERS",
+                              "requestedChannels": "BOTH"
+                            }
+                            """.trimIndent()
+                    }.andExpect {
+                        status { isOk() }
+                        jsonPath("$.scheduleRevision") { value(scheduleRevision) }
+                        jsonPath("$.template.subject") { value("호스트가 고친 제목") }
+                        jsonPath("$.template.bodyPreview") { value("호스트가 고친 본문") }
+                        jsonPath("$.targetSnapshotHash") { exists() }
+                        jsonPath("$.contentHash") { exists() }
+                    }.andReturn()
+                    .response.contentAsString
+
+            assertThat(response).doesNotContain("member@example.com")
+            assertThat(manualEventCount()).isEqualTo(beforeEvents)
+            assertThat(manualPreviewCount()).isEqualTo(beforePreviews + 1)
+
+            mockMvc
+                .post("/api/host/notifications/manual/preview") {
+                    with(user("host@example.com"))
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        """
+                        {
+                          "sessionId": "00000000-0000-0000-0000-000000000301",
+                          "eventType": "SESSION_REMINDER_DUE",
+                          "contentRevision": "$REMINDER_REVISION",
+                          "scheduleRevision": $scheduleRevision,
+                          "subject": "   ",
+                          "body": "본문",
+                          "audience": "ALL_ACTIVE_MEMBERS",
+                          "requestedChannels": "BOTH"
+                        }
+                        """.trimIndent()
+                }.andExpect {
+                    status { isUnprocessableEntity() }
+                    jsonPath("$.code") { value("MANUAL_NOTIFICATION_COPY_INVALID") }
+                }
+            assertThat(manualPreviewCount()).isEqualTo(beforePreviews + 1)
+            assertThat(manualEventCount()).isEqualTo(beforeEvents)
+        }
+    }
+
+    @Test
+    fun `host confirm returns preview stale when schedule changes without outbox or dispatch`() {
+        withTemporarySessionState("OPEN", "MEMBER") {
+            val scheduleRevision = currentScheduleRevision()
+            val previewId = createSnapshotManualPreview(scheduleRevision)
+            val before = manualEventCount()
+            try {
+                jdbcTemplate.update(
+                    "update sessions set schedule_revision = schedule_revision + 1 where club_id = ? and id = ?",
+                    "00000000-0000-0000-0000-000000000001",
+                    "00000000-0000-0000-0000-000000000301",
+                )
+
+                mockMvc
+                    .post("/api/host/notifications/manual") {
+                        with(user("host@example.com"))
+                        contentType = MediaType.APPLICATION_JSON
+                        content =
+                            """
+                            {
+                              "previewId": "$previewId",
+                              "sessionId": "00000000-0000-0000-0000-000000000301",
+                              "eventType": "SESSION_REMINDER_DUE",
+                              "contentRevision": "$REMINDER_REVISION",
+                              "scheduleRevision": $scheduleRevision,
+                              "subject": "일정 알림",
+                              "body": "일정 본문",
+                              "audience": "ALL_ACTIVE_MEMBERS",
+                              "requestedChannels": "BOTH",
+                              "resendConfirmed": false
+                            }
+                            """.trimIndent()
+                    }.andExpect {
+                        status { isConflict() }
+                        jsonPath("$.code") { value("MANUAL_NOTIFICATION_PREVIEW_STALE") }
+                    }
+                assertThat(manualEventCount()).isEqualTo(before)
+                assertThat(previewManualDispatchCount(previewId)).isZero()
+            } finally {
+                jdbcTemplate.update(
+                    "update sessions set schedule_revision = ? where club_id = ? and id = ?",
+                    scheduleRevision,
+                    "00000000-0000-0000-0000-000000000001",
+                    "00000000-0000-0000-0000-000000000301",
+                )
+            }
         }
     }
 
@@ -1030,6 +1152,60 @@ class HostNotificationControllerTest(
                     .get("previewId")
                     .asText()
             }
+
+    private fun createSnapshotManualPreview(scheduleRevision: Long): String =
+        mockMvc
+            .post("/api/host/notifications/manual/preview") {
+                with(user("host@example.com"))
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "sessionId": "00000000-0000-0000-0000-000000000301",
+                      "eventType": "SESSION_REMINDER_DUE",
+                      "contentRevision": "$REMINDER_REVISION",
+                      "scheduleRevision": $scheduleRevision,
+                      "subject": "일정 알림",
+                      "body": "일정 본문",
+                      "audience": "ALL_ACTIVE_MEMBERS",
+                      "requestedChannels": "BOTH"
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+            }.andReturn()
+            .response.contentAsString
+            .let {
+                tools.jackson.databind
+                    .ObjectMapper()
+                    .readTree(it)
+                    .get("previewId")
+                    .asText()
+            }
+
+    private fun currentScheduleRevision(): Long =
+        requireNotNull(
+            jdbcTemplate.queryForObject(
+                "select schedule_revision from sessions where club_id = ? and id = ?",
+                Long::class.java,
+                "00000000-0000-0000-0000-000000000001",
+                "00000000-0000-0000-0000-000000000301",
+            ),
+        )
+
+    private fun manualPreviewCount(): Int =
+        jdbcTemplate.queryForObject(
+            "select count(*) from notification_manual_dispatch_previews where club_id = ?",
+            Int::class.java,
+            "00000000-0000-0000-0000-000000000001",
+        ) ?: 0
+
+    private fun previewManualDispatchCount(previewId: String): Int =
+        jdbcTemplate.queryForObject(
+            "select count(*) from notification_manual_dispatches where preview_id = ?",
+            Int::class.java,
+            previewId,
+        ) ?: 0
 
     private fun createSelectedManualPreview(selectedMembershipId: UUID): String =
         mockMvc

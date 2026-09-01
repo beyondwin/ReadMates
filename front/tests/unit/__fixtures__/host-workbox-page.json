@@ -1,0 +1,51 @@
+{
+  "state": "NOW",
+  "evaluatedAt": "2026-08-30T09:00:00Z",
+  "sourceAvailability": [
+    {
+      "type": "SCHEDULE_UNSEEN",
+      "state": "AVAILABLE",
+      "failureCode": null
+    },
+    {
+      "type": "MEMBER_APPROVAL",
+      "state": "AVAILABLE",
+      "failureCode": null
+    },
+    {
+      "type": "RECORD_CLOSING",
+      "state": "AVAILABLE",
+      "failureCode": null
+    },
+    {
+      "type": "INVITATION_EXPIRY",
+      "state": "AVAILABLE",
+      "failureCode": null
+    },
+    {
+      "type": "NOTIFICATION_FAILURE",
+      "state": "AVAILABLE",
+      "failureCode": null
+    }
+  ],
+  "items": [
+    {
+      "key": "SCHEDULE_UNSEEN:session-1:r7",
+      "type": "SCHEDULE_UNSEEN",
+      "state": "NOW",
+      "title": "일정 확인",
+      "description": "확인이 필요한 멤버가 있어요.",
+      "count": 1,
+      "dueAt": "2026-08-31T09:00:00Z",
+      "deferredUntil": null,
+      "resolvedAt": null,
+      "destinationHref": "/app/host/sessions/session-1/schedule-review",
+      "receiptSummary": {
+        "operation": "SCHEDULE_REMINDER",
+        "outcome": "PENDING",
+        "affectedCount": 1
+      }
+    }
+  ],
+  "nextCursor": null
+}

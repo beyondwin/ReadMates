@@ -90,6 +90,7 @@ test("public to Google fixture login to host smoke flow", async ({ page }) => {
   await expect(
     page.getByRole("navigation", { name: "호스트 유틸리티" }).getByRole("link", { name: "멤버 시야" }),
   ).toHaveAttribute("href", "/clubs/reading-sai/app");
+  await expect(page.getByRole("complementary", { name: "클럽 작업함" })).toBeVisible();
 
   await page.goto(`/app/feedback/${seededFeedbackSessionId}/print`);
   await expect(page.getByRole("heading", { name: /독서모임 1차 피드백/ })).toBeVisible();

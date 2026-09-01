@@ -1,0 +1,47 @@
+{
+  "session": {
+    "sessionId": "00000000-0000-0000-0000-000000000301",
+    "sessionNumber": 1,
+    "bookTitle": "공개 계약 도서",
+    "date": "2026-08-30",
+    "state": "OPEN",
+    "visibility": "MEMBER",
+    "feedbackDocumentUploaded": true,
+    "scheduleRevision": 7
+  },
+  "templates": [
+    {
+      "eventType": "SESSION_REMINDER_DUE",
+      "contentRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "label": "모임 알림",
+      "enabled": true,
+      "disabledReason": null,
+      "defaultAudience": "ALL_ACTIVE_MEMBERS",
+      "allowedAudiences": [
+        "ALL_ACTIVE_MEMBERS",
+        "SESSION_PARTICIPANTS",
+        "SELECTED_MEMBERS"
+      ],
+      "defaultChannels": "BOTH",
+      "defaultSubject": "모임을 안내합니다",
+      "defaultBody": "예정된 모임 정보를 확인해 주세요."
+    }
+  ],
+  "members": {
+    "items": [
+      {
+        "membershipId": "00000000-0000-0000-0000-000000000202",
+        "displayName": "공개 계약 멤버",
+        "maskedEmail": "m***@example.test",
+        "role": "MEMBER",
+        "membershipStatus": "ACTIVE",
+        "sessionParticipationStatus": "ACTIVE",
+        "attendanceStatus": "UNKNOWN",
+        "emailEligibility": "ELIGIBLE",
+        "inAppEligibility": "ELIGIBLE"
+      }
+    ],
+    "nextCursor": null
+  },
+  "recentDispatches": []
+}

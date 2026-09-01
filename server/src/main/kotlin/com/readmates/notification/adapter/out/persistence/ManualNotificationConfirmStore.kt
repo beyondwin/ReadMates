@@ -2,6 +2,7 @@ package com.readmates.notification.adapter.out.persistence
 
 import com.readmates.notification.application.model.ManualNotificationAudience
 import com.readmates.notification.application.model.ManualNotificationConfirmSummary
+import com.readmates.notification.application.model.ManualNotificationCopy
 import com.readmates.notification.application.model.ManualNotificationRequestedChannels
 import com.readmates.notification.application.model.ManualNotificationSelection
 import com.readmates.notification.application.model.NotificationDispatchSource
@@ -19,6 +20,7 @@ import com.readmates.notification.application.port.out.ManualNotificationTargetS
 import com.readmates.notification.application.port.out.contentRevision
 import com.readmates.notification.application.port.out.manualDispatchDisabledReason
 import com.readmates.notification.application.port.out.snapshotHash
+import com.readmates.notification.application.port.out.targetSnapshotRevision
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTime
 import org.springframework.jdbc.core.JdbcTemplate
@@ -116,14 +118,14 @@ private class ManualNotificationConfirmation(
         preview: LockedManualNotificationPreview,
         session: ManualNotificationSessionContext,
     ): ManualNotificationConfirmAttempt {
-        val rejection = sessionRejection(session, input.selection)
+        val rejection = sessionRejection(session, preview, input.selection)
         return if (rejection != null) {
             rejected(rejection)
         } else {
             audienceQueries.lockAudienceInputs(input.clubId, input.selection.sessionId)
             when (val target = resolveTarget(input.clubId, preview, input.selection)) {
                 is TargetResolution.Rejected -> rejected(target.reason)
-                is TargetResolution.Eligible -> confirmEligible(input, session, target.snapshot)
+                is TargetResolution.Eligible -> confirmEligible(input, preview, session, target.snapshot)
             }
         }
     }
@@ -145,7 +147,13 @@ private class ManualNotificationConfirmation(
             val snapshot = audienceQueries.previewTargets(clubId, selection)
             when {
                 preview.targetSnapshotHash == null || preview.targetSnapshotHash != snapshot.snapshotHash() ->
-                    TargetResolution.Rejected(ManualNotificationConfirmRejection.RECIPIENTS_CHANGED)
+                    TargetResolution.Rejected(ManualNotificationConfirmRejection.PREVIEW_STALE)
+                preview.targetSnapshotRevision.isNotEmpty() &&
+                    preview.targetSnapshotRevision != snapshot.targetSnapshotRevision() ->
+                    TargetResolution.Rejected(ManualNotificationConfirmRejection.PREVIEW_STALE)
+                preview.eligibilityFingerprint.isNotEmpty() &&
+                    preview.eligibilityFingerprint != snapshot.eligibilityFingerprint() ->
+                    TargetResolution.Rejected(ManualNotificationConfirmRejection.PREVIEW_STALE)
                 snapshot.hasEligibleTarget(selection.requestedChannels) -> TargetResolution.Eligible(snapshot)
                 else -> TargetResolution.Rejected(ManualNotificationConfirmRejection.AUDIENCE_EMPTY)
             }
@@ -154,6 +162,7 @@ private class ManualNotificationConfirmation(
 
     private fun confirmEligible(
         input: ManualNotificationConfirmTransactionInput,
+        preview: LockedManualNotificationPreview,
         session: ManualNotificationSessionContext,
         targetSnapshot: ManualNotificationTargetSnapshot,
     ): ManualNotificationConfirmAttempt {
@@ -163,18 +172,19 @@ private class ManualNotificationConfirmation(
                 duplicate.copy(status = ManualNotificationConfirmInsertStatus.DUPLICATE),
             )
         } else {
-            createConfirmedDispatch(input, session, targetSnapshot)
+            createConfirmedDispatch(input, preview, session, targetSnapshot)
         }
     }
 
     private fun createConfirmedDispatch(
         input: ManualNotificationConfirmTransactionInput,
+        preview: LockedManualNotificationPreview,
         session: ManualNotificationSessionContext,
         targetSnapshot: ManualNotificationTargetSnapshot,
     ): ManualNotificationConfirmAttempt {
         val eventId = UUID.randomUUID()
         val dispatchId = UUID.randomUUID()
-        val payload = eventPayload(input, session, targetSnapshot, dispatchId)
+        val payload = eventPayload(input, preview, session, targetSnapshot, dispatchId)
         writer.insertOutbox(
             eventId = eventId,
             clubId = input.clubId,
@@ -183,7 +193,7 @@ private class ManualNotificationConfirmation(
             dedupeKey =
                 "manual:${input.selection.eventType}:${input.selection.sessionId}:preview:${input.previewId}",
         )
-        writer.insertPreviewDispatch(dispatchId, eventId, input, targetSnapshot)
+        writer.insertPreviewDispatch(dispatchId, eventId, input, preview, targetSnapshot)
         previewStore.consume(input.previewId, input.clubId, input.hostMembershipId, eventId)
         return ManualNotificationConfirmAttempt.Confirmed(
             ManualNotificationConfirmedDispatch(
@@ -328,16 +338,18 @@ private class ManualNotificationConfirmWriter(
         dispatchId: UUID,
         eventId: UUID,
         input: ManualNotificationConfirmTransactionInput,
+        preview: LockedManualNotificationPreview,
         targetSnapshot: ManualNotificationTargetSnapshot,
     ) {
         jdbcTemplate.update(
             """
             insert into notification_manual_dispatches (
-              id, club_id, event_id, preview_id, session_id, event_type, content_revision, requested_by_membership_id,
+              id, club_id, event_id, preview_id, session_id, event_type, content_revision, content_hash,
+              requested_by_membership_id,
               requested_channels, audience, excluded_count, included_count, target_count,
               expected_in_app_count, expected_email_count, resend, send_mode
             )
-            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
             dispatchId.dbString(),
             input.clubId.dbString(),
@@ -346,6 +358,7 @@ private class ManualNotificationConfirmWriter(
             input.selection.sessionId.dbString(),
             input.selection.eventType.name,
             input.selection.contentRevision,
+            preview.contentHash.takeIf { it.isNotEmpty() },
             input.hostMembershipId.dbString(),
             input.selection.requestedChannels.name,
             input.selection.audience.name,
@@ -424,6 +437,7 @@ private fun previewRejection(
 
 private fun sessionRejection(
     session: ManualNotificationSessionContext,
+    preview: LockedManualNotificationPreview,
     selection: ManualNotificationSelection,
 ): ManualNotificationConfirmRejection? {
     val disabled = session.manualDispatchDisabledReason(selection.eventType) != null
@@ -433,6 +447,8 @@ private fun sessionRejection(
         currentRevision == null -> ManualNotificationConfirmRejection.CONTENT_REVISION_STALE
         !sameRevision(selection.contentRevision, currentRevision) ->
             ManualNotificationConfirmRejection.CONTENT_REVISION_STALE
+        preview.scheduleRevision > 0 && preview.scheduleRevision != session.scheduleRevision ->
+            ManualNotificationConfirmRejection.PREVIEW_STALE
         else -> null
     }
 }
@@ -486,6 +502,7 @@ private fun ManualNotificationTargetSnapshot.toConfirmSummary(requestedChannels:
 
 private fun eventPayload(
     input: ManualNotificationConfirmTransactionInput,
+    preview: LockedManualNotificationPreview,
     session: ManualNotificationSessionContext,
     targetSnapshot: ManualNotificationTargetSnapshot,
     dispatchId: UUID,
@@ -501,6 +518,14 @@ private fun eventPayload(
             requestedChannels = input.selection.requestedChannels,
             audience = input.selection.audience,
             contentRevision = input.selection.contentRevision,
+            customCopy =
+                preview.contentHash.takeIf { it.isNotEmpty() }?.let {
+                    ManualNotificationCopy(
+                        subject = preview.subject,
+                        body = preview.body,
+                        contentHash = it,
+                    )
+                },
             selectedMembershipIds = input.selection.selectedMembershipIds,
             excludedMembershipIds = input.selection.excludedMembershipIds,
             includedMembershipIds = input.selection.includedMembershipIds,
@@ -511,6 +536,11 @@ private fun eventPayload(
             sendMode = input.selection.sendMode,
         ),
 )
+
+private fun ManualNotificationTargetSnapshot.eligibilityFingerprint(): String =
+    com.readmates.shared.security.Sha256.hex(
+        listOf(inAppMembershipIds.sorted(), emailMembershipIds.sorted(), audienceRevision).joinToString("|"),
+    )
 
 private fun rejected(reason: ManualNotificationConfirmRejection): ManualNotificationConfirmAttempt =
     ManualNotificationConfirmAttempt.Rejected(reason)

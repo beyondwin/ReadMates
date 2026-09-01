@@ -1,0 +1,74 @@
+# Stage 5 Task 7 report — mandatory lifecycle browser evidence
+
+## Authority and scope
+
+- Base: `2d40833200434c4ed7c84be3f704138555f69242`.
+- Stage 5 plan SHA-256: `827c369f52ad002bda664c57d171d5c4fd8246f3b8637c85b929a507e1c5c3bb`.
+- Task brief SHA-256: `3a6fa97aa1ac2f6d319eafce54bbe2b3a7b7a741155c80fb36fd4e747c48a971`.
+- ADR impact: `none`. Proposed ADR-0048/0049 and active documentation were not changed.
+- Task 7 source-manifest SHA-256: `c37e5b7835625c4e04f87b02e9762ca86503238fcb905fd60200f8f90b53a7a1`.
+- The unrelated untracked admin-operations mockup directory remained untouched and unstaged. No server, documentation, provider, OAuth, email, real club-end, production data, deploy, tag, PR, push, user port or user container was touched.
+
+## Reused-versus-new coverage matrix
+
+Unchanged evidence was reused only when its current source or report SHA-256 matched the sealed value below. It was not rerun merely to duplicate proof.
+
+| Required claim | Reused exact-hash evidence | Fresh Task 7 evidence | Closure |
+| --- | --- | --- | --- |
+| Scoped/unscoped entry, all three legacy redirects, `/records`, non-current deep-link retention | Task 3 report `6c2894be75d1991cb8b2943f52ce3fd157e36a5860b36fe43c224df8bdd4e988` provided unit/router redirect authority | `host-lifecycle-route-continuity.spec.ts` `bd7dd2b88b7382160b81d9ce169d6a3a2a6bd5893a023dd41388583460cbcbaf` exercised the real browser route tree | Scoped records, unscoped records, non-current published-session deep link and the members/invitations/operations aliases preserve safe query/hash; legacy history entries are replaced. |
+| Combined club+role switch and involuntary authority loss | `multi-club-flow.spec.ts` `67ddc63cb52b3d9076eebae468ae1eed244b370fea84c9e10a324b476d07d439` | 403 authority-loss case at 768 in `host-authority-loss.spec.ts` `18d8e3c3ec69ae25e2c5741c98c0b353647e83107716a80fa965b2a92234a9e8` | Existing combined switch proof retained; 403 recovery gained responsive and accessibility assertions. |
+| DRAFT unavailable → OPEN UNSEEN → CURRENT → STALE → CURRENT, RSVP/attendance unchanged | `schedule-seen-lifecycle.spec.ts` `b9f2aca9921c5f1fc7da718d9418b4112880ae844fc4c2d4fc08a12d9a804e9f` | None; source unchanged | Reused without duplicate execution. |
+| Preparation → live → closing | `host-lifecycle-operating-room.spec.ts` `82f704f2e2f96822935b136fb359e7281a81055a0a5ea96ae700eb4e0fab8e37` | None; source unchanged | Reused without duplicate execution. |
+| 409 schedule comparison/retry; person privacy/cross-club rejection; invitation links/settings; local-safe guarded club-end preview/rejection | Stage 5 Task 1 report `bf8cd34d1ccf0a3893449d66e1df623add66143c14a942bcb0550c377149a130`, Task 2 report `48bb13f4130db085399d351fa896aa161ccc084b62f951d4539e2fd074bf3796`, and Task 3 report `6c2894be75d1991cb8b2943f52ce3fd157e36a5860b36fe43c224df8bdd4e988` | 409 comparison/retry case at 1024 in `host-authority-loss.spec.ts` | Existing functional proof retained; 409 gained responsive and accessibility assertions. Only local-safe synthetic club-end preview/rejection is covered. |
+| Edited notification preview/confirm, schedule/target conflict, partial failure, unknown reconciliation without resend | Stage 5 Task 2 report `48bb13f4130db085399d351fa896aa161ccc084b62f951d4539e2fd074bf3796` | Partial at 1200 and unknown at 1440 in `host-workbox-stage4.spec.ts` `154d713d4fc194db2db03fc40e60703e56ae6d476be4277147fb4c56910a17e0` | Recovery pages gained responsive and accessibility assertions; no real email was sent. |
+| Workbox NOW → DEFERRED → expired NOW → source-derived COMPLETED, invalid/expired cursor recovery | Stage 4 Task 9 report `d502dd76a1493cecce93c988f66fcbebb5c8a0997d448b16be418d3caec586d4` | None beyond the partial/unknown recovery surfaces above | Reused without rerunning the full Stage 4 lane. |
+| Responsive 390/768/1024/1200/1440 evidence for 403/409/partial/unknown | 390 unknown and keyboard/focus/target/overflow proof: Stage 5 Task 1 report `bf8cd34d1ccf0a3893449d66e1df623add66143c14a942bcb0550c377149a130`; CT sources: operating room `6fc7ceb51dbbb0ef5c2b8a669d437c8332aea51942daefde08a1110cf36c2ce8`, lifecycle `62055706f9815dd79971b556d71625a8f856d6d42f45d39d3e2d91a4c7cdd01d`, shell `12b38cf541e4342bde44f471224ddbfeb31dcdc4f6a95bab228f3ae0ecc7d2dc` | 403 at 768, 409 at 1024, partial at 1200 and unknown at 1440 | All five required widths are covered; four were freshly exercised and 390 was reused by exact hash. No redundant screenshot was captured. |
+| Automated accessibility on changed browser surfaces | Stage 5 Task 1 report retained its keyboard/focus/target/overflow result | Repository custom DOM/ARIA rules ran on the non-current deep link plus 403/409/partial/unknown pages | Zero helper-classified serious/critical findings on all five freshly audited pages. This is a bounded custom audit, not an axe or axe-core result. |
+
+## Production defects closed
+
+1. Browser fragments are absent from React Router loader requests, so ordinary unscoped canonical entry redirected with its query but lost its hash. The authenticated parent loader still owns the current-club authority and now returns only that slug; `CanonicalHostCompatibilityRoute` combines it with the real client location and performs the scoped `REPLACE`. It neither bypasses loader auth nor guesses the current club. Existing state validation continues to discard arbitrary, external and cross-club state.
+2. Visible controls referenced conditionally unmounted targets through `aria-controls`. The account menu and workspace basic/history controls now expose the reference only while the corresponding target exists.
+3. At 768, compact CSS hid the desktop brand label and left the visible home link unnamed. The link now has the explicit accessible name `읽는사이 홈`.
+
+## TDD and focused evidence
+
+All frontend commands used `PATH=<node24-bin>:$PATH`, `npx --yes corepack@0.35.0` and repository-pinned pnpm `11.13.1`. Browser commands used isolated port `3117`, API port `18117`, database `readmates_e2e_stage5_task7`, Chromium and one worker.
+
+| Source hash | Literal command | Result | Finding closure |
+| --- | --- | --- | --- |
+| Continuity spec `bd7dd2b88b7382160b81d9ce169d6a3a2a6bd5893a023dd41388583460cbcbaf` | `PATH=<node24-bin>:$PATH PLAYWRIGHT_PORT=3117 PLAYWRIGHT_WORKERS=1 READMATES_API_BASE_URL=http://127.0.0.1:18117 READMATES_E2E_DB_NAME=readmates_e2e_stage5_task7 npx --yes corepack@0.35.0 pnpm --dir front exec playwright test tests/e2e/host-lifecycle-route-continuity.spec.ts --project=chromium --workers=1` before production change | Expected RED: 0/1 completed; unscoped `/records` retained the query but lost `#records-heading`; the serial legacy test did not run after the first failure | Proved the real browser loader boundary could not retain the fragment despite unit/router characterization. |
+| Accessibility helper `25f3105a06bc14b6103276fcfeddf94685302b2cd9d661c53fecb001c902e313` | The same focused continuity command after the fragment fix and before ARIA production fixes | Expected RED characterization: one hidden closed-`details` false positive plus two real broken `aria-controls` references on visible account/workspace controls | The audit now excludes hidden, inert and non-visible ancestor subtrees; production controls remove references while their conditional target is unmounted. |
+| Account/workspace tests `531800db5de8973971096c306b2c855570c81d94c31f8ff7ef91129d4e9ee6da`, `a75beb9f0a0b4d6b9c2dd77fea49263fb88df404ccb083f188a36ee0b587b4fd` | `PATH=<node24-bin>:$PATH npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/auth/ui/account-menu.test.tsx features/host/ui/session-workspace/host-session-workspace.test.tsx --reporter=dot` before production change | Expected RED: 3 failed, 22 passed; closed controls still carried `aria-controls` | Proved both conditional-target defects and then closed them with open-state references only. |
+| Responsive navigation test `5f99bda97f4b19f6560b9f51c0fe00f2233917ccd3c7bc1cf0269b354a264126` | `PATH=<node24-bin>:$PATH npx --yes corepack@0.35.0 pnpm --dir front exec vitest run tests/unit/responsive-navigation.test.tsx -t 'uses the shared brand mark' --reporter=dot` before production change | Expected RED: 0/1; the 768 browser audit showed the compact visible link had no name | The shared brand link now retains an accessible name when visual label text is hidden. |
+| Task 7 source manifest `c37e5b7835625c4e04f87b02e9762ca86503238fcb905fd60200f8f90b53a7a1` | `PATH=<node24-bin>:$PATH npx --yes corepack@0.35.0 pnpm --dir front exec vitest run src/app/routes/host.test.tsx src/app/host-routes/host-redirects.test.tsx features/auth/ui/account-menu.test.tsx features/host/ui/session-workspace/host-session-workspace.test.tsx tests/unit/responsive-navigation.test.tsx --reporter=dot` | GREEN: 5 files, 129/129 | Loader authority, open/external/cross-club state rejection, redirect behavior and all focused ARIA regressions passed. |
+| Task 7 source manifest `c37e5b7835625c4e04f87b02e9762ca86503238fcb905fd60200f8f90b53a7a1` | `PATH=<node24-bin>:$PATH PLAYWRIGHT_PORT=3117 PLAYWRIGHT_WORKERS=1 READMATES_API_BASE_URL=http://127.0.0.1:18117 READMATES_E2E_DB_NAME=readmates_e2e_stage5_task7 npx --yes corepack@0.35.0 pnpm --dir front exec playwright test tests/e2e/host-lifecycle-route-continuity.spec.ts --project=chromium --workers=1` | GREEN: 2/2 | Six route-continuity scenario assertions passed in the real browser route tree. |
+| Task 7 source manifest `c37e5b7835625c4e04f87b02e9762ca86503238fcb905fd60200f8f90b53a7a1` | `PATH=<node24-bin>:$PATH PLAYWRIGHT_PORT=3117 PLAYWRIGHT_WORKERS=1 READMATES_API_BASE_URL=http://127.0.0.1:18117 READMATES_E2E_DB_NAME=readmates_e2e_stage5_task7 npx --yes corepack@0.35.0 pnpm --dir front exec playwright test tests/e2e/host-authority-loss.spec.ts tests/e2e/host-workbox-stage4.spec.ts --project=chromium --workers=1 -g 'revoked authority|revision conflict preserves|schedule review fails closed|partial workbox'` | GREEN: 4/4 | 403 at 768, 409 at 1024, partial at 1200 and unknown at 1440 had no horizontal overflow and zero serious/critical audit findings. |
+| Task 7 source manifest `c37e5b7835625c4e04f87b02e9762ca86503238fcb905fd60200f8f90b53a7a1` | `PATH=<node24-bin>:$PATH npx --yes corepack@0.35.0 pnpm --dir front exec eslint features/auth/ui/account-menu.test.tsx features/auth/ui/account-menu.tsx features/host/ui/session-workspace/host-session-workspace.test.tsx features/host/ui/session-workspace/workspace-header.tsx shared/ui/top-nav.tsx src/app/host-routes/canonical-host-compatibility-route.tsx src/app/routes/host.test.tsx src/app/routes/host.tsx tests/e2e/host-authority-loss.spec.ts tests/e2e/host-workbox-stage4.spec.ts tests/e2e/host-lifecycle-route-continuity.spec.ts tests/e2e/support/visual-authority-contract.ts tests/unit/responsive-navigation.test.tsx` | GREEN: exit `0`, no output | Exact changed-file static quality passed with no warning. |
+| Task 7 source manifest `c37e5b7835625c4e04f87b02e9762ca86503238fcb905fd60200f8f90b53a7a1` | `git diff --check` | GREEN: no output | No whitespace error was introduced. |
+| Task 7 source manifest `c37e5b7835625c4e04f87b02e9762ca86503238fcb905fd60200f8f90b53a7a1` | Targeted local-root, private-domain, private-key and secret-token regex scan over the report, manifest and all manifest-listed sources | GREEN: no matches | No concrete machine-local path, private domain or secret-shaped value was persisted. `gitleaks` was unavailable, so no gitleaks result is claimed. |
+| Task 7 source manifest `c37e5b7835625c4e04f87b02e9762ca86503238fcb905fd60200f8f90b53a7a1` | `shasum -a 256 -c .superpowers/sdd/2026-08-29-host-responsive-closeout-stage5/task-7-manifest.sha256` | GREEN: 14/14 entries `OK` | Brief, production and focused test sources are sealed. |
+
+## Scenario, width and artifact counts
+
+- Fresh Playwright cases: `6` total: `2` continuity tests plus `4` focused recovery-state tests.
+- Fresh scenario assertions: `10` total: scoped records, unscoped records, non-current published-session deep link, three legacy aliases, 403, 409, partial and unknown.
+- Widths: `5` required and covered: 390 reused by exact hash; 768, 1024, 1200 and 1440 freshly executed once each.
+- Fresh automated accessibility pages: `5`: non-current deep link, 403, 409, partial and unknown. Serious/critical findings: `0` after fixes.
+- Tracked screenshots, traces and raster baselines: `0`. Playwright retries were disabled; no evidence artifact containing browser storage, cookie, token, header or path was retained.
+- Fixture provenance: repository-local synthetic E2E identities and the isolated Task 7 database only. No production or private member data was used.
+
+## Accessibility mechanism and limits
+
+The repository-local custom helper checks exactly these DOM/ARIA rules: one visible main landmark; a bounded interactive-name source set consisting of `aria-label`, resolved `aria-labelledby`, associated labels, `alt`, `title`, native button/link or supported role text, and explicit button/reset/submit input values; no nested visible interactive controls; existing `aria-labelledby`/`aria-describedby`/`aria-controls` targets; and author-named, uniquely named visible navigation/complementary landmarks. Landmark descendant body text and ordinary text-input values are not accepted as names. Hidden, inert, `aria-hidden`, display/visibility-hidden ancestor subtrees and closed-`details` non-summary descendants are excluded. This helper is not axe/axe-core and does not claim complete accessible-name computation or comprehensive accessibility conformance. Existing Stage 1 evidence supplies keyboard/focus/target/overflow coverage by exact hash.
+
+Review fix 1 added three negative cases: anonymous navigation, anonymous complementary and a filled but unlabeled text input. All are now detected. It also retains positive author/label/content/alt/explicit-submit sources and proves that hidden/inert exclusion does not suppress a visible missing ARIA-reference finding. The hardened helper was rerun only against the four recovery pages; all four retained zero helper-classified serious/critical findings. The unchanged continuity case was not rerun.
+
+Manual VoiceOver and NVDA testing is `not measured`. Firefox, WebKit and hardware/mobile screen-reader behavior is also `not measured`; Task 7 used focused Chromium automation only.
+
+## Residual and deliberately not measured
+
+- External provider and OAuth execution: `not measured`.
+- Real email delivery: `not measured`; no email was sent.
+- Real club-end/close confirmation against a live club: `not measured`; only previously sealed local-safe preview/rejection evidence is cited.
+- Full frontend lint/test/build, full CT/E2E, server gates and public-release gates were not run because Stage 5 Task 4 owns the single full-gate pass.

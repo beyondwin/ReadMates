@@ -3,11 +3,12 @@
 이 문서는 현재 코드·테스트·tracked screenshot이 구현한 host/admin 시각 권위다.
 승인 설계나 미구현 목표를 적지 않는다. Public, guest, member composition은 이 문서로 바꾸지 않는다.
 
-- ADR-0044: Superseded by ADR-0046 (주 행동 계산 규칙은 다이어리형에 계승)
+- ADR-0044: Superseded by ADR-0046 (단일 주 행동 계산 규칙은 운영실에 계승)
 - ADR-0045: Accepted — host/admin 공유 paper/ink primitive
 - ADR-0046: Superseded by ADR-0048
-- ADR-0048: Proposed — 현재 host lifecycle operating-room 결정의 acceptance는 별도 closeout 대상
 - ADR-0047: Superseded by ADR-0050
+- ADR-0048: Accepted — lifecycle operating room과 host 4축 내비게이션의 현재 권위
+- ADR-0049: Accepted — 독립 schedule-seen revision과 명시적 검토·발송 흐름의 현재 권위
 - ADR-0050: Accepted — 오늘 할 일 중심 운영 데스크 + 클럽 관리·서비스 상태·처리 기록 4축
 - ADR-0051: Accepted — 플랫폼 운영·내 클럽 two-level 전역 공간 전환
 - Token source: `design/system/src/styles/tokens.css`
@@ -15,10 +16,9 @@
 
 ## Host primary chrome
 
-호스트 1차 내비게이션은 3탭이다: **오늘** · **모임** · **멤버**.
-데스크톱 top nav와 모바일 tab bar가 같은 목적지(`HOST_ROUTE_HREFS.today` / `.meetings` / `.members`)를 쓴다.
-알림 발송(`/app/host/notifications`)은 1차 탭이 아니라 오늘에서 진입하는 화면이다(모바일에서 오늘 탭 current에 포함할 수 있다).
-구 경로 replace redirect: `/records`→`/sessions`, `/operations`→오늘(`/host`), `/invitations`→`/members`.
+호스트 1차 내비게이션은 네 영역이다: **운영실** · **일정과 모임** · **사람** · **기록**.
+데스크톱 top nav와 모바일 tab bar는 같은 canonical 목적지(`HOST_ROUTE_HREFS.operatingRoom` / `.meetings` / `.people` / `.records`)와 순서를 쓴다. `초대와 설정`, `멤버 시야`, 알림, 계정, `새 모임`은 utility/action이며 1차 영역을 늘리지 않는다.
+`/members`와 `/operations`는 query·허용된 incoming fragment·검증된 same-club return state를 보존해 각각 `/people`과 운영실로 replace한다. `/invitations`는 query와 검증된 same-club return state를 보존하되 incoming fragment를 canonical `#invitations`로 교체해 `/settings#invitations`로 replace한다. `/records`는 canonical 기록 원장이고 `/sessions/:sessionId/edit`·`/closing`은 기존 deep link 문맥을 보존한다.
 
 ## Shared tokens
 
@@ -41,113 +41,36 @@ Host와 platform admin은 같은 paper/ink primitive를 쓴다. Role-only palett
 - 데이터 사실은 badge보다 문장·표·definition list를 우선한다.
 - `prefers-reduced-motion: reduce`는 animation/transition duration을 `0.001ms`로 강제한다. visual-authority helper `expectReducedMotion`의 20ms lingering cap은 reduced-motion 환경에서만 적용한다.
 
-## Host Today triage
+## Host lifecycle operating room
 
-적용 범위는 host home(오늘)이다. 페이지 타입은 오늘형(트리아지)이다.
+적용 범위는 `/app/host`와 `/clubs/:slug/app/host`다. `HostDashboardRoute`가 URL-authoritative club context, 서버가 고른 현재 모임, phase query, recovery, preparation source와 workbox query를 조립하고 `HostOperatingRoomPage`는 다음 semantic 순서를 유지한다.
 
-`/app/host` (등록 host) · `/clubs/:slug/app/host`
+1. `group "현재 모임"` — 모임 identity, lifecycle, 일정·변경 내역·멤버 시야 utility
+2. `navigation "모임 운영 단계"` — `준비실` · `현장` · `마감실`
+3. `region "다음에 할 일"` — 상태와 이유, 화면 전체에서 접근 가능한 primary action 하나
+4. `region "준비 현황"` — 일정 확인·응답·출석·기록 source를 독립 row로 표시
+5. `aside "클럽 작업함"` — `지금` · `보류` · `완료`, source별 partial/retry와 receipt
 
-`HostDashboardRoute`가 auth, club context, attention·operations·notification query, `buildHostTodayView` composition을 소유한다.
-`HostTodayPage`는 오늘형 page shell이다. DOM 순서:
+Lifecycle·audience·public placement를 한 stepper로 합치지 않는다. 다음 행동은 source가 pending/stale/unavailable이면 성공으로 추정하지 않고, conflict는 최신 값과 보존한 의도를 비교한 뒤 명시적으로 재시도하며 unknown outcome은 같은 mutation을 다시 보내지 않고 state/history로 reconciliation한다.
 
-1. page header — eyebrow `호스트 · 오늘`, h1 `오늘`, headline lede
-2. `region "처리할 일"` — resolve queue(기본 상한 7, **전체 보기**는 같은 페이지에서 나머지 항목을 펼침) 또는 zero-as-data 한 줄(`오늘 처리할 일이 없습니다 · 마지막 확인 HH:MM`)
-3. hero — 다음 모임 / 모임 당일(`오늘 모임` + primary `출석 확인 열기` → `section=attendance`) / empty(`첫 모임 만들기`)
-4. `aside "참고"` — 다가오는 일정, 클럽 상태 definition list, `운영 기록 전체 보기` quiet link → `/sessions` (desktop rail; mobile below)
+### Responsive composition
 
-오늘형은 KPI 타일·균등 카드 그리드가 아니다. 다이어리형 레이아웃을 복제하지 않는다.
-Lifecycle 상태 문구는 `hostMeetingLifecycleLabel`만 쓴다: `작성 중` / `준비 중` / `기록 정리 중` / `게시됨`.
-
-오늘형 CT 스크린샷 잠금 대상은 아직 없다(홈 CT 부재).
-
-## Host list pages (목록형)
-
-적용 범위는 호스트 1차 탭 중 모임 목록과 멤버 원장이다. 페이지 타입은 목록형이다. 오늘형 큐나 다이어리 스프레드를 복제하지 않는다.
-
-### Meeting TOC
-
-`/app/host/sessions` · `/clubs/:slug/app/host/sessions`
-
-`HostMeetingListRoute`가 upcoming·past query와 cursor pagination을 소유한다.
-`HostMeetingList`는 목록형 page shell이다. DOM 순서:
-
-1. page header — eyebrow `호스트 · 예정과 기록`, h1 `모임`, lede
-2. `region "다가오는 모임"` — TOC rows 또는 section-scoped error+retry
-3. `region "지난 모임"` — TOC rows 또는 section-scoped error+retry
-4. quiet `휴지통`
-
-Row grammar: folio ordinal · title · optional attention text · lifecycle chip · dotted leader · mono summary.
-Upcoming summary는 `MM-DD 예정일`. Past summary는 `MM-DD`만 두고 lifecycle은 chip이 담당한다.
-Lifecycle chip은 desktop·mobile 모두 보인다. 다가오는 목록 fetch 실패가 지난 모임 구간을 가리지 않는다.
-
-`max-width: 640px`에서 행은 `핵심 사실 1줄 + 상태 + 시각` 그리드로 재구성되고 title이 행 전체 tap target이다. 가로 스크롤 표가 아니다.
-
-목록형 CT 스크린샷 잠금 대상은 아직 없다.
-
-### Members ledger
-
-`/app/host/members` · `/clubs/:slug/app/host/members`
-
-`HostMembersRoute`가 member·invitation loader와 mutation을 소유한다.
-멤버 화면 DOM 순서:
-
-1. page header — eyebrow `운영 · 멤버 관리`, h1 `멤버 관리`
-2. summary counts
-3. pending viewer zone(있을 때만)
-4. roster table
-5. invitation ledger
-
-Roster row grammar: 이름(핵심 사실) · 상태 · 함께한 기간(시각) · 이번 모임 · 관리.
-Invitation row grammar: 이름(핵심 사실) · 이메일 · 상태 · 만료·수락(시각) · 액션.
-
-`max-width: 640px`에서 두 표 모두 CSS로 `핵심 사실 1줄 + 상태 + 시각` 리스트로 재구성한다. 가로 스크롤 표 금지. 레이아웃은 `member-ledger.css`가 소유한다.
-
-## Host Meeting Diary
-
-적용 범위는 특정 모임 canonical 경로뿐이다. 페이지 타입은 다이어리형이다(ADR-0044 Focus Deck 주 행동 계산을 스프레드로 재조립; ADR-0046 Accepted).
-
-`/clubs/:slug/app/host/sessions/:sessionId` (등록 host의 `/app/host/sessions/:sessionId`)
-
-`HostMeetingWorkspaceRoute`가 auth, base detail, URL, panel query, mutation, receipt, closing-status, authority-loss purge를 소유한다.
-`HostMeetingWorkspace`는 `HostSessionWorkspace`를 `.rm-meeting-diary` 스프레드로 조립한다. DOM 순서:
-
-1. optional `navigation "이전·다음 모임"` — 인접 모임 pager
-2. left page — 모임 identity(`WorkspaceHeader`), `멤버 시야로 보기`, `group "공개 상태"`, `navigation "모임의 걸음"`(6단계 세로 타임라인)
-3. `region "지금 할 일"` — 한 개의 primary CTA와 이유(ADR-0044 계산 규칙 유지)
-4. step content — 기본 `region "진행 목록"`; CLOSED 기록 단계에서는 embedded `region "장부 마감 체크리스트"`(`SessionClosingBoard` `embedded`)
-5. `navigation "관련 작업"` — 정보·응답·출석·기록·알림·변경 내역 deep link
-6. undo/recovery — 최근 변경, 충돌, public convergence
-7. info/attendance/records/history/notification panel 또는 sheet
-
-타임라인 단계명(§4.2 고정): `모임 만들기` → `멤버와 준비` → `응답 모으는 중` → `모임 당일(출석)` → `기록 정리` → `기록 게시`.
-Page-level local task navigation과 judgment complementary rail은 primary composition이 아니다.
-`/closing`은 다이어리 기록 정리 단계(`section=records`)로 착지한다.
-
-List, new, members, notifications는 같은 token과 state grammar를 쓰되 다이어리·오늘형 레이아웃을 복제하지 않는다.
-지운 모임 URL은 다이어리가 아니라 `WorkspaceTrashTombstone`이다.
-
-### Status and primary action
-
-상태 문구는 `작성 중` / `준비 중` / `기록 정리 중` / `게시됨`이다(`hostMeetingLifecycleLabel`).
-Lifecycle·audience·public placement를 하나의 stepper로 합치지 않는다.
-
-| Lifecycle | 계산된 주 행동 |
+| 폭 | composition |
 | --- | --- |
-| `DRAFT` | `멤버와 준비 시작` |
-| `OPEN` before meeting day | `멤버 응답 확인하기` |
-| `OPEN` with unknown attendance | 실제 출석 확인 |
-| `OPEN` otherwise | `모임 마치기` |
-| `CLOSED` record pending / stale / unavailable | `다음 할 일 확인 중` (disabled, fail closed) |
-| `CLOSED` no draft | `정리본 올리기` |
-| `CLOSED` draft needs review | `반영 전 확인` 또는 `기록에 반영` |
-| `CLOSED` applied record ready | `게스트·멤버 노트에 기록 게시` |
-| `PUBLISHED` | `공개 기록 보기` |
+| `390px`(mobile) | 현재 모임 → 단계 → 다음 행동 → 준비 현황 → 작업함의 단일 열이다. 네 영역 mobile tab bar와 `safe-area-inset-bottom` 공간을 보존하며 모든 보이는 control은 최소 44px다. |
+| `768–1199px` | 같은 semantic 순서를 유지하고 primary 뒤에 작업함을 쌓는다. 68/32 rail을 억지로 축소하지 않으며 768px부터 desktop chrome을 사용하되 bottom safe area는 침범하지 않는다. |
+| `1200px+` | main 작업은 약 68%, 작업함 rail은 약 32%의 두 열이다. DOM/읽기 순서는 mobile과 동일하며 작업함만 오른쪽에 배치한다. |
 
-Record-dependent action은 기존 record editor query를 readiness union으로 읽는다.
-`pending`/`stale`/`unavailable`을 `false`로 추정하지 않는다. Publication·overwrite는 ready가 아니면 잠근다.
+390·767·768·1024·1199·1200·1440px와 320×350 200% zoom proxy는 `host-operating-room-responsive.ct.tsx`와 `host-shell.ct.tsx`가 가로 overflow, 44px target, 순서, keyboard roving, visible focus와 reduced motion을 잠근다. Phase와 workbox tab은 방향키와 Home/End를 지원하고, focus/return state는 route/panel을 닫거나 Back/Forward할 때 원래 control로 돌아간다.
 
-`section` query는 panel deep link다. Back/Forward와 Escape는 연 컨트롤로 focus를 되돌린다.
-한 panel 실패가 다이어리 스프레드 전체를 막지 않는다. 모바일 sticky primary는 safe-area를 반영하고 본문 CTA와 중복 announce하지 않는다.
+`front/tests/e2e/support/visual-authority-contract.ts`의 검사는 visible main, bounded interactive accessible-name source, nested interactive, ARIA target, navigation/complementary landmark 이름만 확인하는 저장소 custom DOM/ARIA audit다. axe/axe-core 또는 전체 접근성 적합성으로 부르지 않는다. 현재 Chromium 자동화에서 helper-classified serious/critical finding은 없지만 VoiceOver/NVDA, Firefox/WebKit과 실제 기기 screen reader는 `not measured`다.
+
+## Host ledgers, utilities and deep links
+
+- `/sessions`는 일정과 모임, `/people`과 `/people/:membershipId`는 사람/개인 상태, `/records`는 기록 원장이다. `/settings`는 named invitation link와 club settings/co-host/history를 함께 둔다.
+- `/notifications`와 `/sessions/:sessionId/schedule-review`는 preview/confirm/reconciliation이 필요한 알림 utility다. 닫기·Escape·backdrop·route navigation은 발송을 만들지 않는다.
+- `/sessions/:sessionId`와 비현재 모임 deep link는 canonical detail을 유지한다. `/edit`, `/closing`, feedback-document와 기록 소유 return state는 일정/기록 영역 중 실제 작업 owner로 복귀한다.
+- 한 source 실패는 성공한 sibling을 지우지 않는다. 403은 club-scoped host state를 폐기하고 safe route로 replace하며, 409는 입력을 보존하고, partial은 source별 retry, unknown은 receipt/history reconciliation을 제공한다.
 
 ## Editorial Operations Ledger
 
@@ -209,22 +132,18 @@ Host panel과 admin route는 다음을 명시적으로 다룬다.
 완료 근거는 toast가 아니다. L1은 domain state/history, L2는 receipt, L3는 receipt와 convergence다.
 Live region은 의미 있는 전이에만 쓰고 polling마다 반복하지 않는다.
 
-## Responsive and accessibility matrix
+## Responsive and accessibility evidence index
 
 Contract widths: 320, 390, 768, 900, 1024, 1440px. keyboard, visible focus, 44px target, reduced motion, long Korean/English wrapping은 automated helper로 검증한다. Chrome 실제 200% toolbar zoom은 DPR 2→4, CSS viewport 1728→864, document/body scroll width와 client width 일치, 보이는 focus target 높이로 확인했다. Manual screen-reader announcement order는 아직 `not measured`이며 검증 완료로 주장하지 않는다.
 
-Tracked screenshots는 대표 상태만 잠근다. 1024px는 viewport contract와 browser smoke에 있고 PNG baseline은 없다.
+Host lifecycle의 code-native source는 `front/features/host/ui/operating-room/host-operating-room-responsive.ct.tsx`, `front/features/host/ui/meeting-workspace/host-lifecycle-responsive.ct.tsx`, `front/features/host/ui/shell/host-shell.ct.tsx`다. Real-route continuity와 recovery widths는 `front/tests/e2e/host-lifecycle-route-continuity.spec.ts`, `front/tests/e2e/host-authority-loss.spec.ts`, `front/tests/e2e/host-workbox-stage4.spec.ts`가 맡는다. 이 semantic/geometry/DOM evidence는 승인 PNG나 과거 screenshot baseline을 runtime proof로 사용하지 않으며, Stage 5에서 lifecycle raster baseline을 새로 잠그지 않았다.
+
+Admin tracked screenshots는 대표 상태만 잠근다. 1024px는 viewport contract와 browser smoke에 있고 PNG baseline은 없다.
 
 | Owner | File | Locks |
 | --- | --- | --- |
-| host diary CT | `front/__screenshots__/features/host/ui/meeting-workspace/host-focus-deck.ct.tsx/` | `diary-draft-1440.png`, `diary-open-900.png`, `diary-closed-768.png`, `diary-published-390.png`, `diary-readiness-pending-320.png` (1024는 매트릭스만, PNG 없음) |
-| host closing CT | `front/__screenshots__/features/host/ui/session-closing-board.ct.tsx/` | `host-closing-embedded-blocked-1440.png`, `host-closing-embedded-published-900.png`, `host-closing-embedded-blocked-768.png`, `host-closing-embedded-published-390.png`, `host-closing-embedded-blocked-320.png` (1024는 매트릭스만) |
-| host today CT | _(없음 — 오늘형 baseline 미잠금)_ | — |
 | admin shell CT | `front/__screenshots__/features/platform-admin/route/admin-shell-layout.ct.tsx/` | Today·4축 내비·space menu 1440, mobile 390, long copy 320 |
 | admin ledger CT | `front/__screenshots__/features/platform-admin/ui/admin-editorial-ledger.ct.tsx/` | Today 1440, clubs 900, service 768, records 390, detail 320, emergency 1440/390 |
 | admin support CT | `front/__screenshots__/features/platform-admin/ui/admin-support-workbench.ct.tsx/` | selected support workbench |
 
-Chromium, Firefox, mobile WebKit smoke는 host 다이어리 스프레드와 admin Today/Clubs/Service/Review 대표 흐름이다.
 VoiceOver/Safari와 NVDA/Chrome 수동 결과는 `docs/reports/host-admin-visual-authority-accessibility-evidence-template.md`에 따라 `not measured`다.
-
-이 시각 권위 작업은 server API·schema·auth 계약을 바꾸지 않는다.

@@ -13,6 +13,9 @@ export type HostNotificationComposerDraft = {
   sessionId: string;
   eventType: HostNotificationEventType;
   contentRevision: string;
+  scheduleRevision: number;
+  subject: string;
+  body: string;
   recipientMode: HostNotificationRecipientMode;
   requestedChannels: ManualNotificationRequestedChannels;
   selectedMembershipIds: string[];
@@ -27,8 +30,13 @@ export function recommendedAudience(
 }
 
 export function composerCanPreview(draft: HostNotificationComposerDraft): boolean {
-  return draft.recipientMode !== "SELECTED_MEMBERS"
+  const copyIsValid = draft.subject.trim().length > 0
+    && draft.subject.length <= 200
+    && draft.body.trim().length > 0
+    && draft.body.length <= 4_000;
+  const audienceIsValid = draft.recipientMode !== "SELECTED_MEMBERS"
     || draft.selectedMembershipIds.length > 0;
+  return copyIsValid && audienceIsValid;
 }
 
 export function buildComposerSelection(
@@ -41,6 +49,9 @@ export function buildComposerSelection(
     sessionId: draft.sessionId,
     eventType: draft.eventType,
     contentRevision: draft.contentRevision,
+    scheduleRevision: draft.scheduleRevision,
+    subject: draft.subject,
+    body: draft.body,
     audience,
     requestedChannels: draft.requestedChannels,
     selectedMembershipIds: draft.recipientMode === "SELECTED_MEMBERS"

@@ -220,7 +220,7 @@ function guestLinks(publicBasePath: string): NavLink[] {
 
 function Brand({ href, LinkComponent }: { href: string; LinkComponent: AppLinkComponent }) {
   return (
-    <LinkComponent to={href} className="row" style={{ gap: "10px" }}>
+    <LinkComponent to={href} className="row" style={{ gap: "10px" }} aria-label="읽는사이 홈">
       <ReadmatesBrandMark />
       <span>
         <span

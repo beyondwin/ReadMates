@@ -1,0 +1,14 @@
+3a6fa97aa1ac2f6d319eafce54bbe2b3a7b7a741155c80fb36fd4e747c48a971  .superpowers/sdd/2026-08-29-host-responsive-closeout-stage5/task-7-brief.md
+531800db5de8973971096c306b2c855570c81d94c31f8ff7ef91129d4e9ee6da  front/features/auth/ui/account-menu.test.tsx
+dfa362aaa611c389dd94d54c85b5cd5fee67186dd3c335ebc984c4b697adb142  front/features/auth/ui/account-menu.tsx
+a75beb9f0a0b4d6b9c2dd77fea49263fb88df404ccb083f188a36ee0b587b4fd  front/features/host/ui/session-workspace/host-session-workspace.test.tsx
+b1fc7ea34faad329d8ba4e969046c09578df1500a379008f7924bb85d4f6a3e9  front/features/host/ui/session-workspace/workspace-header.tsx
+18fbb5e1af308db0873d72fdc313f00b205ae385927e3545f642a568518f5404  front/shared/ui/top-nav.tsx
+0268ebdcf619561a9ddbbd2dc1422544a27ce74a22e0fd0de949ba1b05fca6b9  front/src/app/host-routes/canonical-host-compatibility-route.tsx
+a965f8b10f48bb46d6518624969754e758bfb10fe808d5decd5b84577a9d5e78  front/src/app/routes/host.test.tsx
+716dad8583946eaf4f123cfedf834ace5be7dc6866f9a680767419e8cfaff922  front/src/app/routes/host.tsx
+18d8e3c3ec69ae25e2c5741c98c0b353647e83107716a80fa965b2a92234a9e8  front/tests/e2e/host-authority-loss.spec.ts
+154d713d4fc194db2db03fc40e60703e56ae6d476be4277147fb4c56910a17e0  front/tests/e2e/host-workbox-stage4.spec.ts
+bd7dd2b88b7382160b81d9ce169d6a3a2a6bd5893a023dd41388583460cbcbaf  front/tests/e2e/host-lifecycle-route-continuity.spec.ts
+25f3105a06bc14b6103276fcfeddf94685302b2cd9d661c53fecb001c902e313  front/tests/e2e/support/visual-authority-contract.ts
+5f99bda97f4b19f6560b9f51c0fe00f2233917ccd3c7bc1cf0269b354a264126  front/tests/unit/responsive-navigation.test.tsx
