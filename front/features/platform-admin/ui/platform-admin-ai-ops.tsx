@@ -86,7 +86,6 @@ type PlatformAdminAiOpsProps = {
   onRequestPreview?: (jobId: string, action: PlatformAdminAiOpsAction) => void;
   onConfirmCommand?: () => void;
   onRetrySameCommand?: () => void;
-  onRestartPreview?: () => void;
   onDismissCommand?: () => void;
   selectedJob?: PlatformAdminAiOpsJobView | null;
   onSelectJob?: (jobId: string) => void;
@@ -113,7 +112,6 @@ export function PlatformAdminAiOps({
   onRequestPreview,
   onConfirmCommand,
   onRetrySameCommand,
-  onRestartPreview,
   onDismissCommand,
   selectedJob = null,
   onSelectJob,
@@ -181,11 +179,11 @@ export function PlatformAdminAiOps({
 
       <section className="platform-admin-ai-ops__failure-overview" aria-labelledby="platform-admin-ai-failure-title">
         <h2 id="platform-admin-ai-failure-title" className="h3 editorial">최근 실패 묶음</h2>
-        <p className="admin-service-detail__next-action">{serviceDetail.nextSafeAction}</p>
         <FailureCodeList
           items={summary?.failureCodes ?? []}
           unavailable={!summary}
           activeCode={activeFilter?.errorCode ?? null}
+          nextSafeAction={serviceDetail.nextSafeAction}
           onSelect={onSelectFailureCode}
         />
       </section>
@@ -358,7 +356,6 @@ export function PlatformAdminAiOps({
           triggerRef={commandTrigger ? providedCommandTriggerRef : commandTriggerRef}
           onConfirm={onConfirmCommand}
           onRetrySame={onRetrySameCommand}
-          onRestart={onRestartPreview}
           onDismiss={onDismissCommand}
         />
       ) : null}
@@ -376,14 +373,12 @@ function AiCommandDialog({
   triggerRef,
   onConfirm,
   onRetrySame,
-  onRestart,
   onDismiss,
 }: {
   state: PlatformAdminAiOpsCommandState;
   triggerRef: { current: HTMLElement | null };
   onConfirm?: () => void;
   onRetrySame?: () => void;
-  onRestart?: () => void;
   onDismiss?: () => void;
 }) {
   const label = state.action === "FORCE_CANCEL" ? "강제 취소" : "저장 복구";
@@ -394,7 +389,7 @@ function AiCommandDialog({
       titleId={titleId}
       triggerRef={triggerRef}
       onRequestClose={() => {
-        if (!busy) onDismiss?.();
+        if (!busy && state.phase !== "UNKNOWN") onDismiss?.();
       }}
       className="platform-admin-ai-command-dialog"
     >
@@ -476,7 +471,7 @@ function AiCommandDialog({
           authority="allowed"
           state={aiCommandDockState(state, busy)}
           primary={aiCommandPrimary({ state, busy, onConfirm, onRetrySame, onDismiss })}
-          secondary={aiCommandSecondary({ state, busy, onRestart, onRetrySame, onDismiss })}
+          secondary={aiCommandSecondary({ state, busy, onRetrySame, onDismiss })}
         />
       </div>
     </AdminModalDialog>
@@ -533,22 +528,16 @@ function aiCommandPrimary({
 function aiCommandSecondary({
   state,
   busy,
-  onRestart,
   onRetrySame,
   onDismiss,
 }: {
   state: PlatformAdminAiOpsCommandState;
   busy: boolean;
-  onRestart?: () => void;
   onRetrySame?: () => void;
   onDismiss?: () => void;
 }) {
   if (state.phase === "UNKNOWN") {
-    return (
-      <button type="button" className="btn btn-secondary" onClick={() => onRestart?.()}>
-        최신 상태로 다시 검토
-      </button>
-    );
+    return null;
   }
   if (state.phase === "RECEIPT") {
     if (state.receipt?.effectStatus === "PENDING" || state.receipt?.effectStatus === "FAILED") {
@@ -617,11 +606,13 @@ function FailureCodeList({
   items,
   unavailable,
   activeCode,
+  nextSafeAction,
   onSelect,
 }: {
   items: Array<{ code: string; count: number }>;
   unavailable: boolean;
   activeCode: string | null;
+  nextSafeAction: string;
   onSelect?: (code: string) => void;
 }) {
   return (
@@ -638,13 +629,19 @@ function FailureCodeList({
               >
                 이 원인의 작업 보기 · {item.count}건
               </button>
-              <AdminTechnicalDisclosure items={[{ label: "오류 코드", value: item.code }]} />
             </li>
           ))}
         </ul>
       ) : (
         <p className="small muted">{unavailable ? "실패 묶음 집계를 확인할 수 없습니다." : "최근 실패 묶음이 없습니다."}</p>
       )}
+      <p className="admin-service-detail__next-action">{nextSafeAction}</p>
+      {items.map((item) => (
+        <AdminTechnicalDisclosure
+          key={item.code}
+          items={[{ label: `오류 코드 · ${item.count}건`, value: item.code }]}
+        />
+      ))}
     </div>
   );
 }

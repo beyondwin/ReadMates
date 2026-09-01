@@ -109,13 +109,17 @@ describe("PlatformAdminAiOps", () => {
     const sentence = screen.getByText("최근 24시간 실패 1건과 오래 멈춘 작업 1건을 먼저 확인하세요.");
     const freshness = screen.getByText(/^최근 작업 갱신 /);
     const failures = screen.getByRole("heading", { name: "최근 실패 묶음" });
+    const failureEvidence = screen.getByRole("button", { name: "이 원인의 작업 보기 · 1건" }).closest("li")!;
     const nextAction = screen.getByText("실패 원인을 좁힌 뒤 멈춘 작업의 최신 상태와 허용된 복구 방법을 확인하세요.");
     const runs = screen.getByRole("region", { name: "처리 시도 기록" });
     const disclosure = runs.querySelector("[data-admin-technical-disclosure]");
+    const failureDisclosure = failures.closest("section")?.querySelector("[data-admin-technical-disclosure]");
 
     expect(sentence.compareDocumentPosition(freshness) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(freshness.compareDocumentPosition(failures) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(failures.compareDocumentPosition(nextAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(failures.compareDocumentPosition(failureEvidence) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(failureEvidence.compareDocumentPosition(nextAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(nextAction.compareDocumentPosition(failureDisclosure!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(nextAction.compareDocumentPosition(runs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(disclosure).toHaveTextContent("job-1");
     expect(container.querySelector(".platform-admin-ai-ops__job-title")).not.toHaveTextContent("job-1");
@@ -212,6 +216,7 @@ describe("PlatformAdminAiOps", () => {
 
   it("keeps an ambiguous command open for same-key reconciliation and shows its receipt", async () => {
     const onRetrySameCommand = vi.fn();
+    const onDismissCommand = vi.fn();
     const unknown: PlatformAdminAiOpsCommandState = {
       ...reviewState,
       phase: "UNKNOWN",
@@ -226,11 +231,16 @@ describe("PlatformAdminAiOps", () => {
         jobs={[runningJob]}
         commandState={unknown}
         onRetrySameCommand={onRetrySameCommand}
+        onDismissCommand={onDismissCommand}
       />,
     );
 
     await userEvent.click(screen.getByRole("button", { name: "같은 명령으로 다시 확인" }));
     expect(onRetrySameCommand).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "최신 상태로 다시 검토" })).not.toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    await userEvent.click(screen.getByTestId("admin-modal-dialog-backdrop"));
+    expect(onDismissCommand).not.toHaveBeenCalled();
 
     rerender(
       <PlatformAdminAiOps

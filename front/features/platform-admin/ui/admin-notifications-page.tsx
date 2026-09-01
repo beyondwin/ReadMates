@@ -96,7 +96,6 @@ export function AdminNotificationsPage({
         <div className="admin-notifications__grid">
           <section className="admin-notifications__panel" aria-labelledby="admin-notifications-failures-title">
             <h2 id="admin-notifications-failures-title" className="h3 editorial">{ADMIN_COPY.heading.failureClusters}</h2>
-            <p className="admin-service-detail__next-action">{overview.nextSafeAction}</p>
             {snapshot?.failureClusters.length ? (
               <ul className="admin-notifications__cluster-list">
                 {snapshot.failureClusters.map((cluster) => {
@@ -106,13 +105,6 @@ export function AdminNotificationsPage({
                       <div>
                         <span>{evidence.clubLabel} 알림 전달 실패</span>
                         <p className="small muted">최근 확인 {cluster.latestAt ? formatTimestamp(cluster.latestAt) : "시각 없음"}</p>
-                        <AdminTechnicalDisclosure
-                          items={[
-                            { label: "알림 유형 코드", value: evidence.eventType },
-                            { label: "오류 코드", value: cluster.safeErrorCode },
-                            { label: "상태 코드", value: cluster.status },
-                          ]}
-                        />
                       </div>
                       <strong>{cluster.count}</strong>
                       <em>{deliveryLedgerStatusLabel(cluster.status)}</em>
@@ -123,6 +115,20 @@ export function AdminNotificationsPage({
             ) : (
               <p className="muted">같은 원인으로 묶인 최근 실패가 없습니다.</p>
             )}
+            <p className="admin-service-detail__next-action">{overview.nextSafeAction}</p>
+            {snapshot?.failureClusters.map((cluster) => {
+              const evidence = failureClusterEvidence(cluster, events, deliveries);
+              return (
+                <AdminTechnicalDisclosure
+                  key={`${cluster.status}-${cluster.safeErrorCode}`}
+                  items={[
+                    { label: "알림 유형 코드", value: evidence.eventType },
+                    { label: "오류 코드", value: cluster.safeErrorCode },
+                    { label: "상태 코드", value: cluster.status },
+                  ]}
+                />
+              );
+            })}
           </section>
 
           <section className="admin-notifications__panel" aria-labelledby="admin-notifications-replay-title">

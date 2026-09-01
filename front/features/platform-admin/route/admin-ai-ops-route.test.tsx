@@ -253,7 +253,20 @@ describe("AdminAiOpsRoute", () => {
     expect(screen.getByText("운영 · AI 작업")).toBeInTheDocument();
   });
 
-  it("purges an in-flight safe command when platform authority is lost", async () => {
+  it("purges an in-flight safe command and publishes no late receipt when platform authority is lost", async () => {
+    const confirmation = deferred<{
+      receiptId: string;
+      previewId: string;
+      jobId: string;
+      action: "FORCE_CANCEL";
+      beforeJobStatus: string;
+      beforeJobRevision: number;
+      afterJobStatus: string;
+      afterJobRevision: number;
+      originStatus: "ACCEPTED";
+      effectStatus: "PENDING";
+      safeErrorCode: null;
+    }>();
     vi.mocked(previewForceCancelPlatformAdminAiJob).mockResolvedValue({
       previewId: "preview-1",
       jobId: "job-1",
@@ -265,9 +278,12 @@ describe("AdminAiOpsRoute", () => {
       expiresAt: "2026-08-25T01:00:00Z",
       fingerprintPrefix: "00112233",
     });
+    vi.mocked(confirmForceCancelPlatformAdminAiJob).mockReturnValue(confirmation.promise);
     const { queryClient } = renderRoute("/admin/ai-ops", { pages: [[runningJob]] });
     await userEvent.click(screen.getByRole("button", { name: "강제 취소 검토" }));
     expect(await screen.findByRole("dialog", { name: "강제 취소 확인" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "이 작업 강제 취소" }));
+    await waitFor(() => expect(confirmForceCancelPlatformAdminAiJob).toHaveBeenCalledTimes(1));
 
     act(() => {
       purgePlatformAdminState(queryClient);
@@ -287,7 +303,28 @@ describe("AdminAiOpsRoute", () => {
     });
 
     expect(screen.queryByRole("dialog", { name: "강제 취소 확인" })).not.toBeInTheDocument();
+    expect(previewForceCancelPlatformAdminAiJob).toHaveBeenCalledTimes(1);
+    expect(confirmForceCancelPlatformAdminAiJob).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "이 작업 강제 취소" })).not.toBeInTheDocument();
+    await act(async () => {
+      confirmation.resolve({
+        receiptId: "receipt-late",
+        previewId: "preview-1",
+        jobId: "job-1",
+        action: "FORCE_CANCEL",
+        beforeJobStatus: "RUNNING",
+        beforeJobRevision: 7,
+        afterJobStatus: "RUNNING",
+        afterJobRevision: 7,
+        originStatus: "ACCEPTED",
+        effectStatus: "PENDING",
+        safeErrorCode: null,
+      });
+      await confirmation.promise;
+    });
+    expect(confirmForceCancelPlatformAdminAiJob).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("receipt-late")).not.toBeInTheDocument();
     act(() => {
       queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, {
         schemaVersion: 1,
@@ -339,12 +376,34 @@ describe("AdminAiOpsRoute", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "강제 취소 검토" }));
     await userEvent.click(await screen.findByRole("button", { name: "이 작업 강제 취소" }));
+    expect(screen.queryByRole("button", { name: "최신 상태로 다시 검토" })).not.toBeInTheDocument();
     await userEvent.click(await screen.findByRole("button", { name: "같은 명령으로 다시 확인" }));
 
     await waitFor(() => expect(confirmForceCancelPlatformAdminAiJob).toHaveBeenCalledTimes(2));
+    expect(previewForceCancelPlatformAdminAiJob).toHaveBeenCalledTimes(1);
     expect(vi.mocked(confirmForceCancelPlatformAdminAiJob).mock.calls[0]).toEqual(
       vi.mocked(confirmForceCancelPlatformAdminAiJob).mock.calls[1],
     );
+    expect(vi.mocked(confirmForceCancelPlatformAdminAiJob).mock.calls).toEqual([
+      [
+        "job-1",
+        {
+          previewId: "preview-1",
+          idempotencyKey: "preview-1",
+          expectedJobRevision: 7,
+          confirmed: true,
+        },
+      ],
+      [
+        "job-1",
+        {
+          previewId: "preview-1",
+          idempotencyKey: "preview-1",
+          expectedJobRevision: 7,
+          confirmed: true,
+        },
+      ],
+    ]);
     expect(await screen.findByRole("status", { name: "AI 명령 영수증" })).toHaveTextContent("receipt-1");
     expect(await screen.findByRole("region", { name: "명령 기록" })).toHaveTextContent("receipt-1");
     expect(screen.queryByText("공개 반영 추적")).not.toBeInTheDocument();
@@ -414,4 +473,14 @@ async function forbiddenAiError() {
       { status: 403, headers: { "Content-Type": "application/json" } },
     ),
   );
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import type { PlatformAdminAiOpsAction } from "@/features/platform-admin/api/platform-admin-contracts";
@@ -36,7 +36,11 @@ import {
   type PlatformAdminAiOpsJobView,
   type PlatformAdminAiOpsSummaryView,
 } from "@/features/platform-admin/ui/platform-admin-ai-ops";
-import { publishTransitionAction, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import {
+  publishTransitionAction,
+  type TransitionOwnerHandle,
+  useTransitionSafetyOwner,
+} from "@/shared/ui/use-transition-safety-owner";
 
 export function AdminAiOpsRoute() {
   const queryClient = useQueryClient();
@@ -171,12 +175,18 @@ function AiOpsCommandSession({
   const confirmCommandMutation = useConfirmPlatformAdminAiJobCommandMutation();
   const queryClient = useQueryClient();
   const transitionOwner = useTransitionSafetyOwner("admin-ai-ops-command");
+  const activeCommandHandle = useRef<TransitionOwnerHandle | null>(null);
+  const authorityGeneration = useRef(0);
 
   useEffect(
     () =>
       subscribePlatformAdminAuthorityLoss(() => {
+        authorityGeneration.current += 1;
+        const handle = activeCommandHandle.current;
+        activeCommandHandle.current = null;
         setCommandState(null);
         setCommandError(null);
+        handle?.unregister();
       }),
     [],
   );
@@ -227,16 +237,20 @@ function AiOpsCommandSession({
     setCommandState({ ...current, phase: "CONFIRMING" });
     const operationId = `admin-ai-ops:${current.job.jobId}:${current.idempotencyKey}`;
     const handle = transitionOwner.begin(operationId, "L3", async () => ({ operationId, outcome: "still-unknown" }));
+    const commandAuthorityGeneration = authorityGeneration.current;
+    activeCommandHandle.current = handle;
     try {
       const receipt = await confirmCommandMutation.mutateAsync({
         jobId: current.job.jobId,
         action: current.action,
         request,
       });
+      if (authorityGeneration.current !== commandAuthorityGeneration) return;
       if (await handle.settle("succeeded") !== "accepted") return;
       await publishTransitionAction(handle, "cache", () => publishPlatformAdminAiOps(queryClient));
       await publishTransitionAction(handle, "ui", () => setCommandState({ ...current, phase: "RECEIPT", receipt }));
     } catch (error) {
+      if (authorityGeneration.current !== commandAuthorityGeneration) return;
       const accepted = await handle.settle("failed") === "accepted";
       if (!accepted) return;
       if (isPlatformAdminAuthorityLossError(error)) {
@@ -256,6 +270,10 @@ function AiOpsCommandSession({
               ? "작업 상태가 변경되었습니다. 최신 상태로 다시 검토해 주세요."
               : "명령 응답을 확인하지 못했습니다. 같은 명령으로 다시 확인해 주세요.",
         }));
+    } finally {
+      if (activeCommandHandle.current === handle) {
+        activeCommandHandle.current = null;
+      }
     }
   }
 
@@ -273,12 +291,6 @@ function AiOpsCommandSession({
         onRequestPreview={(jobId, action) => void requestPreview(jobId, action)}
         onConfirmCommand={() => void confirmCommand()}
         onRetrySameCommand={() => void confirmCommand()}
-        onRestartPreview={() => {
-          if (!commandState) return;
-          const { job, action } = commandState;
-          setCommandState(null);
-          void requestPreview(job.jobId, action);
-        }}
         onDismissCommand={() => setCommandState(null)}
         activeFilter={filter}
         onSelectFailureCode={(code) => onUpdateSearch({ ...filter, errorCode: code, jobId: null })}

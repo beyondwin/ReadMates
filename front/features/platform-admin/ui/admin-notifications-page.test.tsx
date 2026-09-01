@@ -122,13 +122,16 @@ describe("AdminNotificationsPage", () => {
     const sentence = screen.getByText("발송 실패 3건, 배달 실패 2건, 중계 지연 2건을 확인해야 합니다.");
     const freshness = screen.getByText(/^최근 집계 /);
     const failures = screen.getByRole("heading", { name: "실패 클러스터" });
+    const failureEvidence = screen.getByRole("listitem", { name: "읽는사이 알림 전달 실패 2건" });
     const nextAction = screen.getByText("같은 원인의 실패와 자동 재시도 상태를 확인한 뒤 필요한 항목만 수동 재발송하세요.");
+    const failureDisclosure = failures.closest("section")?.querySelector("[data-admin-technical-disclosure]");
     const technical = Array.from(container.querySelectorAll("[data-admin-technical-disclosure]"));
 
     expect(sentence.compareDocumentPosition(freshness) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(freshness.compareDocumentPosition(failures) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(failures.compareDocumentPosition(nextAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(nextAction.compareDocumentPosition(technical[0]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(failures.compareDocumentPosition(failureEvidence) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(failureEvidence.compareDocumentPosition(nextAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(nextAction.compareDocumentPosition(failureDisclosure!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(technical.some((item) => item.textContent?.includes("event-1"))).toBe(true);
     expect(technical.some((item) => item.textContent?.includes("SESSION_REMINDER_DUE"))).toBe(true);
     expect(technical.some((item) => item.textContent?.includes("mailbox_unavailable"))).toBe(true);
@@ -189,10 +192,13 @@ describe("AdminNotificationsPage", () => {
     renderPage();
 
     const cluster = screen.getByRole("listitem", { name: "읽는사이 알림 전달 실패 2건" });
+    const failures = screen.getByRole("heading", { name: "실패 클러스터" }).closest("section")!;
+    const disclosure = failures.querySelector("[data-admin-technical-disclosure]");
     expect(cluster).toHaveTextContent("읽는사이 알림 전달 실패");
     expect(cluster).toHaveTextContent("최근 확인");
-    expect(cluster.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("SESSION_REMINDER_DUE");
-    expect(cluster.querySelector("[data-admin-technical-disclosure]")).toHaveTextContent("mailbox_unavailable");
+    expect(cluster.querySelector("[data-admin-technical-disclosure]")).toBeNull();
+    expect(disclosure).toHaveTextContent("SESSION_REMINDER_DUE");
+    expect(disclosure).toHaveTextContent("mailbox_unavailable");
   });
 
   it("uses supporting copy for replay expiry and runtime summaries", () => {
