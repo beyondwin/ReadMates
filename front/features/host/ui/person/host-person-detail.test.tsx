@@ -50,8 +50,10 @@ describe("HostPersonDetail", () => {
     expect(screen.getByRole("heading", { name: "참석 응답" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "실제 출석" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "멤버십" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "사람 관리 원장으로" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "현재 상태" })).not.toBeInTheDocument();
     expect(screen.getByText("일정 4판 · 준비 중")).toBeVisible();
     expect(screen.getByText("미응답")).toBeVisible();
+    expect(screen.getByText("8월 18일 · 27회 모임")).toBeVisible();
   });
 });

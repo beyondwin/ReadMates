@@ -169,30 +169,46 @@
 
 @media (max-width: 720px) {
   .rm-host-person {
-    padding: 8px var(--space-md) 24px;
+    padding: 0 var(--space-md) 16px;
+  }
+
+  .rm-host-person__body {
+    padding-top: 0;
   }
 
   .rm-host-person__identity {
-    gap: var(--space-sm);
-    padding: 4px 0 12px;
+    gap: 10px;
+    padding: 0 0 8px;
   }
 
   .rm-host-person__identity h1 {
-    font-size: 1.5rem;
+    font-size: 1.35rem;
   }
 
   .rm-host-person__block {
-    gap: 6px;
-    padding: 10px 0;
+    gap: 4px;
+    padding: 6px 0;
+  }
+
+  .rm-host-person__block-title {
+    font-size: 0.9375rem;
   }
 
   .rm-host-person__block dl > div {
-    grid-template-columns: 5.5rem minmax(0, 1fr);
-    padding: 4px 0;
+    grid-template-columns: 4.75rem minmax(0, 1fr);
+    gap: 8px;
+    padding: 1px 0;
+    border-bottom: 0;
   }
 
   .rm-host-person__attendance li {
-    padding: 6px 0;
+    padding: 3px 0;
+    border-bottom: 0;
+  }
+
+  .rm-host-person .small {
+    font-size: 0.75rem;
+    line-height: 1.35;
   }
 }
 

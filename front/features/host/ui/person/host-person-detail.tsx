@@ -54,6 +54,15 @@ function localDateTime(value: string) {
   return value.replace("T", " ").slice(0, 16);
 }
 
+function localDateLabel(value: string) {
+  const [date] = value.split("T");
+  const parts = date?.split("-") ?? [];
+  const month = Number(parts[1]);
+  const day = Number(parts[2]);
+  if (!month || !day) return localDateTime(value);
+  return `${month}월 ${day}일`;
+}
+
 function BlockTitle({
   id,
   index,
@@ -162,7 +171,7 @@ export function HostPersonDetail({
             <ol>
               {attendanceItems.map((item) => (
                 <li key={`${item.sessionNumber}:${item.scheduledAt}:${item.attendanceStatus}`}>
-                  <strong>{item.sessionNumber}회 모임 · {localDateTime(item.scheduledAt)}</strong>
+                  <strong>{localDateLabel(item.scheduledAt)} · {item.sessionNumber}회 모임</strong>
                   <span>{attendanceLabels[item.attendanceStatus]}</span>
                 </li>
               ))}

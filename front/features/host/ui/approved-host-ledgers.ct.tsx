@@ -33,9 +33,9 @@ const SETTINGS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1052 } as con
 const SCHEDULE_REVIEW_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
 const SCHEDULE_REVIEW_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
 const SCHEDULE_REVIEW_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 943 } as const;
-const PERSON_HEADER_GEOMETRY = { x: 17, y: 66, width: 356, height: 154 } as const;
+const PERSON_HEADER_GEOMETRY = { x: 17, y: 58, width: 356, height: 143 } as const;
 const PERSON_NAV_GEOMETRY = { x: 0, y: 768, width: 390, height: 64 } as const;
-const PERSON_MAIN_GEOMETRY = { x: 1, y: 58, width: 388, height: 888 } as const;
+const PERSON_MAIN_GEOMETRY = { x: 1, y: 58, width: 388, height: 737 } as const;
 
 function boxesOverlap(
   left: { x: number; y: number; width: number; height: number },
@@ -365,12 +365,24 @@ test("person detail matches approved mobile", async ({ mount, page }, testInfo) 
   await expect(nav).toBeVisible();
   await expect(main).toBeVisible();
   const membership = component.getByRole("heading", { name: "멤버십" });
-  const membershipBox = await membership.boundingBox();
-  expect(membershipBox, "04 멤버십 first-viewport").not.toBeNull();
-  expect(
-    membershipBox!.y + membershipBox!.height,
-    `멤버십 bottom ${membershipBox!.y + membershipBox!.height} must stay inside 390×832`,
-  ).toBeLessThanOrEqual(APPROVED_MOBILE_VIEWPORT.height);
+  const membershipCta = component.getByRole("link", { name: "사람 관리 원장으로" });
+  await expect(membership).toBeVisible();
+  await expect(membershipCta).toBeVisible();
+  const navBox = await nav.boundingBox();
+  expect(navBox, "bottom-nav").not.toBeNull();
+  expect(navBox!.y).toBeGreaterThanOrEqual(APPROVED_MOBILE_VIEWPORT.height - 140);
+  expect(navBox!.y + navBox!.height).toBeLessThanOrEqual(APPROVED_MOBILE_VIEWPORT.height + 1);
+  for (const [name, locator] of [
+    ["04 멤버십", membership],
+    ["사람 관리 원장으로", membershipCta],
+  ] as const) {
+    const box = await locator.boundingBox();
+    expect(box, name).not.toBeNull();
+    expect(
+      box!.y + box!.height,
+      `${name} y=${box!.y} h=${box!.height} navY=${navBox!.y}`,
+    ).toBeLessThanOrEqual(navBox!.y + 2);
+  }
   const regions = [
     await regionFromLocator(header, "header", PERSON_HEADER_GEOMETRY, 4),
     await regionFromLocator(nav, "nav", PERSON_NAV_GEOMETRY, 4),
