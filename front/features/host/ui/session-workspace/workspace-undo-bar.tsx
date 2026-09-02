@@ -4,6 +4,7 @@ import type { HostSessionRestorePreviewItemView } from "@/features/host/model/ho
 
 export type WorkspacePendingUndo = {
   description: string;
+  undoLabel?: string;
   error?: string | null;
   onUndo: () => void;
   onOpenHistory: () => void;
@@ -94,7 +95,7 @@ export function WorkspaceUndoBar({
               className="btn btn-quiet btn-sm"
               onClick={pendingUndo.onUndo}
             >
-              되돌리기
+              {pendingUndo.undoLabel ?? "되돌리기"}
             </button>
             <button type="button" className="btn btn-quiet btn-sm" onClick={pendingUndo.onOpenHistory}>
               변경 내역

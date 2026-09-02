@@ -5,6 +5,8 @@ import {
   runMysql,
 } from "./readmates-e2e-db";
 import {
+  VISUAL_AUTHORITY_VIEWPORTS,
+  expectMinimumTargetSize,
   expectNoHorizontalOverflow,
   expectNoSeriousAccessibilityFindings,
 } from "./support/visual-authority-contract";
@@ -113,4 +115,18 @@ test("all three legacy host routes replace once and keep public-safe query and h
     search: "?panel=ops",
     hash: "#current-work",
   });
+});
+
+test("empty operating room keeps one mobile primary without claiming a current meeting", async ({ page }) => {
+  await page.setViewportSize(VISUAL_AUTHORITY_VIEWPORTS.mobile);
+  await loginWithGoogleFixture(page, "host@example.com");
+  await page.goto(`${HOST_PATH}?phase=prep`);
+  await expect(page.getByRole("region", { name: "현재 운영할 모임이 없습니다" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "현재 모임" })).toHaveCount(0);
+  const primary = page.locator(".rm-operating-room-next-action__primary");
+  await expect(primary).toHaveCount(1);
+  await expect(primary).toHaveText("첫 모임 만들기");
+  await expectMinimumTargetSize(primary);
+  await expectNoHorizontalOverflow(page);
+  expect(await expectNoSeriousAccessibilityFindings(page)).toEqual([]);
 });

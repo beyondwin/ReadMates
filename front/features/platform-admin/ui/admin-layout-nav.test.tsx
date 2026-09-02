@@ -35,6 +35,7 @@ function renderNav(opts: {
   currentOwner?: AdminRouteOwner | null;
   compact?: boolean;
   todayCount?: number | null;
+  onLogout?: () => void;
 } = {}) {
   if (opts.compact != null) {
     vi.stubGlobal(
@@ -53,6 +54,7 @@ function renderNav(opts: {
       currentOwner={opts.currentOwner === undefined ? "today" : opts.currentOwner}
       renderLink={renderTestLink}
       todayCount={opts.todayCount}
+      onLogout={opts.onLogout}
     />,
   );
 }
@@ -100,6 +102,21 @@ describe("AdminLayoutNav", () => {
     expect(screen.queryByRole("link", { name: "접근 원장" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "분석 부록" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "클럽 상세" })).not.toBeInTheDocument();
+  });
+
+  it("wires the rail account control to the supplied callback and stays decorative without one", async () => {
+    const onLogout = vi.fn();
+    const { unmount } = renderNav({ onLogout });
+    const account = screen.getByRole("button", { name: "다른 계정으로 로그인" });
+    expect(account.tagName).toBe("BUTTON");
+    expect(screen.queryByRole("button", { name: "로그아웃" })).not.toBeInTheDocument();
+    account.click();
+    expect(onLogout).toHaveBeenCalledOnce();
+    unmount();
+
+    renderNav();
+    expect(screen.queryByRole("button", { name: "다른 계정으로 로그인" })).not.toBeInTheDocument();
+    expect(document.querySelector(".admin-layout-nav__logout")).toHaveAttribute("aria-hidden", "true");
   });
 
   it("pins emergency public takedown at the bottom of the nav", () => {

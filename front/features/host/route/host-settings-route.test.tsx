@@ -178,7 +178,7 @@ describe("HostSettingsRoute transition ownership", () => {
       configurable: true,
       value: { writeText: clipboardWrite },
     });
-    await screen.findByRole("heading", { name: "공유 링크" });
+    await screen.findByRole("heading", { name: "초대 링크" });
 
     await userEvent.type(screen.getByLabelText("링크 이름"), "가을 신규 멤버");
     await userEvent.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
@@ -205,7 +205,7 @@ describe("HostSettingsRoute transition ownership", () => {
       .mockResolvedValueOnce({ ...created, oneTimeSharePath: null, receipt: { ...created.receipt, replayed: true } });
     const coordinator = createGlobalSpaceTransitionCoordinator();
     renderRoute(coordinator);
-    await screen.findByRole("heading", { name: "공유 링크" });
+    await screen.findByRole("heading", { name: "초대 링크" });
 
     await userEvent.type(screen.getByLabelText("링크 이름"), "같은 요청 복구");
     await userEvent.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
@@ -345,7 +345,7 @@ describe("HostSettingsRoute transition ownership", () => {
     const { client, unmount } = renderRoute(coordinator);
     const invalidate = vi.spyOn(client, "invalidateQueries");
     const storageWrite = vi.spyOn(Storage.prototype, "setItem");
-    await screen.findByRole("heading", { name: "공유 링크" });
+    await screen.findByRole("heading", { name: "초대 링크" });
     await userEvent.type(screen.getByLabelText("링크 이름"), "권한 상실 링크");
     await userEvent.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
     await waitFor(() => expect(createHostInvitationLink).toHaveBeenCalledTimes(1));
@@ -416,7 +416,7 @@ describe("HostSettingsRoute transition ownership", () => {
     const registry = createRetiredReceiptCapsuleRegistry();
     const coordinator = createGlobalSpaceTransitionCoordinator({ registry });
     const { unmount } = renderRoute(coordinator);
-    await screen.findByRole("heading", { name: "공유 링크" });
+    await screen.findByRole("heading", { name: "초대 링크" });
     await userEvent.type(screen.getByLabelText("링크 이름"), "분리 복구 링크");
     await userEvent.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
     await waitFor(() => expect(createHostInvitationLink).toHaveBeenCalledTimes(1));

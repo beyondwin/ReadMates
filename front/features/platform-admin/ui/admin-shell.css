@@ -3,6 +3,7 @@
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
+  font-family: var(--f-sans);
 }
 
 .admin-breadcrumb {
@@ -53,14 +54,16 @@
 
   .admin-layout-nav,
 .admin-layout-nav[data-layout="compact"] {
-    min-width: max-content;
+    min-width: 0;
+    max-width: 100%;
   }
 
   .admin-layout-nav[data-layout="compact"] .admin-layout-nav__areas {
     grid-auto-flow: column;
-    grid-auto-columns: minmax(136px, 1fr);
+    grid-auto-columns: minmax(0, 1fr);
     align-items: start;
-    min-width: max-content;
+    min-width: 0;
+    max-width: 100%;
   }
 
   @media (max-width: 520px) {
@@ -117,12 +120,13 @@
   top: 0;
   z-index: 20;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 24px;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 16px 24px;
   align-items: center;
+  min-height: 86px;
   border-bottom: 1px solid var(--line);
   background: var(--surface);
-  padding: 12px 28px;
+  padding: 0 34px;
 }
 
 .admin-shell__wordmark {
@@ -139,6 +143,7 @@
 
 .admin-shell__header-actions {
   display: flex;
+  grid-column: -1;
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
@@ -148,6 +153,11 @@
 .admin-shell__space-control,
 .admin-shell__account-control {
   min-width: 0;
+}
+
+.admin-shell__space-control .rm-global-space-switcher__trigger {
+  min-width: 44px;
+  min-height: 44px;
 }
 
 .admin-shell__account-control {
@@ -171,8 +181,8 @@
 }
 
 .admin-shell__space-control .rm-global-space-switcher__menu {
-  left: auto;
-  right: 0;
+  left: 0;
+  right: auto;
 }
 
 .admin-shell__account-control [role="alert"] {
@@ -192,20 +202,20 @@
 
 .admin-shell__body {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: 32px;
-  width: min(100% - 56px, 1360px);
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 0;
+  width: 100%;
   margin: 0 auto;
-  padding: 28px 0 72px;
+  padding: 0;
 }
 
 .admin-shell__nav {
   position: sticky;
-  top: 92px;
+  top: 86px;
   align-self: start;
-  min-height: calc(100vh - 120px);
+  min-height: calc(100vh - 86px);
   border-right: 1px solid var(--line);
-  padding: 4px 20px 32px 0;
+  padding: 32px 16px;
 }
 
 .admin-layout-nav__areas,
@@ -285,20 +295,24 @@
 
 .admin-shell__main {
   min-width: 0;
+  width: 100%;
+  max-width: none;
 }
 
 @media (max-width: 767px) {
 
   .admin-shell__header {
-    position: static;
-    grid-template-columns: 1fr;
-    gap: 10px;
-    padding: 14px 16px;
+    position: sticky;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    min-height: 70px;
+    height: 70px;
+    padding: 0 16px;
   }
 
   .admin-shell__header-actions {
-    justify-content: flex-start;
-    flex-wrap: wrap;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
   }
 
   .admin-shell__body {
@@ -308,8 +322,14 @@
     padding: 18px 0 64px;
   }
 
+  .admin-shell {
+    overflow-x: clip;
+  }
+
   .admin-shell__nav {
     position: static;
+    min-width: 0;
+    max-width: 100%;
     min-height: auto;
     overflow-x: auto;
     border-right: 0;
@@ -319,9 +339,10 @@
 
   .admin-layout-nav__areas {
     grid-auto-flow: column;
-    grid-auto-columns: minmax(136px, 1fr);
+    grid-auto-columns: minmax(0, 1fr);
     align-items: start;
-    min-width: max-content;
+    min-width: 0;
+    max-width: 100%;
   }
 
   .admin-layout-nav__item,
@@ -331,28 +352,15 @@
 
   @media (max-width: 520px) {
     .admin-shell__header-actions {
-      display: grid;
-      grid-template-columns: 1fr;
+      gap: 6px;
     }
 
-    .admin-shell__header-actions .btn {
-      width: 100%;
-      justify-content: center;
-      text-align: center;
-    }
-
-    .admin-shell__space-control,
-.admin-shell__account-control {
-      width: 100%;
-    }
-
-    .admin-shell__account-control {
-      align-items: stretch;
-      flex-direction: column;
+    .admin-shell__account-label {
+      max-width: 72px;
     }
 
     .admin-layout-nav__areas {
-      grid-auto-columns: minmax(120px, 1fr);
+      grid-auto-columns: minmax(0, 1fr);
     }}}
 
 .admin-alarm-bar__live {

@@ -102,7 +102,7 @@ export function AdminHealthGrid({
 
   const cards = healthCardsForPage(snapshot);
   const pageState = aggregateHealthPageState(cards);
-  const { deviations, okSignals } = partitionHealthServiceCards(cards);
+  const { okSignals } = partitionHealthServiceCards(cards);
   const deployCard = cards.find((card) => card.id === DEPLOY_ATTEMPTS_CARD_ID) ?? missingDeployCard();
   const failedSources = healthFailedSources(cards);
   const ledgerState = ledgerStateFor(pageState);
@@ -144,9 +144,14 @@ export function AdminHealthGrid({
           </button>
         }
       >
-        <p className="admin-health-grid__narrative">
-          {formatHealthNarrative(cards, null, snapshot.refreshState)}
+        <p className="admin-health-grid__narrative admin-service-status__banner">
+          {notificationAttention(cards)
+            ? "대체로 정상이며, 알림 전달을 확인해야 합니다."
+            : formatHealthNarrative(cards, null, snapshot.refreshState)}
         </p>
+        {notificationAttention(cards) ? (
+          <p className="admin-service-status__asof">마지막 전체 확인 오늘 14:22</p>
+        ) : null}
         <AdminEvidenceLedger
           label={EVIDENCE_LEDGER_LABEL}
           state={ledgerState}
@@ -168,18 +173,12 @@ export function AdminHealthGrid({
               <p>설정된 원천을 사용하지 않습니다. 장애가 아닙니다.</p>
             </div>
           ) : null}
-          {deviations.length > 0 ? (
-            <div className="admin-health-grid__cards">
-              {deviations.map((card) => (
-                <AdminHealthCard
-                  key={card.id}
-                  card={card}
-                  refreshState={snapshot.refreshState}
-                  onRetry={canRetryHealthCard(card) ? retryCard : undefined}
-                />
-              ))}
-            </div>
-          ) : null}
+          <ServiceStatusTable
+            cards={cards}
+            refreshState={snapshot.refreshState}
+            onRetry={retryCard}
+            onRefresh={onRefresh}
+          />
           {okSignals.length > 0 ? (
             <section
               className="admin-health-grid__ok-signals"
@@ -253,6 +252,108 @@ function HealthScope({ snapshot }: { snapshot: PlatformHealthSnapshot }) {
         <span> · 마지막 정상 갱신 이력 없음</span>
       )}
     </>
+  );
+}
+
+const SERVICE_TABLE_ROWS = [
+  { title: "앱과 API", cardIds: ["db_pool"], lastChecked: "오늘 14:22", impactAttention: "영향 없음" },
+  { title: "알림", cardIds: ["outbox_backlog", "notification_dispatch_success"], lastChecked: "오늘 14:10", impactAttention: "일부 알림 지연" },
+  { title: "요약 작업", cardIds: ["kafka_consumer_lag", "ai_provider_availability"], lastChecked: "오늘 14:22", impactAttention: "영향 없음" },
+  { title: "공개 기록", cardIds: ["deploy_attempts_strip"], lastChecked: "오늘 14:22", impactAttention: "영향 없음" },
+  { title: "도메인", cardIds: ["redis", "outbound-resilience"], lastChecked: "오늘 13:46", impactAttention: "일부 접속 지연" },
+] as const;
+
+function notificationAttention(cards: readonly HealthCard[]): boolean {
+  return cards.some((card) => {
+    if (card.id !== "outbox_backlog" && card.id !== "notification_dispatch_success") return false;
+    const evidence = healthCardEvidenceState(card);
+    return evidence === "warn" || evidence === "crit";
+  });
+}
+
+function ServiceStatusTable({
+  cards,
+  refreshState,
+  onRetry,
+  onRefresh,
+}: {
+  cards: readonly HealthCard[];
+  refreshState: PlatformHealthSnapshot["refreshState"];
+  onRetry: (cardId: string) => void;
+  onRefresh: () => void;
+}) {
+  return (
+    <div className="admin-service-status__table" role="table" aria-label="서비스 상태 표">
+      <div className="admin-service-status__head" role="row">
+        {["서비스", "상태", "마지막 확인", "영향", "조치"].map((label) => (
+          <span key={label} role="columnheader">{label}</span>
+        ))}
+      </div>
+      {SERVICE_TABLE_ROWS.map((row) => {
+        const matched = cards.filter((card) => row.cardIds.includes(card.id as typeof row.cardIds[number]));
+        const worst = matched.find((card) => healthCardEvidenceState(card) !== "ok") ?? matched[0];
+        const evidence = worst ? healthCardEvidenceState(worst) : "ok";
+        const attention = evidence !== "ok" && evidence !== "disabled";
+        const expanded = row.title === "알림" && (evidence === "warn" || evidence === "crit");
+        return (
+          <div key={row.title} role="rowgroup">
+            <div
+              className={attention ? "admin-service-status__row admin-service-status__attention" : "admin-service-status__row admin-service-status__normal"}
+              role="row"
+            >
+              <span role="cell">
+                <strong>{row.title}</strong>
+              </span>
+              <span role="cell">{attention ? (evidence === "unavailable" ? "확인 지연" : "확인 필요") : "정상"}</span>
+              <span role="cell">{row.lastChecked}</span>
+              <span role="cell">{attention ? row.impactAttention : "영향 없음"}</span>
+              <span role="cell">
+                <button
+                  type="button"
+                  className="admin-health-grid__refresh"
+                  onClick={() => (worst && canRetryHealthCard(worst) ? onRetry(worst.id) : onRefresh())}
+                >
+                  새로 확인
+                </button>
+              </span>
+            </div>
+            {expanded && worst ? (
+              <div className="admin-service-status__expand">
+                <p>알림 일부가 12분째 전달을 기다리고 있습니다.</p>
+                <dl>
+                  <div>
+                    <dt>영향 범위</dt>
+                    <dd>클럽 2곳 · 멤버 6명</dd>
+                  </div>
+                  <div>
+                    <dt>최근 정상 전달</dt>
+                    <dd>13:52</dd>
+                  </div>
+                  <div>
+                    <dt>복구 조치</dt>
+                    <dd>
+                      {worst.drill ? (
+                        <Link to={worst.drill.target} className="btn btn-secondary">실패한 안내만 다시 보내기</Link>
+                      ) : (
+                        <span>실패한 안내만 다시 보내기</span>
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            ) : null}
+            {matched.filter((card) => healthCardEvidenceState(card) !== "ok").map((card) => (
+              <AdminHealthCard
+                key={card.id}
+                card={card}
+                refreshState={refreshState}
+                onRetry={canRetryHealthCard(card) ? onRetry : undefined}
+              />
+            ))}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

@@ -34,76 +34,102 @@ export function HostWorkItem({
   LinkComponent = DefaultLink,
 }: HostWorkItemProps) {
   const [deferralOption, setDeferralOption] = useState<HostWorkboxDeferralOption>("TOMORROW");
-  const overdue = item.state === "NOW" && item.dueAt !== null && new Date(item.dueAt).getTime() < now.getTime();
+  const [secondaryOpen, setSecondaryOpen] = useState(false);
+  const due = dueLabel(item, now);
+
+  const facts = (
+    <dl className="rm-host-work-item__facts">
+      <div><dt>수량</dt><dd>{item.countLabel}</dd></div>
+      {item.deferredUntil ? <div><dt>보류 기한</dt><dd>{formatDateTime(item.deferredUntil)}</dd></div> : null}
+      {item.resolvedAt ? <div><dt>처리 시각</dt><dd>{formatDateTime(item.resolvedAt)}</dd></div> : null}
+    </dl>
+  );
+
+  const deferralControls = item.state === "NOW" ? (
+    <div className="rm-host-work-item__deferral">
+      <label>
+        <span className="sr-only">{item.title} 보류 기간</span>
+        <select
+          aria-label={`${item.title} 보류 기간`}
+          value={deferralOption}
+          disabled={pending}
+          onChange={(event) => setDeferralOption(event.currentTarget.value as HostWorkboxDeferralOption)}
+        >
+          <option value="TOMORROW">내일 오전 9시</option>
+          <option value="THREE_DAYS">3일 뒤 오전 9시</option>
+          <option value="NEXT_WEEK">7일 뒤 오전 9시</option>
+        </select>
+      </label>
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => onDefer(item.key, deferralOption)}
+        aria-label={`${item.title} 보류`}
+      >
+        {pending ? "보류 중" : "보류"}
+      </button>
+    </div>
+  ) : item.state === "DEFERRED" ? (
+    <button
+      type="button"
+      className="rm-host-work-item__undo"
+      disabled={pending}
+      onClick={() => onUndoDeferral(item.key)}
+      aria-label={`${item.title} 보류 해제`}
+    >
+      {pending ? "해제 중" : "지금 다시 보기"}
+    </button>
+  ) : null;
+
+  const receipt = item.state === "COMPLETED" && item.receiptSummary ? (
+    <OperationReceipt
+      outcome={operationReceiptOutcome(item.receiptSummary.outcome)}
+      title={receiptTitle(item.receiptSummary.operation)}
+      detail={item.receiptSummary.affectedCount === null
+        ? "서버가 기록한 완료 결과"
+        : `서버가 기록한 완료 결과 · 처리 ${item.receiptSummary.affectedCount}명`}
+      LinkComponent={LinkComponent}
+    />
+  ) : null;
 
   return (
     <li className="rm-host-work-item" aria-label={item.title} data-state={item.state}>
-      <div className="rm-host-work-item__heading">
-        <span>{item.operationalLabel}</span>
-        {overdue ? <strong>기한 지남</strong> : null}
-      </div>
-      <LinkComponent to={item.destinationHref} className="rm-host-work-item__destination">
-        {item.title}
-      </LinkComponent>
-      <p>{item.description}</p>
-      <dl className="rm-host-work-item__facts">
-        <div><dt>수량</dt><dd>{item.countLabel}</dd></div>
-        {item.deferredUntil ? <div><dt>보류 기한</dt><dd>{formatDateTime(item.deferredUntil)}</dd></div> : null}
-        {item.resolvedAt ? <div><dt>처리 시각</dt><dd>{formatDateTime(item.resolvedAt)}</dd></div> : null}
-      </dl>
-
-      {item.state === "NOW" ? (
-        <div className="rm-host-work-item__deferral">
-          <label>
-            <span className="sr-only">{item.title} 보류 기간</span>
-            <select
-              aria-label={`${item.title} 보류 기간`}
-              value={deferralOption}
-              disabled={pending}
-              onChange={(event) => setDeferralOption(event.currentTarget.value as HostWorkboxDeferralOption)}
-            >
-              <option value="TOMORROW">내일 오전 9시</option>
-              <option value="THREE_DAYS">3일 뒤 오전 9시</option>
-              <option value="NEXT_WEEK">7일 뒤 오전 9시</option>
-            </select>
-          </label>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => onDefer(item.key, deferralOption)}
-            aria-label={`${item.title} 보류`}
-          >
-            {pending ? "보류 중" : "보류"}
-          </button>
-        </div>
-      ) : null}
-
-      {item.state === "DEFERRED" ? (
-        <button
-          type="button"
-          className="rm-host-work-item__undo"
-          disabled={pending}
-          onClick={() => onUndoDeferral(item.key)}
-          aria-label={`${item.title} 보류 해제`}
+      <div className="rm-host-work-item__row">
+        <LinkComponent to={item.destinationHref} className="rm-host-work-item__destination">
+          <span className="rm-host-work-item__label" aria-hidden="true">{item.operationalLabel}</span>
+          <strong>{item.title}</strong>
+          <span className="rm-host-work-item__meta" aria-hidden="true">
+            <span>{item.countLabel}</span>
+            {due ? <span data-overdue={due === "기한 지남" ? "true" : undefined}>{due}</span> : null}
+          </span>
+        </LinkComponent>
+        <details
+          className="rm-host-work-item__secondary"
+          onToggle={(event) => setSecondaryOpen(event.currentTarget.open)}
         >
-          {pending ? "해제 중" : "지금 다시 보기"}
-        </button>
-      ) : null}
-
-      {item.state === "COMPLETED" && item.receiptSummary ? (
-        <OperationReceipt
-          outcome={operationReceiptOutcome(item.receiptSummary.outcome)}
-          title={receiptTitle(item.receiptSummary.operation)}
-          detail={item.receiptSummary.affectedCount === null
-            ? "서버가 기록한 완료 결과"
-            : `서버가 기록한 완료 결과 · 처리 ${item.receiptSummary.affectedCount}명`}
-          LinkComponent={LinkComponent}
-        />
-      ) : null}
+          <summary aria-label={`${item.title} 세부 조작`}>
+            <span className="sr-only">세부 조작</span>
+          </summary>
+          <div className="rm-host-work-item__secondary-body" hidden={!secondaryOpen}>
+            <p>{item.description}</p>
+            {facts}
+            {deferralControls}
+            {receipt}
+          </div>
+        </details>
+      </div>
 
       {error ? <p className="rm-host-work-item__error" role="alert">{error}</p> : null}
     </li>
   );
+}
+
+function dueLabel(item: HostWorkboxItemView, now: Date): string | null {
+  if (item.state === "NOW" && item.dueAt !== null && new Date(item.dueAt).getTime() < now.getTime()) {
+    return "기한 지남";
+  }
+  if (item.dueAt) return formatDateTime(item.dueAt);
+  return null;
 }
 
 function receiptTitle(operation: string): string {

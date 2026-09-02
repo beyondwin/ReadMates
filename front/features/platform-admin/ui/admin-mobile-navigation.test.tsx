@@ -68,17 +68,19 @@ function renderTestLink({
   href,
   className,
   ariaCurrent,
+  ariaLabel,
   style,
   children,
 }: {
   href: string;
   className: string;
   ariaCurrent?: "page";
+  ariaLabel?: string;
   style?: CSSProperties;
   children: ReactNode;
 }) {
   return (
-    <a href={href} className={className} aria-current={ariaCurrent} style={style}>
+    <a href={href} className={className} aria-current={ariaCurrent} aria-label={ariaLabel} style={style}>
       {children}
     </a>
   );
@@ -95,6 +97,12 @@ describe("AdminMobileNavigation", () => {
     const links = within(nav).getAllByRole("link");
 
     expect(links.map((link) => link.textContent)).toEqual([
+      "오늘",
+      "클럽",
+      "상태",
+      "기록",
+    ]);
+    expect(links.map((link) => link.getAttribute("aria-label"))).toEqual([
       "오늘 할 일",
       "클럽 관리",
       "서비스 상태",
@@ -170,6 +178,10 @@ describe("AdminMobileNavigation", () => {
     );
     const nav = screen.getByRole("navigation", { name: "Admin 모바일 메뉴" });
     expect(within(nav).getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "클럽",
+      "기록",
+    ]);
+    expect(within(nav).getAllByRole("link").map((link) => link.getAttribute("aria-label"))).toEqual([
       "클럽 관리",
       "처리 기록",
     ]);

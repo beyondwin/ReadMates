@@ -123,6 +123,7 @@ export type AdminOperationSummaryLabel = {
 export type AdminOperationCaseView = AdminOperationCase & {
   locatorLabel?: string;
   scopeLabel?: string;
+  mobileMetaLabel?: string;
   summary: AdminOperationSummaryLabel;
   severityLabel: string;
   stateLabel: string;
@@ -130,6 +131,8 @@ export type AdminOperationCaseView = AdminOperationCase & {
   impactLabel: string;
   ageLabel: string;
   lastObservedLabel?: string;
+  evidenceLines?: readonly string[];
+  recommendation?: string;
 };
 
 export type AdminOperationWorkView = {

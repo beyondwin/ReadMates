@@ -13,6 +13,7 @@ import type {
   AdminOperationSourceFreshnessView,
   AdminOperationsWorkViewId,
 } from "@/features/platform-admin/model/platform-admin-operations-model";
+import { APPROVED_TODAY_ACTION_COPY } from "./admin-operation-state-actions";
 import type { AdminSafeActionState } from "./admin-action-dock";
 import type { AdminClubsLedgerClub, AdminClubsLedgerFilters } from "./admin-clubs-ledger";
 import type { AdminTodayFilters } from "./admin-today-controls";
@@ -121,6 +122,7 @@ export type TodayLedgerFixture = {
   mode?: AdminOperationsSearchMode;
   query: string;
   workView: AdminOperationsWorkViewId;
+  actionCopy?: Partial<Record<TodayLifecycleAction, string>>;
 };
 
 export type ClubsLedgerFixture = {
@@ -136,6 +138,7 @@ export type ClubsLedgerFixture = {
   hasNextPage: boolean;
   loadingMore: boolean;
   loadMoreError: boolean;
+  tabCounts?: { all: number; attention: number; operating: number };
 };
 
 export type HealthLedgerFixture = {
@@ -175,20 +178,32 @@ type TodayFixtureInput = {
   workView?: AdminOperationsWorkViewId;
   history?: readonly TodayHistoryEvent[];
   emptyItems?: boolean;
+  actionCopy?: Partial<Record<TodayLifecycleAction, string>>;
 };
 
 function todayCase(input: {
   allowedActions: readonly TodayLifecycleAction[];
   title?: string;
   id?: string;
+  description?: string;
+  scopeLabel?: string;
+  mobileMetaLabel?: string;
+  impactLabel?: string;
+  ageLabel?: string;
+  evidenceLines?: readonly string[];
+  recommendation?: string;
+  sourceType?: AdminOperationCaseView["sourceType"];
+  summaryCode?: AdminOperationCaseView["summaryCode"];
+  sourceLabel?: string;
 }): AdminOperationCaseView {
+  const sourceType = input.sourceType ?? "NOTIFICATION";
   return {
     id: input.id ?? "case-notification",
-    sourceType: "NOTIFICATION",
+    sourceType,
     clubId: null,
     state: "OPEN",
     severity: "CRITICAL",
-    summaryCode: "NOTIFICATION_DELIVERY_FAILURE",
+    summaryCode: input.summaryCode ?? "NOTIFICATION_DELIVERY_FAILURE",
     firstObservedAt: "2026-08-26T08:00:00Z",
     lastObservedAt: "2026-08-26T09:55:00Z",
     snoozedUntil: null,
@@ -200,7 +215,7 @@ function todayCase(input: {
     detailHref: "/admin/notifications?focus=delivery",
     allowedActions: [...input.allowedActions],
     source: {
-      sourceType: "NOTIFICATION",
+      sourceType,
       status: "AVAILABLE",
       generatedAt: GENERATED_AT,
       lastSuccessfulAt: GENERATED_AT,
@@ -208,13 +223,18 @@ function todayCase(input: {
     },
     summary: {
       title: input.title ?? EDITORIAL_LEDGER_LONG_TODAY_TITLE,
-      description: "같은 원인의 실패가 여러 지역에서 반복되고 있습니다. Review the delivery ledger, confirm the latest authoritative observation, and keep the current case open until the operator deliberately chooses the next item.",
+      description: input.description
+        ?? "같은 원인의 실패가 여러 지역에서 반복되고 있습니다. Review the delivery ledger, confirm the latest authoritative observation, and keep the current case open until the operator deliberately chooses the next item.",
     },
     severityLabel: "긴급",
     stateLabel: "미확인",
-    sourceLabel: "알림",
-    impactLabel: "영향 2건",
-    ageLabel: "2시간 전",
+    sourceLabel: input.sourceLabel ?? "알림",
+    impactLabel: input.impactLabel ?? "영향 2건",
+    ageLabel: input.ageLabel ?? "2시간 전",
+    scopeLabel: input.scopeLabel,
+    mobileMetaLabel: input.mobileMetaLabel,
+    evidenceLines: input.evidenceLines,
+    recommendation: input.recommendation,
   };
 }
 
@@ -274,13 +294,11 @@ function todayFixture(input: TodayFixtureInput): TodayLedgerFixture {
       selectionFellBack: false,
       sources,
       mobileSummary: {
-        open: items.length > 0 ? "활성 1건" : "활성 0건",
-        critical: items.length > 0 ? "긴급 1건" : "긴급 0건",
-        assignedToMe: items.length > 0 ? "내 담당 1건" : "내 담당 0건",
+        open: `활성 ${items.length}건`,
+        critical: `긴급 ${items.length}건`,
+        assignedToMe: `내 담당 ${items.length}건`,
         snoozed: "보류 0건",
-        label: items.length > 0
-          ? "활성 1건 · 긴급 1건 · 내 담당 1건 · 보류 0건"
-          : "활성 0건 · 긴급 0건 · 내 담당 0건 · 보류 0건",
+        label: `활성 ${items.length}건 · 긴급 ${items.length}건 · 내 담당 ${items.length}건 · 보류 0건`,
       },
       allSourcesAvailable,
       sourceStatusLabel: allSourcesAvailable ? "전체 신호 정상" : "일부 신호 확인 불가",
@@ -310,18 +328,66 @@ function todayFixture(input: TodayFixtureInput): TodayLedgerFixture {
     mode: input.mode,
     query: input.query ?? "",
     workView: input.workView ?? "briefing",
+    actionCopy: input.actionCopy,
   };
 }
+
+const APPROVED_TODAY_CASES: readonly AdminOperationCaseView[] = [
+  todayCase({
+    allowedActions: TODAY_L1_ALLOWED_ACTIONS,
+    id: "case-notification-delay",
+    title: "알림 전달 지연",
+    description: "일부 안내가 늦게 전달되고 있습니다.",
+    scopeLabel: "클럽 2곳 · 멤버 6명",
+    mobileMetaLabel: "클럽 2곳 · 멤버 6명 · 10분 전",
+    impactLabel: "클럽 2곳 · 멤버 6명",
+    ageLabel: "10분 전",
+    evidenceLines: ["데이터 손실 없음", "마지막 정상 전달 13:52"],
+    recommendation: "중복 발송을 확인한 뒤 실패한 안내만 다시 보냅니다.",
+  }),
+  todayCase({
+    allowedActions: TODAY_L1_ALLOWED_ACTIONS,
+    id: "case-public-record",
+    title: "공개 기록 확인",
+    description: "새로 생성된 공개 기록을 확인하세요.",
+    scopeLabel: "처리 필요: 새로 생성된 공개 기록 1건",
+    mobileMetaLabel: "기록 1건 · 35분 전",
+    impactLabel: "기록 1건",
+    ageLabel: "35분 전",
+    sourceType: "CLUB_READINESS",
+    summaryCode: "CLUB_READY_TO_PUBLISH",
+    sourceLabel: "클럽 준비",
+  }),
+  todayCase({
+    allowedActions: TODAY_L1_ALLOWED_ACTIONS,
+    id: "case-summary-result",
+    title: "요약 결과 확인",
+    description: "요약 결과를 확인하세요.",
+    scopeLabel: "처리 필요: 요약 결과 3건",
+    mobileMetaLabel: "결과 3건 · 1시간 전",
+    impactLabel: "결과 3건",
+    ageLabel: "1시간 전",
+    sourceType: "AI_JOB",
+    summaryCode: "AI_JOB_STALE",
+    sourceLabel: "AI 작업",
+  }),
+];
 
 export const todayDesktopLedger = todayFixture({
   capabilities: TODAY_VIEW_CAPABILITIES,
   allowedActions: TODAY_L1_ALLOWED_ACTIONS,
+  items: APPROVED_TODAY_CASES,
+  selectedCase: APPROVED_TODAY_CASES[0],
+  actionCopy: APPROVED_TODAY_ACTION_COPY,
 });
 
 export const todayMobileCaseDetail = todayFixture({
   capabilities: TODAY_VIEW_CAPABILITIES,
   allowedActions: TODAY_L1_ALLOWED_ACTIONS,
+  items: APPROVED_TODAY_CASES,
+  selectedCase: APPROVED_TODAY_CASES[0],
   mode: "detail",
+  actionCopy: APPROVED_TODAY_ACTION_COPY,
 });
 
 export const todayEmptyEvidence = todayFixture({
@@ -397,6 +463,7 @@ function clubsFixture(input: {
   pageState?: ClubsLedgerFixture["pageState"];
   hasNextPage?: boolean;
   loadMoreError?: boolean;
+  tabCounts?: ClubsLedgerFixture["tabCounts"];
 }): ClubsLedgerFixture {
   const clubs = input.clubs ? [...input.clubs] : [criticalClub(), healthyClub()];
   return {
@@ -412,6 +479,7 @@ function clubsFixture(input: {
     hasNextPage: input.hasNextPage ?? false,
     loadingMore: false,
     loadMoreError: input.loadMoreError ?? false,
+    tabCounts: input.tabCounts,
   };
 }
 
@@ -451,8 +519,81 @@ function healthyClub(): AdminClubsLedgerClub {
   };
 }
 
+function approvedClub(input: {
+  clubId: string;
+  name: string;
+  href: string;
+  currentState: string;
+  requiredAction: string | null;
+  recentSignal: string | null;
+  emphasis: "quiet" | "actionable";
+  slug: string;
+  visibility: "PRIVATE" | "PUBLIC";
+}): AdminClubsLedgerClub {
+  return {
+    clubId: input.clubId,
+    name: input.name,
+    href: input.href,
+    currentState: input.currentState,
+    requiredAction: input.requiredAction,
+    recentSignal: input.recentSignal,
+    emphasis: input.emphasis,
+    technicalDisclosure: [
+      { label: "클럽 ID", value: input.clubId },
+      { label: "Slug", value: input.slug },
+      { label: "수명주기 값", value: "ACTIVE" },
+      { label: "공개 상태 값", value: input.visibility },
+    ],
+  };
+}
+
 export const clubsTabletLedger = clubsFixture({
   capabilities: CLUBS_CREATE_CAPABILITIES,
+  tabCounts: { all: 24, attention: 2, operating: 22 },
+  clubs: [
+    {
+      ...approvedClub({
+        clubId: "club-sentences",
+        name: "문장과 사람들",
+        href: "/admin/clubs/club-sentences?returnTo=%2Fadmin%2Fclubs&focusId=club-sentences&scrollTop=0",
+        currentState: "운영 중",
+        requiredAction: "설정 확인 필요",
+        recentSignal: "공개 범위 설정을 다시 확인해 주세요.",
+        emphasis: "actionable",
+        slug: "sentences",
+        visibility: "PRIVATE",
+      }),
+      operationsFacts: {
+        hostsLabel: "호스트 2명",
+        membersLabel: "멤버 18명",
+        recordsLabel: "공개 기록 6건",
+        domainLabel: "도메인 정상",
+        reviewLabel: "공개 범위 설정을 다시 확인해 주세요.",
+        ageLabel: "10분 전",
+      },
+    },
+    {
+      ...approvedClub({
+        clubId: "club-saturday",
+        name: "토요일의 책",
+        href: "/admin/clubs/club-saturday?returnTo=%2Fadmin%2Fclubs&focusId=club-saturday&scrollTop=0",
+        currentState: "운영 중",
+        requiredAction: null,
+        recentSignal: "35분 전",
+        emphasis: "quiet",
+        slug: "saturday-book",
+        visibility: "PUBLIC",
+      }),
+      operationsFacts: {
+        hostsLabel: "호스트 1명",
+        membersLabel: "멤버 9명",
+        recordsLabel: "공개 기록 3건",
+        domainLabel: "도메인 정상",
+        reviewLabel: "운영 중",
+        ageLabel: "35분 전",
+      },
+    },
+  ],
 });
 
 export const clubsPaginationFailure = clubsFixture({
@@ -491,13 +632,13 @@ const HEALTH_SNAPSHOT: PlatformHealthSnapshot = {
     healthCard({
       id: "outbox_backlog",
       title: "Outbox backlog",
+      status: "WARN",
       metric: { value: 42, unit: "rows", label: "pending" },
       drill: { kind: "ADMIN_ROUTE", target: "/admin/notifications?focus=outbox_backlog" },
     }),
     healthCard({
       id: "kafka_consumer_lag",
       title: EDITORIAL_LEDGER_LONG_HEALTH_TITLE,
-      status: "WARN",
       metric: { value: 75, unit: "records", label: "max across partitions" },
       thresholds: { warn: 50, crit: 500 },
       source: "PROMETHEUS",
@@ -581,23 +722,45 @@ function auditItem(overrides: Partial<AdminAuditLedgerItem> & Pick<AdminAuditLed
 
 const REVIEW_PAGE: AdminAuditLedgerPage = {
   generatedAt: GENERATED_AT,
-  filters: { range: "7d" },
-  summary: { visibleCount: 2, sourceUnavailableCount: 0, metadataUnavailableCount: 0, unavailableSources: [] },
+  filters: { range: "24h" },
+  summary: { visibleCount: 3, sourceUnavailableCount: 0, metadataUnavailableCount: 0, unavailableSources: [] },
   nextCursor: "cursor-2",
   items: [
     auditItem({
       id: "platform_audit_events:event-1",
-      summary: EDITORIAL_LEDGER_LONG_AUDIT_SUMMARY,
+      occurredAt: "2026-08-26T05:52:00Z",
+      actor: { userId: "platform-operator-user", role: "OPERATOR", displayLabel: "OPERATOR" },
+      summary: "실패한 안내 6건을 다시 보냈습니다.",
+      safeMetadata: [
+        { label: "처리한 이유", value: "오늘 저녁 모임 안내 복구", kind: "note" },
+        { label: "영향 범위", value: "클럽 2곳 · 멤버 6명", kind: "note" },
+        { label: "변경 전", value: "전달 대기 6건", kind: "note" },
+        { label: "변경 후", value: "전달 완료 6건", kind: "note" },
+        { label: "처리 결과", value: "정상 반영 확인", kind: "note" },
+        { label: "selectionHashPrefix", value: "aaaaaaaa", kind: "fingerprint" },
+      ],
+    }),
+    auditItem({
+      id: "platform_audit_events:event-public-record",
+      occurredAt: "2026-08-26T04:52:00Z",
+      sourceSlice: "S3",
+      actionCategory: "CLUB_LIFECYCLE",
+      actionType: "FEEDBACK_DOCUMENT_PUBLISHED",
+      actor: { userId: "platform-operator-user", role: "OPERATOR", displayLabel: "OPERATOR" },
+      target: { clubId: "club-1", userId: null, jobId: null, eventId: null, label: "공개 기록" },
+      summary: "공개 기록 확인을 완료했습니다.",
+      safeMetadata: [{ label: "처리 결과", value: "정상", kind: "note" }],
     }),
     auditItem({
       id: "platform_audit_events:event-2",
-      occurredAt: "2026-08-26T10:00:00Z",
+      occurredAt: "2026-08-26T02:18:00Z",
       sourceSlice: "S4",
-      actionCategory: "SUPPORT",
-      actionType: "SUPPORT_ACCESS_GRANT_CREATED",
-      outcome: "FAILED",
-      target: { clubId: "club-1", userId: null, jobId: null, eventId: null, label: "사용자 숨김" },
-      summary: "support grant가 생성되었습니다.",
+      actionCategory: "CLUB_LIFECYCLE",
+      actionType: "ADMIN_CLUB_METADATA_UPDATED",
+      outcome: "SUCCESS",
+      actor: { userId: "platform-operator-user", role: "OPERATOR", displayLabel: "OPERATOR" },
+      target: { clubId: "club-1", userId: null, jobId: null, eventId: null, label: "대상 클럽" },
+      summary: "클럽 운영 상태를 변경했습니다.",
       safeMetadata: [{ label: "scope", value: "METADATA_READ", kind: "code" }],
     }),
   ],
@@ -627,6 +790,7 @@ export const reviewAuditEmptyEvidence: ReviewAuditFixture = {
   capabilities: [...AUDIT_REVIEW_CAPABILITIES],
   page: {
     ...REVIEW_PAGE,
+    filters: { range: "7d" },
     summary: { visibleCount: 0, sourceUnavailableCount: 0, metadataUnavailableCount: 0, unavailableSources: [] },
     nextCursor: null,
     items: [],

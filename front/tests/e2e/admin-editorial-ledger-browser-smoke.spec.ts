@@ -32,7 +32,7 @@ test("Today L1 uses explicit allowedActions rather than role", async ({ page }) 
   await page.goto("/admin/today?case=case-notification");
   await expectReducedMotion(page);
 
-  await expect(page.getByRole("heading", { name: "오늘의 운영 케이스" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "오늘 할 일" })).toBeVisible();
   await expect(page.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
   await expect(page.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
   await expect(page.getByRole("button", { name: "확인함" })).toBeEnabled();

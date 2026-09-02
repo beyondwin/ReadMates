@@ -140,14 +140,14 @@ describe("HostMeetingList", () => {
     );
 
     expect(screen.getByRole("status")).toHaveTextContent("목록이 바뀌어 처음부터 다시 불러왔습니다.");
-    expect(screen.getByRole("heading", { name: "모임" })).toHaveFocus();
+    expect(screen.getByRole("heading", { name: "일정과 모임" })).toHaveFocus();
   });
 
   it("stretches the title link across the mobile row for a 44px+ tap target", () => {
     const css = readFileSync(path.resolve("features/host/ui/meeting-list/meeting-toc.css"), "utf8");
     expect(css).toMatch(/\.rm-meeting-toc__row\s*\{[^}]*position:\s*relative/s);
     expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*\.rm-meeting-toc__title::after[\s\S]*inset:\s*0/);
-    expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*\.rm-meeting-toc__row[\s\S]*min-height:\s*44px/);
+    expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*\.rm-meeting-toc__row[\s\S]*min-height:\s*62px/);
   });
 
   it("shows a past-section retry row without collapsing into the first-meeting empty state", async () => {
@@ -231,7 +231,7 @@ describe("HostMeetingList", () => {
     const root = document.querySelector(".rm-meeting-toc") as HTMLElement | null;
     expect(root).not.toBeNull();
     expect(within(root!).getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(within(root!).getByRole("heading", { level: 1, name: "모임" })).toBeInTheDocument();
+    expect(within(root!).getByRole("heading", { level: 1, name: "일정과 모임" })).toBeInTheDocument();
     expect(within(root!).getByRole("tablist", { name: "모임 보기 방식" })).toBeInTheDocument();
     expect(within(root!).getByRole("tab", { name: "목록" })).toHaveAttribute("aria-selected", "true");
     expect(root!.querySelectorAll("[style]")).toHaveLength(0);

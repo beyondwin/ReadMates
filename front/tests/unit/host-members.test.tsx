@@ -407,7 +407,7 @@ describe("HostMembersPage", () => {
     expect(activeRow.getByText("이번 모임 참여")).toBeInTheDocument();
     expect(activeRowElement).toHaveClass("rm-host-member-ledger__row");
     const ledgerCss = readFileSync(path.resolve("features/host/ui/members/member-ledger.css"), "utf8");
-    expect(ledgerCss).toMatch(/\.rm-host-member-ledger__row\s*\{[^}]*min-height:\s*44px/s);
+    expect(ledgerCss).toMatch(/\.rm-host-member-ledger__row\s*\{[^}]*min-height:\s*62px/s);
 
     const outsideRowElement = screen.getByText("새").closest("tr") as HTMLElement;
     const outsideRow = within(outsideRowElement);
@@ -632,7 +632,7 @@ describe("HostMembersPage", () => {
     expect(contentContainer?.style.paddingBottom).toBe("");
     expect(contentContainer?.style.paddingLeft).toBe("");
     expect(contentContainer?.style.paddingRight).toBe("");
-    expect(screen.getByRole("heading", { level: 1, name: "멤버 관리" })).toHaveClass(
+    expect(screen.getByRole("heading", { level: 1, name: "사람" })).toHaveClass(
       "rm-host-editorial-ledger__heading",
     );
     expect(page?.querySelector(".page-header-compact")?.querySelectorAll("[style]")).toHaveLength(0);

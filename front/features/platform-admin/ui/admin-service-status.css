@@ -1,8 +1,88 @@
 .admin-service-status {
+  --attention: var(--warn);
+  position: relative;
   width: 100%;
   max-width: 1240px;
   min-width: 0;
   margin: 0 auto;
+}
+
+.admin-service-status__normal {
+  color: var(--text-3);
+  background: transparent;
+}
+
+.admin-service-status__attention {
+  border-inline-start: 3px solid var(--attention);
+}
+
+.admin-service-status__table {
+  display: grid;
+  min-width: 0;
+}
+
+.admin-service-status__head,
+.admin-service-status__row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 1.1fr) minmax(6rem, 0.7fr) minmax(7rem, 0.9fr) minmax(7rem, 1fr) minmax(7rem, 0.8fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 44px;
+  padding: 14px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-service-status__head {
+  color: var(--text-3);
+  font-size: var(--type-size-supporting);
+  font-weight: 700;
+}
+
+.admin-service-status__source-heading {
+  margin: 4px 0 0;
+  color: var(--text-3);
+  font-size: var(--type-size-supporting);
+  font-weight: 500;
+}
+
+.admin-service-status__expand {
+  padding: 16px 20px 24px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-sub);
+}
+
+.admin-service-status .admin-health-grid__ok-signals,
+.admin-service-status .admin-health-card,
+.admin-service-status .admin-health-grid__strip,
+.admin-service-status .admin-page-context__eyebrow,
+.admin-service-status .admin-page-frame__header h1,
+.admin-service-status .admin-page-frame__description,
+.admin-service-status .admin-page-frame__action,
+.admin-service-status .admin-evidence-ledger > header,
+.admin-service-status .admin-state-panel__notice,
+.admin-service-status .admin-health-grid__stale {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.admin-service-status__banner {
+  margin: 0;
+  padding: 22px 8px 18px;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.admin-service-status__asof {
+  position: absolute;
+  top: 22px;
+  right: 8px;
+  margin: 0;
+  color: var(--text-3);
+  font-size: var(--type-size-supporting);
 }
 
 .admin-notifications,
@@ -186,6 +266,16 @@
   padding: clamp(18px, 2.4vw, 26px) 0;
 }
 
+.admin-service-status .admin-health-card--compact,
+.admin-service-status .admin-health-grid__ok-signals {
+  color: var(--text-3);
+  background: transparent;
+}
+
+.admin-service-status .admin-health-card--attention {
+  border-inline-start: 3px solid var(--attention);
+}
+
 .admin-service-status .admin-health-card__header > div {
   display: grid;
   gap: 5px;
@@ -205,8 +295,10 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
   margin: 0;
-  border: 1px solid var(--line);
-  background: var(--bg-sub);
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
 }
 
 .admin-service-status .admin-health-card__narrative > div {
@@ -265,12 +357,7 @@
 }
 
 .admin-service-status .admin-health-grid__ok-signals {
-  display: grid;
-  grid-template-columns: minmax(9rem, 0.28fr) minmax(0, 1fr);
-  gap: 14px 24px;
-  align-items: start;
-  border-block: 1px solid var(--line);
-  padding: 16px 0;
+  display: block;
 }
 
 .admin-service-status .admin-health-grid__ok-signals > p,

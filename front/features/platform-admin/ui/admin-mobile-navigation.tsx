@@ -44,6 +44,12 @@ function AdminMobileNavigationContent({
   ariaLabel: string;
 }) {
   const { areas } = useMemo(() => visibleAdminNav(capabilities), [capabilities]);
+  const MOBILE_SHORT_LABELS: Record<string, string> = {
+    today: "오늘",
+    clubs: "클럽",
+    service: "상태",
+    records: "기록",
+  };
 
   return (
     <nav
@@ -59,7 +65,7 @@ function AdminMobileNavigationContent({
         overflowX: "hidden",
         borderTop: "1px solid var(--line)",
         background: "var(--bg-raised)",
-        paddingBottom: "max(4px, env(safe-area-inset-bottom))",
+        paddingBottom: "env(safe-area-inset-bottom)",
       }}
     >
       {areas.length > 0 ? (
@@ -84,6 +90,7 @@ function AdminMobileNavigationContent({
                     "admin-mobile-navigation__link" +
                     (active ? " admin-mobile-navigation__link--active" : ""),
                   ariaCurrent: active ? "page" : undefined,
+                  ariaLabel: area.label,
                   style: {
                     display: "flex",
                     minWidth: 0,
@@ -91,7 +98,7 @@ function AdminMobileNavigationContent({
                     width: "100%",
                     alignItems: "center",
                     justifyContent: "center",
-                    padding: "4px",
+                    padding: "12px 4px 10px",
                     borderTop: active ? "3px solid var(--accent)" : "3px solid transparent",
                     color: active ? "var(--text)" : "var(--text-2)",
                     font: "inherit",
@@ -100,7 +107,7 @@ function AdminMobileNavigationContent({
                     textDecoration: "none",
                     whiteSpace: "normal",
                   },
-                  children: <span>{area.label}</span>,
+                  children: MOBILE_SHORT_LABELS[area.id] ?? area.label,
                 })}
               </li>
             );

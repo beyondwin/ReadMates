@@ -127,10 +127,11 @@ describe("AdminOperationsInspector", () => {
 
     const headings = [
       screen.getByRole("heading", { name: selectedCase.summary.title }),
-      screen.getByRole("heading", { name: "무슨 일인가" }),
-      screen.getByRole("heading", { name: "왜 중요한가" }),
-      screen.getByRole("heading", { name: "확인한 근거" }),
-      screen.getByRole("heading", { name: "다음 행동" }),
+      screen.getByRole("heading", { name: "무슨 일이 있었나요?" }),
+      screen.getByRole("heading", { name: "영향 범위" }),
+      screen.getByRole("heading", { name: "확인된 내용" }),
+      screen.getByRole("heading", { name: "권장 처리" }),
+      screen.getByRole("heading", { name: "처리 방법" }),
       screen.getByRole("heading", { name: "최근 처리 기록" }),
     ];
     for (let index = 0; index < headings.length - 1; index += 1) {

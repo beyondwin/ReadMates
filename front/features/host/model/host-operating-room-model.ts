@@ -83,6 +83,14 @@ export type PreparationLedgerRowView = {
   workItemKey: string | null;
 };
 
+export type PhaseStatusLedgerRowView = {
+  label: string;
+  value: string;
+  detail: string;
+  href: string | null;
+  action: string;
+};
+
 export type HostOperatingRoomView = {
   meeting: CurrentMeetingHeaderView | null;
   phases: readonly MeetingPhaseTabView[];
@@ -524,6 +532,81 @@ function noNextAction(): HostNextActionView {
     reason: "현재 모임의 필수 준비가 확인되었습니다.",
     href: null,
   };
+}
+
+export function buildLivePhaseStatusRows(
+  meeting: HostSessionDetailResponse,
+  basePath: string,
+): PhaseStatusLedgerRowView[] {
+  const participants = activeParticipants(meeting);
+  const total = participants.length;
+  const attended = participants.filter(({ attendanceStatus }) => attendanceStatus === "ATTENDED").length;
+  const absent = participants.filter(({ attendanceStatus }) => attendanceStatus === "ABSENT").length;
+  const unknown = participants.filter(({ attendanceStatus }) => attendanceStatus === "UNKNOWN").length;
+  const going = participants.filter(({ rsvpStatus }) => rsvpStatus === "GOING").length;
+  const declined = participants.filter(({ rsvpStatus }) => rsvpStatus === "DECLINED").length;
+  const maybe = participants.filter(({ rsvpStatus }) => rsvpStatus === "MAYBE").length;
+  const noResponse = participants.filter(({ rsvpStatus }) => rsvpStatus === "NO_RESPONSE").length;
+  const responded = going + declined + maybe;
+  const rsvpDetail = maybe > 0
+    ? `참석 ${going} · 불참 ${declined} · 미정 ${maybe} · 미응답 ${noResponse}`
+    : `참석 ${going} · 불참 ${declined} · 미응답 ${noResponse}`;
+
+  return [
+    {
+      label: "실제 출석",
+      value: `${attended} / ${total}`,
+      detail: `참석 ${attended} · 알린 불참 ${absent} · 확인 필요 ${unknown}`,
+      href: hostSessionPath(basePath, meeting.sessionId, "?section=attendance"),
+      action: "출석 보기",
+    },
+    {
+      label: "참석 응답",
+      value: `${responded} / ${total}`,
+      detail: rsvpDetail,
+      href: hostSessionPath(basePath, meeting.sessionId, "?section=responses"),
+      action: "응답 보기",
+    },
+    {
+      label: "진행 순서",
+      value: "확인 전",
+      detail: "진행 순서는 모임 작업에서 확인할 수 있어요",
+      href: hostSessionPath(basePath, meeting.sessionId, "?section=agenda"),
+      action: "진행 보기",
+    },
+    {
+      label: "현장 메모",
+      value: "확인 전",
+      detail: "호스트만 볼 수 있어요",
+      href: hostSessionPath(basePath, meeting.sessionId, "?section=notes"),
+      action: "메모 열기",
+    },
+  ];
+}
+
+export function buildClosingPhaseStatusRows(
+  closing: SessionClosingBoardView,
+): PhaseStatusLedgerRowView[] {
+  return closing.checklist.map((item) => ({
+    label: closingLedgerLabel(item.label),
+    value: item.state === "DONE" ? "완료" : item.stateLabel,
+    detail: item.completedStamp ?? item.detail,
+    href: item.href,
+    action: closingLedgerAction(item.label),
+  }));
+}
+
+function closingLedgerLabel(label: string): string {
+  return label === "피드백 문서 확인" ? "피드백 문서" : label;
+}
+
+function closingLedgerAction(label: string): string {
+  if (label === "출석 확정") return "출석 보기";
+  if (label === "소감 수집") return "대상 보기";
+  if (label === "기록 초안") return "초안 열기";
+  if (label === "피드백 문서 확인" || label === "피드백 문서") return "문서 확인";
+  if (label === "멤버 게시") return "게시 조건";
+  return "자세히 보기";
 }
 
 function activeParticipants(meeting: HostSessionDetailResponse) {

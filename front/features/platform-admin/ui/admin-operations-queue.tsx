@@ -8,7 +8,7 @@ type Props = {
   hasNextPage?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
-  controls?: ReactNode;
+  secondaryControls?: ReactNode;
 };
 
 export function AdminOperationsQueue({
@@ -18,16 +18,14 @@ export function AdminOperationsQueue({
   hasNextPage = false,
   loadingMore = false,
   onLoadMore,
-  controls,
+  secondaryControls,
 }: Props) {
   return (
     <section className="admin-operations-queue" aria-label="운영 케이스 큐">
       <div className="admin-operations-queue__header">
         <h2 className="h3">오늘 할 일</h2>
-        <span>{items.length}건</span>
+        <span className="admin-operations-queue__sort">최신순</span>
       </div>
-
-      {controls ? <div className="admin-operations-queue__controls">{controls}</div> : null}
 
       {items.length === 0 ? (
         <p className="admin-operations-queue__empty">현재 조건에 맞는 운영 케이스가 없습니다.</p>
@@ -44,18 +42,22 @@ export function AdminOperationsQueue({
               onClick={() => onSelectCase(item.id)}
             >
               <span className="admin-operations-queue__headline">
+                <span className="admin-operations-queue__badge" aria-hidden="true">!</span>
                 {item.locatorLabel ? (
                   <span className="admin-operations-queue__locator">{item.locatorLabel}</span>
                 ) : null}
                 <strong className="admin-operation-wrap">{item.summary.title}</strong>
                 <span className="admin-operations-queue__severity">{item.severityLabel}</span>
+                <span className="admin-operations-queue__age">{item.ageLabel}</span>
               </span>
               <span className="admin-operations-queue__context">
-                {item.scopeLabel ? <span className="admin-operation-wrap">{item.scopeLabel}</span> : null}
+                {item.scopeLabel ? <span className="admin-operations-queue__scope admin-operation-wrap">{item.scopeLabel}</span> : null}
+                {item.mobileMetaLabel ? (
+                  <span className="admin-operations-queue__mobile-meta admin-operation-wrap">{item.mobileMetaLabel}</span>
+                ) : null}
                 <span>현재 상태 · {item.stateLabel}</span>
                 <span>{item.sourceLabel}</span>
                 <span>{item.impactLabel}</span>
-                <span>{item.ageLabel}</span>
               </span>
             </button>
           ))}
@@ -71,6 +73,8 @@ export function AdminOperationsQueue({
           ) : null}
         </div>
       )}
+
+      {secondaryControls ? <div className="admin-operations-queue__controls">{secondaryControls}</div> : null}
     </section>
   );
 }

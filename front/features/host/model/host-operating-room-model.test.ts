@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { HostSessionDetailResponse } from "../api/host-contracts";
 import type { SessionClosingStatusInput } from "./session-closing-model";
 import {
+  buildClosingPhaseStatusRows,
   buildHostOperatingRoomView,
+  buildLivePhaseStatusRows,
   type HostOperatingRoomInput,
   type HostOperatingRoomSource,
 } from "./host-operating-room-model";
@@ -392,6 +394,63 @@ describe("buildHostOperatingRoomView", () => {
       expect.objectContaining({
         id: "PUBLIC",
         href: "https://public.example.com/records/12",
+      }),
+    ]));
+  });
+});
+
+describe("operating-room phase status rows", () => {
+  it("keeps actual attendance separate from RSVP in the live ledger", () => {
+    const rows = buildLivePhaseStatusRows(session(), "/clubs/book-club/app/host");
+
+    expect(rows.map(({ label }) => label)).toEqual(["실제 출석", "참석 응답", "진행 순서", "현장 메모"]);
+    expect(rows[0]).toMatchObject({
+      value: "1 / 4",
+      detail: "참석 1 · 알린 불참 1 · 확인 필요 2",
+      action: "출석 보기",
+      href: "/clubs/book-club/app/host/sessions/session-12?section=attendance",
+    });
+    expect(rows[1]).toMatchObject({
+      value: "2 / 4",
+      detail: "참석 1 · 불참 1 · 미응답 2",
+      action: "응답 보기",
+    });
+    expect(rows[2]?.value).toBe("확인 전");
+    expect(rows[3]?.detail).toBe("호스트만 볼 수 있어요");
+  });
+
+  it("maps the closing checklist into the approved 마감 현황 composition", () => {
+    const view = buildHostOperatingRoomView(input({
+      currentMeeting: session({ state: "CLOSED", date: "2026-08-29" }),
+      closing: ready({
+        ...closing("IN_PROGRESS", "IMPORT_RECORDS"),
+        checklist: [
+          { id: "SESSION_CLOSED", state: "DONE", label: "모임 종료", detail: "출석이 확정되었습니다.", href: null },
+          {
+            id: "RECORD_PACKAGE_SAVED",
+            state: "ACTION_REQUIRED",
+            label: "기록 패키지",
+            detail: "정리본을 검토하세요.",
+            href: "/app/host/sessions/session-12?section=records",
+          },
+        ],
+      }),
+    }));
+
+    expect(view.closing).not.toBeNull();
+    const rows = buildClosingPhaseStatusRows(view.closing!);
+    expect(rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        label: "출석 확정",
+        value: "완료",
+        action: "출석 보기",
+      }),
+      expect.objectContaining({
+        label: "기록 초안",
+        value: "조치 필요",
+        detail: "정리본을 검토하세요.",
+        action: "초안 열기",
+        href: "/clubs/book-club/app/host/sessions/session-12?section=records",
       }),
     ]));
   });

@@ -246,7 +246,7 @@ function adminShellSuite() {
 
     await page.goto("/admin");
     await expect(page).toHaveURL(/\/admin\/today(?:\?.*)?$/);
-    await expect(page.getByRole("heading", { name: "오늘의 운영 케이스" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "오늘 할 일" })).toBeVisible();
     await expect(page.getByRole("link", { name: "오늘 할 일", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "클럽 관리", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "서비스 상태", exact: true })).toBeVisible();

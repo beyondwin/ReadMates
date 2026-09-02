@@ -269,7 +269,7 @@ export function MemberList({
         <caption className="rm-host-member-ledger__caption small">{sectionDescription}</caption>
         <thead>
           <tr>
-            <th scope="col">이름</th>
+            <th scope="col">멤버</th>
             <th scope="col">상태</th>
             <th scope="col" className="rm-host-member-ledger__num">
               함께한 기간

@@ -1,6 +1,14 @@
 import { expect, test } from "@playwright/experimental-ct-react";
-import type { ReactNode } from "react";
+import type { Locator, Page, TestInfo } from "@playwright/test";
+import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
+import {
+  approvedMockup,
+  captureApprovedComparison,
+  expectGeometryWithinTolerance,
+  expectLocatorGeometry,
+  type ApprovedRegion,
+} from "@/tests/e2e/support/approved-mockup-contract";
 import {
   expectMinimumTargetSize,
   expectNoHorizontalOverflow,
@@ -8,17 +16,24 @@ import {
   VISUAL_AUTHORITY_VIEWPORTS,
 } from "@/tests/e2e/support/visual-authority-contract";
 import { GlobalSpaceSwitcher } from "@/shared/ui/global-space-switcher";
+import { TodayLedgerCtNode } from "../ui/admin-editorial-ledger-ct-harness";
 import {
   ADMIN_SHELL_LONG_COPY,
   ADMIN_SHELL_VISUAL_CAPABILITIES,
   ADMIN_SHELL_VISUAL_SPACE_OPTIONS,
+  todayDesktopLedger,
 } from "../ui/admin-editorial-ledger.fixtures";
 import { AdminShellLayout } from "./admin-shell-layout";
+
+const APPROVED_DESKTOP_VIEWPORT = { width: 1672, height: 941 } as const;
+const HEADER_DESKTOP_GEOMETRY = { x: 0, y: 0, width: 1672, height: 86 } as const;
+const NAV_DESKTOP_GEOMETRY = { x: 0, y: 86, width: 260, height: 855 } as const;
 
 function shellFixture(
   outlet: ReactNode,
   routePath = "today",
   currentNavigationOwner: "today" | "clubs" | "service" | "records" = "today",
+  workspaceAccountLabel = "운영자",
 ) {
   return (
     <MemoryRouter initialEntries={[`/admin/${routePath}`]}>
@@ -27,7 +42,7 @@ function shellFixture(
           path="/admin"
           element={
             <AdminShellLayout
-              workspaceAccountLabel="운영자"
+              workspaceAccountLabel={workspaceAccountLabel}
               spaceSwitcher={
                 <GlobalSpaceSwitcher
                   currentIdentity={{ productSpace: "platform" }}
@@ -89,6 +104,32 @@ const longCopyShellContent = (
   </section>
 );
 
+test("Admin desktop shell matches approved 1672 geometry", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 1672, height: 941 });
+  const component = await mount(shellFixture(todayShellContent));
+
+  await expectLocatorGeometry(component.locator(".admin-shell__header"), { x: 0, y: 0, width: 1672, height: 86 }, 4);
+  await expectLocatorGeometry(component.locator(".admin-shell__nav"), { x: 0, y: 86, width: 260, height: 855 }, 4);
+  await expectNoHorizontalOverflow(page);
+});
+
+test("Admin mobile shell matches approved 390 geometry", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const component = await mount(shellFixture(todayShellContent));
+
+  await expectLocatorGeometry(component.locator(".admin-shell__header"), { x: 0, y: 0, width: 390, height: 70 }, 4);
+  await expect(component.getByRole("navigation", { name: "Admin 모바일 메뉴" })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
+for (const width of [767, 768, 1536] as const) {
+  test(`admin shell has no horizontal overflow at ${width}`, async ({ mount, page }) => {
+    await page.setViewportSize({ width, height: width < 768 ? 844 : 941 });
+    await mount(shellFixture(todayShellContent));
+    await expectNoHorizontalOverflow(page);
+  });
+}
+
 test("production shell imports scoped CSS in working cascade order", async ({
   mount,
   page,
@@ -141,7 +182,7 @@ test("production shell imports scoped CSS in working cascade order", async ({
 
   expect(styles).toEqual({
     bodyDisplay: "grid",
-    bodyColumns: "220px 1108px",
+    bodyColumns: "260px 1180px",
     navPosition: "sticky",
     pageDisplay: "grid",
     pageGap: "18px",
@@ -170,10 +211,12 @@ test("Today desktop locks the production shell, quiet normal state, and editoria
   });
   expect(shellMetrics.fontFamily).toMatch(/Pretendard/i);
   expect(shellMetrics.mainWidth).toBeLessThanOrEqual(1240);
-  expect(shellMetrics.bodyColumns).toBe("220px 1108px");
+  expect(shellMetrics.bodyColumns).toBe("260px 1180px");
 
   await expectMinimumTargetSize(component.getByRole("button", { name: "공간 전환, 현재 플랫폼 운영" }));
-  await expectMinimumTargetSize(component.getByRole("button", { name: "다른 계정으로 로그인" }));
+  await expectMinimumTargetSize(
+    component.locator(".admin-shell__account-control").getByRole("button", { name: "다른 계정으로 로그인" }),
+  );
   await expectMinimumTargetSize(component.getByRole("button", { name: "다시 확인" }));
   await expect(component).toHaveScreenshot("admin-shell-today-1440.png");
 });
@@ -194,19 +237,102 @@ test("four-axis navigation remains complete in the production desktop shell", as
   await expect(component).toHaveScreenshot("admin-shell-four-axis-nav-1440.png");
 });
 
-test("space menu keeps platform and club choices inside the production shell", async ({ mount, page }) => {
-  await page.setViewportSize(VISUAL_AUTHORITY_VIEWPORTS.desktopWide);
-  const component = await mount(shellFixture(todayShellContent));
+async function regionFromLocator(
+  locator: Locator,
+  name: string,
+  expected: ApprovedRegion["expected"],
+  toleranceCssPx: 2 | 4,
+): Promise<ApprovedRegion> {
+  const box = await locator.boundingBox();
+  if (!box) throw new Error(`${name} has no bounding box`);
+  const actual = { x: box.x, y: box.y, width: box.width, height: box.height };
+  try {
+    expectGeometryWithinTolerance(actual, expected, toleranceCssPx);
+  } catch (error) {
+    throw new Error(
+      `${name} actual=${JSON.stringify(actual)} expected=${JSON.stringify(expected)}`,
+      { cause: error },
+    );
+  }
+  return { name, actual, expected, toleranceCssPx };
+}
+
+async function mountApprovedShell(
+  mount: (component: ReactElement) => Promise<Locator>,
+  page: Page,
+  outlet: ReactNode,
+  workspaceAccountLabel = "김운영",
+) {
+  await page.setViewportSize(APPROVED_DESKTOP_VIEWPORT);
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.addStyleTag({
+    content: `
+      html, body, #root {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        overflow: hidden !important;
+      }
+    `,
+  });
+  const component = await mount(shellFixture(outlet, "today", "today", workspaceAccountLabel));
+  await page.evaluate(() => document.fonts.ready);
+  await expectReducedMotion(page);
+  await expectNoHorizontalOverflow(page);
+  return component;
+}
+
+test("space menu keeps platform and club choices inside the production shell", async ({ mount, page }, testInfo: TestInfo) => {
+  test.setTimeout(90_000);
+  const component = await mountApprovedShell(mount, page, <TodayLedgerCtNode fixture={todayDesktopLedger} />);
 
   await component.getByRole("button", { name: "공간 전환, 현재 플랫폼 운영" }).click();
   const menu = component.getByRole("menu", { name: "ReadMates 공간 전환" });
-  await expect(menu.getByRole("menuitemradio", { name: "플랫폼 운영" })).toHaveAttribute("aria-checked", "true");
-  await expect(menu.getByRole("menuitem", { name: "내 클럽" })).toBeVisible();
+  const platform = menu.getByRole("menuitemradio", { name: "플랫폼 운영" });
+  const clubs = menu.getByRole("menuitem", { name: "내 클럽" });
+  await expect(platform).toHaveAttribute("aria-checked", "true");
+  await expect(clubs).toBeVisible();
   await expect(menu).not.toContainText(/OWNER|OPERATOR|SUPPORT|ACTIVE|SUSPENDED/);
-  await expectMinimumTargetSize(menu.getByRole("menuitemradio", { name: "플랫폼 운영" }));
-  await expectMinimumTargetSize(menu.getByRole("menuitem", { name: "내 클럽" }));
+  await expect(menu.getByText("현재 범위", { exact: true }).first()).toBeVisible();
+  await expect(menu.getByText("이동할 범위")).toBeVisible();
+  await expect(component.getByText("김운영")).toBeVisible();
+  await expect(component.locator(".admin-shell__account-action-short")).toHaveText("계정");
+  await expect(component.locator(".admin-shell__account-control")).toBeVisible();
+  await expectMinimumTargetSize(platform);
+  await expectMinimumTargetSize(clubs);
   await expectNoHorizontalOverflow(page);
-  await expect(component).toHaveScreenshot("admin-shell-space-menu-1440.png");
+
+  const regions = [
+    await regionFromLocator(component.locator(".admin-shell__header"), "header", HEADER_DESKTOP_GEOMETRY, 4),
+    await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4),
+    await regionFromLocator(component.locator(".rm-global-space-switcher__trigger"), "switcher", { x: 188, y: 19, width: 160, height: 48 }, 2),
+    await regionFromLocator(component.locator(".rm-global-space-switcher__menu"), "menu", { x: 188, y: 75, width: 360, height: 244 }, 4),
+    await regionFromLocator(component.locator(".admin-shell__account-control"), "account", { x: 1555, y: 21, width: 83, height: 44 }, 4),
+  ];
+  await captureApprovedComparison({
+    entry: approvedMockup("admin-space-switcher-desktop"),
+    candidate: page.locator("#root"),
+    page,
+    testInfo,
+    regions,
+    allowFontRasterException: true,
+  });
+
+  await platform.press("ArrowDown");
+  await expect(clubs).toBeFocused();
+  await clubs.press("Enter");
+  const member = component.getByRole("menuitemradio", { name: "읽는사이 멤버로 보기" });
+  const host = component.getByRole("menuitemradio", { name: "읽는사이 호스트로 운영" });
+  await expect(member).toBeVisible();
+  await expect(host).toBeVisible();
+  await member.press("ArrowDown");
+  await expect(host).toBeFocused();
+  await host.press("Escape");
+  await expect(platform).toBeVisible();
+  await expect(clubs).toBeVisible();
+  await clubs.press("Escape");
+  await expect(component.getByRole("button", { name: "공간 전환, 현재 플랫폼 운영" })).toBeFocused();
 });
 
 test("390 mobile shell keeps all four destinations thumb-sized without horizontal overflow", async ({ mount, page }) => {

@@ -11,6 +11,7 @@ export type AdminNavigationLinkRenderProps = {
   href: string;
   className: string;
   ariaCurrent?: "page";
+  ariaLabel?: string;
   style?: CSSProperties;
   children: ReactNode;
 };
@@ -25,12 +26,16 @@ export function AdminLayoutNav({
   renderLink,
   ariaLabel = "플랫폼 관리 메뉴",
   todayCount = null,
+  accountBusy = false,
+  onLogout,
 }: {
   capabilities: PlatformAdminCapabilities | null | undefined;
   currentOwner: AdminRouteOwner | null;
   renderLink: AdminNavigationLinkRenderer;
   ariaLabel?: string;
   todayCount?: number | null;
+  accountBusy?: boolean;
+  onLogout?: () => void;
 }) {
   const compact = useAdminShellCompactLayout();
   const { areas, pinned } = useMemo(() => visibleAdminNav(capabilities), [capabilities]);
@@ -43,6 +48,7 @@ export function AdminLayoutNav({
       aria-label={ariaLabel}
       data-layout={compact ? "compact" : "wide"}
     >
+      <p className="admin-layout-nav__eyebrow">운영</p>
       {areas.length > 0 ? (
         <ul className="admin-layout-nav__areas">
           {areas.map((area) => {
@@ -83,6 +89,17 @@ export function AdminLayoutNav({
           ))}
         </ul>
       ) : null}
+      {onLogout ? (
+        <button
+          type="button"
+          className="admin-layout-nav__logout"
+          aria-label={accountBusy ? "로그아웃 중" : "다른 계정으로 로그인"}
+          disabled={accountBusy}
+          onClick={onLogout}
+        />
+      ) : (
+        <span className="admin-layout-nav__logout" aria-hidden="true" />
+      )}
     </nav>
   );
 }

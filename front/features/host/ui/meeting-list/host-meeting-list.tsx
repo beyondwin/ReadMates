@@ -82,6 +82,45 @@ function calendarMonthLabel(month: string) {
   return match ? `${Number(match[1])}년 ${Number(match[2])}월` : month;
 }
 
+function thisMonthKey(now = new Date()) {
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+function ThisMonthRail({
+  sections,
+  LinkComponent,
+}: {
+  sections: HostMeetingTocSections;
+  LinkComponent: HostLinkComponent;
+}) {
+  const month = thisMonthKey();
+  const rows = [
+    ...sections.upcoming.rows,
+    ...sections.past.rows,
+  ].filter((row) => row.date.startsWith(month));
+
+  return (
+    <aside className="rm-meeting-toc__rail" aria-labelledby="this-month-title">
+      <h2 id="this-month-title">이번 달</h2>
+      <p className="small">{`${Number(month.slice(5))}월`}</p>
+      {rows.length === 0 ? (
+        <p className="small rm-meeting-toc__section-empty">이번 달 모임이 없습니다.</p>
+      ) : (
+        <ol className="rm-meeting-toc__list" aria-label="이번 달 모임">
+          {rows.map((row) => (
+            <li key={row.id} className="rm-meeting-toc__row">
+              <time className="mono" dateTime={row.date}>{row.date}</time>
+              <LinkComponent to={row.href} className="rm-meeting-toc__title">{row.ordinalFolio} · {row.title}</LinkComponent>
+            </li>
+          ))}
+        </ol>
+      )}
+    </aside>
+  );
+}
+
 function CalendarView({
   sections,
   loadingMoreUpcoming,
@@ -246,10 +285,10 @@ export function HostMeetingList({
                 tabIndex={-1}
                 className="h1 editorial rm-meeting-toc__heading"
               >
-                모임
+                일정과 모임
               </h1>
               <p className="small rm-meeting-toc__lede">
-                다가오는 모임과 지난 모임을 차례로 확인합니다.
+                다가오는 일정과 지난 모임을 한 흐름에서 관리하세요.
               </p>
             </div>
             {showCreate ? (
@@ -296,48 +335,53 @@ export function HostMeetingList({
               첫 모임 만들기
             </LinkComponent>
           </div>
-        ) : view === "calendar" ? (
-          <CalendarView
-            sections={sections}
-            loadingMoreUpcoming={loadingMoreUpcoming}
-            loadingMorePast={loadingMorePast}
-            onLoadMoreUpcoming={onLoadMoreUpcoming}
-            onLoadMorePast={onLoadMorePast}
-            errorMessage={errorMessage}
-            pastErrorMessage={pastErrorMessage}
-            onRetry={onRetry}
-            onRetryPast={onRetryPast}
-            LinkComponent={LinkComponent}
-          />
         ) : (
-          <div role="tabpanel" aria-label="목록" className="rm-meeting-toc__list-panel">
-            <TocSection
-              title="다가오는 모임"
-              rows={sections.upcoming.rows}
-              nextCursor={sections.upcoming.nextCursor}
-              loadingMore={loadingMoreUpcoming}
-              onLoadMore={onLoadMoreUpcoming}
-              emptyCopy="다가오는 모임이 없습니다."
-              errorMessage={errorMessage}
-              onRetry={onRetry}
-              LinkComponent={LinkComponent}
-            />
-            <TocSection
-              title="지난 모임"
-              rows={sections.past.rows}
-              nextCursor={sections.past.nextCursor}
-              loadingMore={loadingMorePast}
-              onLoadMore={onLoadMorePast}
-              emptyCopy="지난 모임이 없습니다."
-              errorMessage={pastErrorMessage}
-              onRetry={onRetryPast}
-              LinkComponent={LinkComponent}
-            />
-            <div className="rm-meeting-toc__foot">
-              <LinkComponent to={trashHref} className="btn btn-quiet btn-sm rm-meeting-toc__trash">
-                휴지통
-              </LinkComponent>
-            </div>
+          <div className="rm-meeting-toc__layout">
+            {view === "calendar" ? (
+              <CalendarView
+                sections={sections}
+                loadingMoreUpcoming={loadingMoreUpcoming}
+                loadingMorePast={loadingMorePast}
+                onLoadMoreUpcoming={onLoadMoreUpcoming}
+                onLoadMorePast={onLoadMorePast}
+                errorMessage={errorMessage}
+                pastErrorMessage={pastErrorMessage}
+                onRetry={onRetry}
+                onRetryPast={onRetryPast}
+                LinkComponent={LinkComponent}
+              />
+            ) : (
+              <div role="tabpanel" aria-label="목록" className="rm-meeting-toc__list-panel">
+                <TocSection
+                  title="다가오는 모임"
+                  rows={sections.upcoming.rows}
+                  nextCursor={sections.upcoming.nextCursor}
+                  loadingMore={loadingMoreUpcoming}
+                  onLoadMore={onLoadMoreUpcoming}
+                  emptyCopy="다가오는 모임이 없습니다."
+                  errorMessage={errorMessage}
+                  onRetry={onRetry}
+                  LinkComponent={LinkComponent}
+                />
+                <TocSection
+                  title="지난 모임"
+                  rows={sections.past.rows}
+                  nextCursor={sections.past.nextCursor}
+                  loadingMore={loadingMorePast}
+                  onLoadMore={onLoadMorePast}
+                  emptyCopy="지난 모임이 없습니다."
+                  errorMessage={pastErrorMessage}
+                  onRetry={onRetryPast}
+                  LinkComponent={LinkComponent}
+                />
+                <div className="rm-meeting-toc__foot">
+                  <LinkComponent to={trashHref} className="btn btn-quiet btn-sm rm-meeting-toc__trash">
+                    휴지통
+                  </LinkComponent>
+                </div>
+              </div>
+            )}
+            <ThisMonthRail sections={sections} LinkComponent={LinkComponent} />
           </div>
         )}
       </section>

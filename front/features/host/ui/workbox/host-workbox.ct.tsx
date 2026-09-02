@@ -73,6 +73,7 @@ for (const viewport of [
       if (viewport.width === 1440) {
         expect(Math.abs((primary!.width / (primary!.width + workbox!.width)) - 0.68)).toBeLessThan(0.04);
         expect(workbox!.x).toBeGreaterThan(primary!.x);
+        expect(workbox!.width).toBeGreaterThanOrEqual(360);
       } else {
         expect(workbox!.y).toBeGreaterThanOrEqual(primary!.y + primary!.height);
       }
@@ -83,6 +84,17 @@ for (const viewport of [
       const firstTab = component.getByRole("tab", { name: /지금/ });
       await firstTab.focus();
       await expectVisibleFocus(firstTab);
+
+      const row = component.getByRole("listitem", { name: /일정 확인이 필요한 멤버/ });
+      const details = row.locator("details.rm-host-work-item__secondary");
+      await expect(details).not.toHaveAttribute("open");
+      await expect(row.getByRole("combobox", { name: /보류 기간/ })).toHaveCount(0);
+      await expect(row.getByRole("button", { name: /보류$/ })).toHaveCount(0);
+      await expect(row.getByRole("link", { name: "일정 확인이 필요한 멤버" })).toBeVisible();
+      await row.getByText("세부 조작").click();
+      await expect(details).toHaveAttribute("open");
+      await expectMinimumTargetSize(row.getByRole("combobox", { name: /보류 기간/ }));
+      await expectMinimumTargetSize(row.getByRole("button", { name: /보류$/ }));
     });
   });
 }

@@ -31,6 +31,11 @@ export function AdminAlarmBar({
       role={announce ? "status" : undefined}
       aria-busy={state === "loading" || undefined}
     >
+      {showLive && summary?.serviceState === "ok" ? (
+        <span className="admin-alarm-bar__banner">
+          서비스는 정상이며, 확인할 일이 {attentionCount}건 있습니다.
+        </span>
+      ) : null}
       {showLive ? (
         <span className="admin-alarm-bar__live">
           {`${ADMIN_COPY.alarm.attention} ${attentionCount}건`}

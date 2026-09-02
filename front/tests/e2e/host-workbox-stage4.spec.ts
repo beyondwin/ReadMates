@@ -258,11 +258,17 @@ test("authoritative workbox key survives defer, expiry and source-owned completi
 
   const row = page.getByRole("listitem", { name: "가입 승인 요청" });
   await expect(row).toBeVisible();
+  await expect(row.locator("details.rm-host-work-item__secondary")).not.toHaveAttribute("open");
+  await expect(row.getByRole("button", { name: "가입 승인 요청 보류" })).toHaveCount(0);
+  await row.getByText("세부 조작").click();
+  await expect(row.locator("details.rm-host-work-item__secondary")).toHaveAttribute("open");
+  const defer = row.getByRole("button", { name: "가입 승인 요청 보류" });
+  await expect(defer).toBeVisible();
   const deferralResponse = page.waitForResponse((response) => (
     response.request().method() === "PUT"
       && response.url().includes(`/api/host/workbox/items/${encodeURIComponent(authoritativeKey)}/deferral`)
   ));
-  await row.getByRole("button", { name: "가입 승인 요청 보류" }).click();
+  await defer.click();
   const deferred = await deferralResponse;
   expect(deferred.status()).toBe(200);
   expect(deferred.request().postDataJSON()).toMatchObject({ deferredUntil: expect.any(String) });
@@ -298,6 +304,8 @@ where club_id = ${sqlString(CLUB_ID)}
       receiptSummary: expect.objectContaining({ operation: "APPROVED" }),
     }),
   ]));
+  const completedRow = page.getByRole("listitem", { name: "가입 승인 요청" });
+  await completedRow.getByText("세부 조작").click();
   await expect(page.getByText("서버가 기록한 완료 결과")).toBeVisible();
 
   await page.goto(`${HOST_PATH}/people/${VIEWER_MEMBERSHIP_ID}`);
@@ -312,6 +320,41 @@ where club_id = ${sqlString(CLUB_ID)}
     return response.status;
   }, { membershipId: VIEWER_MEMBERSHIP_ID, clubSlug: OTHER_CLUB_SLUG });
   expect(crossClubStatus).toBe(403);
+});
+
+test("prep live and closing stay on the seeded current meeting", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 960 });
+  runMysql(`
+update sessions
+set session_date = utc_date()
+where id = ${sqlString(OPEN_SESSION_ID)};
+`);
+  ({ sessionId: authSessionId } = await loginWithGoogleFixture(page, "host@example.com"));
+  await page.goto(`${HOST_PATH}?phase=prep`);
+  const currentMeeting = page.getByRole("group", { name: "현재 모임" });
+  await expect(currentMeeting).toBeVisible();
+  await expect(page.getByRole("heading", { name: "일정 알림 합성 모임" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "모임 운영 단계" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /준비실/ })).toHaveAttribute("aria-selected", "true");
+
+  const liveTab = page.getByRole("tab", { name: /현장/ });
+  await expect(liveTab).toBeVisible();
+  await liveTab.click();
+  await expect(page).toHaveURL(/phase=live/);
+  await expect(currentMeeting).toBeVisible();
+  await expect(page.getByRole("tab", { name: /현장/ })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tabpanel", { name: /현장 운영/ })).toBeVisible();
+
+  const closingTab = page.getByRole("tab", { name: /마감실/ });
+  await expect(closingTab).toBeVisible();
+  await expect(closingTab).toHaveAttribute("aria-disabled", "true");
+
+  await page.getByRole("tab", { name: /준비실/ }).click();
+  await expect(page).toHaveURL(/phase=prep/);
+  await expect(currentMeeting).toBeVisible();
+  await expect(page.getByRole("tab", { name: /준비실/ })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tabpanel", { name: /준비실 운영/ })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
 });
 
 test("schedule review fails closed for drafts, requires preview, and keeps an unknown receipt without resend", async ({ page }) => {
@@ -353,7 +396,7 @@ test("schedule review fails closed for drafts, requires preview, and keeps an un
   ));
   await page.getByRole("button", { name: "알림 미리보기" }).click();
   expect((await previewResponse).status()).toBe(200);
-  await expect(page.getByRole("button", { name: "1명에게 알림 발송" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "1명에게 안내 보내기" })).toBeVisible();
   expect(previewRequests).toBe(1);
   expect(confirmRequests).toBe(0);
 
@@ -366,14 +409,14 @@ where id = ${sqlString(OPEN_SESSION_ID)} and club_id = ${sqlString(CLUB_ID)};
     response.request().method() === "POST"
       && new URL(response.url()).pathname.endsWith("/api/host/notifications/manual")
   ));
-  await page.getByRole("button", { name: "1명에게 알림 발송" }).click();
+  await page.getByRole("button", { name: "1명에게 안내 보내기" }).click();
   expect((await conflictResponse).status()).toBe(409);
   await expect(page.getByRole("alert")).toContainText("일정 또는 수신 대상이 변경");
   expect(confirmRequests).toBe(1);
 
   await expect(page.getByText("일정 3판")).toBeVisible();
   await page.getByRole("button", { name: "알림 미리보기" }).click();
-  await expect(page.getByRole("button", { name: "1명에게 알림 발송" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "1명에게 안내 보내기" })).toBeVisible();
 
   await page.route("**/api/bff/api/host/notifications/manual?**", async (route) => {
     if (route.request().method() === "POST") {
@@ -384,7 +427,7 @@ where id = ${sqlString(OPEN_SESSION_ID)} and club_id = ${sqlString(CLUB_ID)};
     }
     await route.continue();
   });
-  await page.getByRole("button", { name: "1명에게 알림 발송" }).click();
+  await page.getByRole("button", { name: "1명에게 안내 보내기" }).click();
   const unknownReceipt = page.getByRole("status", { name: "일정 알림 · 결과 확인 필요" });
   await expect(unknownReceipt).toBeVisible();
   await expect(unknownReceipt).toContainText("같은 알림을 다시 보내지 말고");

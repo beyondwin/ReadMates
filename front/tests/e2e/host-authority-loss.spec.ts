@@ -387,6 +387,9 @@ test("revoked authority cancels in-flight host work and cannot resurrect a meeti
   const failure = await triggerSecurityFailure(page);
   expect(failure).toMatchObject({ code: "HOST_AUTHORITY_REVOKED", name: "ReadmatesApiError" });
   await expectSafeReplacement(page, /호스트 권한이 해제/);
+  await expect(page.getByRole("group", { name: "현재 모임" })).toHaveCount(0);
+  await expect(page.getByRole("complementary", { name: "클럽 작업함" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /보류/ })).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
   expect(await expectNoSeriousAccessibilityFindings(page)).toEqual([]);
   expect(participantSeenFact(seenSessionId)).toBe(seenFactBeforeDowngrade);

@@ -92,7 +92,7 @@ describe("ManualNotificationPreviewConfirmation", () => {
     );
 
     expect(screen.getByRole("alert")).toHaveTextContent("발송을 요청하지 못했습니다");
-    expect(screen.getByRole("button", { name: /명에게 알림 발송/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /명에게 안내 보내기/ })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "미리보기 다시 만들기" }));
     expect(onRefreshPreview).toHaveBeenCalledTimes(1);
   });
@@ -102,7 +102,7 @@ describe("ManualNotificationPreviewConfirmation", () => {
     const onConfirm = vi.fn();
     renderPreview({ preview: duplicatePreview, onConfirm });
 
-    const send = screen.getByRole("button", { name: /명에게 알림 발송/ });
+    const send = screen.getByRole("button", { name: /명에게 안내 보내기/ });
     expect(send).toBeDisabled();
     await user.click(screen.getByRole("checkbox", { name: "재발송을 확인했습니다" }));
     await user.click(send);
@@ -124,7 +124,7 @@ describe("ManualNotificationPreviewConfirmation", () => {
     await user.click(
       screen.getByRole("checkbox", { name: "재발송을 확인했습니다" }),
     );
-    expect(screen.getByRole("button", { name: /명에게 알림 발송/ }))
+    expect(screen.getByRole("button", { name: /명에게 안내 보내기/ }))
       .toBeEnabled();
 
     rerender(
@@ -138,7 +138,7 @@ describe("ManualNotificationPreviewConfirmation", () => {
 
     expect(screen.getByRole("checkbox", { name: "재발송을 확인했습니다" }))
       .not.toBeChecked();
-    expect(screen.getByRole("button", { name: /명에게 알림 발송/ }))
+    expect(screen.getByRole("button", { name: /명에게 안내 보내기/ }))
       .toBeDisabled();
   });
 });

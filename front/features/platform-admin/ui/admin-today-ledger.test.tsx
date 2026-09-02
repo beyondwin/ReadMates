@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState, type ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
@@ -236,10 +236,12 @@ describe("AdminTodayLedger", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("region", { name: "오늘의 운영 케이스" })).toHaveClass("admin-page-frame");
-    expect(screen.getByRole("heading", { name: "오늘의 운영 케이스" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "오늘 할 일" })).toHaveClass("admin-page-frame");
+    expect(screen.getByRole("heading", { level: 1, name: "오늘 할 일" })).toBeVisible();
     expect(screen.getByLabelText("운영 케이스 요약")).toHaveTextContent("활성 0건 · 긴급 0건 · 내 담당 0건");
-    expect(screen.getByRole("combobox", { name: "상태 필터" })).toBeInTheDocument();
+    const emptySecondary = screen.getByText("필터와 신호 상태").closest("details")!;
+    expect(emptySecondary).not.toHaveAttribute("open");
+    expect(within(emptySecondary).getByRole("combobox", { name: "상태 필터", hidden: true })).toBeInTheDocument();
     expect(screen.getByText("지금은 처리할 운영 케이스가 없습니다")).toBeInTheDocument();
     expect(screen.getByText("새로운 신호가 생기면 여기에 나타납니다.")).toBeInTheDocument();
     expect(screen.queryByText("현재 조건에 맞는 운영 케이스가 없습니다.")).not.toBeInTheDocument();
@@ -249,14 +251,110 @@ describe("AdminTodayLedger", () => {
     expect(screen.queryByRole("region", { name: "운영 케이스 큐" })).not.toBeInTheDocument();
   });
 
+  it("puts the first task before collapsed secondary controls", () => {
+    render(
+      <MemoryRouter>
+        <AdminTodayLedger
+          view={populatedView()}
+          filters={{ state: "", severity: "", source: "", assignee: "" }}
+          history={[]}
+          lifecycleControls={null}
+          onFilterChange={vi.fn()}
+          onSelectCase={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("heading", { level: 1, name: "오늘 할 일" })).toBeVisible();
+    const queue = screen.getByRole("region", { name: "운영 케이스 큐" });
+    const firstTask = within(queue).getAllByRole("button")[0];
+    const secondary = within(queue).getByText("필터와 신호 상태").closest("details")!;
+    expect(firstTask.compareDocumentPosition(secondary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(secondary).not.toHaveAttribute("open");
+    expect(within(secondary).getByRole("combobox", { name: "상태 필터", hidden: true })).not.toBeVisible();
+  });
+
+  it("keeps filter and source retry callbacks after opening secondary controls", async () => {
+    const user = userEvent.setup();
+    const onFilterChange = vi.fn();
+    const onRetrySource = vi.fn();
+    const selectedCase = operationCase();
+    const view: AdminOperationsView = {
+      ...populatedView(selectedCase),
+      allSourcesAvailable: false,
+      sourceStatusLabel: "일부 신호 확인 불가",
+      sources: [
+        {
+          ...selectedCase.source,
+          sourceLabel: "알림",
+          statusLabel: "정상",
+          message: "정상 · 19:00 기준",
+          canRetry: false,
+        },
+        unavailableAiJob,
+      ],
+    };
+
+    render(
+      <MemoryRouter>
+        <AdminTodayLedger
+          view={view}
+          filters={{ state: "", severity: "", source: "", assignee: "" }}
+          history={[]}
+          lifecycleControls={null}
+          onFilterChange={onFilterChange}
+          onSelectCase={vi.fn()}
+          onRetrySource={onRetrySource}
+        />
+      </MemoryRouter>,
+    );
+
+    const queue = screen.getByRole("region", { name: "운영 케이스 큐" });
+    const secondary = within(queue).getByText("필터와 신호 상태").closest("details")!;
+    await user.click(within(secondary).getByText("필터와 신호 상태"));
+    await user.selectOptions(within(secondary).getByRole("combobox", { name: "상태 필터" }), "open");
+    expect(onFilterChange).toHaveBeenCalledWith("state", "open");
+
+    await user.click(within(secondary).getByRole("button", { name: "AI 작업 다시 확인" }));
+    expect(onRetrySource).toHaveBeenCalledTimes(1);
+    expect(onRetrySource).toHaveBeenCalledWith("AI_JOB");
+  });
+
   it("distinguishes a filtered empty queue from a true empty queue", async () => {
     const user = userEvent.setup();
     const onClearFilters = vi.fn();
-    render(
+    const renderEmptyFiltered = (refreshing = false) => (
       <MemoryRouter>
         <AdminTodayLedger
           view={emptyView}
           filters={{ state: "open", severity: "", source: "", assignee: "" }}
+          history={[]}
+          lifecycleControls={null}
+          refreshing={refreshing}
+          onFilterChange={vi.fn()}
+          onSelectCase={vi.fn()}
+          onClearFilters={onClearFilters}
+        />
+      </MemoryRouter>
+    );
+    const { rerender } = render(renderEmptyFiltered());
+
+    expect(screen.getByText("조건에 맞는 운영 케이스가 없습니다")).toBeInTheDocument();
+    expect(screen.getByText("필터를 바꾸면 다른 케이스를 볼 수 있습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("지금은 처리할 운영 케이스가 없습니다")).not.toBeInTheDocument();
+    const secondary = screen.getByText("필터와 신호 상태").closest("details")!;
+    expect(secondary).toHaveAttribute("open");
+
+    await user.click(screen.getByText("필터와 신호 상태"));
+    expect(secondary).not.toHaveAttribute("open");
+    rerender(renderEmptyFiltered(true));
+    expect(screen.getByText("필터와 신호 상태").closest("details")).not.toHaveAttribute("open");
+
+    rerender(
+      <MemoryRouter>
+        <AdminTodayLedger
+          view={emptyView}
+          filters={{ state: "", severity: "", source: "", assignee: "" }}
           history={[]}
           lifecycleControls={null}
           onFilterChange={vi.fn()}
@@ -265,10 +363,9 @@ describe("AdminTodayLedger", () => {
         />
       </MemoryRouter>,
     );
+    rerender(renderEmptyFiltered());
+    expect(screen.getByText("필터와 신호 상태").closest("details")).not.toHaveAttribute("open");
 
-    expect(screen.getByText("조건에 맞는 운영 케이스가 없습니다")).toBeInTheDocument();
-    expect(screen.getByText("필터를 바꾸면 다른 케이스를 볼 수 있습니다.")).toBeInTheDocument();
-    expect(screen.queryByText("지금은 처리할 운영 케이스가 없습니다")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "필터 지우기" }));
     expect(onClearFilters).toHaveBeenCalledTimes(1);
   });
@@ -454,10 +551,11 @@ describe("AdminTodayLedger", () => {
     expect(screen.getByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toHaveClass("admin-case-docket");
     expect(container.querySelector(".admin-receipt-timeline")).toBeNull();
-    expect(screen.getByRole("button", { name: "오늘의 브리핑 0" })).toHaveAttribute("aria-pressed", "true");
-    const queueHeading = screen.getByRole("heading", { name: "오늘 할 일" });
-    const controls = screen.getByRole("group", { name: "작업 보기" });
-    expect(queueHeading.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("button", { name: "오늘의 브리핑 0", hidden: true })).toHaveAttribute("aria-pressed", "true");
+    const queue = screen.getByRole("region", { name: "운영 케이스 큐" });
+    const queueHeading = within(queue).getByRole("heading", { name: "오늘 할 일" });
+    const secondary = within(queue).getByText("필터와 신호 상태").closest("details")!;
+    expect(queueHeading.compareDocumentPosition(secondary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(findNestedLiveRegions(container)).toEqual([]);
   });
 
@@ -621,10 +719,11 @@ describe("AdminTodayLedger", () => {
     expect(screen.getAllByText("일부 신호 확인 불가").length).toBeGreaterThan(0);
     expect(screen.getByText("일부 확인 불가 · 마지막 정상 18:40")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /알림 전달 실패/ })).toBeEnabled();
+
+    await user.click(screen.getByText("필터와 신호 상태"));
     expect(screen.queryByRole("button", { name: "알림 다시 확인" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "클럽 준비 다시 확인" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "모임 마감 다시 확인" })).not.toBeInTheDocument();
-
     await user.click(screen.getByRole("button", { name: "AI 작업 다시 확인" }));
 
     expect(onRetrySource).toHaveBeenCalledTimes(1);
@@ -709,6 +808,7 @@ describe("AdminTodayLedger", () => {
 
     await user.click(screen.getByRole("button", { name: "배경 갱신" }));
 
+    await user.click(screen.getByText("필터와 신호 상태"));
     expect(screen.getByRole("status")).toHaveTextContent("새 신호 확인 중");
     expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toHaveTextContent("영향 3건");
     expect(screen.getByRole("combobox", { name: "심각도 필터" })).toHaveValue("warning");

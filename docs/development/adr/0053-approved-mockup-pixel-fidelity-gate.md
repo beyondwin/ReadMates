@@ -5,7 +5,7 @@
 - 작성자: product/design/front
 - 관련: ADR-0045, ADR-0048, ADR-0050, ADR-0051, `docs/superpowers/specs/2026-09-02-admin-host-pixel-fidelity-design.md`, `front/DESIGN.md`
 
-> 제품 구성은 ADR-0048·0050을 유지한다. 이 ADR은 승인 PNG를 참고 자산으로만 보고 구현 snapshot을 최종 회귀 권위로 삼던 검증 해석을 좁힌다. 아직 코드·테스트·active design docs가 이 계약과 일치하지 않으므로 `Proposed`다.
+> 제품 구성은 ADR-0048·0050을 유지한다. 이 ADR은 승인 PNG를 참고 자산으로만 보고 구현 snapshot을 최종 회귀 권위로 삼던 검증 해석을 좁힌다. 독립 시각 검토(16/18 FAIL)와 사람 30초 gate가 남아 `Proposed`다.
 
 ## 컨텍스트
 
@@ -64,7 +64,9 @@ Token, shared CSS/component, fixture 또는 baseline 변경은 영향 reference�
 
 ## 검증
 
-`Proposed` 단계에서는 승인 설계와 현재 drift 근거만 확인했다. 구현 후 다음 조건이 모두 충족될 때 `Accepted`로 승격한다.
+`Proposed`를 유지한다. 비교 harness와 18-entry manifest는 구현됐지만 `docs/reports/2026-09-02-admin-host-pixel-fidelity-acceptance.md` 기준 독립 시각 검토는 16/18 FAIL이고 사람 30초 gate는 `pending_external_human_evidence`다. 이 조건이 닫히기 전에는 `Accepted`로 올리지 않는다.
+
+구현 후 다음 조건이 모두 충족될 때 `Accepted`로 승격한다.
 
 - Admin·Host approved asset hash와 deterministic fixture manifest를 추적한다.
 - Focused RED tests가 heading, queue-first, default disclosure, first-viewport, 68:32, mobile single-action 계약을 먼저 실패한 뒤 구현 후 통과한다.

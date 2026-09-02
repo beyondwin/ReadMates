@@ -558,7 +558,7 @@ test("host edits a same-club member display name and sees the row update", async
 
   await page.goto("/app/host/members");
 
-  await expect(page.getByRole("heading", { name: "멤버 관리", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "사람", level: 1 })).toBeVisible();
   await page.getByRole("tab", { name: "활성 멤버" }).click();
 
   const memberRow = page.getByRole("row").filter({ has: page.getByRole("heading", { name: "멤버4" }) });

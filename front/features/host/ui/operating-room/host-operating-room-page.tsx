@@ -24,6 +24,10 @@ export type AttendanceRecoveryView =
       historyHref: string;
     };
 
+const DefaultLink: HostLinkComponent = ({ to, children, ...props }) => (
+  <a {...props} href={to}>{children}</a>
+);
+
 export type HostOperatingRoomPageProps = {
   view: HostOperatingRoomView;
   dDayLabel: string | null;
@@ -69,7 +73,7 @@ export function HostOperatingRoomPage({
   onRetryOptional,
   nextActionPending,
   onDeferNextAction,
-  LinkComponent,
+  LinkComponent = DefaultLink,
 }: HostOperatingRoomPageProps) {
   if (!view.meeting || !headerLinks) {
     return (
@@ -92,7 +96,7 @@ export function HostOperatingRoomPage({
   }
 
   return (
-    <main className="rm-host-operating-room">
+    <main className="rm-host-operating-room" data-phase={view.phase}>
       <CurrentMeetingHeader
         meeting={view.meeting}
         dDayLabel={dDayLabel}

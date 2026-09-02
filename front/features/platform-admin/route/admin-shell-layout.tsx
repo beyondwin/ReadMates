@@ -55,12 +55,12 @@ export function AdminShellLayout({
         본문으로 건너뛰기
       </a>
       <header className="admin-shell__header">
-        <span className="admin-shell__wordmark">ReadMates · 운영</span>
+        <span className="admin-shell__wordmark">ReadMates</span>
+        <div key={spaceControlEpoch} className="admin-shell__space-control">
+          {spaceSwitcher}
+        </div>
         <AdminBreadcrumb routePath={routePath} extra={breadcrumbExtra} />
         <div className="admin-shell__header-actions">
-          <div key={spaceControlEpoch} className="admin-shell__space-control">
-            {spaceSwitcher}
-          </div>
           <div className="admin-shell__account-control">
             <span className="admin-shell__account-label">{workspaceAccountLabel}</span>
             <button
@@ -69,7 +69,10 @@ export function AdminShellLayout({
               disabled={accountBusy}
               onClick={onOtherAccountLogin}
             >
-              {accountBusy ? "로그아웃 중" : "다른 계정으로 로그인"}
+              <span className="admin-shell__account-action-label">
+                {accountBusy ? "로그아웃 중" : "다른 계정으로 로그인"}
+              </span>
+              <span className="admin-shell__account-action-short">계정</span>
             </button>
             {accountError ? <p role="alert">{accountError}</p> : null}
           </div>
@@ -83,6 +86,8 @@ export function AdminShellLayout({
             renderLink={renderAdminNavigationLink}
             ariaLabel="Admin 콘솔"
             todayCount={alarm.summary?.attention.count ?? null}
+            accountBusy={accountBusy}
+            onLogout={onOtherAccountLogin}
           />
         </aside>
         <main id="admin-main" className="admin-shell__main" tabIndex={-1}>
@@ -104,11 +109,12 @@ function renderAdminNavigationLink({
   href,
   className,
   ariaCurrent,
+  ariaLabel,
   style,
   children,
 }: AdminNavigationLinkRenderProps) {
   return (
-    <Link to={href} className={className} aria-current={ariaCurrent} style={style}>
+    <Link to={href} className={className} aria-current={ariaCurrent} aria-label={ariaLabel} style={style}>
       {children}
     </Link>
   );

@@ -134,4 +134,71 @@ describe("MeetingResponseLedger", () => {
     );
     expect(screen.getByRole("button", { name: "되돌리기" })).toBeVisible();
   });
+
+  it("attendanceBoard paints a 3-button actual-attendance group with bulk, save, and undo copy", async () => {
+    const user = userEvent.setup();
+    const onAttendanceChange = vi.fn();
+    const onBulkAttendanceChange = vi.fn();
+    const pendingUndo: WorkspacePendingUndo = {
+      description: "출석 8명 저장됨",
+      onUndo: vi.fn(),
+      onOpenHistory: vi.fn(),
+      onDismiss: vi.fn(),
+    };
+
+    const { rerender } = render(
+      <MeetingResponseLedger
+        presentation="attendanceBoard"
+        agendaHref="/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=agenda"
+        rows={meetingDayRows}
+        onAttendanceChange={onAttendanceChange}
+        onBulkAttendanceChange={onBulkAttendanceChange}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "출석 확인" })).toBeVisible();
+    expect(screen.getByText("참석 응답과 실제 출석은 별개로 기록해요.")).toBeVisible();
+    expect(screen.getByText("실제 출석 1 / 4 · 확인 필요 2")).toBeVisible();
+    expect(screen.getByRole("link", { name: "진행 순서 보기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=agenda",
+    );
+    expect(screen.getAllByText("참석 응답").length).toBeGreaterThan(0);
+    expect(screen.getByText("미정 응답")).toBeVisible();
+    expect(screen.getByText("불참 응답")).toBeVisible();
+    expect(screen.queryByRole("group", { name: "출석 필터" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+
+    const pendingGroup = screen.getByRole("group", { name: "지후 실제 출석" });
+    expect(within(pendingGroup).getByRole("button", { name: "지후 참석" })).toHaveAttribute("aria-pressed", "false");
+    expect(within(pendingGroup).getByRole("button", { name: "지후 불참" })).toHaveAttribute("aria-pressed", "false");
+    expect(within(pendingGroup).getByRole("button", { name: "지후 미확인" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(within(pendingGroup).getByRole("button", { name: "지후 참석" }));
+    expect(onAttendanceChange).toHaveBeenCalledWith("pending-1", "ATTENDED");
+    await user.click(within(pendingGroup).getByRole("button", { name: "지후 불참" }));
+    expect(onAttendanceChange).toHaveBeenCalledWith("pending-1", "ABSENT");
+
+    const arrivedGroup = screen.getByRole("group", { name: "서연 실제 출석" });
+    expect(within(arrivedGroup).getByRole("button", { name: "서연 참석" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(within(arrivedGroup).getByRole("button", { name: "서연 참석" }));
+    expect(onAttendanceChange).not.toHaveBeenCalledWith("arrived-1", "ATTENDED");
+
+    await user.click(screen.getByRole("button", { name: "나머지 2명 모두 참석으로 표시" }));
+    expect(onBulkAttendanceChange).toHaveBeenCalledWith(["pending-1", "pending-2"], "ATTENDED");
+    expect(onBulkAttendanceChange.mock.calls[0]?.[0]).not.toContain("absent-1");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("선택하면 바로 저장돼요.")).toBeVisible();
+
+    rerender(
+      <MeetingResponseLedger
+        presentation="attendanceBoard"
+        rows={meetingDayRows}
+        onAttendanceChange={onAttendanceChange}
+        onBulkAttendanceChange={onBulkAttendanceChange}
+        pendingUndo={pendingUndo}
+      />,
+    );
+    expect(screen.getByText("출석 8명 저장됨")).toBeVisible();
+    expect(screen.getByRole("button", { name: "실행 취소" })).toBeVisible();
+  });
 });

@@ -54,6 +54,7 @@ describe("HostSessionLedger", () => {
       />,
     );
 
+    await user.click(screen.getByText("기록 필터"));
     await user.type(screen.getByRole("searchbox", { name: "모임 기록 검색" }), "  모비 딕  ");
     await user.click(screen.getByRole("button", { name: "검색" }));
     expect(onFiltersChange).toHaveBeenCalledWith({ ...filters, search: "모비 딕" });

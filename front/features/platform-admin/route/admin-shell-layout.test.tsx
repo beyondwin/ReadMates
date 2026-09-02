@@ -421,7 +421,7 @@ describe("AdminShellLayout", () => {
 
   it("keeps clubs onboarding under the real clubs route owner", async () => {
     renderShell("/admin/clubs?onboarding=1");
-    expect(await screen.findByRole("heading", { name: "클럽" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "클럽 찾기" })).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "Admin 콘솔" });
     expect(within(nav).getAllByRole("link", { current: "page" })).toHaveLength(1);
     expect(within(nav).getByRole("link", { name: "클럽 관리" })).toHaveAttribute(
@@ -598,6 +598,13 @@ describe("AdminShellLayout", () => {
       : "";
     expect(shellCss).toContain(".admin-shell");
     expect(shellCss).toContain(".admin-layout-nav");
+    expect(shellCss).toContain("min-height: 86px");
+    expect(shellCss).toContain("padding: 0 34px");
+    expect(shellCss).toContain("grid-template-columns: 260px minmax(0, 1fr)");
+    expect(shellCss).toContain("top: 86px");
+    expect(shellCss).toContain("min-height: calc(100vh - 86px)");
+    expect(shellCss).toContain("padding: 32px 16px");
+    expect(shellCss).toMatch(/\.admin-shell__main\s*\{[^}]*width:\s*100%;[^}]*max-width:\s*none;/s);
     expect(pageCss).toContain(".admin-page-frame");
     expect(pageCss).toContain(".admin-state-panel");
     expect(editorialCss).not.toMatch(/^\s*\.admin-layout-nav(?:\W|$)/m);
@@ -615,7 +622,7 @@ describe("AdminShellLayout", () => {
 
   it("keeps the operating wordmark without exposing a raw capability role badge", () => {
     renderShell("/admin/today");
-    expect(screen.getByText("ReadMates · 운영")).toBeInTheDocument();
+    expect(screen.getByText("ReadMates")).toBeInTheDocument();
     expect(screen.queryByText("OWNER", { exact: true })).not.toBeInTheDocument();
   });
 

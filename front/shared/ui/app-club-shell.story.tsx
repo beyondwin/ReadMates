@@ -64,3 +64,52 @@ export function AppClubShellStory({
     </AppClubShell>
   );
 }
+
+const hostPrimaryItems: PrimaryNavigationItem[] = [
+  { id: "operating-room", label: "운영실", href: "/clubs/reading-sai/host", icon: "host", current: true },
+  { id: "meetings", label: "일정과 모임", mobileLabel: "모임", href: "/clubs/reading-sai/host/meetings", icon: "session", current: false },
+  { id: "people", label: "사람", href: "/clubs/reading-sai/host/people", icon: "me", current: false },
+  { id: "records", label: "기록", href: "/clubs/reading-sai/host/records", icon: "archive", current: false },
+];
+
+function StoryHostSpaceSwitcher() {
+  return (
+    <GlobalSpaceSwitcher
+      currentIdentity={{
+        productSpace: "clubs",
+        clubId: "club-reading-sai",
+        clubSlug: "reading-sai",
+        perspective: "host",
+      }}
+      options={[
+        { identity: { productSpace: "platform" } },
+        {
+          identity: {
+            productSpace: "clubs",
+            clubId: "club-reading-sai",
+            clubSlug: "reading-sai",
+            perspective: "host",
+          },
+          clubName: "읽는사이",
+        },
+      ]}
+      onSelect={async () => ({ status: "selected" })}
+    />
+  );
+}
+
+export function AppClubShellHostStory({ children }: { children: ReactNode }) {
+  return (
+    <AppClubShell
+      workspace="host"
+      primaryItems={hostPrimaryItems}
+      account={{ control: <button type="button" aria-label="계정 메뉴">계정</button> }}
+      brandHref="/clubs/reading-sai/host"
+      mobileTitle="읽는사이 운영"
+      LinkComponent={StoryLink}
+      spaceSwitcher={{ desktop: <StoryHostSpaceSwitcher />, mobile: <StoryHostSpaceSwitcher /> }}
+    >
+      {children}
+    </AppClubShell>
+  );
+}
