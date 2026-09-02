@@ -37,8 +37,11 @@ const meetingSections: HostMeetingTocSections = {
         title: "지구 끝의 온실",
         lifecycleLabel: "준비 중",
         attentionLabel: null,
-        summary: "9월 1일 월요일 · D-3 · 일정 확인 8/12 · 응답 9/12",
+        summary: "일정 확인 8/12 · 응답 9/12",
         date: "2026-09-01",
+        dateLabel: "9월 1일 월요일",
+        dDayLabel: "D-3",
+        actionLabel: "운영실 열기",
         href: "/clubs/reading-sai/app/host/sessions/session-28",
       },
       {
@@ -47,8 +50,10 @@ const meetingSections: HostMeetingTocSections = {
         title: "작별하지 않는다",
         lifecycleLabel: "작성 중",
         attentionLabel: null,
-        summary: "9월 22일 월요일 · 장소 확인 필요",
+        summary: "장소 확인 필요",
         date: "2026-09-22",
+        dateLabel: "9월 22일 월요일",
+        actionLabel: "일정 편집",
         href: "/clubs/reading-sai/app/host/sessions/session-29",
       },
       {
@@ -57,8 +62,10 @@ const meetingSections: HostMeetingTocSections = {
         title: "여름은 오래 그곳에 남아",
         lifecycleLabel: "작성 중",
         attentionLabel: null,
-        summary: "10월 13일 월요일 · 책만 정해짐",
+        summary: "책만 정해짐",
         date: "2026-10-13",
+        dateLabel: "10월 13일 월요일",
+        actionLabel: "계속 작성",
         href: "/clubs/reading-sai/app/host/sessions/session-30",
       },
     ],
@@ -71,9 +78,11 @@ const meetingSections: HostMeetingTocSections = {
         ordinalFolio: "No.27",
         title: "맡겨진 소녀",
         lifecycleLabel: "마감 필요",
-        attentionLabel: "기록 확인 필요",
-        summary: "8월 18일 화요일 · 기록 초안 있음",
+        attentionLabel: null,
+        summary: "기록 초안 있음",
         date: "2026-08-18",
+        dateLabel: "8월 18일 화요일",
+        actionLabel: "마감실 열기",
         href: "/clubs/reading-sai/app/host/sessions/session-27",
       },
       {
@@ -82,8 +91,10 @@ const meetingSections: HostMeetingTocSections = {
         title: "단 한 사람",
         lifecycleLabel: "게시됨",
         attentionLabel: null,
-        summary: "7월 28일 화요일 · 참석 9/12",
+        summary: "참석 9/12",
         date: "2026-07-28",
+        dateLabel: "7월 28일 화요일",
+        actionLabel: "기록 보기",
         href: "/clubs/reading-sai/app/host/sessions/session-26",
       },
       {
@@ -92,8 +103,10 @@ const meetingSections: HostMeetingTocSections = {
         title: "아주 희미한 빛으로도",
         lifecycleLabel: "게시됨",
         attentionLabel: null,
-        summary: "7월 7일 화요일 · 참석 10/12",
+        summary: "참석 10/12",
         date: "2026-07-07",
+        dateLabel: "7월 7일 화요일",
+        actionLabel: "기록 보기",
         href: "/clubs/reading-sai/app/host/sessions/session-25",
       },
     ],
@@ -320,6 +333,7 @@ export function hostMeetingsApprovedView() {
       loadingMorePast={false}
       trashHref="/clubs/reading-sai/app/host/sessions?view=trash"
       newMeetingHref="/clubs/reading-sai/app/host/sessions/new"
+      now={new Date("2026-09-02T10:00:00+09:00")}
     />,
   );
 }

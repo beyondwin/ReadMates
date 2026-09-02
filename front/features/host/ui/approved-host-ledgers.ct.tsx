@@ -21,7 +21,7 @@ const APPROVED_DESKTOP_VIEWPORT = { width: 1536, height: 1024 } as const;
 const APPROVED_MOBILE_VIEWPORT = { width: 390, height: 832 } as const;
 const MEETINGS_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
 const MEETINGS_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
-const MEETINGS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 972 } as const;
+const MEETINGS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1086 } as const;
 
 async function mountApproved(
   mount: (component: ReactElement) => Promise<Locator>,
@@ -115,6 +115,20 @@ test("meetings library matches approved desktop", async ({ mount, page }, testIn
   await expect(component.getByText("맡겨진 소녀")).toBeVisible();
   await expect(component.getByRole("tab", { name: "전체" })).toBeVisible();
   await expect(component.getByRole("tab", { name: "준비 중" })).toBeVisible();
+  await expect(component.getByRole("columnheader", { name: "모임" }).first()).toBeVisible();
+  await expect(component.getByRole("columnheader", { name: "일정" }).first()).toBeVisible();
+  await expect(component.getByRole("columnheader", { name: "상태" }).first()).toBeVisible();
+  await expect(component.getByRole("columnheader", { name: "요약" }).first()).toBeVisible();
+  await expect(component.getByRole("columnheader", { name: "작업" }).first()).toBeVisible();
+  await expect(component.getByRole("link", { name: "운영실 열기" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "마감실 열기" })).toBeVisible();
+  await expect(component.getByText("기록 확인 필요")).toHaveCount(0);
+  await expect(component.getByText("현재 모임")).toBeVisible();
+  await expect(component.getByText("다음 모임")).toBeVisible();
+  await expect(component.getByRole("button", { name: "달력에서 보기" })).toBeVisible();
+  await expect(component.getByText("작별하지 않는다", { exact: true })).toBeVisible();
+  const brandText = (await component.getByRole("link", { name: "ReadMates" }).innerText()).replace(/\s+/g, "");
+  expect(brandText).toBe("ReadMates");
   const header = component.locator("header.topnav");
   const nav = component.getByRole("navigation", { name: "호스트 주 메뉴" });
   const main = component.getByRole("main");

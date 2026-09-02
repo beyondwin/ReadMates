@@ -24,12 +24,33 @@ export type HostMeetingTocRow = {
   date: string;
   href: string;
   state?: unknown;
+  dateLabel?: string;
+  dDayLabel?: string;
+  actionLabel?: string;
 };
 
 export type HostMeetingTocSections = {
   upcoming: { rows: HostMeetingTocRow[]; nextCursor: string | null };
   past: { rows: HostMeetingTocRow[]; nextCursor: string | null };
 };
+
+const WEEKDAYS = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"] as const;
+
+export function formatMeetingWeekday(date: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) return date;
+  const value = new Date(`${match[1]}-${match[2]}-${match[3]}T00:00:00Z`);
+  if (Number.isNaN(value.getTime())) return date;
+  return `${Number(match[2])}월 ${Number(match[3])}일 ${WEEKDAYS[value.getUTCDay()]}`;
+}
+
+export function defaultMeetingActionLabel(lifecycleLabel: string) {
+  if (lifecycleLabel === "준비 중") return "운영실 열기";
+  if (lifecycleLabel === "작성 중") return "일정 편집";
+  if (lifecycleLabel === "마감 필요" || lifecycleLabel === "기록 정리 중") return "마감실 열기";
+  if (lifecycleLabel === "게시됨") return "기록 보기";
+  return "모임 열기";
+}
 
 export type HostMeetingListState = {
   baseUpdatedAt: number;

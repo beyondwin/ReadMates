@@ -60,4 +60,15 @@ describe("HostApprovedShell", () => {
     expect(screen.getByRole("button", { name: "계정 메뉴" }).querySelector("img"))
       .toHaveAttribute("src", "/assets/avatars/book-club/mushroom-green-book.webp");
   });
+
+  it("renders a single ReadMates host wordmark", () => {
+    render(
+      <HostApprovedShell destination="meetings">
+        <main><h1>일정과 모임</h1></main>
+      </HostApprovedShell>,
+    );
+    const brand = screen.getByRole("link", { name: "ReadMates" });
+    expect(brand).toHaveTextContent(/^ReadMates$/);
+    expect(brand.querySelector(".rm-brand-mark")).toBeNull();
+  });
 });

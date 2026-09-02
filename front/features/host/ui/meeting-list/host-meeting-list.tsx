@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { HostLinkComponent, HostLinkProps } from "@/features/host/ui/host-link-types";
-import type { HostMeetingTocRow, HostMeetingTocSections } from "@/features/host/model/host-meeting-list-model";
-import { MeetingTocRow } from "./meeting-toc-row";
+import {
+  formatMeetingWeekday,
+  type HostMeetingTocRow,
+  type HostMeetingTocSections,
+} from "@/features/host/model/host-meeting-list-model";
+import { MeetingLedgerRow, MeetingTocRow } from "./meeting-toc-row";
 import "./meeting-toc.css";
 
 type MeetingStatusFilter = "all" | "준비 중" | "마감 필요" | "게시됨";
@@ -87,11 +91,22 @@ function TocSection({
       ) : rows.length === 0 ? (
         <p className="small rm-meeting-toc__section-empty">{emptyCopy}</p>
       ) : (
-        <ol className="rm-meeting-toc__list" aria-label={title}>
-          {rows.map((row) => (
-            <MeetingTocRow key={row.id} row={row} LinkComponent={LinkComponent} />
-          ))}
-        </ol>
+        <table className="rm-meeting-toc__table">
+          <thead>
+            <tr>
+              <th scope="col">모임</th>
+              <th scope="col">일정</th>
+              <th scope="col">상태</th>
+              <th scope="col">요약</th>
+              <th scope="col">작업</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <MeetingLedgerRow key={row.id} row={row} LinkComponent={LinkComponent} />
+            ))}
+          </tbody>
+        </table>
       )}
       {!errorMessage && nextCursor ? (
         <button
@@ -122,18 +137,24 @@ function thisMonthKey(now = new Date()) {
   return `${year}-${month}`;
 }
 
+const THIS_MONTH_CHIPS = ["현재 모임", "다음 모임"] as const;
+
 function ThisMonthRail({
   sections,
+  now,
+  onShowCalendar,
   LinkComponent,
 }: {
   sections: HostMeetingTocSections;
+  now: Date;
+  onShowCalendar: () => void;
   LinkComponent: HostLinkComponent;
 }) {
-  const month = thisMonthKey();
-  const rows = [
-    ...sections.upcoming.rows,
-    ...sections.past.rows,
-  ].filter((row) => row.date.startsWith(month));
+  const month = thisMonthKey(now);
+  const rows = sections.upcoming.rows
+    .filter((row) => row.date.startsWith(month))
+    .slice()
+    .sort((left, right) => left.date.localeCompare(right.date) || left.id.localeCompare(right.id));
 
   return (
     <aside className="rm-meeting-toc__rail" aria-labelledby="this-month-title">
@@ -142,15 +163,25 @@ function ThisMonthRail({
       {rows.length === 0 ? (
         <p className="small rm-meeting-toc__section-empty">이번 달 모임이 없습니다.</p>
       ) : (
-        <ol className="rm-meeting-toc__list" aria-label="이번 달 모임">
-          {rows.map((row) => (
-            <li key={row.id} className="rm-meeting-toc__row">
-              <time className="mono" dateTime={row.date}>{row.date}</time>
-              <LinkComponent to={row.href} className="rm-meeting-toc__title">{row.ordinalFolio} · {row.title}</LinkComponent>
+        <ol className="rm-meeting-toc__rail-list" aria-label="이번 달 모임">
+          {rows.map((row, index) => (
+            <li key={row.id} className="rm-meeting-toc__rail-item">
+              <div className="rm-meeting-toc__rail-when">
+                <time dateTime={row.date}>{row.dateLabel ?? formatMeetingWeekday(row.date)}</time>
+                {THIS_MONTH_CHIPS[index] ? (
+                  <span className="rm-meeting-toc__rail-chip">{THIS_MONTH_CHIPS[index]}</span>
+                ) : null}
+              </div>
+              <LinkComponent to={row.href} className="rm-meeting-toc__rail-title">
+                {row.ordinalFolio} · {row.title}
+              </LinkComponent>
             </li>
           ))}
         </ol>
       )}
+      <button type="button" className="rm-meeting-toc__rail-calendar" onClick={onShowCalendar}>
+        달력에서 보기
+      </button>
     </aside>
   );
 }
@@ -274,6 +305,7 @@ export function HostMeetingList({
   onRetry,
   pastErrorMessage = null,
   onRetryPast,
+  now = new Date(),
 }: {
   sections: HostMeetingTocSections;
   onLoadMoreUpcoming: () => void;
@@ -290,6 +322,7 @@ export function HostMeetingList({
   onRetry?: () => void;
   pastErrorMessage?: string | null;
   onRetryPast?: () => void;
+  now?: Date;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [view, setView] = useState<"list" | "calendar">("list");
@@ -434,7 +467,12 @@ export function HostMeetingList({
                 </div>
               </div>
             )}
-            <ThisMonthRail sections={visibleSections} LinkComponent={LinkComponent} />
+            <ThisMonthRail
+              sections={visibleSections}
+              now={now}
+              onShowCalendar={() => setView("calendar")}
+              LinkComponent={LinkComponent}
+            />
           </div>
         )}
       </section>

@@ -220,8 +220,25 @@ function guestLinks(publicBasePath: string): NavLink[] {
 
 function Brand({ href, LinkComponent, variant }: { href: string; LinkComponent: AppLinkComponent; variant?: TopNavVariant }) {
   const hostMark = variant === "host";
+  if (hostMark) {
+    return (
+      <LinkComponent to={href} className="row" aria-label="ReadMates">
+        <span
+          className="editorial"
+          style={{
+            fontSize: "16px",
+            lineHeight: 1,
+            letterSpacing: "-0.025em",
+            fontWeight: 600,
+          }}
+        >
+          ReadMates
+        </span>
+      </LinkComponent>
+    );
+  }
   return (
-    <LinkComponent to={href} className="row" style={{ gap: "10px" }} aria-label={hostMark ? "ReadMates" : "읽는사이 홈"}>
+    <LinkComponent to={href} className="row" style={{ gap: "10px" }} aria-label="읽는사이 홈">
       <ReadmatesBrandMark />
       <span>
         <span
@@ -234,13 +251,11 @@ function Brand({ href, LinkComponent, variant }: { href: string; LinkComponent: 
             fontWeight: 600,
           }}
         >
-          {hostMark ? "ReadMates" : "읽는사이"}
+          읽는사이
         </span>
-        {hostMark ? null : (
-          <span className="tiny mono" style={{ display: "block", marginTop: "2px" }}>
-            독서 모임
-          </span>
-        )}
+        <span className="tiny mono" style={{ display: "block", marginTop: "2px" }}>
+          독서 모임
+        </span>
       </span>
     </LinkComponent>
   );
