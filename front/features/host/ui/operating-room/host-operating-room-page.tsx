@@ -8,6 +8,7 @@ import { CurrentMeetingHeader, type CurrentMeetingHeaderLinks } from "./current-
 import { HostNextAction, type HostNextActionSecondary } from "./host-next-action";
 import { MeetingPhaseTabs, type MeetingPhaseTabLink } from "./meeting-phase-tabs";
 import { PreparationLedger } from "./preparation-ledger";
+import { useOperatingRoomCompactViewport } from "./use-operating-room-compact-viewport";
 import "./operating-room.css";
 
 export type AttendanceRecoveryView =
@@ -44,6 +45,7 @@ export type HostOperatingRoomPageProps = {
   }[];
   recovery: AttendanceRecoveryView | null;
   liveContent: ReactNode;
+  compactLiveContent?: ReactNode;
   closingContent: ReactNode;
   workboxContent: ReactNode;
   createMeetingHref: string;
@@ -66,6 +68,7 @@ export function HostOperatingRoomPage({
   optionalFailureActions = [],
   recovery,
   liveContent,
+  compactLiveContent,
   closingContent,
   workboxContent,
   createMeetingHref,
@@ -77,6 +80,7 @@ export function HostOperatingRoomPage({
   nextActionSecondary,
   LinkComponent = DefaultLink,
 }: HostOperatingRoomPageProps) {
+  const compactViewport = useOperatingRoomCompactViewport();
   if (!view.meeting || !headerLinks) {
     return (
       <main className="rm-host-operating-room rm-host-operating-room--empty">
@@ -204,7 +208,9 @@ export function HostOperatingRoomPage({
                 LinkComponent={LinkComponent}
               />
             ) : null}
-            {view.phase === "live" ? liveContent : null}
+            {view.phase === "live"
+              ? (compactViewport ? compactLiveContent ?? liveContent : liveContent)
+              : null}
             {view.phase === "closing" ? closingContent : null}
           </section>
         </div>

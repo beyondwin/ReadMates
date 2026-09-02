@@ -510,6 +510,7 @@ function approvedOperatingRoom(input: {
   nextAction: HostOperatingRoomView["nextAction"];
   nextActionSecondary?: { href: string; label: string };
   liveContent?: ReactNode;
+  compactLiveContent?: ReactNode;
   closingContent?: ReactNode;
   workboxItems: HostWorkboxView["items"];
 }) {
@@ -583,6 +584,7 @@ function approvedOperatingRoom(input: {
         optionalFailureMessages={[]}
         recovery={null}
         liveContent={input.liveContent ?? <section aria-label="현장 운영">현장 운영</section>}
+        compactLiveContent={input.compactLiveContent}
         closingContent={input.closingContent ?? <section aria-label="마감 운영">마감 운영</section>}
         workboxContent={approvedWorkbox(input.workboxItems)}
         createMeetingHref="/clubs/reading-sai/app/host/sessions/new"
@@ -695,7 +697,7 @@ function prepApprovedView() {
   });
 }
 
-function liveApprovedView(liveContent: ReactNode) {
+function liveApprovedView() {
   return approvedOperatingRoom({
     phase: "live",
     dDayLabel: "오늘",
@@ -713,7 +715,8 @@ function liveApprovedView(liveContent: ReactNode) {
       href: liveStatusRows.find((row) => row.label === "진행 순서")!.href,
       label: "모임 진행 보기",
     },
-    liveContent,
+    liveContent: approvedLiveContent(),
+    compactLiveContent: approvedAttendanceBoard(),
     workboxItems: liveWorkboxItems,
   });
 }
@@ -850,7 +853,7 @@ test("live locks the approved desktop operating room", async ({ mount, page }, t
   const component = await mountApproved(
     mount,
     page,
-    liveApprovedView(approvedLiveContent()),
+    liveApprovedView(),
     APPROVED_DESKTOP_VIEWPORT,
   );
   await expect(component.getByRole("region", { name: "다음에 할 일" })).toContainText("아직 출석을 확인하지 않은 3명이 있어요");
@@ -861,7 +864,13 @@ test("live locks the approved desktop operating room", async ({ mount, page }, t
   await expect(component.getByRole("link", { name: "모임 정보" })).toBeVisible();
   await expect(component.getByRole("link", { name: "출석 확인 시작" })).toBeVisible();
   await expect(component.getByRole("link", { name: "모임 진행 보기" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "모임 진행 보기" }).locator("svg[data-icon='list']")).toBeVisible();
   await expect(component.getByRole("region", { name: "현장 현황" })).toBeVisible();
+  const liveLedger = component.getByRole("region", { name: "현장 현황" });
+  await expect(liveLedger.locator("svg[data-icon='person']")).toBeVisible();
+  await expect(liveLedger.locator("svg[data-icon='people']")).toBeVisible();
+  await expect(liveLedger.locator("svg[data-icon='list']")).toBeVisible();
+  await expect(liveLedger.locator("svg[data-icon='notes']")).toBeVisible();
   await expect(component.getByRole("complementary", { name: "클럽 작업함" }).getByRole("listitem", { name: "출석 미확인" })).toBeVisible();
   await expect(component.getByRole("complementary", { name: "클럽 작업함" }).getByRole("listitem")).not.toHaveCount(0);
   await expect(component.getByRole("heading", { name: "출석 확인" })).toHaveCount(0);
@@ -882,6 +891,11 @@ test("closing locks the approved desktop operating room", async ({ mount, page }
   await expect(component.getByRole("region", { name: "다음에 할 일" })).toContainText("기록 초안을 검토하면 멤버에게 게시할 수 있어요");
   await expect(component.getByRole("region", { name: "다음에 할 일" }).getByRole("link", { name: "기록 초안 검토" })).toBeVisible();
   await expect(component.getByRole("region", { name: "마감 현황" }).getByRole("listitem")).toHaveCount(5);
+  const closingItems = component.getByRole("region", { name: "마감 현황" }).getByRole("listitem");
+  await expect(closingItems).toHaveCount(5);
+  for (const index of [1, 2, 3, 4, 5]) {
+    await expect(closingItems.nth(index - 1).locator("[data-index]")).toHaveText(String(index));
+  }
   await expect(component.getByRole("region", { name: "마감 현황" }).getByRole("link", { name: /보기|열기|확인|조건/ }).first()).toBeVisible();
   await expect(component.getByRole("complementary", { name: "클럽 작업함" }).getByRole("listitem", { name: "기록 초안 검토" })).toBeVisible();
   await expect(component.getByRole("region", { name: "다음에 할 일" }).getByText("게시 전에 피드백 문서를 확인해 주세요")).toBeVisible();
@@ -940,7 +954,7 @@ test("live locks the approved mobile attendance board", async ({ mount, page }, 
   const component = await mountApproved(
     mount,
     page,
-    liveApprovedView(approvedAttendanceBoard()),
+    liveApprovedView(),
     APPROVED_MOBILE_VIEWPORT,
   );
   await expect(component.getByRole("heading", { name: "출석 확인" })).toBeVisible();

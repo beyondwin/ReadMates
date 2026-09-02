@@ -1,12 +1,15 @@
 export type OperatingRoomGlyphName =
   | "calendar"
+  | "person"
   | "people"
   | "chat"
   | "pin"
   | "info"
   | "edit"
   | "history"
-  | "eye";
+  | "eye"
+  | "list"
+  | "notes";
 
 export function OperatingRoomGlyph({ name }: { name: OperatingRoomGlyphName }) {
   const common = {
@@ -29,6 +32,13 @@ export function OperatingRoomGlyph({ name }: { name: OperatingRoomGlyphName }) {
         <svg {...common}>
           <rect x="3" y="5" width="18" height="16" rx="2" />
           <path d="M8 3v4M16 3v4M3 11h18" />
+        </svg>
+      );
+    case "person":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="8" r="3.2" />
+          <path d="M5 20c1-4.2 3.5-6.5 7-6.5s6 2.3 7 6.5" />
         </svg>
       );
     case "people":
@@ -79,6 +89,19 @@ export function OperatingRoomGlyph({ name }: { name: OperatingRoomGlyphName }) {
         <svg {...common}>
           <path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z" />
           <circle cx="12" cy="12" r="2.5" />
+        </svg>
+      );
+    case "list":
+      return (
+        <svg {...common}>
+          <path d="M8 6h13M8 12h13M8 18h13M4 6h.01M4 12h.01M4 18h.01" />
+        </svg>
+      );
+    case "notes":
+      return (
+        <svg {...common}>
+          <rect x="5" y="3" width="14" height="18" rx="2" />
+          <path d="M8 8h8M8 12h8M8 16h5" />
         </svg>
       );
   }

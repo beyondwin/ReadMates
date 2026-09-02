@@ -712,6 +712,7 @@
 
 .rm-operating-room-next-action__defer,
 .rm-operating-room-next-action__secondary {
+  gap: 6px;
   padding: 0 var(--space-lg);
   border: 1px solid var(--accent-line);
   background: transparent;
@@ -777,6 +778,20 @@
 .rm-operating-room-glyph {
   flex: 0 0 auto;
   color: var(--text-3);
+}
+
+.rm-phase-status-ledger-row__index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text-3);
+  font-size: var(--type-size-label);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
 }
 
 .rm-preparation-ledger-row__value {

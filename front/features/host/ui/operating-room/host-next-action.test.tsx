@@ -103,7 +103,9 @@ describe("HostNextAction", () => {
     );
 
     expect(screen.getByRole("link", { name: "출석 확인 시작" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "모임 진행 보기" })).toHaveAttribute("href", "?section=agenda");
+    const secondary = screen.getByRole("link", { name: "모임 진행 보기" });
+    expect(secondary).toHaveAttribute("href", "?section=agenda");
+    expect(secondary.querySelector("svg[data-icon='list']")).not.toBeNull();
   });
 
   it("renders a schedule note as real paragraph text instead of a CSS overlay", () => {

@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode } from "react";
 import type { HostNextActionView } from "@/features/host/model/host-operating-room-model";
+import { OperatingRoomGlyph } from "./operating-room-glyph";
 import "./operating-room.css";
 
 type NextActionLinkProps = {
@@ -76,6 +77,7 @@ export function HostNextAction({
               to={secondaryAction.href}
               className="rm-operating-room-next-action__secondary"
             >
+              <OperatingRoomGlyph name="list" />
               {secondaryAction.label}
             </LinkComponent>
           ) : null}
