@@ -642,6 +642,11 @@ const liveAttendees = [
   { membershipId: "m-5", displayName: "최아연", avatarKey: "apple-green-book", rsvpStatus: "GOING" as const, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 },
   { membershipId: "m-6", displayName: "오민재", avatarKey: "banana-green-book", rsvpStatus: "NO_RESPONSE" as const, attendanceStatus: "UNKNOWN" as const, attendanceRevision: 1 },
   { membershipId: "m-7", displayName: "한지수", avatarKey: "mushroom-green-book", rsvpStatus: "GOING" as const, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 },
+  { membershipId: "m-8", displayName: "윤하은", avatarKey: "apple-green-book", rsvpStatus: "GOING" as const, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 },
+  { membershipId: "m-9", displayName: "강태민", avatarKey: "banana-green-book", rsvpStatus: "GOING" as const, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 },
+  { membershipId: "m-10", displayName: "문소율", avatarKey: "mushroom-green-book", rsvpStatus: "GOING" as const, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 },
+  { membershipId: "m-11", displayName: "배지호", avatarKey: "apple-green-book", rsvpStatus: "NO_RESPONSE" as const, attendanceStatus: "UNKNOWN" as const, attendanceRevision: 1 },
+  { membershipId: "m-12", displayName: "조서준", avatarKey: "banana-green-book", rsvpStatus: "GOING" as const, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 },
 ];
 
 function approvedAttendanceBoard() {
@@ -653,6 +658,7 @@ function approvedAttendanceBoard() {
         membershipId: attendee.membershipId,
         displayName: attendee.displayName,
         secondaryLabel: attendee.displayName,
+        avatarKey: attendee.avatarKey,
         response: attendee.rsvpStatus === "GOING"
           ? "GOING"
           : attendee.rsvpStatus === "DECLINED"
@@ -915,6 +921,11 @@ test("prep locks the approved mobile operating room", async ({ mount, page }, te
   const preparation = component.getByRole("region", { name: "준비 현황" });
   const workbox = component.getByRole("complementary", { name: "클럽 작업함" });
   const bottomNav = component.locator('[data-club-shell-region="mobile-primary"]');
+  await expect(component.getByRole("link", { name: "멤버 시야" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "대상과 문구 검토" })).toBeVisible();
+  await expect(component.getByRole("navigation", { name: "호스트 주 메뉴 모바일" })).toBeVisible();
+  await expect(component.getByRole("region", { name: "준비 현황" }).getByRole("listitem")).toHaveCount(4);
+  await expect(component.getByRole("complementary", { name: "클럽 작업함" }).getByRole("listitem")).not.toHaveCount(0);
   await expect(nextAction).toBeVisible();
   await expect(nextAction).toContainText("대상과 문구를 확인한 뒤 직접 보내세요. 자동 발송하지 않아요.");
   await expect(nextAction.getByText("일정이 어제 19:30에 변경되었어요")).toBeVisible();
@@ -923,10 +934,20 @@ test("prep locks the approved mobile operating room", async ({ mount, page }, te
   await expect(preparation.getByText("2명은 아직 작성 전")).toBeVisible();
   await expect(preparation.getByText("을지로 북살롱 예약 확인")).toBeVisible();
   await expect(preparation.getByRole("listitem")).toHaveCount(4);
+  for (const index of [1, 2, 3, 4]) {
+    const marker = preparation.getByRole("listitem").nth(index - 1).locator("[data-prep-index]");
+    await expect(marker).toBeVisible();
+    await expect(marker).toHaveText(String(index).padStart(2, "0"));
+  }
   await expect(workbox.getByRole("listitem")).toHaveCount(4);
   await expect(workbox.getByRole("combobox", { name: /보류 기간/ })).toHaveCount(0);
   await expect(bottomNav).toBeVisible();
-  await expect(component.getByRole("navigation", { name: "호스트 주 메뉴 모바일" })).toBeVisible();
+  const cover = component.locator(".rm-operating-room-header__cover .rm-book-cover");
+  await expect(cover).toBeVisible();
+  const coverBox = await cover.boundingBox();
+  expect(coverBox, "cover cell").not.toBeNull();
+  expect(coverBox!.width).toBeGreaterThan(48);
+  expect(coverBox!.height).toBeGreaterThan(48);
   const frame = { x: 0, y: 0, width: 390, height: 832 };
   for (const [name, locator] of [
     ["next-action", nextAction],
@@ -957,13 +978,23 @@ test("live locks the approved mobile attendance board", async ({ mount, page }, 
     liveApprovedView(),
     APPROVED_MOBILE_VIEWPORT,
   );
+  await expect(component.getByRole("button", { name: /참석|출석/ }).first()).toBeVisible();
+  await expect(component.getByText(/8\s*\/\s*12/)).toBeVisible();
+  await expect(component.getByText(/확인 필요 3/)).toBeVisible();
+  await expect(component.getByText(/나머지 3명/)).toBeVisible();
+  await expect(component.getByRole("navigation", { name: "호스트 주 메뉴 모바일" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "멤버 시야" })).toBeVisible();
+  await expect(component.getByText("진행 중")).toBeVisible();
   await expect(component.getByRole("heading", { name: "출석 확인" })).toBeVisible();
+  await expect(component.locator(".rm-meeting-response-ledger--attendance-board")).toBeVisible();
+  await expect(component.getByRole("region", { name: "현장 현황" })).toHaveCount(0);
   await expect(component.getByRole("button", { name: "박서윤 참석" })).toHaveAttribute("aria-pressed", "true");
   await expect(component.getByRole("button", { name: "박서윤 불참" })).toBeVisible();
   await expect(component.getByRole("button", { name: "박서윤 미확인" })).toBeVisible();
   await expect(component.getByRole("button", { name: "이하린 미확인" })).toHaveAttribute("aria-pressed", "true");
   await expect(component.getByText("미응답").first()).toBeVisible();
-  await expect(component.getByRole("button", { name: "나머지 2명 모두 참석으로 표시" })).toBeVisible();
+  await expect(component.getByRole("button", { name: "나머지 3명 모두 참석으로 표시" })).toBeVisible();
+  await expect(component.locator(".rm-meeting-response-ledger--attendance-board .rm-avatar-chip").first()).toBeVisible();
   await expect(component.getByText("선택하면 바로 저장돼요.")).toBeVisible();
   await expect(component.getByRole("button", { name: "실행 취소" })).toBeVisible();
   await expect(component.getByText("출석 8명 저장됨")).toBeVisible();

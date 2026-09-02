@@ -15,6 +15,7 @@ const DefaultLink: ComponentType<PreparationLedgerLinkProps> = ({ to, children, 
 
 export type PreparationLedgerRowProps = {
   row: PreparationLedgerRowView;
+  index?: number;
   onRetry?: (rowId: PreparationLedgerRowView["id"]) => void;
   LinkComponent?: ComponentType<PreparationLedgerLinkProps>;
 };
@@ -35,6 +36,7 @@ const rowGlyphs: Record<PreparationRowId, OperatingRoomGlyphName> = {
 
 export function PreparationLedgerRow({
   row,
+  index,
   onRetry,
   LinkComponent = DefaultLink,
 }: PreparationLedgerRowProps) {
@@ -45,6 +47,11 @@ export function PreparationLedgerRow({
       data-state={row.state}
     >
       <span className="rm-preparation-ledger-row__label">
+        {index != null ? (
+          <span className="rm-preparation-ledger-row__index" data-prep-index aria-hidden="true">
+            {String(index + 1).padStart(2, "0")}
+          </span>
+        ) : null}
         <OperatingRoomGlyph name={rowGlyphs[row.id]} />
         {row.label}
       </span>
