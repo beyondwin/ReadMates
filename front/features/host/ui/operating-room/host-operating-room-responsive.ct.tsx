@@ -32,6 +32,10 @@ const APPROVED_DESKTOP_VIEWPORT = { width: 1536, height: 1024 } as const;
 const APPROVED_MOBILE_VIEWPORT = { width: 390, height: 832 } as const;
 const BODY_DESKTOP_GEOMETRY = { x: 36, y: 319, width: 1465, height: 665 } as const;
 const WORKBOX_DESKTOP_GEOMETRY = { x: 988, y: 319, width: 513, height: 665 } as const;
+const MOBILE_NAV_GEOMETRY = { x: 0, y: 768, width: 390, height: 64 } as const;
+const PREP_MOBILE_MAIN_GEOMETRY = { x: 19, y: 58, width: 352, height: 960 } as const;
+const LIVE_MOBILE_MAIN_GEOMETRY = { x: 19, y: 58, width: 352, height: 806 } as const;
+const LIVE_MOBILE_BOARD_GEOMETRY = { x: 19, y: 200, width: 352, height: 600 } as const;
 
 const phaseLinks = [
   { id: "prep", label: "준비실", availability: "available", blockedReason: null, href: "?phase=prep" },
@@ -626,6 +630,12 @@ const liveStatusRows = [
   { label: "현장 메모", value: "3개", detail: "호스트만 볼 수 있어요", href: "?section=notes", action: "메모 열기" },
 ] as const;
 
+const liveAttendanceCensus = {
+  attended: 8,
+  all: 12,
+  pending: 3,
+} as const;
+
 const closingStatusRows = [
   { label: "출석 확정", value: "완료", detail: "9명 · 어제 21:42", href: "?section=attendance", action: "출석 보기" },
   { label: "소감 수집", value: "8 / 12", detail: "미작성 4명", href: "?section=notes", action: "대상 보기" },
@@ -642,11 +652,6 @@ const liveAttendees = [
   { membershipId: "m-5", displayName: "최아연", avatarKey: "apple-green-book", rsvpStatus: "GOING" as const, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 },
   { membershipId: "m-6", displayName: "오민재", avatarKey: "banana-green-book", rsvpStatus: "NO_RESPONSE" as const, attendanceStatus: "UNKNOWN" as const, attendanceRevision: 1 },
   { membershipId: "m-7", displayName: "한지수", avatarKey: "mushroom-green-book", rsvpStatus: "GOING" as const, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 },
-  { membershipId: "m-8", displayName: "윤하은", avatarKey: "apple-green-book", rsvpStatus: "GOING" as const, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 },
-  { membershipId: "m-9", displayName: "강태민", avatarKey: "banana-green-book", rsvpStatus: "GOING" as const, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 },
-  { membershipId: "m-10", displayName: "문소율", avatarKey: "mushroom-green-book", rsvpStatus: "GOING" as const, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 },
-  { membershipId: "m-11", displayName: "배지호", avatarKey: "apple-green-book", rsvpStatus: "NO_RESPONSE" as const, attendanceStatus: "UNKNOWN" as const, attendanceRevision: 1 },
-  { membershipId: "m-12", displayName: "조서준", avatarKey: "banana-green-book", rsvpStatus: "GOING" as const, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 },
 ];
 
 function approvedAttendanceBoard() {
@@ -654,6 +659,7 @@ function approvedAttendanceBoard() {
     <MeetingResponseLedger
       presentation="attendanceBoard"
       agendaHref="/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=agenda"
+      attendanceCensus={liveAttendanceCensus}
       rows={liveAttendees.map((attendee) => ({
         membershipId: attendee.membershipId,
         displayName: attendee.displayName,
@@ -967,7 +973,11 @@ test("prep locks the approved mobile operating room", async ({ mount, page }, te
   expect(navBox).not.toBeNull();
   expect(navBox!.y).toBeGreaterThanOrEqual(frame.height - 140);
   expect(navBox!.y).toBeLessThan(frame.height);
-  await captureHostApproved({ id: "host-prep-mobile", page, testInfo, regions: [] });
+  const regions = [
+    await regionFromLocator(bottomNav, "nav", MOBILE_NAV_GEOMETRY, 4),
+    await regionFromLocator(component.locator(".rm-host-operating-room"), "main", PREP_MOBILE_MAIN_GEOMETRY, 4),
+  ];
+  await captureHostApproved({ id: "host-prep-mobile", page, testInfo, regions });
 });
 
 test("live locks the approved mobile attendance board", async ({ mount, page }, testInfo) => {
@@ -998,7 +1008,36 @@ test("live locks the approved mobile attendance board", async ({ mount, page }, 
   await expect(component.getByText("선택하면 바로 저장돼요.")).toBeVisible();
   await expect(component.getByRole("button", { name: "실행 취소" })).toBeVisible();
   await expect(component.getByText("출석 8명 저장됨")).toBeVisible();
-  await captureHostApproved({ id: "host-live-mobile", page, testInfo, regions: [] });
+  const board = component.locator(".rm-meeting-response-ledger--attendance-board");
+  const roster = board.getByRole("listitem");
+  await expect(roster).toHaveCount(7);
+  const bulk = component.getByRole("button", { name: "나머지 3명 모두 참석으로 표시" });
+  const undo = component.locator(".rm-workspace-undo-bar");
+  const bottomNav = component.locator('[data-club-shell-region="mobile-primary"]');
+  const frame = { x: 0, y: 0, width: 390, height: 832 };
+  await expect(bottomNav).toHaveCSS("position", "fixed");
+  const navBox = await bottomNav.boundingBox();
+  expect(navBox, "bottom-nav").not.toBeNull();
+  expect(navBox!.y).toBeGreaterThanOrEqual(frame.height - 140);
+  expect(navBox!.y + navBox!.height).toBeLessThanOrEqual(frame.height + 1);
+  for (const [name, locator] of [
+    ["roster-row-7", roster.nth(6)],
+    ["bulk", bulk],
+    ["undo", undo],
+  ] as const) {
+    const box = await locator.boundingBox();
+    expect(box, name).not.toBeNull();
+    expect(box!.x, name).toBeGreaterThanOrEqual(frame.x);
+    expect(box!.y, name).toBeGreaterThanOrEqual(frame.y);
+    expect(box!.x + box!.width, name).toBeLessThanOrEqual(frame.width + 1);
+    expect(box!.y + box!.height, `${name} y=${box!.y} h=${box!.height} navY=${navBox!.y}`).toBeLessThanOrEqual(navBox!.y + 2);
+  }
+  const regions = [
+    await regionFromLocator(bottomNav, "nav", MOBILE_NAV_GEOMETRY, 4),
+    await regionFromLocator(component.locator(".rm-host-operating-room"), "main", LIVE_MOBILE_MAIN_GEOMETRY, 4),
+    await regionFromLocator(board, "board", LIVE_MOBILE_BOARD_GEOMETRY, 4),
+  ];
+  await captureHostApproved({ id: "host-live-mobile", page, testInfo, regions });
 });
 
 test("empty operating room primary stays readable without a phase overlay", async ({ mount, page }) => {

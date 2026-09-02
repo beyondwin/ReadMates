@@ -201,4 +201,20 @@ describe("MeetingResponseLedger", () => {
     expect(screen.getByText("출석 8명 저장됨")).toBeVisible();
     expect(screen.getByRole("button", { name: "실행 취소" })).toBeVisible();
   });
+
+  it("attendanceBoard can present an approved census without inventing extra roster rows", () => {
+    render(
+      <MeetingResponseLedger
+        presentation="attendanceBoard"
+        rows={meetingDayRows}
+        onAttendanceChange={vi.fn()}
+        onBulkAttendanceChange={vi.fn()}
+        attendanceCensus={{ attended: 8, all: 12, pending: 3 }}
+      />,
+    );
+
+    expect(screen.getByText("실제 출석 8 / 12 · 확인 필요 3")).toBeVisible();
+    expect(screen.getByRole("button", { name: "나머지 3명 모두 참석으로 표시" })).toBeVisible();
+    expect(screen.getAllByRole("listitem")).toHaveLength(meetingDayRows.length);
+  });
 });

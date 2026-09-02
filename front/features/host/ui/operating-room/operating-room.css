@@ -1148,8 +1148,20 @@
 
   .rm-host-operating-room[data-phase="live"] .rm-operating-room-header {
     --rm-operating-room-cover-width: 48px;
+    grid-template-columns: var(--rm-operating-room-cover-width) minmax(0, 1fr);
+    grid-template-areas:
+      "cover identity"
+      "cover facts";
     padding-block: 4px;
     gap: 2px 10px;
+  }
+
+  .rm-host-operating-room[data-phase="live"] .rm-operating-room-header__actions {
+    grid-area: facts;
+    justify-content: flex-end;
+    align-self: start;
+    padding-top: 0;
+    border-top: 0;
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-operating-room-header__lifecycle {
@@ -1180,15 +1192,15 @@
 
   .rm-host-operating-room[data-phase="live"] .rm-operating-room-phases,
   .rm-host-operating-room[data-phase="live"] .rm-operating-room-phases__tab {
-    min-height: 44px;
+    min-height: 40px;
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-operating-room-phases__tab {
-    padding: 4px;
+    padding: 2px 4px;
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-meeting-response-ledger--attendance-board {
-    gap: 4px;
+    gap: 2px;
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-meeting-response-ledger__head {
@@ -1203,12 +1215,12 @@
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-meeting-response-ledger__row--board {
-    min-height: 44px;
+    min-height: 40px;
     padding-block: 0;
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-meeting-response-ledger__attendance-choice {
-    min-height: 44px;
+    min-height: 40px;
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-meeting-response-ledger--attendance-board h2 {
@@ -1220,9 +1232,10 @@
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-workspace-undo-bar {
-    margin-top: 4px;
-    min-height: 40px;
-    padding: 6px 12px;
+    margin-top: 0;
+    min-height: 36px;
+    padding: 2px 10px;
+    flex-wrap: nowrap;
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-meeting-response-ledger__bulk--meeting-day {
