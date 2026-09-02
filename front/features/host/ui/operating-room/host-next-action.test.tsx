@@ -89,6 +89,23 @@ describe("HostNextAction", () => {
     expect(screen.getByRole("link", { name: "대상과 문구 검토" })).toBeVisible();
   });
 
+  it("renders an optional secondary destination next to the primary control", () => {
+    render(
+      <HostNextAction
+        action={{
+          ...actionable,
+          kind: "attendance",
+          label: "아직 출석을 확인하지 않은 3명이 있어요",
+          ctaLabel: "출석 확인 시작",
+        }}
+        secondaryAction={{ href: "?section=agenda", label: "모임 진행 보기" }}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "출석 확인 시작" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "모임 진행 보기" })).toHaveAttribute("href", "?section=agenda");
+  });
+
   it("renders a schedule note as real paragraph text instead of a CSS overlay", () => {
     render(
       <HostNextAction

@@ -13,11 +13,17 @@ const DefaultLink: ComponentType<NextActionLinkProps> = ({ to, children, ...prop
   <a {...props} href={to}>{children}</a>
 );
 
+export type HostNextActionSecondary = {
+  href: string;
+  label: string;
+};
+
 export type HostNextActionProps = {
   action: HostNextActionView;
   pending?: boolean;
   onDefer?: (workItemKey: string) => void;
   LinkComponent?: ComponentType<NextActionLinkProps>;
+  secondaryAction?: HostNextActionSecondary;
 };
 
 const stateLabels: Record<HostNextActionView["state"], string> = {
@@ -33,6 +39,7 @@ export function HostNextAction({
   pending = false,
   onDefer,
   LinkComponent = DefaultLink,
+  secondaryAction,
 }: HostNextActionProps) {
   const deferKey = action.state === "actionable" ? action.workItemKey : null;
   const canDefer = deferKey !== null && onDefer;
@@ -64,6 +71,14 @@ export function HostNextAction({
           >
             {primaryLabel}
           </LinkComponent>
+          {secondaryAction ? (
+            <LinkComponent
+              to={secondaryAction.href}
+              className="rm-operating-room-next-action__secondary"
+            >
+              {secondaryAction.label}
+            </LinkComponent>
+          ) : null}
           {canDefer ? (
             <button
               className="rm-operating-room-next-action__defer"

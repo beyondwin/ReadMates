@@ -5,7 +5,7 @@ import type {
 } from "@/features/host/model/host-operating-room-model";
 import type { HostLinkComponent } from "@/features/host/ui/host-link-types";
 import { CurrentMeetingHeader, type CurrentMeetingHeaderLinks } from "./current-meeting-header";
-import { HostNextAction } from "./host-next-action";
+import { HostNextAction, type HostNextActionSecondary } from "./host-next-action";
 import { MeetingPhaseTabs, type MeetingPhaseTabLink } from "./meeting-phase-tabs";
 import { PreparationLedger } from "./preparation-ledger";
 import "./operating-room.css";
@@ -52,6 +52,7 @@ export type HostOperatingRoomPageProps = {
   onRetryOptional: () => void;
   nextActionPending: boolean;
   onDeferNextAction?: (workItemKey: string) => void;
+  nextActionSecondary?: HostNextActionSecondary;
   LinkComponent: HostLinkComponent;
 };
 
@@ -73,6 +74,7 @@ export function HostOperatingRoomPage({
   onRetryOptional,
   nextActionPending,
   onDeferNextAction,
+  nextActionSecondary,
   LinkComponent = DefaultLink,
 }: HostOperatingRoomPageProps) {
   if (!view.meeting || !headerLinks) {
@@ -125,6 +127,7 @@ export function HostOperatingRoomPage({
             action={view.nextAction}
             pending={nextActionPending}
             onDefer={onDeferNextAction}
+            secondaryAction={nextActionSecondary}
             LinkComponent={LinkComponent}
           />
 

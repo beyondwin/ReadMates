@@ -673,6 +673,7 @@
 
 .rm-operating-room-next-action__primary,
 .rm-operating-room-next-action__defer,
+.rm-operating-room-next-action__secondary,
 .rm-preparation-ledger-row__link,
 .rm-preparation-ledger-row__retry {
   display: inline-flex;
@@ -709,14 +710,16 @@
   background: var(--accent-hover);
 }
 
-.rm-operating-room-next-action__defer {
+.rm-operating-room-next-action__defer,
+.rm-operating-room-next-action__secondary {
   padding: 0 var(--space-lg);
   border: 1px solid var(--accent-line);
   background: transparent;
   color: var(--accent);
 }
 
-.rm-operating-room-next-action__defer:hover {
+.rm-operating-room-next-action__defer:hover,
+.rm-operating-room-next-action__secondary:hover {
   border-color: var(--accent);
   background: var(--accent-soft);
 }
@@ -820,6 +823,7 @@
 
 .rm-operating-room-next-action__primary:focus-visible,
 .rm-operating-room-next-action__defer:focus-visible,
+.rm-operating-room-next-action__secondary:focus-visible,
 .rm-preparation-ledger-row__link:focus-visible,
 .rm-preparation-ledger-row__retry:focus-visible {
   outline: 2px solid var(--focus-ring);
@@ -1202,6 +1206,7 @@
   .rm-operating-room-phases__tab,
   .rm-operating-room-next-action__primary,
   .rm-operating-room-next-action__defer,
+  .rm-operating-room-next-action__secondary,
   .rm-preparation-ledger-row__link,
   .rm-preparation-ledger-row__retry {
     transition-duration: 0.001ms;

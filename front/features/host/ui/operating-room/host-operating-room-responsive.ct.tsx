@@ -161,10 +161,6 @@ const workboxView: HostWorkboxView = {
   ],
 };
 
-export function Link({ to, children, ...props }: { to: string; children: ReactNode; className?: string; "aria-label"?: string }) {
-  return <a {...props} href={to}>{children}</a>;
-}
-
 function hostWorkbox(overrides: {
   view?: HostWorkboxView | null;
   loading?: boolean;
@@ -505,13 +501,14 @@ function phaseStatusLedger(
     action: string;
   }[],
 ) {
-  return <PhaseStatusLedger title={title} rows={rows} LinkComponent={Link} />;
+  return <PhaseStatusLedger title={title} rows={rows} />;
 }
 
 function approvedOperatingRoom(input: {
   phase: HostOperatingRoomView["phase"];
   dDayLabel: string;
   nextAction: HostOperatingRoomView["nextAction"];
+  nextActionSecondary?: { href: string; label: string };
   liveContent?: ReactNode;
   closingContent?: ReactNode;
   workboxItems: HostWorkboxView["items"];
@@ -593,6 +590,7 @@ function approvedOperatingRoom(input: {
         onRetryPreparation={() => undefined}
         onRetryOptional={() => undefined}
         nextActionPending={false}
+        nextActionSecondary={input.nextActionSecondary}
       />
     </HostApprovedShell>
   );
@@ -676,12 +674,7 @@ function approvedAttendanceBoard() {
 }
 
 function approvedLiveContent() {
-  return (
-    <>
-      {phaseStatusLedger("현장 현황", liveStatusRows)}
-      {approvedAttendanceBoard()}
-    </>
-  );
+  return phaseStatusLedger("현장 현황", liveStatusRows);
 }
 
 function prepApprovedView() {
@@ -711,8 +704,14 @@ function liveApprovedView(liveContent: ReactNode) {
       state: "actionable",
       workItemKey: "public-safe-work-item-live",
       label: "아직 출석을 확인하지 않은 3명이 있어요",
+      ctaLabel: "출석 확인 시작",
+      note: "오후 7:26 · 현장 모드가 열렸어요",
       reason: "참석 응답과 실제 출석은 별개로 기록해요.",
       href: "/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=attendance",
+    },
+    nextActionSecondary: {
+      href: liveStatusRows.find((row) => row.label === "진행 순서")!.href,
+      label: "모임 진행 보기",
     },
     liveContent,
     workboxItems: liveWorkboxItems,
@@ -728,6 +727,8 @@ function closingApprovedView() {
       state: "actionable",
       workItemKey: "public-safe-work-item-closing",
       label: "기록 초안을 검토하면 멤버에게 게시할 수 있어요",
+      ctaLabel: "기록 초안 검토",
+      note: "게시 전에 피드백 문서를 확인해 주세요",
       reason: "출석은 확정됐고, 소감 4개를 기다리고 있어요.",
       href: "/clubs/reading-sai/app/host/records",
     },
@@ -856,6 +857,16 @@ test("live locks the approved desktop operating room", async ({ mount, page }, t
   await expect(component.getByRole("region", { name: "현장 현황" })).toBeVisible();
   await expect(component.getByText("실제 출석", { exact: true })).toBeVisible();
   await expect(component.getByRole("region", { name: "현장 현황" }).getByText("참석 응답")).toBeVisible();
+  await expect(component.getByRole("link", { name: "운영실" })).toHaveAttribute("aria-current", "page");
+  await expect(component.getByRole("link", { name: "모임 정보" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "출석 확인 시작" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "모임 진행 보기" })).toBeVisible();
+  await expect(component.getByRole("region", { name: "현장 현황" })).toBeVisible();
+  await expect(component.getByRole("complementary", { name: "클럽 작업함" }).getByRole("listitem", { name: "출석 미확인" })).toBeVisible();
+  await expect(component.getByRole("complementary", { name: "클럽 작업함" }).getByRole("listitem")).not.toHaveCount(0);
+  await expect(component.getByRole("heading", { name: "출석 확인" })).toHaveCount(0);
+  await expect(component.locator(".rm-meeting-response-ledger--attendance-board")).toHaveCount(0);
+  await expect(component.getByRole("region", { name: "다음에 할 일" }).getByText("오후 7:26 · 현장 모드가 열렸어요")).toBeVisible();
   await expectLocatorGeometry(component.locator(".rm-host-operating-room__body"), BODY_DESKTOP_GEOMETRY, 4);
   await expectLocatorGeometry(component.locator(".rm-host-operating-room__workbox-rail"), WORKBOX_DESKTOP_GEOMETRY, 4);
   const regions = [
@@ -869,7 +880,11 @@ test("closing locks the approved desktop operating room", async ({ mount, page }
   test.setTimeout(90_000);
   const component = await mountApproved(mount, page, closingApprovedView(), APPROVED_DESKTOP_VIEWPORT);
   await expect(component.getByRole("region", { name: "다음에 할 일" })).toContainText("기록 초안을 검토하면 멤버에게 게시할 수 있어요");
+  await expect(component.getByRole("region", { name: "다음에 할 일" }).getByRole("link", { name: "기록 초안 검토" })).toBeVisible();
   await expect(component.getByRole("region", { name: "마감 현황" }).getByRole("listitem")).toHaveCount(5);
+  await expect(component.getByRole("region", { name: "마감 현황" }).getByRole("link", { name: /보기|열기|확인|조건/ }).first()).toBeVisible();
+  await expect(component.getByRole("complementary", { name: "클럽 작업함" }).getByRole("listitem", { name: "기록 초안 검토" })).toBeVisible();
+  await expect(component.getByRole("region", { name: "다음에 할 일" }).getByText("게시 전에 피드백 문서를 확인해 주세요")).toBeVisible();
   await expectLocatorGeometry(component.locator(".rm-host-operating-room__body"), BODY_DESKTOP_GEOMETRY, 4);
   await expectLocatorGeometry(component.locator(".rm-host-operating-room__workbox-rail"), WORKBOX_DESKTOP_GEOMETRY, 4);
   const regions = [
@@ -925,7 +940,7 @@ test("live locks the approved mobile attendance board", async ({ mount, page }, 
   const component = await mountApproved(
     mount,
     page,
-    liveApprovedView(approvedLiveContent()),
+    liveApprovedView(approvedAttendanceBoard()),
     APPROVED_MOBILE_VIEWPORT,
   );
   await expect(component.getByRole("heading", { name: "출석 확인" })).toBeVisible();
