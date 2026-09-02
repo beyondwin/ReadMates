@@ -68,7 +68,7 @@ CI=true npx --yes corepack@0.35.0 pnpm --dir front exec playwright test --config
 - Host ledger/person header/nav/main과 Host mobile nav/main/board가 등록되어 4px 이내.
 - Host 운영실 semantic order `현재 모임 → 단계 → 다음 행동 → 준비 현황 → 작업함`.
 - Host 작업함 기본 행에서 보류 combobox 0개; `세부 조작` disclosure 뒤에 둔다.
-- 320–1440 중간 폭: 가로 overflow 없음, 44px target, wrapping, visible focus, reduced motion (approved script가 실행한 CT 파일 범위).
+- 320–1440 중간 폭: 가로 overflow 없음, 44px target(live compact 출석 choice 40px / undo 36px leftover), wrapping, visible focus, reduced motion (approved script가 실행한 CT 파일 범위).
 
 키보드·focus·44px·reduced motion은 CT 자동화다. VoiceOver/NVDA 수동 증거는 아래 Manual assistive technology 절.
 
@@ -89,7 +89,7 @@ CI=true npx --yes corepack@0.35.0 pnpm --dir front exec playwright test --config
 | `host-settings-desktop` | PASS-with-font-raster | `초대와 설정` current, `새 초대 링크`, 활성/만료 예정/중지 테이블, 클럽 설정 행, `클럽 운영 종료`. leftover는 `새 초대 링크`가 hero 버튼이 아니라 칩, `revision`/`설정 저장`, 복사 없음(named), font halo. |
 | `host-schedule-review-desktop` | PASS-with-font-raster | 운영실 current, 두 열 대상·문구, `4명에게 안내 보내기`가 1536×1024 안에 있음. 겹침/한 열 붕괴 없음. leftover는 heading `일정 미열람 검토` vs PNG `일정 미열람 안내`. 변경 내용 / 최근 접속 / 보류는 named empty cells. |
 | `host-prep-mobile` | PASS-with-font-raster | 표지, `멤버 시야`, 주 행동 `대상과 문구 검토`, 01–04, 하단 내비. 채워진 `지금` 행(일정 미열람 확인, 가입 승인 검토)이 390×832 탭 바 위에 있다. leftover는 작업함 제목 클립, 세 번째 `지금` 행/`작업함 모두 보기`가 탭 바에 가림, `자세히 보기` vs chevron, `지금 4+`, 보류 접힘(스펙), BookCover fallback, font halo. |
-| `host-live-mobile` | PASS-with-font-raster | 3버튼 출석판, 8/12·확인 필요 3·나머지 3명, 시안 인원/avatar/`진행 중`/`멤버 시야`, 하단 내비, bulk/undo가 첫 viewport 안. leftover는 버튼 내부 check/X/? glyph, 표지 fallback, 운영실 house vs pen icon, font halo. |
+| `host-live-mobile` | PASS-with-font-raster | 3버튼 출석판, 8/12·확인 필요 3·나머지 3명, 시안 인원/avatar/`진행 중`/`멤버 시야`, 하단 내비, bulk/undo가 첫 viewport 안. leftover는 버튼 내부 check/X/? glyph, 표지 fallback, 운영실 house vs pen icon, font halo. **a11y leftover:** live compact choice 40px, undo bar 36px. 44px로 올리면 mockup-16 closer(7행·bulk·undo)가 탭 바 아래로 밀린다. 이 보드의 모든 390 control이 44px라고 주장하지 않는다. |
 | `host-person-mobile` | PASS-with-font-raster | `← 사람 목록으로`, FOLIO/tenure, 01–04 현재 일정/참석 응답/실제 출석/멤버십, 하단 내비 사람 selected. 멤버 `내 클럽` 홈 셸이 아니라 Host person destination. leftover는 club switcher `내 클럽` 라벨, 책 제목/seen-revision named empty cells, font halo. |
 
 공통 leftover (FAIL 사유 아님): club switcher `내 클럽` vs PNG `읽는사이 · 호스트 운영실`; 온실 표지 BookCover fallback(named); Pretendard·icon halo vs AI PNG.
@@ -111,6 +111,7 @@ CI=true npx --yes corepack@0.35.0 pnpm --dir front exec playwright test --config
 - 픽셀 게이트 기본값은 0.02로 유지한다. threshold를 올리지 않았다. 독립 검토가 font-raster leftover로 인정한 것은 IA-pass 11 id다.
 - Host 작업함 보류는 기본 접힌 disclosure다. PNG에 보류 버튼이 보여도 스펙 `보류는 접힘`을 따른다.
 - Host live desktop 첫 viewport는 mockup 08 `PhaseStatusLedger`다. mockup 16 3-button attendance board는 mobile live에 둔다.
+- Host live-mobile compact 출석 choice는 40px, undo bar는 36px다. 44px 복원은 mockup-16 closer를 탭 바 아래로 밀어 첫 viewport 계약을 깨므로 named leftover로 남긴다. `front/DESIGN.md`는 이 보드의 모든 390 control이 44px라고 주장하지 않는다.
 - Named empty cells (FAIL 단독 사유 아님): Greenhouse BookCover fallback; pending 초대 경로; 출석/소감/피드백 facts 없음; invitation `복사` without sharePath; schedule-review 변경 내용 / 최근 접속 / 보류; person book titles / seen-revision.
 - 승인 PNG는 runtime image가 아니다. tracked snapshot 갱신만으로 합격하지 않는다.
 

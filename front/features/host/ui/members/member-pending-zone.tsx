@@ -5,6 +5,7 @@ import {
   disabledViewerActivationReason,
   disabledViewerDeactivateReason,
 } from "./member-action-rules";
+import { matchesHostPeopleNameQuery, useHostPeopleNameQuery } from "./host-people-name-query";
 import { formatPendingRequestTime, requestMeta } from "./member-list-helpers";
 import type { HostMembersLinkComponent } from "./types";
 
@@ -33,8 +34,10 @@ export function MemberPendingZone({
 }): ReactElement | null {
   const [reviewingIds, setReviewingIds] = useState<ReadonlySet<string>>(() => new Set());
   const PersonLink = LinkComponent ?? DefaultPersonLink;
+  const nameQuery = useHostPeopleNameQuery();
+  const visibleViewers = viewers.filter((member) => matchesHostPeopleNameQuery(member.displayName, nameQuery));
 
-  if (viewers.length === 0) {
+  if (visibleViewers.length === 0) {
     return null;
   }
 
@@ -51,7 +54,7 @@ export function MemberPendingZone({
       <header className="rm-host-pending__header">
         <div className="stack" style={{ "--stack": "6px" } as CSSProperties}>
           <h2 className="h4 editorial" style={{ margin: 0 }}>
-            가입 승인 대기 {viewers.length}명
+            가입 승인 대기 {visibleViewers.length}명
           </h2>
           <p className="small" style={{ margin: 0, color: "var(--text-2)" }}>
             승인과 거절은 결과 안내를 포함해요.
@@ -60,14 +63,14 @@ export function MemberPendingZone({
         <button
           className="btn btn-primary"
           type="button"
-          onClick={() => startReview(viewers[0].membershipId)}
+          onClick={() => startReview(visibleViewers[0].membershipId)}
         >
           가입 승인 검토
         </button>
       </header>
 
       <div className="stack" style={{ "--stack": "10px" } as CSSProperties}>
-        {viewers.map((member) => {
+        {visibleViewers.map((member) => {
           const rowPending = isRowPending(member.membershipId);
           const activateReason = disabledViewerActivationReason(rowPending);
           const releaseReason = disabledViewerDeactivateReason(member, rowPending);

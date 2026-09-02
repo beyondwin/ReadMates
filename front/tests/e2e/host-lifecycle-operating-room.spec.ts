@@ -247,7 +247,7 @@ test("prep, live attendance receipt and undo, and closing stay on one scoped cur
   await page.goto(`${HOST_PATH}?phase=closing`);
   await expectOperatingRoomContext(page, "closing");
   await expect(page.getByRole("region", { name: "마감 현황" })).toBeVisible();
-  const recordReview = page.getByRole("link", { name: "기록 패키지 검토" }).first();
+  const recordReview = page.getByRole("link", { name: "기록 초안 검토" }).first();
   await expect(recordReview).toHaveAttribute(
     "href",
     `${HOST_PATH}/sessions/${SESSION_ID}/edit?records=json`,

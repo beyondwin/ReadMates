@@ -17,6 +17,7 @@ import {
   formatRecentClubAccess,
   rosterStatusLabels,
 } from "./member-list-helpers";
+import { matchesHostPeopleNameQuery, useHostPeopleNameQuery } from "./host-people-name-query";
 import type { HostMemberLifecyclePath } from "./types";
 import type { HostMembersLinkComponent } from "./types";
 import "./member-ledger.css";
@@ -273,7 +274,9 @@ export function MemberList({
   now?: Date;
 }) {
   const PersonLink = LinkComponent ?? DefaultPersonLink;
-  if (members.length === 0) {
+  const nameQuery = useHostPeopleNameQuery();
+  const visibleMembers = members.filter((member) => matchesHostPeopleNameQuery(member.displayName, nameQuery));
+  if (visibleMembers.length === 0) {
     return (
       <div className="surface" style={{ padding: 28 }}>
         <p className="small" style={{ color: "var(--text-2)", margin: "0 0 10px" }}>
@@ -307,7 +310,7 @@ export function MemberList({
           </tr>
         </thead>
         <tbody>
-          {members.map((member) => {
+          {visibleMembers.map((member) => {
             const sessionBadge = renderCurrentSessionBadge(member);
             const facts = factsByMembershipId?.[member.membershipId];
             const scheduleSeenLabel = facts?.scheduleSeenLabel ?? defaultScheduleSeenLabel(member);

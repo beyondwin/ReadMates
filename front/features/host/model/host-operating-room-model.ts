@@ -450,6 +450,7 @@ function resolveNextAction(context: {
     return actionState(context.input, {
       kind: "closing",
       label: context.closing.primaryAction.label,
+      ctaLabel: "기록 초안 검토",
       reason: context.closing.primaryAction.reason,
       href: context.closing.primaryAction.href,
     });
@@ -473,6 +474,7 @@ function resolveNextAction(context: {
       return actionState(context.input, {
         kind,
         label: nextActionLabel(kind),
+        ctaLabel: kind === "schedule-seen" ? "대상과 문구 검토" : undefined,
         reason: row.detail,
         href: row.href,
       });

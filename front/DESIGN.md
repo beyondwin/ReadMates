@@ -62,11 +62,11 @@ Lifecycle·audience·public placement를 한 stepper로 합치지 않는다. 다
 
 | 폭 | composition |
 | --- | --- |
-| `390px`(mobile) | 현재 모임 → 단계 → 다음 행동 → 준비 현황 → 작업함의 단일 열이다. 네 영역 mobile tab bar와 `safe-area-inset-bottom` 공간을 보존하며 모든 보이는 control은 최소 44px다. |
+| `390px`(mobile) | 현재 모임 → 단계 → 다음 행동 → 준비 현황 → 작업함의 단일 열이다. 네 영역 mobile tab bar와 `safe-area-inset-bottom` 공간을 보존하며 보이는 control은 최소 44px다. 예외: live compact 출석판 choice는 40px, undo bar는 36px다. mockup-16 closer를 탭 바 위에 두기 위한 named leftover이며 이 보드의 모든 390 control이 44px라고 주장하지 않는다. |
 | `768–1199px` | 같은 semantic 순서를 유지하고 primary 뒤에 작업함을 쌓는다. 68/32 rail을 억지로 축소하지 않으며 768px부터 desktop chrome을 사용하되 bottom safe area는 침범하지 않는다. |
 | `1200px+` | main 작업은 약 68%, 작업함 rail은 약 32%의 두 열이다. DOM/읽기 순서는 mobile과 동일하며 작업함만 오른쪽에 배치한다. |
 
-390·767·768·1024·1199·1200·1440px와 320×350 200% zoom proxy는 `host-operating-room-responsive.ct.tsx`와 `host-shell.ct.tsx`가 가로 overflow, 44px target, 순서, keyboard roving, visible focus와 reduced motion을 잠근다. Phase와 workbox tab은 방향키와 Home/End를 지원하고, focus/return state는 route/panel을 닫거나 Back/Forward할 때 원래 control로 돌아간다.
+390·767·768·1024·1199·1200·1440px와 320×350 200% zoom proxy는 `host-operating-room-responsive.ct.tsx`와 `host-shell.ct.tsx`가 가로 overflow, 44px target(live compact 출석 choice 40px / undo 36px leftover), 순서, keyboard roving, visible focus와 reduced motion을 잠근다. Phase와 workbox tab은 방향키와 Home/End를 지원하고, focus/return state는 route/panel을 닫거나 Back/Forward할 때 원래 control로 돌아간다.
 
 `front/tests/e2e/support/visual-authority-contract.ts`의 검사는 visible main, bounded interactive accessible-name source, nested interactive, ARIA target, navigation/complementary landmark 이름만 확인하는 저장소 custom DOM/ARIA audit다. axe/axe-core 또는 전체 접근성 적합성으로 부르지 않는다. 현재 Chromium 자동화에서 helper-classified serious/critical finding은 없지만 VoiceOver/NVDA, Firefox/WebKit과 실제 기기 screen reader는 `not measured`다.
 
@@ -139,7 +139,7 @@ Live region은 의미 있는 전이에만 쓰고 polling마다 반복하지 않�
 
 ## Responsive and accessibility evidence index
 
-Contract widths: 320, 390, 768, 900, 1024, 1440px. keyboard, visible focus, 44px target, reduced motion, long Korean/English wrapping은 automated helper로 검증한다. Chrome 실제 200% toolbar zoom은 DPR 2→4, CSS viewport 1728→864, document/body scroll width와 client width 일치, 보이는 focus target 높이로 확인했다. Manual screen-reader announcement order는 아직 `not measured`이며 검증 완료로 주장하지 않는다.
+Contract widths: 320, 390, 768, 900, 1024, 1440px. keyboard, visible focus, 44px target(live compact 출석 choice 40px / undo 36px leftover), reduced motion, long Korean/English wrapping은 automated helper로 검증한다. Chrome 실제 200% toolbar zoom은 DPR 2→4, CSS viewport 1728→864, document/body scroll width와 client width 일치, 보이는 focus target 높이로 확인했다. Manual screen-reader announcement order는 아직 `not measured`이며 검증 완료로 주장하지 않는다.
 
 Host lifecycle의 code-native source는 `front/features/host/ui/operating-room/host-operating-room-responsive.ct.tsx`, `front/features/host/ui/meeting-workspace/host-lifecycle-responsive.ct.tsx`, `front/features/host/ui/shell/host-shell.ct.tsx`다. Real-route continuity와 recovery widths는 `front/tests/e2e/host-lifecycle-route-continuity.spec.ts`, `front/tests/e2e/host-authority-loss.spec.ts`, `front/tests/e2e/host-workbox-stage4.spec.ts`가 맡는다. semantic/geometry/DOM 계약은 이 code-native tests가 잠근다. 승인 PNG를 runtime 배경으로 쓰지 않으며 tracked snapshot은 보조 회귀 cache다.
 

@@ -725,6 +725,36 @@
   background: var(--accent-soft);
 }
 
+.rm-operating-room-next-action__more {
+  min-width: 0;
+}
+
+.rm-operating-room-next-action__more > summary {
+  display: inline-flex;
+  align-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  color: var(--text-2);
+  cursor: pointer;
+  list-style: none;
+}
+
+.rm-operating-room-next-action__more > summary::-webkit-details-marker,
+.rm-operating-room-next-action__more > summary::marker {
+  display: none;
+}
+
+.rm-operating-room-next-action__more > summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.rm-operating-room-next-action__more .rm-operating-room-next-action__defer {
+  display: flex;
+  margin-top: var(--space-xs);
+}
+
 .rm-preparation-ledger {
   position: relative;
   padding: 22px 36px 0 0;
@@ -1190,6 +1220,7 @@
     font-size: 1.25rem;
   }
 
+  /* Live compact 390: 40px tabs/choices keep mockup-16 closer above the tab bar. Named leftover vs 44px. */
   .rm-host-operating-room[data-phase="live"] .rm-operating-room-phases,
   .rm-host-operating-room[data-phase="live"] .rm-operating-room-phases__tab {
     min-height: 40px;
@@ -1231,6 +1262,7 @@
     padding-bottom: calc(var(--m-nav-h, 56px) + var(--m-safe-bottom, 0px));
   }
 
+  /* Live compact undo 36px: named leftover vs 44px so mockup-16 closer stays above the tab bar. */
   .rm-host-operating-room[data-phase="live"] .rm-workspace-undo-bar {
     margin-top: 0;
     min-height: 36px;

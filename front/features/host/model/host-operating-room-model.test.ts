@@ -251,12 +251,18 @@ describe("buildHostOperatingRoomView", () => {
 
   it("chooses exactly one next action in the fixed attendance, schedule, RSVP, questions, place, closing order", () => {
     const base = input();
-    expect(buildHostOperatingRoomView(base).nextAction.kind).toBe("attendance");
+    expect(buildHostOperatingRoomView(base).nextAction).toMatchObject({
+      kind: "attendance",
+      ctaLabel: "출석 확인 시작",
+    });
 
     const attendanceDone = session({
       attendees: session().attendees.map((row) => ({ ...row, attendanceStatus: row.membershipId === "member-2" ? "ABSENT" : "ATTENDED" })),
     });
-    expect(buildHostOperatingRoomView(input({ currentMeeting: attendanceDone })).nextAction.kind).toBe("schedule-seen");
+    expect(buildHostOperatingRoomView(input({ currentMeeting: attendanceDone })).nextAction).toMatchObject({
+      kind: "schedule-seen",
+      ctaLabel: "대상과 문구 검토",
+    });
 
     const scheduleDone = session({
       attendees: attendanceDone.attendees,
@@ -287,7 +293,11 @@ describe("buildHostOperatingRoomView", () => {
       currentMeeting: session({ ...rsvpDone, state: "CLOSED", date: "2026-08-29" }),
       questions: ready({ respondingMemberCount: 4, eligibleMemberCount: 4, questionCount: 5 }),
       closing: ready(closing("BLOCKED", "IMPORT_RECORDS")),
-    })).nextAction).toMatchObject({ kind: "closing", label: "기록 패키지 검토" });
+    })).nextAction).toMatchObject({
+      kind: "closing",
+      label: "기록 패키지 검토",
+      ctaLabel: "기록 초안 검토",
+    });
   });
 
   it("does not synthesize authority or defer from a locally predictable key", () => {

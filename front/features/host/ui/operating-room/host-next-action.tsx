@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from "react";
+import { useState, type ComponentType, type ReactNode } from "react";
 import type { HostNextActionView } from "@/features/host/model/host-operating-room-model";
 import { OperatingRoomGlyph } from "./operating-room-glyph";
 import "./operating-room.css";
@@ -42,6 +42,7 @@ export function HostNextAction({
   LinkComponent = DefaultLink,
   secondaryAction,
 }: HostNextActionProps) {
+  const [moreOpen, setMoreOpen] = useState(false);
   const deferKey = action.state === "actionable" ? action.workItemKey : null;
   const canDefer = deferKey !== null && onDefer;
   const deferAction = canDefer && !pending ? () => onDefer(deferKey) : undefined;
@@ -82,14 +83,22 @@ export function HostNextAction({
             </LinkComponent>
           ) : null}
           {canDefer ? (
-            <button
-              className="rm-operating-room-next-action__defer"
-              type="button"
-              disabled={pending}
-              onClick={deferAction}
+            <details
+              className="rm-operating-room-next-action__more"
+              onToggle={(event) => setMoreOpen(event.currentTarget.open)}
             >
-              {pending ? "보류 중" : "내일 09:00까지 보류"}
-            </button>
+              <summary>세부 조작</summary>
+              <div hidden={!moreOpen}>
+                <button
+                  className="rm-operating-room-next-action__defer"
+                  type="button"
+                  disabled={pending}
+                  onClick={deferAction}
+                >
+                  {pending ? "보류 중" : "내일 09:00까지 보류"}
+                </button>
+              </div>
+            </details>
           ) : null}
         </div>
       ) : null}

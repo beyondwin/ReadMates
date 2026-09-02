@@ -1,8 +1,14 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { HostNextActionView } from "@/features/host/model/host-operating-room-model";
 import { HostNextAction } from "./host-next-action";
+
+async function discloseDefer(user: ReturnType<typeof userEvent.setup>) {
+  const region = screen.getByRole("region", { name: "다음에 할 일" });
+  await user.click(within(region).getByText("세부 조작"));
+  return region;
+}
 
 const actionable: HostNextActionView = {
   kind: "schedule-seen",
@@ -25,30 +31,39 @@ describe("HostNextAction", () => {
     expect(region.querySelectorAll(".rm-operating-room-next-action__primary")).toHaveLength(1);
   });
 
-  it("passes the authoritative opaque work item key unchanged when deferring", async () => {
+  it("folds defer behind 세부 조작 and keeps it available after disclose", async () => {
     const onDefer = vi.fn<(workItemKey: string) => void>();
     const user = userEvent.setup();
     render(<HostNextAction action={actionable} onDefer={onDefer} />);
 
-    await user.click(screen.getByRole("button", { name: "내일 09:00까지 보류" }));
+    const region = screen.getByRole("region", { name: "다음에 할 일" });
+    expect(within(region).getByText("세부 조작")).toBeVisible();
+    expect(within(region).queryByRole("button", { name: "내일 09:00까지 보류" })).not.toBeInTheDocument();
+
+    await discloseDefer(user);
+    await user.click(within(region).getByRole("button", { name: "내일 09:00까지 보류" }));
 
     expect(onDefer).toHaveBeenCalledOnce();
     expect(onDefer).toHaveBeenCalledWith("server/opaque:key:with exact bytes");
   });
 
-  it("disables the exact defer action while its authoritative key is pending", () => {
+  it("disables the exact defer action while its authoritative key is pending", async () => {
+    const user = userEvent.setup();
     render(<HostNextAction action={actionable} onDefer={vi.fn()} pending />);
 
-    expect(screen.getByRole("button", { name: "보류 중" })).toBeDisabled();
+    const region = await discloseDefer(user);
+    expect(within(region).getByRole("button", { name: "보류 중" })).toBeDisabled();
   });
 
   it("does not offer deferral without both server authority and a callback", () => {
     const { rerender } = render(
       <HostNextAction action={{ ...actionable, workItemKey: null }} onDefer={vi.fn()} />,
     );
+    expect(screen.queryByText("세부 조작")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /보류/ })).not.toBeInTheDocument();
 
     rerender(<HostNextAction action={actionable} />);
+    expect(screen.queryByText("세부 조작")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /보류/ })).not.toBeInTheDocument();
   });
 
@@ -72,6 +87,7 @@ describe("HostNextAction", () => {
       actionable.href,
     );
     expect(screen.getAllByRole("link")).toHaveLength(1);
+    expect(screen.queryByText("세부 조작")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /보류/ })).not.toBeInTheDocument();
   });
 

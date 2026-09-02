@@ -132,7 +132,7 @@ async function captureHostLedger(input: {
     regions: input.regions ?? [],
     allowFontRasterException: input.allowFontRasterException,
     fontRasterExceptionMaxRatio: input.fontRasterExceptionMaxRatio,
-    skipMismatchRatioAssertion: input.skipMismatchRatioAssertion ?? true,
+    skipMismatchRatioAssertion: input.skipMismatchRatioAssertion ?? false,
   });
 }
 

@@ -483,7 +483,10 @@ describe("HostDashboardRoute", () => {
       },
     }));
 
-    await userEvent.click(await screen.findByRole("button", { name: "내일 09:00까지 보류" }));
+    const nextAction = await screen.findByRole("region", { name: "다음에 할 일" });
+    expect(within(nextAction).queryByRole("button", { name: "내일 09:00까지 보류" })).not.toBeInTheDocument();
+    await userEvent.click(within(nextAction).getByText("세부 조작"));
+    await userEvent.click(within(nextAction).getByRole("button", { name: "내일 09:00까지 보류" }));
     expect(routeMocks.deferWorkbox).toHaveBeenCalledWith(expect.objectContaining({
       key,
       deferredUntil: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
@@ -536,10 +539,12 @@ describe("HostDashboardRoute", () => {
       },
     }));
 
-    const button = await screen.findByRole("button", { name: "내일 09:00까지 보류" });
+    const nextAction = await screen.findByRole("region", { name: "다음에 할 일" });
+    await userEvent.click(within(nextAction).getByText("세부 조작"));
+    const button = within(nextAction).getByRole("button", { name: "내일 09:00까지 보류" });
     await userEvent.click(button);
-    expect(screen.getByRole("button", { name: "보류 중" })).toBeDisabled();
-    await userEvent.click(screen.getByRole("button", { name: "보류 중" }));
+    expect(within(nextAction).getByRole("button", { name: "보류 중" })).toBeDisabled();
+    await userEvent.click(within(nextAction).getByRole("button", { name: "보류 중" }));
     expect(routeMocks.deferWorkbox).toHaveBeenCalledTimes(1);
 
     pendingDeferral.resolve?.({ key, deferredUntil: "2026-09-01T00:00:00Z" });
@@ -586,7 +591,8 @@ describe("HostDashboardRoute", () => {
 
     const ledger = await screen.findByRole("region", { name: "준비 현황" });
     expect(within(ledger).getByText("현재 일정 확인 1/2")).toBeVisible();
-    expect(screen.getByRole("link", { name: "일정 미확인 멤버 검토" })).toHaveAttribute(
+    expect(screen.getByRole("region", { name: "다음에 할 일" })).toHaveTextContent("일정 미확인 멤버 검토");
+    expect(screen.getByRole("link", { name: "대상과 문구 검토" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7/schedule-review",
     );
@@ -732,7 +738,8 @@ describe("HostDashboardRoute", () => {
     const checklist = screen.getByRole("region", { name: "마감 현황" });
     expect(checklist).toHaveTextContent("출석 확정");
     expect(checklist).toHaveTextContent("기록 초안");
-    expect(screen.getByRole("link", { name: "기록 패키지 검토" })).toHaveAttribute(
+    expect(screen.getByRole("region", { name: "다음에 할 일" })).toHaveTextContent("기록 패키지 검토");
+    expect(screen.getByRole("link", { name: "기록 초안 검토" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7/edit?records=json",
     );
