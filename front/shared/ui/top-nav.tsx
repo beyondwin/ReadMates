@@ -218,7 +218,25 @@ function guestLinks(publicBasePath: string): NavLink[] {
   ];
 }
 
-function Brand({ href, LinkComponent }: { href: string; LinkComponent: AppLinkComponent }) {
+function Brand({ href, LinkComponent, variant }: { href: string; LinkComponent: AppLinkComponent; variant?: TopNavVariant }) {
+  const hostMark = variant === "host";
+  if (hostMark) {
+    return (
+      <LinkComponent to={href} className="row" aria-label="ReadMates">
+        <span
+          className="editorial"
+          style={{
+            fontSize: "16px",
+            lineHeight: 1,
+            letterSpacing: "-0.025em",
+            fontWeight: 600,
+          }}
+        >
+          ReadMates
+        </span>
+      </LinkComponent>
+    );
+  }
   return (
     <LinkComponent to={href} className="row" style={{ gap: "10px" }} aria-label="읽는사이 홈">
       <ReadmatesBrandMark />
@@ -256,6 +274,7 @@ function TopNavFrame({
   primaryControl,
   utilityControl,
   LinkComponent,
+  variant,
 }: {
   brandHref: string;
   navLabel: string;
@@ -269,12 +288,13 @@ function TopNavFrame({
   primaryControl?: ReactNode;
   utilityControl?: ReactNode;
   LinkComponent: AppLinkComponent;
+  variant?: TopNavVariant;
 }) {
   return (
     <header className="topnav">
       <div className="container topnav-inner">
         <div className="topnav-global-context">
-          <Brand href={brandHref} LinkComponent={LinkComponent} />
+          <Brand href={brandHref} LinkComponent={LinkComponent} variant={variant} />
           {contextControl}
         </div>
 
@@ -372,6 +392,7 @@ function GuestTopNav({
       links={guestLinksWithAction(links, authAction)}
       pathname={pathname}
       LinkComponent={LinkComponent}
+      variant="guest"
     />
   );
 }
@@ -454,6 +475,7 @@ function AppTopNav({
       primaryControl={primaryControl}
       utilityControl={utilityControl}
       LinkComponent={LinkComponent}
+      variant={variant}
     />
   );
 }
@@ -508,6 +530,7 @@ export function TopNav({
         primaryControl={primaryControl}
         utilityControl={utilityControl}
         LinkComponent={LinkComponent}
+        variant={variant}
       />
     );
   }

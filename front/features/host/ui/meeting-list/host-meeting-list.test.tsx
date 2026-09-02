@@ -55,30 +55,36 @@ function renderList(overrides: Partial<Parameters<typeof HostMeetingList>[0]> = 
 }
 
 describe("HostMeetingList", () => {
-  it("renders two section headers and TOC rows with folio, dotted leader, and mono summary", () => {
-    renderList();
+  it("renders two section headers and ledger columns with action cells", () => {
+    renderList({ now: new Date("2026-08-30T12:00:00+09:00") });
 
     expect(screen.getByRole("heading", { name: "다가오는 모임" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "지난 모임" })).toBeInTheDocument();
+    expect(screen.getAllByRole("columnheader", { name: "모임" })).toHaveLength(2);
+    expect(screen.getAllByRole("columnheader", { name: "일정" })).toHaveLength(2);
+    expect(screen.getAllByRole("columnheader", { name: "상태" })).toHaveLength(2);
+    expect(screen.getAllByRole("columnheader", { name: "요약" })).toHaveLength(2);
+    expect(screen.getAllByRole("columnheader", { name: "작업" })).toHaveLength(2);
 
-    const upcoming = screen.getByRole("list", { name: "다가오는 모임" });
-    const upcomingItem = within(upcoming).getByRole("listitem");
-    expect(upcomingItem.querySelector(".rm-meeting-toc__no.mono")).toHaveTextContent("No.7");
-    expect(upcomingItem.querySelector(".rm-meeting-toc__leader")).toHaveAttribute("aria-hidden");
-    expect(upcomingItem.querySelector(".rm-meeting-toc__lifecycle")).toHaveTextContent("준비 중");
-    expect(upcomingItem.querySelector(".rm-meeting-toc__summary.mono")).toHaveTextContent("08-30 예정일");
-    expect(within(upcomingItem).getByRole("link", { name: "지구 끝의 온실" })).toHaveAttribute(
+    const upcoming = screen.getByRole("row", { name: /지구 끝의 온실/ });
+    expect(within(upcoming).getByText("No.7")).toBeInTheDocument();
+    expect(within(upcoming).getByText("준비 중")).toBeInTheDocument();
+    expect(within(upcoming).getByText("08-30 예정일")).toBeInTheDocument();
+    expect(within(upcoming).getByRole("link", { name: "지구 끝의 온실" })).toHaveAttribute(
+      "href",
+      "/app/host/sessions/open-1",
+    );
+    expect(within(upcoming).getByRole("link", { name: "운영실 열기" })).toHaveAttribute(
       "href",
       "/app/host/sessions/open-1",
     );
 
-    const past = screen.getByRole("list", { name: "지난 모임" });
-    const pastItem = within(past).getByRole("listitem");
-    expect(pastItem.querySelector(".rm-meeting-toc__no.mono")).toHaveTextContent("No.6");
-    expect(pastItem.querySelector(".rm-meeting-toc__leader")).toHaveAttribute("aria-hidden");
-    expect(pastItem.querySelector(".rm-meeting-toc__summary.mono")).toHaveTextContent("08-15");
-    expect(pastItem.querySelector(".rm-meeting-toc__lifecycle")).toHaveTextContent("기록 정리 중");
-    expect(within(pastItem).getByText("기록 확인 필요")).toBeInTheDocument();
+    const past = screen.getByRole("row", { name: /소년이 온다/ });
+    expect(within(past).getByText("No.6")).toBeInTheDocument();
+    expect(within(past).getByText("기록 정리 중")).toBeInTheDocument();
+    expect(within(past).getByText("08-15")).toBeInTheDocument();
+    expect(within(past).getByRole("link", { name: "마감실 열기" })).toBeInTheDocument();
+    expect(screen.queryByText("기록 확인 필요")).not.toBeInTheDocument();
   });
 
   it("keeps a quiet trash link at the bottom using trashHref", () => {
@@ -143,11 +149,11 @@ describe("HostMeetingList", () => {
     expect(screen.getByRole("heading", { name: "일정과 모임" })).toHaveFocus();
   });
 
-  it("stretches the title link across the mobile row for a 44px+ tap target", () => {
+  it("keeps 44px action targets and a calendar-row mobile tap overlay", () => {
     const css = readFileSync(path.resolve("features/host/ui/meeting-list/meeting-toc.css"), "utf8");
-    expect(css).toMatch(/\.rm-meeting-toc__row\s*\{[^}]*position:\s*relative/s);
-    expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*\.rm-meeting-toc__title::after[\s\S]*inset:\s*0/);
-    expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*\.rm-meeting-toc__row[\s\S]*min-height:\s*62px/);
+    expect(css).toMatch(/\.rm-meeting-toc__work\s*\{[^}]*min-height:\s*44px/s);
+    expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*\.rm-meeting-toc__calendar-row \.rm-meeting-toc__title::after[\s\S]*inset:\s*0/);
+    expect(css).toMatch(/\.rm-meeting-toc__calendar-row\s*\{[^}]*min-height:\s*62px/s);
   });
 
   it("shows a past-section retry row without collapsing into the first-meeting empty state", async () => {
@@ -241,6 +247,44 @@ describe("HostMeetingList", () => {
       "href",
       "/app/host/sessions/new",
     );
+  });
+
+  it("keeps list/calendar and status chips in the first-viewport toolbar", () => {
+    renderList();
+
+    const toolbar = document.querySelector(".rm-meeting-toc__toolbar") as HTMLElement | null;
+    expect(toolbar).not.toBeNull();
+    expect(within(toolbar!).getByRole("tab", { name: "목록" })).toHaveAttribute("aria-selected", "true");
+    expect(within(toolbar!).getByRole("tab", { name: "달력" })).toBeVisible();
+    expect(within(toolbar!).getByRole("tablist", { name: "모임 상태" })).toBeInTheDocument();
+    expect(within(toolbar!).getByRole("tab", { name: "전체" })).toHaveAttribute("aria-selected", "true");
+    expect(within(toolbar!).getByRole("tab", { name: "준비 중" })).toBeVisible();
+  });
+
+  it("filters rows by the selected status chip", async () => {
+    const user = userEvent.setup();
+    renderList();
+
+    await user.click(screen.getByRole("tab", { name: "준비 중" }));
+    expect(screen.getByRole("link", { name: "지구 끝의 온실" })).toBeVisible();
+    expect(screen.queryByText("소년이 온다")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "마감 필요" }));
+    expect(screen.getByText("소년이 온다")).toBeVisible();
+    expect(screen.queryByRole("link", { name: "지구 끝의 온실" })).not.toBeInTheDocument();
+  });
+
+  it("shows weekday labels and current/next chips in the this-month rail", async () => {
+    const user = userEvent.setup();
+    renderList({ now: new Date("2026-08-30T12:00:00+09:00") });
+
+    const rail = screen.getByRole("complementary", { name: "이번 달" });
+    expect(within(rail).getByText("8월 30일 일요일")).toBeVisible();
+    expect(within(rail).getByText("현재 모임")).toBeVisible();
+    expect(within(rail).getByText("No.7 · 지구 끝의 온실")).toBeVisible();
+    expect(within(rail).queryByText("2026-08-30")).not.toBeInTheDocument();
+    await user.click(within(rail).getByRole("button", { name: "달력에서 보기" }));
+    expect(screen.getByRole("tabpanel", { name: "달력" })).toBeVisible();
   });
 
   it("uses editorial state grammar for loading and error", () => {

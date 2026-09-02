@@ -20,10 +20,11 @@ export function PreparationLedger({ rows, onRetry, LinkComponent }: PreparationL
     >
       <h2 id="rm-preparation-ledger-title">준비 현황</h2>
       <ol className="rm-preparation-ledger__list">
-        {rows.map((row) => (
+        {rows.map((row, index) => (
           <PreparationLedgerRow
             key={row.id}
             row={row}
+            index={index}
             onRetry={onRetry}
             LinkComponent={LinkComponent}
           />

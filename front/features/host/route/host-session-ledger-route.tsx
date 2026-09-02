@@ -278,53 +278,39 @@ export function HostSessionLedgerRoute({
   }));
 
   return (
-    <main style={{ minWidth: 0 }}>
-      <section className="page-header-compact">
-        <div className="container">
-          <div className="eyebrow">호스트 · 기록</div>
-          <h1 ref={headingRef} tabIndex={-1} className="h1 editorial" style={{ margin: "6px 0 4px" }}>
-            {trashView ? "휴지통" : "기록"}
-          </h1>
-          <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-            {trashView
-              ? "삭제된 모임을 서버가 정한 기간 동안 복원할 수 있습니다."
-              : "마친 모임의 기록 상태, 초안, 공개 범위를 한곳에서 확인합니다."}
-          </p>
-        </div>
-      </section>
-      <section className="container" style={{ paddingTop: 8, paddingBottom: 72, minWidth: 0 }}>
-        <p className="sr-only" role="status" aria-live="polite">{listAnnouncement}</p>
-        <HostSessionLedger
-          items={visiblePage?.items ?? []}
-          summary={basePage?.summary}
-          trashItems={trashItems}
-          filters={filters}
-          nextCursor={(trashView ? visibleTrashPage?.nextCursor : visiblePage?.nextCursor) ?? null}
-          loading={trashView ? trashQuery.isPending && !baseTrashPage : query.isPending && !basePage}
-          loadingMore={loadingMore}
-          errorMessage={
-            trashView
-              ? trashQuery.isError && !baseTrashPage ? "휴지통을 불러오지 못했습니다." : null
-              : query.isError && !basePage ? "모임 기록을 불러오지 못했습니다. 검색 조건은 유지됩니다." : null
-          }
-          loadMoreError={loadMoreError}
-          onFiltersChange={updateFilters}
-          onLoadMore={() => void loadMore()}
-          onRetry={() => {
-            void (trashView ? trashQuery.refetch() : query.refetch());
-          }}
-          onRestore={(sessionId) => {
-            void restoreTrashItem(sessionId);
-          }}
-          onRetryRestore={(sessionId) => {
-            void restoreTrashItem(sessionId);
-          }}
-          trashHref="/app/host/sessions?view=trash"
-          activeHref="/app/host/records"
-          recordReturnHref={`${location.pathname}${location.search}${location.hash}`}
-          LinkComponent={LinkComponent}
-        />
-      </section>
-    </main>
+    <>
+      <p className="sr-only" role="status" aria-live="polite">{listAnnouncement}</p>
+      <HostSessionLedger
+        headingRef={headingRef}
+        items={visiblePage?.items ?? []}
+        summary={basePage?.summary}
+        trashItems={trashItems}
+        filters={filters}
+        nextCursor={(trashView ? visibleTrashPage?.nextCursor : visiblePage?.nextCursor) ?? null}
+        loading={trashView ? trashQuery.isPending && !baseTrashPage : query.isPending && !basePage}
+        loadingMore={loadingMore}
+        errorMessage={
+          trashView
+            ? trashQuery.isError && !baseTrashPage ? "휴지통을 불러오지 못했습니다." : null
+            : query.isError && !basePage ? "모임 기록을 불러오지 못했습니다. 검색 조건은 유지됩니다." : null
+        }
+        loadMoreError={loadMoreError}
+        onFiltersChange={updateFilters}
+        onLoadMore={() => void loadMore()}
+        onRetry={() => {
+          void (trashView ? trashQuery.refetch() : query.refetch());
+        }}
+        onRestore={(sessionId) => {
+          void restoreTrashItem(sessionId);
+        }}
+        onRetryRestore={(sessionId) => {
+          void restoreTrashItem(sessionId);
+        }}
+        trashHref="/app/host/sessions?view=trash"
+        activeHref="/app/host/records"
+        recordReturnHref={`${location.pathname}${location.search}${location.hash}`}
+        LinkComponent={LinkComponent}
+      />
+    </>
   );
 }

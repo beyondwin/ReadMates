@@ -1,8 +1,14 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { HostNextActionView } from "@/features/host/model/host-operating-room-model";
 import { HostNextAction } from "./host-next-action";
+
+async function discloseDefer(user: ReturnType<typeof userEvent.setup>) {
+  const region = screen.getByRole("region", { name: "다음에 할 일" });
+  await user.click(within(region).getByText("세부 조작"));
+  return region;
+}
 
 const actionable: HostNextActionView = {
   kind: "schedule-seen",
@@ -25,30 +31,39 @@ describe("HostNextAction", () => {
     expect(region.querySelectorAll(".rm-operating-room-next-action__primary")).toHaveLength(1);
   });
 
-  it("passes the authoritative opaque work item key unchanged when deferring", async () => {
+  it("folds defer behind 세부 조작 and keeps it available after disclose", async () => {
     const onDefer = vi.fn<(workItemKey: string) => void>();
     const user = userEvent.setup();
     render(<HostNextAction action={actionable} onDefer={onDefer} />);
 
-    await user.click(screen.getByRole("button", { name: "내일 09:00까지 보류" }));
+    const region = screen.getByRole("region", { name: "다음에 할 일" });
+    expect(within(region).getByText("세부 조작")).toBeVisible();
+    expect(within(region).queryByRole("button", { name: "내일 09:00까지 보류" })).not.toBeInTheDocument();
+
+    await discloseDefer(user);
+    await user.click(within(region).getByRole("button", { name: "내일 09:00까지 보류" }));
 
     expect(onDefer).toHaveBeenCalledOnce();
     expect(onDefer).toHaveBeenCalledWith("server/opaque:key:with exact bytes");
   });
 
-  it("disables the exact defer action while its authoritative key is pending", () => {
+  it("disables the exact defer action while its authoritative key is pending", async () => {
+    const user = userEvent.setup();
     render(<HostNextAction action={actionable} onDefer={vi.fn()} pending />);
 
-    expect(screen.getByRole("button", { name: "보류 중" })).toBeDisabled();
+    const region = await discloseDefer(user);
+    expect(within(region).getByRole("button", { name: "보류 중" })).toBeDisabled();
   });
 
   it("does not offer deferral without both server authority and a callback", () => {
     const { rerender } = render(
       <HostNextAction action={{ ...actionable, workItemKey: null }} onDefer={vi.fn()} />,
     );
+    expect(screen.queryByText("세부 조작")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /보류/ })).not.toBeInTheDocument();
 
     rerender(<HostNextAction action={actionable} />);
+    expect(screen.queryByText("세부 조작")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /보류/ })).not.toBeInTheDocument();
   });
 
@@ -72,7 +87,58 @@ describe("HostNextAction", () => {
       actionable.href,
     );
     expect(screen.getAllByRole("link")).toHaveLength(1);
+    expect(screen.queryByText("세부 조작")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /보류/ })).not.toBeInTheDocument();
+  });
+
+  it("uses ctaLabel for the primary control and keeps label as the status sentence", () => {
+    render(
+      <HostNextAction
+        action={{
+          ...actionable,
+          label: "최신 일정을 아직 보지 않은 4명이 있어요",
+          ctaLabel: "대상과 문구 검토",
+        }}
+      />,
+    );
+    expect(screen.getByText("최신 일정을 아직 보지 않은 4명이 있어요")).toBeVisible();
+    expect(screen.getByRole("link", { name: "대상과 문구 검토" })).toBeVisible();
+  });
+
+  it("renders an optional secondary destination next to the primary control", () => {
+    render(
+      <HostNextAction
+        action={{
+          ...actionable,
+          kind: "attendance",
+          label: "아직 출석을 확인하지 않은 3명이 있어요",
+          ctaLabel: "출석 확인 시작",
+        }}
+        secondaryAction={{ href: "?section=agenda", label: "모임 진행 보기" }}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "출석 확인 시작" })).toBeVisible();
+    const secondary = screen.getByRole("link", { name: "모임 진행 보기" });
+    expect(secondary).toHaveAttribute("href", "?section=agenda");
+    expect(secondary.querySelector("svg[data-icon='list']")).not.toBeNull();
+  });
+
+  it("renders a schedule note as real paragraph text instead of a CSS overlay", () => {
+    render(
+      <HostNextAction
+        action={{
+          ...actionable,
+          label: "최신 일정을 아직 보지 않은 4명이 있어요",
+          ctaLabel: "대상과 문구 검토",
+          note: "일정이 어제 19:30에 변경되었어요",
+        }}
+      />,
+    );
+
+    const note = screen.getByText("일정이 어제 19:30에 변경되었어요");
+    expect(note).toBeVisible();
+    expect(note.tagName).toBe("P");
   });
 
   it("does not invent an action destination for none or a missing href", () => {

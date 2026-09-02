@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
+import "./host-schedule-review.css";
 
 export type HostScheduleReviewLinkProps = {
   to: string;

@@ -67,6 +67,8 @@ export type HostNextActionView = {
   state: HostNextActionState;
   workItemKey: string | null;
   label: string;
+  ctaLabel?: string;
+  note?: string;
   reason: string;
   href: string | null;
 };
@@ -448,6 +450,7 @@ function resolveNextAction(context: {
     return actionState(context.input, {
       kind: "closing",
       label: context.closing.primaryAction.label,
+      ctaLabel: "기록 초안 검토",
       reason: context.closing.primaryAction.reason,
       href: context.closing.primaryAction.href,
     });
@@ -459,6 +462,7 @@ function resolveNextAction(context: {
     return actionState(context.input, {
       kind: "attendance",
       label: "실제 출석 확인",
+      ctaLabel: "출석 확인 시작",
       reason: `출석이 확인되지 않은 멤버가 ${unknownAttendanceCount}명입니다.`,
       href: hostSessionPath(context.input.basePath, meeting.sessionId, "?section=attendance"),
     });
@@ -470,6 +474,7 @@ function resolveNextAction(context: {
       return actionState(context.input, {
         kind,
         label: nextActionLabel(kind),
+        ctaLabel: kind === "schedule-seen" ? "대상과 문구 검토" : undefined,
         reason: row.detail,
         href: row.href,
       });

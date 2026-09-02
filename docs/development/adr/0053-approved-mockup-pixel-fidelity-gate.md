@@ -3,7 +3,7 @@
 - 상태: Proposed
 - 결정일: 2026-09-02
 - 작성자: product/design/front
-- 관련: ADR-0045, ADR-0048, ADR-0050, ADR-0051, `docs/superpowers/specs/2026-09-02-admin-host-pixel-fidelity-design.md`, `front/DESIGN.md`
+- 관련: ADR-0045, ADR-0048, ADR-0050, ADR-0051, `docs/superpowers/specs/2026-09-02-admin-host-pixel-fidelity-design.md`, `docs/superpowers/specs/2026-09-02-host-approved-first-viewport-design.md`, `front/DESIGN.md`
 
 > 제품 구성은 ADR-0048·0050을 유지한다. 이 ADR은 승인 PNG를 참고 자산으로만 보고 구현 snapshot을 최종 회귀 권위로 삼던 검증 해석을 좁힌다. 독립 시각 검토(16/18 FAIL)와 사람 30초 gate가 남아 `Proposed`다.
 
@@ -65,6 +65,8 @@ Token, shared CSS/component, fixture 또는 baseline 변경은 영향 reference�
 ## 검증
 
 `Proposed`를 유지한다. 비교 harness와 18-entry manifest는 구현됐지만 `docs/reports/2026-09-02-admin-host-pixel-fidelity-acceptance.md` 기준 독립 시각 검토는 16/18 FAIL이고 사람 30초 gate는 `pending_external_human_evidence`다. 이 조건이 닫히기 전에는 `Accepted`로 올리지 않는다.
+
+Host 슬라이스(`docs/superpowers/specs/2026-09-02-host-approved-first-viewport-design.md`)의 합격은 11장 독립 시각 검토의 첫 화면 구성이다. `maxDiffPixelRatio` 0.02는 측정값으로 유지한다. Admin 잔여 FAIL과 사람 30초 gate가 비어 있으므로 Accepted로 올리지 않는다.
 
 구현 후 다음 조건이 모두 충족될 때 `Accepted`로 승격한다.
 

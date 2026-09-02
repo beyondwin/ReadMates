@@ -27,6 +27,7 @@
 }
 
 .rm-operating-room-header__cover .rm-book-cover {
+  min-height: 92px;
   height: auto;
   box-shadow: 1px 1px 0 var(--line-soft), 2px 2px 0 var(--line-soft);
 }
@@ -152,6 +153,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   min-width: 44px;
   min-height: 44px;
   padding-inline: var(--space-sm);
@@ -655,6 +657,13 @@
   line-height: var(--type-leading-body);
 }
 
+.rm-operating-room-next-action__note {
+  margin: 0;
+  color: var(--text-3);
+  font-size: var(--type-size-supporting);
+  line-height: 1.45;
+}
+
 .rm-operating-room-next-action__controls {
   display: flex;
   flex-wrap: wrap;
@@ -664,6 +673,7 @@
 
 .rm-operating-room-next-action__primary,
 .rm-operating-room-next-action__defer,
+.rm-operating-room-next-action__secondary,
 .rm-preparation-ledger-row__link,
 .rm-preparation-ledger-row__retry {
   display: inline-flex;
@@ -700,16 +710,49 @@
   background: var(--accent-hover);
 }
 
-.rm-operating-room-next-action__defer {
+.rm-operating-room-next-action__defer,
+.rm-operating-room-next-action__secondary {
+  gap: 6px;
   padding: 0 var(--space-lg);
   border: 1px solid var(--accent-line);
   background: transparent;
   color: var(--accent);
 }
 
-.rm-operating-room-next-action__defer:hover {
+.rm-operating-room-next-action__defer:hover,
+.rm-operating-room-next-action__secondary:hover {
   border-color: var(--accent);
   background: var(--accent-soft);
+}
+
+.rm-operating-room-next-action__more {
+  min-width: 0;
+}
+
+.rm-operating-room-next-action__more > summary {
+  display: inline-flex;
+  align-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  color: var(--text-2);
+  cursor: pointer;
+  list-style: none;
+}
+
+.rm-operating-room-next-action__more > summary::-webkit-details-marker,
+.rm-operating-room-next-action__more > summary::marker {
+  display: none;
+}
+
+.rm-operating-room-next-action__more > summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.rm-operating-room-next-action__more .rm-operating-room-next-action__defer {
+  display: flex;
+  margin-top: var(--space-xs);
 }
 
 .rm-preparation-ledger {
@@ -756,7 +799,39 @@
 }
 
 .rm-preparation-ledger-row__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 650;
+}
+
+.rm-preparation-ledger-row__index {
+  display: none;
+  flex: 0 0 auto;
+  min-width: 1.5em;
+  color: var(--text-3);
+  font-size: var(--type-size-label);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.rm-operating-room-glyph {
+  flex: 0 0 auto;
+  color: var(--text-3);
+}
+
+.rm-phase-status-ledger-row__index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text-3);
+  font-size: var(--type-size-label);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
 }
 
 .rm-preparation-ledger-row__value {
@@ -803,32 +878,12 @@
 
 .rm-operating-room-next-action__primary:focus-visible,
 .rm-operating-room-next-action__defer:focus-visible,
+.rm-operating-room-next-action__secondary:focus-visible,
 .rm-preparation-ledger-row__link:focus-visible,
 .rm-preparation-ledger-row__retry:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   box-shadow: 0 0 0 4px var(--focus-ring-soft);
-}
-
-.rm-host-operating-room[data-phase="prep"] .rm-operating-room-next-action::after,
-.rm-host-operating-room[data-phase="live"] .rm-operating-room-next-action::after,
-.rm-host-operating-room[data-phase="closing"] .rm-operating-room-next-action::after {
-  display: block;
-  color: var(--text-3);
-  font-size: var(--type-size-supporting);
-  line-height: 1.45;
-}
-
-.rm-host-operating-room[data-phase="prep"] .rm-operating-room-next-action::after {
-  content: "일정이 어제 19:30에 변경되었어요";
-}
-
-.rm-host-operating-room[data-phase="live"] .rm-operating-room-next-action::after {
-  content: "오후 7:26 · 현장 모드가 열렸어요";
-}
-
-.rm-host-operating-room[data-phase="closing"] .rm-operating-room-next-action::after {
-  content: "게시 전에 피드백 문서를 확인해 주세요";
 }
 
 .rm-host-operating-room .rm-host-workbox__header {
@@ -837,12 +892,6 @@
 }
 
 .rm-host-operating-room .rm-host-workbox__header h2 {
-  font-size: 0;
-  line-height: 0;
-}
-
-.rm-host-operating-room .rm-host-workbox__header h2::after {
-  content: "호스트 작업함";
   font-size: 1.0625rem;
   font-weight: 700;
   line-height: 1.3;
@@ -1085,6 +1134,11 @@
 }
 
 @media (max-width: 767px) {
+  .rm-preparation-ledger-row__index {
+    display: inline-flex;
+    align-items: baseline;
+  }
+
   .rm-host-operating-room .rm-host-workbox__header {
     height: 0 !important;
     min-height: 0 !important;
@@ -1124,8 +1178,38 @@
 
   .rm-host-operating-room[data-phase="live"] .rm-operating-room-header {
     --rm-operating-room-cover-width: 48px;
+    grid-template-columns: var(--rm-operating-room-cover-width) minmax(0, 1fr);
+    grid-template-areas:
+      "cover identity"
+      "cover facts";
     padding-block: 4px;
     gap: 2px 10px;
+  }
+
+  .rm-host-operating-room[data-phase="live"] .rm-operating-room-header__actions {
+    grid-area: facts;
+    justify-content: flex-end;
+    align-self: start;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .rm-host-operating-room[data-phase="live"] .rm-operating-room-header__lifecycle {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    white-space: nowrap;
+  }
+
+  .rm-host-operating-room[data-phase="live"] .rm-operating-room-header__dday {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-operating-room-header__cover .rm-book-cover {
@@ -1136,17 +1220,18 @@
     font-size: 1.25rem;
   }
 
+  /* Live compact 390: 40px tabs/choices keep mockup-16 closer above the tab bar. Named leftover vs 44px. */
   .rm-host-operating-room[data-phase="live"] .rm-operating-room-phases,
   .rm-host-operating-room[data-phase="live"] .rm-operating-room-phases__tab {
-    min-height: 44px;
+    min-height: 40px;
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-operating-room-phases__tab {
-    padding: 4px;
+    padding: 2px 4px;
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-meeting-response-ledger--attendance-board {
-    gap: 4px;
+    gap: 2px;
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-meeting-response-ledger__head {
@@ -1161,12 +1246,12 @@
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-meeting-response-ledger__row--board {
-    min-height: 44px;
+    min-height: 40px;
     padding-block: 0;
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-meeting-response-ledger__attendance-choice {
-    min-height: 44px;
+    min-height: 40px;
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-meeting-response-ledger--attendance-board h2 {
@@ -1177,14 +1262,73 @@
     padding-bottom: calc(var(--m-nav-h, 56px) + var(--m-safe-bottom, 0px));
   }
 
+  /* Live compact undo 36px: named leftover vs 44px so mockup-16 closer stays above the tab bar. */
   .rm-host-operating-room[data-phase="live"] .rm-workspace-undo-bar {
-    margin-top: 4px;
-    min-height: 40px;
-    padding: 6px 12px;
+    margin-top: 0;
+    min-height: 36px;
+    padding: 2px 10px;
+    flex-wrap: nowrap;
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-meeting-response-ledger__bulk--meeting-day {
     padding-top: 2px;
+  }
+
+  .rm-host-operating-room[data-phase="prep"] .rm-operating-room-header {
+    --rm-operating-room-cover-width: 64px;
+    grid-template-columns: var(--rm-operating-room-cover-width) minmax(0, 1fr);
+    grid-template-areas:
+      "cover identity"
+      "cover facts";
+    padding-block: 4px;
+    gap: 2px 10px;
+  }
+
+  .rm-host-operating-room[data-phase="prep"] .rm-operating-room-header__facts {
+    padding-inline-end: 5rem;
+  }
+
+  .rm-host-operating-room[data-phase="prep"] .rm-operating-room-header__actions {
+    grid-area: facts;
+    justify-content: flex-end;
+    align-self: start;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .rm-host-operating-room[data-phase="prep"] .rm-operating-room-header__title {
+    font-size: 1.25rem;
+  }
+
+  .rm-host-operating-room[data-phase="prep"] .rm-operating-room-header__cover .rm-book-cover {
+    max-height: 64px;
+  }
+
+  .rm-host-operating-room[data-phase="prep"] .rm-operating-room-next-action {
+    padding-block: 4px;
+    gap: 2px;
+  }
+
+  .rm-host-operating-room[data-phase="prep"] .rm-operating-room-next-action__label {
+    font-size: 1.0625rem;
+  }
+
+  .rm-host-operating-room[data-phase="prep"] .rm-preparation-ledger {
+    padding-top: 6px;
+  }
+
+  .rm-host-operating-room[data-phase="prep"] .rm-preparation-ledger h2 {
+    margin-bottom: 4px;
+  }
+
+  .rm-host-operating-room[data-phase="prep"] .rm-preparation-ledger-row,
+  .rm-host-operating-room[data-phase="prep"] .rm-preparation-ledger__row {
+    min-height: 44px;
+    padding-block: 2px;
+  }
+
+  .rm-host-operating-room[data-phase="prep"] .rm-host-operating-room__body {
+    padding-bottom: calc(var(--m-nav-h, 56px) + var(--m-safe-bottom, 0px));
   }
 }
 
@@ -1212,6 +1356,7 @@
   .rm-operating-room-phases__tab,
   .rm-operating-room-next-action__primary,
   .rm-operating-room-next-action__defer,
+  .rm-operating-room-next-action__secondary,
   .rm-preparation-ledger-row__link,
   .rm-preparation-ledger-row__retry {
     transition-duration: 0.001ms;

@@ -44,6 +44,13 @@ describe("CurrentMeetingHeader", () => {
     expect(within(actions).getByRole("link", { name: "일정 편집" })).toHaveAttribute("href", links.scheduleHref);
     expect(within(actions).getByRole("link", { name: "변경 이력" })).toHaveAttribute("href", links.historyHref);
     expect(within(actions).getByRole("link", { name: "멤버 시야" })).toHaveAttribute("href", links.memberViewHref);
+    expect(actions.querySelector("svg[data-icon='info']")).not.toBeNull();
+    expect(actions.querySelector("svg[data-icon='edit']")).not.toBeNull();
+    expect(actions.querySelector("svg[data-icon='history']")).not.toBeNull();
+    expect(actions.querySelector("svg[data-icon='eye']")).not.toBeNull();
+    const cover = header.querySelector(".rm-operating-room-header__cover .rm-book-cover");
+    expect(cover).not.toBeNull();
+    expect(cover?.querySelector(".rm-book-cover__fallback")).not.toBeNull();
   });
 
   it("renders the established cover fallback and explicit labels for partial meeting fields", () => {

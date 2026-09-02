@@ -5,9 +5,10 @@ import type {
 } from "@/features/host/model/host-operating-room-model";
 import type { HostLinkComponent } from "@/features/host/ui/host-link-types";
 import { CurrentMeetingHeader, type CurrentMeetingHeaderLinks } from "./current-meeting-header";
-import { HostNextAction } from "./host-next-action";
+import { HostNextAction, type HostNextActionSecondary } from "./host-next-action";
 import { MeetingPhaseTabs, type MeetingPhaseTabLink } from "./meeting-phase-tabs";
 import { PreparationLedger } from "./preparation-ledger";
+import { useOperatingRoomCompactViewport } from "./use-operating-room-compact-viewport";
 import "./operating-room.css";
 
 export type AttendanceRecoveryView =
@@ -44,6 +45,7 @@ export type HostOperatingRoomPageProps = {
   }[];
   recovery: AttendanceRecoveryView | null;
   liveContent: ReactNode;
+  compactLiveContent?: ReactNode;
   closingContent: ReactNode;
   workboxContent: ReactNode;
   createMeetingHref: string;
@@ -51,7 +53,8 @@ export type HostOperatingRoomPageProps = {
   onRetryPreparation: () => void;
   onRetryOptional: () => void;
   nextActionPending: boolean;
-  onDeferNextAction: (workItemKey: string) => void;
+  onDeferNextAction?: (workItemKey: string) => void;
+  nextActionSecondary?: HostNextActionSecondary;
   LinkComponent: HostLinkComponent;
 };
 
@@ -65,6 +68,7 @@ export function HostOperatingRoomPage({
   optionalFailureActions = [],
   recovery,
   liveContent,
+  compactLiveContent,
   closingContent,
   workboxContent,
   createMeetingHref,
@@ -73,8 +77,10 @@ export function HostOperatingRoomPage({
   onRetryOptional,
   nextActionPending,
   onDeferNextAction,
+  nextActionSecondary,
   LinkComponent = DefaultLink,
 }: HostOperatingRoomPageProps) {
+  const compactViewport = useOperatingRoomCompactViewport();
   if (!view.meeting || !headerLinks) {
     return (
       <main className="rm-host-operating-room rm-host-operating-room--empty">
@@ -125,6 +131,7 @@ export function HostOperatingRoomPage({
             action={view.nextAction}
             pending={nextActionPending}
             onDefer={onDeferNextAction}
+            secondaryAction={nextActionSecondary}
             LinkComponent={LinkComponent}
           />
 
@@ -201,7 +208,9 @@ export function HostOperatingRoomPage({
                 LinkComponent={LinkComponent}
               />
             ) : null}
-            {view.phase === "live" ? liveContent : null}
+            {view.phase === "live"
+              ? (compactViewport ? compactLiveContent ?? liveContent : liveContent)
+              : null}
             {view.phase === "closing" ? closingContent : null}
           </section>
         </div>

@@ -14,6 +14,11 @@ import "./meeting-response-ledger.css";
 type Response = "GOING" | "NOT_GOING" | "UNSURE" | "NO_RESPONSE";
 export type MeetingAttendance = "ATTENDED" | "ABSENT" | "UNKNOWN";
 export type MeetingResponseLedgerPresentation = "default" | "meetingDay" | "attendanceBoard";
+export type AttendanceBoardCensus = {
+  attended: number;
+  all: number;
+  pending: number;
+};
 type MeetingDayFilter = "pending" | "arrived" | "all";
 
 export type MeetingResponseLedgerRow = {
@@ -63,6 +68,7 @@ export function MeetingResponseLedger({
   presentation = "default",
   pendingUndo = null,
   agendaHref = null,
+  attendanceCensus = null,
 }: {
   rows: ReadonlyArray<MeetingResponseLedgerRow>;
   onAttendanceChange: (membershipId: string, attendance: MeetingAttendance) => void;
@@ -70,6 +76,7 @@ export function MeetingResponseLedger({
   presentation?: MeetingResponseLedgerPresentation;
   pendingUndo?: WorkspacePendingUndo | null;
   agendaHref?: string | null;
+  attendanceCensus?: AttendanceBoardCensus | null;
 }) {
   if (presentation === "attendanceBoard") {
     return (
@@ -79,6 +86,7 @@ export function MeetingResponseLedger({
         onBulkAttendanceChange={onBulkAttendanceChange}
         pendingUndo={pendingUndo}
         agendaHref={agendaHref}
+        attendanceCensus={attendanceCensus}
       />
     );
   }
@@ -122,22 +130,27 @@ function AttendanceBoardLedger({
   onBulkAttendanceChange,
   pendingUndo,
   agendaHref,
+  attendanceCensus,
 }: {
   rows: ReadonlyArray<MeetingResponseLedgerRow>;
   onAttendanceChange: (membershipId: string, attendance: MeetingAttendance) => void;
   onBulkAttendanceChange: (membershipIds: ReadonlyArray<string>, attendance: MeetingAttendance) => void;
   pendingUndo: WorkspacePendingUndo | null;
   agendaHref: string | null;
+  attendanceCensus: AttendanceBoardCensus | null;
 }) {
   const pendingIds = useMemo(
     () => rows.filter((row) => isPendingAttendance(row.attendance)).map((row) => row.membershipId),
     [rows],
   );
-  const counts = useMemo(() => ({
-    pending: pendingIds.length,
-    attended: rows.filter((row) => row.attendance === "ATTENDED").length,
-    all: rows.length,
-  }), [pendingIds.length, rows]);
+  const counts = useMemo(() => {
+    const computed = {
+      pending: pendingIds.length,
+      attended: rows.filter((row) => row.attendance === "ATTENDED").length,
+      all: rows.length,
+    };
+    return attendanceCensus ?? computed;
+  }, [attendanceCensus, pendingIds.length, rows]);
 
   useLayoutEffect(() => {
     commitHostMeetingAttendanceRow(rows);

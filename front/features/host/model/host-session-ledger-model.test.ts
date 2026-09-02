@@ -76,15 +76,19 @@ describe("host session ledger model", () => {
     expect(hostSessionLedgerActionLabel({
       hasDraft: true,
       recordStatus: "INCOMPLETE",
-    })).toBe("초안 열기");
+    })).toBe("마감실 열기");
     expect(hostSessionLedgerActionLabel({
       hasDraft: false,
       recordStatus: "INCOMPLETE",
-    })).toBe("이어서 수정");
+    })).toBe("마감실 열기");
     expect(hostSessionLedgerActionLabel({
       hasDraft: false,
       recordStatus: "COMPLETE",
-    })).toBe("보기·수정");
+    })).toBe("기록 보기");
+    expect(hostSessionLedgerActionLabel({
+      hasDraft: false,
+      recordStatus: "NOT_STARTED",
+    })).toBe("마감 시작");
     expect(hostSessionLedgerModifiedAtLabel("2026-07-23T10:00:00+09:00"))
       .toBe("마지막 수정 2026.07.23 10:00");
     expect(hostSessionLedgerModifiedAtLabel(null)).toBe("수정 기록 없음");

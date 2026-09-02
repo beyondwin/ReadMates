@@ -3,14 +3,13 @@ import type { Locator, Page, TestInfo } from "@playwright/test";
 import type { ReactElement, ReactNode } from "react";
 import type { HostOperatingRoomView } from "@/features/host/model/host-operating-room-model";
 import type { HostWorkboxView } from "@/features/host/model/host-workbox-model";
-import { AppClubShell } from "@/shared/ui/app-club-shell";
-import { AvatarChip } from "@/shared/ui/avatar-chip";
+import { HostApprovedShell } from "../approved-host-shell";
 import {
   approvedMockup,
   captureApprovedComparison,
-  HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
   expectGeometryWithinTolerance,
   expectLocatorGeometry,
+  HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
   isSemanticDocumentOrder,
   type ApprovedRegion,
 } from "@/tests/e2e/support/approved-mockup-contract";
@@ -23,10 +22,6 @@ import {
 } from "@/tests/e2e/support/visual-authority-contract";
 import { MeetingResponseLedger } from "../meeting-workspace/meeting-response-ledger";
 import { PhaseStatusLedger } from "./phase-status-ledger";
-import { HostPrimaryNavigation } from "../shell/host-primary-navigation";
-import { HostUtilityActions } from "../shell/host-utility-actions";
-import { HostWorkspaceSwitcher } from "../shell/host-workspace-switcher";
-import "../shell/host-shell.css";
 import { HostWorkbox } from "../workbox/host-workbox";
 import { OperatingRoomPhaseContinuityStory } from "./host-operating-room-phase-continuity-ct-harness";
 import {
@@ -38,6 +33,10 @@ const APPROVED_DESKTOP_VIEWPORT = { width: 1536, height: 1024 } as const;
 const APPROVED_MOBILE_VIEWPORT = { width: 390, height: 832 } as const;
 const BODY_DESKTOP_GEOMETRY = { x: 36, y: 319, width: 1465, height: 665 } as const;
 const WORKBOX_DESKTOP_GEOMETRY = { x: 988, y: 319, width: 513, height: 665 } as const;
+const MOBILE_NAV_GEOMETRY = { x: 0, y: 768, width: 390, height: 64 } as const;
+const PREP_MOBILE_MAIN_GEOMETRY = { x: 19, y: 58, width: 352, height: 902 } as const;
+const LIVE_MOBILE_MAIN_GEOMETRY = { x: 19, y: 58, width: 352, height: 806 } as const;
+const LIVE_MOBILE_BOARD_GEOMETRY = { x: 19, y: 200, width: 352, height: 600 } as const;
 
 const phaseLinks = [
   { id: "prep", label: "준비실", availability: "available", blockedReason: null, href: "?phase=prep" },
@@ -166,10 +165,6 @@ const workboxView: HostWorkboxView = {
     },
   ],
 };
-
-export function Link({ to, children, ...props }: { to: string; children: ReactNode; className?: string; "aria-label"?: string }) {
-  return <a {...props} href={to}>{children}</a>;
-}
 
 function hostWorkbox(overrides: {
   view?: HostWorkboxView | null;
@@ -421,49 +416,6 @@ test("mobile unknown-outcome recovery controls remain visible and unclipped", as
   await expectNoHorizontalOverflow(page);
 });
 
-const hostDestinations = [
-  { id: "operating-room" as const, href: "/clubs/reading-sai/app/host", current: true },
-  { id: "meetings" as const, href: "/clubs/reading-sai/app/host/meetings", current: false },
-  { id: "people" as const, href: "/clubs/reading-sai/app/host/people", current: false },
-  { id: "records" as const, href: "/clubs/reading-sai/app/host/records", current: false },
-];
-
-const hostPrimaryItems = [
-  { id: "operating-room", label: "운영실", href: "/clubs/reading-sai/app/host", icon: "host" as const, current: true },
-  { id: "meetings", label: "일정과 모임", mobileLabel: "모임", href: "/clubs/reading-sai/app/host/meetings", icon: "session" as const, current: false },
-  { id: "people", label: "사람", href: "/clubs/reading-sai/app/host/people", icon: "me" as const, current: false },
-  { id: "records", label: "기록", href: "/clubs/reading-sai/app/host/records", icon: "archive" as const, current: false },
-];
-
-function hostApprovedSwitcher() {
-  return (
-    <HostWorkspaceSwitcher
-      club={{ name: "읽는사이", slug: "reading-sai", avatarKey: "cloud-green-book" }}
-      clubs={[{ slug: "reading-sai", name: "읽는사이", href: "/clubs/reading-sai/app" }]}
-      currentWorkspace="host"
-      workspaceItems={[
-        { id: "member", label: "멤버 공간", href: "/clubs/reading-sai/app" },
-        { id: "host", label: "호스트 운영실", href: "/clubs/reading-sai/app/host" },
-      ]}
-      onSelectTarget={() => undefined}
-    />
-  );
-}
-
-function hostApprovedUtility() {
-  return (
-    <HostUtilityActions
-      settingsHref="/clubs/reading-sai/app/host/settings"
-      memberViewHref="/clubs/reading-sai/app"
-      notificationsHref="/clubs/reading-sai/app/host/notifications"
-      newMeetingHref="/clubs/reading-sai/app/host/sessions/new"
-      unreadNotifications={1}
-      permissionLimits={[]}
-      LinkComponent={Link}
-    />
-  );
-}
-
 const approvedMeeting = {
   sessionId: "public-safe-session-27",
   sessionNumber: 27,
@@ -540,7 +492,6 @@ function approvedWorkbox(items: HostWorkboxView["items"]): ReactElement {
       onLoadMore={() => undefined}
       onDefer={() => undefined}
       onUndoDeferral={() => undefined}
-      LinkComponent={Link}
     />
   );
 }
@@ -555,14 +506,16 @@ function phaseStatusLedger(
     action: string;
   }[],
 ) {
-  return <PhaseStatusLedger title={title} rows={rows} LinkComponent={Link} />;
+  return <PhaseStatusLedger title={title} rows={rows} />;
 }
 
 function approvedOperatingRoom(input: {
   phase: HostOperatingRoomView["phase"];
   dDayLabel: string;
   nextAction: HostOperatingRoomView["nextAction"];
+  nextActionSecondary?: { href: string; label: string };
   liveContent?: ReactNode;
+  compactLiveContent?: ReactNode;
   closingContent?: ReactNode;
   workboxItems: HostWorkboxView["items"];
 }) {
@@ -626,35 +579,7 @@ function approvedOperatingRoom(input: {
   };
 
   return (
-    <AppClubShell
-      workspace="host"
-      primaryItems={hostPrimaryItems}
-      account={{
-        control: (
-          <button type="button" aria-label="계정 메뉴">
-            <AvatarChip avatarKey="mushroom-green-book" name="호스트" label="" sizeRole="navigation" />
-          </button>
-        ),
-      }}
-      brandHref="/clubs/reading-sai/app/host"
-      mobileTitle="읽는사이 운영"
-      LinkComponent={Link}
-      spaceSwitcher={{ desktop: hostApprovedSwitcher(), mobile: hostApprovedSwitcher() }}
-      primarySlot={{
-        desktop: <HostPrimaryNavigation destinations={hostDestinations} mode="desktop" LinkComponent={Link} />,
-      }}
-      utilitySlot={{
-        desktop: hostApprovedUtility(),
-        mobile: (
-          <details className="rm-host-mobile-utility">
-            <summary className="rm-host-mobile-utility__trigger" aria-label="호스트 도구">
-              <span aria-hidden="true">⋯</span>
-            </summary>
-            <div className="rm-host-mobile-utility__menu">{hostApprovedUtility()}</div>
-          </details>
-        ),
-      }}
-    >
+    <HostApprovedShell destination="operating-room">
       <HostOperatingRoomPage
         view={view}
         dDayLabel={input.dDayLabel}
@@ -664,6 +589,7 @@ function approvedOperatingRoom(input: {
         optionalFailureMessages={[]}
         recovery={null}
         liveContent={input.liveContent ?? <section aria-label="현장 운영">현장 운영</section>}
+        compactLiveContent={input.compactLiveContent}
         closingContent={input.closingContent ?? <section aria-label="마감 운영">마감 운영</section>}
         workboxContent={approvedWorkbox(input.workboxItems)}
         createMeetingHref="/clubs/reading-sai/app/host/sessions/new"
@@ -671,10 +597,9 @@ function approvedOperatingRoom(input: {
         onRetryPreparation={() => undefined}
         onRetryOptional={() => undefined}
         nextActionPending={false}
-        onDeferNextAction={() => undefined}
-        LinkComponent={Link}
+        nextActionSecondary={input.nextActionSecondary}
       />
-    </AppClubShell>
+    </HostApprovedShell>
   );
 }
 
@@ -706,6 +631,12 @@ const liveStatusRows = [
   { label: "현장 메모", value: "3개", detail: "호스트만 볼 수 있어요", href: "?section=notes", action: "메모 열기" },
 ] as const;
 
+const liveAttendanceCensus = {
+  attended: 8,
+  all: 12,
+  pending: 3,
+} as const;
+
 const closingStatusRows = [
   { label: "출석 확정", value: "완료", detail: "9명 · 어제 21:42", href: "?section=attendance", action: "출석 보기" },
   { label: "소감 수집", value: "8 / 12", detail: "미작성 4명", href: "?section=notes", action: "대상 보기" },
@@ -729,10 +660,12 @@ function approvedAttendanceBoard() {
     <MeetingResponseLedger
       presentation="attendanceBoard"
       agendaHref="/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=agenda"
+      attendanceCensus={liveAttendanceCensus}
       rows={liveAttendees.map((attendee) => ({
         membershipId: attendee.membershipId,
         displayName: attendee.displayName,
         secondaryLabel: attendee.displayName,
+        avatarKey: attendee.avatarKey,
         response: attendee.rsvpStatus === "GOING"
           ? "GOING"
           : attendee.rsvpStatus === "DECLINED"
@@ -756,12 +689,7 @@ function approvedAttendanceBoard() {
 }
 
 function approvedLiveContent() {
-  return (
-    <>
-      {phaseStatusLedger("현장 현황", liveStatusRows)}
-      {approvedAttendanceBoard()}
-    </>
-  );
+  return phaseStatusLedger("현장 현황", liveStatusRows);
 }
 
 function prepApprovedView() {
@@ -773,6 +701,8 @@ function prepApprovedView() {
       state: "actionable",
       workItemKey: "public-safe-work-item-27",
       label: "최신 일정을 아직 보지 않은 4명이 있어요",
+      ctaLabel: "대상과 문구 검토",
+      note: "일정이 어제 19:30에 변경되었어요",
       reason: "대상과 문구를 확인한 뒤 직접 보내세요. 자동 발송하지 않아요.",
       href: "/clubs/reading-sai/app/host/sessions/public-safe-session-27/schedule-review",
     },
@@ -780,7 +710,7 @@ function prepApprovedView() {
   });
 }
 
-function liveApprovedView(liveContent: ReactNode) {
+function liveApprovedView() {
   return approvedOperatingRoom({
     phase: "live",
     dDayLabel: "오늘",
@@ -789,10 +719,17 @@ function liveApprovedView(liveContent: ReactNode) {
       state: "actionable",
       workItemKey: "public-safe-work-item-live",
       label: "아직 출석을 확인하지 않은 3명이 있어요",
+      ctaLabel: "출석 확인 시작",
+      note: "오후 7:26 · 현장 모드가 열렸어요",
       reason: "참석 응답과 실제 출석은 별개로 기록해요.",
       href: "/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=attendance",
     },
-    liveContent,
+    nextActionSecondary: {
+      href: liveStatusRows.find((row) => row.label === "진행 순서")!.href,
+      label: "모임 진행 보기",
+    },
+    liveContent: approvedLiveContent(),
+    compactLiveContent: approvedAttendanceBoard(),
     workboxItems: liveWorkboxItems,
   });
 }
@@ -806,6 +743,8 @@ function closingApprovedView() {
       state: "actionable",
       workItemKey: "public-safe-work-item-closing",
       label: "기록 초안을 검토하면 멤버에게 게시할 수 있어요",
+      ctaLabel: "기록 초안 검토",
+      note: "게시 전에 피드백 문서를 확인해 주세요",
       reason: "출석은 확정됐고, 소감 4개를 기다리고 있어요.",
       href: "/clubs/reading-sai/app/host/records",
     },
@@ -839,16 +778,19 @@ async function captureHostApproved(input: {
   page: Page;
   testInfo: TestInfo;
   regions: readonly ApprovedRegion[];
+  allowFontRasterException?: boolean;
+  fontRasterExceptionMaxRatio?: number;
+  skipMismatchRatioAssertion?: boolean;
 }) {
-  const hostMobile = input.id === "host-prep-mobile" || input.id === "host-live-mobile";
   return captureApprovedComparison({
     entry: approvedMockup(input.id),
     candidate: input.page.locator("html"),
     page: input.page,
     testInfo: input.testInfo,
     regions: input.regions,
-    allowFontRasterException: true,
-    fontRasterExceptionMaxRatio: hostMobile ? HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO : undefined,
+    allowFontRasterException: input.allowFontRasterException,
+    fontRasterExceptionMaxRatio: input.fontRasterExceptionMaxRatio,
+    skipMismatchRatioAssertion: input.skipMismatchRatioAssertion,
   });
 }
 
@@ -889,7 +831,46 @@ test("prep locks the approved desktop operating room", async ({ mount, page }, t
   ];
   await expectLocatorGeometry(component.locator(".rm-host-operating-room__body"), BODY_DESKTOP_GEOMETRY, 4);
   await expectLocatorGeometry(component.locator(".rm-host-operating-room__workbox-rail"), WORKBOX_DESKTOP_GEOMETRY, 4);
-  await captureHostApproved({ id: "host-prep-desktop", page, testInfo, regions });
+  await expect(component.getByRole("link", { name: "ReadMates" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "운영실" })).toHaveAttribute("aria-current", "page");
+  await expect(component.getByRole("link", { name: "모임 정보" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "일정 편집" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "변경 이력" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "대상과 문구 검토" })).toBeVisible();
+  await expect(component.getByRole("region", { name: "준비 현황" }).getByRole("link", { name: /보기/ }).first()).toBeVisible();
+  await expect(component.getByRole("complementary", { name: "클럽 작업함" }).getByRole("listitem")).toHaveCount(4);
+  await expect(component.getByRole("button", { name: /보류/ })).toHaveCount(0);
+  const cover = component.locator(".rm-operating-room-header__cover .rm-book-cover");
+  await expect(cover).toBeVisible();
+  const coverBox = await cover.boundingBox();
+  expect(coverBox, "cover cell").not.toBeNull();
+  expect(coverBox!.width).toBeGreaterThan(48);
+  expect(coverBox!.height).toBeGreaterThan(48);
+  await expect(cover.locator(".rm-book-cover__fallback")).toBeVisible();
+  const prepIcons = component.getByRole("region", { name: "준비 현황" });
+  await expect(prepIcons.locator("svg[data-icon='calendar']")).toBeVisible();
+  await expect(prepIcons.locator("svg[data-icon='people']")).toBeVisible();
+  await expect(prepIcons.locator("svg[data-icon='chat']")).toBeVisible();
+  await expect(prepIcons.locator("svg[data-icon='pin']")).toBeVisible();
+  const headerActions = component.getByRole("navigation", { name: "현재 모임 작업" });
+  await expect(headerActions.locator("svg[data-icon='info']")).toBeVisible();
+  await expect(headerActions.locator("svg[data-icon='edit']")).toBeVisible();
+  await expect(headerActions.locator("svg[data-icon='history']")).toBeVisible();
+  await expect(headerActions.locator("svg[data-icon='eye']")).toBeVisible();
+  const workboxTitle = workbox.getByRole("heading", { name: "작업함" });
+  await expect(workboxTitle).toBeVisible();
+  expect(await workboxTitle.evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize))).toBeGreaterThan(10);
+  expect(await workboxTitle.evaluate((node) => getComputedStyle(node, "::after").content)).toBe("none");
+  await expect(nextAction.getByText("일정이 어제 19:30에 변경되었어요")).toBeVisible();
+  expect(await nextAction.evaluate((node) => getComputedStyle(node, "::after").content)).toBe("none");
+  await captureHostApproved({
+    id: "host-prep-desktop",
+    page,
+    testInfo,
+    regions,
+    allowFontRasterException: true,
+    skipMismatchRatioAssertion: false,
+  });
 });
 
 test("live locks the approved desktop operating room", async ({ mount, page }, testInfo) => {
@@ -897,34 +878,73 @@ test("live locks the approved desktop operating room", async ({ mount, page }, t
   const component = await mountApproved(
     mount,
     page,
-    liveApprovedView(approvedLiveContent()),
+    liveApprovedView(),
     APPROVED_DESKTOP_VIEWPORT,
   );
   await expect(component.getByRole("region", { name: "다음에 할 일" })).toContainText("아직 출석을 확인하지 않은 3명이 있어요");
   await expect(component.getByRole("region", { name: "현장 현황" })).toBeVisible();
   await expect(component.getByText("실제 출석", { exact: true })).toBeVisible();
   await expect(component.getByRole("region", { name: "현장 현황" }).getByText("참석 응답")).toBeVisible();
+  await expect(component.getByRole("link", { name: "운영실" })).toHaveAttribute("aria-current", "page");
+  await expect(component.getByRole("link", { name: "모임 정보" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "출석 확인 시작" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "모임 진행 보기" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "모임 진행 보기" }).locator("svg[data-icon='list']")).toBeVisible();
+  await expect(component.getByRole("region", { name: "현장 현황" })).toBeVisible();
+  const liveLedger = component.getByRole("region", { name: "현장 현황" });
+  await expect(liveLedger.locator("svg[data-icon='person']")).toBeVisible();
+  await expect(liveLedger.locator("svg[data-icon='people']")).toBeVisible();
+  await expect(liveLedger.locator("svg[data-icon='list']")).toBeVisible();
+  await expect(liveLedger.locator("svg[data-icon='notes']")).toBeVisible();
+  await expect(component.getByRole("complementary", { name: "클럽 작업함" }).getByRole("listitem", { name: "출석 미확인" })).toBeVisible();
+  await expect(component.getByRole("complementary", { name: "클럽 작업함" }).getByRole("listitem")).not.toHaveCount(0);
+  await expect(component.getByRole("heading", { name: "출석 확인" })).toHaveCount(0);
+  await expect(component.locator(".rm-meeting-response-ledger--attendance-board")).toHaveCount(0);
+  await expect(component.getByRole("region", { name: "다음에 할 일" }).getByText("오후 7:26 · 현장 모드가 열렸어요")).toBeVisible();
   await expectLocatorGeometry(component.locator(".rm-host-operating-room__body"), BODY_DESKTOP_GEOMETRY, 4);
   await expectLocatorGeometry(component.locator(".rm-host-operating-room__workbox-rail"), WORKBOX_DESKTOP_GEOMETRY, 4);
   const regions = [
     await regionFromLocator(component.locator(".rm-host-operating-room__body"), "body", BODY_DESKTOP_GEOMETRY, 4),
     await regionFromLocator(component.locator(".rm-host-operating-room__workbox-rail"), "workbox", WORKBOX_DESKTOP_GEOMETRY, 4),
   ];
-  await captureHostApproved({ id: "host-live-desktop", page, testInfo, regions });
+  await captureHostApproved({
+    id: "host-live-desktop",
+    page,
+    testInfo,
+    regions,
+    allowFontRasterException: true,
+    skipMismatchRatioAssertion: false,
+  });
 });
 
 test("closing locks the approved desktop operating room", async ({ mount, page }, testInfo) => {
   test.setTimeout(90_000);
   const component = await mountApproved(mount, page, closingApprovedView(), APPROVED_DESKTOP_VIEWPORT);
   await expect(component.getByRole("region", { name: "다음에 할 일" })).toContainText("기록 초안을 검토하면 멤버에게 게시할 수 있어요");
+  await expect(component.getByRole("region", { name: "다음에 할 일" }).getByRole("link", { name: "기록 초안 검토" })).toBeVisible();
   await expect(component.getByRole("region", { name: "마감 현황" }).getByRole("listitem")).toHaveCount(5);
+  const closingItems = component.getByRole("region", { name: "마감 현황" }).getByRole("listitem");
+  await expect(closingItems).toHaveCount(5);
+  for (const index of [1, 2, 3, 4, 5]) {
+    await expect(closingItems.nth(index - 1).locator("[data-index]")).toHaveText(String(index));
+  }
+  await expect(component.getByRole("region", { name: "마감 현황" }).getByRole("link", { name: /보기|열기|확인|조건/ }).first()).toBeVisible();
+  await expect(component.getByRole("complementary", { name: "클럽 작업함" }).getByRole("listitem", { name: "기록 초안 검토" })).toBeVisible();
+  await expect(component.getByRole("region", { name: "다음에 할 일" }).getByText("게시 전에 피드백 문서를 확인해 주세요")).toBeVisible();
   await expectLocatorGeometry(component.locator(".rm-host-operating-room__body"), BODY_DESKTOP_GEOMETRY, 4);
   await expectLocatorGeometry(component.locator(".rm-host-operating-room__workbox-rail"), WORKBOX_DESKTOP_GEOMETRY, 4);
   const regions = [
     await regionFromLocator(component.locator(".rm-host-operating-room__body"), "body", BODY_DESKTOP_GEOMETRY, 4),
     await regionFromLocator(component.locator(".rm-host-operating-room__workbox-rail"), "workbox", WORKBOX_DESKTOP_GEOMETRY, 4),
   ];
-  await captureHostApproved({ id: "host-closing-desktop", page, testInfo, regions });
+  await captureHostApproved({
+    id: "host-closing-desktop",
+    page,
+    testInfo,
+    regions,
+    allowFontRasterException: true,
+    skipMismatchRatioAssertion: false,
+  });
 });
 
 test("prep locks the approved mobile operating room", async ({ mount, page }, testInfo) => {
@@ -934,40 +954,69 @@ test("prep locks the approved mobile operating room", async ({ mount, page }, te
   const preparation = component.getByRole("region", { name: "준비 현황" });
   const workbox = component.getByRole("complementary", { name: "클럽 작업함" });
   const bottomNav = component.locator('[data-club-shell-region="mobile-primary"]');
+  await expect(component.getByRole("link", { name: "멤버 시야" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "대상과 문구 검토" })).toBeVisible();
+  await expect(component.getByRole("navigation", { name: "호스트 주 메뉴 모바일" })).toBeVisible();
+  await expect(component.getByRole("region", { name: "준비 현황" }).getByRole("listitem")).toHaveCount(4);
+  await expect(component.getByRole("complementary", { name: "클럽 작업함" }).getByRole("listitem")).not.toHaveCount(0);
   await expect(nextAction).toBeVisible();
   await expect(nextAction).toContainText("대상과 문구를 확인한 뒤 직접 보내세요. 자동 발송하지 않아요.");
-  expect(await nextAction.evaluate((node) => getComputedStyle(node, "::after").content)).toContain(
-    "일정이 어제 19:30에 변경되었어요",
-  );
+  await expect(nextAction.getByText("일정이 어제 19:30에 변경되었어요")).toBeVisible();
   await expect(preparation.getByText("변경 전 확인 1 · 미열람 3")).toBeVisible();
   await expect(preparation.getByText("참석 7 · 불참 2 · 미응답 3")).toBeVisible();
   await expect(preparation.getByText("2명은 아직 작성 전")).toBeVisible();
   await expect(preparation.getByText("을지로 북살롱 예약 확인")).toBeVisible();
   await expect(preparation.getByRole("listitem")).toHaveCount(4);
+  for (const index of [1, 2, 3, 4]) {
+    const marker = preparation.getByRole("listitem").nth(index - 1).locator("[data-prep-index]");
+    await expect(marker).toBeVisible();
+    await expect(marker).toHaveText(String(index).padStart(2, "0"));
+  }
   await expect(workbox.getByRole("listitem")).toHaveCount(4);
   await expect(workbox.getByRole("combobox", { name: /보류 기간/ })).toHaveCount(0);
   await expect(bottomNav).toBeVisible();
-  await expect(component.getByRole("navigation", { name: "호스트 주 메뉴 모바일" })).toBeVisible();
+  const cover = component.locator(".rm-operating-room-header__cover .rm-book-cover");
+  await expect(cover).toBeVisible();
+  const coverBox = await cover.boundingBox();
+  expect(coverBox, "cover cell").not.toBeNull();
+  expect(coverBox!.width).toBeGreaterThan(48);
+  expect(coverBox!.height).toBeGreaterThan(48);
   const frame = { x: 0, y: 0, width: 390, height: 832 };
+  await expect(bottomNav).toHaveCSS("position", "fixed");
+  const navBox = await bottomNav.boundingBox();
+  expect(navBox, "bottom-nav").not.toBeNull();
+  expect(navBox!.y).toBeGreaterThanOrEqual(frame.height - 140);
+  expect(navBox!.y).toBeLessThan(frame.height);
+  const firstWorkboxRow = workbox.getByRole("listitem").first();
+  await expect(firstWorkboxRow).toBeVisible();
   for (const [name, locator] of [
     ["next-action", nextAction],
     ["prep-row-4", preparation.getByRole("listitem").nth(3)],
-    ["workbox-row-3", workbox.locator(".rm-host-work-item").nth(2)],
+    ["workbox-now-row", firstWorkboxRow],
   ] as const) {
     const box = await locator.boundingBox();
     expect(box, name).not.toBeNull();
     expect(box!.x, name).toBeGreaterThanOrEqual(frame.x);
     expect(box!.y, name).toBeGreaterThanOrEqual(frame.y);
     expect(box!.x + box!.width, name).toBeLessThanOrEqual(frame.width + 1);
-    const yLimit = name === "workbox-row-3" ? frame.height + 48 : frame.height;
-    expect(box!.y, `${name} y=${box!.y} h=${box!.height}`).toBeLessThan(yLimit);
+    expect(
+      box!.y + box!.height,
+      `${name} y=${box!.y} h=${box!.height} navY=${navBox!.y}`,
+    ).toBeLessThanOrEqual(navBox!.y + 2);
   }
-  await expect(bottomNav).toHaveCSS("position", "fixed");
-  const navBox = await bottomNav.boundingBox();
-  expect(navBox).not.toBeNull();
-  expect(navBox!.y).toBeGreaterThanOrEqual(frame.height - 140);
-  expect(navBox!.y).toBeLessThan(frame.height);
-  await captureHostApproved({ id: "host-prep-mobile", page, testInfo, regions: [] });
+  const regions = [
+    await regionFromLocator(bottomNav, "nav", MOBILE_NAV_GEOMETRY, 4),
+    await regionFromLocator(component.locator(".rm-host-operating-room"), "main", PREP_MOBILE_MAIN_GEOMETRY, 4),
+  ];
+  await captureHostApproved({
+    id: "host-prep-mobile",
+    page,
+    testInfo,
+    regions,
+    allowFontRasterException: true,
+    fontRasterExceptionMaxRatio: HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
+    skipMismatchRatioAssertion: false,
+  });
 });
 
 test("live locks the approved mobile attendance board", async ({ mount, page }, testInfo) => {
@@ -975,20 +1024,67 @@ test("live locks the approved mobile attendance board", async ({ mount, page }, 
   const component = await mountApproved(
     mount,
     page,
-    liveApprovedView(approvedLiveContent()),
+    liveApprovedView(),
     APPROVED_MOBILE_VIEWPORT,
   );
+  await expect(component.getByRole("button", { name: /참석|출석/ }).first()).toBeVisible();
+  await expect(component.getByText(/8\s*\/\s*12/)).toBeVisible();
+  await expect(component.getByText(/확인 필요 3/)).toBeVisible();
+  await expect(component.getByText(/나머지 3명/)).toBeVisible();
+  await expect(component.getByRole("navigation", { name: "호스트 주 메뉴 모바일" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "멤버 시야" })).toBeVisible();
+  await expect(component.getByText("진행 중")).toBeVisible();
   await expect(component.getByRole("heading", { name: "출석 확인" })).toBeVisible();
+  await expect(component.locator(".rm-meeting-response-ledger--attendance-board")).toBeVisible();
+  await expect(component.getByRole("region", { name: "현장 현황" })).toHaveCount(0);
   await expect(component.getByRole("button", { name: "박서윤 참석" })).toHaveAttribute("aria-pressed", "true");
   await expect(component.getByRole("button", { name: "박서윤 불참" })).toBeVisible();
   await expect(component.getByRole("button", { name: "박서윤 미확인" })).toBeVisible();
   await expect(component.getByRole("button", { name: "이하린 미확인" })).toHaveAttribute("aria-pressed", "true");
   await expect(component.getByText("미응답").first()).toBeVisible();
-  await expect(component.getByRole("button", { name: "나머지 2명 모두 참석으로 표시" })).toBeVisible();
+  await expect(component.getByRole("button", { name: "나머지 3명 모두 참석으로 표시" })).toBeVisible();
+  await expect(component.locator(".rm-meeting-response-ledger--attendance-board .rm-avatar-chip").first()).toBeVisible();
   await expect(component.getByText("선택하면 바로 저장돼요.")).toBeVisible();
   await expect(component.getByRole("button", { name: "실행 취소" })).toBeVisible();
   await expect(component.getByText("출석 8명 저장됨")).toBeVisible();
-  await captureHostApproved({ id: "host-live-mobile", page, testInfo, regions: [] });
+  const board = component.locator(".rm-meeting-response-ledger--attendance-board");
+  const roster = board.getByRole("listitem");
+  await expect(roster).toHaveCount(7);
+  const bulk = component.getByRole("button", { name: "나머지 3명 모두 참석으로 표시" });
+  const undo = component.locator(".rm-workspace-undo-bar");
+  const bottomNav = component.locator('[data-club-shell-region="mobile-primary"]');
+  const frame = { x: 0, y: 0, width: 390, height: 832 };
+  await expect(bottomNav).toHaveCSS("position", "fixed");
+  const navBox = await bottomNav.boundingBox();
+  expect(navBox, "bottom-nav").not.toBeNull();
+  expect(navBox!.y).toBeGreaterThanOrEqual(frame.height - 140);
+  expect(navBox!.y + navBox!.height).toBeLessThanOrEqual(frame.height + 1);
+  for (const [name, locator] of [
+    ["roster-row-7", roster.nth(6)],
+    ["bulk", bulk],
+    ["undo", undo],
+  ] as const) {
+    const box = await locator.boundingBox();
+    expect(box, name).not.toBeNull();
+    expect(box!.x, name).toBeGreaterThanOrEqual(frame.x);
+    expect(box!.y, name).toBeGreaterThanOrEqual(frame.y);
+    expect(box!.x + box!.width, name).toBeLessThanOrEqual(frame.width + 1);
+    expect(box!.y + box!.height, `${name} y=${box!.y} h=${box!.height} navY=${navBox!.y}`).toBeLessThanOrEqual(navBox!.y + 2);
+  }
+  const regions = [
+    await regionFromLocator(bottomNav, "nav", MOBILE_NAV_GEOMETRY, 4),
+    await regionFromLocator(component.locator(".rm-host-operating-room"), "main", LIVE_MOBILE_MAIN_GEOMETRY, 4),
+    await regionFromLocator(board, "board", LIVE_MOBILE_BOARD_GEOMETRY, 4),
+  ];
+  await captureHostApproved({
+    id: "host-live-mobile",
+    page,
+    testInfo,
+    regions,
+    allowFontRasterException: true,
+    fontRasterExceptionMaxRatio: HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
+    skipMismatchRatioAssertion: false,
+  });
 });
 
 test("empty operating room primary stays readable without a phase overlay", async ({ mount, page }) => {

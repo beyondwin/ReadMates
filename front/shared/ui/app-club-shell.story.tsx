@@ -65,12 +65,28 @@ export function AppClubShellStory({
   );
 }
 
+type HostApprovedStoryDestination =
+  | "operating-room"
+  | "meetings"
+  | "people"
+  | "records"
+  | "settings"
+  | "schedule-review"
+  | "person-detail";
+
 const hostPrimaryItems: PrimaryNavigationItem[] = [
   { id: "operating-room", label: "운영실", href: "/clubs/reading-sai/host", icon: "host", current: true },
   { id: "meetings", label: "일정과 모임", mobileLabel: "모임", href: "/clubs/reading-sai/host/meetings", icon: "session", current: false },
   { id: "people", label: "사람", href: "/clubs/reading-sai/host/people", icon: "me", current: false },
   { id: "records", label: "기록", href: "/clubs/reading-sai/host/records", icon: "archive", current: false },
 ];
+
+function hostPrimaryCurrentId(destination: HostApprovedStoryDestination): string | null {
+  if (destination === "settings") return null;
+  if (destination === "person-detail") return "people";
+  if (destination === "schedule-review") return "operating-room";
+  return destination;
+}
 
 function StoryHostSpaceSwitcher() {
   return (
@@ -98,11 +114,21 @@ function StoryHostSpaceSwitcher() {
   );
 }
 
-export function AppClubShellHostStory({ children }: { children: ReactNode }) {
+export function AppClubShellHostStory({
+  children,
+  destination = "operating-room",
+}: {
+  children: ReactNode;
+  destination?: HostApprovedStoryDestination;
+}) {
+  const currentId = hostPrimaryCurrentId(destination);
   return (
     <AppClubShell
       workspace="host"
-      primaryItems={hostPrimaryItems}
+      primaryItems={hostPrimaryItems.map((item) => ({
+        ...item,
+        current: currentId !== null && item.id === currentId,
+      }))}
       account={{ control: <button type="button" aria-label="계정 메뉴">계정</button> }}
       brandHref="/clubs/reading-sai/host"
       mobileTitle="읽는사이 운영"

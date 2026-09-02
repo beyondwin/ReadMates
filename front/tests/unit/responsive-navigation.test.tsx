@@ -227,7 +227,7 @@ describe("TopNav responsive variants", () => {
     expect(memberReturn).toHaveAttribute("href", "/app");
     expect(memberReturn).toHaveClass("rm-workspace-switch");
     expect(memberReturn.textContent).toBe("");
-    expect(screen.getByRole("link", { name: /읽는사이/ })).toHaveAttribute("href", "/app/host");
+    expect(screen.getByRole("link", { name: "ReadMates" })).toHaveAttribute("href", "/app/host");
     expect(container.querySelector(".rm-avatar-chip img")).toHaveAttribute("src", "/assets/avatars/book-club/cloud-green-book.webp");
   });
 

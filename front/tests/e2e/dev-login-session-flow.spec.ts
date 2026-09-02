@@ -277,6 +277,7 @@ test("legacy invitation entry replaces to canonical invitation settings", async 
   await page.goto("/app/host/invitations");
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host\/settings#invitations$/);
   await expect(page.getByRole("heading", { name: "초대와 설정" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "공유 링크" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "초대 링크" })).toBeVisible();
+  await page.getByRole("button", { name: "새 초대 링크" }).click();
   await expect(page.getByLabel("링크 이름")).toBeVisible();
 });

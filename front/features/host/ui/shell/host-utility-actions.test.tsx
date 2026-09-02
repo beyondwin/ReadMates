@@ -91,4 +91,18 @@ describe("HostUtilityActions", () => {
     expect(desktopAction).toHaveAccessibleDescription("데스크톱 설정 권한이 필요합니다.");
     expect(mobileAction).toHaveAccessibleDescription("모바일 설정 권한이 필요합니다.");
   });
+
+  it("marks the selected utility as the current page", () => {
+    render(
+      <HostUtilityActions
+        {...hrefs}
+        unreadNotifications={0}
+        permissionLimits={[]}
+        currentId="settings"
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "초대와 설정" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "멤버 시야" })).not.toHaveAttribute("aria-current");
+  });
 });

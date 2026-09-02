@@ -47,6 +47,36 @@ export type HostSessionLedgerSummary = {
   draftCount: number;
 };
 
+export type HostSessionLedgerRowFacts = {
+  attendanceLabel?: string;
+  reflectionLabel?: string;
+  draftLabel?: string;
+  feedbackLabel?: string;
+  publicationLabel?: string;
+  actionLabel?: string;
+  dateLabel?: string;
+};
+
+export type HostSessionLedgerNextAction = {
+  sessionId: string;
+  label: string;
+  meta: string;
+  href?: string;
+  ctaLabel?: string;
+};
+
+export type HostSessionLedgerWorkItem = {
+  title: string;
+  meta: string;
+  href?: string;
+};
+
+export type HostSessionLedgerStatusCounts = {
+  closing: number;
+  drafting: number;
+  published: number;
+};
+
 export type HostSessionAttentionData = {
   items: HostSessionLedgerItem[];
   summary: HostSessionLedgerSummary;
@@ -179,12 +209,43 @@ export function hostSessionLedgerBadges(
 }
 
 export function hostSessionLedgerActionLabel(
+  item: Pick<HostSessionLedgerItem, "hasDraft" | "recordStatus"> &
+    Partial<Pick<HostSessionLedgerItem, "needsAttention">>,
+) {
+  if (item.recordStatus === "NOT_STARTED") {
+    return "마감 시작";
+  }
+  if (item.hasDraft || item.needsAttention || item.recordStatus === "INCOMPLETE") {
+    return "마감실 열기";
+  }
+  return "기록 보기";
+}
+
+export function hostSessionLedgerDraftLabel(
   item: Pick<HostSessionLedgerItem, "hasDraft" | "recordStatus">,
 ) {
-  if (item.hasDraft) {
-    return "초안 열기";
-  }
-  return item.recordStatus === "COMPLETE" ? "보기·수정" : "이어서 수정";
+  if (item.hasDraft) return "작성 중";
+  if (item.recordStatus === "COMPLETE") return "완료";
+  return "초안 없음";
+}
+
+export function hostSessionLedgerPublicationLabel(
+  item: Pick<HostSessionLedgerItem, "recordStatus"> &
+    Partial<Pick<HostSessionLedgerItem, "state">>,
+) {
+  if (item.state === "PUBLISHED") return "게시됨";
+  if (item.recordStatus === "NOT_STARTED") return "마감 필요";
+  if (item.recordStatus === "COMPLETE") return "게시 준비";
+  return "대기";
+}
+
+export function hostSessionLedgerFeedbackLabel(
+  item: Pick<HostSessionLedgerItem, "recordStatus" | "needsAttention">,
+) {
+  if (item.needsAttention) return "확인 필요";
+  if (item.recordStatus === "COMPLETE") return "등록됨";
+  if (item.recordStatus === "NOT_STARTED") return "미등록";
+  return "없음";
 }
 
 export function hostSessionLedgerModifiedAtLabel(value: string | null) {

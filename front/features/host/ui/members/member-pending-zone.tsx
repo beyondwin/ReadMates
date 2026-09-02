@@ -1,98 +1,135 @@
-import { type CSSProperties, type ReactElement } from "react";
+import { type CSSProperties, type ReactElement, useState } from "react";
 import type { HostMemberListItem } from "@/features/host/model/host-view-types";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import {
   disabledViewerActivationReason,
   disabledViewerDeactivateReason,
 } from "./member-action-rules";
-import { requestMeta } from "./member-list-helpers";
+import { matchesHostPeopleNameQuery, useHostPeopleNameQuery } from "./host-people-name-query";
+import { formatPendingRequestTime, requestMeta } from "./member-list-helpers";
 import type { HostMembersLinkComponent } from "./types";
+
+const DefaultPersonLink: HostMembersLinkComponent = ({ to, children, ...props }) => (
+  <a {...props} href={to}>{children}</a>
+);
 
 export function MemberPendingZone({
   viewers,
   isRowPending,
   onActivate,
   onRelease,
+  onReview,
   personHref,
   LinkComponent,
+  now,
 }: {
   viewers: readonly HostMemberListItem[];
   isRowPending: (membershipId: string) => boolean;
   onActivate: (membershipId: string) => void;
   onRelease: (membershipId: string) => void;
+  onReview?: (membershipId: string) => void;
   personHref?: (membershipId: string) => string;
   LinkComponent?: HostMembersLinkComponent;
+  now?: Date;
 }): ReactElement | null {
-  if (viewers.length === 0) {
+  const [reviewingIds, setReviewingIds] = useState<ReadonlySet<string>>(() => new Set());
+  const PersonLink = LinkComponent ?? DefaultPersonLink;
+  const nameQuery = useHostPeopleNameQuery();
+  const visibleViewers = viewers.filter((member) => matchesHostPeopleNameQuery(member.displayName, nameQuery));
+
+  if (visibleViewers.length === 0) {
     return null;
   }
 
+  const startReview = (membershipId: string) => {
+    setReviewingIds((current) => new Set([...current, membershipId]));
+    onReview?.(membershipId);
+  };
+
   return (
     <section
-      className="rm-document-panel"
+      className="rm-document-panel rm-host-pending"
       aria-label="가입 승인 대기"
-      style={{ padding: "18px 22px" }}
     >
-      <header className="stack" style={{ "--stack": "6px", marginBottom: 14 } as CSSProperties}>
-        <div className="eyebrow" style={{ margin: 0 }}>
-          가입 승인
+      <header className="rm-host-pending__header">
+        <div className="stack" style={{ "--stack": "6px" } as CSSProperties}>
+          <h2 className="h4 editorial" style={{ margin: 0 }}>
+            가입 승인 대기 {visibleViewers.length}명
+          </h2>
+          <p className="small" style={{ margin: 0, color: "var(--text-2)" }}>
+            승인과 거절은 결과 안내를 포함해요.
+          </p>
         </div>
-        <h2 className="h4 editorial" style={{ margin: 0 }}>
-          가입 승인 대기 {viewers.length}명
-        </h2>
-        <p className="small" style={{ margin: 0, color: "var(--text-2)" }}>
-          승인·거절은 멤버에게 알림이 갑니다
-        </p>
+        <button
+          className="btn btn-primary"
+          type="button"
+          onClick={() => startReview(visibleViewers[0].membershipId)}
+        >
+          가입 승인 검토
+        </button>
       </header>
 
       <div className="stack" style={{ "--stack": "10px" } as CSSProperties}>
-        {viewers.map((member) => {
+        {visibleViewers.map((member) => {
           const rowPending = isRowPending(member.membershipId);
           const activateReason = disabledViewerActivationReason(rowPending);
           const releaseReason = disabledViewerDeactivateReason(member, rowPending);
           const activateDisabled = rowPending;
           const releaseDisabled = !member.canDeactivate || rowPending;
+          const requestTime = formatPendingRequestTime(member.createdAt, now);
+          const reviewing = reviewingIds.has(member.membershipId);
+          const personTo = personHref?.(member.membershipId)
+            ?? `/app/host/people/${encodeURIComponent(member.membershipId)}`;
 
           return (
-            <article key={member.membershipId} className="surface" style={{ padding: "14px 16px" }}>
+            <article key={member.membershipId} className="rm-host-pending__row">
               <div className="row-between" style={{ alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-                <div style={{ minWidth: 0 }}>
-                  <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <AvatarChip avatarKey={member.avatarKey} name={member.displayName} label="" sizeRole="member" />
-                    <span className="h4 editorial" style={{ margin: 0 }}>
-                      {personHref && LinkComponent ? (
-                        <LinkComponent
-                          to={personHref(member.membershipId)}
-                          className="rm-host-member-ledger__person-link"
-                        >
-                          {member.displayName}
-                        </LinkComponent>
-                      ) : member.displayName}
-                    </span>
-                  </div>
-                  <p className="small" style={{ margin: "4px 0 0", color: "var(--text-2)" }}>
-                    {requestMeta(member)}
-                  </p>
+                <div className="rm-host-pending__identity">
+                  <AvatarChip avatarKey={member.avatarKey} name={member.displayName} label="" sizeRole="member" />
+                  <span className="rm-host-pending__name">
+                    <PersonLink
+                      to={personTo}
+                      className="rm-host-member-ledger__person-link"
+                    >
+                      {member.displayName}
+                    </PersonLink>
+                  </span>
+                  {requestTime ? (
+                    <span className="small rm-host-pending__time">{requestTime}</span>
+                  ) : null}
+                  <span className="rm-sr-only">{requestMeta(member)}</span>
                 </div>
                 <div className="row" style={{ gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                  <PendingActionButton
-                    action="approve"
-                    membershipId={member.membershipId}
-                    label="승인"
-                    tone="primary"
-                    disabled={activateDisabled}
-                    reason={activateReason}
-                    onClick={() => onActivate(member.membershipId)}
-                  />
-                  <PendingActionButton
-                    action="reject"
-                    membershipId={member.membershipId}
-                    label="거절"
-                    tone="ghost"
-                    disabled={releaseDisabled}
-                    reason={releaseReason}
-                    onClick={() => onRelease(member.membershipId)}
-                  />
+                  {reviewing ? (
+                    <>
+                      <PendingActionButton
+                        action="approve"
+                        membershipId={member.membershipId}
+                        label="승인"
+                        tone="primary"
+                        disabled={activateDisabled}
+                        reason={activateReason}
+                        onClick={() => onActivate(member.membershipId)}
+                      />
+                      <PendingActionButton
+                        action="reject"
+                        membershipId={member.membershipId}
+                        label="거절"
+                        tone="ghost"
+                        disabled={releaseDisabled}
+                        reason={releaseReason}
+                        onClick={() => onRelease(member.membershipId)}
+                      />
+                    </>
+                  ) : (
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      type="button"
+                      onClick={() => startReview(member.membershipId)}
+                    >
+                      검토
+                    </button>
+                  )}
                 </div>
               </div>
             </article>

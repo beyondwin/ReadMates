@@ -122,6 +122,9 @@ const HOST_SETTINGS_DEPENDENCIES = [
 
 const HOST_SCHEDULE_REVIEW_DEPENDENCIES = [
   "features/host/ui/schedule-review/host-schedule-review-header.tsx",
+  "features/host/ui/schedule-review/host-schedule-review-page.tsx",
+  "features/host/ui/schedule-review/host-schedule-review.css",
+  "features/host/ui/notifications/manual-notification-preview.tsx",
   "features/host/route/host-schedule-review-route.tsx",
 ] as const;
 

@@ -2,7 +2,7 @@
 
 - 날짜: 2026-08-29
 - 표면: Host app (`/clubs/:slug/app/host/**`, 호환 `/app/host/**`)
-- 상태: 운영실 composition 구현됨. 시각 픽셀 수락은 ADR-0053 `Proposed`(독립 시각 검토·사람 30초 gate 미완)
+- 상태: 운영실 composition 구현됨. Host 첫 화면 독립 시각 검토는 `docs/reports/2026-09-02-host-approved-first-viewport-acceptance.md` 기준 11/11 PASS-with-font-raster. 픽셀 비율 0.02와 사람 30초 gate는 남아 픽셀 수락 완료가 아니다. ADR-0053은 `Proposed`
 - ADR impact: **supersede + new** — ADR-0046을 ADR-0048로 대체하고, 일정 revision 확인 의미를 ADR-0049로 분리. 시각 권위 계층은 ADR-0053 `Proposed`
 - 관련: ADR-0018, ADR-0019, ADR-0021, ADR-0023, ADR-0026, ADR-0028, ADR-0035, ADR-0038, ADR-0045, ADR-0046, ADR-0048, ADR-0049, ADR-0053, `front/DESIGN.md`
 - 승인 시안:
@@ -226,6 +226,6 @@ pnpm --dir front test:e2e
 
 승인 PNG 07–17은 page composition의 시각 권위다. code-native UI(React, semantic HTML, repository token, bundled Pretendard, 실제 avatar asset)는 편집·runtime source이며 PNG를 배경으로 쓰지 않는다. tracked CT snapshot은 보조 회귀 cache이고, snapshot 갱신만으로 합격하지 않는다. token, shared CSS/component, fixture 변경은 영향 reference 증거를 무효화하고 approved PNG·candidate·overlay·diff·measurement와 독립 검토가 다시 필요하다.
 
-메뉴·카피·상태·접근성·responsive contract는 이 문서와 ADR-0048이 규범이다. 시각 위계·밀도·first viewport는 승인 PNG가 우선한다. 기능·권한·안전 조작은 삭제하지 않고 시안 흐름 안에서 progressive disclosure로 재배치한다. 프로젝트에 별도 candidate PNG를 구현 권위로 보존하지 않는다. ADR-0053은 독립 시각 검토와 사람 30초 gate가 남아 `Proposed`다.
+메뉴·카피·상태·접근성·responsive contract는 이 문서와 ADR-0048이 규범이다. 시각 위계·밀도·first viewport는 승인 PNG가 우선한다. 기능·권한·안전 조작은 삭제하지 않고 시안 흐름 안에서 progressive disclosure로 재배치한다. 프로젝트에 별도 candidate PNG를 구현 권위로 보존하지 않는다. Host 첫 화면 독립 시각 검토는 `docs/reports/2026-09-02-host-approved-first-viewport-acceptance.md` 기준 11/11 PASS-with-font-raster다. 픽셀 비율 0.02와 사람 30초 gate는 남아 픽셀 수락 완료가 아니다. ADR-0053은 `Proposed`다.
 
 이미지에 사용된 인물·클럽·모임 데이터는 모두 가상 예시다. 자산의 생성 receipt와 기계적 검증값은 `host-redesign-mockups/README.md`에 기록한다.

@@ -513,6 +513,7 @@ describe("HostScheduleReviewRoute", () => {
     vi.mocked(previewManualNotification).mockImplementation(() => rejection.promise.then(() => {
       throw { code: "MANUAL_NOTIFICATION_RECIPIENTS_CHANGED", status: 409 };
     }));
+    await userEvent.click(screen.getByText("세부 조작"));
     await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
     rejection.resolve();
     await failedSettled.promise;

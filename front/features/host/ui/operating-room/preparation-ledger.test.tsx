@@ -68,6 +68,17 @@ describe("PreparationLedger", () => {
         row.href,
       );
     }
+
+    expect(region.querySelector("svg[data-icon='calendar']")).not.toBeNull();
+    expect(region.querySelector("svg[data-icon='people']")).not.toBeNull();
+    expect(region.querySelector("svg[data-icon='chat']")).not.toBeNull();
+    expect(region.querySelector("svg[data-icon='pin']")).not.toBeNull();
+    expect(items.map((item) => item.querySelector("[data-prep-index]")?.textContent)).toEqual([
+      "01",
+      "02",
+      "03",
+      "04",
+    ]);
   });
 
   it("preserves zero as data and names row state without relying on color", () => {

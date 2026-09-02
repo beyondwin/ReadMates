@@ -180,6 +180,7 @@ describe("HostSettingsRoute transition ownership", () => {
     });
     await screen.findByRole("heading", { name: "초대 링크" });
 
+    await userEvent.click(screen.getByRole("button", { name: "새 초대 링크" }));
     await userEvent.type(screen.getByLabelText("링크 이름"), "가을 신규 멤버");
     await userEvent.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
 
@@ -207,6 +208,7 @@ describe("HostSettingsRoute transition ownership", () => {
     renderRoute(coordinator);
     await screen.findByRole("heading", { name: "초대 링크" });
 
+    await userEvent.click(screen.getByRole("button", { name: "새 초대 링크" }));
     await userEvent.type(screen.getByLabelText("링크 이름"), "같은 요청 복구");
     await userEvent.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
 
@@ -231,6 +233,7 @@ describe("HostSettingsRoute transition ownership", () => {
       receipt: { receiptId: "settings-r", action: "SETTINGS_UPDATED", revision: 4, replayed: false },
     });
     renderRoute(createGlobalSpaceTransitionCoordinator());
+    await userEvent.click(await screen.findByRole("button", { name: "수정" }));
     const clubName = await screen.findByLabelText("클럽 이름");
 
     await userEvent.clear(clubName);
@@ -252,6 +255,7 @@ describe("HostSettingsRoute transition ownership", () => {
     vi.mocked(fetchHostClubSettings).mockResolvedValueOnce(settings).mockResolvedValue(latest);
     vi.mocked(updateHostClubSettings).mockRejectedValue(apiError("HOST_SETTINGS_STALE", 409));
     renderRoute(createGlobalSpaceTransitionCoordinator());
+    await userEvent.click(await screen.findByRole("button", { name: "수정" }));
     const clubName = await screen.findByLabelText("클럽 이름");
 
     await userEvent.clear(clubName);
@@ -273,7 +277,7 @@ describe("HostSettingsRoute transition ownership", () => {
     renderRoute(createGlobalSpaceTransitionCoordinator());
     await screen.findByText(link.name);
 
-    await userEvent.click(screen.getByRole("button", { name: "링크 편집" }));
+    await userEvent.click(screen.getByRole("button", { name: "링크 보기" }));
     await userEvent.clear(screen.getByLabelText("편집 링크 이름"));
     await userEvent.type(screen.getByLabelText("편집 링크 이름"), "충돌한 링크 이름");
     await userEvent.click(screen.getByRole("button", { name: "링크 변경 저장" }));
@@ -288,6 +292,7 @@ describe("HostSettingsRoute transition ownership", () => {
   it("publishes a structured co-host rejection without retaining a retry identity", async () => {
     vi.mocked(changeHostCoHost).mockRejectedValue(apiError("LAST_ACTIVE_HOST_REQUIRED", 409));
     renderRoute(createGlobalSpaceTransitionCoordinator());
+    await userEvent.click(await screen.findByText("세부 조작"));
     const action = await screen.findByRole("button", { name: "은하 공동 호스트 지정" });
 
     await userEvent.click(action);
@@ -346,6 +351,7 @@ describe("HostSettingsRoute transition ownership", () => {
     const invalidate = vi.spyOn(client, "invalidateQueries");
     const storageWrite = vi.spyOn(Storage.prototype, "setItem");
     await screen.findByRole("heading", { name: "초대 링크" });
+    await userEvent.click(screen.getByRole("button", { name: "새 초대 링크" }));
     await userEvent.type(screen.getByLabelText("링크 이름"), "권한 상실 링크");
     await userEvent.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
     await waitFor(() => expect(createHostInvitationLink).toHaveBeenCalledTimes(1));
@@ -382,6 +388,7 @@ describe("HostSettingsRoute transition ownership", () => {
   it("aggregates settings and invitation drafts, then releases clean state on reset", async () => {
     const coordinator = createGlobalSpaceTransitionCoordinator();
     renderRoute(coordinator);
+    await userEvent.click(await screen.findByRole("button", { name: "수정" }));
     const clubName = await screen.findByLabelText("클럽 이름");
     expect(coordinator.getSnapshot()).toEqual({ kind: "clean" });
 
@@ -391,13 +398,14 @@ describe("HostSettingsRoute transition ownership", () => {
     await userEvent.type(clubName, settings.name);
     await waitFor(() => expect(coordinator.getSnapshot()).toEqual({ kind: "clean" }));
 
+    await userEvent.click(screen.getByRole("button", { name: "새 초대 링크" }));
     const createName = screen.getByLabelText("링크 이름");
     await userEvent.type(createName, "작성 중");
     expect(coordinator.getSnapshot()).toMatchObject({ kind: "dirty" });
     await userEvent.clear(createName);
     await waitFor(() => expect(coordinator.getSnapshot()).toEqual({ kind: "clean" }));
 
-    await userEvent.click(screen.getByRole("button", { name: "링크 편집" }));
+    await userEvent.click(screen.getByRole("button", { name: "링크 보기" }));
     expect(coordinator.getSnapshot()).toMatchObject({ kind: "dirty" });
     await userEvent.click(screen.getByRole("button", { name: "링크 편집 취소" }));
     await waitFor(() => expect(coordinator.getSnapshot()).toEqual({ kind: "clean" }));
@@ -417,6 +425,7 @@ describe("HostSettingsRoute transition ownership", () => {
     const coordinator = createGlobalSpaceTransitionCoordinator({ registry });
     const { unmount } = renderRoute(coordinator);
     await screen.findByRole("heading", { name: "초대 링크" });
+    await userEvent.click(screen.getByRole("button", { name: "새 초대 링크" }));
     await userEvent.type(screen.getByLabelText("링크 이름"), "분리 복구 링크");
     await userEvent.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
     await waitFor(() => expect(createHostInvitationLink).toHaveBeenCalledTimes(1));

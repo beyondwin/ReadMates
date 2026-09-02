@@ -54,6 +54,8 @@ describe("HostSessionLedger", () => {
       />,
     );
 
+    await user.click(screen.getByText("세부 조작"));
+    expect(screen.getByRole("link", { name: "휴지통" })).toHaveAttribute("href", "?view=trash");
     await user.click(screen.getByText("기록 필터"));
     await user.type(screen.getByRole("searchbox", { name: "모임 기록 검색" }), "  모비 딕  ");
     await user.click(screen.getByRole("button", { name: "검색" }));
@@ -69,7 +71,8 @@ describe("HostSessionLedger", () => {
     expect(onFiltersChange).toHaveBeenCalledWith({ ...filters, recordStatus: "INCOMPLETE" });
   });
 
-  it("keeps a truthful zero summary as editorial context", () => {
+  it("keeps a truthful zero summary as editorial context", async () => {
+    const user = userEvent.setup();
     render(
       <HostSessionLedger
         items={[]}
@@ -82,10 +85,11 @@ describe("HostSessionLedger", () => {
       />,
     );
 
+    expect(screen.getByText("조건에 맞는 모임 기록이 없습니다.")).toBeVisible();
+    await user.click(screen.getByText("세부 조작"));
     expect(screen.getByRole("region", { name: "기록 장부 요약" })).toHaveTextContent(
       "확인 필요한 기록 없음",
     );
-    expect(screen.getByText("조건에 맞는 모임 기록이 없습니다.")).toBeVisible();
   });
 
   it("renders semantic desktop rows and equivalent mobile cards", () => {
@@ -109,15 +113,13 @@ describe("HostSessionLedger", () => {
     expect(within(table).getByRole("row", { name: /모비 딕/ })).toBeInTheDocument();
     const mobileCard = container.querySelector("article[data-session-id='session-28']");
     expect(mobileCard).toHaveTextContent("모비 딕");
-    expect(mobileCard).toHaveTextContent("확인 필요");
-    expect(mobileCard).toHaveTextContent("마지막 수정 2026.07.23 10:00");
     expect(mobileCard).toHaveStyle({ minWidth: "0", overflowWrap: "anywhere" });
-    expect(screen.getAllByRole("link", { name: "No.28 초안 열기" })).toHaveLength(2);
-    expect(screen.getAllByText("마지막 수정 2026.07.23 10:00")).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "No.28 마감실 열기" })).toHaveLength(2);
+    expect(screen.getByRole("link", { name: "마감실 열기" })).toBeVisible();
     expect(screen.queryByRole("link", { name: "새 모임 만들기" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "휴지통" })).toHaveAttribute("href", "?view=trash");
-    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "기록 상태" })).toBeVisible();
     expect(recordLinkStates.filter(Boolean)).toEqual([
+      { readmatesReturnTo: "/app/host/records", readmatesReturnLabel: "기록으로" },
       { readmatesReturnTo: "/app/host/records", readmatesReturnLabel: "기록으로" },
       { readmatesReturnTo: "/app/host/records", readmatesReturnLabel: "기록으로" },
     ]);
@@ -142,6 +144,10 @@ describe("HostSessionLedger", () => {
     );
 
     expect(recordLinkStates.filter(Boolean)).toEqual([
+      {
+        readmatesReturnTo: "/clubs/reading-sai/app/host/records",
+        readmatesReturnLabel: "기록으로",
+      },
       {
         readmatesReturnTo: "/clubs/reading-sai/app/host/records",
         readmatesReturnLabel: "기록으로",
@@ -286,8 +292,9 @@ describe("HostSessionLedger", () => {
       />,
     );
 
-    expect(screen.getAllByRole("link", { name: "No.28 이어서 수정" })).toHaveLength(2);
-    expect(screen.getAllByRole("link", { name: "No.29 보기·수정" })).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "No.28 마감실 열기" })).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "No.29 기록 보기" })).toHaveLength(2);
+    expect(screen.getByRole("link", { name: "마감실 열기" })).toBeVisible();
   });
 
   it("loads the next cursor page without replacing the current rows", async () => {
@@ -304,7 +311,7 @@ describe("HostSessionLedger", () => {
       />,
     );
 
-    expect(screen.getAllByText("모비 딕")).toHaveLength(2);
+    expect(screen.getAllByText(/모비 딕/).length).toBeGreaterThanOrEqual(2);
     await user.click(screen.getByRole("button", { name: "더 보기" }));
     expect(onLoadMore).toHaveBeenCalledTimes(1);
   });

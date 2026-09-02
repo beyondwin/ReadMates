@@ -64,6 +64,23 @@ function renderPreview({
 }
 
 describe("ManualNotificationPreviewConfirmation", () => {
+  it("folds diagnostic counts and duplicated copy when requested", () => {
+    render(
+      <ManualNotificationPreviewConfirmation
+        preview={previewFixture}
+        busy={false}
+        presentation="side-sheet"
+        diagnostics="folded"
+        onConfirm={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /명에게 안내 보내기/ })).toBeVisible();
+    expect(screen.getByText("최종 대상")).not.toBeVisible();
+    expect(screen.getByText(previewFixture.template.bodyPreview)).not.toBeVisible();
+    expect(screen.getByText("발송 전 확인 세부")).toBeVisible();
+  });
+
   it("renders server-calculated counts and message content in side-sheet mode", () => {
     renderPreview();
 

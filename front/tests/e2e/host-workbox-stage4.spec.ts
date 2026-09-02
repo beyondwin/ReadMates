@@ -708,6 +708,7 @@ test("named links and revisioned settings expose one-time authority while cursor
   expect(initialHistory.nextCursor).toBeTruthy();
   await expect(page.getByText("revision 41", { exact: true }).first()).toBeVisible();
 
+  await page.getByRole("button", { name: "새 초대 링크" }).click();
   await page.getByLabel("링크 이름").fill("브라우저 합성 공유 링크");
   await page.getByLabel("최대 사용 횟수").fill("2");
   const createResponsePromise = page.waitForResponse((response) => (
@@ -745,6 +746,7 @@ where id = ${sqlString(created.link.linkId)} and club_id = ${sqlString(CLUB_ID)}
   await expect(page.getByRole("button", { name: "한 번만 복사" })).toHaveCount(0);
   await expect(page.getByRole("status")).toContainText("다시 표시하지 않습니다");
 
+  await page.locator(".rm-host-editorial-ledger__row").filter({ hasText: "클럽 이름" }).getByRole("button", { name: "수정" }).click();
   await page.getByLabel("클럽 이름").fill("작업함 합성 클럽 개정");
   const settingsResponsePromise = page.waitForResponse((response) => (
     response.request().method() === "PUT"
@@ -769,6 +771,7 @@ where id = ${sqlString(created.link.linkId)} and club_id = ${sqlString(CLUB_ID)}
   const historyCursor = historyPage.nextCursor;
   expect(historyCursor).toBeTruthy();
 
+  await page.locator("summary").filter({ hasText: "세부 조작" }).click();
   const historyRegion = page.getByRole("region", { name: "설정 변경 이력" });
   const continuationRequest = page.waitForRequest((request) => {
     const url = new URL(request.url());

@@ -495,26 +495,30 @@ export function HostDashboardRoute({
     }
     : null;
 
+  const liveRows = selectedDetail
+    ? buildLivePhaseStatusRows(selectedDetail, paths.hostBasePath)
+    : [];
+  const liveAgendaHref = liveRows.find((row) => row.label === "진행 순서")?.href ?? null;
   const liveContent = selectedDetail ? (
-    <>
-      <PhaseStatusLedger
-        title="현장 현황"
-        rows={buildLivePhaseStatusRows(selectedDetail, paths.hostBasePath)}
-        LinkComponent={LinkComponent}
-      />
-      <MeetingResponseLedger
-        presentation="attendanceBoard"
-        agendaHref={hostSessionHref(paths.hostBasePath, selectedDetail.sessionId, "?section=agenda")}
-        rows={meetingResponseLedgerRowsFromAttendees(selectedDetail.attendees, activeAttendanceWriteStates)}
-        onAttendanceChange={(membershipId, attendance) => {
-          void commitAttendance([membershipId], attendance);
-        }}
-        onBulkAttendanceChange={(membershipIds, attendance) => {
-          void commitAttendance(membershipIds, attendance);
-        }}
-        pendingUndo={pendingUndo}
-      />
-    </>
+    <PhaseStatusLedger
+      title="현장 현황"
+      rows={liveRows}
+      LinkComponent={LinkComponent}
+    />
+  ) : null;
+  const compactLiveContent = selectedDetail ? (
+    <MeetingResponseLedger
+      presentation="attendanceBoard"
+      agendaHref={hostSessionHref(paths.hostBasePath, selectedDetail.sessionId, "?section=agenda")}
+      rows={meetingResponseLedgerRowsFromAttendees(selectedDetail.attendees, activeAttendanceWriteStates)}
+      onAttendanceChange={(membershipId, attendance) => {
+        void commitAttendance([membershipId], attendance);
+      }}
+      onBulkAttendanceChange={(membershipIds, attendance) => {
+        void commitAttendance(membershipIds, attendance);
+      }}
+      pendingUndo={pendingUndo}
+    />
   ) : null;
 
   const closingContent = view.closing ? (
@@ -697,6 +701,7 @@ export function HostDashboardRoute({
       }] : []}
       recovery={recovery}
       liveContent={liveContent}
+      compactLiveContent={compactLiveContent}
       closingContent={closingContent}
       workboxContent={workboxContent}
       createMeetingHref={paths.newMeetingHref}
@@ -711,6 +716,9 @@ export function HostDashboardRoute({
       nextActionPending={view.nextAction.workItemKey !== null
         && workboxPendingKey === view.nextAction.workItemKey}
       onDeferNextAction={(workItemKey) => { void deferWorkItem(workItemKey, "TOMORROW"); }}
+      nextActionSecondary={view.phase === "live" && liveAgendaHref
+        ? { href: liveAgendaHref, label: "모임 진행 보기" }
+        : undefined}
       LinkComponent={LinkComponent}
     />
   );

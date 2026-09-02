@@ -21,6 +21,7 @@ import { actionKey, disabledProfileReason, isMembershipPending } from "./members
 import { MemberActionButton } from "./members/member-list";
 import { HostMemberProfileDialog } from "./members/member-profile-editor";
 import { hostProfileErrorMessage, profileFailureMessage } from "./members/member-profile-errors";
+import { HostPeoplePage, type HostPeopleStatusFilter } from "./members/host-people-page";
 import { MemberInvitationsSection } from "./members/member-invitations-section";
 import { MemberPendingZone } from "./members/member-pending-zone";
 import { MemberStatusFilter } from "./members/member-status-filter";
@@ -99,6 +100,7 @@ export default function HostMembers({
   const pendingInvitationCount = invitations.filter((item) => item.effectiveStatus === "PENDING").length;
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [activeTab, setActiveTab] = useState<MemberTab>("active");
+  const [statusFilter, setStatusFilter] = useState<HostPeopleStatusFilter>("all");
   const [dialog, setDialog] = useState<LifecycleDialog>(null);
   const [profileDialog, setProfileDialog] = useState<ProfileDialog>(null);
   const [dialogPolicy, setDialogPolicy] = useState<CurrentSessionPolicy>("APPLY_NOW");
@@ -386,90 +388,119 @@ export default function HostMembers({
     );
   };
 
+  const handleStatusFilterChange = (nextFilter: HostPeopleStatusFilter) => {
+    setStatusFilter(nextFilter);
+    if (nextFilter === "suspended") {
+      setActiveTab("suspended");
+      return;
+    }
+    if (nextFilter === "all" || nextFilter === "active") {
+      setActiveTab("active");
+    }
+  };
+
+  const personHref = (membershipId: string) => `/app/host/people/${encodeURIComponent(membershipId)}`;
+  const pendingZone = (
+    <MemberPendingZone
+      viewers={viewerMembers}
+      isRowPending={(membershipId) => isMembershipPending(membershipId, pendingActions)}
+      onActivate={(membershipId) => {
+        const member = viewerMembers.find((item) => item.membershipId === membershipId);
+        if (member) {
+          void submitViewerAction(member, "activate");
+        }
+      }}
+      onRelease={(membershipId) => {
+        const member = viewerMembers.find((item) => item.membershipId === membershipId);
+        if (member) {
+          void submitViewerAction(member, "deactivate-viewer");
+        }
+      }}
+      personHref={personHref}
+      LinkComponent={LinkComponent}
+    />
+  );
+
   return (
-    <div className="stack" style={{ "--stack": "18px" } as CSSProperties}>
-      <MemberSummary
-        viewerCount={viewerMembers.length}
-        activeCount={activeMembers.length}
-        suspendedCount={suspendedMembers.length}
-      />
+    <HostPeoplePage
+      rosterCounts={{
+        all: members.length,
+        active: activeMembers.length,
+        viewer: viewerMembers.length,
+        suspended: suspendedMembers.length,
+      }}
+      pendingZone={pendingZone}
+      statusFilter={statusFilter}
+      onStatusFilterChange={handleStatusFilterChange}
+    >
+      <div className="stack" style={{ "--stack": "18px" } as CSSProperties}>
+        {message ? (
+          <p
+            role={message.kind}
+            className="small"
+            style={{ margin: 0, color: message.kind === "alert" ? "var(--danger)" : "var(--text-2)" }}
+          >
+            {message.text}
+          </p>
+        ) : null}
 
-      <MemberPendingZone
-        viewers={viewerMembers}
-        isRowPending={(membershipId) => isMembershipPending(membershipId, pendingActions)}
-        onActivate={(membershipId) => {
-          const member = viewerMembers.find((item) => item.membershipId === membershipId);
-          if (member) {
-            void submitViewerAction(member, "activate");
-          }
-        }}
-        onRelease={(membershipId) => {
-          const member = viewerMembers.find((item) => item.membershipId === membershipId);
-          if (member) {
-            void submitViewerAction(member, "deactivate-viewer");
-          }
-        }}
-        personHref={(membershipId) => `/app/host/people/${encodeURIComponent(membershipId)}`}
-        LinkComponent={LinkComponent}
-      />
-
-      <MemberStatusFilter activeTab={activeTab} onTabChange={setActiveTab} />
-
-      {message ? (
-        <p
-          role={message.kind}
-          className="small"
-          style={{ margin: 0, color: message.kind === "alert" ? "var(--danger)" : "var(--text-2)" }}
-        >
-          {message.text}
-        </p>
-      ) : null}
-
-      <MemberTabPanel
-        activeTab={activeTab}
-        activeMembers={activeMembers}
-        suspendedMembers={suspendedMembers}
-        inactiveMembers={inactiveMembers}
-        pendingActions={pendingActions}
-        nextCursor={visibleNextCursor}
-        isLoadingMore={isLoadingMore}
-        renderProfileAction={renderProfileAction}
-        onOpenDialog={openDialog}
-        onSubmitLifecycle={submitLifecycle}
-        onLoadMore={loadMoreMembers}
-        personHref={(membershipId) => `/app/host/people/${encodeURIComponent(membershipId)}`}
-        LinkComponent={LinkComponent}
-      />
-
-      <MemberInvitationsSection
-        invitations={invitations}
-        pendingCount={pendingInvitationCount}
-        onCreate={createInvitation}
-        onRevoke={revokeInvitation}
-        onReissue={reissueInvitation}
-        busyId={invitationBusyId}
-      />
-
-      {dialog ? (
-        <LifecyclePolicyDialog
-          dialog={dialog}
-          policy={dialogPolicy}
-          submitting={pendingActions.has(actionKey(dialog.member, dialog.action === "suspend" ? "/suspend" : "/deactivate"))}
-          onPolicyChange={setDialogPolicy}
-          onClose={closeDialog}
-          onConfirm={() => void confirmDialog()}
+        <MemberTabPanel
+          activeTab={activeTab}
+          activeMembers={activeMembers}
+          suspendedMembers={suspendedMembers}
+          inactiveMembers={inactiveMembers}
+          pendingActions={pendingActions}
+          nextCursor={visibleNextCursor}
+          isLoadingMore={isLoadingMore}
+          renderProfileAction={renderProfileAction}
+          onOpenDialog={openDialog}
+          onSubmitLifecycle={submitLifecycle}
+          onLoadMore={loadMoreMembers}
+          personHref={personHref}
+          LinkComponent={LinkComponent}
         />
-      ) : null}
 
-      {profileDialog ? (
-        <HostMemberProfileDialog
-          member={profileDialog.member}
-          submitting={pendingActions.has(actionKey(profileDialog.member, "profile"))}
-          onClose={closeProfileDialog}
-          onSubmit={(displayName) => submitProfile(profileDialog.member, displayName)}
-        />
-      ) : null}
-    </div>
+        <details className="rm-host-people__extras">
+          <summary>세부 조작</summary>
+          <div className="stack" style={{ "--stack": "18px" } as CSSProperties}>
+            <MemberSummary
+              viewerCount={viewerMembers.length}
+              activeCount={activeMembers.length}
+              suspendedCount={suspendedMembers.length}
+            />
+            <MemberStatusFilter activeTab={activeTab} onTabChange={setActiveTab} />
+            <MemberInvitationsSection
+              invitations={invitations}
+              pendingCount={pendingInvitationCount}
+              onCreate={createInvitation}
+              onRevoke={revokeInvitation}
+              onReissue={reissueInvitation}
+              busyId={invitationBusyId}
+            />
+          </div>
+        </details>
+
+        {dialog ? (
+          <LifecyclePolicyDialog
+            dialog={dialog}
+            policy={dialogPolicy}
+            submitting={pendingActions.has(actionKey(dialog.member, dialog.action === "suspend" ? "/suspend" : "/deactivate"))}
+            onPolicyChange={setDialogPolicy}
+            onClose={closeDialog}
+            onConfirm={() => void confirmDialog()}
+          />
+        ) : null}
+
+        {profileDialog ? (
+          <HostMemberProfileDialog
+            member={profileDialog.member}
+            submitting={pendingActions.has(actionKey(profileDialog.member, "profile"))}
+            onClose={closeProfileDialog}
+            onSubmit={(displayName) => submitProfile(profileDialog.member, displayName)}
+          />
+        ) : null}
+      </div>
+    </HostPeoplePage>
   );
 }
 

@@ -1,5 +1,6 @@
-import type { ComponentType, ReactNode } from "react";
+import { useState, type ComponentType, type ReactNode } from "react";
 import type { HostNextActionView } from "@/features/host/model/host-operating-room-model";
+import { OperatingRoomGlyph } from "./operating-room-glyph";
 import "./operating-room.css";
 
 type NextActionLinkProps = {
@@ -13,11 +14,17 @@ const DefaultLink: ComponentType<NextActionLinkProps> = ({ to, children, ...prop
   <a {...props} href={to}>{children}</a>
 );
 
+export type HostNextActionSecondary = {
+  href: string;
+  label: string;
+};
+
 export type HostNextActionProps = {
   action: HostNextActionView;
   pending?: boolean;
   onDefer?: (workItemKey: string) => void;
   LinkComponent?: ComponentType<NextActionLinkProps>;
+  secondaryAction?: HostNextActionSecondary;
 };
 
 const stateLabels: Record<HostNextActionView["state"], string> = {
@@ -33,11 +40,14 @@ export function HostNextAction({
   pending = false,
   onDefer,
   LinkComponent = DefaultLink,
+  secondaryAction,
 }: HostNextActionProps) {
+  const [moreOpen, setMoreOpen] = useState(false);
   const deferKey = action.state === "actionable" ? action.workItemKey : null;
   const canDefer = deferKey !== null && onDefer;
   const deferAction = canDefer && !pending ? () => onDefer(deferKey) : undefined;
-  const primaryLabel = action.state === "deferred" ? `이어서 ${action.label}` : action.label;
+  const actionName = action.ctaLabel ?? action.label;
+  const primaryLabel = action.state === "deferred" ? `이어서 ${actionName}` : actionName;
   const primaryHref = action.state === "none" ? null : action.href;
 
   return (
@@ -63,17 +73,38 @@ export function HostNextAction({
           >
             {primaryLabel}
           </LinkComponent>
-          {canDefer ? (
-            <button
-              className="rm-operating-room-next-action__defer"
-              type="button"
-              disabled={pending}
-              onClick={deferAction}
+          {secondaryAction ? (
+            <LinkComponent
+              to={secondaryAction.href}
+              className="rm-operating-room-next-action__secondary"
             >
-              {pending ? "보류 중" : "내일 09:00까지 보류"}
-            </button>
+              <OperatingRoomGlyph name="list" />
+              {secondaryAction.label}
+            </LinkComponent>
+          ) : null}
+          {canDefer ? (
+            <details
+              className="rm-operating-room-next-action__more"
+              onToggle={(event) => setMoreOpen(event.currentTarget.open)}
+            >
+              <summary>세부 조작</summary>
+              <div hidden={!moreOpen}>
+                <button
+                  className="rm-operating-room-next-action__defer"
+                  type="button"
+                  disabled={pending}
+                  onClick={deferAction}
+                >
+                  {pending ? "보류 중" : "내일 09:00까지 보류"}
+                </button>
+              </div>
+            </details>
           ) : null}
         </div>
+      ) : null}
+
+      {action.note ? (
+        <p className="rm-operating-room-next-action__note">{action.note}</p>
       ) : null}
     </section>
   );

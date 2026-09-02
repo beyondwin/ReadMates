@@ -43,7 +43,7 @@ tracked snapshot은 보조 회귀 cache이고, token·shared CSS·fixture 변경
 
 ### Code-native 구현 근거
 
-07–17 PNG는 page composition의 시각 권위이고, code-native UI는 편집·runtime source다. PNG를 runtime 배경으로 쓰지 않는다. tracked snapshot은 보조 회귀 cache이며 snapshot 갱신만으로 합격하지 않는다. token, shared CSS/component, fixture 변경은 영향 reference 증거를 무효화한다. ADR-0053은 독립 시각 검토와 사람 30초 gate가 남아 `Proposed`다.
+07–17 PNG는 page composition의 시각 권위이고, code-native UI는 편집·runtime source다. PNG를 runtime 배경으로 쓰지 않는다. tracked snapshot은 보조 회귀 cache이며 snapshot 갱신만으로 합격하지 않는다. token, shared CSS/component, fixture 변경은 영향 reference 증거를 무효화한다. Host 첫 화면 독립 시각 검토는 `docs/reports/2026-09-02-host-approved-first-viewport-acceptance.md` 기준 11/11 PASS-with-font-raster다. 픽셀 비율 0.02와 사람 30초 gate는 남아 픽셀 수락 완료가 아니다. ADR-0053은 `Proposed`다.
 
 현재 responsive·interaction 근거는 [운영실 CT](../../../front/features/host/ui/operating-room/host-operating-room-responsive.ct.tsx), [모임 생애주기 CT](../../../front/features/host/ui/meeting-workspace/host-lifecycle-responsive.ct.tsx), [호스트 shell CT](../../../front/features/host/ui/shell/host-shell.ct.tsx), [route continuity E2E](../../../front/tests/e2e/host-lifecycle-route-continuity.spec.ts), [authority-loss E2E](../../../front/tests/e2e/host-authority-loss.spec.ts), [workbox E2E](../../../front/tests/e2e/host-workbox-stage4.spec.ts)에 있다. 승인 PNG 비교는 `front/tests/e2e/support/approved-mockup-manifest.ts`와 `pnpm --dir front test:ct:approved`가 담당한다. 접근성 근거는 [bounded DOM/ARIA helper](../../../front/tests/e2e/support/visual-authority-contract.ts)를 사용한 코드 기반 검사이며 axe/axe-core나 수동 VoiceOver·NVDA 전체 검증으로 확대 해석하지 않는다.
 

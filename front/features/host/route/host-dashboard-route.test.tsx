@@ -247,7 +247,21 @@ function renderRoute(initialEntry = "/clubs/reading-sai/app/host", data = dashbo
   return { ...view, router };
 }
 
+function stubCompactViewport(compact: boolean) {
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: compact && String(query).includes("max-width: 767px"),
+    media: query,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+    onchange: null,
+  }));
+}
+
 beforeEach(() => {
+  stubCompactViewport(false);
   routeMocks.loaderData = dashboardData();
   routeMocks.detailRefetchData = null;
   routeMocks.refetchDetail.mockReset();
@@ -469,7 +483,10 @@ describe("HostDashboardRoute", () => {
       },
     }));
 
-    await userEvent.click(await screen.findByRole("button", { name: "내일 09:00까지 보류" }));
+    const nextAction = await screen.findByRole("region", { name: "다음에 할 일" });
+    expect(within(nextAction).queryByRole("button", { name: "내일 09:00까지 보류" })).not.toBeInTheDocument();
+    await userEvent.click(within(nextAction).getByText("세부 조작"));
+    await userEvent.click(within(nextAction).getByRole("button", { name: "내일 09:00까지 보류" }));
     expect(routeMocks.deferWorkbox).toHaveBeenCalledWith(expect.objectContaining({
       key,
       deferredUntil: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
@@ -522,10 +539,12 @@ describe("HostDashboardRoute", () => {
       },
     }));
 
-    const button = await screen.findByRole("button", { name: "내일 09:00까지 보류" });
+    const nextAction = await screen.findByRole("region", { name: "다음에 할 일" });
+    await userEvent.click(within(nextAction).getByText("세부 조작"));
+    const button = within(nextAction).getByRole("button", { name: "내일 09:00까지 보류" });
     await userEvent.click(button);
-    expect(screen.getByRole("button", { name: "보류 중" })).toBeDisabled();
-    await userEvent.click(screen.getByRole("button", { name: "보류 중" }));
+    expect(within(nextAction).getByRole("button", { name: "보류 중" })).toBeDisabled();
+    await userEvent.click(within(nextAction).getByRole("button", { name: "보류 중" }));
     expect(routeMocks.deferWorkbox).toHaveBeenCalledTimes(1);
 
     pendingDeferral.resolve?.({ key, deferredUntil: "2026-09-01T00:00:00Z" });
@@ -572,7 +591,8 @@ describe("HostDashboardRoute", () => {
 
     const ledger = await screen.findByRole("region", { name: "준비 현황" });
     expect(within(ledger).getByText("현재 일정 확인 1/2")).toBeVisible();
-    expect(screen.getByRole("link", { name: "일정 미확인 멤버 검토" })).toHaveAttribute(
+    expect(screen.getByRole("region", { name: "다음에 할 일" })).toHaveTextContent("일정 미확인 멤버 검토");
+    expect(screen.getByRole("link", { name: "대상과 문구 검토" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7/schedule-review",
     );
@@ -644,7 +664,7 @@ describe("HostDashboardRoute", () => {
       "href",
       "/clubs/reading-sai/app/sessions/session-7",
     );
-    expect(screen.getByRole("link", { name: "실제 출석 확인" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "출석 확인 시작" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7?section=attendance",
     );
@@ -655,6 +675,7 @@ describe("HostDashboardRoute", () => {
   });
 
   it("changes phase through SPA navigation while preserving unrelated query and recovery state", async () => {
+    stubCompactViewport(true);
     const user = userEvent.setup();
     routeMocks.updateAttendance.mockRejectedValueOnce({ status: 409, code: "REVISION_CONFLICT" });
     routeMocks.detailRefetchData = meetingDetail;
@@ -671,11 +692,21 @@ describe("HostDashboardRoute", () => {
     expect(screen.getByRole("alert", { name: "출석 변경 충돌" })).toBeVisible();
   });
 
-  it("keeps live attendance writes and the existing restore receipt flow in the operating room", async () => {
-    const user = userEvent.setup();
+  it("keeps desktop live as the status ledger without the attendance board", async () => {
     renderRoute("/clubs/reading-sai/app/host?phase=live");
 
     expect(await screen.findByRole("region", { name: "현장 현황" })).toBeVisible();
+    expect(screen.queryByRole("region", { name: "출석 확인" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "모임 진행 보기" })).toBeVisible();
+  });
+
+  it("keeps live attendance writes and the existing restore receipt flow in the operating room", async () => {
+    stubCompactViewport(true);
+    const user = userEvent.setup();
+    renderRoute("/clubs/reading-sai/app/host?phase=live");
+
+    expect(await screen.findByRole("region", { name: "출석 확인" })).toBeVisible();
+    expect(screen.queryByRole("region", { name: "현장 현황" })).not.toBeInTheDocument();
     const attendance = screen.getByRole("region", { name: "출석 확인" });
     await user.click(within(attendance).getByRole("button", { name: "지후 참석" }));
     expect(routeMocks.updateAttendance).toHaveBeenCalledWith({
@@ -707,7 +738,8 @@ describe("HostDashboardRoute", () => {
     const checklist = screen.getByRole("region", { name: "마감 현황" });
     expect(checklist).toHaveTextContent("출석 확정");
     expect(checklist).toHaveTextContent("기록 초안");
-    expect(screen.getByRole("link", { name: "기록 패키지 검토" })).toHaveAttribute(
+    expect(screen.getByRole("region", { name: "다음에 할 일" })).toHaveTextContent("기록 패키지 검토");
+    expect(screen.getByRole("link", { name: "기록 초안 검토" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7/edit?records=json",
     );
@@ -766,6 +798,7 @@ describe("HostDashboardRoute", () => {
   });
 
   it("preserves the intended attendance on 409, refetches exact detail, and offers comparison retry", async () => {
+    stubCompactViewport(true);
     const user = userEvent.setup();
     routeMocks.updateAttendance
       .mockRejectedValueOnce({ status: 409, code: "REVISION_CONFLICT" })
@@ -793,6 +826,7 @@ describe("HostDashboardRoute", () => {
   });
 
   it("keeps an unknown attendance result reconcilable without blind retry", async () => {
+    stubCompactViewport(true);
     const user = userEvent.setup();
     routeMocks.updateAttendance.mockRejectedValueOnce(new HostMutationPendingError());
     routeMocks.detailRefetchData = meetingDetail;
@@ -813,6 +847,7 @@ describe("HostDashboardRoute", () => {
   });
 
   it("clears conflict drafts and receipts through the club-scoped authority-loss purge path", async () => {
+    stubCompactViewport(true);
     const user = userEvent.setup();
     routeMocks.updateAttendance.mockRejectedValueOnce({ status: 409, code: "REVISION_CONFLICT" });
     routeMocks.detailRefetchData = meetingDetail;
@@ -839,6 +874,7 @@ describe("HostDashboardRoute", () => {
   });
 
   it("drops stale attendance recovery when revalidation selects a different current session", async () => {
+    stubCompactViewport(true);
     const user = userEvent.setup();
     routeMocks.updateAttendance.mockRejectedValueOnce({ status: 409, code: "REVISION_CONFLICT" });
     routeMocks.detailRefetchData = meetingDetail;
