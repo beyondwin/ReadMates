@@ -1013,7 +1013,9 @@ test("prep locks the approved mobile operating room", async ({ mount, page }, te
     page,
     testInfo,
     regions,
-    skipMismatchRatioAssertion: true,
+    allowFontRasterException: true,
+    fontRasterExceptionMaxRatio: HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
+    skipMismatchRatioAssertion: false,
   });
 });
 

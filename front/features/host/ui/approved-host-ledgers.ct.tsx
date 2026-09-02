@@ -204,7 +204,8 @@ test("people ledger matches approved desktop", async ({ mount, page }, testInfo)
     page,
     testInfo,
     regions,
-    skipMismatchRatioAssertion: true,
+    allowFontRasterException: true,
+    skipMismatchRatioAssertion: false,
   });
 });
 
