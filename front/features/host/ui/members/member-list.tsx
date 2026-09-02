@@ -21,6 +21,10 @@ import type { HostMemberLifecyclePath } from "./types";
 import type { HostMembersLinkComponent } from "./types";
 import "./member-ledger.css";
 
+const DefaultPersonLink: HostMembersLinkComponent = ({ to, children, ...props }) => (
+  <a {...props} href={to}>{children}</a>
+);
+
 function statusBadgeClass(status: MembershipStatus) {
   if (status === "ACTIVE") {
     return "badge badge-ok badge-dot";
@@ -268,6 +272,7 @@ export function MemberList({
   LinkComponent?: HostMembersLinkComponent;
   now?: Date;
 }) {
+  const PersonLink = LinkComponent ?? DefaultPersonLink;
   if (members.length === 0) {
     return (
       <div className="surface" style={{ padding: 28 }}>
@@ -310,6 +315,8 @@ export function MemberList({
             const lastAccessLabel = facts?.lastAccessLabel
               ?? formatRecentClubAccess(member.lastClubAccessAt, now);
             const rsvpClassName = facts?.rsvpLabel ? undefined : sessionBadge.className;
+            const personTo = personHref?.(member.membershipId)
+              ?? `/app/host/people/${encodeURIComponent(member.membershipId)}`;
 
             return (
               <tr key={member.membershipId} className="rm-host-member-ledger__row">
@@ -321,15 +328,13 @@ export function MemberList({
                       label=""
                       sizeRole="member"
                     />
-                    <h2 className="h4 editorial">
-                      {personHref && LinkComponent ? (
-                        <LinkComponent
-                          to={personHref(member.membershipId)}
-                          className="rm-host-member-ledger__person-link"
-                        >
-                          {member.displayName}
-                        </LinkComponent>
-                      ) : member.displayName}
+                    <h2 className="rm-host-member-ledger__display-name">
+                      <PersonLink
+                        to={personTo}
+                        className="rm-host-member-ledger__person-link"
+                      >
+                        {member.displayName}
+                      </PersonLink>
                     </h2>
                     {member.role === "HOST" ? <span className="badge badge-accent badge-dot">호스트</span> : null}
                   </div>
@@ -352,6 +357,12 @@ export function MemberList({
                 </td>
                 <td className="rm-host-member-ledger__manage">
                   <div className="rm-host-member-ledger__actions">
+                    <PersonLink
+                      to={personTo}
+                      className="rm-host-member-ledger__open"
+                    >
+                      열기
+                    </PersonLink>
                     {renderProfileAction(member)}
                     {renderActions(member)}
                     {renderOverflow?.(member)}

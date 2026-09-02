@@ -8,6 +8,10 @@ import {
 import { formatPendingRequestTime, requestMeta } from "./member-list-helpers";
 import type { HostMembersLinkComponent } from "./types";
 
+const DefaultPersonLink: HostMembersLinkComponent = ({ to, children, ...props }) => (
+  <a {...props} href={to}>{children}</a>
+);
+
 export function MemberPendingZone({
   viewers,
   isRowPending,
@@ -28,6 +32,7 @@ export function MemberPendingZone({
   now?: Date;
 }): ReactElement | null {
   const [reviewingIds, setReviewingIds] = useState<ReadonlySet<string>>(() => new Set());
+  const PersonLink = LinkComponent ?? DefaultPersonLink;
 
   if (viewers.length === 0) {
     return null;
@@ -70,21 +75,21 @@ export function MemberPendingZone({
           const releaseDisabled = !member.canDeactivate || rowPending;
           const requestTime = formatPendingRequestTime(member.createdAt, now);
           const reviewing = reviewingIds.has(member.membershipId);
+          const personTo = personHref?.(member.membershipId)
+            ?? `/app/host/people/${encodeURIComponent(member.membershipId)}`;
 
           return (
             <article key={member.membershipId} className="rm-host-pending__row">
               <div className="row-between" style={{ alignItems: "center", gap: 16, flexWrap: "wrap" }}>
                 <div className="rm-host-pending__identity">
                   <AvatarChip avatarKey={member.avatarKey} name={member.displayName} label="" sizeRole="member" />
-                  <span className="h4 editorial" style={{ margin: 0 }}>
-                    {personHref && LinkComponent ? (
-                      <LinkComponent
-                        to={personHref(member.membershipId)}
-                        className="rm-host-member-ledger__person-link"
-                      >
-                        {member.displayName}
-                      </LinkComponent>
-                    ) : member.displayName}
+                  <span className="rm-host-pending__name">
+                    <PersonLink
+                      to={personTo}
+                      className="rm-host-member-ledger__person-link"
+                    >
+                      {member.displayName}
+                    </PersonLink>
                   </span>
                   {requestTime ? (
                     <span className="small rm-host-pending__time">{requestTime}</span>

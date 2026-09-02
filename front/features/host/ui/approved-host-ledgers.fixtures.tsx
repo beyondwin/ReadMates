@@ -25,6 +25,10 @@ import "./workbox/host-workbox.css";
 
 const noop = () => undefined;
 
+function peoplePersonHref(membershipId: string) {
+  return `/clubs/reading-sai/app/host/people/${membershipId}`;
+}
+
 function hostApprovedShell(destination: HostApprovedDestination, children: ReactNode) {
   return <HostApprovedShell destination={destination}>{children}</HostApprovedShell>;
 }
@@ -487,11 +491,6 @@ export function hostMeetingsApprovedView() {
 }
 
 export function hostPeopleApprovedView() {
-  const personHref = (membershipId: string) => `/clubs/reading-sai/app/host/people/${membershipId}`;
-  const LinkComponent = ({ to, children, ...props }: { to: string; children: ReactNode; className?: string }) => (
-    <a {...props} href={to}>{children}</a>
-  );
-
   return hostApprovedShell(
     "people",
     <HostPeoplePage
@@ -504,8 +503,7 @@ export function hostPeopleApprovedView() {
           isRowPending={() => false}
           onActivate={noop}
           onRelease={noop}
-          personHref={personHref}
-          LinkComponent={LinkComponent}
+          personHref={peoplePersonHref}
           now={peopleNow}
         />
       )}
@@ -515,14 +513,11 @@ export function hostPeopleApprovedView() {
         emptyText="활성 멤버가 없습니다."
         sectionDescription="멤버 원장"
         sectionMeta="현재 일정 기준 · 오늘 14:20"
-        personHref={personHref}
-        LinkComponent={LinkComponent}
+        personHref={peoplePersonHref}
         factsByMembershipId={peopleLedgerFacts}
         now={peopleNow}
         renderProfileAction={() => null}
-        renderActions={(member) => (
-          <a className="btn btn-ghost btn-sm" href={personHref(member.membershipId)}>열기</a>
-        )}
+        renderActions={() => null}
       />
     </HostPeoplePage>,
   );

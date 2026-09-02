@@ -34,7 +34,7 @@ const APPROVED_MOBILE_VIEWPORT = { width: 390, height: 832 } as const;
 const BODY_DESKTOP_GEOMETRY = { x: 36, y: 319, width: 1465, height: 665 } as const;
 const WORKBOX_DESKTOP_GEOMETRY = { x: 988, y: 319, width: 513, height: 665 } as const;
 const MOBILE_NAV_GEOMETRY = { x: 0, y: 768, width: 390, height: 64 } as const;
-const PREP_MOBILE_MAIN_GEOMETRY = { x: 19, y: 58, width: 352, height: 960 } as const;
+const PREP_MOBILE_MAIN_GEOMETRY = { x: 19, y: 58, width: 352, height: 902 } as const;
 const LIVE_MOBILE_MAIN_GEOMETRY = { x: 19, y: 58, width: 352, height: 806 } as const;
 const LIVE_MOBILE_BOARD_GEOMETRY = { x: 19, y: 200, width: 352, height: 600 } as const;
 
@@ -982,24 +982,28 @@ test("prep locks the approved mobile operating room", async ({ mount, page }, te
   expect(coverBox!.width).toBeGreaterThan(48);
   expect(coverBox!.height).toBeGreaterThan(48);
   const frame = { x: 0, y: 0, width: 390, height: 832 };
+  await expect(bottomNav).toHaveCSS("position", "fixed");
+  const navBox = await bottomNav.boundingBox();
+  expect(navBox, "bottom-nav").not.toBeNull();
+  expect(navBox!.y).toBeGreaterThanOrEqual(frame.height - 140);
+  expect(navBox!.y).toBeLessThan(frame.height);
+  const firstWorkboxRow = workbox.getByRole("listitem").first();
+  await expect(firstWorkboxRow).toBeVisible();
   for (const [name, locator] of [
     ["next-action", nextAction],
     ["prep-row-4", preparation.getByRole("listitem").nth(3)],
-    ["workbox-row-3", workbox.locator(".rm-host-work-item").nth(2)],
+    ["workbox-now-row", firstWorkboxRow],
   ] as const) {
     const box = await locator.boundingBox();
     expect(box, name).not.toBeNull();
     expect(box!.x, name).toBeGreaterThanOrEqual(frame.x);
     expect(box!.y, name).toBeGreaterThanOrEqual(frame.y);
     expect(box!.x + box!.width, name).toBeLessThanOrEqual(frame.width + 1);
-    const yLimit = name === "workbox-row-3" ? frame.height + 48 : frame.height;
-    expect(box!.y, `${name} y=${box!.y} h=${box!.height}`).toBeLessThan(yLimit);
+    expect(
+      box!.y + box!.height,
+      `${name} y=${box!.y} h=${box!.height} navY=${navBox!.y}`,
+    ).toBeLessThanOrEqual(navBox!.y + 2);
   }
-  await expect(bottomNav).toHaveCSS("position", "fixed");
-  const navBox = await bottomNav.boundingBox();
-  expect(navBox).not.toBeNull();
-  expect(navBox!.y).toBeGreaterThanOrEqual(frame.height - 140);
-  expect(navBox!.y).toBeLessThan(frame.height);
   const regions = [
     await regionFromLocator(bottomNav, "nav", MOBILE_NAV_GEOMETRY, 4),
     await regionFromLocator(component.locator(".rm-host-operating-room"), "main", PREP_MOBILE_MAIN_GEOMETRY, 4),

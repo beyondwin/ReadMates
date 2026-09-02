@@ -24,7 +24,7 @@ const MEETINGS_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const
 const MEETINGS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1086 } as const;
 const PEOPLE_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
 const PEOPLE_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
-const PEOPLE_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1026 } as const;
+const PEOPLE_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1062 } as const;
 const RECORDS_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
 const RECORDS_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
 const RECORDS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 990 } as const;
@@ -157,6 +157,36 @@ test("people ledger matches approved desktop", async ({ mount, page }, testInfo)
   await expect(component.getByRole("columnheader", { name: "최근 접속" })).toBeVisible();
   await expect(component.getByRole("columnheader", { name: "함께한 기간" })).toBeVisible();
   await expect(component.getByRole("columnheader", { name: "관리" })).toBeVisible();
+  const peopleFrame = { x: 0, y: 0, width: APPROVED_DESKTOP_VIEWPORT.width, height: APPROVED_DESKTOP_VIEWPORT.height };
+  for (const name of ["윤서진", "최도윤", "김하늘", "박서윤", "이도현", "정수아", "한지우", "오민재"]) {
+    const locator = component.getByText(name, { exact: true });
+    await expect(locator).toBeVisible();
+    const box = await locator.boundingBox();
+    expect(box, `${name} bounding box`).not.toBeNull();
+    expect(box!.width, `${name} width`).toBeGreaterThan(12);
+    expect(box!.height, `${name} height`).toBeGreaterThan(10);
+    expect(box!.y).toBeGreaterThanOrEqual(peopleFrame.y);
+    expect(
+      box!.y + box!.height,
+      `${name} y=${box!.y} h=${box!.height} must stay inside 1536×1024`,
+    ).toBeLessThanOrEqual(peopleFrame.height);
+    const fontSize = await locator.evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize));
+    expect(fontSize, `${name} font-size`).toBeGreaterThan(10);
+    expect(await locator.evaluate((node) => getComputedStyle(node).fontSize)).not.toBe("0px");
+    expect(await locator.evaluate((node) => getComputedStyle(node, "::after").content)).toBe("none");
+  }
+  const openLinks = component.getByRole("link", { name: "열기" });
+  await expect(openLinks).toHaveCount(6);
+  const firstOpen = openLinks.first();
+  await expect(firstOpen).toBeVisible();
+  const openBox = await firstOpen.boundingBox();
+  expect(openBox, "관리 열기 bounding box").not.toBeNull();
+  expect(openBox!.width).toBeGreaterThan(12);
+  expect(openBox!.height).toBeGreaterThan(10);
+  expect(
+    openBox!.y + openBox!.height,
+    `열기 y=${openBox!.y} h=${openBox!.height} must stay inside 1536×1024`,
+  ).toBeLessThanOrEqual(peopleFrame.height);
   const header = component.locator("header.topnav");
   const nav = component.getByRole("navigation", { name: "호스트 주 메뉴" });
   const main = component.getByRole("main");

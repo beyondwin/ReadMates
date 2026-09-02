@@ -42,6 +42,10 @@ describe("MemberList person identity", () => {
       "href",
       "/app/host/people/membership-safe",
     );
+    expect(screen.getByRole("link", { name: "열기" })).toHaveAttribute(
+      "href",
+      "/app/host/people/membership-safe",
+    );
     expect(document.body).not.toHaveTextContent("hidden@example.test");
     expect(document.body).not.toHaveTextContent("user-private");
     expect(vi.fn()).not.toHaveBeenCalled();
