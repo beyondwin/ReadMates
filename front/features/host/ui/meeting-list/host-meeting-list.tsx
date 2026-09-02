@@ -1,8 +1,42 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { HostLinkComponent, HostLinkProps } from "@/features/host/ui/host-link-types";
-import type { HostMeetingTocSections } from "@/features/host/model/host-meeting-list-model";
+import type { HostMeetingTocRow, HostMeetingTocSections } from "@/features/host/model/host-meeting-list-model";
 import { MeetingTocRow } from "./meeting-toc-row";
 import "./meeting-toc.css";
+
+type MeetingStatusFilter = "all" | "준비 중" | "마감 필요" | "게시됨";
+
+const STATUS_FILTERS: ReadonlyArray<{ id: MeetingStatusFilter; label: string }> = [
+  { id: "all", label: "전체" },
+  { id: "준비 중", label: "준비 중" },
+  { id: "마감 필요", label: "마감 필요" },
+  { id: "게시됨", label: "게시됨" },
+];
+
+function rowMatchesStatus(row: HostMeetingTocRow, filter: MeetingStatusFilter) {
+  if (filter === "all") return true;
+  if (filter === "마감 필요") {
+    return row.lifecycleLabel === "마감 필요" || row.lifecycleLabel === "기록 정리 중";
+  }
+  return row.lifecycleLabel === filter;
+}
+
+function filterMeetingSections(
+  sections: HostMeetingTocSections,
+  filter: MeetingStatusFilter,
+): HostMeetingTocSections {
+  if (filter === "all") return sections;
+  return {
+    upcoming: {
+      ...sections.upcoming,
+      rows: sections.upcoming.rows.filter((row) => rowMatchesStatus(row, filter)),
+    },
+    past: {
+      ...sections.past,
+      rows: sections.past.rows.filter((row) => rowMatchesStatus(row, filter)),
+    },
+  };
+}
 
 function DefaultLink({ to, children, state: _state, ...props }: HostLinkProps) {
   void _state;
@@ -259,12 +293,17 @@ export function HostMeetingList({
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [view, setView] = useState<"list" | "calendar">("list");
+  const [statusFilter, setStatusFilter] = useState<MeetingStatusFilter>("all");
   const previousFocusRevision = useRef(focusHeadingRevision);
   const isEmpty = !pastErrorMessage
     && !errorMessage
     && sections.upcoming.rows.length === 0
     && sections.past.rows.length === 0;
   const showCreate = !loading && !isEmpty;
+  const visibleSections = useMemo(
+    () => filterMeetingSections(sections, statusFilter),
+    [sections, statusFilter],
+  );
 
   useEffect(() => {
     if (focusHeadingRevision > previousFocusRevision.current) {
@@ -291,12 +330,46 @@ export function HostMeetingList({
                 다가오는 일정과 지난 모임을 한 흐름에서 관리하세요.
               </p>
             </div>
-            {showCreate ? (
-              <LinkComponent to={newMeetingHref} className="btn btn-primary rm-meeting-toc__action">
-                새 모임 만들기
-              </LinkComponent>
-            ) : null}
+            <div className="rm-meeting-toc__view-tabs" role="tablist" aria-label="모임 보기 방식">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={view === "list"}
+                className="btn btn-quiet btn-sm"
+                onClick={() => setView("list")}
+              >
+                목록
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={view === "calendar"}
+                className="btn btn-quiet btn-sm"
+                onClick={() => setView("calendar")}
+              >
+                달력
+              </button>
+            </div>
+            <div className="rm-meeting-toc__filters" role="tablist" aria-label="모임 상태">
+              {STATUS_FILTERS.map((filter) => (
+                <button
+                  key={filter.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={statusFilter === filter.id}
+                  className="btn btn-quiet btn-sm"
+                  onClick={() => setStatusFilter(filter.id)}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
           </div>
+          {showCreate ? (
+            <LinkComponent to={newMeetingHref} className="btn btn-primary rm-meeting-toc__action">
+              새 모임 만들기
+            </LinkComponent>
+          ) : null}
         </div>
       </section>
 
@@ -304,26 +377,6 @@ export function HostMeetingList({
         <p className="sr-only" role="status" aria-live="polite">
           {announcement}
         </p>
-        <div className="rm-meeting-toc__view-tabs" role="tablist" aria-label="모임 보기 방식">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={view === "list"}
-            className="btn btn-quiet btn-sm"
-            onClick={() => setView("list")}
-          >
-            목록
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={view === "calendar"}
-            className="btn btn-quiet btn-sm"
-            onClick={() => setView("calendar")}
-          >
-            달력
-          </button>
-        </div>
         {loading ? (
           <div className="rm-empty-state rm-meeting-toc__state" role="status">
             모임을 불러오는 중
@@ -339,7 +392,7 @@ export function HostMeetingList({
           <div className="rm-meeting-toc__layout">
             {view === "calendar" ? (
               <CalendarView
-                sections={sections}
+                sections={visibleSections}
                 loadingMoreUpcoming={loadingMoreUpcoming}
                 loadingMorePast={loadingMorePast}
                 onLoadMoreUpcoming={onLoadMoreUpcoming}
@@ -354,7 +407,7 @@ export function HostMeetingList({
               <div role="tabpanel" aria-label="목록" className="rm-meeting-toc__list-panel">
                 <TocSection
                   title="다가오는 모임"
-                  rows={sections.upcoming.rows}
+                  rows={visibleSections.upcoming.rows}
                   nextCursor={sections.upcoming.nextCursor}
                   loadingMore={loadingMoreUpcoming}
                   onLoadMore={onLoadMoreUpcoming}
@@ -365,7 +418,7 @@ export function HostMeetingList({
                 />
                 <TocSection
                   title="지난 모임"
-                  rows={sections.past.rows}
+                  rows={visibleSections.past.rows}
                   nextCursor={sections.past.nextCursor}
                   loadingMore={loadingMorePast}
                   onLoadMore={onLoadMorePast}
@@ -381,7 +434,7 @@ export function HostMeetingList({
                 </div>
               </div>
             )}
-            <ThisMonthRail sections={sections} LinkComponent={LinkComponent} />
+            <ThisMonthRail sections={visibleSections} LinkComponent={LinkComponent} />
           </div>
         )}
       </section>

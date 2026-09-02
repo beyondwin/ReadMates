@@ -243,6 +243,31 @@ describe("HostMeetingList", () => {
     );
   });
 
+  it("keeps list/calendar and status chips in the first-viewport toolbar", () => {
+    renderList();
+
+    const toolbar = document.querySelector(".rm-meeting-toc__toolbar") as HTMLElement | null;
+    expect(toolbar).not.toBeNull();
+    expect(within(toolbar!).getByRole("tab", { name: "목록" })).toHaveAttribute("aria-selected", "true");
+    expect(within(toolbar!).getByRole("tab", { name: "달력" })).toBeVisible();
+    expect(within(toolbar!).getByRole("tablist", { name: "모임 상태" })).toBeInTheDocument();
+    expect(within(toolbar!).getByRole("tab", { name: "전체" })).toHaveAttribute("aria-selected", "true");
+    expect(within(toolbar!).getByRole("tab", { name: "준비 중" })).toBeVisible();
+  });
+
+  it("filters rows by the selected status chip", async () => {
+    const user = userEvent.setup();
+    renderList();
+
+    await user.click(screen.getByRole("tab", { name: "준비 중" }));
+    expect(screen.getByRole("link", { name: "지구 끝의 온실" })).toBeVisible();
+    expect(screen.queryByText("소년이 온다")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "마감 필요" }));
+    expect(screen.getByText("소년이 온다")).toBeVisible();
+    expect(screen.queryByRole("link", { name: "지구 끝의 온실" })).not.toBeInTheDocument();
+  });
+
   it("uses editorial state grammar for loading and error", () => {
     const { rerender } = render(
       <HostMeetingList

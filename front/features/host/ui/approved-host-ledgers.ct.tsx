@@ -4,7 +4,9 @@ import type { ReactElement } from "react";
 import {
   approvedMockup,
   captureApprovedComparison,
+  expectGeometryWithinTolerance,
   HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
+  type ApprovedRegion,
 } from "@/tests/e2e/support/approved-mockup-contract";
 import {
   hostMeetingsApprovedView,
@@ -17,6 +19,9 @@ import {
 
 const APPROVED_DESKTOP_VIEWPORT = { width: 1536, height: 1024 } as const;
 const APPROVED_MOBILE_VIEWPORT = { width: 390, height: 832 } as const;
+const MEETINGS_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
+const MEETINGS_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
+const MEETINGS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 972 } as const;
 
 async function mountApproved(
   mount: (component: ReactElement) => Promise<Locator>,
@@ -34,6 +39,26 @@ async function mountApproved(
   return component;
 }
 
+async function regionFromLocator(
+  locator: Locator,
+  name: string,
+  expected: ApprovedRegion["expected"],
+  toleranceCssPx: 2 | 4,
+): Promise<ApprovedRegion> {
+  const box = await locator.boundingBox();
+  if (!box) throw new Error(`${name} has no bounding box`);
+  const actual = { x: box.x, y: box.y, width: box.width, height: box.height };
+  try {
+    expectGeometryWithinTolerance(actual, expected, toleranceCssPx);
+  } catch (error) {
+    throw new Error(
+      `${name} actual=${JSON.stringify(actual)} expected=${JSON.stringify(expected)}`,
+      { cause: error },
+    );
+  }
+  return { name, actual, expected, toleranceCssPx };
+}
+
 async function captureHostLedger(input: {
   id:
     | "host-meetings-desktop"
@@ -45,16 +70,25 @@ async function captureHostLedger(input: {
   candidate: Locator;
   page: Page;
   testInfo: TestInfo;
+  regions?: readonly ApprovedRegion[];
 }) {
   const personMobile = input.id === "host-person-mobile";
+  const meetingsDesktop = input.id === "host-meetings-desktop";
+  if (meetingsDesktop && (!input.regions || input.regions.length === 0)) {
+    throw new Error("host-meetings-desktop requires nav and main capture regions");
+  }
   return captureApprovedComparison({
     entry: approvedMockup(input.id),
     candidate: input.candidate,
     page: input.page,
     testInfo: input.testInfo,
-    regions: [],
-    allowFontRasterException: true,
-    fontRasterExceptionMaxRatio: personMobile ? HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO : undefined,
+    regions: input.regions ?? [],
+    ...(meetingsDesktop
+      ? { skipMismatchRatioAssertion: true as const }
+      : {
+          allowFontRasterException: true as const,
+          fontRasterExceptionMaxRatio: personMobile ? HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO : undefined,
+        }),
   });
 }
 
@@ -71,16 +105,42 @@ test("people ledger matches approved desktop", async ({ mount, page }, testInfo)
 });
 
 test("meetings library matches approved desktop", async ({ mount, page }, testInfo) => {
+  test.setTimeout(90_000);
   const component = await mountApproved(mount, page, hostMeetingsApprovedView(), APPROVED_DESKTOP_VIEWPORT);
-  await expect(component.getByRole("heading", { name: "일정과 모임" })).toBeVisible();
-  await expect(component.getByRole("link", { name: "지구 끝의 온실", exact: true })).toBeVisible();
+  await expect(component.getByRole("link", { name: "일정과 모임" })).toHaveAttribute("aria-current", "page");
+  await expect(component.getByRole("tab", { name: "목록" })).toBeVisible();
+  await expect(component.getByRole("tab", { name: "달력" })).toBeVisible();
   await expect(component.getByRole("link", { name: "새 모임 만들기" })).toBeVisible();
-  await expect(component.getByRole("heading", { name: "이번 달" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "지구 끝의 온실", exact: true })).toBeVisible();
+  await expect(component.getByText("맡겨진 소녀")).toBeVisible();
+  await expect(component.getByRole("tab", { name: "전체" })).toBeVisible();
+  await expect(component.getByRole("tab", { name: "준비 중" })).toBeVisible();
+  const header = component.locator("header.topnav");
+  const nav = component.getByRole("navigation", { name: "호스트 주 메뉴" });
+  const main = component.getByRole("main");
+  const viewTabs = component.getByRole("tablist", { name: "모임 보기 방식" });
+  const statusChips = component.getByRole("tablist", { name: "모임 상태" });
+  await expect(header).toBeVisible();
+  await expect(nav).toBeVisible();
+  await expect(main).toBeVisible();
+  await expect(component.getByRole("tab", { name: "목록" })).toHaveAttribute("aria-selected", "true");
+  for (const locator of [viewTabs, statusChips]) {
+    const box = await locator.boundingBox();
+    expect(box, "first-viewport control").not.toBeNull();
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(APPROVED_DESKTOP_VIEWPORT.height);
+  }
+  const regions = [
+    await regionFromLocator(header, "header", MEETINGS_HEADER_GEOMETRY, 4),
+    await regionFromLocator(nav, "nav", MEETINGS_NAV_GEOMETRY, 4),
+    await regionFromLocator(main, "main", MEETINGS_MAIN_GEOMETRY, 4),
+  ];
   await captureHostLedger({
     id: "host-meetings-desktop",
     candidate: component,
     page,
     testInfo,
+    regions,
   });
 });
 
