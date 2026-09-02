@@ -16,6 +16,7 @@ export type HostUtilityActionsProps = {
   newMeetingHref: string;
   unreadNotifications: number;
   permissionLimits: readonly UtilityLimit[];
+  currentId?: HostUtilityActionId;
   LinkComponent?: ClubShellLinkComponent;
 };
 
@@ -30,6 +31,7 @@ export function HostUtilityActions({
   newMeetingHref,
   unreadNotifications,
   permissionLimits,
+  currentId,
   LinkComponent = DefaultLink,
 }: HostUtilityActionsProps) {
   const instanceId = useId();
@@ -77,6 +79,7 @@ export function HostUtilityActions({
                   to={action.href}
                   className={className}
                   aria-label={notificationLabel}
+                  aria-current={action.id === currentId ? "page" : undefined}
                 >
                   <span>{action.label}</span>
                   {action.id === "notifications" && unreadCount > 0 ? (

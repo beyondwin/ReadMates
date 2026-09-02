@@ -106,4 +106,21 @@ describe("approved mockup contract", () => {
     expect(approvedMockupsAffectedBy(["design/system/src/styles/tokens.css"]))
       .toHaveLength(18);
   });
+
+  it("does not throw above 0.02 when skipMismatchRatioAssertion is true", () => {
+    expect(() => assertApprovedMismatchRatio({
+      id: "host-prep-desktop",
+      mismatchPixelRatio: 0.08,
+      maxDiffPixelRatio: 0.02,
+      skipMismatchRatioAssertion: true,
+    })).not.toThrow();
+  });
+
+  it("still throws above 0.02 when skipMismatchRatioAssertion is omitted", () => {
+    expect(() => assertApprovedMismatchRatio({
+      id: "host-prep-desktop",
+      mismatchPixelRatio: 0.08,
+      maxDiffPixelRatio: 0.02,
+    })).toThrow(/host-prep-desktop mismatch ratio 0.08 exceeds 0.02/);
+  });
 });

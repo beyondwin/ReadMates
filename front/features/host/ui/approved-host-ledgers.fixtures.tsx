@@ -4,7 +4,7 @@ import type { HostPersonDetailView } from "@/features/host/model/host-person-det
 import type { HostInvitationLinkView, HostSettingsView } from "@/features/host/model/host-settings-model";
 import type { HostSessionLedgerItem } from "@/features/host/model/host-session-ledger-model";
 import type { HostMemberListItem, ManualNotificationPreviewResponse } from "@/features/host/model/host-view-types";
-import { AppClubShellHostStory } from "@/shared/ui/app-club-shell.story";
+import { HostApprovedShell, type HostApprovedDestination } from "./approved-host-shell";
 import { HostSessionLedger } from "./host-session-ledger";
 import { HostMeetingList } from "./meeting-list/host-meeting-list";
 import { HostPeoplePage } from "./members/host-people-page";
@@ -24,8 +24,8 @@ import "./workbox/host-workbox.css";
 
 const noop = () => undefined;
 
-function hostApprovedShell(children: ReactNode) {
-  return <AppClubShellHostStory>{children}</AppClubShellHostStory>;
+function hostApprovedShell(destination: HostApprovedDestination, children: ReactNode) {
+  return <HostApprovedShell destination={destination}>{children}</HostApprovedShell>;
 }
 
 const meetingSections: HostMeetingTocSections = {
@@ -301,6 +301,7 @@ const scheduleReviewPreview: ManualNotificationPreviewResponse = {
 
 export function hostMeetingsApprovedView() {
   return hostApprovedShell(
+    "meetings",
     <HostMeetingList
       sections={meetingSections}
       onLoadMoreUpcoming={noop}
@@ -315,6 +316,7 @@ export function hostMeetingsApprovedView() {
 
 export function hostPeopleApprovedView() {
   return hostApprovedShell(
+    "people",
     <HostPeoplePage scheduleSeen={{ current: 8, stale: 1, unseen: 3, notTarget: 3 }}>
       <MemberList
         members={peopleMembers}
@@ -333,6 +335,7 @@ export function hostPeopleApprovedView() {
 
 export function hostRecordsApprovedView() {
   return hostApprovedShell(
+    "records",
     <main className="rm-host-editorial-ledger rm-host-editorial-ledger--context">
       <section className="page-header-compact">
         <div className="container rm-host-editorial-ledger__context">
@@ -360,6 +363,7 @@ export function hostRecordsApprovedView() {
 
 export function hostSettingsApprovedView() {
   return hostApprovedShell(
+    "settings",
     <HostSettingsPage>
       <div className="rm-host-editorial-ledger--split">
         <HostInvitationLinks
@@ -398,6 +402,7 @@ export function hostSettingsApprovedView() {
 
 export function hostScheduleReviewApprovedView() {
   return hostApprovedShell(
+    "schedule-review",
     <main className="rm-schedule-review">
       <HostScheduleReviewHeader
         returnHref="/clubs/reading-sai/app/host"
@@ -450,6 +455,7 @@ export function hostScheduleReviewApprovedView() {
 
 export function hostPersonApprovedView() {
   return hostApprovedShell(
+    "person-detail",
     <HostPersonDetail
       person={person}
       attendanceItems={person.attendanceHistory.items}
