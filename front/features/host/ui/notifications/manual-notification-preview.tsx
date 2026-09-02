@@ -5,6 +5,7 @@ export type ManualNotificationPreviewConfirmationProps = {
   preview: ManualNotificationPreviewResponse;
   busy: boolean;
   presentation?: "centered" | "side-sheet";
+  diagnostics?: "inline" | "folded";
   error?: string | null;
   onRefreshPreview?: () => Promise<unknown> | void;
   onConfirm: (resendConfirmed: boolean) => Promise<unknown> | void;
@@ -18,6 +19,7 @@ export function ManualNotificationPreviewPanel({
   confirmLabel,
   showTitle,
   presentation,
+  diagnostics = "inline",
   error,
   onRefreshPreview,
   onResendConfirmedChange,
@@ -30,6 +32,7 @@ export function ManualNotificationPreviewPanel({
   confirmLabel: string;
   showTitle: boolean;
   presentation: "centered" | "side-sheet";
+  diagnostics?: "inline" | "folded";
   error?: string | null;
   onRefreshPreview?: () => Promise<unknown> | void;
   onResendConfirmedChange: (value: boolean) => void;
@@ -118,6 +121,74 @@ export function ManualNotificationPreviewPanel({
     );
   }
 
+  const counts = (
+    <dl className="rm-notification-preview__counts">
+      <div>
+        <dt>최종 대상</dt>
+        <dd>{preview.audience.finalTargetCount}명</dd>
+      </div>
+      <div>
+        <dt>앱 알림 가능</dt>
+        <dd>{preview.channels.inAppEligibleCount}명</dd>
+      </div>
+      <div>
+        <dt>이메일 가능</dt>
+        <dd>{preview.channels.emailEligibleCount}명</dd>
+      </div>
+    </dl>
+  );
+  const message = (
+    <div className="rm-notification-preview__message">
+      <span>{preview.template.label}</span>
+      <strong>{preview.template.subject}</strong>
+      <p>{preview.template.bodyPreview}</p>
+    </div>
+  );
+  const warnings = preview.warnings.map((warning) => (
+    <p key={warning.code} role="status" className="rm-notification-preview__warning">
+      {warning.message}
+    </p>
+  ));
+  const confirmButton = (
+    <button
+      type="button"
+      className="btn btn-primary btn-sm rm-notification-preview__confirm"
+      disabled={disabled || busy}
+      onClick={onConfirm}
+    >
+      {busy ? "발송 요청 중" : confirmLabel}
+    </button>
+  );
+  const errorBlock = error ? (
+    <div className="rm-notification-preview__error">
+      <p role="alert">{error}</p>
+      {onRefreshPreview ? (
+        <button
+          type="button"
+          className="btn btn-quiet btn-sm"
+          onClick={() => void onRefreshPreview()}
+        >
+          미리보기 다시 만들기
+        </button>
+      ) : null}
+    </div>
+  ) : null;
+  const resendBlock = preview.duplicates.requiresResendConfirmation ? (
+    <div className="rm-notification-preview__resend">
+      <p className="body">
+        이미 발송된 알림입니다.
+      </p>
+      <label className="row">
+        <input
+          type="checkbox"
+          checked={resendConfirmed}
+          onChange={(event) => onResendConfirmedChange(event.currentTarget.checked)}
+        />
+        <span className="small">재발송을 확인했습니다</span>
+      </label>
+    </div>
+  ) : null;
+
   return (
     <section
       className="rm-notification-preview rm-notification-preview--side-sheet"
@@ -133,67 +204,28 @@ export function ManualNotificationPreviewPanel({
           발송 전 확인
         </h3>
       ) : null}
-      <dl className="rm-notification-preview__counts">
-        <div>
-          <dt>최종 대상</dt>
-          <dd>{preview.audience.finalTargetCount}명</dd>
-        </div>
-        <div>
-          <dt>앱 알림 가능</dt>
-          <dd>{preview.channels.inAppEligibleCount}명</dd>
-        </div>
-        <div>
-          <dt>이메일 가능</dt>
-          <dd>{preview.channels.emailEligibleCount}명</dd>
-        </div>
-      </dl>
-      <div className="rm-notification-preview__message">
-        <span>{preview.template.label}</span>
-        <strong>{preview.template.subject}</strong>
-        <p>{preview.template.bodyPreview}</p>
-      </div>
-      {preview.warnings.map((warning) => (
-        <p key={warning.code} role="status" className="rm-notification-preview__warning">
-          {warning.message}
-        </p>
-      ))}
-      {error ? (
-        <div className="rm-notification-preview__error">
-          <p role="alert">{error}</p>
-          {onRefreshPreview ? (
-            <button
-              type="button"
-              className="btn btn-quiet btn-sm"
-              onClick={() => void onRefreshPreview()}
-            >
-              미리보기 다시 만들기
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-      {preview.duplicates.requiresResendConfirmation ? (
-        <div className="rm-notification-preview__resend">
-          <p className="body">
-            이미 발송된 알림입니다.
-          </p>
-          <label className="row">
-            <input
-              type="checkbox"
-              checked={resendConfirmed}
-              onChange={(event) => onResendConfirmedChange(event.currentTarget.checked)}
-            />
-            <span className="small">재발송을 확인했습니다</span>
-          </label>
-        </div>
-      ) : null}
-      <button
-        type="button"
-        className="btn btn-primary btn-sm rm-notification-preview__confirm"
-        disabled={disabled || busy}
-        onClick={onConfirm}
-      >
-        {busy ? "발송 요청 중" : confirmLabel}
-      </button>
+      {diagnostics === "folded" ? (
+        <>
+          {errorBlock}
+          {resendBlock}
+          {confirmButton}
+          <details className="rm-notification-preview__diagnostics">
+            <summary>발송 전 확인 세부</summary>
+            {counts}
+            {message}
+            {warnings}
+          </details>
+        </>
+      ) : (
+        <>
+          {counts}
+          {message}
+          {warnings}
+          {errorBlock}
+          {resendBlock}
+          {confirmButton}
+        </>
+      )}
     </section>
   );
 }
@@ -215,6 +247,7 @@ function ManualNotificationPreviewConfirmationState({
   preview,
   busy,
   presentation = "centered",
+  diagnostics = "inline",
   error,
   onRefreshPreview,
   onConfirm,
@@ -234,6 +267,7 @@ function ManualNotificationPreviewConfirmationState({
         : "발송 확인"}
       showTitle={!isSideSheet}
       presentation={presentation}
+      diagnostics={diagnostics}
       error={error}
       onRefreshPreview={onRefreshPreview}
       onResendConfirmedChange={setResendConfirmed}

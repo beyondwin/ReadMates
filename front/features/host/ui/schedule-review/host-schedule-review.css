@@ -193,12 +193,21 @@
   line-height: var(--type-leading-body);
 }
 
+.rm-schedule-review__layout--previewed .rm-schedule-review__composer {
+  gap: var(--space-sm);
+}
+
 .rm-schedule-review__layout--previewed .rm-schedule-review__composer textarea {
-  min-height: 5.5rem;
+  min-height: 5rem;
 }
 
 .rm-schedule-review__layout--previewed .rm-notification-preview {
-  padding-top: 8px;
+  border-top: 0;
+  padding-top: 0;
+}
+
+.rm-schedule-review__layout--previewed .rm-notification-preview__confirm {
+  margin-top: 0;
 }
 
 .rm-schedule-review__composer fieldset {

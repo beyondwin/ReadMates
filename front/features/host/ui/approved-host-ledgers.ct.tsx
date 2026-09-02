@@ -33,7 +33,7 @@ const SETTINGS_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const
 const SETTINGS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1052 } as const;
 const SCHEDULE_REVIEW_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
 const SCHEDULE_REVIEW_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
-const SCHEDULE_REVIEW_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1142 } as const;
+const SCHEDULE_REVIEW_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 943 } as const;
 
 function boxesOverlap(
   left: { x: number; y: number; width: number; height: number },
@@ -299,7 +299,15 @@ test("unread schedule review matches approved desktop", async ({ mount, page }, 
   await expect(component.getByRole("heading", { name: "안내 대상 4명" })).toBeVisible();
   await expect(component.getByRole("heading", { name: "보낼 안내" })).toBeVisible();
   await expect(component.getByText("미열람 4명").first()).toBeVisible();
-  await expect(component.getByRole("button", { name: "4명에게 안내 보내기" })).toBeVisible();
+  const send = component.getByRole("button", { name: "4명에게 안내 보내기" });
+  await expect(send).toBeVisible();
+  const sendBox = await send.boundingBox();
+  expect(sendBox, "4명에게 안내 보내기 first-viewport").not.toBeNull();
+  expect(sendBox!.y).toBeGreaterThanOrEqual(0);
+  expect(
+    sendBox!.y + sendBox!.height,
+    `send button bottom ${sendBox!.y + sendBox!.height} must stay inside 1536×1024`,
+  ).toBeLessThanOrEqual(APPROVED_DESKTOP_VIEWPORT.height);
   const fields = component.locator("input, textarea, [role='checkbox']");
   expect(await fields.count()).toBeGreaterThan(3);
   const recipients = component.locator(".rm-schedule-review__recipients");

@@ -54,6 +54,7 @@ describe("HostScheduleReviewPage", () => {
         body={preview.template.bodyPreview}
         requestedChannels="BOTH"
         preview={preview}
+        onPreview={vi.fn()}
         onConfirm={vi.fn()}
       />,
     );
@@ -65,6 +66,9 @@ describe("HostScheduleReviewPage", () => {
     expect(screen.getByRole("button", { name: "4명에게 안내 보내기" })).toBeVisible();
     expect(screen.getByRole("checkbox", { name: /박서윤/ })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: /문재희/ })).toBeChecked();
-    expect(screen.queryByRole("button", { name: "알림 미리보기" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "알림 미리보기" })).not.toBeVisible();
+    expect(screen.getByDisplayValue(preview.template.subject)).toBeVisible();
+    expect(screen.getByDisplayValue(preview.template.bodyPreview)).toBeVisible();
+    expect(screen.getByText("최종 대상")).not.toBeVisible();
   });
 });
