@@ -18,7 +18,7 @@ import {
   HostInvitationLinks,
   type HostInvitationCreateDraft,
 } from "./settings/host-invitation-links";
-import { HostSettingsPage } from "./settings/host-settings-page";
+import { HostSettingsColumns, HostSettingsPage } from "./settings/host-settings-page";
 import "./host-editorial-ledger.css";
 import "./shell/host-shell.css";
 import "./workbox/host-workbox.css";
@@ -556,40 +556,44 @@ export function hostSettingsApprovedView() {
   return hostApprovedShell(
     "settings",
     <HostSettingsPage>
-      <div className="rm-host-editorial-ledger--split">
-        <HostInvitationLinks
-          links={invitationLinks}
-          loading={false}
-          error={null}
-          busy={false}
-          createDraft={invitationCreateDraft}
-          editDraft={null}
-          sharePath={null}
-          message={null}
-          alert={null}
-          onRetry={noop}
-          onRefresh={noop}
-          onCreateDraftChange={noop}
-          onEditDraftChange={noop}
-          onCreate={noop}
-          onUpdate={noop}
-          onToggle={noop}
-          onRetryCommand={noop}
-          onCopySharePath={noop}
-          now={new Date("2026-09-02T11:04:00+09:00")}
-        />
-        <HostClubSettings
-          settings={clubSettings}
-          draft={clubSettings}
-          saving={false}
-          stale={false}
-          error={null}
-          hostCount="1명"
-          onDraftChange={noop}
-          onSave={noop}
-          onCloseReview={noop}
-        />
-      </div>
+      <HostSettingsColumns
+        invitations={(
+          <HostInvitationLinks
+            links={invitationLinks}
+            loading={false}
+            error={null}
+            busy={false}
+            createDraft={invitationCreateDraft}
+            editDraft={null}
+            sharePath={null}
+            message={null}
+            alert={null}
+            onRetry={noop}
+            onRefresh={noop}
+            onCreateDraftChange={noop}
+            onEditDraftChange={noop}
+            onCreate={noop}
+            onUpdate={noop}
+            onToggle={noop}
+            onRetryCommand={noop}
+            onCopySharePath={noop}
+            now={new Date("2026-09-02T11:04:00+09:00")}
+          />
+        )}
+        clubSettings={(
+          <HostClubSettings
+            settings={clubSettings}
+            draft={clubSettings}
+            saving={false}
+            stale={false}
+            error={null}
+            hostCount="1명"
+            onDraftChange={noop}
+            onSave={noop}
+            onCloseReview={noop}
+          />
+        )}
+      />
     </HostSettingsPage>,
   );
 }

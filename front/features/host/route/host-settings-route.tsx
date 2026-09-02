@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router";
 import type { HostClubSettings as HostClubSettingsContract } from "@/features/host/api/host-club-settings-contracts";
@@ -31,6 +31,7 @@ import { hostMemberListQuery, invalidateHostMembers } from "@/features/host/quer
 import { HostClubCloseDialog, type HostCloseRecovery } from "@/features/host/ui/settings/host-club-close-dialog";
 import { HostClubSettings } from "@/features/host/ui/settings/host-club-settings";
 import { HostCoHostManagement } from "@/features/host/ui/settings/host-co-host-management";
+import { HostSettingsColumns } from "@/features/host/ui/settings/host-settings-page";
 import {
   HostInvitationLinks,
   type HostInvitationCommandAlert,
@@ -71,13 +72,15 @@ function settingsDraftChanged(current: HostSettingsView | null, source: HostSett
     || current.recordPublicationDefault !== source.recordPublicationDefault;
 }
 
-export function HostSettingsRoute() {
+export function HostSettingsRoute({ extra }: { extra?: ReactNode } = {}) {
   const { clubSlug = "" } = useParams<{ clubSlug: string }>();
-  if (!clubSlug) return null;
-  return <ScopedHostSettingsRoute clubSlug={clubSlug} />;
+  if (!clubSlug) {
+    return extra ? <HostSettingsColumns extra={extra} /> : null;
+  }
+  return <ScopedHostSettingsRoute clubSlug={clubSlug} extra={extra} />;
 }
 
-function ScopedHostSettingsRoute({ clubSlug }: { clubSlug: string }) {
+function ScopedHostSettingsRoute({ clubSlug, extra }: { clubSlug: string; extra?: ReactNode }) {
   const context = useMemo(() => ({ clubSlug }), [clubSlug]);
   const queryClient = useQueryClient();
   const settings = useQuery(hostClubSettingsQuery(context));
@@ -407,60 +410,100 @@ function ScopedHostSettingsRoute({ clubSlug }: { clubSlug: string }) {
 
   const busy = busyOperationId !== null;
 
-  return <div className="rm-host-editorial-ledger--split">
-    <HostInvitationLinks
-      links={links.data?.items ?? []}
-      loading={links.isPending}
-      error={links.isError ? "초대 링크를 불러오지 못했습니다." : null}
-      busy={busy}
-      createDraft={createDraft}
-      editDraft={editDraft}
-      sharePath={linkSharePath}
-      message={linkMessage}
-      alert={linkAlert}
-      onRetry={() => { void links.refetch(); }}
-      onRefresh={refreshSettingsSurface}
-      onCreateDraftChange={updateCreateDraft}
-      onEditDraftChange={updateEditDraft}
-      onCreate={startLinkCreate}
-      onUpdate={startLinkUpdate}
-      onToggle={toggleLink}
-      onRetryCommand={retryPendingCommand}
-      onCopySharePath={() => { void copySharePath(); }}
+  return (
+    <HostSettingsColumns
+      invitations={(
+        <HostInvitationLinks
+          links={links.data?.items ?? []}
+          loading={links.isPending}
+          error={links.isError ? "초대 링크를 불러오지 못했습니다." : null}
+          busy={busy}
+          createDraft={createDraft}
+          editDraft={editDraft}
+          sharePath={linkSharePath}
+          message={linkMessage}
+          alert={linkAlert}
+          onRetry={() => { void links.refetch(); }}
+          onRefresh={refreshSettingsSurface}
+          onCreateDraftChange={updateCreateDraft}
+          onEditDraftChange={updateEditDraft}
+          onCreate={startLinkCreate}
+          onUpdate={startLinkUpdate}
+          onToggle={toggleLink}
+          onRetryCommand={retryPendingCommand}
+          onCopySharePath={() => { void copySharePath(); }}
+        />
+      )}
+      clubSettings={(
+        <>
+          {settings.isPending ? <section className="surface-quiet" role="status">클럽 설정을 불러오는 중입니다.</section> : null}
+          {settings.isError ? <section className="surface-quiet" role="alert"><p>클럽 설정을 불러오지 못했습니다.</p><button type="button" onClick={() => { void settings.refetch(); }}>다시 시도</button></section> : null}
+          {settings.data && visibleSettingsDraft ? (
+            <HostClubSettings
+              settings={settings.data}
+              draft={visibleSettingsDraft}
+              saving={busy}
+              stale={stale}
+              error={settingsError}
+              hostCount={members.data ? `${members.data.items.filter((member) => member.role === "HOST").length}명` : undefined}
+              onDraftChange={(draft) => {
+                setSettingsDraft(draft);
+                setStale(false);
+                setSettingsError(null);
+                if (pendingIdentity?.kind === "settings") setPendingIdentity(null);
+              }}
+              onSave={saveSettings}
+              onCloseReview={() => setCloseOpen(true)}
+            />
+          ) : null}
+          <HostClubCloseDialog
+            open={closeOpen}
+            preview={closePreview}
+            busy={busy}
+            previewError={closePreviewError}
+            recovery={closeRecovery}
+            canRetryConfirm={pendingIdentity?.kind === "close-confirm"}
+            onClose={() => setCloseOpen(false)}
+            onPreview={() => { void runClosePreview(); }}
+            onConfirm={startCloseConfirm}
+            onRefresh={refreshSettingsSurface}
+            onRetryConfirm={retryPendingCommand}
+          />
+        </>
+      )}
+      extra={(
+        <>
+          {settings.data && members.data ? (
+            <HostCoHostManagement
+              settingsRevision={settings.data.revision}
+              members={members.data.items.map((member) => ({
+                membershipId: member.membershipId,
+                displayName: member.displayName,
+                avatarKey: member.avatarKey,
+                status: member.status,
+                role: member.role,
+              }))}
+              busy={busy}
+              alert={coHostAlert}
+              canRetry={pendingIdentity?.kind === "co-host"}
+              onChange={changeCoHostRole}
+              onRefresh={refreshSettingsSurface}
+              onRetryCommand={retryPendingCommand}
+            />
+          ) : null}
+          {members.isError ? <section className="surface-quiet" role="alert">공동 호스트 후보를 불러오지 못했습니다.</section> : null}
+          {history.data ? (
+            <HostSettingsHistory
+              key={`${history.data.items[0]?.historyId ?? "empty"}:${history.data.nextCursor ?? "end"}`}
+              page={history.data}
+              onLoadMore={(cursor) => queryClient.fetchQuery(hostClubSettingsHistoryQuery({ limit: 20, cursor }, context))}
+            />
+          ) : null}
+          {history.isPending ? <section className="surface-quiet" role="status">설정 변경 이력을 불러오는 중입니다.</section> : null}
+          {history.isError ? <section className="surface-quiet" role="alert">설정 변경 이력을 불러오지 못했습니다.</section> : null}
+          {extra}
+        </>
+      )}
     />
-    <div className="stack">
-    {settings.isPending ? <section className="surface-quiet" role="status">클럽 설정을 불러오는 중입니다.</section> : null}
-    {settings.isError ? <section className="surface-quiet" role="alert"><p>클럽 설정을 불러오지 못했습니다.</p><button type="button" onClick={() => { void settings.refetch(); }}>다시 시도</button></section> : null}
-    {settings.data && visibleSettingsDraft ? <HostClubSettings settings={settings.data} draft={visibleSettingsDraft} saving={busy} stale={stale} error={settingsError} hostCount={members.data ? `${members.data.items.filter((member) => member.role === "HOST").length}명` : undefined} onDraftChange={(draft) => { setSettingsDraft(draft); setStale(false); setSettingsError(null); if (pendingIdentity?.kind === "settings") setPendingIdentity(null); }} onSave={saveSettings} onCloseReview={() => setCloseOpen(true)} /> : null}
-    {settings.data && members.data ? (
-      <HostCoHostManagement
-        settingsRevision={settings.data.revision}
-        members={members.data.items.map((member) => ({ membershipId: member.membershipId, displayName: member.displayName, avatarKey: member.avatarKey, status: member.status, role: member.role }))}
-        busy={busy}
-        alert={coHostAlert}
-        canRetry={pendingIdentity?.kind === "co-host"}
-        onChange={changeCoHostRole}
-        onRefresh={refreshSettingsSurface}
-        onRetryCommand={retryPendingCommand}
-      />
-    ) : null}
-    {members.isError ? <section className="surface-quiet" role="alert">공동 호스트 후보를 불러오지 못했습니다.</section> : null}
-    {history.data ? <HostSettingsHistory key={`${history.data.items[0]?.historyId ?? "empty"}:${history.data.nextCursor ?? "end"}`} page={history.data} onLoadMore={(cursor) => queryClient.fetchQuery(hostClubSettingsHistoryQuery({ limit: 20, cursor }, context))} /> : null}
-    {history.isPending ? <section className="surface-quiet" role="status">설정 변경 이력을 불러오는 중입니다.</section> : null}
-    {history.isError ? <section className="surface-quiet" role="alert">설정 변경 이력을 불러오지 못했습니다.</section> : null}
-    <HostClubCloseDialog
-      open={closeOpen}
-      preview={closePreview}
-      busy={busy}
-      previewError={closePreviewError}
-      recovery={closeRecovery}
-      canRetryConfirm={pendingIdentity?.kind === "close-confirm"}
-      onClose={() => setCloseOpen(false)}
-      onPreview={() => { void runClosePreview(); }}
-      onConfirm={startCloseConfirm}
-      onRefresh={refreshSettingsSurface}
-      onRetryConfirm={retryPendingCommand}
-    />
-    </div>
-  </div>;
+  );
 }

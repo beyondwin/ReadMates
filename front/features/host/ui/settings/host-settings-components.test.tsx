@@ -46,6 +46,8 @@ describe("host settings presentation controls", () => {
     const onCreate = vi.fn();
     const onCopy = vi.fn();
     render(<InvitationHarness onCreate={onCreate} onCopy={onCopy} />);
+    expect(screen.queryByLabelText("링크 이름")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "새 초대 링크" }));
     await userEvent.type(screen.getByLabelText("링크 이름"), "새 멤버");
     await userEvent.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
     await userEvent.click(screen.getByRole("button", { name: "한 번만 복사" }));
@@ -59,6 +61,7 @@ describe("host settings presentation controls", () => {
     const onDraftChange = vi.fn();
     const onSave = vi.fn();
     render(<HostClubSettings settings={settings} draft={settings} saving={false} stale={false} error={null} onDraftChange={onDraftChange} onSave={onSave} />);
+    await userEvent.click(screen.getByRole("button", { name: "수정" }));
     fireEvent.change(screen.getByLabelText("클럽 이름"), { target: { value: "읽는사이 새 이름" } });
     await userEvent.click(screen.getByRole("button", { name: "설정 저장" }));
     expect(onDraftChange).toHaveBeenCalledWith(expect.objectContaining({ name: "읽는사이 새 이름" }));

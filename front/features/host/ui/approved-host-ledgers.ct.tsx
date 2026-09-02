@@ -30,7 +30,7 @@ const RECORDS_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
 const RECORDS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 990 } as const;
 const SETTINGS_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
 const SETTINGS_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
-const SETTINGS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1858 } as const;
+const SETTINGS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1052 } as const;
 
 async function mountApproved(
   mount: (component: ReactElement) => Promise<Locator>,
@@ -241,6 +241,17 @@ test("invites and settings match approved desktop", async ({ mount, page }, test
   await expect(component.getByRole("button", { name: "새 초대 링크" })).toBeVisible();
   await expect(component.getByRole("heading", { name: "초대 링크" })).toBeVisible();
   await expect(component.getByText(/활성|만료 예정|중지/).first()).toBeVisible();
+  await expect(component.getByLabel("링크 이름")).toHaveCount(0);
+  const closeHeading = component.getByRole("heading", { name: "클럽 운영 종료" });
+  await expect(closeHeading).toBeVisible();
+  const closeBox = await closeHeading.boundingBox();
+  expect(closeBox, "클럽 운영 종료 first-viewport").not.toBeNull();
+  expect(closeBox!.y).toBeGreaterThanOrEqual(0);
+  expect(closeBox!.y + closeBox!.height).toBeLessThanOrEqual(APPROVED_DESKTOP_VIEWPORT.height);
+  const settingsHeading = component.getByRole("heading", { name: "클럽 설정" });
+  const settingsBox = await settingsHeading.boundingBox();
+  expect(settingsBox, "클럽 설정 first-viewport").not.toBeNull();
+  expect(settingsBox!.y + settingsBox!.height).toBeLessThanOrEqual(APPROVED_DESKTOP_VIEWPORT.height);
   const header = component.locator("header.topnav");
   const nav = component.getByRole("navigation", { name: "호스트 주 메뉴" });
   const main = component.getByRole("main");
@@ -259,6 +270,8 @@ test("invites and settings match approved desktop", async ({ mount, page }, test
     testInfo,
     regions,
   });
+  await component.getByRole("button", { name: "새 초대 링크" }).click();
+  await expect(component.getByLabel("링크 이름")).toBeVisible();
 });
 
 test("unread schedule review matches approved desktop", async ({ mount, page }, testInfo) => {

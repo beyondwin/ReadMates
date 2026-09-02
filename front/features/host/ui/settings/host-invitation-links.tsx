@@ -124,12 +124,14 @@ export function HostInvitationLinks({
       <button className="btn btn-primary" type="button" onClick={() => setCreateOpen((open) => !open)}>
         새 초대 링크
       </button>
-      <form className={createOpen ? "cluster" : "sr-only"} onSubmit={submitCreate}>
-        <label>링크 이름<input value={createDraft.name} maxLength={120} required onChange={(event) => onCreateDraftChange({ ...createDraft, name: event.target.value })} /></label>
-        <label>최대 사용 횟수<input type="number" min="1" max="10000" value={createDraft.maxUses} onChange={(event) => onCreateDraftChange({ ...createDraft, maxUses: event.target.value })} /></label>
-        <label>만료일<input type="date" value={createDraft.expiresAt} onChange={(event) => onCreateDraftChange({ ...createDraft, expiresAt: event.target.value })} /></label>
-        <button className="btn" disabled={busy || !createDraft.name.trim()} type="submit">초대 링크 만들기</button>
-      </form>
+      {createOpen ? (
+        <form className="cluster" onSubmit={submitCreate}>
+          <label>링크 이름<input value={createDraft.name} maxLength={120} required onChange={(event) => onCreateDraftChange({ ...createDraft, name: event.target.value })} /></label>
+          <label>최대 사용 횟수<input type="number" min="1" max="10000" value={createDraft.maxUses} onChange={(event) => onCreateDraftChange({ ...createDraft, maxUses: event.target.value })} /></label>
+          <label>만료일<input type="date" value={createDraft.expiresAt} onChange={(event) => onCreateDraftChange({ ...createDraft, expiresAt: event.target.value })} /></label>
+          <button className="btn" disabled={busy || !createDraft.name.trim()} type="submit">초대 링크 만들기</button>
+        </form>
+      ) : null}
       {sharePath ? <button className="btn" type="button" onClick={onCopySharePath}>한 번만 복사</button> : null}
       {message ? <p role="status" className="small">{message}</p> : null}
       {alert ? <div role="alert" className="stack"><p>{alert.message}</p><button type="button" onClick={onRefresh}>{alert.refreshLabel}</button>{alert.retryLabel ? <button disabled={busy} type="button" onClick={onRetryCommand}>{alert.retryLabel}</button> : null}</div> : null}
