@@ -5,7 +5,7 @@
 - 범위: Host 승인 시안 `07`–`17`(11장), `front/features/host/**` 실제 route/UI/픽스처/CT, Host shell story의 현재 목적지, 관련 Host E2E·active design docs
 - 비범위: Admin, 새 서버 API, PNG runtime 배경, 시안 전용 가짜 페이지, 픽셀 비율 `0.02`를 합격 게이트로 사용, ADR-0053 Accept, 사람 30초 gate를 AI로 채우기
 
-ADR impact: **update** — ADR-0053은 `Proposed`를 유지한다. 구현 계획·closeout에서 검증 칸에 Host 슬라이스 합격을 독립 시각 검토(첫 화면 구성)로 기록하고, `maxDiffPixelRatio` `0.02`는 측정값으로 남긴다. 결정 문장(승인 PNG가 page composition 시각 권위)은 바꾸지 않는다. ADR-0048·0051은 유지한다.
+ADR impact: update — ADR-0053은 `Proposed`를 유지한다. 구현 계획·closeout에서 검증 칸에 Host 슬라이스 합격을 독립 시각 검토(첫 화면 구성)로 기록하고, `maxDiffPixelRatio` `0.02`는 측정값으로 남긴다. 결정 문장(승인 PNG가 page composition 시각 권위)은 바꾸지 않는다. ADR-0048·0051은 유지한다.
 
 관련: ADR-0048, ADR-0049, ADR-0051, ADR-0053, `docs/superpowers/specs/2026-09-02-admin-host-pixel-fidelity-design.md`, `docs/reports/2026-09-02-admin-host-pixel-fidelity-acceptance.md`, `docs/development/host-redesign-mockups/README.md`, `front/DESIGN.md`
 

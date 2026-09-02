@@ -12,7 +12,7 @@
 
 **Plan base:** `4f0d3d453`
 
-ADR impact: **update** — ADR-0053 stays `Proposed`. Task 11 records Host-slice pass as independent first-viewport review. Do not Accept ADR-0053.
+ADR impact: update — ADR-0053 stays `Proposed`. Task 11 records Host-slice pass as independent first-viewport review. Do not Accept ADR-0053.
 
 ## Global Constraints
 
