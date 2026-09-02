@@ -76,6 +76,10 @@ export function HostNextAction({
           ) : null}
         </div>
       ) : null}
+
+      {action.note ? (
+        <p className="rm-operating-room-next-action__note">{action.note}</p>
+      ) : null}
     </section>
   );
 }

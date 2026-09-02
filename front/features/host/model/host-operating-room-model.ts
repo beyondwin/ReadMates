@@ -68,6 +68,7 @@ export type HostNextActionView = {
   workItemKey: string | null;
   label: string;
   ctaLabel?: string;
+  note?: string;
   reason: string;
   href: string | null;
 };

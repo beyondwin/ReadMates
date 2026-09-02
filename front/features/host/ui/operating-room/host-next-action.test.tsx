@@ -89,6 +89,23 @@ describe("HostNextAction", () => {
     expect(screen.getByRole("link", { name: "대상과 문구 검토" })).toBeVisible();
   });
 
+  it("renders a schedule note as real paragraph text instead of a CSS overlay", () => {
+    render(
+      <HostNextAction
+        action={{
+          ...actionable,
+          label: "최신 일정을 아직 보지 않은 4명이 있어요",
+          ctaLabel: "대상과 문구 검토",
+          note: "일정이 어제 19:30에 변경되었어요",
+        }}
+      />,
+    );
+
+    const note = screen.getByText("일정이 어제 19:30에 변경되었어요");
+    expect(note).toBeVisible();
+    expect(note.tagName).toBe("P");
+  });
+
   it("does not invent an action destination for none or a missing href", () => {
     const { rerender } = render(
       <HostNextAction

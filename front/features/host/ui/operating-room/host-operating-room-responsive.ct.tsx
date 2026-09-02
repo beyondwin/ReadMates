@@ -694,6 +694,7 @@ function prepApprovedView() {
       workItemKey: "public-safe-work-item-27",
       label: "최신 일정을 아직 보지 않은 4명이 있어요",
       ctaLabel: "대상과 문구 검토",
+      note: "일정이 어제 19:30에 변경되었어요",
       reason: "대상과 문구를 확인한 뒤 직접 보내세요. 자동 발송하지 않아요.",
       href: "/clubs/reading-sai/app/host/sessions/public-safe-session-27/schedule-review",
     },
@@ -817,6 +818,29 @@ test("prep locks the approved desktop operating room", async ({ mount, page }, t
   await expect(component.getByRole("region", { name: "준비 현황" }).getByRole("link", { name: /보기/ }).first()).toBeVisible();
   await expect(component.getByRole("complementary", { name: "클럽 작업함" }).getByRole("listitem")).toHaveCount(4);
   await expect(component.getByRole("button", { name: /보류/ })).toHaveCount(0);
+  const cover = component.locator(".rm-operating-room-header__cover .rm-book-cover");
+  await expect(cover).toBeVisible();
+  const coverBox = await cover.boundingBox();
+  expect(coverBox, "cover cell").not.toBeNull();
+  expect(coverBox!.width).toBeGreaterThan(48);
+  expect(coverBox!.height).toBeGreaterThan(48);
+  await expect(cover.locator(".rm-book-cover__fallback")).toBeVisible();
+  const prepIcons = component.getByRole("region", { name: "준비 현황" });
+  await expect(prepIcons.locator("svg[data-icon='calendar']")).toBeVisible();
+  await expect(prepIcons.locator("svg[data-icon='people']")).toBeVisible();
+  await expect(prepIcons.locator("svg[data-icon='chat']")).toBeVisible();
+  await expect(prepIcons.locator("svg[data-icon='pin']")).toBeVisible();
+  const headerActions = component.getByRole("navigation", { name: "현재 모임 작업" });
+  await expect(headerActions.locator("svg[data-icon='info']")).toBeVisible();
+  await expect(headerActions.locator("svg[data-icon='edit']")).toBeVisible();
+  await expect(headerActions.locator("svg[data-icon='history']")).toBeVisible();
+  await expect(headerActions.locator("svg[data-icon='eye']")).toBeVisible();
+  const workboxTitle = workbox.getByRole("heading", { name: "작업함" });
+  await expect(workboxTitle).toBeVisible();
+  expect(await workboxTitle.evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize))).toBeGreaterThan(10);
+  expect(await workboxTitle.evaluate((node) => getComputedStyle(node, "::after").content)).toBe("none");
+  await expect(nextAction.getByText("일정이 어제 19:30에 변경되었어요")).toBeVisible();
+  expect(await nextAction.evaluate((node) => getComputedStyle(node, "::after").content)).toBe("none");
   await captureHostApproved({ id: "host-prep-desktop", page, testInfo, regions });
 });
 
@@ -864,9 +888,7 @@ test("prep locks the approved mobile operating room", async ({ mount, page }, te
   const bottomNav = component.locator('[data-club-shell-region="mobile-primary"]');
   await expect(nextAction).toBeVisible();
   await expect(nextAction).toContainText("대상과 문구를 확인한 뒤 직접 보내세요. 자동 발송하지 않아요.");
-  expect(await nextAction.evaluate((node) => getComputedStyle(node, "::after").content)).toContain(
-    "일정이 어제 19:30에 변경되었어요",
-  );
+  await expect(nextAction.getByText("일정이 어제 19:30에 변경되었어요")).toBeVisible();
   await expect(preparation.getByText("변경 전 확인 1 · 미열람 3")).toBeVisible();
   await expect(preparation.getByText("참석 7 · 불참 2 · 미응답 3")).toBeVisible();
   await expect(preparation.getByText("2명은 아직 작성 전")).toBeVisible();

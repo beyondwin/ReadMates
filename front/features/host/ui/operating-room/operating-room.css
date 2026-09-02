@@ -27,6 +27,7 @@
 }
 
 .rm-operating-room-header__cover .rm-book-cover {
+  min-height: 92px;
   height: auto;
   box-shadow: 1px 1px 0 var(--line-soft), 2px 2px 0 var(--line-soft);
 }
@@ -152,6 +153,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   min-width: 44px;
   min-height: 44px;
   padding-inline: var(--space-sm);
@@ -655,6 +657,13 @@
   line-height: var(--type-leading-body);
 }
 
+.rm-operating-room-next-action__note {
+  margin: 0;
+  color: var(--text-3);
+  font-size: var(--type-size-supporting);
+  line-height: 1.45;
+}
+
 .rm-operating-room-next-action__controls {
   display: flex;
   flex-wrap: wrap;
@@ -756,7 +765,15 @@
 }
 
 .rm-preparation-ledger-row__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 650;
+}
+
+.rm-operating-room-glyph {
+  flex: 0 0 auto;
+  color: var(--text-3);
 }
 
 .rm-preparation-ledger-row__value {
@@ -810,39 +827,12 @@
   box-shadow: 0 0 0 4px var(--focus-ring-soft);
 }
 
-.rm-host-operating-room[data-phase="prep"] .rm-operating-room-next-action::after,
-.rm-host-operating-room[data-phase="live"] .rm-operating-room-next-action::after,
-.rm-host-operating-room[data-phase="closing"] .rm-operating-room-next-action::after {
-  display: block;
-  color: var(--text-3);
-  font-size: var(--type-size-supporting);
-  line-height: 1.45;
-}
-
-.rm-host-operating-room[data-phase="prep"] .rm-operating-room-next-action::after {
-  content: "일정이 어제 19:30에 변경되었어요";
-}
-
-.rm-host-operating-room[data-phase="live"] .rm-operating-room-next-action::after {
-  content: "오후 7:26 · 현장 모드가 열렸어요";
-}
-
-.rm-host-operating-room[data-phase="closing"] .rm-operating-room-next-action::after {
-  content: "게시 전에 피드백 문서를 확인해 주세요";
-}
-
 .rm-host-operating-room .rm-host-workbox__header {
   padding: 28px 0 12px;
   border-bottom: 0;
 }
 
 .rm-host-operating-room .rm-host-workbox__header h2 {
-  font-size: 0;
-  line-height: 0;
-}
-
-.rm-host-operating-room .rm-host-workbox__header h2::after {
-  content: "호스트 작업함";
   font-size: 1.0625rem;
   font-weight: 700;
   line-height: 1.3;

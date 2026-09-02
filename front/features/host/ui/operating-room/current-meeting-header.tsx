@@ -2,6 +2,7 @@ import type { ComponentType, ReactNode } from "react";
 import type { CurrentMeetingHeaderView } from "@/features/host/model/host-operating-room-model";
 import { BookCover } from "@/shared/ui/book-cover";
 import { displayText, formatDateOnlyLabel } from "@/shared/ui/readmates-display";
+import { OperatingRoomGlyph, type OperatingRoomGlyphName } from "./operating-room-glyph";
 import "./operating-room.css";
 
 export type CurrentMeetingHeaderMeeting = Omit<
@@ -64,10 +65,10 @@ export function CurrentMeetingHeader({
   const normalizedDday = dDayLabel?.trim() || null;
 
   const actions = [
-    { label: "모임 정보", href: links.infoHref },
-    { label: "일정 편집", href: links.scheduleHref },
-    { label: "변경 이력", href: links.historyHref },
-    { label: "멤버 시야", href: links.memberViewHref },
+    { label: "모임 정보", href: links.infoHref, glyph: "info" as OperatingRoomGlyphName },
+    { label: "일정 편집", href: links.scheduleHref, glyph: "edit" as OperatingRoomGlyphName },
+    { label: "변경 이력", href: links.historyHref, glyph: "history" as OperatingRoomGlyphName },
+    { label: "멤버 시야", href: links.memberViewHref, glyph: "eye" as OperatingRoomGlyphName },
   ] as const;
 
   return (
@@ -124,6 +125,7 @@ export function CurrentMeetingHeader({
             to={action.href}
             className="rm-operating-room-header__action"
           >
+            <OperatingRoomGlyph name={action.glyph} />
             {action.label}
           </LinkComponent>
         ))}
