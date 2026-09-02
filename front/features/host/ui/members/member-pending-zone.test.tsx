@@ -38,10 +38,11 @@ describe("MemberPendingZone", () => {
     expect(screen.queryByText("승인과 거절은 결과 안내를 포함해요.")).not.toBeInTheDocument();
   });
 
-  it("renders a pending-approval header and per-row approve/reject actions when viewers exist", async () => {
+  it("keeps first-viewport rows on 검토 and a working primary review action", async () => {
     const user = userEvent.setup();
     const onActivate = vi.fn();
     const onRelease = vi.fn();
+    const onReview = vi.fn();
     const viewers = [
       viewer(),
       viewer({
@@ -59,30 +60,37 @@ describe("MemberPendingZone", () => {
         isRowPending={() => false}
         onActivate={onActivate}
         onRelease={onRelease}
+        onReview={onReview}
       />,
     );
 
     const zone = screen.getByRole("region", { name: "가입 승인 대기" });
     expect(within(zone).getByText("승인과 거절은 결과 안내를 포함해요.")).toBeInTheDocument();
     expect(within(zone).getByRole("button", { name: "가입 승인 검토" })).toBeEnabled();
+    expect(within(zone).getAllByRole("button", { name: "검토" })).toHaveLength(2);
+    expect(within(zone).queryByRole("button", { name: "거절" })).not.toBeInTheDocument();
     expect(within(zone).queryByText(/초대 링크/)).not.toBeInTheDocument();
+
+    await user.click(within(zone).getByRole("button", { name: "가입 승인 검토" }));
+    expect(onReview).toHaveBeenCalledWith("membership-viewer");
 
     const firstRow = within(zone).getByText("둘").closest("article") as HTMLElement;
     const secondRow = within(zone).getByText("두번째 둘러보기").closest("article") as HTMLElement;
-
     expect(within(firstRow).getByRole("button", { name: "승인" })).toBeEnabled();
     expect(within(firstRow).getByRole("button", { name: "거절" })).toBeEnabled();
-    expect(within(secondRow).getByRole("button", { name: "승인" })).toBeEnabled();
-    expect(within(secondRow).getByRole("button", { name: "거절" })).toBeEnabled();
+    expect(within(secondRow).getByRole("button", { name: "검토" })).toBeEnabled();
+    expect(within(secondRow).queryByRole("button", { name: "거절" })).not.toBeInTheDocument();
 
     await user.click(within(firstRow).getByRole("button", { name: "승인" }));
     expect(onActivate).toHaveBeenCalledWith("membership-viewer");
 
+    await user.click(within(secondRow).getByRole("button", { name: "검토" }));
     await user.click(within(secondRow).getByRole("button", { name: "거절" }));
     expect(onRelease).toHaveBeenCalledWith("membership-viewer-2");
   });
 
-  it("disables the submitting row while a viewer action is in flight", () => {
+  it("disables the submitting row while a viewer action is in flight", async () => {
+    const user = userEvent.setup();
     render(
       <MemberPendingZone
         viewers={[viewer()]}
@@ -93,6 +101,7 @@ describe("MemberPendingZone", () => {
     );
 
     const row = screen.getByText("둘").closest("article") as HTMLElement;
+    await user.click(within(row).getByRole("button", { name: "검토" }));
     expect(within(row).getByRole("button", { name: "승인" })).toBeDisabled();
     expect(within(row).getByRole("button", { name: "거절" })).toBeDisabled();
   });

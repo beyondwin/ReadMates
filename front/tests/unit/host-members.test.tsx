@@ -358,6 +358,16 @@ async function findPendingZone() {
   return within(await screen.findByRole("region", { name: "가입 승인 대기" }));
 }
 
+async function revealPendingRowActions(
+  user: ReturnType<typeof userEvent.setup>,
+  row: ReturnType<typeof within>,
+) {
+  if (row.queryByRole("button", { name: "거절" })) {
+    return;
+  }
+  await user.click(row.getByRole("button", { name: "검토" }));
+}
+
 async function openMemberOverflow(user: ReturnType<typeof userEvent.setup>, row: ReturnType<typeof within>) {
   await user.click(row.getByRole("button", { name: "멤버 관리 메뉴" }));
 }
@@ -368,6 +378,11 @@ describe("HostMembersPage", () => {
     vi.setSystemTime(new Date("2026-08-28T12:00:00Z"));
     const fetchMock = renderHostMembersPage();
 
+    expect(await screen.findByRole("searchbox", { name: /이름/ })).toBeVisible();
+    expect(screen.getByRole("tab", { name: /전체/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: "가입 승인 검토" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "검토" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "거절" })).not.toBeInTheDocument();
     expect(await screen.findByRole("tab", { name: "활성 멤버" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "쉬는 중" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "탈퇴/비활성" })).toBeInTheDocument();
@@ -750,7 +765,9 @@ describe("HostMembersPage", () => {
     } satisfies HostMembersActions;
     render(<HostMembersForTest initialMembers={[activateViewer]} actions={actions} />);
 
-    await user.click((await findPendingZone()).getByRole("button", { name: "승인" }));
+    const refreshZone = await findPendingZone();
+    await revealPendingRowActions(user, within(refreshZone.getByText("둘").closest("article") as HTMLElement));
+    await user.click(refreshZone.getByRole("button", { name: "승인" }));
 
     expect(actions.submitViewerAction).toHaveBeenCalledWith(activateViewer.membershipId, "activate");
     expect(actions.refreshMembers).toHaveBeenCalled();
@@ -808,6 +825,7 @@ describe("HostMembersPage", () => {
     const firstRow = within(zone.getByText("둘").closest("article") as HTMLElement);
     const secondRow = within(zone.getByText("두번째 둘러보기").closest("article") as HTMLElement);
 
+    await revealPendingRowActions(user, firstRow);
     await user.click(firstRow.getByRole("button", { name: "승인" }));
 
     expect(firstRow.getByRole("button", { name: "승인" })).toBeDisabled();
@@ -815,6 +833,8 @@ describe("HostMembersPage", () => {
     expect(firstRow.getByRole("button", { name: "거절" })).toBeDisabled();
     expect(firstRow.getByRole("button", { name: "거절" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
     expect(firstRow.getAllByText("멤버 상태 업데이트를 처리하는 중입니다.")).toHaveLength(2);
+    expect(secondRow.getByRole("button", { name: "검토" })).toBeEnabled();
+    await revealPendingRowActions(user, secondRow);
     expect(secondRow.getByRole("button", { name: "승인" })).toBeEnabled();
     expect(secondRow.getByRole("button", { name: "거절" })).toBeEnabled();
 
@@ -851,6 +871,7 @@ describe("HostMembersPage", () => {
     renderHostMembersPage([], [lockedViewer, lockedSuspended]);
 
     const viewerRow = within((await findPendingZone()).getByText("둘").closest("article") as HTMLElement);
+    await revealPendingRowActions(user, viewerRow);
     const activateButton = viewerRow.getByRole("button", { name: "승인" });
     const deactivateButton = viewerRow.getByRole("button", { name: "거절" });
 
@@ -884,7 +905,9 @@ describe("HostMembersPage", () => {
       memberListResponse(members.map((member) => (member.membershipId === approvedMember.membershipId ? approvedMember : member))),
     ]);
 
-    await user.click((await findPendingZone()).getByRole("button", { name: "승인" }));
+    const activateZone = await findPendingZone();
+    await revealPendingRowActions(user, within(activateZone.getByText("둘").closest("article") as HTMLElement));
+    await user.click(activateZone.getByRole("button", { name: "승인" }));
 
     expect(await screen.findByText("정식 멤버로 전환했습니다.")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "가입 승인 대기" })).not.toBeInTheDocument();
@@ -927,21 +950,14 @@ describe("HostMembersPage", () => {
       initialPendingMembers,
     );
 
-    await user.click(
-      within((await findPendingZone()).getByText("둘").closest("article") as HTMLElement).getByRole("button", {
-        name: "승인",
-      }),
-    );
+    const firstPending = within((await findPendingZone()).getByText("둘").closest("article") as HTMLElement);
+    await revealPendingRowActions(user, firstPending);
+    await user.click(firstPending.getByRole("button", { name: "승인" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
 
-    await user.click(
-      within((await findPendingZone()).getByText("두번째 둘러보기").closest("article") as HTMLElement).getByRole(
-        "button",
-        {
-          name: "승인",
-        },
-      ),
-    );
+    const secondPendingRow = within((await findPendingZone()).getByText("두번째 둘러보기").closest("article") as HTMLElement);
+    await revealPendingRowActions(user, secondPendingRow);
+    await user.click(secondPendingRow.getByRole("button", { name: "승인" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(7));
 
     expect(screen.queryByRole("region", { name: "가입 승인 대기" })).not.toBeInTheDocument();
@@ -974,7 +990,9 @@ describe("HostMembersPage", () => {
       memberListResponse(members.map((member) => (member.membershipId === rejectedMember.membershipId ? rejectedMember : member))),
     ]);
 
-    await user.click((await findPendingZone()).getByRole("button", { name: "거절" }));
+    const rejectZone = await findPendingZone();
+    await revealPendingRowActions(user, within(rejectZone.getByText("둘").closest("article") as HTMLElement));
+    await user.click(rejectZone.getByRole("button", { name: "거절" }));
 
     expect(await screen.findByText("둘러보기 멤버를 해제했습니다.")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "가입 승인 대기" })).not.toBeInTheDocument();
@@ -1003,7 +1021,9 @@ describe("HostMembersPage", () => {
       new Response(JSON.stringify({ message: "refresh failed" }), { status: 500, headers: { "Content-Type": "application/json" } }),
     ]);
 
-    await user.click((await findPendingZone()).getByRole("button", { name: "승인" }));
+    const localActivateZone = await findPendingZone();
+    await revealPendingRowActions(user, within(localActivateZone.getByText("둘").closest("article") as HTMLElement));
+    await user.click(localActivateZone.getByRole("button", { name: "승인" }));
 
     expect(await screen.findByText("처리는 완료됐지만 멤버 목록 새로고침에 실패했습니다. 새로고침해서 최신 상태를 확인해 주세요.")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "가입 승인 대기" })).not.toBeInTheDocument();
@@ -1287,8 +1307,9 @@ describe("HostMembersPage", () => {
       />,
     );
 
-    await user.type(screen.getByLabelText("이름"), "새멤버");
-    await user.type(screen.getByLabelText("초대 이메일"), "new@example.com");
+    const createInvitations = screen.getByRole("region", { name: "초대" });
+    await user.type(within(createInvitations).getByLabelText("이름"), "새멤버");
+    await user.type(within(createInvitations).getByLabelText("초대 이메일"), "new@example.com");
     await user.click(screen.getByRole("button", { name: "초대 보내기" }));
 
     const invitations = screen.getByRole("region", { name: "초대" });
@@ -1334,8 +1355,9 @@ describe("HostMembersPage", () => {
       />,
     );
 
-    await user.type(screen.getByLabelText("이름"), "사라진 소유자");
-    await user.type(screen.getByLabelText("초대 이메일"), "obsolete@example.com");
+    const obsoleteInvitations = screen.getByRole("region", { name: "초대" });
+    await user.type(within(obsoleteInvitations).getByLabelText("이름"), "사라진 소유자");
+    await user.type(within(obsoleteInvitations).getByLabelText("초대 이메일"), "obsolete@example.com");
     await user.click(screen.getByRole("button", { name: "초대 보내기" }));
 
     const invitationRegion = screen.getByRole("region", { name: "초대" });

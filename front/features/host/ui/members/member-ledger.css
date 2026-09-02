@@ -388,6 +388,23 @@
   color: var(--text-3);
 }
 
+.rm-host-people__extras {
+  margin-top: var(--space-lg);
+}
+
+.rm-host-people__extras > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.rm-host-people__extras > summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
 @media (max-width: 640px) {
   .rm-host-people__header,
   .rm-host-people__tools,

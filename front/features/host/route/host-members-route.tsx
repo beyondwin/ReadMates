@@ -4,13 +4,11 @@ import { useLoaderData, useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import HostMembers, { type HostMembersLinkComponent } from "@/features/host/ui/host-members";
-import { HostPeoplePage } from "@/features/host/ui/members/host-people-page";
 import { createHostInvitationsActions } from "./host-invitations-data";
 import { createHostMembersActions, type HostMembersRouteData } from "./host-members-data";
 import type { HostMembersActions } from "@/features/host/model/host-member-actions";
 import { TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 import { registerHostInvitationActions } from "./host-invitations-route";
-import "@/features/host/ui/host-editorial-ledger.css";
 
 export function registerHostMemberActions(
   actions: HostMembersActions,
@@ -70,14 +68,12 @@ export function HostMembersRoute({ LinkComponent }: { LinkComponent?: HostMember
   );
 
   return (
-    <HostPeoplePage>
-      <HostMembers
-        initialMembers={members}
-        actions={registeredActions}
-        initialInvitations={invitations}
-        invitationActions={registeredInvitationActions}
-        LinkComponent={LinkComponent}
-      />
-    </HostPeoplePage>
+    <HostMembers
+      initialMembers={members}
+      actions={registeredActions}
+      initialInvitations={invitations}
+      invitationActions={registeredInvitationActions}
+      LinkComponent={LinkComponent}
+    />
   );
 }

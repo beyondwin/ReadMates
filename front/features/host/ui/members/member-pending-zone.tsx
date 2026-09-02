@@ -1,4 +1,4 @@
-import { type CSSProperties, type ReactElement } from "react";
+import { type CSSProperties, type ReactElement, useState } from "react";
 import type { HostMemberListItem } from "@/features/host/model/host-view-types";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import {
@@ -22,14 +22,21 @@ export function MemberPendingZone({
   isRowPending: (membershipId: string) => boolean;
   onActivate: (membershipId: string) => void;
   onRelease: (membershipId: string) => void;
-  onReview?: () => void;
+  onReview?: (membershipId: string) => void;
   personHref?: (membershipId: string) => string;
   LinkComponent?: HostMembersLinkComponent;
   now?: Date;
 }): ReactElement | null {
+  const [reviewingIds, setReviewingIds] = useState<ReadonlySet<string>>(() => new Set());
+
   if (viewers.length === 0) {
     return null;
   }
+
+  const startReview = (membershipId: string) => {
+    setReviewingIds((current) => new Set([...current, membershipId]));
+    onReview?.(membershipId);
+  };
 
   return (
     <section
@@ -48,7 +55,7 @@ export function MemberPendingZone({
         <button
           className="btn btn-primary"
           type="button"
-          onClick={() => onReview?.()}
+          onClick={() => startReview(viewers[0].membershipId)}
         >
           가입 승인 검토
         </button>
@@ -62,6 +69,7 @@ export function MemberPendingZone({
           const activateDisabled = rowPending;
           const releaseDisabled = !member.canDeactivate || rowPending;
           const requestTime = formatPendingRequestTime(member.createdAt, now);
+          const reviewing = reviewingIds.has(member.membershipId);
 
           return (
             <article key={member.membershipId} className="rm-host-pending__row">
@@ -84,24 +92,36 @@ export function MemberPendingZone({
                   <span className="rm-sr-only">{requestMeta(member)}</span>
                 </div>
                 <div className="row" style={{ gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                  <PendingActionButton
-                    action="approve"
-                    membershipId={member.membershipId}
-                    label="승인"
-                    tone="primary"
-                    disabled={activateDisabled}
-                    reason={activateReason}
-                    onClick={() => onActivate(member.membershipId)}
-                  />
-                  <PendingActionButton
-                    action="reject"
-                    membershipId={member.membershipId}
-                    label="거절"
-                    tone="ghost"
-                    disabled={releaseDisabled}
-                    reason={releaseReason}
-                    onClick={() => onRelease(member.membershipId)}
-                  />
+                  {reviewing ? (
+                    <>
+                      <PendingActionButton
+                        action="approve"
+                        membershipId={member.membershipId}
+                        label="승인"
+                        tone="primary"
+                        disabled={activateDisabled}
+                        reason={activateReason}
+                        onClick={() => onActivate(member.membershipId)}
+                      />
+                      <PendingActionButton
+                        action="reject"
+                        membershipId={member.membershipId}
+                        label="거절"
+                        tone="ghost"
+                        disabled={releaseDisabled}
+                        reason={releaseReason}
+                        onClick={() => onRelease(member.membershipId)}
+                      />
+                    </>
+                  ) : (
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      type="button"
+                      onClick={() => startReview(member.membershipId)}
+                    >
+                      검토
+                    </button>
+                  )}
                 </div>
               </div>
             </article>

@@ -23,22 +23,30 @@ const STATUS_CHIPS = [
   { id: "suspended", label: "쉬는 중", countKey: "suspended" },
 ] as const;
 
+export type HostPeopleStatusFilter = (typeof STATUS_CHIPS)[number]["id"];
+
 export function HostPeoplePage({
   children,
   scheduleSeen,
   rosterCounts,
   unreadHref,
   pendingZone,
+  statusFilter,
+  onStatusFilterChange,
 }: {
   children: ReactNode;
   scheduleSeen?: HostPeopleScheduleSeenCounts;
   rosterCounts?: HostPeopleRosterCounts;
   unreadHref?: string;
   pendingZone?: ReactNode;
+  statusFilter?: HostPeopleStatusFilter;
+  onStatusFilterChange?: (id: HostPeopleStatusFilter) => void;
 }) {
   const searchId = useId();
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<(typeof STATUS_CHIPS)[number]["id"]>("all");
+  const [uncontrolledFilter, setUncontrolledFilter] = useState<HostPeopleStatusFilter>("all");
+  const selectedFilter = statusFilter ?? uncontrolledFilter;
+  const setSelectedFilter = onStatusFilterChange ?? setUncontrolledFilter;
 
   return (
     <main className="rm-host-members-page rm-host-editorial-ledger rm-host-editorial-ledger--context">
@@ -64,7 +72,7 @@ export function HostPeoplePage({
             </label>
             <div className="rm-host-people__filters" role="tablist" aria-label="멤버 상태">
               {STATUS_CHIPS.map((chip) => {
-                const selected = statusFilter === chip.id;
+                const selected = selectedFilter === chip.id;
                 const count = rosterCounts?.[chip.countKey];
                 const name = count != null ? `${chip.label} ${count}` : `${chip.label} 상태`;
                 return (
@@ -75,7 +83,7 @@ export function HostPeoplePage({
                     aria-label={name}
                     aria-selected={selected}
                     className={`rm-host-people__filter${selected ? " is-selected" : ""}`}
-                    onClick={() => setStatusFilter(chip.id)}
+                    onClick={() => setSelectedFilter(chip.id)}
                   >
                     {chip.label}
                     {count != null ? ` ${count}` : ""}

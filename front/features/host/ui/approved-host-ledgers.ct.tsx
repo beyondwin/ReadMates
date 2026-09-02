@@ -106,7 +106,9 @@ test("people ledger matches approved desktop", async ({ mount, page }, testInfo)
   await expect(component.getByRole("searchbox", { name: /이름/ })).toBeVisible();
   await expect(component.getByRole("region", { name: "가입 승인 대기" })).toBeVisible();
   await expect(component.getByText(/가입 승인 대기\s+\d+명/)).toBeVisible();
-  await expect(component.getByRole("button", { name: /가입 승인 검토|승인/ }).first()).toBeVisible();
+  await expect(component.getByRole("button", { name: "가입 승인 검토" })).toBeVisible();
+  await expect(component.getByRole("button", { name: "검토" }).first()).toBeVisible();
+  await expect(component.getByRole("button", { name: "거절" })).toHaveCount(0);
   await expect(component.getByRole("tab", { name: /전체/ })).toBeVisible();
   await expect(component.getByRole("tab", { name: /활동/ })).toBeVisible();
   await expect(component.getByRole("tab", { name: /둘러보기/ })).toBeVisible();

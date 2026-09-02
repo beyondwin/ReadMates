@@ -387,7 +387,6 @@ export function hostPeopleApprovedView() {
           isRowPending={() => false}
           onActivate={noop}
           onRelease={noop}
-          onReview={noop}
           personHref={personHref}
           LinkComponent={LinkComponent}
           now={peopleNow}
