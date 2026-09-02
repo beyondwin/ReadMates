@@ -43,6 +43,7 @@ test("named link stays redacted and is consumed through the isolated Google fixt
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto("/clubs/reading-sai/app/host/settings");
   await expect(page.getByRole("heading", { name: "초대와 설정" })).toBeVisible();
+  await page.getByRole("button", { name: "새 초대 링크" }).click();
   await page.getByLabel("링크 이름").fill("E2E named link");
   await page.getByRole("button", { name: "초대 링크 만들기" }).click();
   const copy = page.getByRole("button", { name: "한 번만 복사" });
@@ -80,6 +81,7 @@ test("legacy invitation entry replaces to canonical named-link settings", async 
   await page.goto("/app/host/invitations");
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host\/settings#invitations$/);
   await expect(page.getByRole("heading", { name: "초대와 설정" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "공유 링크" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "초대 링크" })).toBeVisible();
+  await page.getByRole("button", { name: "새 초대 링크" }).click();
   await expect(page.getByLabel("링크 이름")).toBeVisible();
 });

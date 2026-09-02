@@ -658,7 +658,7 @@ describe("HostDashboardRoute", () => {
       "href",
       "/clubs/reading-sai/app/sessions/session-7",
     );
-    expect(screen.getByRole("link", { name: "실제 출석 확인" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "출석 확인 시작" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7?section=attendance",
     );

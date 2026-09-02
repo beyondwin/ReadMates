@@ -188,6 +188,11 @@ test("prep, live attendance receipt and undo, and closing stay on one scoped cur
 
   await page.getByRole("tab", { name: /현장/ }).click();
   await expectOperatingRoomContext(page, "live");
+  await expect(page.getByRole("region", { name: "현장 현황" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "출석 확인 시작" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "모임 진행 보기" })).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 832 });
   const attendance = page.getByRole("region", { name: "출석 확인" });
 
   const absentResponse = page.waitForResponse((response) => (
@@ -217,8 +222,10 @@ test("prep, live attendance receipt and undo, and closing stay on one scoped cur
   expect((await bulkResponse).status()).toBe(200);
   await expect.poll(memberResponseAndAttendance).toBe("DECLINED|ATTENDED");
 
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.reload();
   await expectOperatingRoomContext(page, "live");
+  await expect(page.getByRole("region", { name: "현장 현황" })).toBeVisible();
   await page.getByRole("link", { name: "모임 정보" }).click();
   await expect(page).toHaveURL(new RegExp(
     `/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}\\?section=basic$`,

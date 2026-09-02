@@ -86,12 +86,12 @@ export function HostClubSettings({
           <label><input type="checkbox" checked={draft.scheduleReminderEnabled} onChange={(event) => onDraftChange({ ...draft, scheduleReminderEnabled: event.target.checked })} /> 일정 알림 사용</label>
         ) : null}
         <div className="rm-host-editorial-ledger__row">
-          <span>기록 공개 기본값</span>
+          <span>기록 기본 공개 범위</span>
           <span>{publicationCopy[draft.recordPublicationDefault]}</span>
           <button type="button" className="btn-quiet" onClick={() => setOpenField(openField === "publication" ? null : "publication")}>변경</button>
         </div>
         {openField === "publication" ? (
-          <label>기록 공개 기본값<select value={draft.recordPublicationDefault} onChange={(event) => onDraftChange({ ...draft, recordPublicationDefault: event.target.value as Settings["recordPublicationDefault"] })}><option value="HOST_ONLY">운영진</option><option value="MEMBER">멤버</option><option value="PUBLIC">공개</option></select></label>
+          <label>기록 기본 공개 범위<select value={draft.recordPublicationDefault} onChange={(event) => onDraftChange({ ...draft, recordPublicationDefault: event.target.value as Settings["recordPublicationDefault"] })}><option value="HOST_ONLY">운영진</option><option value="MEMBER">멤버</option><option value="PUBLIC">공개</option></select></label>
         ) : null}
         <h3 className="rm-host-records-ledger__title">권한과 운영</h3>
         <div className="rm-host-editorial-ledger__row">

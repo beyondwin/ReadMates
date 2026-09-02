@@ -461,6 +461,7 @@ function resolveNextAction(context: {
     return actionState(context.input, {
       kind: "attendance",
       label: "실제 출석 확인",
+      ctaLabel: "출석 확인 시작",
       reason: `출석이 확인되지 않은 멤버가 ${unknownAttendanceCount}명입니다.`,
       href: hostSessionPath(context.input.basePath, meeting.sessionId, "?section=attendance"),
     });

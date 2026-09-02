@@ -121,12 +121,13 @@ test("host activates viewer into full member", async ({ page }) => {
   const activateResponse = page.waitForResponse(
     (response) => response.url().includes("/api/bff/api/host/members/") && response.url().includes("/activate") && response.status() === 200,
   );
+  await viewerRow.getByRole("button", { name: "검토" }).click();
   await viewerRow.getByRole("button", { name: "승인" }).click();
   await activateResponse;
 
   await expect(page.getByRole("status")).toContainText("정식 멤버로 전환했습니다.");
   await expect(page.getByRole("region", { name: "가입 승인 대기" })).toHaveCount(0);
-  await page.getByRole("tab", { name: "활성 멤버" }).click();
+  await page.getByRole("tablist", { name: "멤버 상태" }).getByRole("tab", { name: /활동/ }).click();
   await expect(page.getByRole("row").filter({ hasText: displayName })).toContainText("활동");
 
   await page.evaluate(async () => {
