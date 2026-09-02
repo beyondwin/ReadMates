@@ -35,7 +35,7 @@ describe("MemberPendingZone", () => {
     );
 
     expect(container).toBeEmptyDOMElement();
-    expect(screen.queryByText("승인·거절은 멤버에게 알림이 갑니다")).not.toBeInTheDocument();
+    expect(screen.queryByText("승인과 거절은 결과 안내를 포함해요.")).not.toBeInTheDocument();
   });
 
   it("renders a pending-approval header and per-row approve/reject actions when viewers exist", async () => {
@@ -63,7 +63,8 @@ describe("MemberPendingZone", () => {
     );
 
     const zone = screen.getByRole("region", { name: "가입 승인 대기" });
-    expect(within(zone).getByText("승인·거절은 멤버에게 알림이 갑니다")).toBeInTheDocument();
+    expect(within(zone).getByText("승인과 거절은 결과 안내를 포함해요.")).toBeInTheDocument();
+    expect(within(zone).getByRole("button", { name: "가입 승인 검토" })).toBeEnabled();
     expect(within(zone).queryByText(/초대 링크/)).not.toBeInTheDocument();
 
     const firstRow = within(zone).getByText("둘").closest("article") as HTMLElement;

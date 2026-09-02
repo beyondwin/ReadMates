@@ -10,7 +10,13 @@ import {
 import type { HostMemberListItem, MembershipStatus } from "@/features/host/model/host-view-types";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { isMembershipPending, memberActionPendingReason } from "./member-action-rules";
-import { clubAccessMeta, formatMembershipTenure, rosterStatusLabels } from "./member-list-helpers";
+import {
+  clubAccessMeta,
+  defaultScheduleSeenLabel,
+  formatMembershipTenure,
+  formatRecentClubAccess,
+  rosterStatusLabels,
+} from "./member-list-helpers";
 import type { HostMemberLifecyclePath } from "./types";
 import type { HostMembersLinkComponent } from "./types";
 import "./member-ledger.css";
@@ -229,26 +235,38 @@ export function MemberOverflowMenu({
   );
 }
 
+export type MemberLedgerFacts = {
+  scheduleSeenLabel?: string;
+  rsvpLabel?: string;
+  lastAccessLabel?: string;
+};
+
 export function MemberList({
   members,
   emptyText,
   sectionDescription,
+  sectionMeta,
   renderProfileAction,
   renderActions,
   renderOverflow,
   renderCurrentSessionBadge = currentSessionBadge,
+  factsByMembershipId,
   personHref,
   LinkComponent,
+  now,
 }: {
   members: HostMemberListItem[];
   emptyText: string;
   sectionDescription: string;
+  sectionMeta?: string;
   renderProfileAction: (member: HostMemberListItem) => ReactNode;
   renderActions: (member: HostMemberListItem) => ReactNode;
   renderOverflow?: (member: HostMemberListItem) => ReactNode;
   renderCurrentSessionBadge?: (member: HostMemberListItem) => { label: string; className: string };
+  factsByMembershipId?: Readonly<Record<string, MemberLedgerFacts>>;
   personHref?: (membershipId: string) => string;
   LinkComponent?: HostMembersLinkComponent;
+  now?: Date;
 }) {
   if (members.length === 0) {
     return (
@@ -266,23 +284,32 @@ export function MemberList({
   return (
     <div className="stack" style={{ "--stack": "12px" } as CSSProperties}>
       <table className="rm-host-member-ledger">
-        <caption className="rm-host-member-ledger__caption small">{sectionDescription}</caption>
+        <caption className="rm-host-member-ledger__caption">
+          <span className="rm-host-member-ledger__title">{sectionDescription}</span>
+          {sectionMeta ? <span className="rm-host-member-ledger__caption-meta">{sectionMeta}</span> : null}
+        </caption>
         <thead>
           <tr>
             <th scope="col">멤버</th>
             <th scope="col">상태</th>
+            <th scope="col">최신 일정</th>
+            <th scope="col">참석 응답</th>
+            <th scope="col">최근 접속</th>
             <th scope="col" className="rm-host-member-ledger__num">
               함께한 기간
             </th>
-            <th scope="col">이번 모임</th>
-            <th scope="col">
-              <span className="rm-sr-only">관리</span>
-            </th>
+            <th scope="col">관리</th>
           </tr>
         </thead>
         <tbody>
           {members.map((member) => {
             const sessionBadge = renderCurrentSessionBadge(member);
+            const facts = factsByMembershipId?.[member.membershipId];
+            const scheduleSeenLabel = facts?.scheduleSeenLabel ?? defaultScheduleSeenLabel(member);
+            const rsvpLabel = facts?.rsvpLabel ?? sessionBadge.label;
+            const lastAccessLabel = facts?.lastAccessLabel
+              ?? formatRecentClubAccess(member.lastClubAccessAt, now);
+            const rsvpClassName = facts?.rsvpLabel ? undefined : sessionBadge.className;
 
             return (
               <tr key={member.membershipId} className="rm-host-member-ledger__row">
@@ -310,12 +337,18 @@ export function MemberList({
                 <td className="rm-host-member-ledger__status">
                   <span className={statusBadgeClass(member.status)}>{rosterStatusLabels[member.status]}</span>
                 </td>
-                <td className="rm-host-member-ledger__num rm-host-member-ledger__time">
-                  <span className="mono">{formatMembershipTenure(member.joinedAt)}</span>
-                  <span className="tiny">{clubAccessMeta(member)}</span>
-                </td>
+                <td className="rm-host-member-ledger__schedule">{scheduleSeenLabel}</td>
                 <td className="rm-host-member-ledger__meta">
-                  <span className={sessionBadge.className}>{sessionBadge.label}</span>
+                  {rsvpClassName ? <span className={rsvpClassName}>{rsvpLabel}</span> : rsvpLabel}
+                </td>
+                <td className="rm-host-member-ledger__access">
+                  <span>{lastAccessLabel}</span>
+                  {clubAccessMeta(member) !== lastAccessLabel ? (
+                    <span className="rm-sr-only">{clubAccessMeta(member)}</span>
+                  ) : null}
+                </td>
+                <td className="rm-host-member-ledger__num rm-host-member-ledger__time">
+                  <span className="mono">{formatMembershipTenure(member.joinedAt, now)}</span>
                 </td>
                 <td className="rm-host-member-ledger__manage">
                   <div className="rm-host-member-ledger__actions">

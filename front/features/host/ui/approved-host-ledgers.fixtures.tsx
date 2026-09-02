@@ -9,6 +9,7 @@ import { HostSessionLedger } from "./host-session-ledger";
 import { HostMeetingList } from "./meeting-list/host-meeting-list";
 import { HostPeoplePage } from "./members/host-people-page";
 import { MemberList } from "./members/member-list";
+import { MemberPendingZone } from "./members/member-pending-zone";
 import { ManualNotificationPreviewConfirmation } from "./notifications/manual-notification-preview";
 import { HostPersonDetail } from "./person/host-person-detail";
 import { HostScheduleReviewHeader } from "./schedule-review/host-schedule-review-header";
@@ -119,7 +120,7 @@ function memberRow(
   displayName: string,
   avatarKey: string,
   status: HostMemberListItem["status"],
-  joinedAt: string,
+  joinedAt: string | null,
   lastClubAccessAt: string | null,
 ): HostMemberListItem {
   return {
@@ -133,7 +134,7 @@ function memberRow(
     role: "MEMBER",
     status,
     joinedAt,
-    createdAt: joinedAt,
+    createdAt: joinedAt ?? lastClubAccessAt ?? "2026-09-02T00:00:00+09:00",
     lastClubAccessAt,
     currentSessionParticipationStatus: status === "ACTIVE" ? "ACTIVE" : "REMOVED",
     canSuspend: status === "ACTIVE",
@@ -144,14 +145,44 @@ function memberRow(
   };
 }
 
+const peopleNow = new Date("2026-09-02T14:20:00+09:00");
+
 const peopleMembers: HostMemberListItem[] = [
-  memberRow("membership-sky", "김하늘", "mushroom-green-book", "ACTIVE", "2024-12-01T00:00:00Z", "2026-08-30T09:00:00Z"),
-  memberRow("membership-park", "박서윤", "banana-green-book", "ACTIVE", "2025-09-01T00:00:00Z", "2026-08-29T10:00:00Z"),
-  memberRow("membership-lee", "이도현", "cloud-green-book", "ACTIVE", "2025-12-01T00:00:00Z", "2026-08-27T10:00:00Z"),
-  memberRow("membership-jung", "정수아", "moon-green-book", "ACTIVE", "2024-07-01T00:00:00Z", "2026-08-30T08:00:00Z"),
-  memberRow("membership-han", "한지우", "candle-green-book", "VIEWER", "2026-08-24T00:00:00Z", "2026-08-30T07:00:00Z"),
-  memberRow("membership-oh", "오민재", "starfish-notebook", "SUSPENDED", "2025-06-01T00:00:00Z", "2026-08-18T10:00:00Z"),
+  memberRow("membership-sky", "김하늘", "mushroom-green-book", "ACTIVE", "2025-01-02T00:00:00+09:00", "2026-09-02T09:00:00+09:00"),
+  memberRow("membership-park", "박서윤", "peach-green-book", "ACTIVE", "2025-10-02T00:00:00+09:00", "2026-09-01T10:00:00+09:00"),
+  memberRow("membership-lee", "이도현", "banana-green-book", "ACTIVE", "2026-01-02T00:00:00+09:00", "2026-08-30T10:00:00+09:00"),
+  memberRow("membership-jung", "정수아", "tulip-notebook", "ACTIVE", "2024-08-02T00:00:00+09:00", "2026-09-02T08:00:00+09:00"),
+  memberRow("membership-han", "한지우", "candle-green-book", "VIEWER", "2026-08-27T00:00:00+09:00", "2026-09-02T07:00:00+09:00"),
+  memberRow("membership-oh", "오민재", "apple-green-book", "SUSPENDED", "2025-07-02T00:00:00+09:00", "2026-08-21T10:00:00+09:00"),
 ];
+
+const peoplePendingMembers: HostMemberListItem[] = [
+  {
+    ...memberRow("membership-yoon", "윤서진", "radish-notebook", "VIEWER", null, "2026-09-02T09:12:00+09:00"),
+    createdAt: "2026-09-02T09:12:00+09:00",
+    currentSessionParticipationStatus: null,
+    canSuspend: false,
+    canAddToCurrentSession: false,
+    canRemoveFromCurrentSession: false,
+  },
+  {
+    ...memberRow("membership-choi", "최도윤", "peach-green-book", "VIEWER", null, "2026-09-01T21:40:00+09:00"),
+    createdAt: "2026-09-01T21:40:00+09:00",
+    currentSessionParticipationStatus: null,
+    canSuspend: false,
+    canAddToCurrentSession: false,
+    canRemoveFromCurrentSession: false,
+  },
+];
+
+const peopleLedgerFacts = {
+  "membership-sky": { scheduleSeenLabel: "현재 일정 확인", rsvpLabel: "참석", lastAccessLabel: "오늘" },
+  "membership-park": { scheduleSeenLabel: "변경 전 확인", rsvpLabel: "미응답", lastAccessLabel: "어제" },
+  "membership-lee": { scheduleSeenLabel: "미열람", rsvpLabel: "참석", lastAccessLabel: "3일 전" },
+  "membership-jung": { scheduleSeenLabel: "현재 일정 확인", rsvpLabel: "불참", lastAccessLabel: "오늘" },
+  "membership-han": { scheduleSeenLabel: "일정 대상 아님", rsvpLabel: "—", lastAccessLabel: "오늘" },
+  "membership-oh": { scheduleSeenLabel: "일정 대상 아님", rsvpLabel: "—", lastAccessLabel: "12일 전" },
+} as const;
 
 const recordItems: HostSessionLedgerItem[] = [
   {
@@ -339,18 +370,42 @@ export function hostMeetingsApprovedView() {
 }
 
 export function hostPeopleApprovedView() {
+  const personHref = (membershipId: string) => `/clubs/reading-sai/app/host/people/${membershipId}`;
+  const LinkComponent = ({ to, children, ...props }: { to: string; children: ReactNode; className?: string }) => (
+    <a {...props} href={to}>{children}</a>
+  );
+
   return hostApprovedShell(
     "people",
-    <HostPeoplePage scheduleSeen={{ current: 8, stale: 1, unseen: 3, notTarget: 3 }}>
+    <HostPeoplePage
+      scheduleSeen={{ current: 8, stale: 1, unseen: 3, notTarget: 3 }}
+      rosterCounts={{ all: 15, active: 12, viewer: 2, suspended: 1 }}
+      unreadHref="/clubs/reading-sai/app/host/sessions/session-28/schedule-review"
+      pendingZone={(
+        <MemberPendingZone
+          viewers={peoplePendingMembers}
+          isRowPending={() => false}
+          onActivate={noop}
+          onRelease={noop}
+          onReview={noop}
+          personHref={personHref}
+          LinkComponent={LinkComponent}
+          now={peopleNow}
+        />
+      )}
+    >
       <MemberList
         members={peopleMembers}
         emptyText="활성 멤버가 없습니다."
         sectionDescription="멤버 원장"
-        personHref={(membershipId) => `/clubs/reading-sai/app/host/people/${membershipId}`}
-        LinkComponent={({ to, children, ...props }) => <a {...props} href={to}>{children}</a>}
+        sectionMeta="현재 일정 기준 · 오늘 14:20"
+        personHref={personHref}
+        LinkComponent={LinkComponent}
+        factsByMembershipId={peopleLedgerFacts}
+        now={peopleNow}
         renderProfileAction={() => null}
-        renderActions={() => (
-          <a className="btn btn-ghost btn-sm" href="/clubs/reading-sai/app/host/people/membership-sky">열기</a>
+        renderActions={(member) => (
+          <a className="btn btn-ghost btn-sm" href={personHref(member.membershipId)}>열기</a>
         )}
       />
     </HostPeoplePage>,

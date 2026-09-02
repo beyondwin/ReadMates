@@ -435,7 +435,7 @@ describe("HostMembersPage", () => {
       "/assets/avatars/book-club/cloud-green-book.webp",
     );
     expect(pendingArticle.querySelector(".rm-avatar-chip")).toHaveAttribute("data-avatar-size-role", "member");
-    expect(screen.getByText("승인·거절은 멤버에게 알림이 갑니다")).toBeInTheDocument();
+    expect(screen.getByText("승인과 거절은 결과 안내를 포함해요.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "탈퇴/비활성" }));
     const inactiveRowElement = screen.getByText("탈").closest("tr") as HTMLElement;
@@ -620,12 +620,11 @@ describe("HostMembersPage", () => {
     expect(await screen.findByRole("tab", { name: "활성 멤버" })).toBeInTheDocument();
 
     const page = document.querySelector("main.rm-host-members-page");
-    const headerEyebrow = document.querySelector(".page-header-compact .eyebrow");
     const contentContainer = document.querySelector("main > section.container") as HTMLElement | null;
     expect(page).not.toBeNull();
     expect(page).toHaveClass("rm-host-editorial-ledger");
     expect(page).toHaveClass("rm-host-editorial-ledger--context");
-    expect(headerEyebrow?.tagName).toBe("DIV");
+    expect(document.querySelector(".page-header-compact .eyebrow")).toBeNull();
     expect(contentContainer).not.toBeNull();
     expect(contentContainer).toHaveClass("rm-host-members-page__body");
     expect(contentContainer?.style.paddingTop).toBe("");
@@ -651,7 +650,7 @@ describe("HostMembersPage", () => {
     expect(viewer.getByText("둘러보기 멤버 · 요청일 2026.04.20")).toBeInTheDocument();
     expect(viewer.queryByText("viewer@example.com")).not.toBeInTheDocument();
     expect(screen.queryByText("승인 대기")).not.toBeInTheDocument();
-    expect(screen.getByText("승인·거절은 멤버에게 알림이 갑니다")).toBeInTheDocument();
+    expect(screen.getByText("승인과 거절은 결과 안내를 포함해요.")).toBeInTheDocument();
   });
 
   it("supports keyboard selection in the member management tablist", async () => {

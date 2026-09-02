@@ -7,6 +7,20 @@
   margin: 0 0 12px;
   color: var(--text-2);
   text-align: left;
+  caption-side: top;
+}
+
+.rm-host-member-ledger__title {
+  color: var(--ink-900);
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.rm-host-member-ledger__caption-meta {
+  margin-left: 12px;
+  color: var(--text-3);
+  font-size: 12.5px;
+  font-weight: 500;
 }
 
 .rm-host-member-ledger thead th {
@@ -71,12 +85,18 @@
   white-space: nowrap;
 }
 
+.rm-host-member-ledger__schedule,
+.rm-host-member-ledger__access {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
 .rm-host-member-ledger__actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
-  opacity: 0;
+  opacity: 1;
 }
 
 .rm-host-member-ledger__row:hover .rm-host-member-ledger__actions,
@@ -170,8 +190,9 @@
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       "fact fact"
-      "status time"
-      "meta meta"
+      "status access"
+      "schedule rsvp"
+      "time time"
       "actions actions";
     align-items: start;
     column-gap: var(--space-sm, 10px);
@@ -195,8 +216,17 @@
     text-align: right;
   }
 
+  .rm-host-member-ledger__schedule {
+    grid-area: schedule;
+  }
+
+  .rm-host-member-ledger__access {
+    grid-area: access;
+    text-align: right;
+  }
+
   .rm-host-member-ledger__meta {
-    grid-area: meta;
+    grid-area: rsvp;
     min-width: 0;
   }
 
@@ -234,4 +264,141 @@
   outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
   box-shadow: 0 0 0 4px var(--focus-ring-soft);
+}
+
+.rm-host-people__header {
+  display: grid;
+  grid-template-columns: minmax(16rem, 1fr) auto;
+  align-items: start;
+  gap: var(--space-lg);
+}
+
+.rm-host-people__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+.rm-host-people__search input {
+  min-width: 220px;
+  min-height: 44px;
+  padding: 0 14px 0 36px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background:
+    var(--bg)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23666' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='7' cy='7' r='4.5'/%3E%3Cpath d='M10.5 10.5 14 14'/%3E%3C/svg%3E")
+    no-repeat 14px 50%;
+  color: var(--ink-900);
+  font: inherit;
+}
+
+.rm-host-people__search input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px var(--focus-ring-soft);
+}
+
+.rm-host-people__filters {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.rm-host-people__filter {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-inline-end: 1px solid var(--line);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.rm-host-people__filter:last-child {
+  border-inline-end: 0;
+}
+
+.rm-host-people__filter.is-selected {
+  background: var(--ink-900);
+  color: var(--paper-50);
+}
+
+.rm-host-people__filter:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.rm-host-people__unread {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  color: inherit;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.rm-host-people__unread:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.rm-host-pending {
+  padding: 18px 22px;
+  margin-bottom: var(--space-lg);
+}
+
+.rm-host-pending__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.rm-host-pending__row {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.rm-host-pending__row:last-child {
+  border-bottom: 0;
+}
+
+.rm-host-pending__identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.rm-host-pending__time {
+  color: var(--text-3);
+}
+
+@media (max-width: 640px) {
+  .rm-host-people__header,
+  .rm-host-people__tools,
+  .rm-host-pending__header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rm-host-people__search input,
+  .rm-host-people__filters,
+  .rm-host-pending__header .btn {
+    width: 100%;
+  }
 }

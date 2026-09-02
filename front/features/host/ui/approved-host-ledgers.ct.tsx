@@ -22,6 +22,9 @@ const APPROVED_MOBILE_VIEWPORT = { width: 390, height: 832 } as const;
 const MEETINGS_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
 const MEETINGS_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
 const MEETINGS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1086 } as const;
+const PEOPLE_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
+const PEOPLE_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
+const PEOPLE_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1026 } as const;
 
 async function mountApproved(
   mount: (component: ReactElement) => Promise<Locator>,
@@ -74,8 +77,12 @@ async function captureHostLedger(input: {
 }) {
   const personMobile = input.id === "host-person-mobile";
   const meetingsDesktop = input.id === "host-meetings-desktop";
+  const peopleDesktop = input.id === "host-people-desktop";
   if (meetingsDesktop && (!input.regions || input.regions.length === 0)) {
     throw new Error("host-meetings-desktop requires nav and main capture regions");
+  }
+  if (peopleDesktop && (!input.regions || input.regions.length === 0)) {
+    throw new Error("host-people-desktop requires nav and main capture regions");
   }
   return captureApprovedComparison({
     entry: approvedMockup(input.id),
@@ -83,7 +90,7 @@ async function captureHostLedger(input: {
     page: input.page,
     testInfo: input.testInfo,
     regions: input.regions ?? [],
-    ...(meetingsDesktop
+    ...(meetingsDesktop || peopleDesktop
       ? { skipMismatchRatioAssertion: true as const }
       : {
           allowFontRasterException: true as const,
@@ -93,14 +100,41 @@ async function captureHostLedger(input: {
 }
 
 test("people ledger matches approved desktop", async ({ mount, page }, testInfo) => {
+  test.setTimeout(90_000);
   const component = await mountApproved(mount, page, hostPeopleApprovedView(), APPROVED_DESKTOP_VIEWPORT);
-  await expect(component.getByRole("heading", { name: "사람" })).toBeVisible();
-  await expect(component.getByText("현재 일정 확인").first()).toBeVisible();
+  await expect(component.getByRole("link", { name: "사람" })).toHaveAttribute("aria-current", "page");
+  await expect(component.getByRole("searchbox", { name: /이름/ })).toBeVisible();
+  await expect(component.getByRole("region", { name: "가입 승인 대기" })).toBeVisible();
+  await expect(component.getByText(/가입 승인 대기\s+\d+명/)).toBeVisible();
+  await expect(component.getByRole("button", { name: /가입 승인 검토|승인/ }).first()).toBeVisible();
+  await expect(component.getByRole("tab", { name: /전체/ })).toBeVisible();
+  await expect(component.getByRole("tab", { name: /활동/ })).toBeVisible();
+  await expect(component.getByRole("tab", { name: /둘러보기/ })).toBeVisible();
+  await expect(component.getByRole("tab", { name: /쉬는 중/ })).toBeVisible();
+  await expect(component.getByRole("columnheader", { name: "멤버" })).toBeVisible();
+  await expect(component.getByRole("columnheader", { name: "상태" })).toBeVisible();
+  await expect(component.getByRole("columnheader", { name: "최신 일정" })).toBeVisible();
+  await expect(component.getByRole("columnheader", { name: "참석 응답" })).toBeVisible();
+  await expect(component.getByRole("columnheader", { name: "최근 접속" })).toBeVisible();
+  await expect(component.getByRole("columnheader", { name: "함께한 기간" })).toBeVisible();
+  await expect(component.getByRole("columnheader", { name: "관리" })).toBeVisible();
+  const header = component.locator("header.topnav");
+  const nav = component.getByRole("navigation", { name: "호스트 주 메뉴" });
+  const main = component.getByRole("main");
+  await expect(header).toBeVisible();
+  await expect(nav).toBeVisible();
+  await expect(main).toBeVisible();
+  const regions = [
+    await regionFromLocator(header, "header", PEOPLE_HEADER_GEOMETRY, 4),
+    await regionFromLocator(nav, "nav", PEOPLE_NAV_GEOMETRY, 4),
+    await regionFromLocator(main, "main", PEOPLE_MAIN_GEOMETRY, 4),
+  ];
   await captureHostLedger({
     id: "host-people-desktop",
     candidate: component,
     page,
     testInfo,
+    regions,
   });
 });
 

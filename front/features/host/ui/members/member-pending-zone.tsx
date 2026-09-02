@@ -5,7 +5,7 @@ import {
   disabledViewerActivationReason,
   disabledViewerDeactivateReason,
 } from "./member-action-rules";
-import { requestMeta } from "./member-list-helpers";
+import { formatPendingRequestTime, requestMeta } from "./member-list-helpers";
 import type { HostMembersLinkComponent } from "./types";
 
 export function MemberPendingZone({
@@ -13,15 +13,19 @@ export function MemberPendingZone({
   isRowPending,
   onActivate,
   onRelease,
+  onReview,
   personHref,
   LinkComponent,
+  now,
 }: {
   viewers: readonly HostMemberListItem[];
   isRowPending: (membershipId: string) => boolean;
   onActivate: (membershipId: string) => void;
   onRelease: (membershipId: string) => void;
+  onReview?: () => void;
   personHref?: (membershipId: string) => string;
   LinkComponent?: HostMembersLinkComponent;
+  now?: Date;
 }): ReactElement | null {
   if (viewers.length === 0) {
     return null;
@@ -29,20 +33,25 @@ export function MemberPendingZone({
 
   return (
     <section
-      className="rm-document-panel"
+      className="rm-document-panel rm-host-pending"
       aria-label="가입 승인 대기"
-      style={{ padding: "18px 22px" }}
     >
-      <header className="stack" style={{ "--stack": "6px", marginBottom: 14 } as CSSProperties}>
-        <div className="eyebrow" style={{ margin: 0 }}>
-          가입 승인
+      <header className="rm-host-pending__header">
+        <div className="stack" style={{ "--stack": "6px" } as CSSProperties}>
+          <h2 className="h4 editorial" style={{ margin: 0 }}>
+            가입 승인 대기 {viewers.length}명
+          </h2>
+          <p className="small" style={{ margin: 0, color: "var(--text-2)" }}>
+            승인과 거절은 결과 안내를 포함해요.
+          </p>
         </div>
-        <h2 className="h4 editorial" style={{ margin: 0 }}>
-          가입 승인 대기 {viewers.length}명
-        </h2>
-        <p className="small" style={{ margin: 0, color: "var(--text-2)" }}>
-          승인·거절은 멤버에게 알림이 갑니다
-        </p>
+        <button
+          className="btn btn-primary"
+          type="button"
+          onClick={() => onReview?.()}
+        >
+          가입 승인 검토
+        </button>
       </header>
 
       <div className="stack" style={{ "--stack": "10px" } as CSSProperties}>
@@ -52,27 +61,27 @@ export function MemberPendingZone({
           const releaseReason = disabledViewerDeactivateReason(member, rowPending);
           const activateDisabled = rowPending;
           const releaseDisabled = !member.canDeactivate || rowPending;
+          const requestTime = formatPendingRequestTime(member.createdAt, now);
 
           return (
-            <article key={member.membershipId} className="surface" style={{ padding: "14px 16px" }}>
+            <article key={member.membershipId} className="rm-host-pending__row">
               <div className="row-between" style={{ alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-                <div style={{ minWidth: 0 }}>
-                  <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <AvatarChip avatarKey={member.avatarKey} name={member.displayName} label="" sizeRole="member" />
-                    <span className="h4 editorial" style={{ margin: 0 }}>
-                      {personHref && LinkComponent ? (
-                        <LinkComponent
-                          to={personHref(member.membershipId)}
-                          className="rm-host-member-ledger__person-link"
-                        >
-                          {member.displayName}
-                        </LinkComponent>
-                      ) : member.displayName}
-                    </span>
-                  </div>
-                  <p className="small" style={{ margin: "4px 0 0", color: "var(--text-2)" }}>
-                    {requestMeta(member)}
-                  </p>
+                <div className="rm-host-pending__identity">
+                  <AvatarChip avatarKey={member.avatarKey} name={member.displayName} label="" sizeRole="member" />
+                  <span className="h4 editorial" style={{ margin: 0 }}>
+                    {personHref && LinkComponent ? (
+                      <LinkComponent
+                        to={personHref(member.membershipId)}
+                        className="rm-host-member-ledger__person-link"
+                      >
+                        {member.displayName}
+                      </LinkComponent>
+                    ) : member.displayName}
+                  </span>
+                  {requestTime ? (
+                    <span className="small rm-host-pending__time">{requestTime}</span>
+                  ) : null}
+                  <span className="rm-sr-only">{requestMeta(member)}</span>
                 </div>
                 <div className="row" style={{ gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                   <PendingActionButton
