@@ -90,6 +90,14 @@ export function AdminClubsLedger({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<"all" | "attention" | "operating">("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const filtersActive = Boolean(
+    filters.search
+    || filters.lifecycle
+    || filters.visibility
+    || filters.domainStatus
+    || filters.onboardingState,
+  );
+  const [filtersOpen, setFiltersOpen] = useState(filtersActive);
   const appliedRestoreKeyRef = useRef<string | null>(null);
   const safeFocusId =
     focusId && FOCUS_ID_PATTERN.test(focusId) ? focusId : null;
@@ -219,40 +227,45 @@ export function AdminClubsLedger({
           ) : null
         }
       >
-        {pageState !== "ready" ? (
-          <AdminEvidenceLedger
-            label={ADMIN_COPY.heading.clubsLedger}
-            count={undefined}
-            state={pageState}
-            title={
-              pageState === "empty"
-                ? "조건에 맞는 클럽이 없습니다."
-                : pageState === "unavailable"
-                  ? "클럽 목록을 불러오지 못했습니다."
-                  : "클럽을 불러오는 중입니다."
-            }
-            description=""
-            action={
-              pageState === "unavailable" ? (
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={onRetry}
-                >
-                  다시 시도
-                </button>
-              ) : undefined
-            }
-          />
-        ) : (
-          <div className="admin-club-management">
-            <div className="admin-club-management__split">
-              <section className="admin-club-management__finder" aria-label="클럽 찾기">
-                <p className="admin-club-management__title" aria-hidden="true">클럽 찾기</p>
-                <details className="admin-club-management__filters">
-                  <summary>필터와 검색</summary>
-                  <AdminWorkViewBar search={undefined} filters={filterFields} />
-                </details>
+        <div className="admin-club-management">
+          <div className="admin-club-management__split">
+            <section className="admin-club-management__finder" aria-label="클럽 찾기">
+              <p className="admin-club-management__title" aria-hidden="true">클럽 찾기</p>
+              <details
+                className="admin-club-management__filters"
+                open={filtersOpen}
+                onToggle={(event) => setFiltersOpen(event.currentTarget.open)}
+              >
+                <summary>필터와 검색</summary>
+                <AdminWorkViewBar search={undefined} filters={filterFields} />
+              </details>
+              {pageState !== "ready" ? (
+                <AdminEvidenceLedger
+                  label={ADMIN_COPY.heading.clubsLedger}
+                  count={undefined}
+                  state={pageState}
+                  title={
+                    pageState === "empty"
+                      ? "조건에 맞는 클럽이 없습니다."
+                      : pageState === "unavailable"
+                        ? "클럽 목록을 불러오지 못했습니다."
+                        : "클럽을 불러오는 중입니다."
+                  }
+                  description=""
+                  action={
+                    pageState === "unavailable" ? (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={onRetry}
+                      >
+                        다시 시도
+                      </button>
+                    ) : undefined
+                  }
+                />
+              ) : (
+                <>
                 <div className="admin-club-management__tabs" role="tablist" aria-label="클럽 찾기 구분">
                   {(
                     [
@@ -363,11 +376,12 @@ export function AdminClubsLedger({
                     </button>
                   </div>
                 ) : null}
-              </section>
-              <ClubDocket club={selected} />
-            </div>
+                </>
+              )}
+            </section>
+            <ClubDocket club={pageState === "ready" ? selected : null} />
           </div>
-        )}
+        </div>
       </AdminPageContext>
     </div>
   );

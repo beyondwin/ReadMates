@@ -225,7 +225,8 @@ async function regionFromLocator(
     expectGeometryWithinTolerance(actual, expected, toleranceCssPx);
   } catch (error) {
     throw new Error(
-      `${name} actual=${JSON.stringify(actual)} expected=${JSON.stringify(expected)}: ${(error as Error).message}`,
+      `${name} actual=${JSON.stringify(actual)} expected=${JSON.stringify(expected)}`,
+      { cause: error },
     );
   }
   return { name, actual, expected, toleranceCssPx };
@@ -791,8 +792,8 @@ test("empty evidence, failed sources, pending-new, pagination failure and unknow
   await expect(component.getByText("스냅샷을 불러오지 못했습니다")).toBeVisible();
   await expect(component.getByText("이어지는 페이지를 불러오지 못했습니다.")).toBeVisible();
   await expect(component.getByText("기록된 감사 이벤트가 없습니다.")).toBeVisible();
-  await expect(component.getByRole("button", { name: "다시 보내기 검토" })).toHaveCount(3);
-  await expect(component.getByRole("button", { name: "다시 보내기 검토", disabled: true })).toHaveCount(1);
+  await expect(component.getByRole("button", { name: "확인함" })).toHaveCount(3);
+  await expect(component.getByRole("button", { name: "확인함", disabled: true })).toHaveCount(1);
   await expectMinimumTargetSize(component.getByRole("button", { name: "AI 작업 다시 확인" }));
 });
 
@@ -812,7 +813,7 @@ test("Today loading keeps a stable shell without a safe action", async ({ mount,
   await expect(component.locator(".admin-state-panel--loading")).toContainText("운영 케이스를 불러오는 중입니다.");
   await expect(component.locator(".admin-shell__header")).toBeVisible();
   await expect(component.getByRole("navigation", { name: "Admin 콘솔" })).toBeVisible();
-  await expect(component.getByRole("button", { name: "다시 보내기 검토" })).toHaveCount(0);
+  await expect(component.getByRole("button", { name: "확인함" })).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 });
 
@@ -873,7 +874,7 @@ test("Today support read keeps the case without a safe action", async ({ mount, 
   );
   await expect(component.getByRole("heading", { name: "오늘 할 일" }).first()).toBeVisible();
   await expect(component.getByText("현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.")).toBeVisible();
-  await expect(component.getByRole("button", { name: "다시 보내기 검토" })).toHaveCount(0);
+  await expect(component.getByRole("button", { name: "확인함" })).toHaveCount(0);
   expect(await isSemanticDocumentOrder([
     component.getByRole("heading", { name: "무슨 일이 있었나요?" }),
     component.getByRole("heading", { name: "영향 범위" }),
@@ -893,7 +894,7 @@ test("Today stale unknown-outcome keeps a refresh path", async ({ mount, page })
   );
   await expect(component.getByRole("heading", { name: "오늘 할 일" }).first()).toBeVisible();
   await expect(component.getByRole("alert")).toContainText("결과를 확인하지 못했습니다.");
-  await expect(component.getByRole("button", { name: "다시 보내기 검토" })).toBeDisabled();
+  await expect(component.getByRole("button", { name: "확인함" })).toBeDisabled();
   expect(await isSemanticDocumentOrder([
     component.getByRole("region", { name: "운영 케이스 큐" }),
     component.getByRole("region", { name: "운영 케이스 상세" }),

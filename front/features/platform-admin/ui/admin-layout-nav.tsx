@@ -26,6 +26,7 @@ export function AdminLayoutNav({
   renderLink,
   ariaLabel = "플랫폼 관리 메뉴",
   todayCount = null,
+  accountBusy = false,
   onLogout,
 }: {
   capabilities: PlatformAdminCapabilities | null | undefined;
@@ -33,6 +34,7 @@ export function AdminLayoutNav({
   renderLink: AdminNavigationLinkRenderer;
   ariaLabel?: string;
   todayCount?: number | null;
+  accountBusy?: boolean;
   onLogout?: () => void;
 }) {
   const compact = useAdminShellCompactLayout();
@@ -88,7 +90,13 @@ export function AdminLayoutNav({
         </ul>
       ) : null}
       {onLogout ? (
-        <button type="button" className="admin-layout-nav__logout" aria-label="다른 계정으로 로그인" onClick={onLogout} />
+        <button
+          type="button"
+          className="admin-layout-nav__logout"
+          aria-label={accountBusy ? "로그아웃 중" : "다른 계정으로 로그인"}
+          disabled={accountBusy}
+          onClick={onLogout}
+        />
       ) : (
         <span className="admin-layout-nav__logout" aria-hidden="true" />
       )}

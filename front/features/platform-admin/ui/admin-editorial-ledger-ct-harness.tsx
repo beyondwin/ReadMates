@@ -1,5 +1,5 @@
 import type { PropsWithChildren } from "react";
-import { AdminOperationStateActions, APPROVED_TODAY_ACTION_COPY } from "./admin-operation-state-actions";
+import { AdminOperationStateActions } from "./admin-operation-state-actions";
 import { AdminTodayLedger } from "./admin-today-ledger";
 import { noopEditorialLedgerHandler, type TodayLedgerFixture } from "./admin-editorial-ledger.fixtures";
 import "./admin-shell.css";
@@ -22,7 +22,7 @@ export function TodayLedgerCtNode({ fixture }: { fixture: TodayLedgerFixture }) 
           ? { kind: "unknown-outcome", text: fixture.actionReason ?? "결과를 확인하지 못했습니다." }
           : null
       }
-      actionCopy={APPROVED_TODAY_ACTION_COPY}
+      actionCopy={fixture.actionCopy}
       onAcknowledge={noopEditorialLedgerHandler}
       onSnooze={noopEditorialLedgerHandler}
       onResolve={noopEditorialLedgerHandler}
@@ -39,7 +39,7 @@ export function TodayLedgerCtNode({ fixture }: { fixture: TodayLedgerFixture }) 
           : null
       }
       presentation="prioritized"
-      actionCopy={APPROVED_TODAY_ACTION_COPY}
+      actionCopy={fixture.actionCopy}
       onAcknowledge={noopEditorialLedgerHandler}
       onSnooze={noopEditorialLedgerHandler}
       onResolve={noopEditorialLedgerHandler}

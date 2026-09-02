@@ -54,7 +54,7 @@ export function HostClubSettings({ settings, draft, saving, stale, error, onDraf
         </div>
         <label className={openField === "reminder" ? undefined : "sr-only"}><input type="checkbox" checked={draft.scheduleReminderEnabled} onChange={(event) => onDraftChange({ ...draft, scheduleReminderEnabled: event.target.checked })} /> 일정 알림 사용</label>
         <div className="rm-host-editorial-ledger__row">
-          <span>기록 공개 기본값</span>
+          <span>기록 기본 공개 범위</span>
           <span>{publicationCopy[draft.recordPublicationDefault]}</span>
           <button type="button" className="btn-quiet" onClick={() => setOpenField(openField === "publication" ? null : "publication")}>변경</button>
         </div>

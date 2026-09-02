@@ -107,7 +107,9 @@ export function HostWorkItem({
           className="rm-host-work-item__secondary"
           onToggle={(event) => setSecondaryOpen(event.currentTarget.open)}
         >
-          <summary aria-label={`${item.title} 세부 조작`}>세부 조작</summary>
+          <summary aria-label={`${item.title} 세부 조작`}>
+            <span className="sr-only">세부 조작</span>
+          </summary>
           <div className="rm-host-work-item__secondary-body" hidden={!secondaryOpen}>
             <p>{item.description}</p>
             {facts}

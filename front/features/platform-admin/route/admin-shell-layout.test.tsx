@@ -421,7 +421,7 @@ describe("AdminShellLayout", () => {
 
   it("keeps clubs onboarding under the real clubs route owner", async () => {
     renderShell("/admin/clubs?onboarding=1");
-    expect(await screen.findByRole("heading", { name: "클럽" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "클럽 찾기" })).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "Admin 콘솔" });
     expect(within(nav).getAllByRole("link", { current: "page" })).toHaveLength(1);
     expect(within(nav).getByRole("link", { name: "클럽 관리" })).toHaveAttribute(

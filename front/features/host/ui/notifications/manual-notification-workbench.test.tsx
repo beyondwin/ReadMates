@@ -230,7 +230,7 @@ describe("ManualNotificationWorkbench", () => {
     });
 
     const dialog = screen.getByRole("dialog", { name: "발송 전 확인" });
-    expect(within(dialog).getByRole("button", { name: "3명에게 알림 발송" }))
+    expect(within(dialog).getByRole("button", { name: "3명에게 안내 보내기" }))
       .toBeInTheDocument();
     expect(screen.getAllByText("발송 전 확인")).toHaveLength(1);
 

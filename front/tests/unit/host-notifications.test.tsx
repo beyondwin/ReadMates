@@ -1013,7 +1013,7 @@ describe("HostNotificationsPage", () => {
     await user.click(screen.getByRole("button", { name: "검색" }));
     await user.click(screen.getByRole("checkbox", { name: /비공개 멤버/ }));
     await user.click(screen.getByRole("button", { name: "미리보기 열기" }));
-    await user.click(await screen.findByRole("button", { name: "1명에게 알림 발송" }));
+    await user.click(await screen.findByRole("button", { name: "1명에게 안내 보내기" }));
     expect(await screen.findAllByText("발송을 요청하지 못했습니다. 미리보기 만료 또는 중복 발송 여부를 확인해 주세요."))
       .not.toHaveLength(0);
 
@@ -1385,7 +1385,7 @@ describe("HostNotificationsPage", () => {
     expect(within(previewPanel as HTMLElement).getByText("모임 전 준비를 확인해 주세요.")).toBeInTheDocument();
     expect(screen.getByText("이미 발송된 알림입니다.")).toBeInTheDocument();
 
-    const confirm = screen.getByRole("button", { name: "3명에게 알림 발송" });
+    const confirm = screen.getByRole("button", { name: "3명에게 안내 보내기" });
     expect(confirm).toBeDisabled();
     await user.click(screen.getByRole("checkbox", { name: "재발송을 확인했습니다" }));
     await user.click(confirm);
@@ -1738,7 +1738,7 @@ describe("HostNotificationsPage", () => {
     await user.click(screen.getByRole("button", { name: "미리보기 열기" }));
     await screen.findByRole("heading", { name: "발송 전 확인" });
 
-    const confirmButton = screen.getByRole("button", { name: "3명에게 알림 발송" });
+    const confirmButton = screen.getByRole("button", { name: "3명에게 안내 보내기" });
     expect(confirmButton).toBeDisabled();
     await user.click(confirmButton);
     expect(onConfirmManual).not.toHaveBeenCalled();

@@ -13,6 +13,7 @@ import type {
   AdminOperationSourceFreshnessView,
   AdminOperationsWorkViewId,
 } from "@/features/platform-admin/model/platform-admin-operations-model";
+import { APPROVED_TODAY_ACTION_COPY } from "./admin-operation-state-actions";
 import type { AdminSafeActionState } from "./admin-action-dock";
 import type { AdminClubsLedgerClub, AdminClubsLedgerFilters } from "./admin-clubs-ledger";
 import type { AdminTodayFilters } from "./admin-today-controls";
@@ -121,6 +122,7 @@ export type TodayLedgerFixture = {
   mode?: AdminOperationsSearchMode;
   query: string;
   workView: AdminOperationsWorkViewId;
+  actionCopy?: Partial<Record<TodayLifecycleAction, string>>;
 };
 
 export type ClubsLedgerFixture = {
@@ -176,6 +178,7 @@ type TodayFixtureInput = {
   workView?: AdminOperationsWorkViewId;
   history?: readonly TodayHistoryEvent[];
   emptyItems?: boolean;
+  actionCopy?: Partial<Record<TodayLifecycleAction, string>>;
 };
 
 function todayCase(input: {
@@ -325,6 +328,7 @@ function todayFixture(input: TodayFixtureInput): TodayLedgerFixture {
     mode: input.mode,
     query: input.query ?? "",
     workView: input.workView ?? "briefing",
+    actionCopy: input.actionCopy,
   };
 }
 
@@ -374,6 +378,7 @@ export const todayDesktopLedger = todayFixture({
   allowedActions: TODAY_L1_ALLOWED_ACTIONS,
   items: APPROVED_TODAY_CASES,
   selectedCase: APPROVED_TODAY_CASES[0],
+  actionCopy: APPROVED_TODAY_ACTION_COPY,
 });
 
 export const todayMobileCaseDetail = todayFixture({
@@ -382,6 +387,7 @@ export const todayMobileCaseDetail = todayFixture({
   items: APPROVED_TODAY_CASES,
   selectedCase: APPROVED_TODAY_CASES[0],
   mode: "detail",
+  actionCopy: APPROVED_TODAY_ACTION_COPY,
 });
 
 export const todayEmptyEvidence = todayFixture({

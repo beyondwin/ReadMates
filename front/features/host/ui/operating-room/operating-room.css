@@ -688,40 +688,11 @@
 .rm-operating-room-next-action__primary {
   position: relative;
   min-width: 168px;
-  max-height: 44px;
-  overflow: hidden;
   padding: 0 22px;
   border: 1px solid var(--accent);
   background: var(--accent);
   color: var(--paper-50);
   white-space: nowrap;
-}
-
-.rm-host-operating-room[data-phase] .rm-operating-room-next-action__primary {
-  font-size: 0;
-  line-height: 0;
-}
-
-.rm-host-operating-room[data-phase="prep"] .rm-operating-room-next-action__primary::after {
-  content: "대상과 문구 검토";
-  color: var(--paper-50);
-  font-size: 0.9375rem;
-  font-weight: 650;
-  line-height: 44px;
-}
-
-.rm-host-operating-room[data-phase="live"] .rm-operating-room-next-action__primary::after {
-  content: "출석 확인 시작";
-}
-
-.rm-host-operating-room[data-phase="closing"] .rm-operating-room-next-action__primary::after {
-  content: "기록 초안 검토";
-}
-
-.rm-operating-room-next-action__primary::after {
-  font-size: 0.9375rem;
-  font-weight: 650;
-  line-height: 44px;
 }
 
 .rm-operating-room-next-action__primary:hover {
@@ -820,67 +791,8 @@
   border: 0;
   background: transparent;
   color: var(--accent);
-  font-size: 0;
-  line-height: 0;
+  font-size: var(--type-size-control);
   text-decoration: none;
-}
-
-.rm-preparation-ledger-row__link::after,
-.rm-preparation-ledger-row__retry::after {
-  font-size: 0.8125rem;
-  font-weight: 650;
-  line-height: 44px;
-}
-
-.rm-preparation-ledger-row[aria-label="현재 일정 확인"] .rm-preparation-ledger-row__link::after,
-.rm-preparation-ledger-row[aria-label="일정 확인"] .rm-preparation-ledger-row__link::after {
-  content: "멤버 보기";
-}
-
-.rm-preparation-ledger-row[aria-label="참석 응답"] .rm-preparation-ledger-row__link::after {
-  content: "응답 보기";
-}
-
-.rm-preparation-ledger-row[aria-label="발제 질문"] .rm-preparation-ledger-row__link::after {
-  content: "질문 보기";
-}
-
-.rm-preparation-ledger-row[aria-label="장소 준비"] .rm-preparation-ledger-row__link::after,
-.rm-preparation-ledger-row[aria-label="장소"] .rm-preparation-ledger-row__link::after {
-  content: "정보 보기";
-}
-
-.rm-preparation-ledger-row[aria-label="실제 출석"] .rm-preparation-ledger-row__link::after,
-.rm-preparation-ledger-row[aria-label="출석 확정"] .rm-preparation-ledger-row__link::after {
-  content: "출석 보기";
-}
-
-.rm-preparation-ledger-row[aria-label="진행 순서"] .rm-preparation-ledger-row__link::after {
-  content: "진행 보기";
-}
-
-.rm-preparation-ledger-row[aria-label="현장 메모"] .rm-preparation-ledger-row__link::after {
-  content: "메모 열기";
-}
-
-.rm-preparation-ledger-row[aria-label="소감 수집"] .rm-preparation-ledger-row__link::after {
-  content: "대상 보기";
-}
-
-.rm-preparation-ledger-row[aria-label="기록 초안"] .rm-preparation-ledger-row__link::after {
-  content: "초안 열기";
-}
-
-.rm-preparation-ledger-row[aria-label="피드백 문서"] .rm-preparation-ledger-row__link::after {
-  content: "문서 확인";
-}
-
-.rm-preparation-ledger-row[aria-label="멤버 게시"] .rm-preparation-ledger-row__link::after {
-  content: "게시 조건";
-}
-
-.rm-preparation-ledger-row__retry::after {
-  content: "다시 불러오기";
 }
 
 .rm-preparation-ledger-row__link:hover,
@@ -981,15 +893,6 @@
   width: 100%;
   margin-top: 8px;
   border: 0;
-  font-size: 0;
-  line-height: 0;
-}
-
-.rm-host-operating-room .rm-host-workbox__load-more::after {
-  content: "작업함 모두 보기";
-  font-size: 0.875rem;
-  font-weight: 650;
-  line-height: 44px;
 }
 
 .rm-host-operating-room__phase-panel > .rm-preparation-ledger {

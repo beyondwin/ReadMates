@@ -86,6 +86,7 @@ export function AdminShellLayout({
             renderLink={renderAdminNavigationLink}
             ariaLabel="Admin 콘솔"
             todayCount={alarm.summary?.attention.count ?? null}
+            accountBusy={accountBusy}
             onLogout={onOtherAccountLogin}
           />
         </aside>

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import {
   createMemoryRouter,
   RouterProvider,
@@ -153,12 +153,13 @@ describe("AdminClubsRoute", () => {
 
   it("renders server-ordered registry rows as operator judgment records with accessible controls", () => {
     const { container } = renderRoute();
-    expect(screen.getByRole("heading", { name: "클럽" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "클럽 찾기" })).toBeInTheDocument();
     expect(
       screen.getByRole("searchbox", { name: "클럽 검색" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("활성 · 비공개")).toBeInTheDocument();
-    expect(screen.getByText("alpha")).toBeInTheDocument();
+    const list = screen.getByRole("region", { name: "클럽 관리 목록" });
+    expect(within(list).getByText("활성 · 비공개")).toBeInTheDocument();
+    expect(within(list).getByText("alpha")).toBeInTheDocument();
     const href = screen.getByRole("link", { name: "Alpha" }).getAttribute("href");
     expect(href).toContain("/admin/clubs/c-1");
     expect(href).toContain("returnTo=%2Fadmin%2Fclubs");

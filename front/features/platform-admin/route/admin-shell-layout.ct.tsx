@@ -250,7 +250,8 @@ async function regionFromLocator(
     expectGeometryWithinTolerance(actual, expected, toleranceCssPx);
   } catch (error) {
     throw new Error(
-      `${name} actual=${JSON.stringify(actual)} expected=${JSON.stringify(expected)}: ${(error as Error).message}`,
+      `${name} actual=${JSON.stringify(actual)} expected=${JSON.stringify(expected)}`,
+      { cause: error },
     );
   }
   return { name, actual, expected, toleranceCssPx };
