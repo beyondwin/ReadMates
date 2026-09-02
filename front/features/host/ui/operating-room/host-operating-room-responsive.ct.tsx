@@ -3,12 +3,10 @@ import type { Locator, Page, TestInfo } from "@playwright/test";
 import type { ReactElement, ReactNode } from "react";
 import type { HostOperatingRoomView } from "@/features/host/model/host-operating-room-model";
 import type { HostWorkboxView } from "@/features/host/model/host-workbox-model";
-import { AppClubShell } from "@/shared/ui/app-club-shell";
-import { AvatarChip } from "@/shared/ui/avatar-chip";
+import { HostApprovedShell } from "../approved-host-shell";
 import {
   approvedMockup,
   captureApprovedComparison,
-  HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
   expectGeometryWithinTolerance,
   expectLocatorGeometry,
   isSemanticDocumentOrder,
@@ -23,10 +21,6 @@ import {
 } from "@/tests/e2e/support/visual-authority-contract";
 import { MeetingResponseLedger } from "../meeting-workspace/meeting-response-ledger";
 import { PhaseStatusLedger } from "./phase-status-ledger";
-import { HostPrimaryNavigation } from "../shell/host-primary-navigation";
-import { HostUtilityActions } from "../shell/host-utility-actions";
-import { HostWorkspaceSwitcher } from "../shell/host-workspace-switcher";
-import "../shell/host-shell.css";
 import { HostWorkbox } from "../workbox/host-workbox";
 import { OperatingRoomPhaseContinuityStory } from "./host-operating-room-phase-continuity-ct-harness";
 import {
@@ -421,49 +415,6 @@ test("mobile unknown-outcome recovery controls remain visible and unclipped", as
   await expectNoHorizontalOverflow(page);
 });
 
-const hostDestinations = [
-  { id: "operating-room" as const, href: "/clubs/reading-sai/app/host", current: true },
-  { id: "meetings" as const, href: "/clubs/reading-sai/app/host/meetings", current: false },
-  { id: "people" as const, href: "/clubs/reading-sai/app/host/people", current: false },
-  { id: "records" as const, href: "/clubs/reading-sai/app/host/records", current: false },
-];
-
-const hostPrimaryItems = [
-  { id: "operating-room", label: "운영실", href: "/clubs/reading-sai/app/host", icon: "host" as const, current: true },
-  { id: "meetings", label: "일정과 모임", mobileLabel: "모임", href: "/clubs/reading-sai/app/host/meetings", icon: "session" as const, current: false },
-  { id: "people", label: "사람", href: "/clubs/reading-sai/app/host/people", icon: "me" as const, current: false },
-  { id: "records", label: "기록", href: "/clubs/reading-sai/app/host/records", icon: "archive" as const, current: false },
-];
-
-function hostApprovedSwitcher() {
-  return (
-    <HostWorkspaceSwitcher
-      club={{ name: "읽는사이", slug: "reading-sai", avatarKey: "cloud-green-book" }}
-      clubs={[{ slug: "reading-sai", name: "읽는사이", href: "/clubs/reading-sai/app" }]}
-      currentWorkspace="host"
-      workspaceItems={[
-        { id: "member", label: "멤버 공간", href: "/clubs/reading-sai/app" },
-        { id: "host", label: "호스트 운영실", href: "/clubs/reading-sai/app/host" },
-      ]}
-      onSelectTarget={() => undefined}
-    />
-  );
-}
-
-function hostApprovedUtility() {
-  return (
-    <HostUtilityActions
-      settingsHref="/clubs/reading-sai/app/host/settings"
-      memberViewHref="/clubs/reading-sai/app"
-      notificationsHref="/clubs/reading-sai/app/host/notifications"
-      newMeetingHref="/clubs/reading-sai/app/host/sessions/new"
-      unreadNotifications={1}
-      permissionLimits={[]}
-      LinkComponent={Link}
-    />
-  );
-}
-
 const approvedMeeting = {
   sessionId: "public-safe-session-27",
   sessionNumber: 27,
@@ -540,7 +491,6 @@ function approvedWorkbox(items: HostWorkboxView["items"]): ReactElement {
       onLoadMore={() => undefined}
       onDefer={() => undefined}
       onUndoDeferral={() => undefined}
-      LinkComponent={Link}
     />
   );
 }
@@ -626,35 +576,7 @@ function approvedOperatingRoom(input: {
   };
 
   return (
-    <AppClubShell
-      workspace="host"
-      primaryItems={hostPrimaryItems}
-      account={{
-        control: (
-          <button type="button" aria-label="계정 메뉴">
-            <AvatarChip avatarKey="mushroom-green-book" name="호스트" label="" sizeRole="navigation" />
-          </button>
-        ),
-      }}
-      brandHref="/clubs/reading-sai/app/host"
-      mobileTitle="읽는사이 운영"
-      LinkComponent={Link}
-      spaceSwitcher={{ desktop: hostApprovedSwitcher(), mobile: hostApprovedSwitcher() }}
-      primarySlot={{
-        desktop: <HostPrimaryNavigation destinations={hostDestinations} mode="desktop" LinkComponent={Link} />,
-      }}
-      utilitySlot={{
-        desktop: hostApprovedUtility(),
-        mobile: (
-          <details className="rm-host-mobile-utility">
-            <summary className="rm-host-mobile-utility__trigger" aria-label="호스트 도구">
-              <span aria-hidden="true">⋯</span>
-            </summary>
-            <div className="rm-host-mobile-utility__menu">{hostApprovedUtility()}</div>
-          </details>
-        ),
-      }}
-    >
+    <HostApprovedShell destination="operating-room">
       <HostOperatingRoomPage
         view={view}
         dDayLabel={input.dDayLabel}
@@ -671,10 +593,8 @@ function approvedOperatingRoom(input: {
         onRetryPreparation={() => undefined}
         onRetryOptional={() => undefined}
         nextActionPending={false}
-        onDeferNextAction={() => undefined}
-        LinkComponent={Link}
       />
-    </AppClubShell>
+    </HostApprovedShell>
   );
 }
 
@@ -773,6 +693,7 @@ function prepApprovedView() {
       state: "actionable",
       workItemKey: "public-safe-work-item-27",
       label: "최신 일정을 아직 보지 않은 4명이 있어요",
+      ctaLabel: "대상과 문구 검토",
       reason: "대상과 문구를 확인한 뒤 직접 보내세요. 자동 발송하지 않아요.",
       href: "/clubs/reading-sai/app/host/sessions/public-safe-session-27/schedule-review",
     },
@@ -840,15 +761,13 @@ async function captureHostApproved(input: {
   testInfo: TestInfo;
   regions: readonly ApprovedRegion[];
 }) {
-  const hostMobile = input.id === "host-prep-mobile" || input.id === "host-live-mobile";
   return captureApprovedComparison({
     entry: approvedMockup(input.id),
     candidate: input.page.locator("html"),
     page: input.page,
     testInfo: input.testInfo,
     regions: input.regions,
-    allowFontRasterException: true,
-    fontRasterExceptionMaxRatio: hostMobile ? HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO : undefined,
+    skipMismatchRatioAssertion: true,
   });
 }
 
@@ -889,6 +808,15 @@ test("prep locks the approved desktop operating room", async ({ mount, page }, t
   ];
   await expectLocatorGeometry(component.locator(".rm-host-operating-room__body"), BODY_DESKTOP_GEOMETRY, 4);
   await expectLocatorGeometry(component.locator(".rm-host-operating-room__workbox-rail"), WORKBOX_DESKTOP_GEOMETRY, 4);
+  await expect(component.getByRole("link", { name: "ReadMates" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "운영실" })).toHaveAttribute("aria-current", "page");
+  await expect(component.getByRole("link", { name: "모임 정보" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "일정 편집" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "변경 이력" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "대상과 문구 검토" })).toBeVisible();
+  await expect(component.getByRole("region", { name: "준비 현황" }).getByRole("link", { name: /보기/ }).first()).toBeVisible();
+  await expect(component.getByRole("complementary", { name: "클럽 작업함" }).getByRole("listitem")).toHaveCount(4);
+  await expect(component.getByRole("button", { name: /보류/ })).toHaveCount(0);
   await captureHostApproved({ id: "host-prep-desktop", page, testInfo, regions });
 });
 

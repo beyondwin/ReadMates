@@ -37,7 +37,8 @@ export function HostNextAction({
   const deferKey = action.state === "actionable" ? action.workItemKey : null;
   const canDefer = deferKey !== null && onDefer;
   const deferAction = canDefer && !pending ? () => onDefer(deferKey) : undefined;
-  const primaryLabel = action.state === "deferred" ? `이어서 ${action.label}` : action.label;
+  const actionName = action.ctaLabel ?? action.label;
+  const primaryLabel = action.state === "deferred" ? `이어서 ${actionName}` : actionName;
   const primaryHref = action.state === "none" ? null : action.href;
 
   return (

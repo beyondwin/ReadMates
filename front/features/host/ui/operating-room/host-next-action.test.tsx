@@ -75,6 +75,20 @@ describe("HostNextAction", () => {
     expect(screen.queryByRole("button", { name: /보류/ })).not.toBeInTheDocument();
   });
 
+  it("uses ctaLabel for the primary control and keeps label as the status sentence", () => {
+    render(
+      <HostNextAction
+        action={{
+          ...actionable,
+          label: "최신 일정을 아직 보지 않은 4명이 있어요",
+          ctaLabel: "대상과 문구 검토",
+        }}
+      />,
+    );
+    expect(screen.getByText("최신 일정을 아직 보지 않은 4명이 있어요")).toBeVisible();
+    expect(screen.getByRole("link", { name: "대상과 문구 검토" })).toBeVisible();
+  });
+
   it("does not invent an action destination for none or a missing href", () => {
     const { rerender } = render(
       <HostNextAction

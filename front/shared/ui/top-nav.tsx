@@ -218,9 +218,10 @@ function guestLinks(publicBasePath: string): NavLink[] {
   ];
 }
 
-function Brand({ href, LinkComponent }: { href: string; LinkComponent: AppLinkComponent }) {
+function Brand({ href, LinkComponent, variant }: { href: string; LinkComponent: AppLinkComponent; variant?: TopNavVariant }) {
+  const hostMark = variant === "host";
   return (
-    <LinkComponent to={href} className="row" style={{ gap: "10px" }} aria-label="읽는사이 홈">
+    <LinkComponent to={href} className="row" style={{ gap: "10px" }} aria-label={hostMark ? "ReadMates" : "읽는사이 홈"}>
       <ReadmatesBrandMark />
       <span>
         <span
@@ -233,11 +234,13 @@ function Brand({ href, LinkComponent }: { href: string; LinkComponent: AppLinkCo
             fontWeight: 600,
           }}
         >
-          읽는사이
+          {hostMark ? "ReadMates" : "읽는사이"}
         </span>
-        <span className="tiny mono" style={{ display: "block", marginTop: "2px" }}>
-          독서 모임
-        </span>
+        {hostMark ? null : (
+          <span className="tiny mono" style={{ display: "block", marginTop: "2px" }}>
+            독서 모임
+          </span>
+        )}
       </span>
     </LinkComponent>
   );
@@ -256,6 +259,7 @@ function TopNavFrame({
   primaryControl,
   utilityControl,
   LinkComponent,
+  variant,
 }: {
   brandHref: string;
   navLabel: string;
@@ -269,12 +273,13 @@ function TopNavFrame({
   primaryControl?: ReactNode;
   utilityControl?: ReactNode;
   LinkComponent: AppLinkComponent;
+  variant?: TopNavVariant;
 }) {
   return (
     <header className="topnav">
       <div className="container topnav-inner">
         <div className="topnav-global-context">
-          <Brand href={brandHref} LinkComponent={LinkComponent} />
+          <Brand href={brandHref} LinkComponent={LinkComponent} variant={variant} />
           {contextControl}
         </div>
 
@@ -372,6 +377,7 @@ function GuestTopNav({
       links={guestLinksWithAction(links, authAction)}
       pathname={pathname}
       LinkComponent={LinkComponent}
+      variant="guest"
     />
   );
 }
@@ -454,6 +460,7 @@ function AppTopNav({
       primaryControl={primaryControl}
       utilityControl={utilityControl}
       LinkComponent={LinkComponent}
+      variant={variant}
     />
   );
 }
@@ -508,6 +515,7 @@ export function TopNav({
         primaryControl={primaryControl}
         utilityControl={utilityControl}
         LinkComponent={LinkComponent}
+        variant={variant}
       />
     );
   }

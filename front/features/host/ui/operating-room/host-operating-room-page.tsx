@@ -51,7 +51,7 @@ export type HostOperatingRoomPageProps = {
   onRetryPreparation: () => void;
   onRetryOptional: () => void;
   nextActionPending: boolean;
-  onDeferNextAction: (workItemKey: string) => void;
+  onDeferNextAction?: (workItemKey: string) => void;
   LinkComponent: HostLinkComponent;
 };
 
