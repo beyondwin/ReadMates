@@ -15,6 +15,7 @@ import {
   VISUAL_AUTHORITY_VIEWPORTS,
   expectMinimumTargetSize,
   expectNoHorizontalOverflow,
+  expectNoSeriousAccessibilityFindings,
   expectReducedMotion,
   expectVisibleFocus,
 } from "@/tests/e2e/support/visual-authority-contract";
@@ -22,11 +23,15 @@ import { AdminShellLayout } from "../route/admin-shell-layout";
 import { AdminAuditLedger } from "./admin-audit-ledger";
 import { AdminClubsLedger } from "./admin-clubs-ledger";
 import { AdminEditorialLedgerCtHarness, TodayLedgerCtNode } from "./admin-editorial-ledger-ct-harness";
+import { AdminPageFrame } from "./admin-page-frame";
+import { AdminStatePanel } from "./admin-state-panel";
+import { ADMIN_TODAY_DESCRIPTION } from "./admin-today-ledger";
 import {
   ADMIN_SHELL_VISUAL_CAPABILITIES,
   ADMIN_SHELL_VISUAL_SPACE_OPTIONS,
   EDITORIAL_LEDGER_LONG_CLUB_NAME,
   EDITORIAL_LEDGER_LONG_TAKEDOWN_LIMITATION,
+  EDITORIAL_LEDGER_LONG_TODAY_TITLE,
   clubsEmptyEvidence,
   clubsPaginationFailure,
   clubsTabletLedger,
@@ -68,6 +73,14 @@ const RECOMMENDED_DESKTOP_GEOMETRY = { x: 859, y: 621, width: 773, height: 24 } 
 const FIRST_ROW_MOBILE_GEOMETRY = { x: 20, y: 220, width: 350, height: 94 } as const;
 const BACK_MOBILE_GEOMETRY = { x: 0, y: 0, width: 390, height: 67 } as const;
 const DETAIL_DOCKET_MOBILE_GEOMETRY = { x: 20, y: 67, width: 350, height: 761 } as const;
+const INTERMEDIATE_VIEWPORTS = [
+  { width: 320, height: 720 },
+  { width: 768, height: 900 },
+  { width: 900, height: 900 },
+  { width: 1024, height: 900 },
+  { width: 1200, height: 900 },
+  { width: 1440, height: 960 },
+] as const;
 
 async function mountEditorial(
   mount: (component: ReactElement) => Promise<Locator>,
@@ -678,18 +691,66 @@ test("Today keeps the 320 queue locator intact without horizontal overflow", asy
   await expectNoHorizontalOverflow(page);
 });
 
-for (const width of [390, 768, 900, 1024] as const) {
-  test(`Today follows observed content width without overflow at ${width}px`, async ({ mount, page }) => {
+async function expectVisibleTargetsMeetMinimum(root: Locator) {
+  for (const control of await root.locator("button:visible, a[href]:visible, select:visible").all()) {
+    await expectMinimumTargetSize(control);
+  }
+}
+
+async function expectCopyWraps(locator: Locator) {
+  await expect(locator).toBeVisible();
+  const metrics = await locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      overflowWrap: style.overflowWrap,
+      scrollWidth: Math.ceil((element as HTMLElement).scrollWidth),
+      clientWidth: (element as HTMLElement).clientWidth,
+    };
+  });
+  expect(["anywhere", "break-word"]).toContain(metrics.overflowWrap);
+  expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+}
+
+for (const viewport of INTERMEDIATE_VIEWPORTS) {
+  test(`Today follows observed content width without overflow at ${viewport.width}px`, async ({ mount, page }) => {
     const component = await mountEditorial(
       mount,
       page,
-      todayNode({ ...todayDesktopLedger, mode: width < 960 ? "list" : undefined }),
-      { width, height: 900 },
+      <main>{todayNode({ ...todayDesktopLedger, mode: viewport.width < 960 ? "list" : undefined })}</main>,
+      viewport,
     );
-    await expect(component.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
+    const queue = component.getByRole("region", { name: "운영 케이스 큐" });
+    await expect(component.getByRole("heading", { name: "오늘 할 일" }).first()).toBeVisible();
+    await expect(queue).toBeVisible();
+    const firstTask = component.getByRole("button", { name: /알림 전달 지연/ });
+    const box = await firstTask.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.y + Math.min(box!.height, 44)).toBeLessThanOrEqual(viewport.height);
+    if (viewport.width >= 1024) {
+      expect(await isSemanticDocumentOrder([
+        queue,
+        component.getByRole("region", { name: "운영 케이스 상세" }),
+      ])).toBe(true);
+    } else {
+      expect(await isSemanticDocumentOrder([
+        component.getByRole("heading", { name: "오늘 할 일", level: 1 }),
+        queue,
+      ])).toBe(true);
+    }
+    await firstTask.focus();
+    await expectVisibleFocus(firstTask);
+    await expectVisibleTargetsMeetMinimum(component.locator(".admin-today-ledger"));
     await expectNoHorizontalOverflow(page);
+    expect(await expectNoSeriousAccessibilityFindings(page)).toEqual([]);
     const layout = component.locator(".admin-today-ledger");
-    await expect(layout).toHaveAttribute("data-content-layout", width >= 1024 ? "split" : "flow");
+    await expect(layout).toHaveAttribute("data-content-layout", viewport.width >= 1024 ? "split" : "flow");
+    if (viewport.width < 1024) {
+      await expect(component.getByRole("region", { name: "운영 케이스 상세" })).toHaveCount(0);
+      await expect(component.locator(".admin-today-ledger__columns")).toHaveCount(0);
+    } else {
+      await expect(component.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
+      await expect(component.locator(".admin-operation-actions .btn-primary")).toHaveCount(1);
+    }
   });
 }
 
@@ -733,4 +794,166 @@ test("empty evidence, failed sources, pending-new, pagination failure and unknow
   await expect(component.getByRole("button", { name: "다시 보내기 검토" })).toHaveCount(3);
   await expect(component.getByRole("button", { name: "다시 보내기 검토", disabled: true })).toHaveCount(1);
   await expectMinimumTargetSize(component.getByRole("button", { name: "AI 작업 다시 확인" }));
+});
+
+test("Today loading keeps a stable shell without a safe action", async ({ mount, page }) => {
+  const component = await mountApprovedShell(
+    mount,
+    page,
+    adminShellFixture({
+      outlet: (
+        <AdminPageFrame heading="오늘 할 일" description={ADMIN_TODAY_DESCRIPTION}>
+          <AdminStatePanel state="loading" title="운영 케이스를 불러오는 중입니다." description="" />
+        </AdminPageFrame>
+      ),
+    }),
+  );
+  await expect(component.getByRole("heading", { name: "오늘 할 일", level: 1 })).toBeVisible();
+  await expect(component.locator(".admin-state-panel--loading")).toContainText("운영 케이스를 불러오는 중입니다.");
+  await expect(component.locator(".admin-shell__header")).toBeVisible();
+  await expect(component.getByRole("navigation", { name: "Admin 콘솔" })).toBeVisible();
+  await expect(component.getByRole("button", { name: "다시 보내기 검토" })).toHaveCount(0);
+  await expectNoHorizontalOverflow(page);
+});
+
+test("Today empty filtered state keeps disclosure recoverable", async ({ mount, page }) => {
+  const component = await mountEditorial(
+    mount,
+    page,
+    <main>{todayNode({
+      ...todayEmptyEvidence,
+      filters: { state: "open", severity: "", source: "", assignee: "" },
+    })}</main>,
+    INTERMEDIATE_VIEWPORTS[1],
+  );
+  await expect(component.getByRole("heading", { name: "오늘 할 일" }).first()).toBeVisible();
+  await expect(component.getByText("조건에 맞는 운영 케이스가 없습니다")).toBeVisible();
+  const disclosure = component.locator("details.admin-today-controls");
+  await expect(disclosure).toHaveAttribute("open");
+  await component.getByText("필터와 신호 상태").click();
+  await expect(disclosure).not.toHaveAttribute("open");
+  const clear = component.getByRole("button", { name: "필터 지우기" });
+  await expect(clear).toBeVisible();
+  await expectMinimumTargetSize(clear);
+  await clear.focus();
+  await expectVisibleFocus(clear);
+  await expectNoHorizontalOverflow(page);
+  expect(await expectNoSeriousAccessibilityFindings(page)).toEqual([]);
+});
+
+test("Today denied capability offers no safe action", async ({ mount, page }) => {
+  const component = await mountApprovedShell(
+    mount,
+    page,
+    adminShellFixture({
+      outlet: (
+        <AdminPageFrame heading="오늘 할 일" description={ADMIN_TODAY_DESCRIPTION}>
+          <AdminStatePanel
+            state="forbidden"
+            title="권한이 없습니다"
+            description="현재 역할로 운영 케이스를 확인할 수 없습니다. 권한을 확인해 주세요."
+          />
+        </AdminPageFrame>
+      ),
+    }),
+  );
+  await expect(component.getByRole("heading", { name: "오늘 할 일", level: 1 })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "권한이 없습니다" })).toBeVisible();
+  await expect(component.getByRole("button", { name: "다시 보내기 검토" })).toHaveCount(0);
+  await expect(component.getByRole("button", { name: "확인함" })).toHaveCount(0);
+  await expectNoHorizontalOverflow(page);
+});
+
+test("Today support read keeps the case without a safe action", async ({ mount, page }) => {
+  const component = await mountEditorial(
+    mount,
+    page,
+    <main>{todayNode(todayEmptyAllowedActions)}</main>,
+    INTERMEDIATE_VIEWPORTS[3],
+  );
+  await expect(component.getByRole("heading", { name: "오늘 할 일" }).first()).toBeVisible();
+  await expect(component.getByText("현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.")).toBeVisible();
+  await expect(component.getByRole("button", { name: "다시 보내기 검토" })).toHaveCount(0);
+  expect(await isSemanticDocumentOrder([
+    component.getByRole("heading", { name: "무슨 일이 있었나요?" }),
+    component.getByRole("heading", { name: "영향 범위" }),
+    component.getByRole("heading", { name: "확인된 내용" }),
+    component.getByRole("heading", { name: "권장 처리" }),
+    component.getByRole("heading", { name: "처리 방법" }),
+  ])).toBe(true);
+  await expectNoHorizontalOverflow(page);
+});
+
+test("Today stale unknown-outcome keeps a refresh path", async ({ mount, page }) => {
+  const component = await mountEditorial(
+    mount,
+    page,
+    <main>{todayNode(todayUnknownOutcome)}</main>,
+    INTERMEDIATE_VIEWPORTS[4],
+  );
+  await expect(component.getByRole("heading", { name: "오늘 할 일" }).first()).toBeVisible();
+  await expect(component.getByRole("alert")).toContainText("결과를 확인하지 못했습니다.");
+  await expect(component.getByRole("button", { name: "다시 보내기 검토" })).toBeDisabled();
+  expect(await isSemanticDocumentOrder([
+    component.getByRole("region", { name: "운영 케이스 큐" }),
+    component.getByRole("region", { name: "운영 케이스 상세" }),
+  ])).toBe(true);
+  await expectNoHorizontalOverflow(page);
+});
+
+test("Today partial source failure keeps retry and usable rows", async ({ mount, page }) => {
+  const component = await mountEditorial(
+    mount,
+    page,
+    <main>{todayNode(todayFailedSources)}</main>,
+    INTERMEDIATE_VIEWPORTS[2],
+  );
+  await expect(component.getByRole("heading", { name: "오늘 할 일" }).first()).toBeVisible();
+  await expect(component.getByText("일부만 확인됨")).toBeVisible();
+  await component.locator("details.admin-today-controls").evaluate((node) => {
+    (node as HTMLDetailsElement).open = true;
+  });
+  const retry = component.getByRole("button", { name: "AI 작업 다시 확인" });
+  await expect(retry).toBeVisible();
+  await expectMinimumTargetSize(retry);
+  await retry.focus();
+  await expectVisibleFocus(retry);
+  await expect(component.getByRole("button", { name: new RegExp(EDITORIAL_LEDGER_LONG_TODAY_TITLE) })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
+test("Today long Korean and English titles wrap without overflow", async ({ mount, page }) => {
+  const first = todayDesktopLedger.view.items[0]!;
+  const longFixture: TodayLedgerFixture = {
+    ...todayDesktopLedger,
+    view: {
+      ...todayDesktopLedger.view,
+      items: [
+        {
+          ...first,
+          summary: { ...first.summary, title: EDITORIAL_LEDGER_LONG_TODAY_TITLE },
+        },
+        ...todayDesktopLedger.view.items.slice(1),
+      ],
+      selectedCase: todayDesktopLedger.view.selectedCase
+        ? {
+            ...todayDesktopLedger.view.selectedCase,
+            summary: {
+              ...todayDesktopLedger.view.selectedCase.summary,
+              title: EDITORIAL_LEDGER_LONG_TODAY_TITLE,
+            },
+          }
+        : null,
+    },
+  };
+  const component = await mountEditorial(
+    mount,
+    page,
+    <main>{todayNode({ ...longFixture, mode: "list" })}</main>,
+    INTERMEDIATE_VIEWPORTS[0],
+  );
+  const title = component.getByRole("button", { name: new RegExp(EDITORIAL_LEDGER_LONG_TODAY_TITLE) });
+  await expect(title).toBeVisible();
+  await expectCopyWraps(component.locator(".admin-operation-wrap").first());
+  await expectNoHorizontalOverflow(page);
 });

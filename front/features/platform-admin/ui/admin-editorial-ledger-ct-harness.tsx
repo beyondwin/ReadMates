@@ -70,6 +70,7 @@ export function TodayLedgerCtNode({ fixture }: { fixture: TodayLedgerFixture }) 
       onApplyPending={noopEditorialLedgerHandler}
       onBackToList={noopEditorialLedgerHandler}
       onRetrySource={noopEditorialLedgerHandler}
+      onClearFilters={noopEditorialLedgerHandler}
     />
   );
 }

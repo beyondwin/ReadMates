@@ -17,6 +17,7 @@ import {
 import {
   expectMinimumTargetSize,
   expectNoHorizontalOverflow,
+  expectNoSeriousAccessibilityFindings,
   expectReducedMotion,
   expectVisibleFocus,
 } from "@/tests/e2e/support/visual-authority-contract";
@@ -169,22 +170,31 @@ export function Link({ to, children, ...props }: { to: string; children: ReactNo
   return <a {...props} href={to}>{children}</a>;
 }
 
-function operatingRoomFixture(recovery: AttendanceRecoveryView | null = null) {
-  const workbox = (
+function hostWorkbox(overrides: {
+  view?: HostWorkboxView | null;
+  loading?: boolean;
+  error?: string | null;
+} = {}) {
+  return (
     <HostWorkbox
       state="NOW"
-      view={workboxView}
-      loading={false}
-      error={null}
+      view={overrides.view === undefined ? workboxView : overrides.view}
+      loading={overrides.loading ?? false}
+      error={overrides.error ?? null}
       pendingKey={null}
       onStateChange={() => undefined}
       onRetry={() => undefined}
       onLoadMore={() => undefined}
       onDefer={() => undefined}
       onUndoDeferral={() => undefined}
-      LinkComponent={Link}
     />
   );
+}
+
+function operatingRoomFixture(
+  recovery: AttendanceRecoveryView | null = null,
+  workboxContent: ReactNode = hostWorkbox(),
+) {
 
   return (
     <HostOperatingRoomPage
@@ -202,22 +212,23 @@ function operatingRoomFixture(recovery: AttendanceRecoveryView | null = null) {
       recovery={recovery}
       liveContent={<section aria-label="현장 운영">현장 운영</section>}
       closingContent={<section aria-label="마감 운영">마감 운영</section>}
-      workboxContent={workbox}
+      workboxContent={workboxContent}
       createMeetingHref="/clubs/public-safe/app/host/sessions/new"
       onPhaseChange={() => undefined}
       onRetryPreparation={() => undefined}
       onRetryOptional={() => undefined}
       nextActionPending={false}
       onDeferNextAction={() => undefined}
-      LinkComponent={Link}
     />
   );
 }
 
 const viewports = [
+  { width: 320, height: 720 },
   { width: 390, height: 844 },
   { width: 767, height: 900 },
   { width: 768, height: 900 },
+  { width: 900, height: 900 },
   { width: 1024, height: 900 },
   { width: 1199, height: 900 },
   { width: 1200, height: 900 },
@@ -250,6 +261,10 @@ for (const viewport of viewports) {
     const order = [context, phases, nextAction, preparation, workbox];
     expect(await isSemanticDocumentOrder(order)).toBe(true);
 
+    const nextBox = await nextAction.boundingBox();
+    expect(nextBox).not.toBeNull();
+    expect(nextBox!.y + Math.min(nextBox!.height, 44)).toBeLessThanOrEqual(viewport.height);
+
     const primaryBox = await primary.boundingBox();
     const workboxBox = await workbox.boundingBox();
     expect(primaryBox).not.toBeNull();
@@ -261,7 +276,13 @@ for (const viewport of viewports) {
       expect(Math.abs(primaryBox!.width / (primaryBox!.width + workboxBox!.width) - 0.68)).toBeLessThan(0.04);
     }
 
+    await expect(nextAction.getByRole("link")).toHaveCount(1);
+
+    const prep = component.getByRole("tab", { name: /준비실/ });
+    await prep.focus();
+    await expectVisibleFocus(prep);
     await expectNoHorizontalOverflow(page);
+    expect(await expectNoSeriousAccessibilityFindings(page)).toEqual([]);
     for (const control of await component.locator("button:visible, a[href]:visible, select:visible").all()) {
       await expectMinimumTargetSize(control);
     }
@@ -284,6 +305,79 @@ test("operating room supports keyboard roving, visible focus and reduced motion 
   await expect(completed).toBeFocused();
   await expectVisibleFocus(completed);
 
+  await expectNoHorizontalOverflow(page);
+  await expectReducedMotion(page);
+});
+
+test("operating room loading keeps current-meeting context", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 768, height: 900 });
+  const component = await mount(operatingRoomFixture(null, hostWorkbox({ view: null, loading: true })));
+  await expect(component.getByRole("group", { name: "현재 모임" })).toBeVisible();
+  await expect(component.getByRole("heading", { name: view.meeting!.title })).toBeVisible();
+  await expect(component.getByRole("status")).toContainText("작업함을 불러오는 중입니다.");
+  await expect(component.getByRole("region", { name: "다음에 할 일" })).toBeVisible();
+  expect(await isSemanticDocumentOrder([
+    component.getByRole("group", { name: "현재 모임" }),
+    component.getByRole("navigation", { name: "모임 운영 단계" }),
+    component.getByRole("region", { name: "다음에 할 일" }),
+  ])).toBe(true);
+  await expectNoHorizontalOverflow(page);
+  expect(await expectNoSeriousAccessibilityFindings(page)).toEqual([]);
+});
+
+test("operating room empty workbox stays usable", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 900, height: 900 });
+  const component = await mount(operatingRoomFixture(null, hostWorkbox({
+    view: { ...workboxView, items: [], partialWarnings: [], nextCursor: null },
+  })));
+  await expect(component.getByRole("group", { name: "현재 모임" })).toBeVisible();
+  await expect(component.getByText("지금 처리할 작업이 없습니다.")).toBeVisible();
+  await expect(component.getByRole("region", { name: "다음에 할 일" }).getByRole("link")).toHaveCount(1);
+  await expectNoHorizontalOverflow(page);
+});
+
+test("operating room stale workbox keeps loaded rows and a retry path", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 1024, height: 900 });
+  const component = await mount(operatingRoomFixture(null, hostWorkbox({
+    error: "작업함을 불러오지 못했습니다. 보이는 항목은 그대로 유지합니다.",
+  })));
+  const retry = component.locator(".rm-host-workbox__error").getByRole("button", { name: "다시 불러오기", exact: true });
+  await expect(component.locator(".rm-host-workbox__error")).toContainText("작업함을 불러오지 못했습니다");
+  await expect(retry).toBeVisible();
+  await expectMinimumTargetSize(retry);
+  await expect(component.getByRole("listitem", { name: workboxView.items[0]!.title })).toBeVisible();
+  await expect(component.getByRole("listitem", { name: workboxView.items[1]!.title })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
+test("operating room partial warning keeps unaffected rows usable", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 1200, height: 900 });
+  const component = await mount(operatingRoomFixture());
+  await expect(component.getByText("알림 실패 확인 일부 행을 불러오지 못했어요.")).toBeVisible();
+  await expect(component.getByRole("button", { name: "현재 묶음 다시 불러오기" })).toBeVisible();
+  await expect(component.getByRole("listitem", { name: workboxView.items[0]!.title })).toBeVisible();
+  const row = component.getByRole("listitem", { name: workboxView.items[1]!.title });
+  await expect(row).toBeVisible();
+  await expect(row.locator("details.rm-host-work-item__secondary")).not.toHaveAttribute("open");
+  await expectNoHorizontalOverflow(page);
+});
+
+test("operating room long Korean and English titles wrap without overflow", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 320, height: 720 });
+  const component = await mount(operatingRoomFixture());
+  const title = component.getByRole("heading", { name: view.meeting!.title });
+  await expect(title).toBeVisible();
+  const metrics = await title.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      overflowWrap: style.overflowWrap,
+      scrollWidth: Math.ceil((element as HTMLElement).scrollWidth),
+      clientWidth: (element as HTMLElement).clientWidth,
+    };
+  });
+  expect(["anywhere", "break-word"]).toContain(metrics.overflowWrap);
+  expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+  await expect(component.getByRole("listitem", { name: workboxView.items[1]!.title })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await expectReducedMotion(page);
 });

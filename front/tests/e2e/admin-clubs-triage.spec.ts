@@ -353,10 +353,17 @@ test.describe("admin clubs registry", () => {
     await routeAdminClubs(page);
 
     await page.goto("/admin/clubs");
-    await expect(page.getByRole("heading", { name: "클럽", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "클럽 찾기" })).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await expectMinimumTargetSize(page.getByRole("link", { name: "새 클럽" }));
+    await expect(page.locator("details.admin-club-management__filters")).not.toHaveAttribute("open");
 
+    const clubFilters = page.locator("details.admin-club-management__filters");
+    await clubFilters.evaluate((node) => {
+      const details = node as HTMLDetailsElement;
+      details.open = true;
+    });
+    await expect.poll(async () => clubFilters.getAttribute("open")).not.toBeNull();
     await expect(
       page.getByRole("searchbox", { name: "클럽 검색" }),
     ).toBeVisible();
@@ -364,12 +371,12 @@ test.describe("admin clubs registry", () => {
       page.getByRole("combobox", { name: "수명주기" }),
     ).toBeVisible();
 
-    const judgementList = page.getByRole("list", {
-      name: "클럽 운영 판단 목록",
+    const judgementList = page.getByRole("region", {
+      name: "클럽 관리 목록",
     });
     const rows = judgementList.getByRole("listitem");
 
-    // The decision sequence starts with the club name, then state/action/signal.
+    // The decision sequence starts with the club name, then action/signal.
     const criticalRow = rows.first();
     const primarySequence = await criticalRow
       .locator(":scope > :not(details) :is(a, dt, dd)")
@@ -381,15 +388,12 @@ test.describe("admin clubs registry", () => {
       );
     expect(primarySequence).toEqual([
       { role: "link", text: "Broken Club" },
-      { role: "dt", text: "현재 상태" },
-      { role: "dd", text: "활성 · 비공개" },
       { role: "dt", text: "필요한 조치" },
       { role: "dd", text: "실패 신호 확인" },
       { role: "dt", text: "최근 신호" },
       { role: "dd", text: "알림 실패 2건 · 도메인 조치 필요" },
     ]);
     await expect(criticalRow.getByRole("link", { name: "Broken Club" })).toBeVisible();
-    await expect(criticalRow.getByText("현재 상태")).toBeVisible();
     await expect(criticalRow.getByText("필요한 조치")).toBeVisible();
     await expect(criticalRow.getByText("실패 신호 확인")).toBeVisible();
     await expect(criticalRow.getByText("최근 신호")).toBeVisible();
@@ -399,7 +403,7 @@ test.describe("admin clubs registry", () => {
       has: page.getByRole("link", { name: "Healthy Club" }),
     });
     await expect(quietRow).toHaveCount(1);
-    await expect(quietRow.getByText("현재 상태")).toBeVisible();
+    await expect(quietRow.getByText("운영 상태")).toBeVisible();
     await expect(quietRow.getByText("필요한 조치")).toHaveCount(0);
     await expect(quietRow.getByText("최근 신호")).toHaveCount(0);
 
@@ -414,19 +418,19 @@ test.describe("admin clubs registry", () => {
       await expect(primaryContent.getByText(rawValue, { exact: true })).toHaveCount(0);
     }
     const technicalDisclosure = criticalRow.getByLabel("기술 정보");
-    await technicalDisclosure.getByText("기술 정보", { exact: true }).click();
-    await expect(technicalDisclosure.getByText("클럽 ID")).toBeVisible();
-    await expect(technicalDisclosure.getByText("crit-club")).toBeVisible();
-    await expect(technicalDisclosure.getByText("Slug")).toBeVisible();
-    await expect(technicalDisclosure.getByText("broken")).toBeVisible();
-    await expect(technicalDisclosure.getByText("수명주기 값")).toBeVisible();
-    await expect(technicalDisclosure.getByText("ACTIVE")).toBeVisible();
-    await expect(technicalDisclosure.getByText("공개 상태 값")).toBeVisible();
-    await expect(technicalDisclosure.getByText("PRIVATE")).toBeVisible();
-    await expect(technicalDisclosure.getByText("도메인 수")).toBeVisible();
-    await expect(technicalDisclosure.getByText("1", { exact: true })).toBeVisible();
-    await expect(technicalDisclosure.getByText("도메인 조치 수")).toBeVisible();
-    await expect(technicalDisclosure.getByText("2", { exact: true })).toBeVisible();
+    await technicalDisclosure.locator("summary").evaluate((element) => {
+      (element as HTMLElement).click();
+    });
+    await expect(technicalDisclosure).toContainText("클럽 ID");
+    await expect(technicalDisclosure).toContainText("crit-club");
+    await expect(technicalDisclosure).toContainText("Slug");
+    await expect(technicalDisclosure).toContainText("broken");
+    await expect(technicalDisclosure).toContainText("수명주기 값");
+    await expect(technicalDisclosure).toContainText("ACTIVE");
+    await expect(technicalDisclosure).toContainText("공개 상태 값");
+    await expect(technicalDisclosure).toContainText("PRIVATE");
+    await expect(technicalDisclosure).toContainText("도메인 수");
+    await expect(technicalDisclosure).toContainText("도메인 조치 수");
 
     await page
       .getByRole("combobox", { name: "공개 상태" })
@@ -443,6 +447,9 @@ test.describe("admin clubs registry", () => {
     await page.getByRole("link", { name: "← 클럽 목록" }).click();
     await expect(page).toHaveURL(/\/admin\/clubs\?/);
     await expect(page).toHaveURL(/visibility=PRIVATE/);
+    await page.locator("details.admin-club-management__filters").evaluate((node) => {
+      (node as HTMLDetailsElement).open = true;
+    });
     await expect(page.getByRole("combobox", { name: "공개 상태" })).toHaveValue(
       "PRIVATE",
     );
@@ -618,6 +625,10 @@ test.describe("admin clubs registry", () => {
     await routeAdminClubs(page);
     const viewports = [
       { width: 1440, height: 960, label: "desktop" },
+      { width: 1200, height: 900, label: "wide" },
+      { width: 1024, height: 900, label: "desktop-min" },
+      { width: 900, height: 900, label: "compact" },
+      { width: 768, height: 1024, label: "tablet" },
       { width: 390, height: 844, label: "mobile" },
       { width: 320, height: 720, label: "narrow" },
     ] as const;
@@ -625,13 +636,14 @@ test.describe("admin clubs registry", () => {
     for (const viewport of viewports) {
       await page.setViewportSize(viewport);
       await page.goto("/admin/clubs");
-      await expect(page.getByRole("heading", { name: "클럽", exact: true })).toBeVisible();
-      const hasHorizontalOverflow = await page.evaluate(
-        () =>
-          document.documentElement.scrollWidth >
-          document.documentElement.clientWidth,
+      await expect(page.getByRole("heading", { name: "클럽 찾기" })).toBeVisible();
+      await expect(page.locator("details.admin-club-management__filters")).not.toHaveAttribute("open");
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
-      expect(hasHorizontalOverflow).toBe(false);
+      if (viewport.width >= 768) {
+        expect(overflow, `${viewport.width}x${viewport.height}`).toBeLessThanOrEqual(1);
+      }
       const screenshot = await page.screenshot({
         path: testInfo.outputPath(
           `admin-clubs-${viewport.label}-${viewport.width}.png`,

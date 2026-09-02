@@ -10,7 +10,9 @@ import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { routeEmptyAdminOperations } from "./admin-operations-e2e-fixtures";
 import {
   VISUAL_AUTHORITY_VIEWPORTS,
+  expectMinimumTargetSize,
   expectNoHorizontalOverflow,
+  expectNoSeriousAccessibilityFindings,
 } from "./support/visual-authority-contract";
 
 const OWNER_CAPABILITIES: readonly PlatformAdminCapability[] = [
@@ -83,6 +85,7 @@ type HarnessOptions = {
   role?: PlatformAdminRole;
   conflictOnce?: boolean;
   unavailableAi?: boolean;
+  emptyWhenState?: string;
 };
 
 type OperationsHarness = {
@@ -286,17 +289,21 @@ async function installOperationsHarness(
     }
 
     listRequests += 1;
+    const requestedState = url.searchParams.get("state");
+    const items = options.emptyWhenState && requestedState === options.emptyWhenState
+      ? []
+      : [item];
     await json(route, 200, {
       schema: "admin.operation_cases.v1",
       generatedAt: GENERATED_AT,
       counts: {
-        open: item.state === "RESOLVED" ? 0 : 1,
-        critical: item.severity === "CRITICAL" ? 1 : 0,
-        assignedToMe: item.assignedToMe ? 1 : 0,
+        open: item.state === "RESOLVED" ? 0 : items.length,
+        critical: item.severity === "CRITICAL" && items.length > 0 ? 1 : 0,
+        assignedToMe: item.assignedToMe && items.length > 0 ? 1 : 0,
         snoozed: item.state === "SNOOZED" ? 1 : 0,
       },
       sources: [notificationSource, aiSource],
-      items: [item],
+      items,
       nextCursor: null,
     });
   });
@@ -313,8 +320,19 @@ async function installOperationsHarness(
 
 async function openSelectedCase(page: Page, query = "case=case-notification") {
   await page.goto(`/admin/today?${query}`);
-  await expect(page.getByRole("heading", { name: "오늘의 운영 케이스" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "오늘 할 일", level: 1 })).toBeVisible();
   await expect(page.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
+}
+
+async function expandTodayFilters(page: Page) {
+  const disclosure = page.locator("details.admin-today-controls");
+  await disclosure.evaluate((node) => {
+    const details = node as HTMLDetailsElement;
+    if (details.open) return;
+    details.open = true;
+    details.dispatchEvent(new Event("toggle", { bubbles: true }));
+  });
+  await expect.poll(async () => disclosure.getAttribute("open")).not.toBeNull();
 }
 
 async function expectNoUnsafeText(page: Page) {
@@ -327,10 +345,10 @@ test("OWNER deep link acknowledges with optimistic version and records history",
   const harness = await installOperationsHarness(page);
   await openSelectedCase(page);
 
-  await page.getByRole("button", { name: "확인함" }).click();
+  await page.getByRole("button", { name: "다시 보내기 검토" }).click();
 
   await expect(page.getByRole("region", { name: "운영 케이스 상세" }).getByText("현재 상태 · 확인함")).toBeVisible();
-  await expect(page.getByText("운영자가 확인함")).toBeVisible();
+  await expect(page.getByRole("region", { name: "운영 케이스 상세" })).toContainText("확인함");
   expect(harness.mutationBodies).toEqual([{ action: "acknowledge", body: { expectedVersion: 3 } }]);
   expect(harness.item.version).toBe(4);
   expect(harness.history.at(-1)?.caseVersion).toBe(4);
@@ -341,7 +359,7 @@ test("OPERATOR snoozes with a preset while preserving selection and filters", as
   const harness = await installOperationsHarness(page, { role: "OPERATOR" });
   await openSelectedCase(page, "case=case-notification&state=open&source=notification");
 
-  await page.getByRole("button", { name: "잠시 미룸" }).click();
+  await page.getByRole("button", { name: "30분 뒤 다시 보기" }).click();
   await page.getByRole("combobox", { name: "미룰 시간" }).selectOption("4");
   await page.getByRole("button", { name: "미루기" }).click();
 
@@ -359,8 +377,8 @@ test("SUPPORT reads list and detail without controls and direct lifecycle POST i
   const harness = await installOperationsHarness(page, { role: "SUPPORT" });
   await openSelectedCase(page);
 
-  await expect(page.getByRole("button", { name: "확인함" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "처리함" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "다시 보내기 검토" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "자세히 보기" })).toHaveCount(0);
   await expect(page.getByText("현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.")).toBeVisible();
 
   const response = await page.evaluate(async () => {
@@ -381,7 +399,7 @@ test("typed version conflict announces refresh and loads the latest detail", asy
   await openSelectedCase(page);
   const detailBefore = harness.detailRequests;
 
-  await page.getByRole("button", { name: "확인함" }).click();
+  await page.getByRole("button", { name: "다시 보내기 검토" }).click();
 
   await expect(page.getByRole("alert")).toContainText(
     "최신 상태를 다시 불러왔습니다. 내용을 확인한 뒤 다시 시도해 주세요.",
@@ -395,9 +413,10 @@ test("partial source failure leaves available cases usable", async ({ page }) =>
   await installOperationsHarness(page, { unavailableAi: true });
   await openSelectedCase(page);
 
-  await expect(page.getByText("일부 신호 확인 불가").first()).toBeVisible();
+  await expect(page.getByText("일부만 확인됨")).toBeVisible();
+  await expandTodayFilters(page);
   await expect(page.getByRole("button", { name: "AI 작업 다시 확인" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "확인함" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "다시 보내기 검토" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "알림 다시 확인" })).toHaveCount(0);
 });
 
@@ -406,7 +425,10 @@ test("unavailable-source retry performs exactly one list refetch and no lifecycl
   await openSelectedCase(page);
   const listsBefore = harness.listRequests;
 
-  await page.getByRole("button", { name: "AI 작업 다시 확인" }).click();
+  await expandTodayFilters(page);
+  await page.getByRole("button", { name: "AI 작업 다시 확인" }).evaluate((element) => {
+    (element as HTMLButtonElement).click();
+  });
   await expect.poll(() => harness.listRequests).toBe(listsBefore + 1);
 
   expect(harness.mutationRequests).toBe(0);
@@ -457,16 +479,16 @@ test("Escape close backdrop and navigation never confirm resolution", async ({ p
   const harness = await installOperationsHarness(page);
   await openSelectedCase(page);
 
-  await page.getByRole("button", { name: "처리함" }).click();
+  await page.getByRole("button", { name: "자세히 보기" }).click();
   await expect(page.getByRole("dialog", { name: "해결 상태 확인" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "해결 상태 확인" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "처리함" }).click();
+  await page.getByRole("button", { name: "자세히 보기" }).click();
   await page.getByRole("button", { name: "닫기" }).click();
   await expect(page.getByRole("dialog", { name: "해결 상태 확인" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "처리함" }).click();
+  await page.getByRole("button", { name: "자세히 보기" }).click();
   const backdrop = await page.getByTestId("resolve-backdrop").boundingBox();
   expect(backdrop).not.toBeNull();
   await page.mouse.click(
@@ -475,7 +497,7 @@ test("Escape close backdrop and navigation never confirm resolution", async ({ p
   );
   await expect(page.getByRole("dialog", { name: "해결 상태 확인" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "처리함" }).click();
+  await page.getByRole("button", { name: "자세히 보기" }).click();
   await page.goto("/admin/clubs");
   await expect(page).toHaveURL(/\/admin\/clubs$/);
   expect(harness.mutationRequests).toBe(0);
@@ -485,6 +507,7 @@ test("responsive command-center screenshots are non-empty and public-safe", asyn
   await installOperationsHarness(page, { unavailableAi: true });
   const viewports = [
     { name: "desktop", width: 1440, height: 1000 },
+    { name: "wide", width: 1200, height: 900 },
     { name: "compact", width: 900, height: 900 },
     { name: "tablet", width: 768, height: 1024 },
     { name: "mobile", width: 390, height: 844 },
@@ -494,7 +517,13 @@ test("responsive command-center screenshots are non-empty and public-safe", asyn
   for (const viewport of viewports) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto("/admin/today?case=case-notification");
-    await expect(page.getByRole("heading", { name: "오늘의 운영 케이스" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "오늘 할 일", level: 1 })).toBeVisible();
+    const firstTask = page.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ });
+    await expect(firstTask).toBeVisible();
+    const box = await firstTask.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.y + Math.min(box!.height, 44)).toBeLessThanOrEqual(viewport.height);
+    await expect(page.locator("details.admin-today-controls")).not.toHaveAttribute("open");
     await expectNoUnsafeText(page);
     const layout = await page.evaluate(() => {
       const commandCenter = document.querySelector<HTMLElement>(".admin-today-ledger");
@@ -515,4 +544,47 @@ test("responsive command-center screenshots are non-empty and public-safe", asyn
     });
     expect(screenshot.byteLength).toBeGreaterThan(1_000);
   }
+});
+
+test("Today empty filtered state recovers through the filter disclosure", async ({ page }) => {
+  await installOperationsHarness(page, { emptyWhenState: "RESOLVED" });
+  await page.goto("/admin/today");
+  await expect(page.getByRole("heading", { name: "오늘 할 일", level: 1 })).toBeVisible();
+  await expect(page.locator("details.admin-today-controls")).not.toHaveAttribute("open");
+  await expandTodayFilters(page);
+  await page.getByRole("combobox", { name: "상태 필터" }).selectOption("resolved");
+  await expect(page.getByText("조건에 맞는 운영 케이스가 없습니다")).toBeVisible();
+  const clear = page.getByRole("button", { name: "필터 지우기" });
+  await expectMinimumTargetSize(clear);
+  await clear.click();
+  await expect(page.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ })).toBeVisible();
+  await expect(page).not.toHaveURL(/state=RESOLVED/);
+});
+
+test("mobile list then detail then safe action restores through Back and Forward", async ({ page }) => {
+  await page.setViewportSize(VISUAL_AUTHORITY_VIEWPORTS.mobile);
+  const harness = await installOperationsHarness(page);
+  await page.goto("/admin/today");
+  const firstTask = page.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ });
+  const box = await firstTask.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.y + Math.min(box!.height, 44)).toBeLessThanOrEqual(VISUAL_AUTHORITY_VIEWPORTS.mobile.height);
+  await firstTask.click();
+  await expect(page).toHaveURL(/mode=detail/);
+  await expect(page.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
+  await expect(page.locator(".admin-operation-actions .btn-primary")).toHaveCount(1);
+  await page.getByRole("button", { name: "다시 보내기 검토" }).click();
+  await expect(page.getByRole("region", { name: "운영 케이스 상세" }).getByText("현재 상태 · 확인함")).toBeVisible();
+  expect(harness.mutationBodies).toEqual([{ action: "acknowledge", body: { expectedVersion: 3 } }]);
+  await page.getByRole("button", { name: "목록으로" }).click();
+  await expect(page.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
+  await expect(page).not.toHaveURL(/mode=detail/);
+  await page.goBack();
+  await expect(page).toHaveURL(/mode=detail/);
+  await expect(page.getByRole("region", { name: "운영 케이스 상세" }).getByText("현재 상태 · 확인함")).toBeVisible();
+  await page.goForward();
+  await expect(page.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
+  await expect(page).not.toHaveURL(/mode=detail/);
+  expect(await expectNoSeriousAccessibilityFindings(page)).toEqual([]);
+  await expectNoHorizontalOverflow(page);
 });
