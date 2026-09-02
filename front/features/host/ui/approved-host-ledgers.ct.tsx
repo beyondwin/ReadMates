@@ -5,7 +5,6 @@ import {
   approvedMockup,
   captureApprovedComparison,
   expectGeometryWithinTolerance,
-  HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
   type ApprovedRegion,
 } from "@/tests/e2e/support/approved-mockup-contract";
 import {
@@ -34,6 +33,9 @@ const SETTINGS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1052 } as con
 const SCHEDULE_REVIEW_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
 const SCHEDULE_REVIEW_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
 const SCHEDULE_REVIEW_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 943 } as const;
+const PERSON_HEADER_GEOMETRY = { x: 17, y: 66, width: 356, height: 154 } as const;
+const PERSON_NAV_GEOMETRY = { x: 0, y: 768, width: 390, height: 64 } as const;
+const PERSON_MAIN_GEOMETRY = { x: 1, y: 58, width: 388, height: 888 } as const;
 
 function boxesOverlap(
   left: { x: number; y: number; width: number; height: number },
@@ -115,18 +117,16 @@ async function captureHostLedger(input: {
   if (scheduleReviewDesktop && (!input.regions || input.regions.length === 0)) {
     throw new Error("host-schedule-review-desktop requires nav and main capture regions");
   }
+  if (personMobile && (!input.regions || input.regions.length === 0)) {
+    throw new Error("host-person-mobile requires nav and main capture regions");
+  }
   return captureApprovedComparison({
     entry: approvedMockup(input.id),
     candidate: input.candidate,
     page: input.page,
     testInfo: input.testInfo,
     regions: input.regions ?? [],
-    ...(meetingsDesktop || peopleDesktop || recordsDesktop || settingsDesktop || scheduleReviewDesktop
-      ? { skipMismatchRatioAssertion: true as const }
-      : {
-          allowFontRasterException: true as const,
-          fontRasterExceptionMaxRatio: personMobile ? HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO : undefined,
-        }),
+    skipMismatchRatioAssertion: true,
   });
 }
 
@@ -347,16 +347,40 @@ test("unread schedule review matches approved desktop", async ({ mount, page }, 
 });
 
 test("person detail matches approved mobile", async ({ mount, page }, testInfo) => {
+  test.setTimeout(90_000);
   const component = await mountApproved(mount, page, hostPersonApprovedView(), APPROVED_MOBILE_VIEWPORT);
+  await expect(component.getByRole("link", { name: "사람 목록으로" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "내 클럽" })).toHaveCount(0);
+  await expect(component.getByText(/No\.\s*\d+|FOLIO|회차/)).toBeVisible();
+  await expect(component.getByText("현재 일정")).toBeVisible();
+  await expect(component.getByText("참석 응답")).toBeVisible();
+  await expect(component.getByText("실제 출석")).toBeVisible();
+  await expect(component.getByText("멤버십")).toBeVisible();
   await expect(component.getByRole("heading", { name: "박서윤" })).toBeVisible();
-  await expect(component.getByText("최근 접속", { exact: true })).toBeVisible();
-  await expect(component.getByText("일정 확인", { exact: true })).toBeVisible();
-  await expect(component.getByText("참석 응답", { exact: true })).toBeVisible();
-  await expect(component.getByRole("heading", { name: /실제 출석/ })).toBeVisible();
+  await expect(component.getByRole("link", { name: "사람", exact: true })).toHaveAttribute("aria-current", "page");
+  const header = component.locator(".rm-host-person__header");
+  const nav = component.locator('[data-club-shell-region="mobile-primary"]');
+  const main = component.getByRole("main");
+  await expect(header).toBeVisible();
+  await expect(nav).toBeVisible();
+  await expect(main).toBeVisible();
+  const membership = component.getByRole("heading", { name: "멤버십" });
+  const membershipBox = await membership.boundingBox();
+  expect(membershipBox, "04 멤버십 first-viewport").not.toBeNull();
+  expect(
+    membershipBox!.y + membershipBox!.height,
+    `멤버십 bottom ${membershipBox!.y + membershipBox!.height} must stay inside 390×832`,
+  ).toBeLessThanOrEqual(APPROVED_MOBILE_VIEWPORT.height);
+  const regions = [
+    await regionFromLocator(header, "header", PERSON_HEADER_GEOMETRY, 4),
+    await regionFromLocator(nav, "nav", PERSON_NAV_GEOMETRY, 4),
+    await regionFromLocator(main, "main", PERSON_MAIN_GEOMETRY, 4),
+  ];
   await captureHostLedger({
     id: "host-person-mobile",
     candidate: component,
     page,
     testInfo,
+    regions,
   });
 });

@@ -9,6 +9,7 @@ import { HostSessionLedger } from "./host-session-ledger";
 import { HostMeetingList } from "./meeting-list/host-meeting-list";
 import { HostPeoplePage } from "./members/host-people-page";
 import { MemberList } from "./members/member-list";
+import { formatMembershipTenure } from "./members/member-list-helpers";
 import { MemberPendingZone } from "./members/member-pending-zone";
 import { HostPersonDetail } from "./person/host-person-detail";
 import { HostScheduleReviewPage } from "./schedule-review/host-schedule-review-page";
@@ -405,13 +406,16 @@ const invitationCreateDraft: HostInvitationCreateDraft = {
   expiresAt: "2026-09-30",
 };
 
+const personNow = new Date("2026-09-02T14:20:00+09:00");
+const personJoinedAt = "2025-10-02T00:00:00+09:00";
+
 const person: HostPersonDetailView = {
   membershipId: "membership-park",
   displayName: "박서윤",
-  avatarKey: "banana-green-book",
+  avatarKey: "apple-green-book",
   status: "ACTIVE",
   role: "MEMBER",
-  lastClubAccessAt: "2026-08-29T10:00:00+09:00",
+  lastClubAccessAt: "2026-09-01T10:00:00+09:00",
   currentSchedule: {
     state: "OPEN",
     scheduleRevision: 4,
@@ -633,7 +637,12 @@ export function hostPersonApprovedView() {
       loadMoreError={null}
       onLoadMore={noop}
       peopleHref="/clubs/reading-sai/app/host/people"
-      now={new Date("2026-08-30T10:00:00+09:00")}
+      now={personNow}
+      identity={{
+        folioLabel: "FOLIO · 017",
+        tenureLabel: formatMembershipTenure(personJoinedAt, personNow),
+        joinedLabel: "2025년 10월 가입 · 초대 링크로 참여",
+      }}
     />,
   );
 }
