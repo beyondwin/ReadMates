@@ -5,6 +5,7 @@ import {
   approvedMockup,
   captureApprovedComparison,
   expectGeometryWithinTolerance,
+  HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
   type ApprovedRegion,
 } from "@/tests/e2e/support/approved-mockup-contract";
 import {
@@ -95,6 +96,9 @@ async function captureHostLedger(input: {
   page: Page;
   testInfo: TestInfo;
   regions?: readonly ApprovedRegion[];
+  allowFontRasterException?: boolean;
+  fontRasterExceptionMaxRatio?: number;
+  skipMismatchRatioAssertion?: boolean;
 }) {
   const personMobile = input.id === "host-person-mobile";
   const meetingsDesktop = input.id === "host-meetings-desktop";
@@ -126,7 +130,9 @@ async function captureHostLedger(input: {
     page: input.page,
     testInfo: input.testInfo,
     regions: input.regions ?? [],
-    skipMismatchRatioAssertion: true,
+    allowFontRasterException: input.allowFontRasterException,
+    fontRasterExceptionMaxRatio: input.fontRasterExceptionMaxRatio,
+    skipMismatchRatioAssertion: input.skipMismatchRatioAssertion ?? true,
   });
 }
 
@@ -168,6 +174,7 @@ test("people ledger matches approved desktop", async ({ mount, page }, testInfo)
     page,
     testInfo,
     regions,
+    skipMismatchRatioAssertion: true,
   });
 });
 
@@ -222,6 +229,8 @@ test("meetings library matches approved desktop", async ({ mount, page }, testIn
     page,
     testInfo,
     regions,
+    allowFontRasterException: true,
+    skipMismatchRatioAssertion: false,
   });
 });
 
@@ -248,6 +257,8 @@ test("records ledger matches approved desktop", async ({ mount, page }, testInfo
     page,
     testInfo,
     regions,
+    allowFontRasterException: true,
+    skipMismatchRatioAssertion: false,
   });
 });
 
@@ -286,6 +297,8 @@ test("invites and settings match approved desktop", async ({ mount, page }, test
     page,
     testInfo,
     regions,
+    allowFontRasterException: true,
+    skipMismatchRatioAssertion: false,
   });
   await component.getByRole("button", { name: "새 초대 링크" }).click();
   await expect(component.getByLabel("링크 이름")).toBeVisible();
@@ -343,6 +356,8 @@ test("unread schedule review matches approved desktop", async ({ mount, page }, 
     page,
     testInfo,
     regions,
+    allowFontRasterException: true,
+    skipMismatchRatioAssertion: false,
   });
 });
 
@@ -394,5 +409,8 @@ test("person detail matches approved mobile", async ({ mount, page }, testInfo) 
     page,
     testInfo,
     regions,
+    allowFontRasterException: true,
+    fontRasterExceptionMaxRatio: HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
+    skipMismatchRatioAssertion: false,
   });
 });

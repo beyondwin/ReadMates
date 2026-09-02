@@ -9,6 +9,7 @@ import {
   captureApprovedComparison,
   expectGeometryWithinTolerance,
   expectLocatorGeometry,
+  HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
   isSemanticDocumentOrder,
   type ApprovedRegion,
 } from "@/tests/e2e/support/approved-mockup-contract";
@@ -777,6 +778,9 @@ async function captureHostApproved(input: {
   page: Page;
   testInfo: TestInfo;
   regions: readonly ApprovedRegion[];
+  allowFontRasterException?: boolean;
+  fontRasterExceptionMaxRatio?: number;
+  skipMismatchRatioAssertion?: boolean;
 }) {
   return captureApprovedComparison({
     entry: approvedMockup(input.id),
@@ -784,7 +788,9 @@ async function captureHostApproved(input: {
     page: input.page,
     testInfo: input.testInfo,
     regions: input.regions,
-    skipMismatchRatioAssertion: true,
+    allowFontRasterException: input.allowFontRasterException,
+    fontRasterExceptionMaxRatio: input.fontRasterExceptionMaxRatio,
+    skipMismatchRatioAssertion: input.skipMismatchRatioAssertion,
   });
 }
 
@@ -857,7 +863,14 @@ test("prep locks the approved desktop operating room", async ({ mount, page }, t
   expect(await workboxTitle.evaluate((node) => getComputedStyle(node, "::after").content)).toBe("none");
   await expect(nextAction.getByText("일정이 어제 19:30에 변경되었어요")).toBeVisible();
   expect(await nextAction.evaluate((node) => getComputedStyle(node, "::after").content)).toBe("none");
-  await captureHostApproved({ id: "host-prep-desktop", page, testInfo, regions });
+  await captureHostApproved({
+    id: "host-prep-desktop",
+    page,
+    testInfo,
+    regions,
+    allowFontRasterException: true,
+    skipMismatchRatioAssertion: false,
+  });
 });
 
 test("live locks the approved desktop operating room", async ({ mount, page }, testInfo) => {
@@ -894,7 +907,14 @@ test("live locks the approved desktop operating room", async ({ mount, page }, t
     await regionFromLocator(component.locator(".rm-host-operating-room__body"), "body", BODY_DESKTOP_GEOMETRY, 4),
     await regionFromLocator(component.locator(".rm-host-operating-room__workbox-rail"), "workbox", WORKBOX_DESKTOP_GEOMETRY, 4),
   ];
-  await captureHostApproved({ id: "host-live-desktop", page, testInfo, regions });
+  await captureHostApproved({
+    id: "host-live-desktop",
+    page,
+    testInfo,
+    regions,
+    allowFontRasterException: true,
+    skipMismatchRatioAssertion: false,
+  });
 });
 
 test("closing locks the approved desktop operating room", async ({ mount, page }, testInfo) => {
@@ -917,7 +937,14 @@ test("closing locks the approved desktop operating room", async ({ mount, page }
     await regionFromLocator(component.locator(".rm-host-operating-room__body"), "body", BODY_DESKTOP_GEOMETRY, 4),
     await regionFromLocator(component.locator(".rm-host-operating-room__workbox-rail"), "workbox", WORKBOX_DESKTOP_GEOMETRY, 4),
   ];
-  await captureHostApproved({ id: "host-closing-desktop", page, testInfo, regions });
+  await captureHostApproved({
+    id: "host-closing-desktop",
+    page,
+    testInfo,
+    regions,
+    allowFontRasterException: true,
+    skipMismatchRatioAssertion: false,
+  });
 });
 
 test("prep locks the approved mobile operating room", async ({ mount, page }, testInfo) => {
@@ -977,7 +1004,13 @@ test("prep locks the approved mobile operating room", async ({ mount, page }, te
     await regionFromLocator(bottomNav, "nav", MOBILE_NAV_GEOMETRY, 4),
     await regionFromLocator(component.locator(".rm-host-operating-room"), "main", PREP_MOBILE_MAIN_GEOMETRY, 4),
   ];
-  await captureHostApproved({ id: "host-prep-mobile", page, testInfo, regions });
+  await captureHostApproved({
+    id: "host-prep-mobile",
+    page,
+    testInfo,
+    regions,
+    skipMismatchRatioAssertion: true,
+  });
 });
 
 test("live locks the approved mobile attendance board", async ({ mount, page }, testInfo) => {
@@ -1037,7 +1070,15 @@ test("live locks the approved mobile attendance board", async ({ mount, page }, 
     await regionFromLocator(component.locator(".rm-host-operating-room"), "main", LIVE_MOBILE_MAIN_GEOMETRY, 4),
     await regionFromLocator(board, "board", LIVE_MOBILE_BOARD_GEOMETRY, 4),
   ];
-  await captureHostApproved({ id: "host-live-mobile", page, testInfo, regions });
+  await captureHostApproved({
+    id: "host-live-mobile",
+    page,
+    testInfo,
+    regions,
+    allowFontRasterException: true,
+    fontRasterExceptionMaxRatio: HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
+    skipMismatchRatioAssertion: false,
+  });
 });
 
 test("empty operating room primary stays readable without a phase overlay", async ({ mount, page }) => {
