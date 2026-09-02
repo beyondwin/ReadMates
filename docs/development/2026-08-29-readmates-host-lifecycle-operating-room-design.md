@@ -2,9 +2,9 @@
 
 - 날짜: 2026-08-29
 - 표면: Host app (`/clubs/:slug/app/host/**`, 호환 `/app/host/**`)
-- 상태: 시각 방향 승인됨, 구현 전
-- ADR impact: **supersede + new** — ADR-0046을 ADR-0048로 대체하고, 일정 revision 확인 의미를 ADR-0049로 분리
-- 관련: ADR-0018, ADR-0019, ADR-0021, ADR-0023, ADR-0026, ADR-0028, ADR-0035, ADR-0038, ADR-0045, ADR-0046, ADR-0048, ADR-0049, `front/DESIGN.md`
+- 상태: 운영실 composition 구현됨. 시각 픽셀 수락은 ADR-0053 `Proposed`(독립 시각 검토·사람 30초 gate 미완)
+- ADR impact: **supersede + new** — ADR-0046을 ADR-0048로 대체하고, 일정 revision 확인 의미를 ADR-0049로 분리. 시각 권위 계층은 ADR-0053 `Proposed`
+- 관련: ADR-0018, ADR-0019, ADR-0021, ADR-0023, ADR-0026, ADR-0028, ADR-0035, ADR-0038, ADR-0045, ADR-0046, ADR-0048, ADR-0049, ADR-0053, `front/DESIGN.md`
 - 승인 시안:
   - [`07-host-lifecycle-operating-room-approved.png`](host-redesign-mockups/07-host-lifecycle-operating-room-approved.png) — 운영실·준비실
   - [`08-host-operating-room-live-approved.png`](host-redesign-mockups/08-host-operating-room-live-approved.png) — 운영실·현장
@@ -87,7 +87,7 @@ ReadMates의 warm paper, ink hierarchy, restrained navy, Pretendard-only 원칙�
 - 원장 행은 가로 스크롤 표가 아니라 `항목/핵심 수치/세부 상태/행동`의 2행 리스트로 재구성한다.
 - 768–1199px에서는 작업함을 본문 아래로 내리고 요약 카운트를 단계 탭 아래에 제공한다.
 
-모바일 시각 권위는 동일한 866×1846 규격의 승인 자산 `15`–`17`이다. 세 자산은 데스크톱을 단순 축소하지 않고 390px 기준으로 운영실·현장 출석·사람 상세의 정보 구조를 다시 편집한다. 구현 시 승인 PNG를 배경으로 사용하지 않으며 390px CT fixture에서 하단 safe-area, 44px 이상 터치 영역, 한 손 조작, 긴 한국어 문자열을 구조적으로 검증한다.
+모바일 시각 권위는 동일한 866×1846 규격의 승인 자산 `15`–`17`이다. 세 자산은 데스크톱을 단순 축소하지 않고 390px 기준으로 운영실·현장 출석·사람 상세의 정보 구조를 다시 편집한다. 구현은 code-native UI로 유지하고 승인 PNG를 배경으로 사용하지 않는다. 390px CT fixture에서 하단 safe-area, 44px 이상 터치 영역, 한 손 조작, 긴 한국어 문자열을 구조적으로 검증한다.
 
 ## 5. 컴포넌트 계약
 
@@ -224,6 +224,8 @@ pnpm --dir front test:e2e
 
 ## 13. 승인 자산의 사용 규칙
 
-승인 PNG 07–17은 visual reference이며 code-native UI의 대체물이 아니다. 프로젝트에 별도 candidate PNG를 구현 권위로 보존하지 않는다. 메뉴·카피·상태·접근성·responsive contract는 이 문서가 규범이다. 구현 후에는 React component와 CSS token이 editable source가 되고, tracked CT screenshot이 회귀 기준이 된다.
+승인 PNG 07–17은 page composition의 시각 권위다. code-native UI(React, semantic HTML, repository token, bundled Pretendard, 실제 avatar asset)는 편집·runtime source이며 PNG를 배경으로 쓰지 않는다. tracked CT snapshot은 보조 회귀 cache이고, snapshot 갱신만으로 합격하지 않는다. token, shared CSS/component, fixture 변경은 영향 reference 증거를 무효화하고 approved PNG·candidate·overlay·diff·measurement와 독립 검토가 다시 필요하다.
+
+메뉴·카피·상태·접근성·responsive contract는 이 문서와 ADR-0048이 규범이다. 시각 위계·밀도·first viewport는 승인 PNG가 우선한다. 기능·권한·안전 조작은 삭제하지 않고 시안 흐름 안에서 progressive disclosure로 재배치한다. 프로젝트에 별도 candidate PNG를 구현 권위로 보존하지 않는다. ADR-0053은 독립 시각 검토와 사람 30초 gate가 남아 `Proposed`다.
 
 이미지에 사용된 인물·클럽·모임 데이터는 모두 가상 예시다. 자산의 생성 receipt와 기계적 검증값은 `host-redesign-mockups/README.md`에 기록한다.

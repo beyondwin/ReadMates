@@ -1,10 +1,12 @@
-# 호스트 리디자인 시안 (비규범 참고 자료)
+# 호스트 리디자인 시안
 
 ## 2026-08-29 승인 시안 — Quiet Editorial Desk
 
 `07-host-lifecycle-operating-room-approved.png`는 ADR-0048과
-`docs/development/2026-08-29-readmates-host-lifecycle-operating-room-design.md`의 승인 시각 참고 자산입니다.
-구현 기준은 디자인 문서의 메뉴·상태·접근성·responsive contract이며, PNG를 그대로 UI 배경으로 사용하지 않습니다.
+`docs/development/2026-08-29-readmates-host-lifecycle-operating-room-design.md`의 page composition 시각 권위입니다.
+code-native UI는 편집·runtime source이며 PNG를 그대로 UI 배경으로 사용하지 않습니다.
+tracked snapshot은 보조 회귀 cache이고, token·shared CSS·fixture 변경은 영향 reference 증거를 무효화합니다.
+메뉴·상태·접근성·responsive contract는 디자인 문서와 ADR-0048이 규범입니다.
 
 - 화면: 호스트 운영실 desktop 1536×1024
 - 핵심 흐름: 현재 모임 → 준비실/현장/마감실 → 다음 행동 → 준비 현황 → 호스트 작업함
@@ -13,7 +15,7 @@
 - SHA-256: `fc5f8fd00301d90f3616c335306ca9cf99c59293589841ca3601afdbb04c25a9`
 - 데이터: 가상 클럽·모임·상태 값만 사용
 
-07–17만 ADR-0048 구현의 승인 시각 참고 자산이다. 별도 candidate 번호나 폐기된 중간 생성물은 프로젝트에 보존하지 않는다. 계정·멤버 썸네일은 생성 이미지에서 추출하지 않고 실제 구현에서 `front/shared/ui/book-club-avatar.ts`와 `front/shared/ui/avatar-chip.tsx`를 통해 `/assets/avatars/book-club/*.webp`를 직접 렌더링한다.
+07–17만 ADR-0048 구현의 승인 시각 권위다. 별도 candidate 번호나 폐기된 중간 생성물은 프로젝트에 보존하지 않는다. 계정·멤버 썸네일은 생성 이미지에서 추출하지 않고 실제 구현에서 `front/shared/ui/book-club-avatar.ts`와 `front/shared/ui/avatar-chip.tsx`를 통해 `/assets/avatars/book-club/*.webp`를 직접 렌더링한다.
 
 ### 승인된 확장 화면
 
@@ -41,9 +43,11 @@
 
 ### Code-native 구현 근거
 
-07–17 PNG는 승인된 디자인 참고 자산이며 runtime proof가 아니다. 현재 responsive·interaction 근거는 [운영실 CT](../../../front/features/host/ui/operating-room/host-operating-room-responsive.ct.tsx), [모임 생애주기 CT](../../../front/features/host/ui/meeting-workspace/host-lifecycle-responsive.ct.tsx), [호스트 shell CT](../../../front/features/host/ui/shell/host-shell.ct.tsx), [route continuity E2E](../../../front/tests/e2e/host-lifecycle-route-continuity.spec.ts), [authority-loss E2E](../../../front/tests/e2e/host-authority-loss.spec.ts), [workbox E2E](../../../front/tests/e2e/host-workbox-stage4.spec.ts)에 있다. 접근성 근거는 [bounded DOM/ARIA helper](../../../front/tests/e2e/support/visual-authority-contract.ts)를 사용한 코드 기반 검사이며 axe/axe-core나 수동 VoiceOver·NVDA 전체 검증으로 확대 해석하지 않는다.
+07–17 PNG는 page composition의 시각 권위이고, code-native UI는 편집·runtime source다. PNG를 runtime 배경으로 쓰지 않는다. tracked snapshot은 보조 회귀 cache이며 snapshot 갱신만으로 합격하지 않는다. token, shared CSS/component, fixture 변경은 영향 reference 증거를 무효화한다. ADR-0053은 독립 시각 검토와 사람 30초 gate가 남아 `Proposed`다.
 
-위 근거는 repository-local synthetic fixture만 사용하고 production/private member data를 포함하지 않는다. CT/E2E screenshot·trace는 저장소 권위로 보존하지 않았으며, PNG 자체를 구현 완료 증거로 승격하지 않는다.
+현재 responsive·interaction 근거는 [운영실 CT](../../../front/features/host/ui/operating-room/host-operating-room-responsive.ct.tsx), [모임 생애주기 CT](../../../front/features/host/ui/meeting-workspace/host-lifecycle-responsive.ct.tsx), [호스트 shell CT](../../../front/features/host/ui/shell/host-shell.ct.tsx), [route continuity E2E](../../../front/tests/e2e/host-lifecycle-route-continuity.spec.ts), [authority-loss E2E](../../../front/tests/e2e/host-authority-loss.spec.ts), [workbox E2E](../../../front/tests/e2e/host-workbox-stage4.spec.ts)에 있다. 승인 PNG 비교는 `front/tests/e2e/support/approved-mockup-manifest.ts`와 `pnpm --dir front test:ct:approved`가 담당한다. 접근성 근거는 [bounded DOM/ARIA helper](../../../front/tests/e2e/support/visual-authority-contract.ts)를 사용한 코드 기반 검사이며 axe/axe-core나 수동 VoiceOver·NVDA 전체 검증으로 확대 해석하지 않는다.
+
+위 근거는 repository-local synthetic fixture만 사용하고 production/private member data를 포함하지 않는다. CT/E2E screenshot·trace는 저장소 권위로 보존하지 않는다.
 
 아래 01–06 시안은 ADR-0046의 과거 구현 맥락을 보존하는 역사 참고 자료입니다. ADR-0048 구현의 시각 권위로 사용하지 않습니다.
 

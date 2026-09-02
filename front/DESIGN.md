@@ -1,7 +1,10 @@
 # ReadMates host·admin visual authority
 
-이 문서는 현재 코드·테스트·tracked screenshot이 구현한 host/admin 시각 권위다.
-승인 설계나 미구현 목표를 적지 않는다. Public, guest, member composition은 이 문서로 바꾸지 않는다.
+이 문서는 현재 코드·테스트가 구현한 host/admin composition과 시각 권위 계층이다.
+승인된 Admin `01`–`07`·Host `07`–`17` PNG가 page composition의 시각 권위다.
+code-native UI는 편집·runtime source다. tracked CT snapshot은 보조 회귀 cache이며 snapshot 갱신만으로 합격하지 않는다.
+token, shared CSS/component, fixture 변경은 영향 reference 증거를 무효화한다.
+ADR-0053은 독립 시각 검토와 사람 30초 gate가 남아 `Proposed`다. Public, guest, member composition은 이 문서로 바꾸지 않는다.
 
 - ADR-0044: Superseded by ADR-0046 (단일 주 행동 계산 규칙은 운영실에 계승)
 - ADR-0045: Accepted — host/admin 공유 paper/ink primitive
@@ -11,8 +14,10 @@
 - ADR-0049: Accepted — 독립 schedule-seen revision과 명시적 검토·발송 흐름의 현재 권위
 - ADR-0050: Accepted — 오늘 할 일 중심 운영 데스크 + 클럽 관리·서비스 상태·처리 기록 4축
 - ADR-0051: Accepted — 플랫폼 운영·내 클럽 two-level 전역 공간 전환
+- ADR-0053: Proposed — 승인 PNG를 Admin·Host 픽셀 근접 합격 기준으로 사용. 독립 시각 검토 16/18 FAIL, 사람 30초 gate `pending_external_human_evidence`
 - Token source: `design/system/src/styles/tokens.css`
 - Viewport contract: `front/tests/e2e/support/visual-authority-contract.ts`
+- Approved mockup manifest: `front/tests/e2e/support/approved-mockup-manifest.ts`
 
 ## Host primary chrome
 
@@ -136,9 +141,11 @@ Live region은 의미 있는 전이에만 쓰고 polling마다 반복하지 않�
 
 Contract widths: 320, 390, 768, 900, 1024, 1440px. keyboard, visible focus, 44px target, reduced motion, long Korean/English wrapping은 automated helper로 검증한다. Chrome 실제 200% toolbar zoom은 DPR 2→4, CSS viewport 1728→864, document/body scroll width와 client width 일치, 보이는 focus target 높이로 확인했다. Manual screen-reader announcement order는 아직 `not measured`이며 검증 완료로 주장하지 않는다.
 
-Host lifecycle의 code-native source는 `front/features/host/ui/operating-room/host-operating-room-responsive.ct.tsx`, `front/features/host/ui/meeting-workspace/host-lifecycle-responsive.ct.tsx`, `front/features/host/ui/shell/host-shell.ct.tsx`다. Real-route continuity와 recovery widths는 `front/tests/e2e/host-lifecycle-route-continuity.spec.ts`, `front/tests/e2e/host-authority-loss.spec.ts`, `front/tests/e2e/host-workbox-stage4.spec.ts`가 맡는다. 이 semantic/geometry/DOM evidence는 승인 PNG나 과거 screenshot baseline을 runtime proof로 사용하지 않으며, Stage 5에서 lifecycle raster baseline을 새로 잠그지 않았다.
+Host lifecycle의 code-native source는 `front/features/host/ui/operating-room/host-operating-room-responsive.ct.tsx`, `front/features/host/ui/meeting-workspace/host-lifecycle-responsive.ct.tsx`, `front/features/host/ui/shell/host-shell.ct.tsx`다. Real-route continuity와 recovery widths는 `front/tests/e2e/host-lifecycle-route-continuity.spec.ts`, `front/tests/e2e/host-authority-loss.spec.ts`, `front/tests/e2e/host-workbox-stage4.spec.ts`가 맡는다. semantic/geometry/DOM 계약은 이 code-native tests가 잠근다. 승인 PNG를 runtime 배경으로 쓰지 않으며 tracked snapshot은 보조 회귀 cache다.
 
-Admin tracked screenshots는 대표 상태만 잠근다. 1024px는 viewport contract와 browser smoke에 있고 PNG baseline은 없다.
+Admin·Host 승인 PNG 비교는 `front/tests/e2e/support/approved-mockup-manifest.ts`와 `pnpm --dir front test:ct:approved`가 담당한다. token, shared CSS/component, fixture 변경은 영향 id의 기존 승인을 무효화하고 approved reference·candidate·overlay·diff·measurement와 독립 검토가 다시 필요하다. 현재 수락 상태와 잔여 실패는 `docs/reports/2026-09-02-admin-host-pixel-fidelity-acceptance.md`를 따른다. ADR-0053은 `Proposed`다.
+
+Admin tracked screenshots는 대표 상태의 보조 cache다. 1024px는 viewport contract와 browser smoke에 있고, Admin 시각 권위 PNG는 `design/mockups/2026-08-30-admin-operations-redesign/` `01`–`07`이다.
 
 | Owner | File | Locks |
 | --- | --- | --- |

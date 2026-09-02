@@ -3,9 +3,9 @@
 - 날짜: 2026-08-30
 - 표면: Platform admin (`/admin/**`) + 전역 공간 전환
 - 상태: 구현됨 (`not measured` 항목은 §13의 후속 검증으로 유지)
-- ADR impact: **supersede** — ADR-0050이 ADR-0047을, ADR-0051이 ADR-0026을 대체한다. 두 ADR은 구현·자동 검증·active architecture 정합성 확인 뒤 `Accepted`다.
-- 관련: ADR-0019, ADR-0030, ADR-0035, ADR-0037, ADR-0039, ADR-0040, ADR-0045, ADR-0050, ADR-0051
-- 시안: `design/mockups/2026-08-30-admin-operations-redesign/`
+- ADR impact: **supersede** — ADR-0050이 ADR-0047을, ADR-0051이 ADR-0026을 대체한다. 두 ADR은 구현·자동 검증·active architecture 정합성 확인 뒤 `Accepted`다. 시각 권위 계층은 ADR-0053 `Proposed`.
+- 관련: ADR-0019, ADR-0030, ADR-0035, ADR-0037, ADR-0039, ADR-0040, ADR-0045, ADR-0050, ADR-0051, ADR-0053
+- 시안: `design/mockups/2026-08-30-admin-operations-redesign/` (`01`–`07`이 page composition 시각 권위)
 
 ## 1. 한 문장 정의
 
@@ -215,7 +215,7 @@
 - 장식 gradient, glow, glass, 과도한 card, dark NOC theme를 사용하지 않는다.
 - 숫자 비교에만 tabular number를 사용한다.
 
-시안은 톤과 비율의 권위이며 픽셀 복사 대상이 아니다. 실제 구현은 repository token과 bundled Pretendard를 사용하고, Korean/English wrapping, contrast, focus, reduced motion을 code/CT/browser로 검증한다.
+승인 PNG `01`–`07`은 page composition의 시각 권위다. code-native UI는 편집·runtime source이며 PNG를 배경으로 쓰지 않는다. tracked snapshot은 보조 회귀 cache이고, snapshot 갱신만으로 합격하지 않는다. token, shared CSS/component, fixture 변경은 영향 reference 증거를 무효화하고 approved PNG·candidate·overlay·diff·measurement와 독립 검토가 다시 필요하다. 실제 구현은 repository token과 bundled Pretendard를 사용하고, Korean/English wrapping, contrast, focus, reduced motion을 code/CT/browser로 검증한다. ADR-0053은 독립 시각 검토와 사람 30초 gate가 남아 `Proposed`다.
 
 ## 11. 프런트엔드 목표 구조
 
@@ -272,7 +272,7 @@ shared
 
 ## 14. 시안 자산 계약
 
-승인된 일관 세트만 추적한다. 모든 PNG에는 생성 prompt가 embedded되어 있고 같은 이름의 JSON sidecar가 있다.
+승인된 일관 세트만 추적한다. 이 PNG가 Admin page composition의 시각 권위이고, code-native UI가 runtime source이며, tracked snapshot은 보조 회귀 cache다. 모든 PNG에는 생성 prompt가 embedded되어 있고 같은 이름의 JSON sidecar가 있다.
 
 | 파일 | 크기 | SHA-256 | 의도 |
 | --- | --- | --- | --- |
