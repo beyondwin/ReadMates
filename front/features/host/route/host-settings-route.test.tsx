@@ -273,7 +273,7 @@ describe("HostSettingsRoute transition ownership", () => {
     renderRoute(createGlobalSpaceTransitionCoordinator());
     await screen.findByText(link.name);
 
-    await userEvent.click(screen.getByRole("button", { name: "링크 편집" }));
+    await userEvent.click(screen.getByRole("button", { name: "링크 보기" }));
     await userEvent.clear(screen.getByLabelText("편집 링크 이름"));
     await userEvent.type(screen.getByLabelText("편집 링크 이름"), "충돌한 링크 이름");
     await userEvent.click(screen.getByRole("button", { name: "링크 변경 저장" }));
@@ -397,7 +397,7 @@ describe("HostSettingsRoute transition ownership", () => {
     await userEvent.clear(createName);
     await waitFor(() => expect(coordinator.getSnapshot()).toEqual({ kind: "clean" }));
 
-    await userEvent.click(screen.getByRole("button", { name: "링크 편집" }));
+    await userEvent.click(screen.getByRole("button", { name: "링크 보기" }));
     expect(coordinator.getSnapshot()).toMatchObject({ kind: "dirty" });
     await userEvent.click(screen.getByRole("button", { name: "링크 편집 취소" }));
     await waitFor(() => expect(coordinator.getSnapshot()).toEqual({ kind: "clean" }));

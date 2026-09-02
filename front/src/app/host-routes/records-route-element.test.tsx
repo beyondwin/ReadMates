@@ -75,9 +75,10 @@ describe("HostRecordsRouteElement", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "기록" })).toBeVisible();
+    await user.click(screen.getByText("세부 조작"));
     expect(screen.getByRole("region", { name: "기록 장부 요약" })).toHaveTextContent("확인 필요 1건");
     expect(screen.queryByRole("heading", { name: "다가오는 모임" })).not.toBeInTheDocument();
-    await user.click((await screen.findAllByRole("link", { name: "No.7 이어서 수정" }))[0]!);
+    await user.click((await screen.findAllByRole("link", { name: "No.7 마감실 열기" }))[0]!);
 
     expect(screen.getByRole("status", { name: "상세 위치" })).toHaveTextContent(JSON.stringify({
       pathname: "/clubs/reading-sai/app/host/sessions/session-7",

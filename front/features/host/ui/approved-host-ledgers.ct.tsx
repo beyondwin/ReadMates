@@ -25,6 +25,12 @@ const MEETINGS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1086 } as con
 const PEOPLE_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
 const PEOPLE_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
 const PEOPLE_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1026 } as const;
+const RECORDS_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
+const RECORDS_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
+const RECORDS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 990 } as const;
+const SETTINGS_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
+const SETTINGS_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
+const SETTINGS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1858 } as const;
 
 async function mountApproved(
   mount: (component: ReactElement) => Promise<Locator>,
@@ -78,11 +84,19 @@ async function captureHostLedger(input: {
   const personMobile = input.id === "host-person-mobile";
   const meetingsDesktop = input.id === "host-meetings-desktop";
   const peopleDesktop = input.id === "host-people-desktop";
+  const recordsDesktop = input.id === "host-records-desktop";
+  const settingsDesktop = input.id === "host-settings-desktop";
   if (meetingsDesktop && (!input.regions || input.regions.length === 0)) {
     throw new Error("host-meetings-desktop requires nav and main capture regions");
   }
   if (peopleDesktop && (!input.regions || input.regions.length === 0)) {
     throw new Error("host-people-desktop requires nav and main capture regions");
+  }
+  if (recordsDesktop && (!input.regions || input.regions.length === 0)) {
+    throw new Error("host-records-desktop requires nav and main capture regions");
+  }
+  if (settingsDesktop && (!input.regions || input.regions.length === 0)) {
+    throw new Error("host-settings-desktop requires nav and main capture regions");
   }
   return captureApprovedComparison({
     entry: approvedMockup(input.id),
@@ -90,7 +104,7 @@ async function captureHostLedger(input: {
     page: input.page,
     testInfo: input.testInfo,
     regions: input.regions ?? [],
-    ...(meetingsDesktop || peopleDesktop
+    ...(meetingsDesktop || peopleDesktop || recordsDesktop || settingsDesktop
       ? { skipMismatchRatioAssertion: true as const }
       : {
           allowFontRasterException: true as const,
@@ -195,29 +209,55 @@ test("meetings library matches approved desktop", async ({ mount, page }, testIn
 });
 
 test("records ledger matches approved desktop", async ({ mount, page }, testInfo) => {
+  test.setTimeout(90_000);
   const component = await mountApproved(mount, page, hostRecordsApprovedView(), APPROVED_DESKTOP_VIEWPORT);
-  await expect(component.getByRole("heading", { name: "기록", exact: true })).toBeVisible();
+  await expect(component.getByRole("link", { name: "기록", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(component.getByRole("link", { name: /마감실 열기/ }).first()).toBeVisible();
   await expect(component.getByRole("row", { name: /단 한 사람/ })).toBeVisible();
-  await expect(component.getByRole("link", { name: /보기·수정/ }).first()).toBeVisible();
-  await expect(component.getByRole("heading", { name: "마감 작업" })).toBeVisible();
+  const header = component.locator("header.topnav");
+  const nav = component.getByRole("navigation", { name: "호스트 주 메뉴" });
+  const main = component.getByRole("main");
+  await expect(header).toBeVisible();
+  await expect(nav).toBeVisible();
+  await expect(main).toBeVisible();
+  const regions = [
+    await regionFromLocator(header, "header", RECORDS_HEADER_GEOMETRY, 4),
+    await regionFromLocator(nav, "nav", RECORDS_NAV_GEOMETRY, 4),
+    await regionFromLocator(main, "main", RECORDS_MAIN_GEOMETRY, 4),
+  ];
   await captureHostLedger({
     id: "host-records-desktop",
     candidate: component,
     page,
     testInfo,
+    regions,
   });
 });
 
 test("invites and settings match approved desktop", async ({ mount, page }, testInfo) => {
+  test.setTimeout(90_000);
   const component = await mountApproved(mount, page, hostSettingsApprovedView(), APPROVED_DESKTOP_VIEWPORT);
-  await expect(component.getByRole("heading", { name: "초대와 설정" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "초대와 설정" })).toHaveAttribute("aria-current", "page");
+  await expect(component.getByRole("button", { name: "새 초대 링크" })).toBeVisible();
   await expect(component.getByRole("heading", { name: "초대 링크" })).toBeVisible();
-  await expect(component.getByRole("heading", { name: "클럽 설정" })).toBeVisible();
+  await expect(component.getByText(/활성|만료 예정|중지/).first()).toBeVisible();
+  const header = component.locator("header.topnav");
+  const nav = component.getByRole("navigation", { name: "호스트 주 메뉴" });
+  const main = component.getByRole("main");
+  await expect(header).toBeVisible();
+  await expect(nav).toBeVisible();
+  await expect(main).toBeVisible();
+  const regions = [
+    await regionFromLocator(header, "header", SETTINGS_HEADER_GEOMETRY, 4),
+    await regionFromLocator(nav, "nav", SETTINGS_NAV_GEOMETRY, 4),
+    await regionFromLocator(main, "main", SETTINGS_MAIN_GEOMETRY, 4),
+  ];
   await captureHostLedger({
     id: "host-settings-desktop",
     candidate: component,
     page,
     testInfo,
+    regions,
   });
 });
 

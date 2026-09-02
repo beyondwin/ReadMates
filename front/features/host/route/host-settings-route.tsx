@@ -431,7 +431,7 @@ function ScopedHostSettingsRoute({ clubSlug }: { clubSlug: string }) {
     <div className="stack">
     {settings.isPending ? <section className="surface-quiet" role="status">클럽 설정을 불러오는 중입니다.</section> : null}
     {settings.isError ? <section className="surface-quiet" role="alert"><p>클럽 설정을 불러오지 못했습니다.</p><button type="button" onClick={() => { void settings.refetch(); }}>다시 시도</button></section> : null}
-    {settings.data && visibleSettingsDraft ? <HostClubSettings settings={settings.data} draft={visibleSettingsDraft} saving={busy} stale={stale} error={settingsError} onDraftChange={(draft) => { setSettingsDraft(draft); setStale(false); setSettingsError(null); if (pendingIdentity?.kind === "settings") setPendingIdentity(null); }} onSave={saveSettings} /> : null}
+    {settings.data && visibleSettingsDraft ? <HostClubSettings settings={settings.data} draft={visibleSettingsDraft} saving={busy} stale={stale} error={settingsError} hostCount={members.data ? `${members.data.items.filter((member) => member.role === "HOST").length}명` : undefined} onDraftChange={(draft) => { setSettingsDraft(draft); setStale(false); setSettingsError(null); if (pendingIdentity?.kind === "settings") setPendingIdentity(null); }} onSave={saveSettings} onCloseReview={() => setCloseOpen(true)} /> : null}
     {settings.data && members.data ? (
       <HostCoHostManagement
         settingsRevision={settings.data.revision}
@@ -448,23 +448,19 @@ function ScopedHostSettingsRoute({ clubSlug }: { clubSlug: string }) {
     {history.data ? <HostSettingsHistory key={`${history.data.items[0]?.historyId ?? "empty"}:${history.data.nextCursor ?? "end"}`} page={history.data} onLoadMore={(cursor) => queryClient.fetchQuery(hostClubSettingsHistoryQuery({ limit: 20, cursor }, context))} /> : null}
     {history.isPending ? <section className="surface-quiet" role="status">설정 변경 이력을 불러오는 중입니다.</section> : null}
     {history.isError ? <section className="surface-quiet" role="alert">설정 변경 이력을 불러오지 못했습니다.</section> : null}
-    <section className="surface-quiet stack rm-host-editorial-ledger__panel">
-      <h2>클럽 운영 종료</h2><p className="small muted">종료 전 영향을 미리 확인하고 같은 확인 내용으로만 실행합니다.</p>
-      <button className="btn-quiet" type="button" onClick={() => setCloseOpen(true)}>종료 검토</button>
-      <HostClubCloseDialog
-        open={closeOpen}
-        preview={closePreview}
-        busy={busy}
-        previewError={closePreviewError}
-        recovery={closeRecovery}
-        canRetryConfirm={pendingIdentity?.kind === "close-confirm"}
-        onClose={() => setCloseOpen(false)}
-        onPreview={() => { void runClosePreview(); }}
-        onConfirm={startCloseConfirm}
-        onRefresh={refreshSettingsSurface}
-        onRetryConfirm={retryPendingCommand}
-      />
-    </section>
+    <HostClubCloseDialog
+      open={closeOpen}
+      preview={closePreview}
+      busy={busy}
+      previewError={closePreviewError}
+      recovery={closeRecovery}
+      canRetryConfirm={pendingIdentity?.kind === "close-confirm"}
+      onClose={() => setCloseOpen(false)}
+      onPreview={() => { void runClosePreview(); }}
+      onConfirm={startCloseConfirm}
+      onRefresh={refreshSettingsSurface}
+      onRetryConfirm={retryPendingCommand}
+    />
     </div>
   </div>;
 }

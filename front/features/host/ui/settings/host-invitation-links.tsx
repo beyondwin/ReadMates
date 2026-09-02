@@ -36,14 +36,45 @@ type Props = {
   onToggle: (item: HostInvitationLinkView) => void;
   onRetryCommand: () => void;
   onCopySharePath: () => void;
+  now?: Date;
 };
 
-const statusCopy: Record<HostInvitationLinkView["status"], string> = {
-  ACTIVE: "활성",
-  PAUSED: "중지",
-  EXHAUSTED: "소진",
-  EXPIRED: "만료",
-};
+type InvitationPresentationStatus = "활성" | "만료 예정" | "중지" | "소진" | "만료";
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function invitationPresentationStatus(
+  link: HostInvitationLinkView,
+  now: Date,
+): InvitationPresentationStatus {
+  if (link.status === "PAUSED") return "중지";
+  if (link.status === "EXHAUSTED") return "소진";
+  if (link.status === "EXPIRED") return "만료";
+  const remaining = Date.parse(link.expiresAt) - now.getTime();
+  if (Number.isFinite(remaining) && remaining <= 7 * MS_PER_DAY) return "만료 예정";
+  return "활성";
+}
+
+function expiryLabel(link: HostInvitationLinkView, now: Date, status: InvitationPresentationStatus) {
+  if (status === "중지") return "이력 보존";
+  const expires = Date.parse(link.expiresAt);
+  if (!Number.isFinite(expires)) return "제한 없음";
+  const remaining = expires - now.getTime();
+  if (status === "만료 예정") {
+    const days = Math.max(1, Math.ceil(remaining / MS_PER_DAY));
+    return `${days}일 남음`;
+  }
+  if (remaining > 365 * MS_PER_DAY) return "제한 없음";
+  const date = new Date(expires);
+  return `${date.getUTCMonth() + 1}월 ${date.getUTCDate()}일`;
+}
+
+function managementActions(status: InvitationPresentationStatus): ReadonlyArray<"보기" | "복사" | "연장" | "중지" | "이력"> {
+  if (status === "만료 예정") return ["연장", "중지"];
+  if (status === "중지") return ["이력"];
+  if (status === "활성") return ["보기", "복사"];
+  return ["이력"];
+}
 
 export function HostInvitationLinks({
   links,
@@ -64,8 +95,20 @@ export function HostInvitationLinks({
   onToggle,
   onRetryCommand,
   onCopySharePath,
+  now = new Date(),
 }: Props) {
   const [createOpen, setCreateOpen] = useState(Boolean(createDraft.name.trim()));
+  const [statusFilter, setStatusFilter] = useState<InvitationPresentationStatus>("활성");
+  const presented = links.map((item) => {
+    const status = invitationPresentationStatus(item, now);
+    return { item, status, expiry: expiryLabel(item, now, status) };
+  });
+  const counts = {
+    활성: presented.filter((row) => row.status === "활성").length,
+    "만료 예정": presented.filter((row) => row.status === "만료 예정").length,
+    중지: presented.filter((row) => row.status === "중지").length,
+  } as const;
+  const visibleRows = presented;
 
   function submitCreate(event: FormEvent) {
     event.preventDefault();
@@ -75,11 +118,12 @@ export function HostInvitationLinks({
   return (
     <section className="stack rm-host-editorial-ledger__panel" aria-labelledby="named-links-title">
       <div>
-        <p className="eyebrow">이름이 있는 초대 링크</p>
         <h2 id="named-links-title">초대 링크</h2>
+        <p className="small muted">링크 이름은 호스트만 볼 수 있어요.</p>
       </div>
-      <p className="small muted">링크 이름은 호스트만 볼 수 있어요. 생성된 경로는 지금 한 번만 복사할 수 있습니다.</p>
-      <button className="btn" type="button" onClick={() => setCreateOpen((open) => !open)}>새 초대 링크</button>
+      <button className="btn btn-primary" type="button" onClick={() => setCreateOpen((open) => !open)}>
+        새 초대 링크
+      </button>
       <form className={createOpen ? "cluster" : "sr-only"} onSubmit={submitCreate}>
         <label>링크 이름<input value={createDraft.name} maxLength={120} required onChange={(event) => onCreateDraftChange({ ...createDraft, name: event.target.value })} /></label>
         <label>최대 사용 횟수<input type="number" min="1" max="10000" value={createDraft.maxUses} onChange={(event) => onCreateDraftChange({ ...createDraft, maxUses: event.target.value })} /></label>
@@ -92,33 +136,108 @@ export function HostInvitationLinks({
       {loading ? <p role="status">초대 링크를 불러오는 중입니다.</p> : null}
       {error ? <div role="alert"><p>{error}</p><button type="button" onClick={onRetry}>다시 시도</button></div> : null}
       {!loading && !error && links.length === 0 ? <p className="muted">아직 만든 링크가 없습니다.</p> : null}
-      <div className="stack">{links.map((item) => (
-        <article className="rm-host-editorial-ledger__row" key={item.linkId}>
-          <div className="rm-host-editorial-ledger__row-copy">
-            <strong>{item.name}</strong>
-            <span className="badge">{statusCopy[item.status]}</span>
-            <span className="small muted">revision {item.revision}</span>
+      {!loading && !error && links.length > 0 ? (
+        <>
+          <div className="rm-host-editorial-ledger__filters" role="tablist" aria-label="초대 링크 상태">
+            {([
+              { id: "활성", label: "활성", count: counts.활성 },
+              { id: "만료 예정", label: "만료 예정", count: counts["만료 예정"] },
+              { id: "중지", label: "중지", count: counts.중지 },
+            ] as const).map((chip) => {
+              const selected = statusFilter === chip.id;
+              return (
+                <button
+                  key={chip.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  aria-label={`${chip.label} ${chip.count}`}
+                  className={`rm-host-editorial-ledger__filter${selected ? " is-selected" : ""}`}
+                  onClick={() => setStatusFilter(chip.id)}
+                >
+                  {chip.label} {chip.count}
+                </button>
+              );
+            })}
           </div>
-          <p className="small muted">사용 {item.usedCount}/{item.maxUses} · 만료 {new Date(item.expiresAt).toLocaleDateString("ko-KR")}</p>
-          <div className="cluster">
-            {(item.status === "ACTIVE" || item.status === "PAUSED") ? (
-              <button type="button" className="btn-quiet" onClick={() => onToggle(item)}>
-                {item.status === "ACTIVE" ? "링크 일시정지" : "링크 다시 시작"}
-              </button>
-            ) : null}
-            <button type="button" className="btn-quiet" onClick={() => onEditDraftChange({ linkId: item.linkId, name: item.name, maxUses: String(item.maxUses), expiresAt: item.expiresAt.slice(0, 10) })}>링크 편집</button>
-          </div>
-          {editDraft?.linkId === item.linkId ? (
-            <form className="cluster" onSubmit={(event) => { event.preventDefault(); onUpdate(item); }}>
-              <label>편집 링크 이름<input value={editDraft.name} onChange={(event) => onEditDraftChange({ ...editDraft, name: event.target.value })} /></label>
-              <label>편집 최대 사용 횟수<input type="number" min={Math.max(item.usedCount, 1)} max="10000" value={editDraft.maxUses} onChange={(event) => onEditDraftChange({ ...editDraft, maxUses: event.target.value })} /></label>
-              <label>편집 만료일<input type="date" value={editDraft.expiresAt} onChange={(event) => onEditDraftChange({ ...editDraft, expiresAt: event.target.value })} /></label>
-              <button disabled={busy} type="submit">링크 변경 저장</button>
-              <button disabled={busy} type="button" onClick={() => onEditDraftChange(null)}>링크 편집 취소</button>
-            </form>
-          ) : null}
-        </article>
-      ))}</div>
+          <table className="rm-host-invite-table" aria-label="초대 링크">
+            <thead>
+              <tr>
+                <th scope="col">이름</th>
+                <th scope="col">상태</th>
+                <th scope="col">사용</th>
+                <th scope="col">만료</th>
+                <th scope="col">관리</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleRows.map(({ item, status, expiry }) => (
+                <tr key={item.linkId}>
+                  <td>{item.name}</td>
+                  <td>
+                    <span className="rm-host-invite-status" data-status={status}>
+                      <span className="rm-host-invite-status__dot" aria-hidden="true" />
+                      {status}
+                    </span>
+                  </td>
+                  <td>{item.usedCount} / {item.maxUses}</td>
+                  <td>{expiry}</td>
+                  <td>
+                    <div className="cluster">
+                      {managementActions(status).map((action) => {
+                        if (action === "보기" || action === "연장" || action === "이력") {
+                          return (
+                            <button
+                              key={action}
+                              type="button"
+                              className="btn-quiet"
+                              onClick={() => onEditDraftChange({
+                                linkId: item.linkId,
+                                name: item.name,
+                                maxUses: String(item.maxUses),
+                                expiresAt: item.expiresAt.slice(0, 10),
+                              })}
+                            >
+                              {action === "보기" ? "링크 보기" : action}
+                            </button>
+                          );
+                        }
+                        if (action === "복사") {
+                          return sharePath ? (
+                            <button key={action} type="button" className="btn-quiet" onClick={onCopySharePath}>복사</button>
+                          ) : null;
+                        }
+                        return (
+                          <button
+                            key={action}
+                            type="button"
+                            className="btn-quiet"
+                            onClick={() => onToggle(item)}
+                          >
+                            {item.status === "ACTIVE" ? "중지" : "다시 시작"}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {editDraft?.linkId === item.linkId ? (
+                      <form className="cluster" onSubmit={(event) => { event.preventDefault(); onUpdate(item); }}>
+                        <label>편집 링크 이름<input value={editDraft.name} onChange={(event) => onEditDraftChange({ ...editDraft, name: event.target.value })} /></label>
+                        <label>편집 최대 사용 횟수<input type="number" min={Math.max(item.usedCount, 1)} max="10000" value={editDraft.maxUses} onChange={(event) => onEditDraftChange({ ...editDraft, maxUses: event.target.value })} /></label>
+                        <label>편집 만료일<input type="date" value={editDraft.expiresAt} onChange={(event) => onEditDraftChange({ ...editDraft, expiresAt: event.target.value })} /></label>
+                        <button disabled={busy} type="submit">링크 변경 저장</button>
+                        <button disabled={busy} type="button" onClick={() => onEditDraftChange(null)}>링크 편집 취소</button>
+                      </form>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button type="button" className="btn-quiet" onClick={() => setStatusFilter("중지")}>
+            만료·중지된 링크 보기
+          </button>
+        </>
+      ) : null}
     </section>
   );
 }

@@ -186,26 +186,6 @@ const peopleLedgerFacts = {
 
 const recordItems: HostSessionLedgerItem[] = [
   {
-    sessionId: "session-26",
-    sessionNumber: 26,
-    title: "스물여섯 번째 모임",
-    bookTitle: "단 한 사람",
-    bookAuthor: "최진영",
-    bookImageUrl: null,
-    date: "2026-07-28",
-    startTime: "19:30",
-    endTime: "21:30",
-    locationLabel: "을지로 북살롱",
-    state: "CLOSED",
-    visibility: "MEMBER",
-    recordStatus: "COMPLETE",
-    needsAttention: false,
-    hasDraft: false,
-    liveRevision: 4,
-    draftRevision: null,
-    lastModifiedAt: "2026-07-30T10:00:00+09:00",
-  },
-  {
     sessionId: "session-28",
     sessionNumber: 28,
     title: "스물여덟 번째 모임",
@@ -225,6 +205,140 @@ const recordItems: HostSessionLedgerItem[] = [
     draftRevision: 3,
     lastModifiedAt: "2026-08-30T10:00:00+09:00",
   },
+  {
+    sessionId: "session-27",
+    sessionNumber: 27,
+    title: "스물일곱 번째 모임",
+    bookTitle: "맡겨진 소녀",
+    bookAuthor: "히가시노 게이고",
+    bookImageUrl: null,
+    date: "2026-08-18",
+    startTime: "19:30",
+    endTime: "21:30",
+    locationLabel: "을지로 북살롱",
+    state: "CLOSED",
+    visibility: "MEMBER",
+    recordStatus: "COMPLETE",
+    needsAttention: false,
+    hasDraft: false,
+    liveRevision: 4,
+    draftRevision: null,
+    lastModifiedAt: "2026-08-20T10:00:00+09:00",
+  },
+  {
+    sessionId: "session-26",
+    sessionNumber: 26,
+    title: "스물여섯 번째 모임",
+    bookTitle: "단 한 사람",
+    bookAuthor: "최진영",
+    bookImageUrl: null,
+    date: "2026-07-28",
+    startTime: "19:30",
+    endTime: "21:30",
+    locationLabel: "을지로 북살롱",
+    state: "PUBLISHED",
+    visibility: "MEMBER",
+    recordStatus: "COMPLETE",
+    needsAttention: false,
+    hasDraft: false,
+    liveRevision: 4,
+    draftRevision: null,
+    lastModifiedAt: "2026-07-30T10:00:00+09:00",
+  },
+  {
+    sessionId: "session-25",
+    sessionNumber: 25,
+    title: "스물다섯 번째 모임",
+    bookTitle: "아주 희미한 빛으로도",
+    bookAuthor: "최은영",
+    bookImageUrl: null,
+    date: "2026-07-07",
+    startTime: "19:30",
+    endTime: "21:30",
+    locationLabel: "을지로 북살롱",
+    state: "PUBLISHED",
+    visibility: "MEMBER",
+    recordStatus: "COMPLETE",
+    needsAttention: false,
+    hasDraft: false,
+    liveRevision: 3,
+    draftRevision: null,
+    lastModifiedAt: "2026-07-09T10:00:00+09:00",
+  },
+  {
+    sessionId: "session-24",
+    sessionNumber: 24,
+    title: "스물네 번째 모임",
+    bookTitle: "이처럼 사소한 것들",
+    bookAuthor: "클레어 키건",
+    bookImageUrl: null,
+    date: "2026-06-16",
+    startTime: "19:30",
+    endTime: "21:30",
+    locationLabel: "을지로 북살롱",
+    state: "CLOSED",
+    visibility: "MEMBER",
+    recordStatus: "NOT_STARTED",
+    needsAttention: true,
+    hasDraft: false,
+    liveRevision: 1,
+    draftRevision: null,
+    lastModifiedAt: "2026-06-16T21:30:00+09:00",
+  },
+];
+
+const recordFacts = {
+  "session-28": {
+    attendanceLabel: "확정 9명",
+    reflectionLabel: "8/12",
+    draftLabel: "작성 중",
+    feedbackLabel: "확인 필요",
+    publicationLabel: "대기",
+    actionLabel: "마감실 열기",
+    dateLabel: "9월 1일",
+  },
+  "session-27": {
+    attendanceLabel: "확정 10명",
+    reflectionLabel: "10/12",
+    draftLabel: "완료",
+    feedbackLabel: "등록됨",
+    publicationLabel: "게시 준비",
+    actionLabel: "게시 검토",
+    dateLabel: "8월 18일",
+  },
+  "session-26": {
+    attendanceLabel: "확정 9명",
+    reflectionLabel: "9/12",
+    draftLabel: "완료",
+    feedbackLabel: "등록됨",
+    publicationLabel: "게시됨",
+    actionLabel: "기록 보기",
+    dateLabel: "7월 28일",
+  },
+  "session-25": {
+    attendanceLabel: "확정 10명",
+    reflectionLabel: "10/12",
+    draftLabel: "완료",
+    feedbackLabel: "없음",
+    publicationLabel: "게시됨",
+    actionLabel: "기록 보기",
+    dateLabel: "7월 7일",
+  },
+  "session-24": {
+    attendanceLabel: "확정 8명",
+    reflectionLabel: "7/12",
+    draftLabel: "초안 없음",
+    feedbackLabel: "미등록",
+    publicationLabel: "마감 필요",
+    actionLabel: "마감 시작",
+    dateLabel: "6월 16일",
+  },
+} as const;
+
+const recordWorkItems = [
+  { title: "피드백 문서 확인", meta: "1개 · 오늘", href: "/clubs/reading-sai/app/host/sessions/session-28" },
+  { title: "지난 기록 게시 검토", meta: "1건 · 이번 주", href: "/clubs/reading-sai/app/host/sessions/session-27" },
+  { title: "소감 수집 보류", meta: "4명 · 내일", href: "/clubs/reading-sai/app/host/sessions/session-24" },
 ];
 
 const invitationLinks: HostInvitationLinkView[] = [
@@ -414,28 +528,27 @@ export function hostPeopleApprovedView() {
 export function hostRecordsApprovedView() {
   return hostApprovedShell(
     "records",
-    <main className="rm-host-editorial-ledger rm-host-editorial-ledger--context">
-      <section className="page-header-compact">
-        <div className="container rm-host-editorial-ledger__context">
-          <h1 className="h1 editorial rm-host-editorial-ledger__heading">기록</h1>
-          <p className="small rm-host-editorial-ledger__lede">
-            모임이 끝난 뒤 남겨야 할 기록과 게시 이력을 관리하세요.
-          </p>
-        </div>
-      </section>
-      <section className="container rm-host-editorial-ledger__body">
-        <HostSessionLedger
-          items={recordItems}
-          summary={{ needsAttentionCount: 2, incompletePublishedCount: 1, draftCount: 1 }}
-          filters={{ view: "active", search: "", state: null, recordStatus: null, needsAttention: null }}
-          nextCursor={null}
-          loadingMore={false}
-          onFiltersChange={noop}
-          onLoadMore={noop}
-          recordReturnHref="/clubs/reading-sai/app/host/records"
-        />
-      </section>
-    </main>,
+    <HostSessionLedger
+      items={recordItems}
+      summary={{ needsAttentionCount: 2, incompletePublishedCount: 1, draftCount: 1 }}
+      filters={{ view: "active", search: "", state: null, recordStatus: null, needsAttention: null }}
+      nextCursor={null}
+      loadingMore={false}
+      onFiltersChange={noop}
+      onLoadMore={noop}
+      recordReturnHref="/clubs/reading-sai/app/host/records"
+      factsBySessionId={recordFacts}
+      nextAction={{
+        sessionId: "session-28",
+        label: "지구 끝의 온실 기록 초안을 검토해 주세요",
+        meta: "출석 확정 완료 · 소감 8/12 · 피드백 문서 확인 필요",
+        href: "/clubs/reading-sai/app/host/sessions/session-28",
+        ctaLabel: "마감실 열기",
+      }}
+      workItems={recordWorkItems}
+      statusCounts={{ closing: 2, drafting: 1, published: 18 }}
+      workTabCounts={{ now: 2, deferred: 1 }}
+    />,
   );
 }
 
@@ -463,6 +576,7 @@ export function hostSettingsApprovedView() {
           onToggle={noop}
           onRetryCommand={noop}
           onCopySharePath={noop}
+          now={new Date("2026-09-02T11:04:00+09:00")}
         />
         <HostClubSettings
           settings={clubSettings}
@@ -470,8 +584,10 @@ export function hostSettingsApprovedView() {
           saving={false}
           stale={false}
           error={null}
+          hostCount="1명"
           onDraftChange={noop}
           onSave={noop}
+          onCloseReview={noop}
         />
       </div>
     </HostSettingsPage>,

@@ -52,7 +52,7 @@ describe("host settings presentation controls", () => {
     expect(onCreate).toHaveBeenCalledTimes(1);
     expect(onCopy).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("alert")).toHaveTextContent("최신 목록");
-    expect(screen.getByRole("button", { name: "링크 일시정지" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "링크 보기" })).toBeInTheDocument();
   });
 
   it("emits controlled settings draft changes and save intent", async () => {
