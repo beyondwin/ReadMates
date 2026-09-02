@@ -262,13 +262,13 @@ test("authoritative workbox key survives defer, expiry and source-owned completi
   await expect(row.getByRole("button", { name: "가입 승인 요청 보류" })).toHaveCount(0);
   await row.getByText("세부 조작").click();
   await expect(row.locator("details.rm-host-work-item__secondary")).toHaveAttribute("open");
+  const defer = row.getByRole("button", { name: "가입 승인 요청 보류" });
+  await expect(defer).toBeVisible();
   const deferralResponse = page.waitForResponse((response) => (
     response.request().method() === "PUT"
       && response.url().includes(`/api/host/workbox/items/${encodeURIComponent(authoritativeKey)}/deferral`)
   ));
-  await row.getByRole("button", { name: "가입 승인 요청 보류" }).evaluate((element) => {
-    (element as HTMLButtonElement).click();
-  });
+  await defer.click();
   const deferred = await deferralResponse;
   expect(deferred.status()).toBe(200);
   expect(deferred.request().postDataJSON()).toMatchObject({ deferredUntil: expect.any(String) });
@@ -320,6 +320,41 @@ where club_id = ${sqlString(CLUB_ID)}
     return response.status;
   }, { membershipId: VIEWER_MEMBERSHIP_ID, clubSlug: OTHER_CLUB_SLUG });
   expect(crossClubStatus).toBe(403);
+});
+
+test("prep live and closing stay on the seeded current meeting", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 960 });
+  runMysql(`
+update sessions
+set session_date = utc_date()
+where id = ${sqlString(OPEN_SESSION_ID)};
+`);
+  ({ sessionId: authSessionId } = await loginWithGoogleFixture(page, "host@example.com"));
+  await page.goto(`${HOST_PATH}?phase=prep`);
+  const currentMeeting = page.getByRole("group", { name: "현재 모임" });
+  await expect(currentMeeting).toBeVisible();
+  await expect(page.getByRole("heading", { name: "일정 알림 합성 모임" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "모임 운영 단계" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /준비실/ })).toHaveAttribute("aria-selected", "true");
+
+  const liveTab = page.getByRole("tab", { name: /현장/ });
+  await expect(liveTab).toBeVisible();
+  await liveTab.click();
+  await expect(page).toHaveURL(/phase=live/);
+  await expect(currentMeeting).toBeVisible();
+  await expect(page.getByRole("tab", { name: /현장/ })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tabpanel", { name: /현장 운영/ })).toBeVisible();
+
+  const closingTab = page.getByRole("tab", { name: /마감실/ });
+  await expect(closingTab).toBeVisible();
+  await expect(closingTab).toHaveAttribute("aria-disabled", "true");
+
+  await page.getByRole("tab", { name: /준비실/ }).click();
+  await expect(page).toHaveURL(/phase=prep/);
+  await expect(currentMeeting).toBeVisible();
+  await expect(page.getByRole("tab", { name: /준비실/ })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tabpanel", { name: /준비실 운영/ })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
 });
 
 test("schedule review fails closed for drafts, requires preview, and keeps an unknown receipt without resend", async ({ page }) => {

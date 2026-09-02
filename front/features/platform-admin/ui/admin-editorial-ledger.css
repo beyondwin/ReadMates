@@ -4059,14 +4059,15 @@
 }
 
 .admin-today-ledger .admin-operations-queue__controls {
-  position: absolute;
+  position: relative;
   order: 3;
-  width: 1px;
-  height: 1px;
+  width: auto;
   margin: 0;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
+  padding: 8px 32px 20px;
+}
+
+.admin-today-ledger .admin-today-controls:not([open]) .admin-today-controls__body {
+  display: none;
 }
 
 .admin-today-ledger .admin-today-controls > summary {

@@ -359,11 +359,9 @@ test.describe("admin clubs registry", () => {
     await expect(page.locator("details.admin-club-management__filters")).not.toHaveAttribute("open");
 
     const clubFilters = page.locator("details.admin-club-management__filters");
-    await clubFilters.evaluate((node) => {
-      const details = node as HTMLDetailsElement;
-      details.open = true;
-    });
-    await expect.poll(async () => clubFilters.getAttribute("open")).not.toBeNull();
+    await expect(clubFilters.locator("summary")).toBeVisible();
+    await clubFilters.locator("summary").click();
+    await expect(clubFilters).toHaveAttribute("open");
     await expect(
       page.getByRole("searchbox", { name: "클럽 검색" }),
     ).toBeVisible();
@@ -418,9 +416,8 @@ test.describe("admin clubs registry", () => {
       await expect(primaryContent.getByText(rawValue, { exact: true })).toHaveCount(0);
     }
     const technicalDisclosure = criticalRow.getByLabel("기술 정보");
-    await technicalDisclosure.locator("summary").evaluate((element) => {
-      (element as HTMLElement).click();
-    });
+    await expect(technicalDisclosure.locator("summary")).toBeVisible();
+    await technicalDisclosure.locator("summary").click();
     await expect(technicalDisclosure).toContainText("클럽 ID");
     await expect(technicalDisclosure).toContainText("crit-club");
     await expect(technicalDisclosure).toContainText("Slug");
@@ -447,15 +444,17 @@ test.describe("admin clubs registry", () => {
     await page.getByRole("link", { name: "← 클럽 목록" }).click();
     await expect(page).toHaveURL(/\/admin\/clubs\?/);
     await expect(page).toHaveURL(/visibility=PRIVATE/);
-    await page.locator("details.admin-club-management__filters").evaluate((node) => {
-      (node as HTMLDetailsElement).open = true;
-    });
-    await expect(page.getByRole("combobox", { name: "공개 상태" })).toHaveValue(
-      "PRIVATE",
-    );
     await expect(
       page.getByRole("link", { name: "Broken Club" }),
     ).toBeFocused();
+    const returnedFilters = page.locator("details.admin-club-management__filters");
+    if (await returnedFilters.getAttribute("open") === null) {
+      await expect(returnedFilters.locator("summary")).toBeVisible();
+      await returnedFilters.locator("summary").click();
+    }
+    await expect(page.getByRole("combobox", { name: "공개 상태" })).toHaveValue(
+      "PRIVATE",
+    );
   });
 
   test("falls back to the clubs list when detail return state is unsafe", async ({
@@ -641,9 +640,7 @@ test.describe("admin clubs registry", () => {
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
-      if (viewport.width >= 768) {
-        expect(overflow, `${viewport.width}x${viewport.height}`).toBeLessThanOrEqual(1);
-      }
+      expect(overflow, `${viewport.width}x${viewport.height}`).toBeLessThanOrEqual(1);
       const screenshot = await page.screenshot({
         path: testInfo.outputPath(
           `admin-clubs-${viewport.label}-${viewport.width}.png`,

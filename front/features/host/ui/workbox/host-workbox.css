@@ -173,11 +173,17 @@
 
 .rm-host-work-item {
   position: relative;
+  z-index: 0;
   display: grid;
   gap: var(--space-xs);
   padding-block: var(--space-md);
   padding-inline-end: 44px;
   border-bottom: 1px solid var(--line-soft);
+  background: var(--bg-sub);
+}
+
+.rm-host-work-item:has(.rm-host-work-item__secondary[open]) {
+  z-index: 1;
 }
 
 .rm-host-work-item__row {

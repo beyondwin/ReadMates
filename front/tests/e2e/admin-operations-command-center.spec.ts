@@ -326,13 +326,12 @@ async function openSelectedCase(page: Page, query = "case=case-notification") {
 
 async function expandTodayFilters(page: Page) {
   const disclosure = page.locator("details.admin-today-controls");
-  await disclosure.evaluate((node) => {
-    const details = node as HTMLDetailsElement;
-    if (details.open) return;
-    details.open = true;
-    details.dispatchEvent(new Event("toggle", { bubbles: true }));
-  });
-  await expect.poll(async () => disclosure.getAttribute("open")).not.toBeNull();
+  const summary = disclosure.locator("summary");
+  await expect(summary).toBeVisible();
+  if (await disclosure.getAttribute("open") === null) {
+    await summary.click();
+  }
+  await expect(disclosure).toHaveAttribute("open");
 }
 
 async function expectNoUnsafeText(page: Page) {
@@ -426,9 +425,9 @@ test("unavailable-source retry performs exactly one list refetch and no lifecycl
   const listsBefore = harness.listRequests;
 
   await expandTodayFilters(page);
-  await page.getByRole("button", { name: "AI 작업 다시 확인" }).evaluate((element) => {
-    (element as HTMLButtonElement).click();
-  });
+  const retry = page.getByRole("button", { name: "AI 작업 다시 확인" });
+  await expect(retry).toBeVisible();
+  await retry.click();
   await expect.poll(() => harness.listRequests).toBe(listsBefore + 1);
 
   expect(harness.mutationRequests).toBe(0);

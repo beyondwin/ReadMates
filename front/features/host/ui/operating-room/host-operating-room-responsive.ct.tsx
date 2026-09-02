@@ -28,6 +28,7 @@ import { HostUtilityActions } from "../shell/host-utility-actions";
 import { HostWorkspaceSwitcher } from "../shell/host-workspace-switcher";
 import "../shell/host-shell.css";
 import { HostWorkbox } from "../workbox/host-workbox";
+import { OperatingRoomPhaseContinuityStory } from "./host-operating-room-phase-continuity-ct-harness";
 import {
   HostOperatingRoomPage,
   type AttendanceRecoveryView,
@@ -195,7 +196,6 @@ function operatingRoomFixture(
   recovery: AttendanceRecoveryView | null = null,
   workboxContent: ReactNode = hostWorkbox(),
 ) {
-
   return (
     <HostOperatingRoomPage
       view={view}
@@ -288,6 +288,24 @@ for (const viewport of viewports) {
     }
   });
 }
+
+test("operating room phase tabs keep current-meeting continuity", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const component = await mount(<OperatingRoomPhaseContinuityStory />);
+  await expect(component.getByRole("group", { name: "현재 모임" })).toBeVisible();
+  await expect(component.getByRole("tab", { name: /준비실/ })).toHaveAttribute("aria-selected", "true");
+  await component.getByRole("tab", { name: /현장/ }).click();
+  await expect(component.getByRole("tab", { name: /현장/ })).toHaveAttribute("aria-selected", "true");
+  await expect(component.getByRole("group", { name: "현재 모임" })).toBeVisible();
+  await expect(component.getByRole("tabpanel", { name: /현장 운영/ })).toBeVisible();
+  await component.getByRole("tab", { name: /마감실/ }).click();
+  await expect(component.getByRole("tab", { name: /마감실/ })).toHaveAttribute("aria-selected", "true");
+  await expect(component.getByRole("group", { name: "현재 모임" })).toBeVisible();
+  await expect(component.getByRole("tabpanel", { name: /마감실 운영/ })).toBeVisible();
+  await component.getByRole("tab", { name: /준비실/ }).click();
+  await expect(component.getByRole("tab", { name: /준비실/ })).toHaveAttribute("aria-selected", "true");
+  await expect(component.getByRole("tabpanel", { name: /준비실 운영/ })).toBeVisible();
+});
 
 test("operating room supports keyboard roving, visible focus and reduced motion at the zoom proxy", async ({ mount, page }) => {
   await page.setViewportSize({ width: 320, height: 350 });
