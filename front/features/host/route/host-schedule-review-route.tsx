@@ -10,7 +10,6 @@ import type {
   ManualNotificationRequestedChannels,
 } from "@/features/host/api/host-contracts";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
-import { hostScheduleSeenStateLabel } from "@/features/host/model/host-schedule-seen-model";
 import {
   hostNotificationKeys,
   hostNotificationManualOptionsQuery,
@@ -22,8 +21,7 @@ import {
   hostSessionKeys,
 } from "@/features/host/queries/host-session-queries";
 import { hostWorkboxKeys } from "@/features/host/queries/host-workbox-queries";
-import { ManualNotificationPreviewConfirmation } from "@/features/host/ui/notifications/manual-notification-preview";
-import { HostScheduleReviewHeader } from "@/features/host/ui/schedule-review/host-schedule-review-header";
+import { HostScheduleReviewPage } from "@/features/host/ui/schedule-review/host-schedule-review-page";
 import {
   OperationReceipt,
   operationReceiptOutcome,
@@ -31,6 +29,7 @@ import {
 } from "@/features/host/ui/workbox/operation-receipt";
 import { isReadmatesTransportError } from "@/shared/api/errors";
 import { publishTransitionAction, TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
+import "@/features/host/ui/schedule-review/host-schedule-review.css";
 import "@/features/host/ui/workbox/host-workbox.css";
 
 type ScheduleReviewLinkProps = {
@@ -426,23 +425,33 @@ function HostScheduleReviewSession({
   }
 
   const busy = previewMutation.isPending || confirmMutation.isPending;
-  const canPreview = draft.selectedMembershipIds.length > 0
-    && draft.subject.trim().length > 0
-    && draft.body.trim().length > 0
-    && !busy;
+  const excludedCurrentCount = detail.attendees.filter((attendee) => attendee.scheduleSeenState === "CURRENT").length;
 
   return (
-    <main className="rm-schedule-review">
-      <HostScheduleReviewHeader
-        returnHref={returnHref}
-        sessionNumber={detail.sessionNumber}
-        bookTitle={detail.bookTitle}
-        scheduleRevision={detail.scheduleRevision}
-        unreadMemberCount={eligibleIds.length}
-        LinkComponent={LinkComponent}
-      />
-
-      {receipt ? (
+    <HostScheduleReviewPage
+      returnHref={returnHref}
+      sessionNumber={detail.sessionNumber}
+      bookTitle={detail.bookTitle}
+      scheduleRevision={detail.scheduleRevision}
+      unreadMemberCount={eligibleIds.length}
+      excludedCurrentCount={excludedCurrentCount}
+      recipients={detail.attendees.map((attendee) => ({
+        membershipId: attendee.membershipId,
+        displayName: attendee.displayName,
+        avatarKey: attendee.avatarKey,
+        scheduleSeenState: attendee.scheduleSeenState,
+      }))}
+      selectedMembershipIds={draft.selectedMembershipIds}
+      subject={draft.subject}
+      body={draft.body}
+      requestedChannels={draft.requestedChannels}
+      busy={busy}
+      error={error}
+      preview={previewSnapshot?.response ?? null}
+      previewPending={previewMutation.isPending}
+      confirmBusy={confirmMutation.isPending}
+      LinkComponent={LinkComponent}
+      receipt={receipt ? (
         <OperationReceipt
           outcome={receipt.outcome}
           title="일정 알림"
@@ -450,101 +459,15 @@ function HostScheduleReviewSession({
           ledgerHref={receipt.outcome === "unknown" ? notificationLedgerHref : null}
           LinkComponent={LinkComponent}
         />
-      ) : (
-        <div className="rm-schedule-review__layout">
-          <section className="rm-schedule-review__recipients" aria-labelledby="schedule-review-recipients-title">
-            <div className="rm-schedule-review__section-heading">
-              <h2 id="schedule-review-recipients-title">대상 확인</h2>
-              <span>선택 {draft.selectedMembershipIds.length}명</span>
-            </div>
-            <p>변경 전 확인과 미열람만 선택됩니다. 현재 일정을 확인한 멤버는 보이지만 발송 대상에서는 제외됩니다.</p>
-            <ul>
-              {detail.attendees.map((attendee) => {
-                const eligible = attendee.scheduleSeenState === "STALE" || attendee.scheduleSeenState === "UNSEEN";
-                const checked = draft.selectedMembershipIds.includes(attendee.membershipId);
-                return (
-                  <li key={attendee.membershipId} data-state={attendee.scheduleSeenState}>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        disabled={!eligible || busy}
-                        onChange={(event) => {
-                          const selectedMembershipIds = event.currentTarget.checked
-                            ? [...draft.selectedMembershipIds, attendee.membershipId]
-                            : draft.selectedMembershipIds.filter((id) => id !== attendee.membershipId);
-                          updateDraft({ selectedMembershipIds });
-                        }}
-                      />
-                      <span><strong>{attendee.displayName}</strong><small>{hostScheduleSeenStateLabel(attendee.scheduleSeenState)}</small></span>
-                    </label>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-
-          <section className="rm-schedule-review__composer" aria-labelledby="schedule-review-composer-title">
-            <h2 id="schedule-review-composer-title">문구와 채널</h2>
-            <label>
-              <span>알림 제목</span>
-              <input
-                aria-label="알림 제목"
-                maxLength={200}
-                value={draft.subject}
-                disabled={busy}
-                onChange={(event) => updateDraft({ subject: event.currentTarget.value })}
-              />
-            </label>
-            <label>
-              <span>알림 본문</span>
-              <textarea
-                aria-label="알림 본문"
-                rows={6}
-                maxLength={4_000}
-                value={draft.body}
-                disabled={busy}
-                onChange={(event) => updateDraft({ body: event.currentTarget.value })}
-              />
-            </label>
-            <fieldset disabled={busy}>
-              <legend>발송 채널</legend>
-              {(["BOTH", "IN_APP", "EMAIL"] as const).map((channel) => (
-                <label key={channel}>
-                  <input
-                    type="radio"
-                    name="schedule-review-channel"
-                    checked={draft.requestedChannels === channel}
-                    onChange={() => updateDraft({ requestedChannels: channel })}
-                  /> {channelLabel(channel)}
-                </label>
-              ))}
-            </fieldset>
-
-            {error ? <p className="rm-schedule-review__error" role="alert">{error}</p> : null}
-            <button
-              type="button"
-              className="rm-schedule-review__preview"
-              disabled={!canPreview}
-              onClick={() => void previewNotification()}
-            >
-              {previewMutation.isPending ? "미리보기 만드는 중" : "알림 미리보기"}
-            </button>
-
-            {previewSnapshot ? (
-              <ManualNotificationPreviewConfirmation
-                preview={previewSnapshot.response}
-                busy={confirmMutation.isPending}
-                presentation="side-sheet"
-                error={error}
-                onRefreshPreview={previewNotification}
-                onConfirm={confirmNotification}
-              />
-            ) : null}
-          </section>
-        </div>
-      )}
-    </main>
+      ) : null}
+      onSelectedMembershipIdsChange={(selectedMembershipIds) => updateDraft({ selectedMembershipIds })}
+      onSubjectChange={(subject) => updateDraft({ subject })}
+      onBodyChange={(body) => updateDraft({ body })}
+      onRequestedChannelsChange={(requestedChannels) => updateDraft({ requestedChannels })}
+      onPreview={() => void previewNotification()}
+      onConfirm={confirmNotification}
+      onRefreshPreview={previewNotification}
+    />
   );
 }
 
@@ -611,10 +534,4 @@ function receiptFromConfirm(result: ManualNotificationConfirmResponse): DurableR
     outcome,
     detail: `대상 ${summary.targetCount}명 · 앱 ${summary.expectedInAppCount}명 · 이메일 ${summary.expectedEmailCount}명`,
   };
-}
-
-function channelLabel(channel: ManualNotificationRequestedChannels): string {
-  if (channel === "IN_APP") return "앱 알림";
-  if (channel === "EMAIL") return "이메일";
-  return "앱 알림 + 이메일";
 }

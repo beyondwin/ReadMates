@@ -10,9 +10,8 @@ import { HostMeetingList } from "./meeting-list/host-meeting-list";
 import { HostPeoplePage } from "./members/host-people-page";
 import { MemberList } from "./members/member-list";
 import { MemberPendingZone } from "./members/member-pending-zone";
-import { ManualNotificationPreviewConfirmation } from "./notifications/manual-notification-preview";
 import { HostPersonDetail } from "./person/host-person-detail";
-import { HostScheduleReviewHeader } from "./schedule-review/host-schedule-review-header";
+import { HostScheduleReviewPage } from "./schedule-review/host-schedule-review-page";
 import { HostClubSettings } from "./settings/host-club-settings";
 import {
   HostInvitationLinks,
@@ -431,10 +430,10 @@ const person: HostPersonDetailView = {
 };
 
 const scheduleReviewMembers = [
-  { id: "membership-park", name: "박서윤", state: "변경 전 확인" },
-  { id: "membership-lee", name: "이도현", state: "미열람" },
-  { id: "membership-kang", name: "강유진", state: "미열람" },
-  { id: "membership-moon", name: "문재희", state: "미열람" },
+  { membershipId: "membership-park", displayName: "박서윤", avatarKey: "peach-green-book", scheduleSeenState: "STALE" },
+  { membershipId: "membership-lee", displayName: "이도현", avatarKey: "banana-green-book", scheduleSeenState: "UNSEEN" },
+  { membershipId: "membership-kang", displayName: "강유진", avatarKey: "tulip-notebook", scheduleSeenState: "UNSEEN" },
+  { membershipId: "membership-moon", displayName: "문재희", avatarKey: "candle-green-book", scheduleSeenState: "UNSEEN" },
 ] as const;
 
 const scheduleReviewPreview: ManualNotificationPreviewResponse = {
@@ -601,53 +600,25 @@ export function hostSettingsApprovedView() {
 export function hostScheduleReviewApprovedView() {
   return hostApprovedShell(
     "schedule-review",
-    <main className="rm-schedule-review">
-      <HostScheduleReviewHeader
-        returnHref="/clubs/reading-sai/app/host"
-        sessionNumber={28}
-        bookTitle="지구 끝의 온실"
-        scheduleRevision={4}
-        unreadMemberCount={4}
-      />
-      <div className="rm-schedule-review__layout">
-        <section className="rm-schedule-review__recipients" aria-labelledby="schedule-review-recipients-title">
-          <div className="rm-schedule-review__section-heading">
-            <h2 id="schedule-review-recipients-title">안내 대상 4명</h2>
-            <span>미열람 4명</span>
-          </div>
-          <p>현재 일정 확인 8명은 자동으로 제외했어요. 미리보기 뒤에만 보냅니다.</p>
-          <ul>
-            {scheduleReviewMembers.map((member) => (
-              <li key={member.id} data-state={member.state === "미열람" ? "UNSEEN" : "STALE"}>
-                <label>
-                  <input type="checkbox" defaultChecked readOnly />
-                  <span><strong>{member.name}</strong><small>{member.state}</small></span>
-                </label>
-              </li>
-            ))}
-          </ul>
-        </section>
-        <section className="rm-schedule-review__composer" aria-labelledby="schedule-review-composer-title">
-          <h2 id="schedule-review-composer-title">보낼 안내</h2>
-          <p>대상과 문구를 확인한 뒤 직접 보내세요. 자동 발송하지 않아요.</p>
-          <label>
-            <span>알림 제목</span>
-            <input aria-label="알림 제목" readOnly value={scheduleReviewPreview.template.subject} />
-          </label>
-          <label>
-            <span>알림 본문</span>
-            <textarea aria-label="알림 본문" readOnly rows={6} value={scheduleReviewPreview.template.bodyPreview} />
-          </label>
-          <button type="button" className="rm-schedule-review__preview">알림 미리보기</button>
-          <ManualNotificationPreviewConfirmation
-            preview={scheduleReviewPreview}
-            busy={false}
-            presentation="side-sheet"
-            onConfirm={async () => undefined}
-          />
-        </section>
-      </div>
-    </main>,
+    <HostScheduleReviewPage
+      returnHref="/clubs/reading-sai/app/host"
+      sessionNumber={28}
+      bookTitle="지구 끝의 온실"
+      scheduleRevision={4}
+      unreadMemberCount={4}
+      excludedCurrentCount={8}
+      recipients={scheduleReviewMembers}
+      selectedMembershipIds={scheduleReviewMembers.map((member) => member.membershipId)}
+      subject={scheduleReviewPreview.template.subject}
+      body={scheduleReviewPreview.template.bodyPreview}
+      requestedChannels="BOTH"
+      preview={scheduleReviewPreview}
+      onSelectedMembershipIdsChange={noop}
+      onSubjectChange={noop}
+      onBodyChange={noop}
+      onRequestedChannelsChange={noop}
+      onConfirm={async () => undefined}
+    />,
   );
 }
 

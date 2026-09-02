@@ -31,6 +31,19 @@ const RECORDS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 990 } as const
 const SETTINGS_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
 const SETTINGS_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
 const SETTINGS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1052 } as const;
+const SCHEDULE_REVIEW_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
+const SCHEDULE_REVIEW_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
+const SCHEDULE_REVIEW_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1142 } as const;
+
+function boxesOverlap(
+  left: { x: number; y: number; width: number; height: number },
+  right: { x: number; y: number; width: number; height: number },
+) {
+  return left.x < right.x + right.width
+    && left.x + left.width > right.x
+    && left.y < right.y + right.height
+    && left.y + left.height > right.y;
+}
 
 async function mountApproved(
   mount: (component: ReactElement) => Promise<Locator>,
@@ -86,6 +99,7 @@ async function captureHostLedger(input: {
   const peopleDesktop = input.id === "host-people-desktop";
   const recordsDesktop = input.id === "host-records-desktop";
   const settingsDesktop = input.id === "host-settings-desktop";
+  const scheduleReviewDesktop = input.id === "host-schedule-review-desktop";
   if (meetingsDesktop && (!input.regions || input.regions.length === 0)) {
     throw new Error("host-meetings-desktop requires nav and main capture regions");
   }
@@ -98,13 +112,16 @@ async function captureHostLedger(input: {
   if (settingsDesktop && (!input.regions || input.regions.length === 0)) {
     throw new Error("host-settings-desktop requires nav and main capture regions");
   }
+  if (scheduleReviewDesktop && (!input.regions || input.regions.length === 0)) {
+    throw new Error("host-schedule-review-desktop requires nav and main capture regions");
+  }
   return captureApprovedComparison({
     entry: approvedMockup(input.id),
     candidate: input.candidate,
     page: input.page,
     testInfo: input.testInfo,
     regions: input.regions ?? [],
-    ...(meetingsDesktop || peopleDesktop || recordsDesktop || settingsDesktop
+    ...(meetingsDesktop || peopleDesktop || recordsDesktop || settingsDesktop || scheduleReviewDesktop
       ? { skipMismatchRatioAssertion: true as const }
       : {
           allowFontRasterException: true as const,
@@ -275,15 +292,49 @@ test("invites and settings match approved desktop", async ({ mount, page }, test
 });
 
 test("unread schedule review matches approved desktop", async ({ mount, page }, testInfo) => {
+  test.setTimeout(90_000);
   const component = await mountApproved(mount, page, hostScheduleReviewApprovedView(), APPROVED_DESKTOP_VIEWPORT);
+  await expect(component.getByRole("link", { name: "운영실", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(component.getByRole("heading", { name: "일정 미열람 검토" })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "안내 대상 4명" })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "보낼 안내" })).toBeVisible();
   await expect(component.getByText("미열람 4명").first()).toBeVisible();
   await expect(component.getByRole("button", { name: "4명에게 안내 보내기" })).toBeVisible();
+  const fields = component.locator("input, textarea, [role='checkbox']");
+  expect(await fields.count()).toBeGreaterThan(3);
+  const recipients = component.locator(".rm-schedule-review__recipients");
+  const composer = component.locator(".rm-schedule-review__composer");
+  await expect(recipients).toBeVisible();
+  await expect(composer).toBeVisible();
+  const recipientBox = await recipients.boundingBox();
+  const composerBox = await composer.boundingBox();
+  expect(recipientBox, "recipient list bounding box").not.toBeNull();
+  expect(composerBox, "message composer bounding box").not.toBeNull();
+  expect(
+    boxesOverlap(recipientBox!, composerBox!),
+    `recipient ${JSON.stringify(recipientBox)} overlaps composer ${JSON.stringify(composerBox)}`,
+  ).toBe(false);
+  expect(
+    recipientBox!.x + recipientBox!.width,
+    "two-column layout at 1536px must keep recipients left of the composer",
+  ).toBeLessThanOrEqual(composerBox!.x + 4);
+  const header = component.locator("header.topnav");
+  const nav = component.getByRole("navigation", { name: "호스트 주 메뉴" });
+  const main = component.getByRole("main");
+  await expect(header).toBeVisible();
+  await expect(nav).toBeVisible();
+  await expect(main).toBeVisible();
+  const regions = [
+    await regionFromLocator(header, "header", SCHEDULE_REVIEW_HEADER_GEOMETRY, 4),
+    await regionFromLocator(nav, "nav", SCHEDULE_REVIEW_NAV_GEOMETRY, 4),
+    await regionFromLocator(main, "main", SCHEDULE_REVIEW_MAIN_GEOMETRY, 4),
+  ];
   await captureHostLedger({
     id: "host-schedule-review-desktop",
     candidate: component,
     page,
     testInfo,
+    regions,
   });
 });
 
