@@ -47,19 +47,21 @@ ADR impact: update — ADR-0048·0050·0051의 제품 구성은 유지한다. AD
 
 Tracked snapshot은 직전 구현 대비 회귀 cache다. Snapshot 갱신만으로 승인하지 않으며 승인 reference, 실제 route candidate, overlay, diff, measurement, 독립 검토가 함께 있어야 한다.
 
+의도한 code-native UI 변경으로 CT snapshot이 달라지면, 해당 실제 route가 먼저 strict GREEN을 통과하고 독립 diff 검토가 끝난 뒤에만 Docker update mode로 영향 snapshot을 갱신할 수 있다. 승인 reference PNG와 sidecar는 이 절차의 갱신 대상이 아니다. CT snapshot 갱신은 실제 route 승인 증거를 보완할 뿐 대체하지 않는다.
+
 ## 4. 승인 자산과 실제 route 시나리오
 
 각 id는 하나의 `VisualAuthorityScenario`를 가진다. Scenario는 다음을 등록한다.
 
 - approved reference path와 SHA-256
 - 실제 route와 URL 소유 상태
-- 인증 역할과 club scope
+- 인증 역할·capability와 club scope
 - CSS viewport와 reference 정규화 크기
-- 결정적이고 public-safe한 BFF 응답 fixture
+- 결정적이고 public-safe한 BFF 응답 fixture key와 capture 준비 동작
 - 첫 화면 필수 region과 순서
 - 기본 노출 항목 수
 - 허용되는 데이터 변화와 금지되는 구성 변화
-- pixel·geometry·typography·interaction assertion
+- pixel·geometry·typography(size, weight, line-height, color)·interaction assertion
 
 | id | 승인 파일 | 실제 route 표면 |
 | --- | --- | --- |
@@ -83,6 +85,8 @@ Tracked snapshot은 직전 구현 대비 회귀 cache다. Snapshot 갱신만으�
 | `host-person-mobile` | `docs/development/host-redesign-mockups/17-mobile-host-person-detail-approved.png` | `/clubs/:slug/app/host/people/:membershipId` mobile |
 
 실제 route는 제품의 router, layout, controller, query, view-model, UI와 responsive CSS를 그대로 지난다. 시각 테스트는 네트워크 경계에서 결정적 BFF fixture를 공급하고 기존 개발용 인증 경로로 역할을 구성한다. 별도 page tree나 시안 전용 제품 route를 만들지 않는다.
+
+Fixture는 요청 method, route club scope와 body를 검증하고 등록되지 않은 `/api/bff/**` 요청을 fail closed한다. 대표 상태를 준비하는 데 필요한 preview POST는 허용할 수 있지만 confirmation/send, invitation create, settings update, club close 등 외부 효과 요청은 capture 준비 중 0건이어야 한다. Auth fixture 변경 자체도 platform capability와 Host club-scope fail-closed E2E를 통과해야 한다.
 
 ## 5. 화면 구성과 데이터 초과 규칙
 
@@ -153,6 +157,8 @@ UI는 기존 route-first dependency를 유지한다. `ui`는 props/callback만 �
 
 Pretendard와 icon font는 CI image에 고정한다. 전체 capture에 0.10/0.15 font-raster ceiling을 적용하지 않는다. 불가피한 glyph raster 차이는 해당 glyph 영역, 환경, 근거, reviewer를 기록한 좁은 mask만 허용한다. Mask는 composition, background, spacing, control geometry를 덮을 수 없으며 승인 id와 함께 versioned contract로 관리한다.
 
+Harness는 settle 뒤 pixel·region·typography·first viewport·기본 노출량·overflow·interaction 결과를 먼저 모두 측정하고 candidate, overlay, diff, versioned JSON report를 쓴 다음 strict assertion을 평가한다. 실패하더라도 비교 근거가 남아야 한다. Report는 reference/candidate hash, canonical Docker image, browser·Playwright·Node·pnpm·font·DPR fingerprint, viewport, 각 측정값과 판정, `mask: null` 또는 별도 승인된 좁은 mask를 포함한다.
+
 ## 9. 공통 스트레스 계약
 
 승인 18장은 대표 상태의 pixel authority다. 다음 스트레스 상태는 같은 실제 route에서 semantic·geometry invariant로 별도 차단한다.
@@ -204,6 +210,8 @@ Pretendard와 icon font는 CI image에 고정한다. 전체 capture에 0.10/0.15
 
 실제 route visual-authority test를 별도 필수 CI job으로 둔다. Workflow는 실제 git diff를 `approvedMockupsAffectedBy(changedPaths)`에 전달한다. 영향받은 reference는 이전 승인을 만료시키고 새 candidate·overlay·diff·measurement를 요구한다.
 
+Changed path는 repository-relative canonical path로 정규화한다. 승인 reference는 자기 id, Admin/Host route·model·UI·fixture·actual-route spec은 해당 role id, shared shell/auth/style/token·harness·runner·lockfile·package/config·workflow는 관련 전체 id를 무효화한다. 시각 민감 경로가 dependency partition에 들어왔는데 어느 id에도 매핑되지 않으면 빈 목록으로 통과하지 않고 CI를 실패시킨다.
+
 CI artifact에는 각 id의 reference hash, candidate hash, browser/font fingerprint, region result, pixel ratio와 mask 사용 여부를 남긴다. Snapshot 갱신은 visual-authority receipt가 아니다. Admin 또는 Host authority job이 실패하면 merge할 수 없다.
 
 ## 12. 검증과 사람 승인
@@ -230,7 +238,8 @@ CI artifact에는 각 id의 reference hash, candidate hash, browser/font fingerp
 ## 13. Acceptance matrix
 
 - 선택: `UI or runtime state` — loading, empty, stale, partial, denied, wrapping, desktop/mobile, route continuity와 visual geometry.
-- 조건부 선택: 실제 route scenario가 auth 또는 club-context fixture를 바꾸면 actor/authorization과 club-context focused E2E를 추가한다.
+- 선택: `Actor or authorization` — Admin capability projection과 Host perspective가 실제 authenticated route를 열기 전에 fail closed하는지 focused E2E로 확인한다.
+- 선택: `Club context` — Host auth 요청의 route slug 결속, same-club safe fallback, cross-club projection 거부를 focused E2E로 확인한다.
 - 제외: BFF/OAuth protocol, persistence/migration, guest/public projection, provider, deploy. 이 설계는 해당 의미를 변경하지 않는다. 구현 중 필요해지면 중단하고 별도 승인을 받는다.
 
 ## 14. 완료 정의
