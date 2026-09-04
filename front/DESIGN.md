@@ -68,7 +68,7 @@ Lifecycle·audience·public placement를 한 stepper로 합치지 않는다. 다
 | `768–1199px` | 같은 semantic 순서를 유지하고 primary 뒤에 작업함을 쌓는다. 68/32 rail을 억지로 축소하지 않으며 768px부터 desktop chrome을 사용하되 bottom safe area는 침범하지 않는다. |
 | `1200px+` | main 작업은 약 68%, 작업함 rail은 약 32%의 두 열이다. DOM/읽기 순서는 mobile과 동일하며 작업함만 오른쪽에 배치한다. |
 
-390·767·768·1024·1199·1200·1440px와 320×350 200% zoom proxy는 `host-operating-room-responsive.ct.tsx`와 `host-shell.ct.tsx`가 가로 overflow, 44px target(live compact 출석 choice 40px / undo 36px leftover), 순서, keyboard roving, visible focus와 reduced motion을 잠근다. Phase와 workbox tab은 방향키와 Home/End를 지원하고, focus/return state는 route/panel을 닫거나 Back/Forward할 때 원래 control로 돌아간다.
+390·767·768·1024·1199·1200·1440px와 320×350 200% zoom proxy에서 가로 overflow, 44px target(live compact 출석 choice 40px / undo 36px leftover), 순서, keyboard roving, visible focus와 reduced motion은 이 문서가 규정하는 계약이다. 2026-09-04 기준 이 계약을 실제로 잠그고 있는 것은 **`host-shell.ct.tsx`뿐**이다. `host-operating-room-responsive.ct.tsx`는 실패 중이므로 현재 이 계약을 잠그지 않는다(아래 주의 참고). Phase와 workbox tab은 방향키와 Home/End를 지원하고, focus/return state는 route/panel을 닫거나 Back/Forward할 때 원래 control로 돌아간다.
 
 > **Stale 근거 주의.** `host-operating-room-responsive.ct.tsx`, `approved-host-ledgers.ct.tsx`, `admin-editorial-ledger.ct.tsx`, `admin-shell-layout.ct.tsx`와 E2E `host-workbox-stage4.spec.ts`, `admin-today.spec.ts`, `admin-editorial-ledger-browser-smoke.spec.ts`, `host-lifecycle-operating-room.spec.ts`는 2026-09-04 기준 **실패 중**이다. 이 spec들은 Admin 3건·Host desktop 4건/mobile 3건 cap과 새 heading 계약 이전의 기대치를 담고 있어(예: `host-workbox-stage4.spec.ts`는 작업함 listitem 40개를 기대하지만 실제는 4개다) 갱신 전까지 현재 계약의 통과 근거로 인용하지 않는다. 전체 목록과 exit code는 `docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md` §잔여 위험과 릴리스 경계에 있다. **CT snapshot이나 reference를 갱신해 이 차이를 흡수하지 않는다.**
 
@@ -145,7 +145,18 @@ Live region은 의미 있는 전이에만 쓰고 polling마다 반복하지 않�
 
 Contract widths: 320, 390, 768, 900, 1024, 1440px. keyboard, visible focus, 44px target(live compact 출석 choice 40px / undo 36px leftover), reduced motion, long Korean/English wrapping은 automated helper로 검증한다. Chrome 실제 toolbar 200% zoom은 이번 actual-route 수렴에서 **`not_measured`**다. 자동화의 320×350 200% proxy는 실제 toolbar 확대 측정이 아니므로 DPR·CSS viewport·scroll/client width 확인으로 확대 해석하지 않는다. Manual screen-reader announcement order도 `not_measured`이며 어느 쪽도 검증 완료로 주장하지 않는다. 근거는 `docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md` §Step 4다.
 
-Host lifecycle의 code-native source는 `front/features/host/ui/operating-room/host-operating-room-responsive.ct.tsx`, `front/features/host/ui/meeting-workspace/host-lifecycle-responsive.ct.tsx`, `front/features/host/ui/shell/host-shell.ct.tsx`다. Real-route continuity와 recovery widths는 `front/tests/e2e/host-lifecycle-route-continuity.spec.ts`, `front/tests/e2e/host-authority-loss.spec.ts`, `front/tests/e2e/host-workbox-stage4.spec.ts`가 맡는다. semantic/geometry/DOM 계약은 이 code-native tests가 잠근다. 승인 PNG를 runtime 배경으로 쓰지 않으며 tracked snapshot은 보조 회귀 cache다.
+Host lifecycle의 code-native source는 `front/features/host/ui/operating-room/host-operating-room-responsive.ct.tsx`, `front/features/host/ui/meeting-workspace/host-lifecycle-responsive.ct.tsx`, `front/features/host/ui/shell/host-shell.ct.tsx`이고, real-route continuity와 recovery widths는 `front/tests/e2e/host-lifecycle-route-continuity.spec.ts`, `front/tests/e2e/host-authority-loss.spec.ts`, `front/tests/e2e/host-workbox-stage4.spec.ts`가 맡는다. 다만 **이 목록 전체가 현재 계약을 잠근다고 읽지 않는다.** 2026-09-04 실행 기준 상태는 다음과 같다.
+
+| suite | 2026-09-04 상태 |
+| --- | --- |
+| `host-lifecycle-responsive.ct.tsx` | 통과 — 잠근다 |
+| `host-shell.ct.tsx` | 통과 — 잠근다 |
+| `host-lifecycle-route-continuity.spec.ts` | 통과 — 잠근다 |
+| `host-operating-room-responsive.ct.tsx` | **실패 (5건)** — 잠그지 않는다 |
+| `host-workbox-stage4.spec.ts` | **실패 (1건)** — 잠그지 않는다 |
+| `host-authority-loss.spec.ts` | **미실행** — 이번 수렴에서 돌리지 않았다. 통과로 읽지 않는다. |
+
+따라서 semantic/geometry/DOM 계약을 현재 잠그는 것은 위 표의 통과 3개뿐이다. 실패·미실행 suite는 갱신 또는 실행 전까지 통과 근거로 인용하지 않는다. 자세한 내용은 `docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md` §잔여 위험과 릴리스 경계에 있다. 승인 PNG를 runtime 배경으로 쓰지 않으며 tracked snapshot은 보조 회귀 cache다.
 
 Admin·Host 승인 PNG 비교는 `front/tests/e2e/support/approved-mockup-manifest.ts`와 실제 authenticated route를 candidate로 쓰는 `pnpm --dir front test:e2e:approved-routes:docker`가 담당한다. `pnpm --dir front test:ct:docker`는 보조 component 회귀 suite이며 승인 receipt를 만들지 않는다. token, shared CSS/component, fixture 변경은 `pnpm --dir front visual-authority:affected`가 계산한 영향 id의 기존 승인을 무효화하고 approved reference·candidate·overlay·diff·measurement report와 독립 검토가 다시 필요하다. 현재 결과는 `docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md`를 따른다: composition·geometry·typography·first viewport·interaction·request audit 18/18 통과, strict pixel 18/18 `not_passed_0.02`. 2026-09-02 두 보고서는 component fixture 기반 역사적 기록이다. ADR-0053은 `Proposed`다.
 

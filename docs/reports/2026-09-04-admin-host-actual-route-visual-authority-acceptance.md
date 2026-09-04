@@ -194,7 +194,7 @@ push·merge·PR 생성 권한이 이 작업 범위에 없다. 원격 CI 실행 �
 1. **strict pixel `not_passed_0.02` (18/18).** composition/geometry/typography/first viewport/interaction/request audit는 통과했지만 승인 AI PNG 대비 raster 잔여가 남는다.
 2. **`pnpm --dir front lint` FAIL (error 4건).** 그중 하나는 제품 route 파일의 `react-hooks/refs`다.
 3. **`test:ct:docker` FAIL (18건).** geometry·semantic·tracked snapshot이 새 composition과 어긋난다. snapshot을 갱신해 덮지 않았다.
-4. **cross-browser smoke FAIL (9건)과 focused E2E FAIL (7건 + 2 did not run).** 기존 Admin heading/`확인함` 계약과 Host 작업함 40건 기대치가 새 밀도·disclosure 계약으로 갱신되지 않았다.
+4. **cross-browser smoke FAIL (9건)과 focused E2E FAIL (7건 + 2 did not run).** 기존 Admin heading/`확인함` 계약과 Host 작업함 40건 기대치가 새 밀도·disclosure 계약으로 갱신되지 않았다. `front/tests/e2e/host-authority-loss.spec.ts`는 focused set에 없어 **이번 수렴에서 실행하지 않았다.** 통과로 읽지 않는다.
 5. **사람 30초 gate `pending_external_human_evidence`.**
 6. **Chrome 200%·VoiceOver/Safari·NVDA/Chrome `not_measured`.**
 7. **원격 CI `pending_remote_ci`.**
