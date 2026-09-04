@@ -175,18 +175,28 @@ describe("approved mockup contract", () => {
   });
 
   it("rejects a local renderer fingerprint that is not the pinned Jammy image", () => {
-    expect(resolveApprovedRendererImage()).not.toBe(CANONICAL_RENDERER_IMAGE);
-    expect(() => assertApprovedRouteReport(validReport({
-      renderer: {
-        image: `local/${process.platform}`,
-        browser: "chromium",
-        playwrightVersion: "1.61.1",
-        nodeVersion: "24.0.0",
-        pnpmVersion: "11.13.1",
-        dpr: 1,
-        pretendardFaces: ["Pretendard Variable"],
-      },
-    }))).toThrow(/jammy/i);
+    const previous = process.env.READMATES_VISUAL_AUTHORITY_RENDERER_IMAGE;
+    delete process.env.READMATES_VISUAL_AUTHORITY_RENDERER_IMAGE;
+    try {
+      expect(resolveApprovedRendererImage()).not.toBe(CANONICAL_RENDERER_IMAGE);
+      expect(() => assertApprovedRouteReport(validReport({
+        renderer: {
+          image: `local/${process.platform}`,
+          browser: "chromium",
+          playwrightVersion: "1.61.1",
+          nodeVersion: "24.0.0",
+          pnpmVersion: "11.13.1",
+          dpr: 1,
+          pretendardFaces: ["Pretendard Variable"],
+        },
+      }))).toThrow(/jammy/i);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.READMATES_VISUAL_AUTHORITY_RENDERER_IMAGE;
+      } else {
+        process.env.READMATES_VISUAL_AUTHORITY_RENDERER_IMAGE = previous;
+      }
+    }
   });
 });
 

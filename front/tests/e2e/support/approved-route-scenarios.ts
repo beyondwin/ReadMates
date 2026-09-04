@@ -353,7 +353,7 @@ const TYPO_HOST_WORDMARK = {
 };
 const TYPO_HOST_WORDMARK_MOBILE = {
   name: "wordmark",
-  selector: ".m-hdr-heading, .m-hdr-brand",
+  selector: '[data-club-shell-region="mobile-context"] .rm-global-space-switcher__trigger strong',
   fontFamilyIncludes: "Pretendard" as const,
   fontSizePx: 12,
   fontWeight: [650],
@@ -519,7 +519,7 @@ const HOST_OPERATING_TYPOGRAPHY = [
   TYPO_HOST_WORDMARK,
   TYPO_HOST_PAGE_TITLE,
   typo("phase-label", ".rm-operating-room-phases__label", 14, [600], 19.6),
-  typo("work-item-title", ".rm-host-work-item__destination strong", 17, [600], 23.8),
+  typo("work-item-title", ".rm-host-work-item__label", 17, [600], 23.8),
   TYPO_BODY,
 ] as const;
 
@@ -578,7 +578,7 @@ const HOST_MOBILE_TYPOGRAPHY = [
   TYPO_HOST_WORDMARK_MOBILE,
   TYPO_HOST_PAGE_TITLE_MOBILE,
   typo("phase-label", ".rm-operating-room-phases__label", 14, [600], 19.6),
-  typo("work-item-title", ".rm-host-work-item__destination strong", 17, [600], 23.8),
+  typo("work-item-title", ".rm-host-work-item__label", 17, [600], 23.8),
   TYPO_BODY,
 ] as const;
 

@@ -141,14 +141,33 @@ describe("actual-route visual authority scenarios", () => {
     expect(noCommand?.visibility).toBe("absent");
     expect(noCommand?.selector).toMatch(/새로 확인|admin-health-grid__refresh/);
 
-    const prep = visualAuthorityScenario("host-prep-desktop");
-    expect(prep.typography.find((entry) => entry.name === "work-item-title")?.selector)
-      .toBe(".rm-host-work-item__destination strong");
+    for (const id of [
+      "host-prep-desktop",
+      "host-live-desktop",
+      "host-closing-desktop",
+      "host-prep-mobile",
+      "host-live-mobile",
+    ] as const) {
+      expect(
+        visualAuthorityScenario(id).typography.find((entry) => entry.name === "work-item-title")?.selector,
+        id,
+      ).toBe(".rm-host-work-item__label");
+    }
 
     for (const id of ["host-prep-mobile", "host-live-mobile", "host-person-mobile"] as const) {
       const wordmark = visualAuthorityScenario(id).typography.find((entry) => entry.name === "wordmark");
-      expect(wordmark?.selector, id).toMatch(/m-hdr-heading|m-hdr-brand/);
-      expect(wordmark?.selector, id).not.toMatch(/header\.topnav/);
+      expect(wordmark?.selector, id).toBe(
+        '[data-club-shell-region="mobile-context"] .rm-global-space-switcher__trigger strong',
+      );
+      expect(wordmark?.selector, id).not.toMatch(/m-hdr-heading|m-hdr-brand|header\.topnav/);
+    }
+  });
+
+  it("does not use clipped host mobile header classes as the wordmark", () => {
+    for (const id of ["host-prep-mobile", "host-live-mobile", "host-person-mobile"] as const) {
+      const selector = visualAuthorityScenario(id).typography.find((entry) => entry.name === "wordmark")?.selector ?? "";
+      expect(selector, id).not.toMatch(/m-hdr-heading/);
+      expect(selector, id).not.toMatch(/m-hdr-brand/);
     }
   });
 
