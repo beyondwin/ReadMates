@@ -10,6 +10,7 @@ import {
 } from "./approved-route-scenarios";
 import {
   APPROVED_ROUTE_PREPARATIONS,
+  executeKeyboardMenuSequence,
   performHistoryRestore,
   runActualRouteAuthority,
 } from "./approved-route-harness";
@@ -42,7 +43,7 @@ describe("actual-route visual authority scenarios", () => {
         expect(scenario.typography.some((item) => item.selector === entry.selector)).toBe(true);
       }
       for (const entry of required.firstViewport) {
-        expect(["fully-visible", "intersects"]).toContain(entry.visibility);
+        expect(["fully-visible", "intersects", "absent"]).toContain(entry.visibility);
         expect(scenario.firstViewport.some((item) => item.selector === entry.selector)).toBe(true);
       }
       if (required.defaultVisibleItems) {
@@ -123,6 +124,74 @@ describe("actual-route visual authority scenarios", () => {
       },
     });
     expect(history[index]).toBe("/admin/today?queue=all");
+  });
+
+  it("retargets typography and absence checks to live production selectors", () => {
+    const today = visualAuthorityScenario("admin-today-desktop");
+    expect(today.typography.find((entry) => entry.name === "queue-title")?.selector)
+      .toBe(".admin-operations-queue__header h2");
+    expect(today.typography.some((entry) => entry.selector.includes("admin-operations-queue__title"))).toBe(false);
+
+    const records = visualAuthorityScenario("admin-records-desktop");
+    expect(records.regions.some((region) => region.selector === ".admin-audit__list")).toBe(true);
+
+    const service = visualAuthorityScenario("admin-service-desktop");
+    expect(service.regions.some((region) => region.selector === ".admin-health-grid__strip")).toBe(true);
+    const noCommand = service.firstViewport.find((entry) => entry.name === "no-command-control");
+    expect(noCommand?.visibility).toBe("absent");
+    expect(noCommand?.selector).toMatch(/새로 확인|admin-health-grid__refresh/);
+
+    const prep = visualAuthorityScenario("host-prep-desktop");
+    expect(prep.typography.find((entry) => entry.name === "work-item-title")?.selector)
+      .toBe(".rm-host-work-item__destination strong");
+
+    for (const id of ["host-prep-mobile", "host-live-mobile", "host-person-mobile"] as const) {
+      const wordmark = visualAuthorityScenario(id).typography.find((entry) => entry.name === "wordmark");
+      expect(wordmark?.selector, id).toMatch(/m-hdr-heading|m-hdr-brand/);
+      expect(wordmark?.selector, id).not.toMatch(/header\.topnav/);
+    }
+  });
+
+  it("orders host operating-room regions next-action before a non-nested status notice", () => {
+    for (const id of [
+      "host-prep-desktop",
+      "host-live-desktop",
+      "host-closing-desktop",
+      "host-prep-mobile",
+      "host-live-mobile",
+    ] as const) {
+      const names = visualAuthorityScenario(id).regions.map((region) => region.name);
+      const index = (name: string) => names.indexOf(name);
+      expect(index("current-meeting"), id).toBeGreaterThan(-1);
+      expect(index("phase-navigation"), id).toBeGreaterThan(index("current-meeting"));
+      expect(index("primary-next-action"), id).toBeGreaterThan(index("phase-navigation"));
+      expect(index("phase-status"), id).toBeGreaterThan(index("primary-next-action"));
+      expect(index("phase-panel"), id).toBeGreaterThan(index("phase-status"));
+      expect(index("workbox"), id).toBeGreaterThan(index("phase-panel"));
+      const status = visualAuthorityScenario(id).regions.find((region) => region.name === "phase-status");
+      expect(status?.selector, id).toBe(".rm-host-operating-room__phase-notice");
+      expect(status?.selector, id).not.toMatch(/next-action__state/);
+    }
+  });
+
+  it("asserts keyboard-menu focus after the non-Escape prefix then after Escape", async () => {
+    const presses: string[] = [];
+    let assertedExpandedAt = "";
+    let assertedEscapeAt = "";
+    await executeKeyboardMenuSequence({
+      keys: ["Enter", "ArrowDown", "Escape"],
+      press: async (key) => {
+        presses.push(key);
+      },
+      assertExpandedFocus: async () => {
+        assertedExpandedAt = presses.join(",");
+      },
+      assertEscapeFocus: async () => {
+        assertedEscapeAt = presses.join(",");
+      },
+    });
+    expect(assertedExpandedAt).toBe("Enter,ArrowDown");
+    expect(assertedEscapeAt).toBe("Enter,ArrowDown,Escape");
   });
 
   it("does not restore a ratio bypass in the contract source", () => {

@@ -57,6 +57,29 @@ export function locateApprovedTarget(page: Page, selector: string): Locator {
   return page.locator(selector).first();
 }
 
+export async function executeKeyboardMenuSequence(input: {
+  keys: readonly ("Enter" | "ArrowDown" | "ArrowUp" | "Escape")[];
+  press: (key: "Enter" | "ArrowDown" | "ArrowUp" | "Escape") => Promise<void>;
+  assertExpandedFocus: () => Promise<void>;
+  assertEscapeFocus: () => Promise<void>;
+}): Promise<void> {
+  const escapeIndex = input.keys.indexOf("Escape");
+  const prefix = escapeIndex === -1 ? input.keys : input.keys.slice(0, escapeIndex);
+  const suffix = escapeIndex === -1 ? [] : input.keys.slice(escapeIndex);
+  for (const key of prefix) {
+    await input.press(key);
+  }
+  if (prefix.length > 0) {
+    await input.assertExpandedFocus();
+  }
+  for (const key of suffix) {
+    await input.press(key);
+  }
+  if (suffix.includes("Escape")) {
+    await input.assertEscapeFocus();
+  }
+}
+
 export async function performHistoryRestore(input: {
   interaction: Extract<VisualAuthorityInteraction, { kind: "history-restore" }>;
   activate: () => Promise<void>;
@@ -154,8 +177,11 @@ async function measureBox(locator: Locator): Promise<{ x: number; y: number; wid
 
 async function visibilityOf(
   locator: Locator,
-  expected: "fully-visible" | "intersects",
-): Promise<{ visibility: "fully-visible" | "intersects"; passed: boolean }> {
+  expected: "fully-visible" | "intersects" | "absent",
+): Promise<{ visibility: "fully-visible" | "intersects" | "absent"; passed: boolean }> {
+  if (expected === "absent") {
+    return { visibility: "absent", passed: await locator.count() === 0 };
+  }
   const measured = await locator.evaluate((element) => {
     const box = element.getBoundingClientRect();
     const intersects = box.bottom > 0 && box.top < window.innerHeight && box.right > 0 && box.left < window.innerWidth;
@@ -305,19 +331,22 @@ async function executeInteraction(input: {
     } else if (interaction.kind === "keyboard-menu") {
       const trigger = locateApprovedTarget(page, interaction.trigger);
       await trigger.focus();
-      for (const key of interaction.keys) {
-        await page.keyboard.press(key);
-      }
-      const endsWithEscape = interaction.keys[interaction.keys.length - 1] === "Escape";
-      if (endsWithEscape) {
-        await assertFocused(page, interaction.expectedFocusAfterEscape);
-      } else {
-        await assertFocused(page, interaction.expectedFocused);
-        const expanded = await trigger.getAttribute("aria-expanded");
-        if ((expanded === "true") !== interaction.expectedExpanded) {
-          throw new Error(`${interaction.name} expectedExpanded=${interaction.expectedExpanded}`);
-        }
-      }
+      await executeKeyboardMenuSequence({
+        keys: interaction.keys,
+        press: async (key) => {
+          await page.keyboard.press(key);
+        },
+        assertExpandedFocus: async () => {
+          await assertFocused(page, interaction.expectedFocused);
+          const expanded = await trigger.getAttribute("aria-expanded");
+          if ((expanded === "true") !== interaction.expectedExpanded) {
+            throw new Error(`${interaction.name} expectedExpanded=${interaction.expectedExpanded}`);
+          }
+        },
+        assertEscapeFocus: async () => {
+          await assertFocused(page, interaction.expectedFocusAfterEscape);
+        },
+      });
     } else if (interaction.kind === "history-restore") {
       await performHistoryRestore({
         interaction,
@@ -421,6 +450,16 @@ export async function runActualRouteAuthority(input: {
   const firstViewport: ApprovedComparisonReport["firstViewport"] = [];
   for (const entry of scenario.firstViewport) {
     const locator = page.locator(entry.selector);
+    if (entry.visibility === "absent") {
+      const measured = await visibilityOf(locator, "absent");
+      firstViewport.push({
+        name: entry.name,
+        selector: entry.selector,
+        visibility: "absent",
+        passed: measured.passed,
+      });
+      continue;
+    }
     if (entry.name.includes("items")) {
       const expectedCount = scenario.defaultVisibleItems?.count ?? 1;
       let passed = true;

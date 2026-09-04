@@ -12,9 +12,11 @@ import {
 } from "../e2e/support/approved-mockup-manifest";
 import {
   APPROVED_COMPARISON_REPORT_REQUIRED_FIELDS,
+  CANONICAL_RENDERER_IMAGE,
   assertApprovedMismatchRatio,
   assertApprovedRouteReport,
   expectGeometryWithinTolerance,
+  resolveApprovedRendererImage,
   verifyApprovedReference,
   writeApprovedArtifacts,
   type ApprovedComparisonReport,
@@ -156,6 +158,35 @@ describe("approved mockup contract", () => {
     }
     expect(() => assertApprovedRouteReport(report)).toThrow(/mismatch ratio/);
     expect(existsSync(testInfo.outputPath("approved-mockup", `${report.id}-report.json`))).toBe(true);
+  });
+
+  it("names failed sub-results instead of hiding them behind the verdict", () => {
+    expect(() => assertApprovedRouteReport(validReport({
+      verdict: "fail",
+      geometry: [{
+        name: "admin-header",
+        actual: { x: 10, y: 0, width: 1672, height: 86 },
+        expected: { x: 0, y: 0, width: 1672, height: 86 },
+        toleranceCssPx: 4,
+        deltas: { x: 10, y: 0, width: 0, height: 0 },
+        passed: false,
+      }],
+    }))).toThrow(/geometry:admin-header/);
+  });
+
+  it("rejects a local renderer fingerprint that is not the pinned Jammy image", () => {
+    expect(resolveApprovedRendererImage()).not.toBe(CANONICAL_RENDERER_IMAGE);
+    expect(() => assertApprovedRouteReport(validReport({
+      renderer: {
+        image: `local/${process.platform}`,
+        browser: "chromium",
+        playwrightVersion: "1.61.1",
+        nodeVersion: "24.0.0",
+        pnpmVersion: "11.13.1",
+        dpr: 1,
+        pretendardFaces: ["Pretendard Variable"],
+      },
+    }))).toThrow(/jammy/i);
   });
 });
 

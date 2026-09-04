@@ -52,7 +52,7 @@ export type ApprovedComparisonReport = {
     actual: { fontFamily: string; fontSizePx: number; fontWeight: string; lineHeightPx: number | "normal"; color: string };
     expected: { fontFamilyIncludes: "Pretendard"; fontSizePx: number; fontWeight: readonly number[]; lineHeightPx: number | "normal"; color: string };
   }>;
-  firstViewport: Array<{ name: string; selector: string; visibility: "fully-visible" | "intersects"; passed: boolean }>;
+  firstViewport: Array<{ name: string; selector: string; visibility: "fully-visible" | "intersects" | "absent"; passed: boolean }>;
   defaultVisibleCount: { selector: string; expected: 3 | 4; actual: number; passed: boolean } | null;
   overflow: { horizontalCssPx: number; passed: boolean };
   interactions: Array<{ name: string; passed: boolean; detail: string }>;
@@ -249,9 +249,15 @@ function passedResultsFromRegions(regions: readonly ApprovedRegion[]): ApprovedR
   };
 }
 
+export function resolveApprovedRendererImage(): string {
+  const supplied = process.env.READMATES_VISUAL_AUTHORITY_RENDERER_IMAGE?.trim();
+  if (supplied) return supplied;
+  return `local/${process.platform}`;
+}
+
 function processFingerprint(): ApprovedComparisonReport["renderer"] {
   return {
-    image: CANONICAL_RENDERER_IMAGE,
+    image: resolveApprovedRendererImage(),
     browser: process.env.READMATES_VISUAL_AUTHORITY_BROWSER ?? "chromium",
     playwrightVersion: process.env.READMATES_VISUAL_AUTHORITY_PLAYWRIGHT_VERSION ?? "1.61.1",
     nodeVersion: process.version.replace(/^v/, ""),
@@ -355,14 +361,14 @@ export function assertApprovedRouteReport(report: ApprovedComparisonReport): voi
   if (!rendererFingerprintComplete(report.renderer)) {
     throw new Error("renderer fingerprint is incomplete");
   }
+  if (report.renderer.image !== CANONICAL_RENDERER_IMAGE) {
+    throw new Error(`renderer image must be ${CANONICAL_RENDERER_IMAGE}, got ${report.renderer.image}`);
+  }
   assertApprovedMismatchRatio({
     id: report.id,
     mismatchPixelRatio: report.mismatchPixelRatio,
     maxDiffPixelRatio: 0.02,
   });
-  if (report.verdict !== "pass" || !report.mismatchPassed) {
-    throw new Error(`${report.id} visual authority verdict is ${report.verdict}`);
-  }
   const failed = [
     ...report.geometry.filter((item) => !item.passed).map((item) => `geometry:${item.name}`),
     ...report.typography.filter((item) => !item.passed).map((item) => `typography:${item.name}`),
@@ -374,6 +380,9 @@ export function assertApprovedRouteReport(report: ApprovedComparisonReport): voi
   ];
   if (failed.length > 0) {
     throw new Error(`${report.id} failed sub-results: ${failed.join(", ")}`);
+  }
+  if (report.verdict !== "pass" || !report.mismatchPassed) {
+    throw new Error(`${report.id} visual authority verdict is ${report.verdict}`);
   }
 }
 

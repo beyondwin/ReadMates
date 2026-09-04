@@ -202,7 +202,7 @@ export type VisualAuthorityScenario = {
   firstViewport: readonly {
     name: string;
     selector: string;
-    visibility: "fully-visible" | "intersects";
+    visibility: "fully-visible" | "intersects" | "absent";
   }[];
   defaultVisibleItems?: { selector: string; count: 3 | 4 };
   interactions: readonly VisualAuthorityInteraction[];
@@ -326,7 +326,7 @@ const TYPO_ADMIN_PAGE_TITLE_MOBILE = {
 };
 const TYPO_QUEUE_TITLE = {
   name: "queue-title",
-  selector: ".admin-operations-queue__title",
+  selector: ".admin-operations-queue__header h2",
   fontFamilyIncludes: "Pretendard" as const,
   fontSizePx: 17,
   fontWeight: [600],
@@ -345,6 +345,15 @@ const TYPO_BODY = {
 const TYPO_HOST_WORDMARK = {
   name: "wordmark",
   selector: "header.topnav .editorial",
+  fontFamilyIncludes: "Pretendard" as const,
+  fontSizePx: 12,
+  fontWeight: [650],
+  lineHeightPx: 16.8,
+  color: INK,
+};
+const TYPO_HOST_WORDMARK_MOBILE = {
+  name: "wordmark",
+  selector: ".m-hdr-heading, .m-hdr-brand",
   fontFamilyIncludes: "Pretendard" as const,
   fontSizePx: 12,
   fontWeight: [650],
@@ -480,15 +489,15 @@ function hostOperatingRoomRegions(body = HOST_BODY_DESKTOP_GEOMETRY, workbox = H
       toleranceCssPx: 4 as const,
     },
     {
-      name: "phase-status",
-      selector: ".rm-host-operating-room__phase-notice, .rm-operating-room-next-action__state",
-      expected: HOST_PHASE_STATUS_DESKTOP_GEOMETRY,
-      toleranceCssPx: 4 as const,
-    },
-    {
       name: "primary-next-action",
       selector: ".rm-operating-room-next-action",
       expected: HOST_NEXT_ACTION_DESKTOP_GEOMETRY,
+      toleranceCssPx: 4 as const,
+    },
+    {
+      name: "phase-status",
+      selector: ".rm-host-operating-room__phase-notice",
+      expected: HOST_PHASE_STATUS_DESKTOP_GEOMETRY,
       toleranceCssPx: 4 as const,
     },
     {
@@ -510,7 +519,7 @@ const HOST_OPERATING_TYPOGRAPHY = [
   TYPO_HOST_WORDMARK,
   TYPO_HOST_PAGE_TITLE,
   typo("phase-label", ".rm-operating-room-phases__label", 14, [600], 19.6),
-  typo("work-item-title", ".rm-host-workbox", 17, [600], 23.8),
+  typo("work-item-title", ".rm-host-work-item__destination strong", 17, [600], 23.8),
   TYPO_BODY,
 ] as const;
 
@@ -537,14 +546,14 @@ function hostMobileOperatingRegions(mainGeometry: Geometry, extra: VisualAuthori
       toleranceCssPx: 4 as const,
     },
     {
-      name: "phase-status",
-      selector: ".rm-host-operating-room__phase-notice, .rm-operating-room-next-action__state",
+      name: "primary-next-action",
+      selector: ".rm-operating-room-next-action",
       expected: mainGeometry,
       toleranceCssPx: 4 as const,
     },
     {
-      name: "primary-next-action",
-      selector: ".rm-operating-room-next-action",
+      name: "phase-status",
+      selector: ".rm-host-operating-room__phase-notice",
       expected: mainGeometry,
       toleranceCssPx: 4 as const,
     },
@@ -566,10 +575,10 @@ function hostMobileOperatingRegions(mainGeometry: Geometry, extra: VisualAuthori
 }
 
 const HOST_MOBILE_TYPOGRAPHY = [
-  TYPO_HOST_WORDMARK,
+  TYPO_HOST_WORDMARK_MOBILE,
   TYPO_HOST_PAGE_TITLE_MOBILE,
   typo("phase-label", ".rm-operating-room-phases__label", 14, [600], 19.6),
-  typo("work-item-title", ".rm-host-workbox", 17, [600], 23.8),
+  typo("work-item-title", ".rm-host-work-item__destination strong", 17, [600], 23.8),
   TYPO_BODY,
 ] as const;
 
@@ -759,7 +768,7 @@ export const REQUIRED_VISUAL_AUTHORITY_COVERAGE: Record<ApprovedMockupId, Requir
     firstViewport: [
       { name: "service-table", selector: ".admin-service-status__table", visibility: "fully-visible" },
       { name: "service-evidence", selector: ".admin-health-grid__strip", visibility: "fully-visible" },
-      { name: "no-command-control", selector: ".admin-service-status", visibility: "intersects" },
+      { name: "no-command-control", selector: 'role=button[name="새로 확인"]', visibility: "absent" },
     ],
     defaultVisibleItems: undefined,
     interactions: [
@@ -1439,7 +1448,7 @@ export const REQUIRED_VISUAL_AUTHORITY_COVERAGE: Record<ApprovedMockupId, Requir
       HOST_MOBILE_NAV,
     ],
     typography: [
-      TYPO_HOST_WORDMARK,
+      TYPO_HOST_WORDMARK_MOBILE,
       TYPO_HOST_PAGE_TITLE_MOBILE,
       typo("status-label", ".rm-host-person__tenure", 14, [600], 19.6),
       typo("history-copy", '[aria-label="참석 기록"]', 16, [400], 25.6),
