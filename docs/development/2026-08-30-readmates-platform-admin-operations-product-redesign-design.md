@@ -260,7 +260,7 @@ shared
 
 ## 13. 접근성·반응형·복구 검증
 
-- viewport: 320, 390, 768, 900, 1024, 1440px 및 200% zoom
+- viewport: 320, 390, 768, 900, 1024, 1440px 및 200% zoom. 자동화는 320×350 proxy까지만 덮으며, **실제 Chrome toolbar 200% zoom은 2026-09-04 actual-route 수렴 기준 `not_measured`**다(`docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md` §Step 4).
 - keyboard: skip link, space menu, queue roving/selection, dialog focus trap/return, Back/Forward
 - semantics: `aria-current`, selection, pressed state를 한 control에 중복 선언하지 않음
 - wrapping: 긴 한국어/영어 club name, status sentence, button label

@@ -10,11 +10,13 @@
 
 ## 컨텍스트
 
-ADR-0048은 Host를 현재 모임 생애주기 운영실+작업함으로, ADR-0050은 Admin을 오늘 할 일 중심 운영 데스크로 고정했다. 기능, 권한, 회복성, responsive geometry 검증은 폭넓게 구현됐지만 현재 화면은 승인 시안의 정보 위계와 밀도에서 벗어났다.
+ADR-0048은 Host를 현재 모임 생애주기 운영실+작업함으로, ADR-0050은 Admin을 오늘 할 일 중심 운영 데스크로 고정했다. 기능, 권한, 회복성, responsive geometry 검증은 폭넓게 구현됐지만 이 결정 시점의 화면은 승인 시안의 정보 위계와 밀도에서 벗어나 있었다.
+
+아래 §컨텍스트는 이 결정을 내리게 만든 **당시 상태의 기록**이다. 현재 구현 상태는 §검증을 따른다.
 
 이 결정 시점에 18개 authority capture는 모두 strict mismatch ratio 0.02를 초과했고, 보고된 PASS는 desktop/Admin 0.10, Host mobile 0.15까지 허용하는 당시의 `allowFontRasterException`에 의존했다(이 예외 API는 이후 제거됐다. §검증 참고). 이 예외는 glyph raster뿐 아니라 spacing, 배경, control geometry 차이까지 전체 이미지 비율로 흡수할 수 있어 픽셀 근접 수락의 의미를 보장하지 못한다.
 
-Host 비교는 실제 authenticated route가 아니라 `HostApprovedShell`과 정돈된 component fixture를 최종 candidate로 사용한다. 반대로 실제 route에는 단계 보정, partial failure, 12건 작업함 같은 runtime 상태가 함께 나타나 첫 화면 구성과 노출량이 승인 시안에서 벗어난다. Admin mobile 실제 route는 locator가 추가된 queue DOM과 이를 반영하지 않은 fixture/grid 계약이 갈라져 제목 열이 한 글자 너비로 붕괴한다.
+당시 Host 비교는 실제 authenticated route가 아니라 `HostApprovedShell`과 정돈된 component fixture를 최종 candidate로 **사용했다**. 반대로 실제 route에는 단계 보정, partial failure, 12건 작업함 같은 runtime 상태가 함께 나타나 첫 화면 구성과 노출량이 승인 시안에서 **벗어났다**. Admin mobile 실제 route는 locator가 추가된 queue DOM과 이를 반영하지 않은 fixture/grid 계약이 갈라져 제목 열이 한 글자 너비로 **붕괴했다**. 이 세 가지는 모두 이후 수렴 작업에서 해소됐다: 18개 candidate는 실제 authenticated route가 소유하고, 작업함 기본 노출은 desktop 4건·mobile 3건으로 제한되며, Admin mobile 제목 열 붕괴는 재발하지 않는다(§검증).
 
 기존 tracked screenshot은 직전 구현 대비 회귀를 찾을 수 있지만, baseline 갱신이 승인 원본과 실제 route의 재대조를 요구하지 않으면 drift를 새 기준으로 굳힐 수 있다. 따라서 승인 자산, actual-route deterministic fixture, measurable geometry, 변경 무효화, 사람의 첫 작업 발견성을 하나의 합격 계약으로 연결해야 한다.
 
@@ -84,6 +86,7 @@ Token, shared CSS/component, fixture, route 또는 baseline 변경은 영향 ref
 - 사람 30초 discovery gate는 `pending_external_human_evidence`다.
 - Chrome toolbar 200% 실측과 VoiceOver/Safari, NVDA/Chrome은 `not_measured`다.
 - 원격 CI는 `pending_remote_ci`다. 로컬 parity로 CI 성공을 추정하지 않는다.
+- Candidate capture가 byte 단위로 완전 결정적이지 않다. 세 id(`admin-today-desktop`, `admin-space-switcher-desktop`, `host-live-mobile`)는 같은 실행의 재시도 간 candidate PNG hash가 달랐다. 측정 비율은 재현되지만 immutable receipt를 주장하려면 원인 확인이 필요하다.
 
 이 조건이 모두 닫히기 전에는 `Accepted`로 올리지 않는다. 자동화 테스트나 AI 검토를 사람·보조기술·원격 CI 증거로 대신 쓰지 않는다.
 

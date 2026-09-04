@@ -108,6 +108,37 @@ Component CT는 **보조 회귀 suite**다. 최종 수락 권위가 아니다. �
 
 `requestAudit`는 18/18에서 unmatched 0건, effecting 0건이다. `host-schedule-review-desktop`만 preview 1건을 기록하며, 이는 검증된 POST preview 하나이고 confirm/send 요청은 없다.
 
+### id별 hash·검토자 receipt
+
+아래 hash는 **두 번째(최신) docker 실행의 첫 시도(attempt 0)** `<id>-report.json`에서 그대로 읽은 값이다. 값을 만들어 쓰지 않았다. Renderer fingerprint는 18/18 동일하므로 §Source binding의 한 줄을 공유한다: `mcr.microsoft.com/playwright:v1.61.1-jammy`, Chrome/149.0.7827.55, Playwright 1.61.1, Node 24.17.0, pnpm 11.13.1, DPR 1, Pretendard Variable.
+
+| id | referenceSha256 | candidateSha256 (attempt 0) | 재시도 간 candidate 안정성 | mask | 검토자 |
+| --- | --- | --- | --- | --- | --- |
+| `admin-today-desktop` | `5d4d778850e45bce7449002c186ccea6fa7f830d1cee76ff38a904b1971ea76b` | `fa2d1042242ac65f279b55077c69a2d374c2e207bfa14d7e231624de86bff572` | 3시도 중 2종 (비율 동일) | null | `pending_controller_whole_branch` |
+| `admin-clubs-desktop` | `273f2fbfc4df955ce837b0120cb9b518f10991be546c218d707ded9a32d67c91` | `6d5edc4a9d85129849e28289329a7e431a9c6b187435b27f223f1cd8e12af941` | 3시도 동일 | null | `pending_controller_whole_branch` |
+| `admin-service-desktop` | `6b6af23ba5eb6b25437d5ff2bdbe50f9d9dcbf8e62092705ed28485a1a584b2b` | `2428bbd90042c7d5787d619da410bfb4da9af198f3096f314561decf2a61b54d` | 3시도 동일 | null | `pending_controller_whole_branch` |
+| `admin-records-desktop` | `0d318e14a7757e279cb4595a3bfc299335a6262a95edf23ed5c719b62940cbd3` | `767078ccbd0a080ff858fc38ba84f55b75c3946b5dc39272ae61f4d11bd9d477` | 3시도 동일 | null | `pending_controller_whole_branch` |
+| `admin-space-switcher-desktop` | `dfc9222888cf41cdd4f0e3c03c260be349f5fe3120068486f0151fc1a07578a8` | `cfba80010de5ac4e1016b4e880f3b7091592f125f91c97862c039838165f0b37` | 3시도 중 2종 (비율 동일) | null | `pending_controller_whole_branch` |
+| `admin-today-mobile` | `c3171752bfd56d7957dea6cfb06f4031692113024a0bf3b2bcc452f61b6d9aeb` | `71ee11d5322f9e8f719a3bf751d76ad37fce55999fd5b7ecacbd8e5a3b8d3c68` | 3시도 동일 | null | `pending_controller_whole_branch` |
+| `admin-work-detail-mobile` | `a6098cbb77c991197e7e03e2b803438342a66daad3d83c46b2dc74b90de16291` | `ba97bbf61b8f88684a9f8fe8d485ad92190023ac95ac54e467fd0f613edf358f` | 3시도 동일 | null | `pending_controller_whole_branch` |
+| `host-prep-desktop` | `fc5f8fd00301d90f3616c335306ca9cf99c59293589841ca3601afdbb04c25a9` | `37e2912ed0ea56610285064c9a816eed776856e85554d8a68c0eec61a9e2cc6c` | 3시도 동일 | null | `pending_controller_whole_branch` |
+| `host-live-desktop` | `9a0b50081506f266eccff15606e2e74da0b926b699166d9ce56020c8b263ff15` | `6626951af01722a55d385409da8fedbbe61584d961a07869b4c2ebe3fcdb1a11` | 3시도 동일 | null | `pending_controller_whole_branch` |
+| `host-closing-desktop` | `be94c7e1adc587d27c6f5e37b2a2f61f658d47e067b44961f8bb6e527542ac08` | `4a3f69cd51da85d08402230b9ea0563f67381e956e6ade533ebd01be04464f0c` | 3시도 동일 | null | `pending_controller_whole_branch` |
+| `host-meetings-desktop` | `7385c5f2369be3b3fcbfe7a87f737a4325802890e3dff2d9892161e0eed28f94` | `d90c57ea41ca42aee92d5d4fa1da39deeedbff257de39aa65f8259b72e40bf45` | 3시도 동일 | null | `pending_controller_whole_branch` |
+| `host-people-desktop` | `a1b2afb663cc9cdf304563f189bc2306908eb9da28cb3da9cd94d47ba908c50f` | `1e28fcb52093577b7dfc54f55b2d9e340ccab22dc294f177926d517e60391d80` | 3시도 동일 | null | `pending_controller_whole_branch` |
+| `host-records-desktop` | `8ca899b88148f9491149017653d7d71e8b8d34642f4f8b92c794b5f3717254cf` | `04e3861d1ff2139f7b731d36db08bcb43fcaa5dc83e0d349f2716d6689b28ae8` | 3시도 동일 | null | `pending_controller_whole_branch` |
+| `host-settings-desktop` | `80cb99506f90337660fcf42857d5f556e8a92a9932cf0e3f9f15e39180675b95` | `40f22e048c4089a2ec9a721e3861885b1a5bb7d9544025aa0ec44da5963704eb` | 3시도 동일 | null | `pending_controller_whole_branch` |
+| `host-schedule-review-desktop` | `ca58ef916dd5487dca5811f395ed44792febfa86a4c3bf60f4bd5f9333a0bd61` | `00e9cbf1497063d238120fcd1f37a6028b44a0d5dc60a4075dc50caa11d9bf31` | 3시도 동일 | null | `pending_controller_whole_branch` |
+| `host-prep-mobile` | `fde68389cc111e6c9cfe06543a50ac749cca937f65f3cd4f07d7369796e3ec3a` | `b92b272487aa2ea7a7a6815bd1a0ed60c32c8cebf8eea6d4870f5d075943436c` | 3시도 동일 | null | `pending_controller_whole_branch` |
+| `host-live-mobile` | `b3fd160481039d28857ee9de88593c897f4ee9a51a19de99fb395453ee4e33d5` | `456dd2c10b041413116cf9210f258c5278a11b52cfc4fdb65bb46eeee513934e` | 3시도 중 3종 (비율 동일) | null | `pending_controller_whole_branch` |
+| `host-person-mobile` | `12c542d4d409f2390c987acbb2c0bed886fa874bfe256f4fda8653df1afe44c5` | `01c8ea98b8f0a271fc629e61e3a777cb46d1cfbfa6b6da62c177a5bb75811a02` | 3시도 동일 | null | `pending_controller_whole_branch` |
+
+`referenceSha256`는 18/18 manifest 값과 일치한다. `candidateSha256`는 실제 authenticated route capture의 hash이며 승인 reference와 같아지지 않는다(strict pixel이 18/18 `not_passed_0.02`이므로 당연하다).
+
+**candidate byte 안정성 주의:** `admin-today-desktop`, `admin-space-switcher-desktop`, `host-live-mobile` 세 id는 같은 실행 안에서 재시도마다 candidate PNG byte가 달랐다. 세 id 모두 `mismatchPixelRatio`는 소수점 6자리까지 동일했으므로 측정값은 재현되지만 capture byte는 완전 결정적이지 않다. 이 값들을 immutable receipt로 쓰려면 원인(폰트 raster 타이밍 또는 PNG 인코딩 비결정성)을 먼저 확인해야 한다.
+
+**보존 주의:** `front/test-results/`는 gitignore이며 `pnpm --dir front test:ct:docker`가 실행되면 지워진다. 위 hash는 저장소가 아니라 이 보고서가 보존하는 유일한 기록이다. 재생성하려면 `pnpm --dir front test:e2e:approved-routes:docker`를 CT 이후에 실행해야 한다.
+
 읽는 법:
 
 - **composition·geometry·typography·first viewport·interaction·request audit는 18/18 통과**했다. major region은 4px, 반복 정렬은 2px 안에 있고 가로 overflow는 0px다.
@@ -167,7 +198,8 @@ push·merge·PR 생성 권한이 이 작업 범위에 없다. 원격 CI 실행 �
 5. **사람 30초 gate `pending_external_human_evidence`.**
 6. **Chrome 200%·VoiceOver/Safari·NVDA/Chrome `not_measured`.**
 7. **원격 CI `pending_remote_ci`.**
-8. ADR-0053은 `Proposed`로 유지한다. 위 8개 항목 중 하나라도 열려 있으면 `Accepted`로 올리지 않는다.
+8. **Candidate capture가 byte 단위로 완전 결정적이지 않다.** `admin-today-desktop`, `admin-space-switcher-desktop`, `host-live-mobile` 세 id는 같은 실행의 재시도 간 candidate PNG hash가 달랐다(비율은 동일). immutable receipt를 주장하기 전에 원인을 확인해야 한다.
+9. ADR-0053은 `Proposed`로 유지한다. 위 9개 항목 중 하나라도 열려 있으면 `Accepted`로 올리지 않는다.
 
 API/BFF/server/deploy는 이 작업에서 바꾸지 않았다. 공개 저장소에 실제 회원 데이터·secret·private domain·로컬 절대 경로·OCID·token 형태 예시를 넣지 않았다. Playwright 산출물(`front/test-results/`, `playwright-report/`)은 gitignore이며 커밋하지 않는다.
 

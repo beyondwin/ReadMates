@@ -70,6 +70,8 @@ Lifecycle·audience·public placement를 한 stepper로 합치지 않는다. 다
 
 390·767·768·1024·1199·1200·1440px와 320×350 200% zoom proxy는 `host-operating-room-responsive.ct.tsx`와 `host-shell.ct.tsx`가 가로 overflow, 44px target(live compact 출석 choice 40px / undo 36px leftover), 순서, keyboard roving, visible focus와 reduced motion을 잠근다. Phase와 workbox tab은 방향키와 Home/End를 지원하고, focus/return state는 route/panel을 닫거나 Back/Forward할 때 원래 control로 돌아간다.
 
+> **Stale 근거 주의.** `host-operating-room-responsive.ct.tsx`, `approved-host-ledgers.ct.tsx`, `admin-editorial-ledger.ct.tsx`, `admin-shell-layout.ct.tsx`와 E2E `host-workbox-stage4.spec.ts`, `admin-today.spec.ts`, `admin-editorial-ledger-browser-smoke.spec.ts`, `host-lifecycle-operating-room.spec.ts`는 2026-09-04 기준 **실패 중**이다. 이 spec들은 Admin 3건·Host desktop 4건/mobile 3건 cap과 새 heading 계약 이전의 기대치를 담고 있어(예: `host-workbox-stage4.spec.ts`는 작업함 listitem 40개를 기대하지만 실제는 4개다) 갱신 전까지 현재 계약의 통과 근거로 인용하지 않는다. 전체 목록과 exit code는 `docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md` §잔여 위험과 릴리스 경계에 있다. **CT snapshot이나 reference를 갱신해 이 차이를 흡수하지 않는다.**
+
 `front/tests/e2e/support/visual-authority-contract.ts`의 검사는 visible main, bounded interactive accessible-name source, nested interactive, ARIA target, navigation/complementary landmark 이름만 확인하는 저장소 custom DOM/ARIA audit다. axe/axe-core 또는 전체 접근성 적합성으로 부르지 않는다. 현재 Chromium 자동화에서 helper-classified serious/critical finding은 없지만 VoiceOver/NVDA, Firefox/WebKit과 실제 기기 screen reader는 `not measured`다.
 
 ## Host ledgers, utilities and deep links
@@ -141,7 +143,7 @@ Live region은 의미 있는 전이에만 쓰고 polling마다 반복하지 않�
 
 ## Responsive and accessibility evidence index
 
-Contract widths: 320, 390, 768, 900, 1024, 1440px. keyboard, visible focus, 44px target(live compact 출석 choice 40px / undo 36px leftover), reduced motion, long Korean/English wrapping은 automated helper로 검증한다. Chrome 실제 200% toolbar zoom은 DPR 2→4, CSS viewport 1728→864, document/body scroll width와 client width 일치, 보이는 focus target 높이로 확인했다. Manual screen-reader announcement order는 아직 `not measured`이며 검증 완료로 주장하지 않는다.
+Contract widths: 320, 390, 768, 900, 1024, 1440px. keyboard, visible focus, 44px target(live compact 출석 choice 40px / undo 36px leftover), reduced motion, long Korean/English wrapping은 automated helper로 검증한다. Chrome 실제 toolbar 200% zoom은 이번 actual-route 수렴에서 **`not_measured`**다. 자동화의 320×350 200% proxy는 실제 toolbar 확대 측정이 아니므로 DPR·CSS viewport·scroll/client width 확인으로 확대 해석하지 않는다. Manual screen-reader announcement order도 `not_measured`이며 어느 쪽도 검증 완료로 주장하지 않는다. 근거는 `docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md` §Step 4다.
 
 Host lifecycle의 code-native source는 `front/features/host/ui/operating-room/host-operating-room-responsive.ct.tsx`, `front/features/host/ui/meeting-workspace/host-lifecycle-responsive.ct.tsx`, `front/features/host/ui/shell/host-shell.ct.tsx`다. Real-route continuity와 recovery widths는 `front/tests/e2e/host-lifecycle-route-continuity.spec.ts`, `front/tests/e2e/host-authority-loss.spec.ts`, `front/tests/e2e/host-workbox-stage4.spec.ts`가 맡는다. semantic/geometry/DOM 계약은 이 code-native tests가 잠근다. 승인 PNG를 runtime 배경으로 쓰지 않으며 tracked snapshot은 보조 회귀 cache다.
 
