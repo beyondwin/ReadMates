@@ -36,7 +36,6 @@ import {
   HOST_MOBILE_NAV_GEOMETRY,
   HOST_OR_DESKTOP_NAV_GEOMETRY,
   HOST_OR_LIVE_MOBILE_BOARD_GEOMETRY,
-  HOST_OR_MOBILE_CONTEXT_GEOMETRY,
   HOST_OR_MOBILE_CURRENT_MEETING_GEOMETRY,
   HOST_OR_WORKBOX_DESKTOP_GEOMETRY,
   HOST_NEXT_ACTION_DESKTOP_GEOMETRY,
@@ -364,15 +363,6 @@ const TYPO_HOST_WORDMARK = {
   lineHeightPx: 16.8,
   color: INK,
 };
-const TYPO_HOST_WORDMARK_MOBILE = {
-  name: "wordmark",
-  selector: '[data-club-shell-region="mobile-context"] .rm-global-space-switcher__current-space',
-  fontFamilyIncludes: "Pretendard" as const,
-  fontSizePx: 12,
-  fontWeight: [650],
-  lineHeightPx: 16.8,
-  color: INK,
-};
 const TYPO_HOST_PAGE_TITLE = {
   name: "page-title",
   selector: "main h1, .rm-host-operating-room h1, .admin-page-frame h1",
@@ -561,10 +551,6 @@ function hostMobileOperatingRegions(
 ) {
   return [
     {
-      ...HOST_MOBILE_HEADER,
-      expected: HOST_OR_MOBILE_CONTEXT_GEOMETRY,
-    },
-    {
       name: "current-meeting",
       selector: '[aria-label="현재 모임"]',
       expected: boxes.currentMeeting,
@@ -606,7 +592,6 @@ function hostMobileOperatingRegions(
 }
 
 const HOST_MOBILE_TYPOGRAPHY = [
-  TYPO_HOST_WORDMARK_MOBILE,
   TYPO_HOST_PAGE_TITLE_MOBILE,
   typo("phase-label", ".rm-operating-room-phases__label", 14, [600], 19.6),
   typo("work-item-title", ".rm-host-work-item__label", 17, [600], 23.8),
@@ -1492,7 +1477,6 @@ export const REQUIRED_VISUAL_AUTHORITY_COVERAGE: Record<ApprovedMockupId, Requir
       HOST_MOBILE_NAV,
     ],
     typography: [
-      TYPO_HOST_WORDMARK_MOBILE,
       TYPO_HOST_PAGE_TITLE_MOBILE,
       typo("status-label", ".rm-host-person__tenure", 14, [600], 19.6),
       typo("history-copy", '[aria-label="참석 기록"]', 16, [400], 25.6),

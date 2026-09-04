@@ -313,12 +313,19 @@ describe("buildHostOperatingRoomView", () => {
     });
   });
 
-  it("does not treat absent questions or closed schedule-seen as optional failures", () => {
-    const questionsAbsent = buildHostOperatingRoomView(input({
-      questions: { state: "absent" },
+  it("keeps unpublished schedule-seen copy on DRAFT only", () => {
+    const draft = buildHostOperatingRoomView(input({
+      currentMeeting: session({
+        state: "DRAFT",
+        date: "2026-09-03",
+        scheduleSeenAvailability: "UNAVAILABLE",
+        scheduleSeenSummary: { currentCount: null, staleCount: null, unseenCount: null, eligibleCount: null },
+      }),
     }));
-    expect(questionsAbsent.partialFailures).toEqual([]);
-    expect(questionsAbsent.preparation.find(({ id }) => id === "questions")?.state).toBe("unavailable");
+    expect(draft.preparation.find(({ id }) => id === "schedule-seen")).toMatchObject({
+      value: "아직 멤버에게 공개되지 않음",
+    });
+    expect(draft.partialFailures).toEqual([]);
 
     const closedUnavailable = buildHostOperatingRoomView(input({
       currentMeeting: session({
@@ -334,8 +341,30 @@ describe("buildHostOperatingRoomView", () => {
       }),
       closing: ready(closing("IN_PROGRESS", "IMPORT_RECORDS")),
     }));
-    expect(closedUnavailable.partialFailures).toEqual([]);
+    expect(closedUnavailable.preparation.find(({ id }) => id === "schedule-seen")).toMatchObject({
+      value: "집계 준비 중",
+    });
+    expect(closedUnavailable.partialFailures).toEqual([
+      expect.objectContaining({ source: "schedule-seen", retryable: true }),
+    ]);
     expect(closedUnavailable.nextAction.href).toBe("/clubs/book-club/app/host/records");
+  });
+
+  it("routes IMPORT_RECORDS closing next-action to host records, not the Korean label", () => {
+    const importRecords = buildHostOperatingRoomView(input({
+      currentMeeting: session({ state: "CLOSED", date: "2026-08-29" }),
+      closing: ready(closing("BLOCKED", "IMPORT_RECORDS")),
+    }));
+    expect(importRecords.nextAction).toMatchObject({
+      kind: "closing",
+      href: "/clubs/book-club/app/host/records",
+    });
+
+    const publishRecords = buildHostOperatingRoomView(input({
+      currentMeeting: session({ state: "CLOSED", date: "2026-08-29" }),
+      closing: ready(closing("READY", "PUBLISH_RECORDS")),
+    }));
+    expect(publishRecords.nextAction.href).not.toBe("/clubs/book-club/app/host/records");
   });
 
   it("does not synthesize authority or defer from a locally predictable key", () => {

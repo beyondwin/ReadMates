@@ -325,8 +325,8 @@ export function buildHostApprovedSessionDetail(
     publication: null,
     state,
     scheduleRevision: 4,
-    scheduleSeenAvailability: currentOpen && state === "OPEN" ? "AVAILABLE" : "UNAVAILABLE",
-    scheduleSeenSummary: currentOpen && state === "OPEN"
+    scheduleSeenAvailability: currentOpen ? "AVAILABLE" : "UNAVAILABLE",
+    scheduleSeenSummary: currentOpen
       ? {
         currentCount: eligible.filter((attendee) => attendee.scheduleSeenState === "CURRENT").length,
         staleCount: eligible.filter((attendee) => attendee.scheduleSeenState === "STALE").length,
@@ -518,7 +518,7 @@ export function buildHostApprovedOperatingRoomCurrent(
     currentMeeting: {
       sessionId: HOST_APPROVED_SESSION_ID,
       selection,
-      scheduleSeenAvailability: closing ? "UNAVAILABLE" : "AVAILABLE",
+      scheduleSeenAvailability: "AVAILABLE",
     },
   };
 }

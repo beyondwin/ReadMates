@@ -532,12 +532,18 @@ export function HostDashboardRoute({
     ? meetingResponseLedgerRowsFromAttendees(selectedDetail.attendees, activeAttendanceWriteStates)
     : [];
   const compactAttendancePreview = compactAttendanceRows.slice(0, 1);
+  const compactAttendanceCensus = {
+    attended: compactAttendanceRows.filter((row) => row.attendance === "ATTENDED").length,
+    all: compactAttendanceRows.length,
+    pending: compactAttendanceRows.filter((row) => row.attendance === "UNKNOWN").length,
+  };
   const compactLiveContent = selectedDetail ? (
     <>
       <MeetingResponseLedger
         presentation="attendanceBoard"
         agendaHref={hostSessionHref(paths.hostBasePath, selectedDetail.sessionId, "?section=agenda")}
         rows={compactAttendancePreview}
+        attendanceCensus={compactAttendanceCensus}
         onAttendanceChange={(membershipId, attendance) => {
           void commitAttendance([membershipId], attendance);
         }}
@@ -551,7 +557,7 @@ export function HostDashboardRoute({
           to={hostSessionHref(paths.hostBasePath, selectedDetail.sessionId, "?section=attendance")}
           className="rm-host-operating-room__attendance-disclose"
         >
-          {`출석 ${compactAttendanceRows.length}명 모두 보기`}
+          {`출석 ${compactAttendanceCensus.all}명 모두 보기`}
         </LinkComponent>
       ) : null}
     </>

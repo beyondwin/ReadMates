@@ -279,7 +279,7 @@ function scheduleSeenRow(
   const summary = hostScheduleSeenSummary(meeting);
   const href = hostSessionPath(basePath, meeting.sessionId, "/schedule-review");
   if (summary.availability === "UNAVAILABLE") {
-    if (meeting.state !== "OPEN") {
+    if (meeting.state === "DRAFT") {
       return unavailableRow("schedule-seen", "일정 확인", "아직 멤버에게 공개되지 않음", "멤버 공개 뒤 집계가 시작됩니다.", null);
     }
     failures.push({ source: "schedule-seen", message: "일정 확인 집계를 불러오지 못했습니다.", retryable: true });
@@ -448,12 +448,14 @@ function resolveNextAction(context: {
       };
     }
     if (context.closing.primaryAction.label === "추가 조치 없음") return noNextAction();
+    const importRecords = context.input.closing.state === "ready"
+      && context.input.closing.data.overall.primaryAction === "IMPORT_RECORDS";
     return actionState(context.input, {
       kind: "closing",
       label: context.closing.primaryAction.label,
       ctaLabel: "기록 초안 검토",
       reason: context.closing.primaryAction.reason,
-      href: context.closing.primaryAction.label === "기록 패키지 검토"
+      href: importRecords
         ? `${context.input.basePath}/records`
         : context.closing.primaryAction.href,
     });

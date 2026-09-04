@@ -758,7 +758,7 @@ describe("HostDashboardRoute", () => {
     );
   });
 
-  it("does not insert a giant optional-failure panel on closing when schedule-seen is unavailable", async () => {
+  it("surfaces closing schedule-seen UNAVAILABLE as a retryable optional failure", async () => {
     const closed = {
       ...meetingDetail,
       state: "CLOSED" as const,
@@ -782,7 +782,22 @@ describe("HostDashboardRoute", () => {
 
     expect(await screen.findByRole("tab", { name: /마감실/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("region", { name: "마감 현황" })).toBeVisible();
-    expect(screen.queryByRole("region", { name: "일부 운영 정보 불러오기 실패" })).not.toBeInTheDocument();
+    const partial = screen.getByRole("region", { name: "일부 운영 정보 불러오기 실패" });
+    expect(partial).toHaveTextContent("일정 확인 집계를 불러오지 못했습니다.");
+  });
+
+  it("summarizes compact live attendance from the full GET census", async () => {
+    stubCompactViewport(true);
+    renderRoute("/clubs/reading-sai/app/host?phase=live");
+
+    expect(await screen.findByRole("region", { name: "출석 확인" })).toBeVisible();
+    expect(screen.getByText("실제 출석 1 / 2 · 확인 필요 1")).toBeVisible();
+    expect(screen.getByRole("link", { name: "출석 2명 모두 보기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-7?section=attendance",
+    );
+    expect(screen.getByText("지후")).toBeVisible();
+    expect(screen.queryByText("서연")).not.toBeInTheDocument();
   });
 
   it("keeps successful meeting content when optional sources fail and exposes scoped retry", async () => {

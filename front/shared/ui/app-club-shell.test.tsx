@@ -168,4 +168,47 @@ describe("AppClubShell", () => {
       /\.rm-club-shell-mobile-context:has\(> \.rm-club-shell-mobile-context__inner > \.rm-sr-only:only-child\)[^{]*\{[^}]*display:\s*none/,
     );
   });
+
+  it("does not paint Host mobile-context sr-only current-space copy as visible chrome", () => {
+    const host = {
+      productSpace: "clubs" as const,
+      clubId: "club-reading-sai",
+      clubSlug: "reading-sai",
+      perspective: "host" as const,
+    };
+    const staticSwitcher = (
+      <GlobalSpaceSwitcher
+        currentIdentity={host}
+        options={[{ identity: host, clubName: "샘플 독서모임" }]}
+        onSelect={async () => ({ status: "selected" })}
+      />
+    );
+    const { container } = render(
+      <AppClubShell
+        workspace="host"
+        primaryItems={primaryItems("host")}
+        account={{ control: <button type="button">계정 메뉴</button> }}
+        brandHref="/clubs/reading-sai/app/host"
+        mobileTitle="모임 운영실"
+        LinkComponent={LinkComponent}
+        spaceSwitcher={{ desktop: staticSwitcher, mobile: staticSwitcher }}
+      >
+        <main>host content</main>
+      </AppClubShell>,
+    );
+
+    const currentSpace = container.querySelector(
+      '[data-club-shell-region="mobile-context"] .rm-global-space-switcher__current-space',
+    );
+    expect(currentSpace).toHaveClass("rm-sr-only");
+    expect(currentSpace).toHaveTextContent("현재 공간 내 클럽, 샘플 독서모임 호스트로 운영");
+
+    const hostShellCss = readFileSync("features/host/ui/shell/host-shell.css", "utf8");
+    expect(hostShellCss).not.toMatch(
+      /\.rm-club-shell-mobile-context:has\(> \.rm-club-shell-mobile-context__inner > \.rm-sr-only:only-child\)[^{]*\{[^}]*display:\s*block/,
+    );
+    expect(hostShellCss).not.toMatch(
+      /\[data-club-shell-region="mobile-context"\] \.rm-global-space-switcher__current-space\s*\{[^}]*position:\s*static/,
+    );
+  });
 });
