@@ -751,6 +751,25 @@
   overflow: visible;
 }
 
+.admin-shell:has(.admin-today-ledger) .admin-shell__space-control:not(:has(.rm-global-space-switcher__trigger[aria-expanded="true"])) {
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-shell__space-control:not(:has(.rm-global-space-switcher__trigger[aria-expanded="true"])) .rm-global-space-switcher__trigger {
+  pointer-events: auto;
+}
+
+.admin-shell:has(.admin-today-ledger[data-content-layout="split"]) .admin-shell__space-control:not(:has(.rm-global-space-switcher__trigger[aria-expanded="true"])) {
+  width: 160px;
+  height: 48px;
+}
+
+.admin-shell:has(.admin-today-ledger) .admin-shell__space-control:has(.rm-global-space-switcher__trigger[aria-expanded="true"]) {
+  pointer-events: auto;
+  overflow: visible;
+}
+
 .admin-shell:has(.admin-today-ledger) .admin-shell__header-actions {
   z-index: 22;
 }

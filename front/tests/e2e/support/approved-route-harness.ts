@@ -90,14 +90,14 @@ export async function performHistoryRestore(input: {
 }): Promise<void> {
   const { interaction } = input;
   await input.activate();
-  assertApprovedLocation(await input.readUrl(), interaction.expectedUrlAfterActivate, `${interaction.name} after activate`);
+  await waitForApprovedLocation(input.readUrl, interaction.expectedUrlAfterActivate, `${interaction.name} after activate`);
   await input.goBack();
-  assertApprovedLocation(await input.readUrl(), interaction.expectedUrlAfterBack, `${interaction.name} after back`);
+  await waitForApprovedLocation(input.readUrl, interaction.expectedUrlAfterBack, `${interaction.name} after back`);
   if (interaction.expectedRestoredFocusAfterBack) {
     await input.assertFocus?.(interaction.expectedRestoredFocusAfterBack);
   }
   await input.goForward();
-  assertApprovedLocation(await input.readUrl(), interaction.expectedUrlAfterForward, `${interaction.name} after forward`);
+  await waitForApprovedLocation(input.readUrl, interaction.expectedUrlAfterForward, `${interaction.name} after forward`);
   if (interaction.expectedRestoredFocusAfterForward) {
     await input.assertFocus?.(interaction.expectedRestoredFocusAfterForward);
   }
@@ -274,6 +274,22 @@ async function activateTarget(page: Page, target: string, via: "click" | "Enter"
   await page.keyboard.press(via);
 }
 
+async function waitForApprovedLocation(
+  readUrl: () => string | Promise<string>,
+  expectedPath: string,
+  label: string,
+): Promise<void> {
+  const expected = approvedLocation(expectedPath);
+  try {
+    await expect.poll(
+      async () => approvedLocation(await readUrl()),
+      { timeout: 2_000 },
+    ).toBe(expected);
+  } catch {
+    throw new Error(`${label}: expected ${expected}, got ${approvedLocation(await readUrl())}`);
+  }
+}
+
 export function isCanonicalRootSpaceSwitcherOpen(input: {
   menuVisible: boolean;
   platformRootChoiceVisible: boolean;
@@ -334,7 +350,7 @@ async function executeInteraction(input: {
       await activateTarget(page, interaction.target, interaction.via);
       await locateApprovedTarget(page, interaction.expectedVisible).waitFor({ state: "visible" });
       if (interaction.expectedUrl) {
-        assertApprovedLocation(page.url(), interaction.expectedUrl, interaction.name);
+        await waitForApprovedLocation(() => page.url(), interaction.expectedUrl, interaction.name);
       }
       if (interaction.expectedFocus) {
         await assertFocused(page, interaction.expectedFocus);
