@@ -6,7 +6,7 @@ import {
   useLocation,
   useNavigate,
 } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PlatformAdminClub } from "@/features/platform-admin/api/platform-admin-contracts";
 import { platformAdminClubListFiltersFromSearch } from "@/features/platform-admin/model/platform-admin-club-list-filters";
 import {
@@ -14,7 +14,7 @@ import {
   platformAdminClubsInfiniteQuery,
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
-import { AdminClubsRoute } from "./admin-clubs-route";
+import { AdminClubsRoute, ADMIN_CLUBS_FOCUS_RESTORE_KEY } from "./admin-clubs-route";
 
 vi.mock(
   "@/features/platform-admin/api/platform-admin-api",
@@ -50,6 +50,7 @@ function LocationProbe() {
   return (
     <>
       <output data-testid="location-search">{location.search}</output>
+      <output data-testid="location-href">{`${location.pathname}${location.search}`}</output>
       <button
         type="button"
         onClick={() => navigate("/admin/clubs?search=restored")}
@@ -123,7 +124,12 @@ function renderRoute(
           </>
         ),
       },
-      { path: "/admin/clubs/:clubId", element: <div>club detail</div> },
+      { path: "/admin/clubs/:clubId", element: (
+        <>
+          <LocationProbe />
+          <div>club detail</div>
+        </>
+      ) },
     ],
     { initialEntries },
   );
@@ -135,6 +141,9 @@ function renderRoute(
 }
 
 describe("AdminClubsRoute", () => {
+  afterEach(() => {
+    sessionStorage.removeItem(ADMIN_CLUBS_FOCUS_RESTORE_KEY);
+  });
   beforeEach(() => vi.clearAllMocks());
 
   it("opens real clubs onboarding without consuming registry query filters", () => {
@@ -296,6 +305,29 @@ describe("AdminClubsRoute", () => {
     expect(href).toContain("scrollTop=240");
   });
 
+  it("restores row focus from a pending list return even without location state", async () => {
+    sessionStorage.setItem(
+      ADMIN_CLUBS_FOCUS_RESTORE_KEY,
+      JSON.stringify({ focusId: "c-1", scrollTop: 0 }),
+    );
+    const { container } = renderRoute();
+    await waitFor(() =>
+      expect(container.querySelector(".admin-club-management__row")).toHaveFocus(),
+    );
+  });
+
+  it("opens the selected club on the canonical path without encoding return state in the URL", async () => {
+    const { container } = renderRoute();
+    fireEvent.click(container.querySelector(".admin-club-management__row") as HTMLElement);
+
+    await waitFor(() =>
+      expect(screen.getByText("club detail")).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("location-href")).toHaveTextContent("/admin/clubs/c-1");
+    expect(screen.getByTestId("location-href")).not.toHaveTextContent("returnTo=");
+    expect(screen.getByTestId("location-href")).not.toHaveTextContent("?");
+  });
+
   it("restores row focus and scroll when returning to the filtered list", async () => {
     const { container } = renderRoute(
       [club],
@@ -306,7 +338,7 @@ describe("AdminClubsRoute", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByRole("link", { name: "Alpha" })).toHaveFocus(),
+      expect(container.querySelector(".admin-club-management__row")).toHaveFocus(),
     );
     expect(
       (container.querySelector(".admin-clubs-ledger__scroller") as HTMLElement)
@@ -330,7 +362,7 @@ describe("AdminClubsRoute", () => {
       ".admin-clubs-ledger__scroller",
     ) as HTMLElement;
     await waitFor(() =>
-      expect(screen.getByRole("link", { name: "Alpha" })).toHaveFocus(),
+      expect(container.querySelector(".admin-club-management__row")).toHaveFocus(),
     );
     expect(scroller.scrollTop).toBe(240);
 
@@ -343,7 +375,7 @@ describe("AdminClubsRoute", () => {
     expect(await screen.findByRole("link", { name: "Beta" })).toBeInTheDocument();
     expect(search).toHaveFocus();
     expect(scroller.scrollTop).toBe(12);
-    expect(screen.getByRole("link", { name: "Alpha" })).not.toHaveFocus();
+    expect(container.querySelector(".admin-club-management__row")).not.toHaveFocus();
   });
 
   it("ignores unsafe restored focus and unbounded scroll", async () => {

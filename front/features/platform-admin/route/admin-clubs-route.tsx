@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import {
   useLocation,
@@ -35,6 +36,7 @@ type FilterKey =
   | "onboardingState";
 
 const CLUBS_ALLOWED = { fallback: "/admin/clubs", allowedPath: "/admin/clubs" };
+export const ADMIN_CLUBS_FOCUS_RESTORE_KEY = "readmates.admin-clubs.focus-restore";
 
 export function AdminClubsRoute() {
   const location = useLocation();
@@ -59,32 +61,31 @@ export function AdminClubsRoute() {
     restoreParams(searchParams, location.state, returnTo),
     CLUBS_ALLOWED,
   );
+  const sessionRestore = readClubsFocusRestore();
   const restorePending = consumedRestoreKey !== location.key;
   const restore = restorePending
-    ? parsedRestore
+    ? {
+        ...parsedRestore,
+        focusId: parsedRestore.focusId ?? sessionRestore?.focusId ?? null,
+        scrollTop: parsedRestore.scrollTop || sessionRestore?.scrollTop || 0,
+      }
     : { ...parsedRestore, focusId: null, scrollTop: 0 };
   const consumeRestore = useCallback(() => {
     if (consumedRestoreKey === location.key) return;
     setConsumedRestoreKey(location.key);
+    clearClubsFocusRestore();
     const next = new URLSearchParams(searchParams);
     const hadRestoreParams = next.has("focusId") || next.has("scrollTop");
     next.delete("focusId");
     next.delete("scrollTop");
-    const state = location.state;
-    const hasRestoreState = Boolean(
-      state &&
-        typeof state === "object" &&
-        ((state as { focusId?: unknown }).focusId != null ||
-          (state as { scrollTop?: unknown }).scrollTop != null),
-    );
-    if (!hadRestoreParams && !hasRestoreState) return;
+    if (!hadRestoreParams) return;
     navigate(
       {
         pathname: location.pathname,
         search: next.toString() ? `?${next.toString()}` : "",
         hash: location.hash,
       },
-      { replace: true, state: {} },
+      { replace: true, state: location.state },
     );
   }, [
     consumedRestoreKey,
@@ -134,6 +135,20 @@ export function AdminClubsRoute() {
     (value: string) => updateFilter("search", value),
     [updateFilter],
   );
+  const openClub = useCallback((clubId: string) => {
+    writeClubsFocusRestore({ focusId: clubId, scrollTop });
+    flushSync(() => {
+      navigate(
+        {
+          pathname: location.pathname,
+          search: location.search,
+          hash: location.hash,
+        },
+        { replace: true, state: { focusId: clubId, scrollTop } },
+      );
+    });
+    navigate(`/admin/clubs/${clubId}`);
+  }, [location.hash, location.pathname, location.search, navigate, scrollTop]);
 
   const pageState = deriveClubsPageState({
     isError: clubsQuery.isError && !clubsQuery.isFetchNextPageError,
@@ -162,6 +177,7 @@ export function AdminClubsRoute() {
         onRetry={() => void clubsQuery.refetch()}
         onLoadMore={() => void clubsQuery.fetchNextPage()}
         onScrollChange={setScrollTop}
+        onActivateClub={openClub}
       />
       <AdminOnboardingController
         capabilities={capabilities}
@@ -184,6 +200,26 @@ function deriveClubsPageState({
   if (isPending) return "loading";
   if (isEmpty) return "empty";
   return "ready";
+}
+
+function writeClubsFocusRestore(value: { focusId: string; scrollTop: number }) {
+  sessionStorage.setItem(ADMIN_CLUBS_FOCUS_RESTORE_KEY, JSON.stringify(value));
+}
+
+function readClubsFocusRestore(): { focusId: string; scrollTop: number } | null {
+  const raw = sessionStorage.getItem(ADMIN_CLUBS_FOCUS_RESTORE_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as { focusId?: unknown; scrollTop?: unknown };
+    if (typeof parsed.focusId !== "string" || typeof parsed.scrollTop !== "number") return null;
+    return { focusId: parsed.focusId, scrollTop: parsed.scrollTop };
+  } catch {
+    return null;
+  }
+}
+
+function clearClubsFocusRestore() {
+  sessionStorage.removeItem(ADMIN_CLUBS_FOCUS_RESTORE_KEY);
 }
 
 function restoreParams(

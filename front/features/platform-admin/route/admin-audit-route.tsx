@@ -80,8 +80,10 @@ export function AdminAuditRoute() {
 
   function selectEvent(item: AdminAuditLedgerItem) {
     const next = adminAuditSearchFromFilters(filters);
+    if (next.get("range") === "7d") next.delete("range");
+    next.delete("from");
+    next.delete("to");
     next.set("event", item.id);
-    next.set("mode", "detail");
     setSearchParams(next);
   }
 

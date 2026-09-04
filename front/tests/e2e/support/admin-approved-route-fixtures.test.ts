@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   ADMIN_APPROVED_SAMPLE_CLUB,
+  buildAdminApprovedAuditEvents,
   buildAdminApprovedAuth,
+  buildAdminApprovedClubs,
   buildAdminTodayOperationCases,
   buildMemberAuthWithoutPlatformAdmin,
 } from "./admin-approved-route-fixtures";
@@ -35,5 +37,20 @@ describe("admin approved Today fixtures", () => {
     expect(auth.joinedClubs?.map((club) => club.clubName)).toEqual(["샘플 독서모임"]);
     expect(buildMemberAuthWithoutPlatformAdmin().platformAdmin).toBeNull();
     expect(buildMemberAuthWithoutPlatformAdmin().availableSpaces?.kinds).toEqual(["CLUBS"]);
+  });
+});
+
+describe("admin approved Clubs, Health, and Audit fixtures", () => {
+  it("freezes the clubs row that the selected-club URL names", () => {
+    const page = buildAdminApprovedClubs();
+    expect(page.items[0]?.clubId).toBe("club-sample");
+    expect(page.items[0]?.name).toBe("샘플 독서모임");
+    expect(page.nextCursor).toEqual("clubs-visual-next");
+  });
+
+  it("freezes the audit row that the selected-event URL names", () => {
+    const page = buildAdminApprovedAuditEvents();
+    expect(page.items[0]?.id).toBe("audit-visual-1");
+    expect(page.nextCursor).toEqual("audit-visual-next");
   });
 });

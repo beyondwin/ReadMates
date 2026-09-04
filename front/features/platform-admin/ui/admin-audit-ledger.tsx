@@ -78,6 +78,7 @@ export function AdminAuditLedger({
 }: AdminAuditLedgerProps) {
   const rowsRef = useRef<HTMLDivElement>(null);
   const wasDetailOpen = useRef(detailOpen);
+  const previousSelectedId = useRef(selectedId);
   const [findDraft, setFindDraft] = useState("");
   const selected = page?.items.find((item) => item.id === selectedId)
     ?? (selectedId ? null : page?.items[0] ?? null);
@@ -90,6 +91,16 @@ export function AdminAuditLedger({
     }
     wasDetailOpen.current = detailOpen;
   }, [detailOpen, selectedId]);
+
+  useEffect(() => {
+    const previousId = previousSelectedId.current;
+    previousSelectedId.current = selectedId;
+    if (!previousId || selectedId) return;
+    const row = [...(rowsRef.current?.querySelectorAll<HTMLButtonElement>("[data-audit-row]") ?? [])]
+      .find((button) => button.dataset.auditRow === previousId)
+      ?? rowsRef.current?.querySelector<HTMLButtonElement>(".admin-audit__row");
+    row?.focus();
+  }, [selectedId]);
   const hasFilters = sensitiveSearch.active || Object.entries(filters).some(([key, value]) => {
     if (key === "range") return value !== "7d";
     return Boolean(value);

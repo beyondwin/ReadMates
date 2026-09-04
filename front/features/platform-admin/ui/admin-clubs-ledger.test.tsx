@@ -154,7 +154,7 @@ describe("AdminClubsLedger", () => {
     ) as HTMLElement;
 
     await waitFor(() =>
-      expect(screen.getByRole("link", { name: "Alpha" })).toHaveFocus(),
+      expect(container.querySelector(".admin-club-management__row")).toHaveFocus(),
     );
     expect(scroller.scrollTop).toBe(240);
   });
@@ -193,7 +193,7 @@ describe("AdminClubsLedger", () => {
       ".admin-clubs-ledger__scroller",
     ) as HTMLElement;
     await waitFor(() =>
-      expect(screen.getByRole("link", { name: "Alpha" })).toHaveFocus(),
+      expect(container.querySelector(".admin-club-management__row")).toHaveFocus(),
     );
     expect(scroller.scrollTop).toBe(240);
 
@@ -227,7 +227,7 @@ describe("AdminClubsLedger", () => {
 
     expect(screen.getByRole("searchbox", { name: "클럽 검색" })).toHaveFocus();
     expect(scroller.scrollTop).toBe(12);
-    expect(screen.getByRole("link", { name: "Alpha" })).not.toHaveFocus();
+    expect(container.querySelector(".admin-club-management__row")).not.toHaveFocus();
   });
 
   it("rejects unsafe focus ids and unbounded scroll offsets", async () => {
@@ -277,6 +277,30 @@ describe("AdminClubsLedger", () => {
     );
     expect(CLUB_MANAGEMENT_CSS).toContain(".admin-club-management");
     expect(CLUB_MANAGEMENT_CSS).toContain("prefers-reduced-motion");
+  });
+
+  it("paints club rows at the approved 17/600/23.8 title metric", () => {
+    expect(CLUB_MANAGEMENT_CSS).toMatch(
+      /\.admin-club-management__row[\s\S]*font-size:\s*17px[\s\S]*font-weight:\s*600[\s\S]*line-height:\s*23\.8px/,
+    );
+  });
+
+  it("fills the approved page-heading band with the clubs h1", () => {
+    expect(CLUB_MANAGEMENT_CSS).toMatch(
+      /\.admin-shell:has\(\.admin-clubs-ledger\) \.admin-page-frame > \.admin-page-frame__header h1[\s\S]*width:\s*100%[\s\S]*height:\s*68px/,
+    );
+  });
+
+  it("lets a keyboard operator focus a club row", () => {
+    const { container } = renderLedger();
+    expect(container.querySelector(".admin-club-management__row")).toHaveAttribute("tabIndex", "0");
+  });
+
+  it("does not let collapsed space-control intercept club rows", () => {
+    expect(CLUB_MANAGEMENT_CSS).toContain(":has(.admin-clubs-ledger)");
+    expect(CLUB_MANAGEMENT_CSS).toMatch(
+      /\.admin-shell__space-control:not\(:has\(\.rm-global-space-switcher__trigger\[aria-expanded="true"\]\)\)[\s\S]*pointer-events:\s*none/,
+    );
   });
 
   it("emphasizes only rows that need an operator decision", () => {

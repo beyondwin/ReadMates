@@ -177,7 +177,6 @@ export function AdminHealthGrid({
             cards={cards}
             refreshState={snapshot.refreshState}
             onRetry={retryCard}
-            onRefresh={onRefresh}
           />
           {okSignals.length > 0 ? (
             <section
@@ -275,12 +274,10 @@ function ServiceStatusTable({
   cards,
   refreshState,
   onRetry,
-  onRefresh,
 }: {
   cards: readonly HealthCard[];
   refreshState: PlatformHealthSnapshot["refreshState"];
   onRetry: (cardId: string) => void;
-  onRefresh: () => void;
 }) {
   return (
     <div className="admin-service-status__table" role="table" aria-label="서비스 상태 표">
@@ -300,6 +297,7 @@ function ServiceStatusTable({
             <div
               className={attention ? "admin-service-status__row admin-service-status__attention" : "admin-service-status__row admin-service-status__normal"}
               role="row"
+              tabIndex={0}
             >
               <span role="cell">
                 <strong>{row.title}</strong>
@@ -307,15 +305,7 @@ function ServiceStatusTable({
               <span role="cell">{attention ? (evidence === "unavailable" ? "확인 지연" : "확인 필요") : "정상"}</span>
               <span role="cell">{row.lastChecked}</span>
               <span role="cell">{attention ? row.impactAttention : "영향 없음"}</span>
-              <span role="cell">
-                <button
-                  type="button"
-                  className="admin-health-grid__refresh"
-                  onClick={() => (worst && canRetryHealthCard(worst) ? onRetry(worst.id) : onRefresh())}
-                >
-                  새로 확인
-                </button>
-              </span>
+              <span role="cell" />
             </div>
             {expanded && worst ? (
               <div className="admin-service-status__expand">

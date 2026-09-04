@@ -253,6 +253,40 @@ describe("AdminHealthGrid", () => {
     expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 
+  it("does not offer a per-row 새로 확인 command on the actual health route", () => {
+    renderGrid();
+
+    expect(screen.queryByRole("button", { name: "새로 확인" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "새로고침" })).toBeInTheDocument();
+  });
+
+  it("lets a keyboard operator focus a service row", () => {
+    renderGrid();
+    const row = document.querySelector(".admin-service-status__row");
+    expect(row).toHaveAttribute("tabIndex", "0");
+  });
+
+  it("does not clip the deploy evidence strip out of the first viewport", () => {
+    expect(SERVICE_STATUS_CSS).not.toMatch(
+      /\.admin-service-status \.admin-health-grid__strip\s*\{[^}]*clip:\s*rect/,
+    );
+    expect(SERVICE_STATUS_CSS).toMatch(
+      /\.admin-shell:has\(\.admin-service-status\) \.admin-health-grid__strip\s*\{[^}]*clip:\s*auto/,
+    );
+  });
+
+  it("keeps the service table in the list column so the evidence strip does not intercept row clicks", () => {
+    expect(SERVICE_STATUS_CSS).toMatch(
+      /\.admin-shell:has\(\.admin-service-status\) \.admin-service-status__table\s*\{[^}]*width:\s*1348px[^}]*overflow:\s*hidden/,
+    );
+    expect(SERVICE_STATUS_CSS).toMatch(
+      /\.admin-shell:has\(\.admin-service-status\) \.admin-service-status__row[\s\S]*width:\s*527px/,
+    );
+    expect(SERVICE_STATUS_CSS).toMatch(
+      /\.admin-shell:has\(\.admin-service-status\) \.admin-service-status\s*\{[^}]*padding:\s*0/,
+    );
+  });
+
   it.each([
     ["FRESH", 0, "현재 자료로 확인했습니다."],
     ["REFRESHING", 12, "새 상태를 확인하고 있습니다."],
@@ -503,6 +537,25 @@ describe("AdminHealthGrid", () => {
       /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.admin-service-status[\s\S]*animation-duration:\s*0\.01ms/,
     );
     expect(SERVICE_STATUS_CSS).not.toMatch(/backdrop-filter|linear-gradient/);
+  });
+
+  it("paints service rows at the approved 17/600/23.8 title metric", () => {
+    expect(SERVICE_STATUS_CSS).toMatch(
+      /\.admin-service-status__row[\s\S]*font-size:\s*17px[\s\S]*font-weight:\s*600[\s\S]*line-height:\s*23\.8px/,
+    );
+  });
+
+  it("fills the approved page-heading band with the health h1", () => {
+    expect(SERVICE_STATUS_CSS).toMatch(
+      /\.admin-shell:has\(\.admin-service-status\) \.admin-page-frame > \.admin-page-frame__header h1[\s\S]*width:\s*100%[\s\S]*height:\s*68px/,
+    );
+  });
+
+  it("does not let collapsed space-control intercept health rows", () => {
+    expect(SERVICE_STATUS_CSS).toContain(":has(.admin-service-status)");
+    expect(SERVICE_STATUS_CSS).toMatch(
+      /\.admin-shell__space-control:not\(:has\(\.rm-global-space-switcher__trigger\[aria-expanded="true"\]\)\)[\s\S]*pointer-events:\s*none/,
+    );
   });
 
   it("renders an all-ok snapshot as one narrative, names in details, and no percent readings", () => {

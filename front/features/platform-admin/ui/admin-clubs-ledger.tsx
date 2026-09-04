@@ -63,6 +63,7 @@ type Props = {
   onRetry: () => void;
   onLoadMore: () => void;
   onScrollChange: (scrollTop: number) => void;
+  onActivateClub?: (clubId: string) => void;
   tabCounts?: AdminClubsTabCounts;
 };
 
@@ -85,6 +86,7 @@ export function AdminClubsLedger({
   onRetry,
   onLoadMore,
   onScrollChange,
+  onActivateClub,
   tabCounts,
 }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -306,17 +308,30 @@ export function AdminClubsLedger({
                     {visibleClubs.map((club) => (
                       <li
                         key={club.clubId}
+                        id={`admin-club-row-${club.clubId}`}
                         className="admin-club-management__row"
                         data-club-id={club.clubId}
                         data-emphasis={club.emphasis}
                         data-selected={club.clubId === selected?.clubId ? "true" : "false"}
-                        onClick={() => setSelectedId(club.clubId)}
+                        tabIndex={0}
+                        onClick={() => {
+                          setSelectedId(club.clubId);
+                          onActivateClub?.(club.clubId);
+                        }}
                       >
                         <div className="admin-club-management__identity">
                           <Link
-                            id={`admin-club-row-${club.clubId}`}
                             to={club.href}
-                            onClick={(event) => event.stopPropagation()}
+                            onClick={(event) => {
+                              if (!onActivateClub) {
+                                event.stopPropagation();
+                                return;
+                              }
+                              event.preventDefault();
+                              event.stopPropagation();
+                              setSelectedId(club.clubId);
+                              onActivateClub(club.clubId);
+                            }}
                           >
                             {club.name}
                           </Link>

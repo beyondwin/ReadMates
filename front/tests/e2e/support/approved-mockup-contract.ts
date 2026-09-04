@@ -156,9 +156,12 @@ export async function isSemanticDocumentOrder(locators: readonly Locator[]): Pro
   if (handles.some((handle) => handle === null)) throw new Error("Semantic order locator is missing");
   return handles[0]!.evaluate((first, rest) => {
     const nodes = [first, ...(rest as Node[])];
-    return nodes.every((node, index) => index === 0 || Boolean(
-      nodes[index - 1]!.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ));
+    return nodes.every((node, index) => {
+      if (index === 0) return true;
+      const previous = nodes[index - 1]!;
+      if (previous === node) return true;
+      return Boolean(previous.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
   }, handles.slice(1));
 }
 

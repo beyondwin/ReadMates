@@ -123,3 +123,51 @@ test("admin-space-switcher-desktop matches its approved actual route", async ({ 
   expect(report.mask).toBeNull();
   expect(report).not.toHaveProperty("exception");
 });
+
+async function assertAdminLedgerAuthoritySurface(
+  page: Parameters<typeof runActualRouteAuthority>[0]["page"],
+  id: "admin-clubs-desktop" | "admin-service-desktop" | "admin-records-desktop",
+): Promise<void> {
+  const scenario = visualAuthorityScenario(id);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.locator(".admin-shell__nav")).toBeVisible();
+  await expect(page.locator(scenario.regions[2].selector)).toBeVisible();
+
+  if (id === "admin-clubs-desktop") {
+    await expect(page.locator(".admin-club-management__finder")).toBeVisible();
+    await expect(page.locator(".admin-club-management__docket")).toBeVisible();
+    return;
+  }
+
+  if (id === "admin-service-desktop") {
+    await expect(page.locator(".admin-service-status__table")).toBeVisible();
+    await expect(page.locator(".admin-health-grid__strip")).toBeVisible();
+    await expect(page.getByRole("button", { name: "새로 확인" })).toHaveCount(0);
+    return;
+  }
+
+  await expect(page.locator(".admin-audit__list")).toBeVisible();
+  await expect(page.locator(".admin-audit__detail")).toBeVisible();
+}
+
+for (const id of ["admin-clubs-desktop", "admin-service-desktop", "admin-records-desktop"] as const) {
+  test(`${id} matches its approved actual route`, async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    test.skip(!visualAuthoritySelected(id), "not affected: " + id);
+    const scenario = visualAuthorityScenario(id);
+    const requestAudit = createApprovedRouteRequestAudit();
+    await page.setViewportSize(scenario.viewport);
+    await installAdminApprovedRoutes(page, scenario.fixtureKey, requestAudit);
+    await page.goto(scenario.route, { waitUntil: "domcontentloaded" });
+    await assertAdminLedgerAuthoritySurface(page, id);
+    const report = await runActualRouteAuthority({
+      page,
+      testInfo,
+      scenario,
+      installFixtures: (installPage, fixtureKey, audit) =>
+        installAdminApprovedRoutes(installPage, fixtureKey, audit),
+    });
+    expect(report.mask).toBeNull();
+    expect(report).not.toHaveProperty("exception");
+  });
+}

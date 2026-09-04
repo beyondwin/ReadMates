@@ -99,7 +99,7 @@ describe("AdminAuditRoute", () => {
     expect(screen.getAllByRole("button", { name: /클럽을 활성화했습니다/ })).toHaveLength(1);
     expect(screen.getByRole("region", { name: "감사 이벤트 상세" })).toHaveTextContent("클럽을 활성화했습니다");
     expect(screen.getByLabelText("location")).toHaveTextContent("event=boundary");
-    expect(screen.getByLabelText("location")).toHaveTextContent("mode=detail");
+    expect(screen.getByLabelText("location")).not.toHaveTextContent("mode=detail");
     expect(fetchAdminAuditLedger).toHaveBeenLastCalledWith(
       {
         range: "7d",
@@ -171,6 +171,16 @@ describe("AdminAuditRoute", () => {
     expect(screen.getByLabelText("location")).not.toHaveTextContent("mode=detail");
     expect(screen.getByRole("button", { name: /AI 작업 반영을 다시 시도했습니다/ })).toHaveFocus();
     expect(document.querySelector(".admin-audit__body")).toHaveAttribute("data-detail-open", "false");
+  });
+
+  it("selects an event without encoding the default range or detail mode into the URL", async () => {
+    const user = userEvent.setup();
+    renderRoute("/admin/audit");
+    await user.click(await screen.findByRole("button", { name: /AI 작업 반영을 다시 시도했습니다/ }));
+
+    expect(screen.getByLabelText("location")).toHaveTextContent("/admin/audit?event=event-1");
+    expect(screen.getByLabelText("location")).not.toHaveTextContent("range=");
+    expect(screen.getByLabelText("location")).not.toHaveTextContent("mode=detail");
   });
 
   it("does not put a sensitive target into the event URL or query key after a row is selected", async () => {

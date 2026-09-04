@@ -1,9 +1,18 @@
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router";
 import type { AdminAuditLedgerPage } from "@/features/platform-admin/model/platform-admin-audit-model";
 import { AdminAuditLedger } from "./admin-audit-ledger";
+
+const PROCESSING_RECORDS_CSS_PATH = path.resolve(
+  "features/platform-admin/ui/admin-processing-records.css",
+);
+const PROCESSING_RECORDS_CSS = existsSync(PROCESSING_RECORDS_CSS_PATH)
+  ? readFileSync(PROCESSING_RECORDS_CSS_PATH, "utf8")
+  : "";
 
 const defaultSearch = {
   value: "",
@@ -475,5 +484,22 @@ describe("AdminAuditLedger", () => {
     expect(disclosure).toHaveTextContent("원본 설명");
     expect(disclosure).toHaveTextContent("support grant가 생성되었습니다.");
     expect(disclosure).toHaveTextContent("METADATA_READ");
+  });
+
+  it("paints row titles at 17/600 and leaves pagination in the first viewport", () => {
+    expect(PROCESSING_RECORDS_CSS).toMatch(
+      /\.admin-audit__row-title[\s\S]*font-weight:\s*600/,
+    );
+    expect(PROCESSING_RECORDS_CSS).not.toMatch(
+      /\.admin-audit__more \{[\s\S]*clip:\s*rect/,
+    );
+    expect(PROCESSING_RECORDS_CSS).toContain("pointer-events: none");
+    expect(PROCESSING_RECORDS_CSS).toContain(".admin-audit");
+  });
+
+  it("fills the approved page-heading band with the audit h1", () => {
+    expect(PROCESSING_RECORDS_CSS).toMatch(
+      /\.admin-shell:has\(\.admin-audit\) \.admin-page-frame > \.admin-page-frame__header h1[\s\S]*width:\s*100%[\s\S]*height:\s*68px/,
+    );
   });
 });

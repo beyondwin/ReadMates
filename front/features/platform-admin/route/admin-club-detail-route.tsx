@@ -104,13 +104,13 @@ export function AdminClubDetailRoute() {
 
   if (detailQuery.isPending)
     return (
-      <section className="admin-club-detail">
+      <section className="admin-club-detail admin-club-management__docket">
         <p className="muted">클럽 정보를 불러오는 중입니다.</p>
       </section>
     );
   if (detailQuery.isError || !club)
     return (
-      <section className="admin-club-detail" aria-label="클럽 상세">
+      <section className="admin-club-detail admin-club-management__docket" aria-label="클럽 상세">
         <p role="alert">해당 클럽을 찾을 수 없습니다.</p>
         <button
           type="button"
@@ -128,7 +128,7 @@ export function AdminClubDetailRoute() {
   const canManageDomains =
     capabilities != null && canAdmin(capabilities, "MANAGE_CLUB_DOMAINS");
   return (
-    <section className="admin-club-detail" aria-label="클럽 상세">
+    <section className="admin-club-detail admin-club-management__docket" aria-label="클럽 상세">
       <AdminPageContext
         eyebrow={ADMIN_COPY.eyebrow.clubDetail}
         heading={club.name}

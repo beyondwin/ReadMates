@@ -5,6 +5,8 @@ import type { PlatformAdminCapability } from "@/features/platform-admin/model/pl
 import type { PlatformAdminRole } from "@/features/platform-admin/api/platform-admin-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import {
+  routeAdminAuditLedger,
+  routeAdminClubsLedger,
   routeAdminEditorialLedgerShell,
   routeAdminHealthSnapshot,
   routeAdminTodayCases,
@@ -18,6 +20,11 @@ const ADMIN_TODAY_CAPABILITIES = [
   "VIEW_CLUBS",
   "VIEW_SERVICE_HEALTH",
   "VIEW_AUDIT",
+] as const satisfies readonly PlatformAdminCapability[];
+const ADMIN_CLUBS_CAPABILITIES = [
+  ...ADMIN_TODAY_CAPABILITIES,
+  "VIEW_CLUB_OPERATIONS",
+  "CREATE_CLUB",
 ] as const satisfies readonly PlatformAdminCapability[];
 const TODAY_LIFECYCLE_ACTIONS = [
   "ACKNOWLEDGE",
@@ -43,7 +50,16 @@ export const ADMIN_APPROVED_SAMPLE_CLUB = {
 
 export const ADMIN_APPROVED_SAMPLE_CLUB_PERSPECTIVES = ["MEMBER", "HOST"] as const;
 
-const ADMIN_APPROVED_FIXTURE_KEYS = new Set<ApprovedRouteFixtureKey>(["admin-today"]);
+const ADMIN_APPROVED_FIXTURE_KEYS = new Set<ApprovedRouteFixtureKey>([
+  "admin-today",
+  "admin-clubs",
+  "admin-health",
+  "admin-audit",
+]);
+const ADMIN_SHARED_FIXTURE_PATHS = [
+  ...ADMIN_TODAY_FIXTURE_PATHS,
+  "/api/bff/api/admin/audit/events",
+] as const;
 
 async function json(route: Route, status: number, body: unknown): Promise<void> {
   await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -181,6 +197,72 @@ export function buildAdminTodayOperationCases(): AdminOperationCase[] {
       detailHref: "/admin/clubs",
     }),
   ];
+}
+
+const APPROVED_CLUB_SAMPLE = {
+  clubId: "club-sample",
+  slug: "sample-reading",
+  name: "샘플 독서모임",
+  tagline: "",
+  about: "",
+  status: "ACTIVE" as const,
+  publicVisibility: "PUBLIC" as const,
+  domainCount: 1,
+  domainActionRequiredCount: 0,
+  notificationFailureCount: 0,
+  aiFailureCount: 0,
+  firstHostOnboardingState: "ASSIGNED" as const,
+  adminRevision: 4,
+};
+
+export function buildAdminApprovedClubs() {
+  return {
+    items: [APPROVED_CLUB_SAMPLE],
+    nextCursor: "clubs-visual-next",
+  };
+}
+
+export function buildAdminApprovedAuditEvents() {
+  return {
+    generatedAt: GENERATED_AT,
+    filters: {
+      range: "7d",
+      from: "2026-08-19T10:00:00.000Z",
+      to: GENERATED_AT,
+    },
+    summary: {
+      visibleCount: 1,
+      sourceUnavailableCount: 0,
+      metadataUnavailableCount: 0,
+      unavailableSources: [] as string[],
+    },
+    nextCursor: "audit-visual-next",
+    items: [
+      {
+        id: "audit-visual-1",
+        occurredAt: "2026-08-26T09:50:00Z",
+        sourceSlice: "S5" as const,
+        sourceTable: "platform_audit_events",
+        actionCategory: "NOTIFICATION" as const,
+        actionType: "ADMIN_NOTIFICATION_REPLAY_CONFIRMED",
+        outcome: "SUCCESS" as const,
+        actor: { userId: "platform-operator", role: "OPERATOR" as const, displayLabel: "OPERATOR" },
+        target: {
+          clubId: "club-sample",
+          userId: null,
+          jobId: null,
+          eventId: "preview-sample",
+          label: "알림 다시 보내기",
+        },
+        summary: "알림 다시 보내기 완료",
+        safeMetadata: [
+          { label: "처리한 이유", value: "전달 지연을 확인했습니다.", kind: "text" as const },
+          { label: "영향 범위", value: "클럽 2곳", kind: "text" as const },
+        ],
+        metadataState: "AVAILABLE" as const,
+      },
+    ],
+  };
 }
 
 async function routeAdminTodayHealthySnapshot(page: Page): Promise<void> {
@@ -354,7 +436,11 @@ export async function installAdminApprovedRoutes(
     throw new Error(`Unsupported Admin fixture key: ${fixtureKey}`);
   }
 
-  for (const path of ADMIN_TODAY_FIXTURE_PATHS) {
+  const capabilities = fixtureKey === "admin-clubs"
+    ? ADMIN_CLUBS_CAPABILITIES
+    : ADMIN_TODAY_CAPABILITIES;
+
+  for (const path of ADMIN_SHARED_FIXTURE_PATHS) {
     requestAudit.allowFixture({ method: "GET", path });
   }
   requestAudit.allowFixture({ method: "POST", path: FRONTEND_OBSERVABILITY_PATH });
@@ -364,9 +450,16 @@ export async function installAdminApprovedRoutes(
       path: `/api/bff/api/admin/operations/cases/${item.id}`,
     });
   }
+  if (fixtureKey === "admin-clubs") {
+    requestAudit.allowFixture({ method: "GET", path: "/api/bff/api/admin/clubs/club-sample" });
+    requestAudit.allowFixture({
+      method: "GET",
+      path: "/api/bff/api/admin/clubs/club-sample/operations",
+    });
+  }
 
   await routeAdminEditorialLedgerShell(page, {
-    capabilities: ADMIN_TODAY_CAPABILITIES,
+    capabilities,
     authRole: "OPERATOR",
   });
   await page.route("**/api/bff/api/auth/me**", (route) => json(route, 200, buildAdminApprovedAuth()));
@@ -378,4 +471,237 @@ export async function installAdminApprovedRoutes(
     if (route.request().method() !== "POST") return route.fallback();
     return route.fulfill({ status: 204 });
   });
+
+  if (fixtureKey === "admin-clubs") {
+    await routeAdminClubsLedger(page);
+    await routeAdminApprovedClubs(page);
+    await routeAdminAuditLedger(page);
+    await routeAdminApprovedAudit(page);
+  }
+  if (fixtureKey === "admin-health") {
+    await routeAdminApprovedHealth(page);
+  }
+  if (fixtureKey === "admin-audit") {
+    await routeAdminAuditLedger(page);
+    await routeAdminApprovedAudit(page);
+  }
+}
+
+async function routeAdminApprovedClubs(page: Page): Promise<void> {
+  const firstPage = buildAdminApprovedClubs();
+  const nextClub = {
+    ...APPROVED_CLUB_SAMPLE,
+    clubId: "club-sample-next",
+    slug: "sample-reading-next",
+    name: "샘플 독서모임 다음",
+    adminRevision: 2,
+  };
+  await page.route("**/api/bff/api/admin/clubs**", async (route) => {
+    const requestUrl = new URL(route.request().url());
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+    if (requestUrl.pathname === "/api/bff/api/admin/clubs/club-sample") {
+      await json(route, 200, { ...APPROVED_CLUB_SAMPLE, domains: [] });
+      return;
+    }
+    if (requestUrl.pathname === "/api/bff/api/admin/clubs/club-sample/operations") {
+      await json(route, 200, {
+        schema: "admin.club_operations_snapshot.v1",
+        generatedAt: GENERATED_AT,
+        club: {
+          clubId: APPROVED_CLUB_SAMPLE.clubId,
+          slug: APPROVED_CLUB_SAMPLE.slug,
+          name: APPROVED_CLUB_SAMPLE.name,
+          status: APPROVED_CLUB_SAMPLE.status,
+          publicVisibility: APPROVED_CLUB_SAMPLE.publicVisibility,
+        },
+        readiness: { state: "READY", blockingReasons: [], nextAction: null },
+        memberActivity: { activeCount: 6, dormantCount: 0, pendingViewerCount: 0, hostCount: 1 },
+        sessionProgress: {
+          upcomingCount: 0,
+          currentOpenCount: 0,
+          closedCount: 0,
+          publishedRecordCount: 1,
+          incompleteRecordCount: 0,
+        },
+        notificationHealth: {
+          pending: 0,
+          failed: 0,
+          dead: 0,
+          lastSuccessAt: GENERATED_AT,
+          failureClusters: [],
+        },
+        aiUsage: {
+          activeJobs: 0,
+          failedRecentJobs: 0,
+          staleCandidates: 0,
+          costEstimateUsd: "0.0000",
+          state: "NO_ACTIVITY",
+        },
+        safeLinks: [],
+      });
+      return;
+    }
+    if (requestUrl.pathname !== "/api/bff/api/admin/clubs") {
+      await route.fallback();
+      return;
+    }
+    if (requestUrl.searchParams.get("cursor") === firstPage.nextCursor) {
+      await json(route, 200, { items: [nextClub], nextCursor: null });
+      return;
+    }
+    await json(route, 200, firstPage);
+  });
+}
+
+async function routeAdminApprovedHealth(page: Page): Promise<void> {
+  await page.route("**/api/bff/api/admin/health/snapshot", (route) => json(route, 200, {
+    schema: "platform.health_snapshot.v1",
+    generatedAt: GENERATED_AT,
+    lastSuccessfulAt: GENERATED_AT,
+    refreshState: "FRESH",
+    staleAgeSeconds: 0,
+    cards: [
+      {
+        id: "outbox_backlog",
+        title: "Outbox backlog",
+        status: "WARN",
+        metric: { value: 120, unit: "rows", label: "pending" },
+        thresholds: { warn: 100, crit: 1000 },
+        lastCheckedAt: GENERATED_AT,
+        source: "IN_PROCESS",
+        drill: { kind: "ADMIN_ROUTE", target: "/admin/notifications?focus=outbox_backlog" },
+        reason: null,
+        deployStrip: null,
+      },
+      {
+        id: "kafka_consumer_lag",
+        title: "Kafka consumer lag",
+        status: "OK",
+        metric: { value: 12, unit: "records", label: "max across partitions" },
+        thresholds: { warn: 50, crit: 500 },
+        lastCheckedAt: GENERATED_AT,
+        source: "PROMETHEUS",
+        drill: null,
+        reason: null,
+        deployStrip: null,
+      },
+      {
+        id: "redis",
+        title: "Redis",
+        status: "OK",
+        metric: { value: 0, unit: "errors", label: "current" },
+        thresholds: { warn: 1, crit: 50 },
+        lastCheckedAt: GENERATED_AT,
+        source: "IN_PROCESS",
+        drill: null,
+        reason: null,
+        deployStrip: null,
+      },
+      {
+        id: "db_pool",
+        title: "DB pool",
+        status: "OK",
+        metric: { value: 3, unit: "connections", label: "active" },
+        thresholds: { warn: 8, crit: 12 },
+        lastCheckedAt: GENERATED_AT,
+        source: "IN_PROCESS",
+        drill: null,
+        reason: null,
+        deployStrip: null,
+      },
+      {
+        id: "notification_dispatch_success",
+        title: "Notification dispatch success",
+        status: "OK",
+        metric: { value: 0.997, unit: "ratio", label: "last 5m" },
+        thresholds: { warn: 0.95, crit: 0.9 },
+        lastCheckedAt: GENERATED_AT,
+        source: "PROMETHEUS",
+        drill: { kind: "ADMIN_ROUTE", target: "/admin/notifications" },
+        reason: null,
+        deployStrip: null,
+      },
+      {
+        id: "ai_provider_availability",
+        title: "AI provider availability",
+        status: "OK",
+        metric: { value: 1, unit: "ratio", label: "last 5m" },
+        thresholds: { warn: 0.98, crit: 0.9 },
+        lastCheckedAt: GENERATED_AT,
+        source: "PROMETHEUS",
+        drill: { kind: "ADMIN_ROUTE", target: "/admin/ai-ops" },
+        reason: null,
+        deployStrip: null,
+      },
+      {
+        id: "outbound-resilience",
+        title: "Outbound resilience",
+        status: "OK",
+        metric: { value: 0, unit: "errors", label: "current" },
+        thresholds: { warn: 1, crit: 8 },
+        lastCheckedAt: GENERATED_AT,
+        source: "IN_PROCESS",
+        drill: null,
+        reason: null,
+        deployStrip: null,
+      },
+      {
+        id: "deploy_attempts_strip",
+        title: "Deploy attempts",
+        status: "OK",
+        metric: null,
+        thresholds: null,
+        lastCheckedAt: GENERATED_AT,
+        source: "FILE",
+        drill: null,
+        reason: null,
+        deployStrip: [
+          {
+            attemptId: "deploy-sample-001",
+            startedAt: GENERATED_AT,
+            endedAt: GENERATED_AT,
+            finalStatus: "SUCCEEDED",
+            imageTag: "readmates-api:sample",
+            durationSeconds: 90,
+          },
+        ],
+      },
+    ],
+  }));
+}
+
+async function routeAdminApprovedAudit(page: Page): Promise<void> {
+  await page.route("**/api/bff/api/admin/audit/events**", fulfillAudit);
+  await page.route("**/api/admin/audit/events**", fulfillAudit);
+}
+
+async function fulfillAudit(route: Route): Promise<void> {
+  if (route.request().method() !== "GET") {
+    await route.fallback();
+    return;
+  }
+  const firstPage = buildAdminApprovedAuditEvents();
+  const nextItem = {
+    ...firstPage.items[0],
+    id: "audit-visual-2",
+    occurredAt: "2026-08-26T09:20:00Z",
+    actionType: "FEEDBACK_DOCUMENT_PUBLISHED",
+    actionCategory: "CLUB_LIFECYCLE" as const,
+    sourceSlice: "S3" as const,
+    summary: "공개 기록 확인 완료",
+  };
+  const cursor = new URL(route.request().url()).searchParams.get("cursor");
+  if (cursor === firstPage.nextCursor) {
+    await json(route, 200, {
+      ...firstPage,
+      items: [nextItem],
+      nextCursor: null,
+      summary: { ...firstPage.summary, visibleCount: 1 },
+    });
+    return;
+  }
+  await json(route, 200, firstPage);
 }
