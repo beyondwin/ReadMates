@@ -5,10 +5,12 @@ import { approvedRecordItems, approvedScheduleReviewMembers } from "@/features/h
 import {
   HOST_APPROVED_PERSON_ID,
   HOST_APPROVED_SESSION_ID,
+  buildHostApprovedAuth,
   buildHostApprovedMeetingList,
   buildHostApprovedMembersPage,
   buildHostApprovedPersonDetail,
   buildHostApprovedRecordLedger,
+  buildHostApprovedClosingStatus,
   buildHostApprovedSessionDetail,
   resolveHostApprovedCursorPage,
 } from "./host-approved-route-fixtures";
@@ -32,6 +34,24 @@ describe("host approved route fixtures", () => {
     expect(buildHostApprovedSessionDetail("session-99")).toBeNull();
     expect(parseHostSessionDetailResponse(current!)).toMatchObject({ sessionId: HOST_APPROVED_SESSION_ID, state: "OPEN" });
     expect(parseHostSessionDetailResponse(closing!)).toMatchObject({ sessionId: "session-27", state: "CLOSED" });
+  });
+
+  it("keeps session-28 CLOSED with a closing checklist when the closing lifecycle is requested", () => {
+    const closed = buildHostApprovedSessionDetail(HOST_APPROVED_SESSION_ID, { lifecycle: "CLOSED" });
+    const open = buildHostApprovedSessionDetail(HOST_APPROVED_SESSION_ID, { attendanceMix: true });
+    expect(closed).toMatchObject({ sessionId: HOST_APPROVED_SESSION_ID, state: "CLOSED" });
+    expect(open?.state).toBe("OPEN");
+    expect(open?.attendees.filter((attendee) => attendee.attendanceStatus === "ATTENDED").length).toBeGreaterThan(0);
+    const status = buildHostApprovedClosingStatus(HOST_APPROVED_SESSION_ID, { lifecycle: "CLOSED" });
+    expect(status?.overall.primaryAction).toBe("IMPORT_RECORDS");
+    expect(status?.checklist.map((item) => item.id)).toEqual([
+      "SESSION_CLOSED",
+      "MEMBER_NOTIFICATION_SENT",
+      "RECORD_PACKAGE_SAVED",
+      "FEEDBACK_DOCUMENT_READY",
+      "PUBLIC_RECORD_VISIBLE",
+    ]);
+    expect(parseHostSessionDetailResponse(closed!)).toMatchObject({ state: "CLOSED" });
   });
 
   it("keeps CLOSED session-28 on the record ledger and OPEN session-28 on the meeting list", () => {
@@ -84,6 +104,11 @@ describe("host approved route fixtures", () => {
       nextCursor: null,
     });
     expect(resolveHostApprovedCursorPage(members, "cursor-unknown")).toBeNull();
+  });
+
+  it("exposes platform and club kinds so the mobile space-switcher trigger remains measurable", () => {
+    expect(buildHostApprovedAuth().availableSpaces?.kinds).toEqual(["PLATFORM", "CLUBS"]);
+    expect(buildHostApprovedAuth().platformAdmin).toBeNull();
   });
 
   it("converts schedule-review recipients from the approved ledger", () => {

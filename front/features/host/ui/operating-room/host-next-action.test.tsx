@@ -28,6 +28,7 @@ describe("HostNextAction", () => {
     expect(screen.getByText("미열람 3 · 변경 전 확인 1")).toBeVisible();
     const primary = screen.getByRole("link", { name: "일정 미확인 멤버 검토" });
     expect(primary).toHaveAttribute("href", actionable.href);
+    expect(primary).toHaveClass("btn", "btn-primary");
     expect(region.querySelectorAll(".rm-operating-room-next-action__primary")).toHaveLength(1);
   });
 

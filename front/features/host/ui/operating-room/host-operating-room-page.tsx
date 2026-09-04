@@ -115,25 +115,37 @@ export function HostOperatingRoomPage({
         onPhaseChange={onPhaseChange}
       />
 
-      {phaseNormalizationReason ? (
-        <p
-          className="rm-host-operating-room__phase-notice"
-          role="status"
-          aria-label="운영 단계 이동 안내"
-        >
-          {phaseNormalizationReason}
-        </p>
-      ) : null}
-
       <div className="rm-host-operating-room__body">
         <div className="rm-host-operating-room__primary">
-          <HostNextAction
-            action={view.nextAction}
-            pending={nextActionPending}
-            onDefer={onDeferNextAction}
-            secondaryAction={nextActionSecondary}
-            LinkComponent={LinkComponent}
-          />
+          {view.phase === "closing" ? (
+            <div className="rm-host-closing-board">
+              <div className="rm-host-closing-board__primary">
+                <HostNextAction
+                  action={view.nextAction}
+                  pending={nextActionPending}
+                  onDefer={onDeferNextAction}
+                  secondaryAction={nextActionSecondary}
+                  LinkComponent={LinkComponent}
+                />
+              </div>
+            </div>
+          ) : (
+            <HostNextAction
+              action={view.nextAction}
+              pending={nextActionPending}
+              onDefer={onDeferNextAction}
+              secondaryAction={nextActionSecondary}
+              LinkComponent={LinkComponent}
+            />
+          )}
+
+          <p
+            className="rm-host-operating-room__phase-notice"
+            role="status"
+            aria-label={phaseNormalizationReason ? "운영 단계 이동 안내" : "필요한 상태 안내"}
+          >
+            {phaseNormalizationReason ?? view.nextAction.note ?? ""}
+          </p>
 
           {recovery?.kind === "conflict" ? (
           <section

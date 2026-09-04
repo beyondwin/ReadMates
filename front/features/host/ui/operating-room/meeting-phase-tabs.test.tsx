@@ -42,7 +42,7 @@ describe("MeetingPhaseTabs", () => {
     expect(blocked).toHaveAttribute("aria-disabled", "true");
     expect(blocked).not.toHaveAttribute("href");
     expect(blocked).toHaveAccessibleDescription("모임을 마친 뒤 사용할 수 있습니다.");
-    expect(screen.getByText("모임을 마친 뒤 사용할 수 있습니다.")).toBeVisible();
+    expect(screen.getByText("모임을 마친 뒤 사용할 수 있습니다.")).toHaveClass("rm-operating-room-phases__reason");
   });
 
   it("preserves completion meaning when a completed phase is also current", () => {

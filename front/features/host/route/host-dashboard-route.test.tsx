@@ -741,12 +741,39 @@ describe("HostDashboardRoute", () => {
     expect(screen.getByRole("region", { name: "다음에 할 일" })).toHaveTextContent("기록 패키지 검토");
     expect(screen.getByRole("link", { name: "기록 초안 검토" })).toHaveAttribute(
       "href",
-      "/clubs/reading-sai/app/host/sessions/session-7/edit?records=json",
+      "/clubs/reading-sai/app/host/records",
     );
     expect(within(checklist).getByRole("link", { name: "기록 초안 자세히 보기" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7?section=records",
     );
+  });
+
+  it("does not insert a giant optional-failure panel on closing when schedule-seen is unavailable", async () => {
+    const closed = {
+      ...meetingDetail,
+      state: "CLOSED" as const,
+      scheduleSeenAvailability: "UNAVAILABLE" as const,
+      scheduleSeenSummary: {
+        currentCount: null,
+        staleCount: null,
+        unseenCount: null,
+        eligibleCount: null,
+      },
+    };
+    renderRoute("/clubs/reading-sai/app/host?phase=closing", dashboardData({
+      operatingRoom: { currentMeeting: {
+        sessionId: closed.sessionId,
+        selection: "CLOSING_REQUIRED",
+        scheduleSeenAvailability: "UNAVAILABLE",
+      } },
+      currentMeeting: closed,
+      closingStatus: { state: "ready", data: closingStatus },
+    }));
+
+    expect(await screen.findByRole("tab", { name: /마감실/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("region", { name: "마감 현황" })).toBeVisible();
+    expect(screen.queryByRole("region", { name: "일부 운영 정보 불러오기 실패" })).not.toBeInTheDocument();
   });
 
   it("keeps successful meeting content when optional sources fail and exposes scoped retry", async () => {
@@ -956,6 +983,16 @@ describe("HostDashboardRoute", () => {
     const workbox = await screen.findByRole("region", { name: "작업함" });
     expect(within(workbox).getAllByRole("listitem")).toHaveLength(3);
     expect(within(workbox).getByRole("button", { name: "작업함 모두 보기" })).toBeVisible();
+  });
+
+  it("keeps the current operating phase when expanding the workbox", async () => {
+    routeMocks.workboxPages.set("NOW:root", workboxPageWithItems(12));
+    const user = userEvent.setup();
+    const { router } = renderRoute("/clubs/reading-sai/app/host?phase=live");
+
+    const workbox = await screen.findByRole("region", { name: "작업함" });
+    await user.click(within(workbox).getByRole("button", { name: "작업함 모두 보기" }));
+    await waitFor(() => expect(router.state.location.search).toBe("?phase=live&workbox=all"));
   });
 
   it("announces workbox source warnings once in the compact state-summary channel", async () => {

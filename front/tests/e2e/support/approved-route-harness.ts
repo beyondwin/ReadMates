@@ -396,7 +396,9 @@ async function executeInteraction(input: {
         assertFocus: (selector) => assertFocused(page, selector),
       });
     } else if (interaction.kind === "tab-selection") {
-      await locateApprovedTarget(page, interaction.tab).click();
+      const tab = locateApprovedTarget(page, interaction.tab);
+      await tab.click();
+      await expect(tab).toHaveAttribute("aria-selected", "true");
       await expect(locateApprovedTarget(page, interaction.expectedSelected)).toBeVisible();
       await expect(locateApprovedTarget(page, interaction.expectedPanel)).toBeVisible();
     } else if (interaction.kind === "prepared-request") {

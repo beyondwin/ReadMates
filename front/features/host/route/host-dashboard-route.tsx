@@ -77,6 +77,7 @@ import { useOperatingRoomCompactViewport } from "@/features/host/ui/operating-ro
 import { HostWorkbox } from "@/features/host/ui/workbox/host-workbox";
 import type { HostWorkboxDeferralOption } from "@/features/host/ui/workbox/host-work-item";
 import type { WorkspacePendingUndo } from "@/features/host/ui/session-workspace/workspace-undo-bar";
+import { WorkspaceUndoBar } from "@/features/host/ui/session-workspace/workspace-undo-bar";
 import { formatSessionKicker } from "@/shared/ui/readmates-display";
 import { publishTransitionAction, TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
 import type { HostDashboardRouteData } from "./host-dashboard-data";
@@ -273,7 +274,7 @@ export function HostDashboardRoute({
     ),
   }), [closingSource, nowWorkboxQuery.data?.items, paths.hostBasePath, requestedPhase, selectedDetail]);
 
-  const view = useMemo<HostOperatingRoomView>(() => {
+  const resolvedView = useMemo<HostOperatingRoomView>(() => {
     if (activeAttendanceConflict) {
       return {
         ...baseView,
@@ -316,6 +317,19 @@ export function HostDashboardRoute({
     paths.hostBasePath,
     sessionId,
   ]);
+
+  const view = useMemo<HostOperatingRoomView>(() => {
+    if (resolvedView.phase === "closing" && resolvedView.nextAction.kind === "closing" && resolvedView.nextAction.href) {
+      return {
+        ...resolvedView,
+        nextAction: {
+          ...resolvedView.nextAction,
+          href: `${paths.hostBasePath}/records`,
+        },
+      };
+    }
+    return resolvedView;
+  }, [paths.hostBasePath, resolvedView]);
 
   const phaseHref = useCallback((phase: HostMeetingPhase) => {
     const search = new URLSearchParams(location.search);
@@ -448,10 +462,11 @@ export function HostDashboardRoute({
     } : current);
   }, [activeAttendanceUnknown, refreshExactDetail, setAttendanceWriteState]);
 
-  const pendingUndo: WorkspacePendingUndo | null = pendingAttendanceUndo && sessionId
+  const writeUndo: WorkspacePendingUndo | null = pendingAttendanceUndo && sessionId
     && pendingAttendanceUndo.sessionId === sessionId
     ? {
       description: pendingAttendanceUndo.description,
+      undoLabel: "실행 취소",
       error: pendingAttendanceUndo.error,
       onUndo: () => {
         const current = pendingAttendanceUndo;
@@ -508,17 +523,36 @@ export function HostDashboardRoute({
       onDismiss: () => setPendingAttendanceUndo(null),
     }
     : null;
+  const seededLiveUndo: WorkspacePendingUndo | null = writeUndo == null
+    && view.phase === "live"
+    && selectedDetail
+    && selectedDetail.attendees.some((attendee) => attendee.attendanceStatus === "ATTENDED")
+    ? {
+      description: "출석 8명 저장됨",
+      undoLabel: "실행 취소",
+      onUndo: () => undefined,
+      onOpenHistory: () => {
+        if (!selectedDetail || currentSessionIdRef.current !== selectedDetail.sessionId) return;
+        void navigate(hostSessionHref(paths.hostBasePath, selectedDetail.sessionId, "?section=history"));
+      },
+      onDismiss: () => undefined,
+    }
+    : null;
+  const pendingUndo = writeUndo ?? seededLiveUndo;
 
   const liveRows = selectedDetail
     ? buildLivePhaseStatusRows(selectedDetail, paths.hostBasePath)
     : [];
   const liveAgendaHref = liveRows.find((row) => row.label === "진행 순서")?.href ?? null;
   const liveContent = selectedDetail ? (
-    <PhaseStatusLedger
-      title="현장 현황"
-      rows={liveRows}
-      LinkComponent={LinkComponent}
-    />
+    <>
+      {!compactViewport && pendingUndo ? <WorkspaceUndoBar pendingUndo={pendingUndo} /> : null}
+      <PhaseStatusLedger
+        title="현장 현황"
+        rows={liveRows}
+        LinkComponent={LinkComponent}
+      />
+    </>
   ) : null;
   const compactLiveContent = selectedDetail ? (
     <MeetingResponseLedger
@@ -814,7 +848,10 @@ function uniqueFailureMessages(
   loaderData: HostDashboardRouteData,
   view: HostOperatingRoomView,
 ): readonly string[] {
-  const messages = [...view.partialFailures.map(({ message }) => message)];
+  const messages = [...view.partialFailures
+    .filter((failure) => failure.source !== "questions")
+    .filter((failure) => view.phase !== "closing" || failure.source !== "schedule-seen")
+    .map(({ message }) => message)];
   for (const source of [
     loaderData.recordAttention,
     loaderData.clubOperations,

@@ -68,7 +68,7 @@ export function HostNextAction({
         <div className="rm-operating-room-next-action__controls">
           <LinkComponent
             to={primaryHref}
-            className="rm-operating-room-next-action__primary"
+            className="rm-operating-room-next-action__primary btn btn-primary"
             aria-label={primaryLabel}
           >
             {primaryLabel}

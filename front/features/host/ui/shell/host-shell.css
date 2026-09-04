@@ -325,17 +325,33 @@ button.rm-host-workspace-switcher__choice {
   gap: 0;
 }
 
+.rm-app-club-shell[data-workspace="host"] .topnav-global-context > a.row > .editorial,
+.rm-app-club-shell[data-workspace="host"] header.topnav .editorial {
+  font-size: 12px !important;
+  font-weight: 650 !important;
+  line-height: 16.8px !important;
+  color: oklch(0.18 0.020 255);
+}
+
 .rm-app-club-shell[data-workspace="host"] .topnav-global-context > a.row > span > .editorial {
-  font-size: 0;
-  line-height: 0;
+  font-size: 12px;
+  line-height: 16.8px;
 }
 
 .rm-app-club-shell[data-workspace="host"] .topnav-global-context > a.row > span > .editorial::after {
-  content: "ReadMates";
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.025em;
-  line-height: 1;
+  content: none;
+}
+
+.rm-app-club-shell[data-workspace="host"] [data-club-shell-region="mobile-context"] .rm-global-space-switcher__trigger {
+  min-height: 44px;
+  padding: 4px 10px;
+}
+
+.rm-app-club-shell[data-workspace="host"] [data-club-shell-region="mobile-context"] .rm-global-space-switcher__trigger strong {
+  font-size: 12px !important;
+  font-weight: 650 !important;
+  line-height: 16.8px !important;
+  color: oklch(0.18 0.020 255) !important;
 }
 
 .rm-app-club-shell[data-workspace="host"] .topnav-global-context > a.row > span > .tiny {

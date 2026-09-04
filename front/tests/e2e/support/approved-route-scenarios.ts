@@ -22,14 +22,23 @@ import {
   ADMIN_SERVICE_TABLE_GEOMETRY,
   ADMIN_SPACE_TRIGGER_GEOMETRY,
   ADMIN_TODAY_HEADING_MOBILE_GEOMETRY,
-  HOST_BODY_DESKTOP_GEOMETRY,
+  HOST_CLOSING_PHASE_PANEL_DESKTOP_GEOMETRY,
   HOST_CURRENT_MEETING_DESKTOP_GEOMETRY,
-  HOST_LIVE_MOBILE_BOARD_GEOMETRY,
-  HOST_LIVE_MOBILE_MAIN_GEOMETRY,
+  HOST_LIVE_MOBILE_NEXT_ACTION_GEOMETRY,
+  HOST_LIVE_MOBILE_PHASE_NAV_GEOMETRY,
+  HOST_LIVE_MOBILE_PHASE_PANEL_GEOMETRY,
+  HOST_LIVE_MOBILE_PHASE_STATUS_GEOMETRY,
+  HOST_LIVE_MOBILE_WORKBOX_GEOMETRY,
+  HOST_LIVE_PHASE_PANEL_DESKTOP_GEOMETRY,
   HOST_MEETINGS_HEADER_GEOMETRY,
   HOST_MEETINGS_MAIN_GEOMETRY,
   HOST_MEETINGS_NAV_GEOMETRY,
   HOST_MOBILE_NAV_GEOMETRY,
+  HOST_OR_DESKTOP_NAV_GEOMETRY,
+  HOST_OR_LIVE_MOBILE_BOARD_GEOMETRY,
+  HOST_OR_MOBILE_CONTEXT_GEOMETRY,
+  HOST_OR_MOBILE_CURRENT_MEETING_GEOMETRY,
+  HOST_OR_WORKBOX_DESKTOP_GEOMETRY,
   HOST_NEXT_ACTION_DESKTOP_GEOMETRY,
   HOST_PEOPLE_HEADER_GEOMETRY,
   HOST_PEOPLE_MAIN_GEOMETRY,
@@ -38,7 +47,12 @@ import {
   HOST_PERSON_MAIN_GEOMETRY,
   HOST_PHASE_NAV_DESKTOP_GEOMETRY,
   HOST_PHASE_STATUS_DESKTOP_GEOMETRY,
-  HOST_PREP_MOBILE_MAIN_GEOMETRY,
+  HOST_PREP_MOBILE_NEXT_ACTION_GEOMETRY,
+  HOST_PREP_MOBILE_PHASE_NAV_GEOMETRY,
+  HOST_PREP_MOBILE_PHASE_PANEL_GEOMETRY,
+  HOST_PREP_MOBILE_PHASE_STATUS_GEOMETRY,
+  HOST_PREP_MOBILE_WORKBOX_GEOMETRY,
+  HOST_PREP_PHASE_PANEL_DESKTOP_GEOMETRY,
   HOST_RECORDS_HEADER_GEOMETRY,
   HOST_RECORDS_MAIN_GEOMETRY,
   HOST_RECORDS_NAV_GEOMETRY,
@@ -48,7 +62,6 @@ import {
   HOST_SETTINGS_HEADER_GEOMETRY,
   HOST_SETTINGS_MAIN_GEOMETRY,
   HOST_SETTINGS_NAV_GEOMETRY,
-  HOST_WORKBOX_DESKTOP_GEOMETRY,
 } from "./approved-route-geometry";
 
 export type { ApprovedMockupId };
@@ -472,10 +485,15 @@ const CLOSING_DESTINATION: VisualAuthorityInteraction = {
   restoreCanonicalState: true,
 };
 
-function hostOperatingRoomRegions(body = HOST_BODY_DESKTOP_GEOMETRY, workbox = HOST_WORKBOX_DESKTOP_GEOMETRY) {
+function hostOperatingRoomRegions(body = HOST_PREP_PHASE_PANEL_DESKTOP_GEOMETRY, workbox = HOST_OR_WORKBOX_DESKTOP_GEOMETRY) {
   return [
     HOST_HEADER,
-    HOST_NAV,
+    {
+      name: "host-nav",
+      selector: 'nav[aria-label="호스트 주 메뉴"]',
+      expected: HOST_OR_DESKTOP_NAV_GEOMETRY,
+      toleranceCssPx: 4 as const,
+    },
     {
       name: "current-meeting",
       selector: '[aria-label="현재 모임"]',
@@ -530,46 +548,59 @@ const HOST_OPERATING_FIRST_VIEWPORT = [
   { name: "show-all-workbox", selector: WORKBOX_SHOW_ALL, visibility: "fully-visible" as const },
 ] as const;
 
-function hostMobileOperatingRegions(mainGeometry: Geometry, extra: VisualAuthorityScenario["regions"] = []) {
+function hostMobileOperatingRegions(
+  boxes: {
+    currentMeeting: Geometry;
+    phaseNav: Geometry;
+    nextAction: Geometry;
+    phaseStatus: Geometry;
+    phasePanel: Geometry;
+    workbox: Geometry;
+  },
+  extra: VisualAuthorityScenario["regions"] = [],
+) {
   return [
-    HOST_MOBILE_HEADER,
+    {
+      ...HOST_MOBILE_HEADER,
+      expected: HOST_OR_MOBILE_CONTEXT_GEOMETRY,
+    },
     {
       name: "current-meeting",
       selector: '[aria-label="현재 모임"]',
-      expected: HOST_PERSON_HEADER_GEOMETRY,
+      expected: boxes.currentMeeting,
       toleranceCssPx: 4 as const,
     },
     {
       name: "phase-navigation",
       selector: 'nav[aria-label="모임 운영 단계"]',
-      expected: mainGeometry,
+      expected: boxes.phaseNav,
       toleranceCssPx: 4 as const,
     },
     {
       name: "primary-next-action",
       selector: ".rm-operating-room-next-action",
-      expected: mainGeometry,
+      expected: boxes.nextAction,
       toleranceCssPx: 4 as const,
     },
     {
       name: "phase-status",
       selector: ".rm-host-operating-room__phase-notice",
-      expected: mainGeometry,
+      expected: boxes.phaseStatus,
       toleranceCssPx: 4 as const,
     },
     {
       name: "phase-panel",
       selector: ".rm-host-operating-room__phase-panel",
-      expected: mainGeometry,
-      toleranceCssPx: 4 as const,
-    },
-    {
-      name: "workbox",
-      selector: ".rm-host-operating-room__workbox-rail",
-      expected: mainGeometry,
+      expected: boxes.phasePanel,
       toleranceCssPx: 4 as const,
     },
     ...extra,
+    {
+      name: "workbox",
+      selector: ".rm-host-operating-room__workbox-rail",
+      expected: boxes.workbox,
+      toleranceCssPx: 4 as const,
+    },
     HOST_MOBILE_NAV,
   ] as const;
 }
@@ -1067,7 +1098,7 @@ export const REQUIRED_VISUAL_AUTHORITY_COVERAGE: Record<ApprovedMockupId, Requir
     actor: HOST_ACTOR,
     fixtureKey: "host-operating-room",
     preparationKey: "none",
-    regions: hostOperatingRoomRegions(),
+    regions: hostOperatingRoomRegions(HOST_LIVE_PHASE_PANEL_DESKTOP_GEOMETRY),
     typography: HOST_OPERATING_TYPOGRAPHY,
     firstViewport: HOST_OPERATING_FIRST_VIEWPORT,
     defaultVisibleItems: { selector: WORKBOX_ITEMS, count: 4 },
@@ -1077,7 +1108,7 @@ export const REQUIRED_VISUAL_AUTHORITY_COVERAGE: Record<ApprovedMockupId, Requir
     actor: HOST_ACTOR,
     fixtureKey: "host-operating-room",
     preparationKey: "none",
-    regions: hostOperatingRoomRegions(),
+    regions: hostOperatingRoomRegions(HOST_CLOSING_PHASE_PANEL_DESKTOP_GEOMETRY),
     typography: HOST_OPERATING_TYPOGRAPHY,
     firstViewport: HOST_OPERATING_FIRST_VIEWPORT,
     defaultVisibleItems: { selector: WORKBOX_ITEMS, count: 4 },
@@ -1386,7 +1417,14 @@ export const REQUIRED_VISUAL_AUTHORITY_COVERAGE: Record<ApprovedMockupId, Requir
     actor: HOST_ACTOR,
     fixtureKey: "host-operating-room",
     preparationKey: "none",
-    regions: hostMobileOperatingRegions(HOST_PREP_MOBILE_MAIN_GEOMETRY),
+    regions: hostMobileOperatingRegions({
+      currentMeeting: HOST_OR_MOBILE_CURRENT_MEETING_GEOMETRY,
+      phaseNav: HOST_PREP_MOBILE_PHASE_NAV_GEOMETRY,
+      nextAction: HOST_PREP_MOBILE_NEXT_ACTION_GEOMETRY,
+      phaseStatus: HOST_PREP_MOBILE_PHASE_STATUS_GEOMETRY,
+      phasePanel: HOST_PREP_MOBILE_PHASE_PANEL_GEOMETRY,
+      workbox: HOST_PREP_MOBILE_WORKBOX_GEOMETRY,
+    }),
     typography: HOST_MOBILE_TYPOGRAPHY,
     firstViewport: [
       { name: "primary-next-action", selector: ".rm-operating-room-next-action", visibility: "fully-visible" },
@@ -1401,11 +1439,18 @@ export const REQUIRED_VISUAL_AUTHORITY_COVERAGE: Record<ApprovedMockupId, Requir
     actor: HOST_ACTOR,
     fixtureKey: "host-operating-room",
     preparationKey: "none",
-    regions: hostMobileOperatingRegions(HOST_LIVE_MOBILE_MAIN_GEOMETRY, [
+    regions: hostMobileOperatingRegions({
+      currentMeeting: HOST_OR_MOBILE_CURRENT_MEETING_GEOMETRY,
+      phaseNav: HOST_LIVE_MOBILE_PHASE_NAV_GEOMETRY,
+      nextAction: HOST_LIVE_MOBILE_NEXT_ACTION_GEOMETRY,
+      phaseStatus: HOST_LIVE_MOBILE_PHASE_STATUS_GEOMETRY,
+      phasePanel: HOST_LIVE_MOBILE_PHASE_PANEL_GEOMETRY,
+      workbox: HOST_LIVE_MOBILE_WORKBOX_GEOMETRY,
+    }, [
       {
         name: "attendance-board",
         selector: ".rm-meeting-response-ledger--attendance-board",
-        expected: HOST_LIVE_MOBILE_BOARD_GEOMETRY,
+        expected: HOST_OR_LIVE_MOBILE_BOARD_GEOMETRY,
         toleranceCssPx: 4,
       },
     ]),

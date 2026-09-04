@@ -13,12 +13,14 @@ export const ADMIN_DETAIL_DOCKET_MOBILE_GEOMETRY = { x: 20, y: 67, width: 350, h
 export const ADMIN_PAGE_HEADING_DESKTOP_GEOMETRY = { x: 260, y: 86, width: 1412, height: 68 } as const;
 export const HOST_BODY_DESKTOP_GEOMETRY = { x: 36, y: 319, width: 1465, height: 665 } as const;
 export const HOST_WORKBOX_DESKTOP_GEOMETRY = { x: 988, y: 319, width: 513, height: 665 } as const;
+export const HOST_OR_WORKBOX_DESKTOP_GEOMETRY = { x: 987, y: 282, width: 513, height: 665 } as const;
 export const HOST_MOBILE_NAV_GEOMETRY = { x: 0, y: 768, width: 390, height: 64 } as const;
 export const HOST_PREP_MOBILE_MAIN_GEOMETRY = { x: 19, y: 58, width: 352, height: 902 } as const;
 export const HOST_LIVE_MOBILE_MAIN_GEOMETRY = { x: 19, y: 58, width: 352, height: 806 } as const;
 export const HOST_LIVE_MOBILE_BOARD_GEOMETRY = { x: 19, y: 200, width: 352, height: 600 } as const;
 export const HOST_MEETINGS_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
 export const HOST_MEETINGS_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
+export const HOST_OR_DESKTOP_NAV_GEOMETRY = { x: 678, y: 23, width: 233, height: 44 } as const;
 export const HOST_MEETINGS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1086 } as const;
 export const HOST_PEOPLE_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
 export const HOST_PEOPLE_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
@@ -100,14 +102,49 @@ export const HOST_PHASE_NAV_DESKTOP_GEOMETRY = {
 
 export const HOST_PHASE_STATUS_DESKTOP_GEOMETRY = {
   x: HOST_BODY_DESKTOP_GEOMETRY.x,
-  y: HOST_PHASE_NAV_DESKTOP_GEOMETRY.y + HOST_PHASE_NAV_DESKTOP_GEOMETRY.height,
-  width: HOST_BODY_DESKTOP_GEOMETRY.width,
+  y: 515,
+  width: 951,
   height: 18,
 } as const;
 
 export const HOST_NEXT_ACTION_DESKTOP_GEOMETRY = {
   x: HOST_BODY_DESKTOP_GEOMETRY.x,
-  y: HOST_BODY_DESKTOP_GEOMETRY.y - 18,
-  width: HOST_BODY_DESKTOP_GEOMETRY.width,
-  height: 18,
+  y: 283,
+  width: 951,
+  height: 232,
 } as const;
+
+export const HOST_PREP_PHASE_PANEL_DESKTOP_GEOMETRY = {
+  x: HOST_BODY_DESKTOP_GEOMETRY.x,
+  y: 532,
+  width: 951,
+  height: 313,
+} as const;
+
+export const HOST_LIVE_PHASE_PANEL_DESKTOP_GEOMETRY = {
+  x: HOST_BODY_DESKTOP_GEOMETRY.x,
+  y: 544,
+  width: 951,
+  height: 365,
+} as const;
+
+export const HOST_CLOSING_PHASE_PANEL_DESKTOP_GEOMETRY = {
+  x: HOST_BODY_DESKTOP_GEOMETRY.x,
+  y: 532,
+  width: 951,
+  height: 375,
+} as const;
+
+export const HOST_OR_MOBILE_CONTEXT_GEOMETRY = { x: 1, y: 0, width: 388, height: 58 } as const;
+export const HOST_OR_MOBILE_CURRENT_MEETING_GEOMETRY = { x: 19, y: 59, width: 352, height: 101 } as const;
+export const HOST_PREP_MOBILE_PHASE_NAV_GEOMETRY = { x: 19, y: 160, width: 352, height: 45 } as const;
+export const HOST_PREP_MOBILE_NEXT_ACTION_GEOMETRY = { x: 19, y: 205, width: 352, height: 131 } as const;
+export const HOST_PREP_MOBILE_PHASE_STATUS_GEOMETRY = { x: 19, y: 336, width: 352, height: 18 } as const;
+export const HOST_PREP_MOBILE_PHASE_PANEL_GEOMETRY = { x: 19, y: 354, width: 352, height: 242 } as const;
+export const HOST_PREP_MOBILE_WORKBOX_GEOMETRY = { x: 19, y: 595, width: 352, height: 227 } as const;
+export const HOST_LIVE_MOBILE_PHASE_NAV_GEOMETRY = { x: 19, y: 160, width: 352, height: 41 } as const;
+export const HOST_LIVE_MOBILE_NEXT_ACTION_GEOMETRY = { x: 19, y: 200, width: 352, height: 154 } as const;
+export const HOST_LIVE_MOBILE_PHASE_STATUS_GEOMETRY = { x: 19, y: 354, width: 352, height: 18 } as const;
+export const HOST_LIVE_MOBILE_PHASE_PANEL_GEOMETRY = { x: 19, y: 372, width: 352, height: 226 } as const;
+export const HOST_OR_LIVE_MOBILE_BOARD_GEOMETRY = { x: 19, y: 372, width: 352, height: 226 } as const;
+export const HOST_LIVE_MOBILE_WORKBOX_GEOMETRY = { x: 19, y: 598, width: 352, height: 227 } as const;

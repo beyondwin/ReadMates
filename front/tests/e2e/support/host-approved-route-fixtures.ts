@@ -233,7 +233,15 @@ export function buildHostApprovedMeetingList(): HostSessionListPage & { summary:
   };
 }
 
-function sessionAttendees(sessionId: string): HostSessionDetailResponse["attendees"] {
+export type HostApprovedSessionDetailOptions = {
+  lifecycle?: HostSessionDetailResponse["state"];
+  attendanceMix?: boolean;
+};
+
+function sessionAttendees(
+  sessionId: string,
+  attendanceMix = false,
+): HostSessionDetailResponse["attendees"] {
   if (sessionId !== HOST_APPROVED_SESSION_ID) return [];
   const fromPeople = approvedPeopleMembers
     .filter((member) => member.status === "ACTIVE")
@@ -269,10 +277,18 @@ function sessionAttendees(sessionId: string): HostSessionDetailResponse["attende
       scheduleSeenAt: null,
       scheduleSeenState: member.scheduleSeenState,
     }));
-  return [...fromPeople, ...extra];
+  const attendees = [...fromPeople, ...extra];
+  if (!attendanceMix) return attendees;
+  return attendees.map((attendee, index) => ({
+    ...attendee,
+    attendanceStatus: index < 8 ? "ATTENDED" : index === 8 ? "ABSENT" : "UNKNOWN",
+  }));
 }
 
-export function buildHostApprovedSessionDetail(sessionId: string): HostSessionDetailResponse | null {
+export function buildHostApprovedSessionDetail(
+  sessionId: string,
+  options?: HostApprovedSessionDetailOptions,
+): HostSessionDetailResponse | null {
   if (!SESSION_ID_SET.has(sessionId)) return null;
   const upcoming = approvedMeetingSections.upcoming.rows.find((row) => row.id === sessionId);
   const past = approvedMeetingSections.past.rows.find((row) => row.id === sessionId);
@@ -281,10 +297,9 @@ export function buildHostApprovedSessionDetail(sessionId: string): HostSessionDe
   if (!record && !row) return null;
 
   const currentOpen = sessionId === HOST_APPROVED_SESSION_ID;
-  const state = currentOpen
-    ? "OPEN"
-    : record?.state ?? (upcoming ? "DRAFT" : "CLOSED");
-  const attendees = sessionAttendees(sessionId);
+  const state = options?.lifecycle
+    ?? (currentOpen ? "OPEN" : record?.state ?? (upcoming ? "DRAFT" : "CLOSED"));
+  const attendees = sessionAttendees(sessionId, Boolean(options?.attendanceMix) && state === "OPEN");
   const eligible = attendees.filter((attendee) => attendee.participationStatus === "ACTIVE");
   return {
     sessionId,
@@ -310,8 +325,8 @@ export function buildHostApprovedSessionDetail(sessionId: string): HostSessionDe
     publication: null,
     state,
     scheduleRevision: 4,
-    scheduleSeenAvailability: currentOpen ? "AVAILABLE" : "UNAVAILABLE",
-    scheduleSeenSummary: currentOpen
+    scheduleSeenAvailability: currentOpen && state === "OPEN" ? "AVAILABLE" : "UNAVAILABLE",
+    scheduleSeenSummary: currentOpen && state === "OPEN"
       ? {
         currentCount: eligible.filter((attendee) => attendee.scheduleSeenState === "CURRENT").length,
         staleCount: eligible.filter((attendee) => attendee.scheduleSeenState === "STALE").length,
@@ -417,7 +432,7 @@ export function buildHostApprovedAuth(overrides: Partial<AuthMeResponse> = {}): 
     platformAdmin: null,
     availableSpaces: {
       version: 1,
-      kinds: ["CLUBS"],
+      kinds: ["PLATFORM", "CLUBS"],
       clubs: [{
         clubId: HOST_APPROVED_CLUB.clubId,
         clubSlug: HOST_APPROVED_CLUB.clubSlug,
@@ -477,19 +492,48 @@ export function buildMemberAuthWithoutHostPerspective(): AuthMeResponse {
   };
 }
 
-function operatingRoomCurrent(): HostOperatingRoomCurrentResponse {
+function requestedOperatingPhase(page: Page): string | null {
+  try {
+    return new URL(page.url()).searchParams.get("phase");
+  } catch {
+    return null;
+  }
+}
+
+function closingRequested(page: Page): boolean {
+  return requestedOperatingPhase(page) === "closing";
+}
+
+function sessionDetailOptionsForPage(page: Page, sessionId: string): HostApprovedSessionDetailOptions | undefined {
+  if (sessionId !== HOST_APPROVED_SESSION_ID) return undefined;
+  if (closingRequested(page)) return { lifecycle: "CLOSED" };
+  return { attendanceMix: true };
+}
+
+export function buildHostApprovedOperatingRoomCurrent(
+  selection: "OPEN" | "UPCOMING_DRAFT" | "CLOSING_REQUIRED" = "OPEN",
+): HostOperatingRoomCurrentResponse {
+  const closing = selection === "CLOSING_REQUIRED";
   return {
     currentMeeting: {
       sessionId: HOST_APPROVED_SESSION_ID,
-      selection: "OPEN",
-      scheduleSeenAvailability: "AVAILABLE",
+      selection,
+      scheduleSeenAvailability: closing ? "UNAVAILABLE" : "AVAILABLE",
     },
   };
 }
 
-function closingStatus(sessionId: string): HostSessionClosingStatusResponse | null {
-  const detail = buildHostApprovedSessionDetail(sessionId);
+function operatingRoomCurrent(page: Page): HostOperatingRoomCurrentResponse {
+  return buildHostApprovedOperatingRoomCurrent(closingRequested(page) ? "CLOSING_REQUIRED" : "OPEN");
+}
+
+export function buildHostApprovedClosingStatus(
+  sessionId: string,
+  options?: HostApprovedSessionDetailOptions,
+): HostSessionClosingStatusResponse | null {
+  const detail = buildHostApprovedSessionDetail(sessionId, options);
   if (!detail) return null;
+  const closed = detail.state === "CLOSED" || detail.state === "PUBLISHED";
   return {
     schema: "host.session_closing_status.v1",
     session: {
@@ -503,17 +547,51 @@ function closingStatus(sessionId: string): HostSessionClosingStatusResponse | nu
       participantSetRevision: detail.versions.participantSetRevision,
       attendanceSnapshotId: detail.attendanceSnapshotId,
     },
-    overall: { state: "NOT_STARTED", label: "모임 진행 중", primaryAction: "NONE" },
-    checklist: [
-      { id: "SESSION_CLOSED", state: "NOT_APPLICABLE", label: "모임 종료", detail: "아직 진행 중인 모임입니다.", href: null },
-      {
-        id: "RECORD_PACKAGE_SAVED",
-        state: "NOT_APPLICABLE",
-        label: "기록 패키지",
-        detail: "마감 후 기록을 정리합니다.",
-        href: `/app/host/sessions/${sessionId}`,
-      },
-    ],
+    overall: closed
+      ? { state: "IN_PROGRESS", label: "기록 정리 중", primaryAction: "IMPORT_RECORDS" }
+      : { state: "NOT_STARTED", label: "모임 진행 중", primaryAction: "NONE" },
+    checklist: closed
+      ? [
+        { id: "SESSION_CLOSED", state: "DONE", label: "모임 종료", detail: "출석이 확정되었습니다.", href: null },
+        {
+          id: "MEMBER_NOTIFICATION_SENT",
+          state: "ACTION_REQUIRED",
+          label: "소감 수집",
+          detail: "멤버 회고 안내를 확인하세요.",
+          href: `/app/host/sessions/${sessionId}`,
+        },
+        {
+          id: "RECORD_PACKAGE_SAVED",
+          state: "ACTION_REQUIRED",
+          label: "기록 패키지",
+          detail: "정리본을 검토하세요.",
+          href: `/app/host/sessions/${sessionId}?section=records`,
+        },
+        {
+          id: "FEEDBACK_DOCUMENT_READY",
+          state: "ACTION_REQUIRED",
+          label: "피드백 문서",
+          detail: "게시 전에 피드백 문서를 확인해 주세요.",
+          href: `/app/host/sessions/${sessionId}`,
+        },
+        {
+          id: "PUBLIC_RECORD_VISIBLE",
+          state: "ACTION_REQUIRED",
+          label: "멤버 게시",
+          detail: "게시 조건을 확인하세요.",
+          href: `/app/host/sessions/${sessionId}`,
+        },
+      ]
+      : [
+        { id: "SESSION_CLOSED", state: "NOT_APPLICABLE", label: "모임 종료", detail: "아직 진행 중인 모임입니다.", href: null },
+        {
+          id: "RECORD_PACKAGE_SAVED",
+          state: "NOT_APPLICABLE",
+          label: "기록 패키지",
+          detail: "마감 후 기록을 정리합니다.",
+          href: `/app/host/sessions/${sessionId}`,
+        },
+      ],
     evidence: {
       summaryPublished: false,
       highlightCount: 0,
@@ -784,7 +862,7 @@ export async function installHostApprovedRoutes(
 
     const pathname = url.pathname;
     if (pathname === "/api/bff/api/host/operating-room/current") {
-      await json(route, 200, operatingRoomCurrent());
+      await json(route, 200, operatingRoomCurrent(page));
       return;
     }
     if (pathname === "/api/bff/api/host/club-operations") {
@@ -881,7 +959,7 @@ export async function installHostApprovedRoutes(
         return;
       }
       if (rest === "") {
-        const detail = buildHostApprovedSessionDetail(sessionId);
+        const detail = buildHostApprovedSessionDetail(sessionId, sessionDetailOptionsForPage(page, sessionId));
         if (!detail) {
           await route.fallback();
           return;
@@ -890,7 +968,7 @@ export async function installHostApprovedRoutes(
         return;
       }
       if (rest === "closing-status") {
-        const status = closingStatus(sessionId);
+        const status = buildHostApprovedClosingStatus(sessionId, sessionDetailOptionsForPage(page, sessionId));
         if (!status) {
           await route.fallback();
           return;
