@@ -280,6 +280,8 @@ jobs:
 
       - name: Check out repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -312,6 +314,56 @@ jobs:
       - name: Run component visual regression tests
         run: pnpm test:ct:docker
 
+      - name: Resolve affected actual-route visual authorities
+        working-directory: .
+        env:
+          READMATES_VISUAL_EVENT_NAME: ${{ github.event_name }}
+          READMATES_VISUAL_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          READMATES_VISUAL_PUSH_BEFORE_SHA: ${{ github.event.before }}
+        shell: bash
+        run: |
+          base_sha=""
+          case "${READMATES_VISUAL_EVENT_NAME}" in
+            pull_request)
+              base_sha="${READMATES_VISUAL_PR_BASE_SHA}"
+              ;;
+            push)
+              base_sha="${READMATES_VISUAL_PUSH_BEFORE_SHA}"
+              if [[ "$base_sha" =~ ^0+$ ]]; then
+                if ! base_sha="$(git rev-parse --verify --quiet 'HEAD^^{commit}')"; then
+                  echo "Visual authority comparison base is unavailable." >&2
+                  exit 1
+                fi
+              fi
+              ;;
+            *)
+              echo "Unsupported visual authority comparison event." >&2
+              exit 1
+              ;;
+          esac
+          if [[ -z "$base_sha" ]]; then
+            echo "Visual authority comparison base is empty." >&2
+            exit 1
+          fi
+          if ! base_sha="$(git rev-parse --verify --quiet "${base_sha}^{commit}")"; then
+            echo "Visual authority comparison base cannot be resolved locally." >&2
+            exit 1
+          fi
+          mkdir -p .tmp
+          git diff --name-only "$base_sha" HEAD > .tmp/visual-authority-changed-paths.txt
+          ids="$(pnpm --dir front --silent visual-authority:affected -- --changed-paths-file .tmp/visual-authority-changed-paths.txt)"
+          {
+            echo "READMATES_VISUAL_AUTHORITY_IDS<<EOF"
+            printf '%s\n' "$ids"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+
+      - name: Run affected actual-route visual authorities
+        if: env.READMATES_VISUAL_AUTHORITY_IDS != ''
+        env:
+          READMATES_VISUAL_AUTHORITY_IDS: ${{ env.READMATES_VISUAL_AUTHORITY_IDS }}
+        run: pnpm test:e2e:approved-routes:docker
+
       - name: Upload visual regression reports
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -320,6 +372,7 @@ jobs:
           path: |
             front/test-results
             front/playwright-report
+            front/test-results/**/approved-mockup/*
           if-no-files-found: ignore
 
   frontend-host-workspace-quality:

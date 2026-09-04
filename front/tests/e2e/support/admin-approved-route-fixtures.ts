@@ -102,8 +102,27 @@ function operationCase(
   };
 }
 
-export function buildAdminTodayOperationCases(): AdminOperationCase[] {
-  return [
+export type AdminApprovedCopyVariant = "default" | "long-korean" | "long-english" | "unbroken-token";
+export type AdminApprovedListState = "ready" | "unavailable" | "stale" | "forbidden";
+
+export type AdminApprovedRouteStressOptions = {
+  caseCount?: number;
+  copy?: AdminApprovedCopyVariant;
+  listState?: AdminApprovedListState;
+};
+
+const ADMIN_STRESS_COPY: Record<Exclude<AdminApprovedCopyVariant, "default">, string> = {
+  "long-korean": "알림 전달이 지연되어 운영자가 영향 범위와 최근 정상 전달 시각을 다시 확인해야 하는 공개 기록 확인 상태입니다",
+  "long-english": "Notification delivery is delayed and the operator must reconfirm the latest authoritative observation before continuing.",
+  "unbroken-token": "A".repeat(160),
+};
+
+export function buildAdminTodayOperationCases(options?: {
+  count?: number;
+  copy?: AdminApprovedCopyVariant;
+  authoritative?: boolean;
+}): AdminOperationCase[] {
+  const items = [
     operationCase({
       id: "case-notification",
       sourceType: "NOTIFICATION",
@@ -197,6 +216,19 @@ export function buildAdminTodayOperationCases(): AdminOperationCase[] {
       detailHref: "/admin/clubs",
     }),
   ];
+  const count = options?.count ?? items.length;
+  const sliced = items.slice(0, count);
+  const copy = options?.copy ?? "default";
+  const titled = copy === "default" || sliced[0] == null
+    ? sliced
+    : [{ ...sliced[0], summaryTitle: ADMIN_STRESS_COPY[copy] }, ...sliced.slice(1)];
+  if (options?.authoritative === false) {
+    return titled.map((item) => ({
+      ...item,
+      source: { ...item.source, authoritative: false },
+    }));
+  }
+  return titled;
 }
 
 const APPROVED_CLUB_SAMPLE = {
@@ -289,15 +321,23 @@ async function routeAdminTodayHealthySnapshot(page: Page): Promise<void> {
   }));
 }
 
-async function routeAdminTodayPriorityCases(page: Page): Promise<void> {
-  const items = buildAdminTodayOperationCases();
+async function routeAdminTodayPriorityCases(
+  page: Page,
+  options?: AdminApprovedRouteStressOptions,
+): Promise<void> {
+  const listState = options?.listState ?? "ready";
+  const items = buildAdminTodayOperationCases({
+    count: options?.caseCount,
+    copy: options?.copy,
+    authoritative: listState === "stale" ? false : undefined,
+  });
   const byId = new Map(items.map((item) => [item.id, item]));
   const sources = [
     availableSource("NOTIFICATION"),
     availableSource("CLOSING_RISK"),
     availableSource("AI_JOB"),
     availableSource("CLUB_READINESS"),
-  ];
+  ].map((source) => listState === "stale" ? { ...source, authoritative: false } : source);
 
   await page.route("**/api/bff/api/admin/operations/cases**", (route) => {
     if (route.request().method() !== "GET") {
@@ -321,10 +361,16 @@ async function routeAdminTodayPriorityCases(page: Page): Promise<void> {
         }],
       });
     }
+    if (listState === "unavailable") {
+      return json(route, 500, { code: "INTERNAL_ERROR", message: "operations unavailable", status: 500 });
+    }
+    if (listState === "forbidden") {
+      return json(route, 403, { code: "PERMISSION_DENIED", message: "이 작업을 수행할 권한이 없습니다.", status: 403 });
+    }
     return json(route, 200, {
       schema: "admin.operation_cases.v1",
       generatedAt: GENERATED_AT,
-      counts: { open: items.length, critical: 3, assignedToMe: items.length, snoozed: 0 },
+      counts: { open: items.length, critical: Math.min(3, items.length), assignedToMe: items.length, snoozed: 0 },
       sources,
       items,
       nextCursor: null,
@@ -431,6 +477,7 @@ export async function installAdminApprovedRoutes(
   page: Page,
   fixtureKey: ApprovedRouteFixtureKey,
   requestAudit: ApprovedRouteRequestAudit,
+  options?: AdminApprovedRouteStressOptions,
 ): Promise<void> {
   if (!ADMIN_APPROVED_FIXTURE_KEYS.has(fixtureKey)) {
     throw new Error(`Unsupported Admin fixture key: ${fixtureKey}`);
@@ -444,7 +491,11 @@ export async function installAdminApprovedRoutes(
     requestAudit.allowFixture({ method: "GET", path });
   }
   requestAudit.allowFixture({ method: "POST", path: FRONTEND_OBSERVABILITY_PATH });
-  for (const item of buildAdminTodayOperationCases()) {
+  for (const item of buildAdminTodayOperationCases({
+    count: options?.caseCount,
+    copy: options?.copy,
+    authoritative: options?.listState === "stale" ? false : undefined,
+  })) {
     requestAudit.allowFixture({
       method: "GET",
       path: `/api/bff/api/admin/operations/cases/${item.id}`,
@@ -466,7 +517,7 @@ export async function installAdminApprovedRoutes(
   await routeAdminHealthSnapshot(page);
   await routeAdminTodayHealthySnapshot(page);
   await routeAdminTodayCases(page, { allowedActions: TODAY_LIFECYCLE_ACTIONS });
-  await routeAdminTodayPriorityCases(page);
+  await routeAdminTodayPriorityCases(page, options);
   await page.route("**/api/bff/observability/frontend-events", (route) => {
     if (route.request().method() !== "POST") return route.fallback();
     return route.fulfill({ status: 204 });

@@ -107,6 +107,25 @@ const WORKBOX_COPY: Record<HostWorkItemType, { title: string; description: strin
   },
 };
 
+export type HostApprovedCopyVariant = "default" | "long-korean" | "long-english" | "unbroken-token";
+export type HostApprovedWorkboxState = "ready" | "partial" | "unavailable";
+export type HostApprovedCurrentMeeting = "present" | "none";
+export type HostApprovedLiveMutation = "none" | "conflict" | "unknown";
+
+export type InstallHostApprovedRoutesOptions = {
+  workboxItems?: number;
+  copy?: HostApprovedCopyVariant;
+  workboxState?: HostApprovedWorkboxState;
+  currentMeeting?: HostApprovedCurrentMeeting;
+  liveMutation?: HostApprovedLiveMutation;
+};
+
+const HOST_STRESS_COPY: Record<Exclude<HostApprovedCopyVariant, "default">, string> = {
+  "long-korean": "일정 확인이 필요한 멤버가 늘어 호스트가 변경 전 확인과 미열람 인원을 다시 살펴봐야 하는 상태입니다",
+  "long-english": "Schedule confirmation is overdue and the host must review unseen members before continuing the current operating-room work.",
+  "unbroken-token": "A".repeat(160),
+};
+
 const SESSION_IDS = [...new Set([
   ...approvedMeetingSections.upcoming.rows.map((row) => row.id),
   ...approvedMeetingSections.past.rows.map((row) => row.id),
@@ -127,19 +146,24 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
   await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 }
 
-function workboxItem(type: HostWorkItemType, index: number): HostWorkboxItem {
-  const copy = WORKBOX_COPY[type];
+function workboxItem(
+  type: HostWorkItemType,
+  index: number,
+  copy: HostApprovedCopyVariant = "default",
+): HostWorkboxItem {
+  const base = WORKBOX_COPY[type];
+  const title = index === 0 && copy !== "default" ? HOST_STRESS_COPY[copy] : base.title;
   return {
-    key: `${type}:${copy.resource}:${index}`,
+    key: `${type}:${base.resource}:${index}`,
     type,
     state: "NOW",
-    title: copy.title,
-    description: copy.description,
+    title,
+    description: base.description,
     count: index + 1,
     dueAt: index % 2 === 0 ? "2026-08-31T09:00:00Z" : null,
     deferredUntil: null,
     resolvedAt: null,
-    destinationHref: copy.href,
+    destinationHref: base.href,
     receiptSummary: null,
   };
 }
@@ -147,14 +171,20 @@ function workboxItem(type: HostWorkItemType, index: number): HostWorkboxItem {
 export function buildHostApprovedWorkboxPage(
   itemCount = DEFAULT_WORKBOX_ITEMS,
   state: HostWorkboxPage["state"] = "NOW",
+  options?: { copy?: HostApprovedCopyVariant; partial?: boolean },
 ): HostWorkboxPage {
+  const copy = options?.copy ?? "default";
   const items = state === "NOW"
-    ? Array.from({ length: itemCount }, (_, index) => workboxItem(WORKBOX_TYPES[index % WORKBOX_TYPES.length], index))
+    ? Array.from({ length: itemCount }, (_, index) => workboxItem(WORKBOX_TYPES[index % WORKBOX_TYPES.length], index, copy))
     : [];
   return {
     state,
     evaluatedAt: EVALUATED_AT,
-    sourceAvailability: WORKBOX_TYPES.map((type) => ({ type, state: "AVAILABLE" as const })),
+    sourceAvailability: WORKBOX_TYPES.map((type) => (
+      options?.partial && type === "RECORD_CLOSING"
+        ? { type, state: "UNAVAILABLE" as const, failureCode: "RECORD_SOURCE_UNAVAILABLE" as const }
+        : { type, state: "AVAILABLE" as const }
+    )),
     items,
     nextCursor: null,
   };
@@ -524,7 +554,14 @@ export function hostApprovedSessionDetailOptionsFor(
   return { attendanceMix: true };
 }
 
-function operatingRoomCurrent(page: Page, fixtureKey: ApprovedRouteFixtureKey): HostOperatingRoomCurrentResponse {
+function operatingRoomCurrent(
+  page: Page,
+  fixtureKey: ApprovedRouteFixtureKey,
+  options?: InstallHostApprovedRoutesOptions,
+): HostOperatingRoomCurrentResponse {
+  if (options?.currentMeeting === "none") {
+    return { currentMeeting: null };
+  }
   return buildHostApprovedOperatingRoomCurrent(hostApprovedCurrentSelection(fixtureKey, page.url()));
 }
 
@@ -821,10 +858,6 @@ function isVisualAuthorityScope(url: URL): boolean {
   return clubSlug === null || clubSlug === HOST_APPROVED_CLUB.clubSlug;
 }
 
-export type InstallHostApprovedRoutesOptions = {
-  workboxItems?: number;
-};
-
 async function fulfillCursorPage<T extends CursorPage<unknown>>(
   route: Route,
   firstPage: T,
@@ -922,7 +955,7 @@ export async function installHostApprovedRoutes(
 
     const pathname = url.pathname;
     if (pathname === "/api/bff/api/host/operating-room/current") {
-      await json(route, 200, operatingRoomCurrent(page, fixtureKey));
+      await json(route, 200, operatingRoomCurrent(page, fixtureKey, options));
       return;
     }
     if (pathname === "/api/bff/api/host/club-operations") {
@@ -949,12 +982,19 @@ export async function installHostApprovedRoutes(
       return;
     }
     if (pathname === "/api/bff/api/host/workbox") {
+      if (options?.workboxState === "unavailable") {
+        await json(route, 503, { error: "workbox_unavailable" });
+        return;
+      }
       const state = url.searchParams.get("state");
       if (state !== "NOW" && state !== "DEFERRED" && state !== "COMPLETED") {
         await json(route, 400, { error: "invalid_workbox_state" });
         return;
       }
-      await fulfillCursorPage(route, buildHostApprovedWorkboxPage(workboxItems, state));
+      await fulfillCursorPage(route, buildHostApprovedWorkboxPage(workboxItems, state, {
+        copy: options?.copy,
+        partial: options?.workboxState === "partial",
+      }));
       return;
     }
     if (pathname === "/api/bff/api/host/members") {
@@ -1162,4 +1202,39 @@ export async function installHostApprovedRoutes(
       }),
     });
   });
+
+  const liveMutation = options?.liveMutation ?? "none";
+  if (liveMutation !== "none") {
+    await page.route(`**/api/bff/api/host/sessions/${HOST_APPROVED_SESSION_ID}/attendance**`, async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.fallback();
+        return;
+      }
+      if (liveMutation === "conflict") {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        await json(route, 409, {
+          code: "REVISION_CONFLICT",
+          message: "출석 상태가 바뀌었습니다.",
+          status: 409,
+        });
+        return;
+      }
+      await route.abort("failed");
+    });
+    if (liveMutation === "unknown") {
+      await page.route("**/api/bff/api/host/mutations/**", async (route) => {
+        if (route.request().method() !== "GET") {
+          await route.fallback();
+          return;
+        }
+        await json(route, 200, {
+          status: "PENDING",
+          receipt: null,
+          current: null,
+          attendanceVersions: null,
+          attendanceSnapshotId: null,
+        });
+      });
+    }
+  }
 }
