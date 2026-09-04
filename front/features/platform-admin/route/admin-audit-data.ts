@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { replace, type LoaderFunctionArgs } from "react-router";
 import { adminAuditFiltersFromSearchParams, adminAuditSearchFromFilters, adminAuditShareSafeIdentifier } from "@/features/platform-admin/model/platform-admin-audit-model";
 import { platformAdminAuditLedgerInfiniteQuery } from "@/features/platform-admin/queries/platform-admin-audit-queries";
+import { requirePlatformAdminLoaderAuth } from "@/shared/auth/platform-admin-loader";
 
 const SAFE_AUDIT_PARAMS = new Set(["range", "from", "to", "clubId", "actorRole", "sourceSlice", "actionCategory", "outcome", "event", "mode", "target"]);
 const SAFE_EVENT_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
@@ -18,6 +19,7 @@ export function adminAuditDetailOpenFromSearchParams(params: URLSearchParams): b
 
 export function adminAuditLoaderFactory(queryClient: QueryClient) {
   return async function loadAdminAudit(args: LoaderFunctionArgs) {
+    await requirePlatformAdminLoaderAuth(args);
     const url = new URL(args.request.url);
     const filters = adminAuditFiltersFromSearchParams(url.searchParams);
     const eventId = adminAuditEventFromSearchParams(url.searchParams);

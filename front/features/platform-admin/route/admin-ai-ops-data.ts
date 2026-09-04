@@ -12,9 +12,11 @@ import {
   platformAdminAiOpsJobsInfiniteQuery,
   platformAdminAiOpsSummaryQuery,
 } from "@/features/platform-admin/queries/platform-admin-ai-ops-queries";
+import { requirePlatformAdminLoaderAuth } from "@/shared/auth/platform-admin-loader";
 
 export function adminAiOpsLoaderFactory(queryClient: QueryClient) {
   return async function loadAdminAiOps(args?: LoaderFunctionArgs) {
+    await requirePlatformAdminLoaderAuth(args);
     const filter = args
       ? aiOpsFilterFromSearchParams(new URL(args.request.url).searchParams)
       : EMPTY_AI_OPS_FILTER;

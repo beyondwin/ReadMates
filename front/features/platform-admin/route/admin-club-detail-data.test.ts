@@ -2,6 +2,13 @@ import { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { adminClubDetailLoaderFactory } from "./admin-club-detail-data";
 
+vi.mock("@/shared/auth/platform-admin-loader", () => ({
+  requirePlatformAdminLoaderAuth: vi.fn(async () => ({
+    authenticated: true,
+    platformAdmin: { role: "OPERATOR" },
+  })),
+}));
+
 const api = vi.hoisted(() => ({
   fetchClub: vi.fn(),
   fetchOperations: vi.fn(),

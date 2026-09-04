@@ -1,6 +1,13 @@
 import { QueryClient } from "@tanstack/react-query";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { adminSupportLoaderFactory } from "./admin-support-data";
+
+vi.mock("@/shared/auth/platform-admin-loader", () => ({
+  requirePlatformAdminLoaderAuth: vi.fn(async () => ({
+    authenticated: true,
+    platformAdmin: { role: "OPERATOR" },
+  })),
+}));
 
 describe("adminSupportLoader", () => {
   it("strips private and invalid values before any support data is loaded", async () => {

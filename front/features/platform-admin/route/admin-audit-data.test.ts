@@ -3,6 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchAdminAuditLedger } from "@/features/platform-admin/api/platform-admin-audit-api";
 import { adminAuditLoaderFactory } from "./admin-audit-data";
 
+vi.mock("@/shared/auth/platform-admin-loader", () => ({
+  requirePlatformAdminLoaderAuth: vi.fn(async () => ({
+    authenticated: true,
+    platformAdmin: { role: "OPERATOR" },
+  })),
+}));
+
 vi.mock("@/features/platform-admin/api/platform-admin-audit-api", () => ({ fetchAdminAuditLedger: vi.fn() }));
 
 beforeEach(() => {

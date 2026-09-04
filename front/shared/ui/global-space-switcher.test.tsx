@@ -282,6 +282,41 @@ describe("GlobalSpaceSwitcher", () => {
     expect(screen.queryByRole("menuitemradio", { name: "읽는사이 멤버로 보기" })).not.toBeInTheDocument();
   });
 
+  it("re-enters an already-open root menu at 플랫폼 운영 so Escape can close from that item", async () => {
+    const user = userEvent.setup();
+    renderSwitcher();
+    const trigger = screen.getByRole("button", { name: "공간 전환, 현재 플랫폼 운영" });
+
+    await user.click(trigger);
+    await user.click(screen.getByRole("menuitem", { name: "내 클럽" }));
+    await user.click(screen.getByRole("button", { name: "범위 선택으로 돌아가기" }));
+    expect(screen.getByRole("menuitem", { name: "내 클럽" })).toHaveFocus();
+
+    trigger.focus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("menuitemradio", { name: "플랫폼 운영" })).toHaveFocus();
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    await user.keyboard("{Escape}");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveFocus();
+  });
+
+  it("closes on Escape from a focused menu item, not only from the trigger", async () => {
+    const user = userEvent.setup();
+    renderSwitcher();
+    const trigger = screen.getByRole("button", { name: "공간 전환, 현재 플랫폼 운영" });
+
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("menuitemradio", { name: "플랫폼 운영" })).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
   it("closes on Escape or outside click, removes hidden items, and returns focus", async () => {
     const user = userEvent.setup();
     renderSwitcher();

@@ -201,7 +201,8 @@ export function GlobalSpaceSwitcher({
       setActiveIndex((current) => nextMenuIndex(current, rootItemCount, "ArrowDown"));
       return;
     }
-    itemRefs.current[activeIndex]?.focus();
+    setActiveIndex(0);
+    itemRefs.current[0]?.focus();
   };
 
   const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {

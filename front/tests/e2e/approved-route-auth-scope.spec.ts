@@ -89,9 +89,21 @@ test("a user without platform-admin capability does not see Admin or request pro
     return route.fulfill({ status: 204 });
   });
 
-  await page.goto("/admin/today", { waitUntil: "domcontentloaded" });
-  await expect(page).not.toHaveURL(/\/admin(?:\/|$|\?)/);
+  for (const path of [
+    "/admin/today",
+    "/admin/clubs",
+    "/admin/health",
+    "/admin/audit",
+    "/admin/notifications",
+    "/admin/ai-ops",
+    "/admin/analytics",
+    "/admin/support",
+    "/admin/clubs/club-sample-reading",
+  ]) {
+    await page.goto(path, { waitUntil: "domcontentloaded" });
+    await expect(page).not.toHaveURL(/\/admin(?:\/|$|\?)/);
+    expect(adminDataRecords(requestAudit), path).toEqual([]);
+  }
   await expect(page.getByRole("button", { name: "공간 전환, 현재 플랫폼 운영" })).toHaveCount(0);
   await expect(page.getByRole("menuitemradio", { name: /플랫폼 운영/ })).toHaveCount(0);
-  expect(adminDataRecords(requestAudit)).toEqual([]);
 });

@@ -270,6 +270,15 @@ describe("actual-route visual authority scenarios", () => {
       expectedFocused: 'role=menuitem[name="내 클럽"]',
       expectedExpanded: true,
     });
+    const escape = scenario.interactions.find((item) => item.name === "escape-restores-trigger");
+    expect(escape).toMatchObject({
+      kind: "keyboard-menu",
+      keys: ["Enter", "Escape"],
+      expectedFocused: 'role=menuitemradio[name=/플랫폼 운영/]',
+      expectedExpanded: true,
+      expectedFocusAfterEscape: '[aria-label="공간 전환, 현재 플랫폼 운영"]',
+    });
+    expect(escape).not.toMatchObject({ keys: ["Escape"] });
   });
 
   it("treats only the platform root menu as the canonical space-switcher capture", () => {

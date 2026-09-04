@@ -360,6 +360,10 @@ async function executeInteraction(input: {
         },
         assertEscapeFocus: async () => {
           await assertFocused(page, interaction.expectedFocusAfterEscape);
+          const expanded = await trigger.getAttribute("aria-expanded");
+          if (expanded === "true") {
+            throw new Error(`${interaction.name} still expanded after Escape`);
+          }
         },
       });
     } else if (interaction.kind === "history-restore") {
