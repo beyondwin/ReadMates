@@ -259,6 +259,30 @@ describe("HostWorkbox", () => {
     expect(screen.getByRole("button", { name: "다음 묶음 불러오기" })).toBeVisible();
   });
 
+  it("keeps 작업함 모두 보기 off when every loaded item is visible and only nextCursor remains", () => {
+    const items = Array.from({ length: 4 }, (_, index): HostWorkboxItemView => ({
+      ...page.items[0],
+      key: `SCHEDULE_UNSEEN:resource-${index}:g1`,
+      title: `작업 ${index + 1}`,
+      count: index + 1,
+      countLabel: String(index + 1),
+    }));
+    renderWorkbox({
+      view: { ...page, items, partialWarnings: [], nextCursor: "opaque-next-page" },
+      disclosure: {
+        visibleItems: items,
+        hiddenCount: 0,
+        hasMore: true,
+        expanded: false,
+      },
+      onShowAll: vi.fn(),
+    });
+
+    expect(screen.getAllByRole("listitem")).toHaveLength(4);
+    expect(screen.queryByRole("button", { name: "작업함 모두 보기" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "다음 묶음 불러오기" })).toBeVisible();
+  });
+
   it("exposes every loaded item in source order when disclosure is expanded", async () => {
     const items = Array.from({ length: 12 }, (_, index): HostWorkboxItemView => ({
       ...page.items[0],

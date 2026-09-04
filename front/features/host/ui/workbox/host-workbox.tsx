@@ -60,7 +60,7 @@ export function HostWorkbox({
     onShowAll
     && disclosure
     && !disclosure.expanded
-    && (disclosure.hiddenCount > 0 || disclosure.hasMore),
+    && disclosure.hiddenCount > 0,
   );
 
   const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {

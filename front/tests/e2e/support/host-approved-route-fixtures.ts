@@ -1,12 +1,10 @@
 import type { Page, Route } from "@playwright/test";
 import type {
   HostClubOperationsResponse,
-  HostMemberListItem,
   HostNotificationSummary,
   HostOperatingRoomCurrentResponse,
   HostSessionClosingStatusResponse,
   HostSessionDetailResponse,
-  HostSessionListItem,
   HostSessionLedgerSummary,
   HostSessionListPage,
   HostSessionRecordLedgerPage,
@@ -21,6 +19,19 @@ import type {
   HostWorkboxPage,
 } from "@/features/host/api/host-workbox-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import {
+  approvedClubSettings,
+  approvedInvitationLinks,
+  approvedMeetingSections,
+  approvedPeopleLedgerFacts,
+  approvedPeopleMembers,
+  approvedPeoplePendingMembers,
+  approvedPerson,
+  approvedRecordItems,
+  approvedRecordLedgerSummary,
+  approvedScheduleReviewMembers,
+  approvedScheduleReviewPreview,
+} from "@/features/host/ui/approved-host-ledgers.data";
 import { routeHostEditorShell } from "../aigen-test-fixtures";
 import {
   installApprovedRouteCatchAllAudit,
@@ -94,74 +105,24 @@ const WORKBOX_COPY: Record<HostWorkItemType, { title: string; description: strin
   },
 };
 
-const SESSION_IDS = [
-  "session-24",
-  "session-25",
-  "session-26",
-  "session-27",
-  HOST_APPROVED_SESSION_ID,
-  "session-29",
-  "session-30",
-] as const;
+const SESSION_IDS = [...new Set([
+  ...approvedMeetingSections.upcoming.rows.map((row) => row.id),
+  ...approvedMeetingSections.past.rows.map((row) => row.id),
+  ...approvedRecordItems.map((item) => item.sessionId),
+])];
 
-const MEMBERSHIP_IDS = [
-  HOST_APPROVED_PERSON_ID,
-  "membership-park",
-  "membership-lee",
-  "membership-jung",
-  "membership-han",
-  "membership-oh",
-  "membership-yoon",
-  "membership-choi",
-] as const;
+const MEMBERSHIP_IDS = [...new Set([
+  ...approvedPeopleMembers.map((member) => member.membershipId),
+  ...approvedPeoplePendingMembers.map((member) => member.membershipId),
+  ...approvedScheduleReviewMembers.map((member) => member.membershipId),
+  approvedPerson.membershipId,
+])];
+
+const SESSION_ID_SET = new Set(SESSION_IDS);
+const MEMBERSHIP_ID_SET = new Set(MEMBERSHIP_IDS);
 
 async function json(route: Route, status: number, body: unknown): Promise<void> {
   await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
-}
-
-function memberRow(
-  membershipId: string,
-  displayName: string,
-  avatarKey: string,
-  status: HostMemberListItem["status"],
-  joinedAt: string | null,
-  lastClubAccessAt: string | null,
-): HostMemberListItem {
-  return {
-    membershipId,
-    userId: `user-${membershipId}`,
-    email: "hidden@example.test",
-    displayName,
-    accountName: displayName,
-    profileImageUrl: null,
-    avatarKey,
-    role: "MEMBER",
-    status,
-    joinedAt,
-    createdAt: joinedAt ?? lastClubAccessAt ?? "2026-09-02T00:00:00+09:00",
-    lastClubAccessAt,
-    currentSessionParticipationStatus: status === "ACTIVE" ? "ACTIVE" : "REMOVED",
-    canSuspend: status === "ACTIVE",
-    canRestore: status === "SUSPENDED",
-    canDeactivate: true,
-    canAddToCurrentSession: status === "ACTIVE",
-    canRemoveFromCurrentSession: status === "ACTIVE",
-  };
-}
-
-function meetingItem(
-  overrides: Pick<HostSessionListItem, "sessionId" | "sessionNumber" | "title" | "bookTitle" | "bookAuthor" | "date" | "state" | "recordStatus" | "needsAttention" | "hasDraft" | "liveRevision" | "draftRevision" | "lastModifiedAt">,
-): HostSessionListItem {
-  return {
-    bookImageUrl: null,
-    startTime: "19:30",
-    endTime: "21:30",
-    locationLabel: "을지로 북살롱",
-    visibility: "MEMBER",
-    accessScope: "GUEST_READABLE",
-    siteVisibility: "HIDDEN",
-    ...overrides,
-  };
 }
 
 function workboxItem(type: HostWorkItemType, index: number): HostWorkboxItem {
@@ -194,6 +155,229 @@ export function buildHostApprovedWorkboxPage(
     sourceAvailability: WORKBOX_TYPES.map((type) => ({ type, state: "AVAILABLE" as const })),
     items,
     nextCursor: null,
+  };
+}
+
+type CursorPage<T> = { items: T[]; nextCursor: string | null };
+
+export function resolveHostApprovedCursorPage<T extends CursorPage<unknown>>(
+  firstPage: T,
+  cursor: string | null,
+): T | null {
+  if (cursor == null || cursor === "") return firstPage;
+  if (firstPage.nextCursor !== null && cursor === firstPage.nextCursor) {
+    return { ...firstPage, items: [], nextCursor: null };
+  }
+  return null;
+}
+
+function folioNumber(folio: string): number {
+  const match = /No\.(\d+)/.exec(folio);
+  return match ? Number(match[1]) : 0;
+}
+
+function rsvpFromLedgerLabel(label: string | undefined): HostPersonDetail["currentRsvp"] {
+  if (label === "참석") return "GOING";
+  if (label === "불참") return "DECLINED";
+  if (label === "미응답") return "NO_RESPONSE";
+  return null;
+}
+
+function scheduleSeenFromLedgerLabel(label: string | undefined): "CURRENT" | "STALE" | "UNSEEN" {
+  if (label === "현재 일정 확인") return "CURRENT";
+  if (label === "변경 전 확인") return "STALE";
+  return "UNSEEN";
+}
+
+export function buildHostApprovedRecordLedger(): HostSessionRecordLedgerPage {
+  return {
+    items: approvedRecordItems.map((item) => ({ ...item })),
+    nextCursor: "records-visual-next",
+    summary: { ...approvedRecordLedgerSummary },
+  };
+}
+
+export function buildHostApprovedMeetingList(): HostSessionListPage & { summary: HostSessionLedgerSummary } {
+  const venue = approvedRecordItems[0];
+  return {
+    items: approvedMeetingSections.upcoming.rows.map((row) => {
+      const record = approvedRecordItems.find((item) => item.sessionId === row.id);
+      const draft = row.lifecycleLabel === "작성 중";
+      return {
+        sessionId: row.id,
+        sessionNumber: record?.sessionNumber ?? folioNumber(row.ordinalFolio),
+        title: record?.title ?? row.title,
+        bookTitle: record?.bookTitle ?? row.title,
+        bookAuthor: record?.bookAuthor ?? "",
+        bookImageUrl: record?.bookImageUrl ?? null,
+        date: row.date,
+        startTime: record?.startTime ?? venue?.startTime ?? "19:30",
+        endTime: record?.endTime ?? venue?.endTime ?? "21:30",
+        locationLabel: record?.locationLabel ?? venue?.locationLabel ?? "을지로 북살롱",
+        state: row.id === HOST_APPROVED_SESSION_ID ? "OPEN" : "DRAFT",
+        visibility: record?.visibility ?? "MEMBER",
+        recordStatus: record?.recordStatus ?? "NOT_STARTED",
+        needsAttention: false,
+        hasDraft: draft,
+        liveRevision: record?.liveRevision ?? 0,
+        draftRevision: draft ? 1 : null,
+        lastModifiedAt: record?.lastModifiedAt ?? null,
+      };
+    }),
+    nextCursor: "meetings-visual-next",
+    summary: {
+      needsAttentionCount: approvedRecordLedgerSummary.needsAttentionCount,
+      incompletePublishedCount: approvedRecordLedgerSummary.incompletePublishedCount,
+      draftCount: approvedMeetingSections.upcoming.rows.filter((row) => row.lifecycleLabel === "작성 중").length,
+    },
+  };
+}
+
+function sessionAttendees(sessionId: string): HostSessionDetailResponse["attendees"] {
+  if (sessionId !== HOST_APPROVED_SESSION_ID) return [];
+  const fromPeople = approvedPeopleMembers
+    .filter((member) => member.status === "ACTIVE")
+    .map((member) => {
+      const facts = approvedPeopleLedgerFacts[member.membershipId as keyof typeof approvedPeopleLedgerFacts];
+      const seen = scheduleSeenFromLedgerLabel(facts?.scheduleSeenLabel);
+      return {
+        membershipId: member.membershipId,
+        avatarKey: member.avatarKey ?? "apple-green-book",
+        displayName: member.displayName,
+        accountName: member.accountName,
+        rsvpStatus: rsvpFromLedgerLabel(facts?.rsvpLabel) ?? "NO_RESPONSE",
+        attendanceStatus: "UNKNOWN" as const,
+        participationStatus: "ACTIVE" as const,
+        attendanceRevision: 1,
+        seenScheduleRevision: seen === "CURRENT" ? 4 : seen === "STALE" ? 3 : null,
+        scheduleSeenAt: seen === "UNSEEN" ? null : member.lastClubAccessAt,
+        scheduleSeenState: seen,
+      };
+    });
+  const extra = approvedScheduleReviewMembers
+    .filter((member) => !fromPeople.some((attendee) => attendee.membershipId === member.membershipId))
+    .map((member) => ({
+      membershipId: member.membershipId,
+      avatarKey: member.avatarKey,
+      displayName: member.displayName,
+      accountName: member.displayName,
+      rsvpStatus: "NO_RESPONSE" as const,
+      attendanceStatus: "UNKNOWN" as const,
+      participationStatus: "ACTIVE" as const,
+      attendanceRevision: 1,
+      seenScheduleRevision: member.scheduleSeenState === "STALE" ? 3 : null,
+      scheduleSeenAt: null,
+      scheduleSeenState: member.scheduleSeenState,
+    }));
+  return [...fromPeople, ...extra];
+}
+
+export function buildHostApprovedSessionDetail(sessionId: string): HostSessionDetailResponse | null {
+  if (!SESSION_ID_SET.has(sessionId)) return null;
+  const upcoming = approvedMeetingSections.upcoming.rows.find((row) => row.id === sessionId);
+  const past = approvedMeetingSections.past.rows.find((row) => row.id === sessionId);
+  const record = approvedRecordItems.find((item) => item.sessionId === sessionId);
+  const row = upcoming ?? past;
+  if (!record && !row) return null;
+
+  const currentOpen = sessionId === HOST_APPROVED_SESSION_ID;
+  const state = currentOpen
+    ? "OPEN"
+    : record?.state ?? (upcoming ? "DRAFT" : "CLOSED");
+  const attendees = sessionAttendees(sessionId);
+  const eligible = attendees.filter((attendee) => attendee.participationStatus === "ACTIVE");
+  return {
+    sessionId,
+    sessionNumber: record?.sessionNumber ?? (row ? folioNumber(row.ordinalFolio) : 0),
+    title: record?.title ?? row?.title ?? "",
+    bookTitle: record?.bookTitle ?? row?.title ?? "",
+    bookAuthor: record?.bookAuthor ?? "",
+    bookLink: null,
+    bookImageUrl: record?.bookImageUrl ?? null,
+    locationLabel: record?.locationLabel ?? "을지로 북살롱",
+    meetingUrl: null,
+    meetingPasscode: null,
+    date: record?.date ?? row?.date ?? "",
+    startTime: record?.startTime ?? "19:30",
+    endTime: record?.endTime ?? "21:30",
+    questionDeadlineAt: `${record?.date ?? row?.date ?? "2026-08-31"}T14:59:00Z`.replace(
+      /^(\d{4}-\d{2}-)(\d{2})/,
+      (_, prefix: string, day: string) => `${prefix}${String(Math.max(1, Number(day) - 1)).padStart(2, "0")}`,
+    ),
+    visibility: record?.visibility ?? "MEMBER",
+    accessScope: "GUEST_READABLE",
+    siteVisibility: "HIDDEN",
+    publication: null,
+    state,
+    scheduleRevision: 4,
+    scheduleSeenAvailability: currentOpen ? "AVAILABLE" : "UNAVAILABLE",
+    scheduleSeenSummary: currentOpen
+      ? {
+        currentCount: eligible.filter((attendee) => attendee.scheduleSeenState === "CURRENT").length,
+        staleCount: eligible.filter((attendee) => attendee.scheduleSeenState === "STALE").length,
+        unseenCount: eligible.filter((attendee) => attendee.scheduleSeenState === "UNSEEN").length,
+        eligibleCount: eligible.length,
+      }
+      : { currentCount: null, staleCount: null, unseenCount: null, eligibleCount: null },
+    versions: {
+      sessionRevision: record?.liveRevision ?? 4,
+      scheduleRevision: 4,
+      exposureRevision: 2,
+      participantSetRevision: attendees.length,
+      recordDraftRevision: record?.draftRevision ?? null,
+      liveRecordRevision: record?.liveRevision ?? null,
+      publicationRevision: record?.state === "PUBLISHED" ? 1 : 0,
+    },
+    attendanceSnapshotId: `attendance-snapshot-${sessionId}`,
+    attendees,
+    feedbackDocument: {
+      uploaded: false,
+      fileName: null,
+      uploadedAt: null,
+    },
+  };
+}
+
+export function buildHostApprovedPersonDetail(membershipId: string): HostPersonDetail | null {
+  if (!MEMBERSHIP_ID_SET.has(membershipId)) return null;
+  const member = [...approvedPeopleMembers, ...approvedPeoplePendingMembers]
+    .find((item) => item.membershipId === membershipId);
+  const review = approvedScheduleReviewMembers.find((item) => item.membershipId === membershipId);
+  const facts = approvedPeopleLedgerFacts[membershipId as keyof typeof approvedPeopleLedgerFacts];
+  if (membershipId === approvedPerson.membershipId) {
+    return {
+      ...approvedPerson,
+      displayName: member?.displayName ?? approvedPerson.displayName,
+      avatarKey: member?.avatarKey ?? approvedPerson.avatarKey,
+      lastClubAccessAt: member?.lastClubAccessAt ?? approvedPerson.lastClubAccessAt,
+      currentRsvp: rsvpFromLedgerLabel(facts?.rsvpLabel) ?? approvedPerson.currentRsvp,
+    };
+  }
+  if (!member && !review) return null;
+  return {
+    membershipId,
+    displayName: member?.displayName ?? review?.displayName ?? membershipId,
+    avatarKey: member?.avatarKey ?? review?.avatarKey ?? "apple-green-book",
+    status: member?.status ?? "ACTIVE",
+    role: "MEMBER",
+    lastClubAccessAt: member?.lastClubAccessAt ?? null,
+    currentSchedule: {
+      state: "OPEN",
+      scheduleRevision: 4,
+      scheduledAt: "2026-09-01T19:30:00",
+    },
+    currentRsvp: rsvpFromLedgerLabel(facts?.rsvpLabel),
+    attendanceHistory: {
+      items: approvedPerson.attendanceHistory.items.map((item) => ({ ...item })),
+      nextCursor: approvedPerson.attendanceHistory.nextCursor,
+    },
+  };
+}
+
+export function buildHostApprovedMembersPage() {
+  return {
+    items: [...approvedPeopleMembers, ...approvedPeoplePendingMembers],
+    nextCursor: "people-visual-next",
   };
 }
 
@@ -303,102 +487,21 @@ function operatingRoomCurrent(): HostOperatingRoomCurrentResponse {
   };
 }
 
-function sessionDetail(sessionId = HOST_APPROVED_SESSION_ID): HostSessionDetailResponse {
-  return {
-    sessionId,
-    sessionNumber: 28,
-    title: "스물여덟 번째 모임",
-    bookTitle: "지구 끝의 온실",
-    bookAuthor: "김초엽",
-    bookLink: null,
-    bookImageUrl: null,
-    locationLabel: "을지로 북살롱",
-    meetingUrl: null,
-    meetingPasscode: null,
-    date: "2026-09-01",
-    startTime: "19:30",
-    endTime: "21:30",
-    questionDeadlineAt: "2026-08-31T14:59:00Z",
-    visibility: "MEMBER",
-    accessScope: "GUEST_READABLE",
-    siteVisibility: "HIDDEN",
-    publication: null,
-    state: "OPEN",
-    scheduleRevision: 4,
-    scheduleSeenAvailability: "AVAILABLE",
-    scheduleSeenSummary: { currentCount: 1, staleCount: 1, unseenCount: 1, eligibleCount: 3 },
-    versions: {
-      sessionRevision: 4,
-      scheduleRevision: 4,
-      exposureRevision: 2,
-      participantSetRevision: 3,
-      recordDraftRevision: null,
-      liveRecordRevision: null,
-      publicationRevision: 0,
-    },
-    attendanceSnapshotId: "attendance-snapshot-28",
-    attendees: [
-      {
-        membershipId: HOST_APPROVED_PERSON_ID,
-        avatarKey: "mushroom-green-book",
-        displayName: "김하늘",
-        accountName: "김하늘",
-        rsvpStatus: "GOING",
-        attendanceStatus: "UNKNOWN",
-        participationStatus: "ACTIVE",
-        attendanceRevision: 1,
-        seenScheduleRevision: 4,
-        scheduleSeenAt: "2026-08-30T01:00:00Z",
-        scheduleSeenState: "CURRENT",
-      },
-      {
-        membershipId: "membership-park",
-        avatarKey: "peach-green-book",
-        displayName: "박서윤",
-        accountName: "박서윤",
-        rsvpStatus: "NO_RESPONSE",
-        attendanceStatus: "UNKNOWN",
-        participationStatus: "ACTIVE",
-        attendanceRevision: 1,
-        seenScheduleRevision: 3,
-        scheduleSeenAt: "2026-08-20T01:00:00Z",
-        scheduleSeenState: "STALE",
-      },
-      {
-        membershipId: "membership-lee",
-        avatarKey: "banana-green-book",
-        displayName: "이도현",
-        accountName: "이도현",
-        rsvpStatus: "GOING",
-        attendanceStatus: "UNKNOWN",
-        participationStatus: "ACTIVE",
-        attendanceRevision: 1,
-        seenScheduleRevision: null,
-        scheduleSeenAt: null,
-        scheduleSeenState: "UNSEEN",
-      },
-    ],
-    feedbackDocument: {
-      uploaded: false,
-      fileName: null,
-      uploadedAt: null,
-    },
-  };
-}
-
-function closingStatus(sessionId = HOST_APPROVED_SESSION_ID): HostSessionClosingStatusResponse {
+function closingStatus(sessionId: string): HostSessionClosingStatusResponse | null {
+  const detail = buildHostApprovedSessionDetail(sessionId);
+  if (!detail) return null;
   return {
     schema: "host.session_closing_status.v1",
     session: {
-      sessionId,
-      sessionNumber: 28,
-      bookTitle: "지구 끝의 온실",
-      meetingDate: "2026-09-01",
-      state: "OPEN",
-      recordVisibility: "MEMBER",
-      sessionRevision: 4,
-      participantSetRevision: 3,
-      attendanceSnapshotId: "attendance-snapshot-28",
+      sessionId: detail.sessionId,
+      sessionNumber: detail.sessionNumber,
+      bookTitle: detail.bookTitle,
+      meetingDate: detail.date,
+      state: detail.state,
+      recordVisibility: detail.visibility,
+      sessionRevision: detail.versions.sessionRevision,
+      participantSetRevision: detail.versions.participantSetRevision,
+      attendanceSnapshotId: detail.attendanceSnapshotId,
     },
     overall: { state: "NOT_STARTED", label: "모임 진행 중", primaryAction: "NONE" },
     checklist: [
@@ -420,114 +523,6 @@ function closingStatus(sessionId = HOST_APPROVED_SESSION_ID): HostSessionClosing
       publicRecordHref: null,
       memberReflectionHref: null,
     },
-  };
-}
-
-function meetingListPage(): HostSessionListPage & { summary: HostSessionLedgerSummary } {
-  return {
-    items: [
-      meetingItem({
-        sessionId: HOST_APPROVED_SESSION_ID,
-        sessionNumber: 28,
-        title: "스물여덟 번째 모임",
-        bookTitle: "지구 끝의 온실",
-        bookAuthor: "김초엽",
-        date: "2026-09-01",
-        state: "OPEN",
-        recordStatus: "NOT_STARTED",
-        needsAttention: false,
-        hasDraft: false,
-        liveRevision: 0,
-        draftRevision: null,
-        lastModifiedAt: "2026-08-30T10:00:00+09:00",
-      }),
-      meetingItem({
-        sessionId: "session-29",
-        sessionNumber: 29,
-        title: "스물아홉 번째 모임",
-        bookTitle: "작별하지 않는다",
-        bookAuthor: "한강",
-        date: "2026-09-22",
-        state: "DRAFT",
-        recordStatus: "NOT_STARTED",
-        needsAttention: false,
-        hasDraft: true,
-        liveRevision: 0,
-        draftRevision: 1,
-        lastModifiedAt: "2026-08-28T10:00:00+09:00",
-      }),
-      meetingItem({
-        sessionId: "session-30",
-        sessionNumber: 30,
-        title: "서른 번째 모임",
-        bookTitle: "여름은 오래 그곳에 남아",
-        bookAuthor: "김애란",
-        date: "2026-10-13",
-        state: "DRAFT",
-        recordStatus: "NOT_STARTED",
-        needsAttention: false,
-        hasDraft: true,
-        liveRevision: 0,
-        draftRevision: 1,
-        lastModifiedAt: "2026-08-27T10:00:00+09:00",
-      }),
-    ],
-    nextCursor: "meetings-visual-next",
-    summary: { needsAttentionCount: 2, incompletePublishedCount: 0, draftCount: 2 },
-  };
-}
-
-function recordLedgerPage(): HostSessionRecordLedgerPage {
-  return {
-    items: [
-      meetingItem({
-        sessionId: "session-27",
-        sessionNumber: 27,
-        title: "스물일곱 번째 모임",
-        bookTitle: "맡겨진 소녀",
-        bookAuthor: "히가시노 게이고",
-        date: "2026-08-18",
-        state: "CLOSED",
-        recordStatus: "INCOMPLETE",
-        needsAttention: true,
-        hasDraft: true,
-        liveRevision: 4,
-        draftRevision: 5,
-        lastModifiedAt: "2026-08-20T10:00:00+09:00",
-      }),
-      meetingItem({
-        sessionId: "session-24",
-        sessionNumber: 24,
-        title: "스물네 번째 모임",
-        bookTitle: "이처럼 사소한 것들",
-        bookAuthor: "클레어 키건",
-        date: "2026-06-16",
-        state: "CLOSED",
-        recordStatus: "NOT_STARTED",
-        needsAttention: true,
-        hasDraft: false,
-        liveRevision: 1,
-        draftRevision: null,
-        lastModifiedAt: "2026-06-16T21:30:00+09:00",
-      }),
-      meetingItem({
-        sessionId: "session-26",
-        sessionNumber: 26,
-        title: "스물여섯 번째 모임",
-        bookTitle: "단 한 사람",
-        bookAuthor: "최진영",
-        date: "2026-07-28",
-        state: "PUBLISHED",
-        recordStatus: "COMPLETE",
-        needsAttention: false,
-        hasDraft: false,
-        liveRevision: 4,
-        draftRevision: null,
-        lastModifiedAt: "2026-07-30T10:00:00+09:00",
-      }),
-    ],
-    nextCursor: "records-visual-next",
-    summary: { needsAttentionCount: 2, incompletePublishedCount: 0, draftCount: 0 },
   };
 }
 
@@ -563,6 +558,22 @@ function clubOperations(): HostClubOperationsResponse {
   };
 }
 
+function invitationLinks(): { items: HostInvitationLink[]; nextCursor: string | null } {
+  return {
+    items: approvedInvitationLinks.map((link) => ({ ...link })),
+    nextCursor: null,
+  };
+}
+
+function clubSettings(): HostClubSettings {
+  return {
+    ...approvedClubSettings,
+    clubId: HOST_APPROVED_CLUB.clubId,
+    clubSlug: HOST_APPROVED_CLUB.clubSlug,
+    name: HOST_APPROVED_CLUB.clubName,
+  };
+}
+
 function notificationSummary(): HostNotificationSummary {
   return {
     pending: 0,
@@ -573,168 +584,47 @@ function notificationSummary(): HostNotificationSummary {
   };
 }
 
-function membersPage() {
-  return {
-    items: [
-      memberRow(HOST_APPROVED_PERSON_ID, "김하늘", "mushroom-green-book", "ACTIVE", "2025-01-02T00:00:00+09:00", "2026-09-02T09:00:00+09:00"),
-      memberRow("membership-park", "박서윤", "peach-green-book", "ACTIVE", "2025-10-02T00:00:00+09:00", "2026-09-01T10:00:00+09:00"),
-      memberRow("membership-lee", "이도현", "banana-green-book", "ACTIVE", "2026-01-02T00:00:00+09:00", "2026-08-30T10:00:00+09:00"),
-      memberRow("membership-jung", "정수아", "tulip-notebook", "ACTIVE", "2024-08-02T00:00:00+09:00", "2026-09-02T08:00:00+09:00"),
-      memberRow("membership-han", "한지우", "candle-green-book", "VIEWER", "2026-08-27T00:00:00+09:00", "2026-09-02T07:00:00+09:00"),
-      memberRow("membership-oh", "오민재", "apple-green-book", "SUSPENDED", "2025-07-02T00:00:00+09:00", "2026-08-21T10:00:00+09:00"),
-      {
-        ...memberRow("membership-yoon", "윤서진", "radish-notebook", "VIEWER", null, "2026-09-02T09:12:00+09:00"),
-        createdAt: "2026-09-02T09:12:00+09:00",
-        currentSessionParticipationStatus: null,
-        canSuspend: false,
-        canAddToCurrentSession: false,
-        canRemoveFromCurrentSession: false,
-      },
-      {
-        ...memberRow("membership-choi", "최도윤", "peach-green-book", "VIEWER", null, "2026-09-01T21:40:00+09:00"),
-        createdAt: "2026-09-01T21:40:00+09:00",
-        currentSessionParticipationStatus: null,
-        canSuspend: false,
-        canAddToCurrentSession: false,
-        canRemoveFromCurrentSession: false,
-      },
-    ],
-    nextCursor: "people-visual-next",
-  };
-}
-
-function invitationLinks(): { items: HostInvitationLink[]; nextCursor: string | null } {
-  return {
-    items: [
-      {
-        linkId: "link-september",
-        name: "9월 공개 초대",
-        status: "ACTIVE",
-        maxUses: 10,
-        usedCount: 4,
-        expiresAt: "2026-09-30T23:59:59Z",
-        revision: 2,
-        createdAt: "2026-08-01T00:00:00Z",
-        updatedAt: "2026-08-20T00:00:00Z",
-      },
-      {
-        linkId: "link-friend",
-        name: "친구 추천",
-        status: "ACTIVE",
-        maxUses: 5,
-        usedCount: 2,
-        expiresAt: "2027-12-31T23:59:59Z",
-        revision: 1,
-        createdAt: "2026-07-01T00:00:00Z",
-        updatedAt: "2026-08-20T00:00:00Z",
-      },
-      {
-        linkId: "link-summer",
-        name: "여름 모임",
-        status: "ACTIVE",
-        maxUses: 10,
-        usedCount: 8,
-        expiresAt: "2026-09-04T23:59:59Z",
-        revision: 3,
-        createdAt: "2026-06-01T00:00:00Z",
-        updatedAt: "2026-08-20T00:00:00Z",
-      },
-      {
-        linkId: "link-test",
-        name: "테스트 링크",
-        status: "PAUSED",
-        maxUses: 1,
-        usedCount: 1,
-        expiresAt: "2026-08-01T23:59:59Z",
-        revision: 4,
-        createdAt: "2026-05-01T00:00:00Z",
-        updatedAt: "2026-08-20T00:00:00Z",
-      },
-    ],
-    nextCursor: null,
-  };
-}
-
-function clubSettings(): HostClubSettings {
-  return {
-    clubId: HOST_APPROVED_CLUB.clubId,
-    clubSlug: HOST_APPROVED_CLUB.clubSlug,
-    name: HOST_APPROVED_CLUB.clubName,
-    approvalPolicy: "HOST_APPROVAL",
-    defaultTimezone: "Asia/Seoul",
-    scheduleReminderEnabled: true,
-    recordPublicationDefault: "MEMBER",
-    revision: 4,
-    status: "ACTIVE",
-  };
-}
-
-function personDetail(membershipId: string): HostPersonDetail {
-  const member = membersPage().items.find((item) => item.membershipId === membershipId);
-  return {
-    membershipId,
-    displayName: member?.displayName ?? "김하늘",
-    avatarKey: member?.avatarKey ?? "mushroom-green-book",
-    status: member?.status ?? "ACTIVE",
-    role: "MEMBER",
-    lastClubAccessAt: member?.lastClubAccessAt ?? "2026-09-02T09:00:00+09:00",
-    currentSchedule: {
-      state: "OPEN",
-      scheduleRevision: 4,
-      scheduledAt: "2026-09-01T19:30:00",
-    },
-    currentRsvp: "GOING",
-    attendanceHistory: {
-      items: [
-        { sessionNumber: 27, scheduledAt: "2026-08-18T19:30:00", attendanceStatus: "ATTENDED" },
-        { sessionNumber: 26, scheduledAt: "2026-08-04T19:30:00", attendanceStatus: "ATTENDED" },
-        { sessionNumber: 25, scheduledAt: "2026-07-21T19:30:00", attendanceStatus: "UNKNOWN" },
-        { sessionNumber: 24, scheduledAt: "2026-07-07T19:30:00", attendanceStatus: "ABSENT" },
-      ],
-      nextCursor: "opaque-attendance-cursor",
-    },
-  };
-}
-
 function manualNotificationOptions(): ManualNotificationOptionsResponse {
+  const preview = approvedScheduleReviewPreview;
+  const session = buildHostApprovedSessionDetail(HOST_APPROVED_SESSION_ID);
   return {
     session: {
       sessionId: HOST_APPROVED_SESSION_ID,
-      sessionNumber: 28,
-      bookTitle: "지구 끝의 온실",
-      date: "2026-09-01",
-      state: "OPEN",
-      visibility: "MEMBER",
+      sessionNumber: session?.sessionNumber ?? 28,
+      bookTitle: session?.bookTitle ?? "지구 끝의 온실",
+      date: session?.date ?? "2026-09-01",
+      state: session?.state ?? "OPEN",
+      visibility: session?.visibility ?? "MEMBER",
       feedbackDocumentUploaded: false,
-      scheduleRevision: 4,
+      scheduleRevision: preview.scheduleRevision,
     },
     templates: [{
-      eventType: "SESSION_REMINDER_DUE",
+      eventType: preview.template.eventType,
       contentRevision: CONTENT_REVISION,
-      label: "모임 리마인더",
+      label: preview.template.label,
       enabled: true,
       disabledReason: null,
-      defaultAudience: "SELECTED_MEMBERS",
+      defaultAudience: preview.audience.baseGroup,
       allowedAudiences: ["ALL_ACTIVE_MEMBERS", "CONFIRMED_ATTENDEES", "SELECTED_MEMBERS"],
-      defaultChannels: "BOTH",
-      defaultSubject: "다음 모임 일정",
-      defaultBody: "다음 모임 일정을 확인해 주세요.",
+      defaultChannels: preview.channels.requested,
+      defaultSubject: preview.template.subject,
+      defaultBody: preview.template.bodyPreview,
     }],
     members: {
-      items: [{
-        membershipId: HOST_APPROVED_PERSON_ID,
-        displayName: "김하늘",
-        maskedEmail: "sky@example.test",
-        role: "MEMBER",
-        membershipStatus: "ACTIVE",
-        sessionParticipationStatus: "ACTIVE",
-        attendanceStatus: "UNKNOWN",
-        emailEligibility: "ELIGIBLE",
-        inAppEligibility: "ELIGIBLE",
-      }],
+      items: approvedScheduleReviewMembers.map((member) => ({
+        membershipId: member.membershipId,
+        displayName: member.displayName,
+        maskedEmail: `${member.membershipId.replace("membership-", "")}@example.test`,
+        role: "MEMBER" as const,
+        membershipStatus: "ACTIVE" as const,
+        sessionParticipationStatus: "ACTIVE" as const,
+        attendanceStatus: "UNKNOWN" as const,
+        emailEligibility: "ELIGIBLE" as const,
+        inAppEligibility: "ELIGIBLE" as const,
+      })),
       nextCursor: null,
     },
-    recentDispatches: [],
+    recentDispatches: preview.duplicates.recentDispatches,
   };
 }
 
@@ -797,13 +687,26 @@ export type InstallHostApprovedRoutesOptions = {
   workboxItems?: number;
 };
 
+async function fulfillCursorPage<T extends CursorPage<unknown>>(
+  route: Route,
+  firstPage: T,
+): Promise<void> {
+  const cursor = new URL(route.request().url()).searchParams.get("cursor");
+  const page = resolveHostApprovedCursorPage(firstPage, cursor);
+  if (page == null) {
+    await route.fallback();
+    return;
+  }
+  await json(route, 200, page);
+}
+
 export async function installHostApprovedRoutes(
   page: Page,
-  fixtureKey: string,
+  fixtureKey: ApprovedRouteFixtureKey,
   requestAudit: ApprovedRouteRequestAudit,
   options?: InstallHostApprovedRoutesOptions,
 ): Promise<void> {
-  if (!HOST_APPROVED_FIXTURE_KEYS.has(fixtureKey as ApprovedRouteFixtureKey)) {
+  if (!HOST_APPROVED_FIXTURE_KEYS.has(fixtureKey)) {
     throw new Error(`Unsupported Host fixture key: ${fixtureKey}`);
   }
 
@@ -913,15 +816,11 @@ export async function installHostApprovedRoutes(
         await json(route, 400, { error: "invalid_workbox_state" });
         return;
       }
-      if (url.searchParams.get("cursor")) {
-        await json(route, 200, buildHostApprovedWorkboxPage(0, state));
-        return;
-      }
-      await json(route, 200, buildHostApprovedWorkboxPage(workboxItems, state));
+      await fulfillCursorPage(route, buildHostApprovedWorkboxPage(workboxItems, state));
       return;
     }
     if (pathname === "/api/bff/api/host/members") {
-      await json(route, 200, membersPage());
+      await fulfillCursorPage(route, buildHostApprovedMembersPage());
       return;
     }
     if (pathname === "/api/bff/api/host/invitations") {
@@ -929,7 +828,7 @@ export async function installHostApprovedRoutes(
       return;
     }
     if (pathname === "/api/bff/api/host/invitation-links") {
-      await json(route, 200, invitationLinks());
+      await fulfillCursorPage(route, invitationLinks());
       return;
     }
     if (pathname === "/api/bff/api/host/club-settings") {
@@ -966,11 +865,10 @@ export async function installHostApprovedRoutes(
       return;
     }
     if (pathname === "/api/bff/api/host/sessions") {
-      if (url.searchParams.get("mode") === "record" || url.searchParams.has("needsAttention")) {
-        await json(route, 200, recordLedgerPage());
-        return;
-      }
-      await json(route, 200, meetingListPage());
+      const firstPage = url.searchParams.get("mode") === "record" || url.searchParams.has("needsAttention")
+        ? buildHostApprovedRecordLedger()
+        : buildHostApprovedMeetingList();
+      await fulfillCursorPage(route, firstPage);
       return;
     }
 
@@ -978,16 +876,26 @@ export async function installHostApprovedRoutes(
     if (sessionMatch) {
       const sessionId = sessionMatch[1];
       const rest = sessionMatch[2] ?? "";
-      if (!SESSION_IDS.includes(sessionId as typeof SESSION_IDS[number])) {
+      if (!SESSION_ID_SET.has(sessionId)) {
         await route.fallback();
         return;
       }
       if (rest === "") {
-        await json(route, 200, sessionDetail(sessionId));
+        const detail = buildHostApprovedSessionDetail(sessionId);
+        if (!detail) {
+          await route.fallback();
+          return;
+        }
+        await json(route, 200, detail);
         return;
       }
       if (rest === "closing-status") {
-        await json(route, 200, closingStatus(sessionId));
+        const status = closingStatus(sessionId);
+        if (!status) {
+          await route.fallback();
+          return;
+        }
+        await json(route, 200, status);
         return;
       }
       if (rest === "history") {
@@ -1040,7 +948,20 @@ export async function installHostApprovedRoutes(
 
     const personMatch = /^\/api\/bff\/api\/host\/people\/([^/]+)$/.exec(pathname);
     if (personMatch) {
-      await json(route, 200, personDetail(personMatch[1]));
+      const person = buildHostApprovedPersonDetail(personMatch[1]);
+      if (!person) {
+        await route.fallback();
+        return;
+      }
+      const attendance = resolveHostApprovedCursorPage(
+        person.attendanceHistory,
+        url.searchParams.get("cursor"),
+      );
+      if (!attendance) {
+        await route.fallback();
+        return;
+      }
+      await json(route, 200, { ...person, attendanceHistory: attendance });
       return;
     }
 

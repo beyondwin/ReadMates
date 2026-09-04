@@ -184,4 +184,5 @@ test("mobile workbox shows three items and 작업함 모두 보기 until expande
 
   await expect(component.getByRole("listitem")).toHaveCount(3);
   await expect(component.getByRole("button", { name: "작업함 모두 보기" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "작업 4" })).toHaveCount(0);
 });
