@@ -23,7 +23,7 @@ export type ApprovedRouteRequestAudit = {
   allowValidatedPreview(input: {
     method: "POST";
     path: typeof PREVIEW_NOTIFICATION_PATH;
-    validate: (request: { method: string; path: string; postData: string | null }) => boolean;
+    validate: (request: { method: string; path: string; postData: string | null; url?: string }) => boolean;
   }): void;
   observe(request: { method: string; url: string; postData?: string | null }): ApprovedRouteRequestRecord;
   records(): readonly ApprovedRouteRequestRecord[];
@@ -68,7 +68,7 @@ export function createApprovedRouteRequestAudit(): ApprovedRouteRequestAudit {
   const previews: Array<{
     method: "POST";
     path: string;
-    validate: (request: { method: string; path: string; postData: string | null }) => boolean;
+    validate: (request: { method: string; path: string; postData: string | null; url?: string }) => boolean;
   }> = [];
   const observed: ApprovedRouteRequestRecord[] = [];
 
@@ -101,7 +101,7 @@ export function createApprovedRouteRequestAudit(): ApprovedRouteRequestAudit {
     }
     const preview = previews.find((entry) => entry.method === method && entry.path === path);
     if (preview) {
-      if (preview.validate({ method, path, postData })) {
+      if (preview.validate({ method, path, postData, url: request.url })) {
         const record: ApprovedRouteRequestRecord = { method, url: request.url, path, classification: "preview" };
         observed.push(record);
         return record;

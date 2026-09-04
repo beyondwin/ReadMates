@@ -26,6 +26,8 @@ const DefaultPersonLink: HostMembersLinkComponent = ({ to, children, ...props })
   <a {...props} href={to}>{children}</a>
 );
 
+const HOST_PEOPLE_FOCUS_KEY = "readmates.host-people.focus-restore";
+
 function statusBadgeClass(status: MembershipStatus) {
   if (status === "ACTIVE") {
     return "badge badge-ok badge-dot";
@@ -276,6 +278,27 @@ export function MemberList({
   const PersonLink = LinkComponent ?? DefaultPersonLink;
   const nameQuery = useHostPeopleNameQuery();
   const visibleMembers = members.filter((member) => matchesHostPeopleNameQuery(member.displayName, nameQuery));
+  const visibleMembershipIds = visibleMembers.map((member) => member.membershipId).join("\0");
+  useEffect(() => {
+    const membershipId = sessionStorage.getItem(HOST_PEOPLE_FOCUS_KEY);
+    if (!membershipId) return;
+    const target = document.querySelector<HTMLElement>(
+      `.rm-host-member-ledger__person-link[href*="${membershipId}"]`,
+    );
+    if (!target) return;
+    let inner = 0;
+    const outer = window.requestAnimationFrame(() => {
+      inner = window.requestAnimationFrame(() => {
+        if (!document.contains(target)) return;
+        target.focus();
+        sessionStorage.removeItem(HOST_PEOPLE_FOCUS_KEY);
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(outer);
+      window.cancelAnimationFrame(inner);
+    };
+  }, [visibleMembershipIds]);
   if (visibleMembers.length === 0) {
     return (
       <div className="surface" style={{ padding: 28 }}>
@@ -290,7 +313,20 @@ export function MemberList({
   }
 
   return (
-    <div className="stack" style={{ "--stack": "12px" } as CSSProperties}>
+    <div
+      className="stack"
+      style={{ "--stack": "12px" } as CSSProperties}
+      onClick={(event) => {
+        const heading = (event.target as HTMLElement).closest("[data-membership-id]");
+        const membershipId = heading?.getAttribute("data-membership-id");
+        if (
+          membershipId
+          && (event.target as HTMLElement).closest(".rm-host-member-ledger__person-link")
+        ) {
+          sessionStorage.setItem(HOST_PEOPLE_FOCUS_KEY, membershipId);
+        }
+      }}
+    >
       <table className="rm-host-member-ledger">
         <caption className="rm-host-member-ledger__caption">
           <span className="rm-host-member-ledger__title">{sectionDescription}</span>
@@ -331,10 +367,11 @@ export function MemberList({
                       label=""
                       sizeRole="member"
                     />
-                    <h2 className="rm-host-member-ledger__display-name">
+                    <h2 className="rm-host-member-ledger__display-name" data-membership-id={member.membershipId}>
                       <PersonLink
                         to={personTo}
                         className="rm-host-member-ledger__person-link"
+                        onClick={() => sessionStorage.setItem(HOST_PEOPLE_FOCUS_KEY, member.membershipId)}
                       >
                         {member.displayName}
                       </PersonLink>
@@ -363,6 +400,7 @@ export function MemberList({
                     <PersonLink
                       to={personTo}
                       className="rm-host-member-ledger__open"
+                      onClick={() => sessionStorage.setItem(HOST_PEOPLE_FOCUS_KEY, member.membershipId)}
                     >
                       열기
                     </PersonLink>

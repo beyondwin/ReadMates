@@ -35,6 +35,7 @@ import {
 import { routeHostEditorShell } from "../aigen-test-fixtures";
 import {
   installApprovedRouteCatchAllAudit,
+  PREVIEW_NOTIFICATION_PATH,
   type ApprovedRouteRequestAudit,
 } from "./approved-route-request-audit";
 import type { ApprovedRouteFixtureKey } from "./approved-route-scenarios";
@@ -52,6 +53,7 @@ export const HOST_APPROVED_HOST_MEMBERSHIP_ID = "membership-host-visual";
 const EVALUATED_AT = "2026-08-30T09:00:00Z";
 const CONTENT_REVISION = "e".repeat(64);
 const FRONTEND_OBSERVABILITY_PATH = "/api/bff/observability/frontend-events";
+const CLIENT_CONTRACT_STATUS_PATH = "/api/bff/__internal/client-contract-status";
 const DEFAULT_WORKBOX_ITEMS = 4;
 
 const HOST_APPROVED_FIXTURE_KEYS = new Set<ApprovedRouteFixtureKey>([
@@ -492,22 +494,38 @@ export function buildMemberAuthWithoutHostPerspective(): AuthMeResponse {
   };
 }
 
-function requestedOperatingPhase(page: Page): string | null {
+function requestedOperatingPhase(pageUrl: string): string | null {
   try {
-    return new URL(page.url()).searchParams.get("phase");
+    return new URL(pageUrl).searchParams.get("phase");
   } catch {
     return null;
   }
 }
 
-function closingRequested(page: Page): boolean {
-  return requestedOperatingPhase(page) === "closing";
+export function hostApprovedCurrentSelection(
+  fixtureKey: ApprovedRouteFixtureKey,
+  pageUrl: string,
+): "OPEN" | "UPCOMING_DRAFT" | "CLOSING_REQUIRED" {
+  if (fixtureKey === "host-records" || requestedOperatingPhase(pageUrl) === "closing") {
+    return "CLOSING_REQUIRED";
+  }
+  return "OPEN";
 }
 
-function sessionDetailOptionsForPage(page: Page, sessionId: string): HostApprovedSessionDetailOptions | undefined {
+export function hostApprovedSessionDetailOptionsFor(
+  fixtureKey: ApprovedRouteFixtureKey,
+  pageUrl: string,
+  sessionId: string,
+): HostApprovedSessionDetailOptions | undefined {
   if (sessionId !== HOST_APPROVED_SESSION_ID) return undefined;
-  if (closingRequested(page)) return { lifecycle: "CLOSED" };
+  if (hostApprovedCurrentSelection(fixtureKey, pageUrl) === "CLOSING_REQUIRED") {
+    return { lifecycle: "CLOSED" };
+  }
   return { attendanceMix: true };
+}
+
+function operatingRoomCurrent(page: Page, fixtureKey: ApprovedRouteFixtureKey): HostOperatingRoomCurrentResponse {
+  return buildHostApprovedOperatingRoomCurrent(hostApprovedCurrentSelection(fixtureKey, page.url()));
 }
 
 export function buildHostApprovedOperatingRoomCurrent(
@@ -521,10 +539,6 @@ export function buildHostApprovedOperatingRoomCurrent(
       scheduleSeenAvailability: "AVAILABLE",
     },
   };
-}
-
-function operatingRoomCurrent(page: Page): HostOperatingRoomCurrentResponse {
-  return buildHostApprovedOperatingRoomCurrent(closingRequested(page) ? "CLOSING_REQUIRED" : "OPEN");
 }
 
 export function buildHostApprovedClosingStatus(
@@ -662,6 +676,46 @@ function notificationSummary(): HostNotificationSummary {
   };
 }
 
+export function isApprovedHostPreviewPost(request: {
+  method: string;
+  path: string;
+  postData: string | null;
+  url?: string;
+}): boolean {
+  if (request.method.toUpperCase() !== "POST" || request.path !== PREVIEW_NOTIFICATION_PATH) {
+    return false;
+  }
+  let clubSlug: string | null = null;
+  try {
+    clubSlug = new URL(request.url ?? "", "https://visual-authority.readmates.invalid").searchParams.get("clubSlug");
+  } catch {
+    return false;
+  }
+  if (clubSlug !== HOST_APPROVED_CLUB.clubSlug || !request.postData) return false;
+  let payload: Record<string, unknown>;
+  try {
+    const parsed: unknown = JSON.parse(request.postData);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false;
+    payload = parsed as Record<string, unknown>;
+  } catch {
+    return false;
+  }
+  const selected = Array.isArray(payload.selectedMembershipIds)
+    ? [...payload.selectedMembershipIds].map(String).sort()
+    : [];
+  const expected = [...approvedScheduleReviewMembers.map((member) => member.membershipId)].sort();
+  return payload.sessionId === HOST_APPROVED_SESSION_ID
+    && payload.eventType === "SESSION_REMINDER_DUE"
+    && payload.sendMode === "NOW"
+    && payload.contentRevision === CONTENT_REVISION
+    && payload.scheduleRevision === approvedScheduleReviewPreview.scheduleRevision
+    && payload.subject === approvedScheduleReviewPreview.template.subject
+    && payload.body === approvedScheduleReviewPreview.template.bodyPreview
+    && payload.audience === "SELECTED_MEMBERS"
+    && selected.length === expected.length
+    && selected.every((id, index) => id === expected[index]);
+}
+
 function manualNotificationOptions(): ManualNotificationOptionsResponse {
   const preview = approvedScheduleReviewPreview;
   const session = buildHostApprovedSessionDetail(HOST_APPROVED_SESSION_ID);
@@ -734,6 +788,12 @@ function allowHostFixturePaths(requestAudit: ApprovedRouteRequestAudit): void {
   }
   requestAudit.allowFixture({ method: "PUT", path: "/api/bff/api/me/club-access" });
   requestAudit.allowFixture({ method: "POST", path: FRONTEND_OBSERVABILITY_PATH });
+  requestAudit.allowFixture({ method: "GET", path: CLIENT_CONTRACT_STATUS_PATH });
+  requestAudit.allowValidatedPreview({
+    method: "POST",
+    path: PREVIEW_NOTIFICATION_PATH,
+    validate: isApprovedHostPreviewPost,
+  });
   for (const sessionId of SESSION_IDS) {
     for (const suffix of [
       "",
@@ -862,7 +922,7 @@ export async function installHostApprovedRoutes(
 
     const pathname = url.pathname;
     if (pathname === "/api/bff/api/host/operating-room/current") {
-      await json(route, 200, operatingRoomCurrent(page));
+      await json(route, 200, operatingRoomCurrent(page, fixtureKey));
       return;
     }
     if (pathname === "/api/bff/api/host/club-operations") {
@@ -959,7 +1019,10 @@ export async function installHostApprovedRoutes(
         return;
       }
       if (rest === "") {
-        const detail = buildHostApprovedSessionDetail(sessionId, sessionDetailOptionsForPage(page, sessionId));
+        const detail = buildHostApprovedSessionDetail(
+          sessionId,
+          hostApprovedSessionDetailOptionsFor(fixtureKey, page.url(), sessionId),
+        );
         if (!detail) {
           await route.fallback();
           return;
@@ -968,7 +1031,10 @@ export async function installHostApprovedRoutes(
         return;
       }
       if (rest === "closing-status") {
-        const status = buildHostApprovedClosingStatus(sessionId, sessionDetailOptionsForPage(page, sessionId));
+        const status = buildHostApprovedClosingStatus(
+          sessionId,
+          hostApprovedSessionDetailOptionsFor(fixtureKey, page.url(), sessionId),
+        );
         if (!status) {
           await route.fallback();
           return;
@@ -1044,5 +1110,56 @@ export async function installHostApprovedRoutes(
     }
 
     await route.fallback();
+  });
+
+  await page.route("**/api/bff/api/host/notifications/manual/preview**", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.fallback();
+      return;
+    }
+    const request = route.request();
+    let postData = request.postData();
+    if (postData == null) {
+      try {
+        const parsed = request.postDataJSON();
+        postData = parsed == null ? null : JSON.stringify(parsed);
+      } catch {
+        postData = null;
+      }
+    }
+    const record = requestAudit.observe({
+      method: request.method(),
+      url: request.url(),
+      postData,
+    });
+    if (record.classification !== "preview") {
+      await route.fulfill({
+        status: 599,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: record.classification,
+          path: record.path,
+          effectKind: record.effectKind ?? null,
+        }),
+      });
+      return;
+    }
+    await json(route, 200, approvedScheduleReviewPreview);
+  });
+
+  await page.route("**/api/bff/__internal/client-contract-status**", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: { "Cache-Control": "no-store" },
+      body: JSON.stringify({
+        schemaVersion: 1,
+        supportedHostClientContracts: ["v2", "v3"],
+      }),
+    });
   });
 }

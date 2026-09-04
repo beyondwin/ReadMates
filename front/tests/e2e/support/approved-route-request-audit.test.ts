@@ -83,6 +83,32 @@ describe("approved route request audit", () => {
     expect(classifyApprovedEffectKind("DELETE", "/api/bff/api/host/unknown")).toBe("other-effecting-request");
   });
 
+  it("passes the request url into preview validation", () => {
+    const audit = createApprovedRouteRequestAudit();
+    const seen: string[] = [];
+    audit.allowValidatedPreview({
+      method: "POST",
+      path: PREVIEW_NOTIFICATION_PATH,
+      validate: (request) => {
+        seen.push(request.url ?? "");
+        return request.url?.includes("clubSlug=visual-authority") === true;
+      },
+    });
+
+    expect(audit.observe({
+      method: "POST",
+      url: `https://readmates.example${PREVIEW_NOTIFICATION_PATH}?clubSlug=visual-authority`,
+      postData: "{}",
+    }).classification).toBe("preview");
+    expect(seen[0]).toContain("clubSlug=visual-authority");
+
+    expect(audit.observe({
+      method: "POST",
+      url: `https://readmates.example${PREVIEW_NOTIFICATION_PATH}?clubSlug=other-club`,
+      postData: "{}",
+    }).classification).toBe("effecting");
+  });
+
   it("ignores non-BFF traffic", () => {
     const audit = createApprovedRouteRequestAudit();
     expect(audit.observe({

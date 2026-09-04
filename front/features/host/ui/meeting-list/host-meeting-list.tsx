@@ -112,6 +112,7 @@ function TocSection({
         <button
           type="button"
           className="btn btn-ghost rm-meeting-toc__more"
+          aria-label={title === "다가오는 모임" ? "다가오는 모임 더 보기" : "지난 모임 더 보기"}
           disabled={loadingMore}
           onClick={onLoadMore}
         >

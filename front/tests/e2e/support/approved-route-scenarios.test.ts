@@ -297,6 +297,56 @@ describe("actual-route visual authority scenarios", () => {
     })).toBe(false);
   });
 
+  it("measures host ledger regions from actual-route boxes instead of CT main stubs", () => {
+    const meetings = visualAuthorityScenario("host-meetings-desktop");
+    expect(meetings.regions.find((region) => region.name === "host-nav")?.expected)
+      .toEqual({ x: 678, y: 23, width: 233, height: 44 });
+    expect(meetings.regions.find((region) => region.name === "meeting-ledger")?.selector)
+      .toBe(".rm-meeting-toc__layout");
+
+    const people = visualAuthorityScenario("host-people-desktop");
+    expect(people.regions.find((region) => region.name === "member-table")?.selector)
+      .toBe(".rm-host-member-ledger");
+    expect(people.interactions.find((item) => item.name === "select-member")).toMatchObject({
+      target: expect.stringContaining("membership-sky"),
+    });
+
+    const records = visualAuthorityScenario("host-records-desktop");
+    expect(records.regions.map((region) => region.name)).toEqual([
+      "host-header",
+      "host-nav",
+      "records-heading",
+      "closing-link",
+      "record-ledger",
+    ]);
+    expect(records.regions.find((region) => region.name === "closing-link")?.selector)
+      .toBe(".rm-host-records-next a");
+    expect(records.interactions.find((item) => item.name === "open-closing-record")).toMatchObject({
+      target: ".rm-host-records-next a",
+      expectedUrl: "/clubs/visual-authority/app/host?phase=closing",
+    });
+
+    const settings = visualAuthorityScenario("host-settings-desktop");
+    expect(settings.regions.find((region) => region.name === "club-settings")?.selector)
+      .toBe('[aria-labelledby="club-settings-title"]');
+
+    const review = visualAuthorityScenario("host-schedule-review-desktop");
+    expect(review.regions.find((region) => region.name === "host-nav")?.expected)
+      .toEqual({ x: 678, y: 23, width: 233, height: 44 });
+    expect(review.regions.find((region) => region.name === "review-heading")?.expected)
+      .toEqual({ x: 48, y: 171, width: 1440, height: 41 });
+    expect(review.firstViewport.find((entry) => entry.name === "preview-confirmation")?.selector)
+      .toBe('[aria-label="발송 전 확인"]');
+
+    const person = visualAuthorityScenario("host-person-mobile");
+    expect(person.regions.find((region) => region.name === "person-heading")?.expected)
+      .toEqual({ x: 91, y: 121, width: 72, height: 34 });
+    expect(person.regions.find((region) => region.name === "person-status")?.expected)
+      .toEqual({ x: 91, y: 155, width: 72, height: 20 });
+    expect(person.regions.find((region) => region.name === "person-history")?.expected)
+      .toEqual({ x: 17, y: 389, width: 356, height: 217 });
+  });
+
   it("does not restore a ratio bypass in the contract source", () => {
     const contractSource = readFileSync(new URL("./approved-mockup-contract.ts", import.meta.url), "utf8");
     expect(contractSource).not.toMatch(

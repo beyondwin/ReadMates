@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { HostMemberListItem } from "@/features/host/model/host-view-types";
 import { MemberList } from "./member-list";
@@ -49,5 +49,59 @@ describe("MemberList person identity", () => {
     expect(document.body).not.toHaveTextContent("hidden@example.test");
     expect(document.body).not.toHaveTextContent("user-private");
     expect(vi.fn()).not.toHaveBeenCalled();
+  });
+
+  it("restores person-link focus from the list/detail return key", async () => {
+    sessionStorage.setItem("readmates.host-people.focus-restore", "membership-safe");
+    render(
+      <MemberList
+        members={[member]}
+        emptyText="비어 있음"
+        sectionDescription="멤버"
+        personHref={(membershipId) => `/app/host/people/${membershipId}`}
+        LinkComponent={({ to, children, ...props }) => <a {...props} href={to}>{children}</a>}
+        renderProfileAction={() => null}
+        renderActions={() => null}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "안전한 이름" })).toHaveFocus();
+    });
+    expect(sessionStorage.getItem("readmates.host-people.focus-restore")).toBeNull();
+  });
+
+  it("keeps the person-return key until the person link exists", async () => {
+    sessionStorage.setItem("readmates.host-people.focus-restore", "membership-safe");
+    const { rerender } = render(
+      <MemberList
+        members={[]}
+        emptyText="비어 있음"
+        sectionDescription="멤버"
+        personHref={(membershipId) => `/app/host/people/${membershipId}`}
+        LinkComponent={({ to, children, ...props }) => <a {...props} href={to}>{children}</a>}
+        renderProfileAction={() => null}
+        renderActions={() => null}
+      />,
+    );
+
+    expect(sessionStorage.getItem("readmates.host-people.focus-restore")).toBe("membership-safe");
+
+    rerender(
+      <MemberList
+        members={[member]}
+        emptyText="비어 있음"
+        sectionDescription="멤버"
+        personHref={(membershipId) => `/app/host/people/${membershipId}`}
+        LinkComponent={({ to, children, ...props }) => <a {...props} href={to}>{children}</a>}
+        renderProfileAction={() => null}
+        renderActions={() => null}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "안전한 이름" })).toHaveFocus();
+    });
+    expect(sessionStorage.getItem("readmates.host-people.focus-restore")).toBeNull();
   });
 });

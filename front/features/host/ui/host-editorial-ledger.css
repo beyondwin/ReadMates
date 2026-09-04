@@ -30,11 +30,14 @@
   margin: 0;
 }
 
+h1.rm-host-editorial-ledger__heading,
 .rm-host-editorial-ledger__heading {
   margin: var(--space-xs) 0;
   overflow-wrap: anywhere;
   text-wrap: balance;
-  font-size: clamp(2.25rem, 4.5vw, 3.5rem);
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 41.4px;
   letter-spacing: -0.04em;
 }
 
@@ -42,8 +45,19 @@
 .rm-host-editorial-ledger__identity,
 .rm-host-editorial-ledger__fact {
   margin: 0;
-  color: var(--text-2);
   overflow-wrap: anywhere;
+}
+
+.rm-host-editorial-ledger__identity,
+.rm-host-editorial-ledger__fact {
+  color: var(--text-2);
+}
+
+.rm-host-editorial-ledger__lede {
+  color: oklch(0.18 0.020 255);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 25.6px;
 }
 
 .rm-host-editorial-ledger__identity {
@@ -133,6 +147,9 @@
   border-bottom: 1px solid var(--line);
   border-radius: 0;
   background: transparent;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 23.8px;
 }
 
 .rm-host-editorial-ledger--split {
@@ -147,9 +164,12 @@
   padding-bottom: var(--space-md);
 }
 
+.rm-host-settings-page h1.rm-host-editorial-ledger__heading,
 .rm-host-settings-page .rm-host-editorial-ledger__heading {
   margin: 4px 0;
-  font-size: clamp(2rem, 3.2vw, 2.75rem);
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 41.4px;
 }
 
 .rm-host-settings-page .rm-host-editorial-ledger__body {
@@ -220,9 +240,13 @@
   min-width: 0;
 }
 
-.rm-host-editorial-ledger__rail h2 {
+.rm-host-editorial-ledger__rail h2,
+.rm-host-records-ledger__title,
+.rm-host-editorial-ledger h2:not(.rm-host-member-ledger__display-name) {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 26px;
 }
 
 .rm-host-editorial-ledger__row-copy {
@@ -273,8 +297,9 @@
   background: transparent;
   color: var(--text-2);
   font: inherit;
-  font-size: 13px;
-  font-weight: 650;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 19.6px;
   cursor: pointer;
 }
 
@@ -357,7 +382,9 @@
 
 .rm-host-records-ledger__title {
   margin: 0 0 12px;
-  font-size: 1.05rem;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 26px;
 }
 
 .rm-host-records-ledger table {

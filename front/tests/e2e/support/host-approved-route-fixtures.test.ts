@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { parseHostSessionDetailResponse, parseHostSessionListPage } from "@/features/host/api/host-contracts";
 import { parseHostPersonDetail } from "@/features/host/api/host-person-contracts";
-import { approvedRecordItems, approvedScheduleReviewMembers } from "@/features/host/ui/approved-host-ledgers.data";
+import { approvedRecordItems, approvedScheduleReviewMembers, approvedScheduleReviewPreview } from "@/features/host/ui/approved-host-ledgers.data";
+import { PREVIEW_NOTIFICATION_PATH } from "./approved-route-request-audit";
 import {
+  HOST_APPROVED_CLUB,
   HOST_APPROVED_PERSON_ID,
   HOST_APPROVED_SESSION_ID,
   buildHostApprovedAuth,
@@ -12,6 +14,9 @@ import {
   buildHostApprovedRecordLedger,
   buildHostApprovedClosingStatus,
   buildHostApprovedSessionDetail,
+  hostApprovedCurrentSelection,
+  hostApprovedSessionDetailOptionsFor,
+  isApprovedHostPreviewPost,
   resolveHostApprovedCursorPage,
 } from "./host-approved-route-fixtures";
 
@@ -52,6 +57,32 @@ describe("host approved route fixtures", () => {
       "PUBLIC_RECORD_VISIBLE",
     ]);
     expect(parseHostSessionDetailResponse(closed!)).toMatchObject({ state: "CLOSED" });
+  });
+
+  it("keeps the records fixture on CLOSING_REQUIRED with CLOSED session-28", () => {
+    expect(hostApprovedCurrentSelection("host-records", "https://visual-authority.example/app/host/records"))
+      .toBe("CLOSING_REQUIRED");
+    expect(hostApprovedCurrentSelection("host-operating-room", "https://visual-authority.example/app/host"))
+      .toBe("OPEN");
+    expect(hostApprovedCurrentSelection(
+      "host-operating-room",
+      "https://visual-authority.example/app/host?phase=closing",
+    )).toBe("CLOSING_REQUIRED");
+    expect(hostApprovedSessionDetailOptionsFor(
+      "host-records",
+      "https://visual-authority.example/app/host/records",
+      HOST_APPROVED_SESSION_ID,
+    )).toEqual({ lifecycle: "CLOSED" });
+    expect(hostApprovedSessionDetailOptionsFor(
+      "host-operating-room",
+      "https://visual-authority.example/app/host",
+      HOST_APPROVED_SESSION_ID,
+    )).toEqual({ attendanceMix: true });
+    expect(hostApprovedSessionDetailOptionsFor(
+      "host-records",
+      "https://visual-authority.example/app/host/records",
+      "session-27",
+    )).toBeUndefined();
   });
 
   it("keeps CLOSED session-28 on the record ledger and OPEN session-28 on the meeting list", () => {
@@ -118,5 +149,55 @@ describe("host approved route fixtures", () => {
       "membership-kang",
       "membership-moon",
     ]);
+  });
+
+  it("accepts only the authenticated visual-authority preview POST with selected recipients and revision", () => {
+    const selectedMembershipIds = [...approvedScheduleReviewMembers.map((member) => member.membershipId)].sort();
+    const postData = JSON.stringify({
+      sessionId: HOST_APPROVED_SESSION_ID,
+      eventType: "SESSION_REMINDER_DUE",
+      contentRevision: "e".repeat(64),
+      audience: "SELECTED_MEMBERS",
+      requestedChannels: "BOTH",
+      selectedMembershipIds,
+      excludedMembershipIds: [],
+      includedMembershipIds: [],
+      sendMode: "NOW",
+      scheduleRevision: approvedScheduleReviewPreview.scheduleRevision,
+      subject: approvedScheduleReviewPreview.template.subject,
+      body: approvedScheduleReviewPreview.template.bodyPreview,
+    });
+    const url = `https://readmates.example${PREVIEW_NOTIFICATION_PATH}?clubSlug=${HOST_APPROVED_CLUB.clubSlug}`;
+
+    expect(isApprovedHostPreviewPost({
+      method: "POST",
+      path: PREVIEW_NOTIFICATION_PATH,
+      postData,
+      url,
+    })).toBe(true);
+    expect(isApprovedHostPreviewPost({
+      method: "POST",
+      path: PREVIEW_NOTIFICATION_PATH,
+      postData,
+      url: `https://readmates.example${PREVIEW_NOTIFICATION_PATH}?clubSlug=other-club`,
+    })).toBe(false);
+    expect(isApprovedHostPreviewPost({
+      method: "POST",
+      path: PREVIEW_NOTIFICATION_PATH,
+      postData: postData.replace('"contentRevision":"' + "e".repeat(64) + '"', '"contentRevision":"' + "a".repeat(64) + '"'),
+      url,
+    })).toBe(false);
+    expect(isApprovedHostPreviewPost({
+      method: "POST",
+      path: PREVIEW_NOTIFICATION_PATH,
+      postData: postData.replace('"scheduleRevision":4', '"scheduleRevision":5'),
+      url,
+    })).toBe(false);
+    expect(isApprovedHostPreviewPost({
+      method: "POST",
+      path: PREVIEW_NOTIFICATION_PATH,
+      postData: JSON.stringify({ confirm: true }),
+      url,
+    })).toBe(false);
   });
 });

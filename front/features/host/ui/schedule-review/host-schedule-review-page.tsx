@@ -194,20 +194,10 @@ export function HostScheduleReviewPage({
                   </label>
                 ))}
               </fieldset>
-              {onPreview && preview ? (
-                <button
-                  type="button"
-                  className="rm-schedule-review__preview"
-                  disabled={!canPreview}
-                  onClick={() => void onPreview()}
-                >
-                  {previewPending ? "미리보기 만드는 중" : "알림 미리보기"}
-                </button>
-              ) : null}
             </details>
 
             {error && !preview ? <p className="rm-schedule-review__error" role="alert">{error}</p> : null}
-            {onPreview && !preview ? (
+            {onPreview ? (
               <button
                 type="button"
                 className="rm-schedule-review__preview"

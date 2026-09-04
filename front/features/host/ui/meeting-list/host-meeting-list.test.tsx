@@ -188,8 +188,8 @@ describe("HostMeetingList", () => {
 
     const upcoming = screen.getByRole("region", { name: "다가오는 모임" });
     const past = screen.getByRole("region", { name: "지난 모임" });
-    await userEvent.click(within(upcoming).getByRole("button", { name: "더 보기" }));
-    await userEvent.click(within(past).getByRole("button", { name: "더 보기" }));
+    await userEvent.click(within(upcoming).getByRole("button", { name: "다가오는 모임 더 보기" }));
+    await userEvent.click(within(past).getByRole("button", { name: "지난 모임 더 보기" }));
     expect(onLoadMoreUpcoming).toHaveBeenCalledOnce();
     expect(onLoadMorePast).toHaveBeenCalledOnce();
   });
@@ -319,6 +319,26 @@ describe("HostMeetingList", () => {
     const upcoming = screen.getByRole("region", { name: "다가오는 모임" });
     expect(within(upcoming).getByRole("alert")).toHaveTextContent("모임을 불러오지 못했습니다.");
     expect(screen.getByRole("button", { name: "다시 시도" }).closest(".rm-meeting-toc")).not.toBeNull();
+  });
+
+  it("names list-section load more with the upcoming meetings continuation", () => {
+    renderList({
+      sections: {
+        upcoming: { rows: [upcomingRow], nextCursor: "meetings-visual-next" },
+        past: { rows: [pastRow], nextCursor: "past-visual-next" },
+      },
+    });
+
+    expect(
+      within(screen.getByRole("region", { name: "다가오는 모임" })).getByRole("button", {
+        name: "다가오는 모임 더 보기",
+      }),
+    ).toBeVisible();
+    expect(
+      within(screen.getByRole("region", { name: "지난 모임" })).getByRole("button", {
+        name: "지난 모임 더 보기",
+      }),
+    ).toBeVisible();
   });
 
   it("imports meeting TOC styles from the list module and keeps the route CSS entry", () => {

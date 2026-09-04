@@ -1,11 +1,16 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import {
   HostSessionAttentionSummary,
   HostSessionLedger,
 } from "./host-session-ledger";
-import type { HostSessionLedgerItem } from "@/features/host/model/host-session-ledger-model";
+import {
+  hostRecordsNextClosingAction,
+  type HostSessionLedgerItem,
+} from "@/features/host/model/host-session-ledger-model";
 
 const items: HostSessionLedgerItem[] = [
   {
@@ -123,6 +128,65 @@ describe("HostSessionLedger", () => {
       { readmatesReturnTo: "/app/host/records", readmatesReturnLabel: "기록으로" },
       { readmatesReturnTo: "/app/host/records", readmatesReturnLabel: "기록으로" },
     ]);
+  });
+
+  it("routes the next closing CTA to the operating-room closing phase", () => {
+    expect(hostRecordsNextClosingAction(items[0])).toEqual({
+      sessionId: "session-28",
+      label: "모비 딕 기록 초안을 검토해 주세요",
+      meta: "작성 중 · 확인 필요",
+      href: "/app/host?phase=closing",
+      ctaLabel: "마감실 열기",
+    });
+
+    render(
+      <HostSessionLedger
+        items={items}
+        filters={filters}
+        nextCursor={null}
+        loadingMore={false}
+        onFiltersChange={vi.fn()}
+        onLoadMore={vi.fn()}
+        nextAction={hostRecordsNextClosingAction(items[0])}
+        LinkComponent={({ to, children, ...props }) => <a {...props} href={to}>{children}</a>}
+      />,
+    );
+    expect(screen.getByRole("link", { name: "마감실 열기" })).toHaveAttribute("href", "/app/host?phase=closing");
+
+    const routeSource = readFileSync(path.resolve("features/host/route/host-session-ledger-route.tsx"), "utf8");
+    expect(routeSource).toContain("hostRecordsNextClosingAction");
+  });
+
+  it("keeps the closing-return key until the next-action link exists", async () => {
+    sessionStorage.setItem("readmates.host-records.focus-restore", "closing");
+    const { rerender } = render(
+      <HostSessionLedger
+        items={[]}
+        filters={filters}
+        nextCursor={null}
+        loadingMore={false}
+        onFiltersChange={vi.fn()}
+        onLoadMore={vi.fn()}
+      />,
+    );
+    expect(sessionStorage.getItem("readmates.host-records.focus-restore")).toBe("closing");
+
+    rerender(
+      <HostSessionLedger
+        items={items}
+        filters={filters}
+        nextCursor={null}
+        loadingMore={false}
+        onFiltersChange={vi.fn()}
+        onLoadMore={vi.fn()}
+        nextAction={hostRecordsNextClosingAction(items[0])}
+        LinkComponent={({ to, children, ...props }) => <a {...props} href={to}>{children}</a>}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "마감실 열기" })).toHaveFocus();
+    });
+    expect(sessionStorage.getItem("readmates.host-records.focus-restore")).toBeNull();
   });
 
   it("preserves the scoped records owner on every record row link", () => {

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -30,6 +32,15 @@ function member(overrides: Partial<HostMemberListItem> = {}): HostMemberListItem
     ...overrides,
   };
 }
+
+describe("HostPeoplePage type contract", () => {
+  it("keeps member display names out of the editorial 20px h2 scale", () => {
+    const editorial = readFileSync(path.resolve("features/host/ui/host-editorial-ledger.css"), "utf8");
+    const ledger = readFileSync(path.resolve("features/host/ui/members/member-ledger.css"), "utf8");
+    expect(editorial).toMatch(/h2:not\(\.rm-host-member-ledger__display-name\)/);
+    expect(ledger).toMatch(/\.rm-host-member-ledger h2\.rm-host-member-ledger__display-name[\s\S]*font-size: 17px/);
+  });
+});
 
 describe("matchesHostPeopleNameQuery", () => {
   it("matches a trimmed case-insensitive display-name substring", () => {

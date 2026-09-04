@@ -1,4 +1,4 @@
-import { useState, type ComponentType, type FormEvent, type ReactNode, type Ref } from "react";
+import { useEffect, useState, type ComponentType, type FormEvent, type ReactNode, type Ref } from "react";
 import {
   hostSessionLedgerActionLabel,
   hostSessionLedgerDraftLabel,
@@ -69,6 +69,8 @@ export type HostSessionLedgerProps = {
   statusCounts?: HostSessionLedgerStatusCounts;
   workTabCounts?: { now: number; deferred: number };
 };
+
+const HOST_RECORDS_FOCUS_KEY = "readmates.host-records.focus-restore";
 
 type RecordsStatusFilter = "all" | "closing" | "drafting" | "published";
 
@@ -366,7 +368,15 @@ function RecordsNextActionCard({
   const href = nextAction?.href ?? sessionRecordHref(item.sessionId);
   const label = nextAction?.label ?? `${item.bookTitle} 기록 초안을 검토해 주세요`;
   return (
-    <section className="rm-host-records-next" aria-labelledby="rm-host-records-next-title">
+    <section
+      className="rm-host-records-next"
+      aria-labelledby="rm-host-records-next-title"
+      onClick={(event) => {
+        if ((event.target as HTMLElement).closest("a")) {
+          sessionStorage.setItem(HOST_RECORDS_FOCUS_KEY, "closing");
+        }
+      }}
+    >
       <p className="rm-host-records-next__eyebrow">다음에 마감할 기록</p>
       <div className="rm-host-records-next__body">
         <div className="rm-host-records-next__copy">
@@ -417,6 +427,24 @@ export function HostSessionLedger({
 }: HostSessionLedgerProps) {
   const trashView = filters.view === "trash";
   const [statusFilter, setStatusFilter] = useState<RecordsStatusFilter>("all");
+  const itemIds = items.map((item) => item.sessionId).join("\0");
+  useEffect(() => {
+    if (sessionStorage.getItem(HOST_RECORDS_FOCUS_KEY) !== "closing") return;
+    const target = document.querySelector<HTMLElement>(".rm-host-records-next a");
+    if (!target) return;
+    let inner = 0;
+    const outer = window.requestAnimationFrame(() => {
+      inner = window.requestAnimationFrame(() => {
+        if (!document.contains(target)) return;
+        target.focus();
+        sessionStorage.removeItem(HOST_RECORDS_FOCUS_KEY);
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(outer);
+      window.cancelAnimationFrame(inner);
+    };
+  }, [itemIds]);
   const factRows = items.map((item) => ({ item, facts: rowFacts(item, factsBySessionId) }));
   const visibleFactRows = trashView
     ? []

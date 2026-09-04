@@ -5,6 +5,7 @@ import type { HostSessionRecordLedgerPage, HostSessionTrashPage } from "@/featur
 import { hostMeetingHref } from "@/features/host/model/host-meeting-ledger-model";
 import {
   dedupeHostSessionLedgerItems,
+  hostRecordsNextClosingAction,
   hostSessionTrashDeletedAtLabel,
   hostSessionTrashRemainingCopy,
   normalizeHostSessionLedgerFilters,
@@ -309,6 +310,13 @@ export function HostSessionLedgerRoute({
         trashHref="/app/host/sessions?view=trash"
         activeHref="/app/host/records"
         recordReturnHref={`${location.pathname}${location.search}${location.hash}`}
+        nextAction={
+          !trashView && visiblePage?.items[0]
+            ? hostRecordsNextClosingAction(
+              visiblePage.items.find((item) => item.needsAttention) ?? visiblePage.items[0],
+            )
+            : undefined
+        }
         LinkComponent={LinkComponent}
       />
     </>

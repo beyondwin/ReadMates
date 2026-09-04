@@ -105,3 +105,92 @@ for (const id of HOST_OPERATING_IDS) {
     expect(report).not.toHaveProperty("exception");
   });
 }
+
+const HOST_LEDGER_IDS = [
+  "host-meetings-desktop",
+  "host-people-desktop",
+  "host-records-desktop",
+  "host-settings-desktop",
+  "host-schedule-review-desktop",
+  "host-person-mobile",
+] as const satisfies readonly ApprovedMockupId[];
+
+async function assertHostLedgerAuthoritySurface(
+  page: Page,
+  id: (typeof HOST_LEDGER_IDS)[number],
+): Promise<void> {
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+  if (id === "host-meetings-desktop") {
+    await expect(page.getByRole("tablist", { name: "모임 보기 방식" })).toBeVisible();
+    await expect(page.getByRole("tablist", { name: "모임 상태" })).toBeVisible();
+    const calendarTab = page.getByRole("tab", { name: "달력" });
+    const listTab = page.getByRole("tab", { name: "목록" });
+    await expect(calendarTab).toBeVisible();
+    await expect(page.getByRole("tab", { name: "준비 중" })).toBeVisible();
+    if (await calendarTab.getAttribute("aria-selected") === "true") {
+      await listTab.click();
+      await expect(listTab).toHaveAttribute("aria-selected", "true");
+    }
+    const preparingTab = page.getByRole("tab", { name: "준비 중" });
+    const allTab = page.getByRole("tab", { name: "전체" }).first();
+    if (await preparingTab.getAttribute("aria-selected") === "true") {
+      await allTab.click();
+      await expect(allTab).toHaveAttribute("aria-selected", "true");
+    }
+    return;
+  }
+
+  if (id === "host-people-desktop") {
+    await expect(page.getByRole("region", { name: "가입 승인 대기" })).toBeVisible();
+    await expect(page.locator(".rm-host-member-ledger").first()).toBeVisible();
+    await expect(page.locator(".rm-host-member-ledger__row").first()).toBeVisible();
+    return;
+  }
+
+  if (id === "host-records-desktop") {
+    await expect(page.locator(".rm-host-records-next a")).toBeVisible();
+    return;
+  }
+
+  if (id === "host-settings-desktop") {
+    await expect(page.getByRole("button", { name: "새 초대 링크" })).toBeVisible();
+    const createForm = page.getByRole("textbox", { name: "링크 이름" });
+    if (await createForm.count()) {
+      await page.getByRole("button", { name: "새 초대 링크" }).click();
+      await expect(createForm).toHaveCount(0);
+    }
+    return;
+  }
+
+  if (id === "host-schedule-review-desktop") {
+    await expect(page.locator(".rm-schedule-review__recipients")).toBeVisible();
+    await expect(page.getByRole("button", { name: "알림 미리보기" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "발송 전 확인" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /명에게 안내 보내기/ })).toBeVisible();
+    return;
+  }
+
+  await expect(page.locator(".rm-host-person__tenure")).toBeVisible();
+  await expect(page.getByRole("region", { name: "참석 기록" })).toBeVisible();
+  await expect(page.locator('[data-club-shell-region="mobile-primary"] .m-tabbar')).toBeVisible();
+}
+
+for (const id of HOST_LEDGER_IDS) {
+  test(`${id} matches its approved actual route`, async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    test.skip(!visualAuthoritySelected(id), "not affected: " + id);
+    const report = await runActualRouteAuthority({
+      page,
+      testInfo,
+      scenario: visualAuthorityScenario(id),
+      installFixtures: (installPage, fixtureKey, audit) =>
+        installHostApprovedRoutes(installPage, fixtureKey, audit, { workboxItems: 12 }),
+      beforeCapture: (capturePage) => assertHostLedgerAuthoritySurface(capturePage, id),
+    });
+    expect(report.mask).toBeNull();
+    expect(report).not.toHaveProperty("exception");
+    expect(report.results.requestAudit.effecting).toBe(0);
+    expect(report.results.requestAudit.unmatched).toBe(0);
+  });
+}

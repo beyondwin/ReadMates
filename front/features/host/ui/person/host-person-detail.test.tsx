@@ -56,4 +56,23 @@ describe("HostPersonDetail", () => {
     expect(screen.getByText("미응답")).toBeVisible();
     expect(screen.getByText("8월 18일 · 27회 모임")).toBeVisible();
   });
+
+  it("keeps attendance pagination and the management ledger link keyboard-reachable", () => {
+    render(
+      <HostPersonDetail
+        person={person}
+        attendanceItems={person.attendanceHistory.items}
+        nextCursor="opaque-attendance-cursor"
+        loadingMore={false}
+        loadMoreError={null}
+        onLoadMore={() => undefined}
+        peopleHref="/clubs/visual-authority/app/host/people"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "참석 기록 더 보기" })).toBeVisible();
+    expect(document.querySelector(".rm-host-person__management .rm-host-person__text-link")).toHaveTextContent(
+      "사람 관리 원장으로",
+    );
+  });
 });

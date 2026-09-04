@@ -125,7 +125,7 @@ export const APPROVED_ROUTE_PREPARATIONS: Record<
   "preview-schedule-notification": async ({ page, requestAudit }) => {
     const before = requestAudit.previewPosts().length;
     await clickPreviewControl(page);
-    await locateApprovedTarget(page, ".rm-schedule-review__preview").waitFor({ state: "visible" });
+    await locateApprovedTarget(page, '[aria-label="발송 전 확인"]').waitFor({ state: "visible" });
     return {
       key: "preview-schedule-notification",
       previewPosted: requestAudit.previewPosts().length > before || before > 0 || requestAudit.previewPosts().length > 0,
@@ -135,6 +135,7 @@ export const APPROVED_ROUTE_PREPARATIONS: Record<
 
 async function waitForFontsAndIdle(page: Page, scenario: VisualAuthorityScenario): Promise<void> {
   await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await locateApprovedTarget(page, scenario.rootSelector).waitFor({ state: "visible" });
   const readySelector = scenario.regions[0]?.selector ?? scenario.rootSelector;
   await locateApprovedTarget(page, readySelector).waitFor({ state: "visible" });
@@ -199,6 +200,23 @@ async function measureTypography(
   page: Page,
   entry: VisualAuthorityScenario["typography"][number],
 ): Promise<ApprovedComparisonReport["typography"][number]> {
+  const expected = {
+    fontFamilyIncludes: entry.fontFamilyIncludes,
+    fontSizePx: entry.fontSizePx,
+    fontWeight: entry.fontWeight,
+    lineHeightPx: entry.lineHeightPx,
+    color: entry.color,
+  };
+  const empty = {
+    fontFamily: "",
+    fontSizePx: 0,
+    fontWeight: "",
+    lineHeightPx: "normal" as const,
+    color: "",
+  };
+  if (await page.locator(entry.selector).count() === 0) {
+    return { name: entry.name, selector: entry.selector, passed: false, actual: empty, expected };
+  }
   const locator = await firstMatching(page, entry.selector);
   const actual = await locator.evaluate((element) => {
     const style = getComputedStyle(element);
@@ -210,13 +228,7 @@ async function measureTypography(
       lineHeightPx: Number.isFinite(lineHeight as number) || lineHeight === "normal" ? lineHeight : "normal" as const,
       color: style.color,
     };
-  }).catch(() => ({
-    fontFamily: "",
-    fontSizePx: 0,
-    fontWeight: "",
-    lineHeightPx: "normal" as const,
-    color: "",
-  }));
+  }).catch(() => empty);
   const expectedColor = await page.evaluate((color) => {
     const probe = document.createElement("span");
     probe.style.color = color;
@@ -238,13 +250,7 @@ async function measureTypography(
     selector: entry.selector,
     passed: familyPass && sizePass && weightPass && linePass && colorPass,
     actual,
-    expected: {
-      fontFamilyIncludes: entry.fontFamilyIncludes,
-      fontSizePx: entry.fontSizePx,
-      fontWeight: entry.fontWeight,
-      lineHeightPx: entry.lineHeightPx,
-      color: entry.color,
-    },
+    expected,
   };
 }
 
@@ -308,7 +314,7 @@ async function restoreCanonical(
     await waitForFontsAndIdle(page, scenario);
   }
   if (scenario.preparationKey === "preview-schedule-notification") {
-    const previewed = page.locator(".rm-schedule-review__layout--previewed, .rm-schedule-review__preview");
+    const previewed = page.locator(".rm-schedule-review__layout--previewed, [aria-label='발송 전 확인']");
     if (onCanonical && await previewed.first().isVisible().catch(() => false)) {
       return { key: "preview-schedule-notification", previewPosted: true };
     }

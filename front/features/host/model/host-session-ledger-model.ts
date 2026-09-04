@@ -239,6 +239,23 @@ export function hostSessionLedgerPublicationLabel(
   return "대기";
 }
 
+export function hostRecordsClosingRoomHref(hostBase = "/app/host") {
+  return `${hostBase}?phase=closing`;
+}
+
+export function hostRecordsNextClosingAction(
+  item: HostSessionLedgerItem,
+  hostBase = "/app/host",
+): HostSessionLedgerNextAction {
+  return {
+    sessionId: item.sessionId,
+    label: `${item.bookTitle} 기록 초안을 검토해 주세요`,
+    meta: `${hostSessionLedgerDraftLabel(item)} · ${hostSessionLedgerFeedbackLabel(item)}`,
+    href: hostRecordsClosingRoomHref(hostBase),
+    ctaLabel: hostSessionLedgerActionLabel(item),
+  };
+}
+
 export function hostSessionLedgerFeedbackLabel(
   item: Pick<HostSessionLedgerItem, "recordStatus" | "needsAttention">,
 ) {

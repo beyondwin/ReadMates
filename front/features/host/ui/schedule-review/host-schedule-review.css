@@ -22,10 +22,11 @@
 
 .rm-schedule-review__header h1 {
   margin-top: var(--space-sm);
-  font-size: clamp(1.8rem, 3.2vw, 2.4rem);
+  font-size: 36px;
+  font-weight: 600;
   font-family: var(--f-sans);
   letter-spacing: -0.03em;
-  line-height: 1.15;
+  line-height: 41.4px;
 }
 
 .rm-schedule-review__header p {
@@ -71,6 +72,14 @@
   gap: var(--space-xs);
 }
 
+.rm-schedule-review__section-heading h2,
+#schedule-review-recipients-title,
+#schedule-review-composer-title {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 26px;
+}
+
 .rm-schedule-review__section-heading > span,
 .rm-schedule-review__recipients > p,
 .rm-schedule-review__composer-meta {
@@ -87,7 +96,10 @@
 
 .rm-schedule-review__composer-lede {
   margin-top: var(--space-xs);
-  color: var(--text-2);
+  color: oklch(0.18 0.020 255);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 25.6px;
 }
 
 .rm-schedule-review__composer-meta {

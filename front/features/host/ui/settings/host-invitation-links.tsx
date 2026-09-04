@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { HostInvitationLinkView } from "@/features/host/model/host-settings-model";
 
 export type HostInvitationCreateDraft = {
@@ -99,6 +99,7 @@ export function HostInvitationLinks({
 }: Props) {
   const [createOpen, setCreateOpen] = useState(Boolean(createDraft.name.trim()));
   const [statusFilter, setStatusFilter] = useState<InvitationPresentationStatus>("활성");
+  const createTriggerRef = useRef<HTMLButtonElement>(null);
   const presented = links.map((item) => {
     const status = invitationPresentationStatus(item, now);
     return { item, status, expiry: expiryLabel(item, now, status) };
@@ -115,13 +116,31 @@ export function HostInvitationLinks({
     onCreate();
   }
 
+  useEffect(() => {
+    if (!createOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setCreateOpen(false);
+      createTriggerRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [createOpen]);
+
   return (
     <section className="stack rm-host-editorial-ledger__panel" aria-labelledby="named-links-title">
       <div>
         <h2 id="named-links-title">초대 링크</h2>
         <p className="small muted">링크 이름은 호스트만 볼 수 있어요.</p>
       </div>
-      <button className="btn btn-primary" type="button" onClick={() => setCreateOpen((open) => !open)}>
+      <button
+        ref={createTriggerRef}
+        className="btn btn-primary"
+        type="button"
+        aria-expanded={createOpen}
+        onClick={() => setCreateOpen((open) => !open)}
+      >
         새 초대 링크
       </button>
       {createOpen ? (

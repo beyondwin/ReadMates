@@ -63,13 +63,15 @@
 }
 
 .rm-host-member-ledger__display-name,
-.rm-host-pending__name {
+.rm-host-pending__name,
+.rm-host-editorial-ledger .rm-host-member-ledger h2.rm-host-member-ledger__display-name,
+.rm-host-member-ledger h2.rm-host-member-ledger__display-name {
   margin: 0;
   flex: 0 0 auto;
   color: var(--ink-900);
-  font-size: 14px;
-  font-weight: 650;
-  line-height: 1.35;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 23.8px;
   letter-spacing: -0.01em;
   white-space: nowrap;
 }

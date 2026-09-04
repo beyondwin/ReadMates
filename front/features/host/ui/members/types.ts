@@ -9,6 +9,7 @@ export type HostMembersLinkProps = {
   to: string;
   className?: string;
   children: ReactNode;
+  onClick?: () => void;
 };
 export type HostMembersLinkComponent = ComponentType<HostMembersLinkProps>;
 

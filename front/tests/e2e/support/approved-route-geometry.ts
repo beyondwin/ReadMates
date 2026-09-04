@@ -36,6 +36,25 @@ export const HOST_SCHEDULE_REVIEW_NAV_GEOMETRY = { x: 800, y: 23, width: 235, he
 export const HOST_SCHEDULE_REVIEW_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 943 } as const;
 export const HOST_PERSON_HEADER_GEOMETRY = { x: 17, y: 58, width: 356, height: 143 } as const;
 export const HOST_PERSON_MAIN_GEOMETRY = { x: 1, y: 58, width: 388, height: 737 } as const;
+export const HOST_PERSON_ROUTE_HEADER_GEOMETRY = { x: 17, y: 59, width: 356, height: 125 } as const;
+export const HOST_PERSON_HEADING_GEOMETRY = { x: 91, y: 121, width: 72, height: 34 } as const;
+export const HOST_PERSON_TENURE_GEOMETRY = { x: 91, y: 155, width: 72, height: 20 } as const;
+export const HOST_PERSON_HISTORY_GEOMETRY = { x: 17, y: 389, width: 356, height: 217 } as const;
+export const HOST_MEETINGS_HEADING_GEOMETRY = { x: 180, y: 146, width: 693, height: 41 } as const;
+export const HOST_MEETINGS_TABS_GEOMETRY = { x: 897, y: 167, width: 130, height: 53 } as const;
+export const HOST_MEETINGS_LAYOUT_GEOMETRY = { x: 180, y: 376, width: 1176, height: 937 } as const;
+export const HOST_PEOPLE_HEADING_GEOMETRY = { x: 180, y: 129, width: 498, height: 41 } as const;
+export const HOST_PEOPLE_PENDING_GEOMETRY = { x: 180, y: 240, width: 1176, height: 311 } as const;
+export const HOST_PEOPLE_TABLE_GEOMETRY = { x: 180, y: 598, width: 871, height: 334 } as const;
+export const HOST_RECORDS_HEADING_GEOMETRY = { x: 180, y: 144, width: 1176, height: 41 } as const;
+export const HOST_RECORDS_CLOSING_GEOMETRY = { x: 1259, y: 383, width: 97, height: 38 } as const;
+export const HOST_RECORDS_TABLE_GEOMETRY = { x: 180, y: 464, width: 1176, height: 543 } as const;
+export const HOST_SETTINGS_HEADING_GEOMETRY = { x: 180, y: 124, width: 1176, height: 41 } as const;
+export const HOST_SETTINGS_INVITATION_GEOMETRY = { x: 180, y: 243, width: 591, height: 373 } as const;
+export const HOST_SETTINGS_CLUB_GEOMETRY = { x: 820, y: 242, width: 536, height: 735 } as const;
+export const HOST_SCHEDULE_REVIEW_HEADING_GEOMETRY = { x: 48, y: 171, width: 1440, height: 41 } as const;
+export const HOST_SCHEDULE_REVIEW_RECIPIENTS_GEOMETRY = { x: 48, y: 303, width: 756, height: 516 } as const;
+export const HOST_SCHEDULE_REVIEW_COMPOSER_GEOMETRY = { x: 804, y: 303, width: 684, height: 740 } as const;
 
 export const ADMIN_FIRST_ROW_DESKTOP_GEOMETRY = {
   x: ADMIN_QUEUE_DESKTOP_GEOMETRY.x,

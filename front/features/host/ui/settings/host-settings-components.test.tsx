@@ -57,6 +57,25 @@ describe("host settings presentation controls", () => {
     expect(screen.getByRole("button", { name: "링크 보기" })).toBeInTheDocument();
   });
 
+  it("closes the invitation form on Escape without creating a link and restores the trigger", async () => {
+    const onCreate = vi.fn();
+    const user = userEvent.setup();
+    render(<InvitationHarness onCreate={onCreate} />);
+
+    const trigger = screen.getByRole("button", { name: "새 초대 링크" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByLabelText("링크 이름")).toBeVisible();
+
+    trigger.focus();
+    await user.keyboard("{Escape}");
+    expect(onCreate).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("링크 이름")).not.toBeInTheDocument();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveFocus();
+  });
+
   it("emits controlled settings draft changes and save intent", async () => {
     const onDraftChange = vi.fn();
     const onSave = vi.fn();
