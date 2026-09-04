@@ -528,7 +528,7 @@ export function HostDashboardRoute({
   const liveAgendaHref = liveRows.find((row) => row.label === "진행 순서")?.href ?? null;
   const liveContent = selectedDetail ? (
     <>
-      {!compactViewport && pendingUndo ? <WorkspaceUndoBar pendingUndo={pendingUndo} /> : null}
+      {compactViewport ? null : <WorkspaceUndoBar pendingUndo={pendingUndo} />}
       <PhaseStatusLedger
         title="현장 현황"
         rows={liveRows}

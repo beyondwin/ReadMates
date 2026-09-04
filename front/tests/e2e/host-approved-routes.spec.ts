@@ -1,5 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { isSemanticDocumentOrder } from "./support/approved-mockup-contract";
+import {
+  CANONICAL_RENDERER_IMAGE,
+  isSemanticDocumentOrder,
+  resolveApprovedRendererImage,
+} from "./support/approved-mockup-contract";
 import { runActualRouteAuthority } from "./support/approved-route-harness";
 import {
   visualAuthorityScenario,
@@ -7,6 +11,11 @@ import {
   type ApprovedMockupId,
 } from "./support/approved-route-scenarios";
 import { installHostApprovedRoutes } from "./support/host-approved-route-fixtures";
+
+test.skip(
+  resolveApprovedRendererImage() !== CANONICAL_RENDERER_IMAGE,
+  `actual-route visual authority requires renderer ${CANONICAL_RENDERER_IMAGE}`,
+);
 
 const HOST_OPERATING_IDS = [
   "host-prep-desktop",
@@ -190,7 +199,7 @@ for (const id of HOST_LEDGER_IDS) {
     });
     expect(report.mask).toBeNull();
     expect(report).not.toHaveProperty("exception");
-    expect(report.results.requestAudit.effecting).toBe(0);
-    expect(report.results.requestAudit.unmatched).toBe(0);
+    expect(report.requestAudit.effecting).toBe(0);
+    expect(report.requestAudit.unmatched).toBe(0);
   });
 }

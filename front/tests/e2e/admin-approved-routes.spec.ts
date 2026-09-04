@@ -1,11 +1,20 @@
 import { expect, test } from "@playwright/test";
 import { installAdminApprovedRoutes } from "./support/admin-approved-route-fixtures";
+import {
+  CANONICAL_RENDERER_IMAGE,
+  resolveApprovedRendererImage,
+} from "./support/approved-mockup-contract";
 import { runActualRouteAuthority } from "./support/approved-route-harness";
 import { createApprovedRouteRequestAudit } from "./support/approved-route-request-audit";
 import {
   visualAuthorityScenario,
   visualAuthoritySelected,
 } from "./support/approved-route-scenarios";
+
+test.skip(
+  resolveApprovedRendererImage() !== CANONICAL_RENDERER_IMAGE,
+  `actual-route visual authority requires renderer ${CANONICAL_RENDERER_IMAGE}`,
+);
 
 async function assertQueueRowsReachable(
   page: Parameters<typeof runActualRouteAuthority>[0]["page"],

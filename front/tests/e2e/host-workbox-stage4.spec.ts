@@ -599,6 +599,9 @@ test("workbox continuation submits the opaque cursor and preserves loaded rows t
   await page.getByRole("button", { name: "다음 묶음 불러오기" }).click();
   await continuationRequest;
   const workbox = page.getByRole("region", { name: "작업함" });
+  // The first viewport caps the desktop workbox at 4 rows; the rest stay behind disclosure.
+  await expect(workbox.getByRole("listitem")).toHaveCount(4);
+  await workbox.getByRole("button", { name: "작업함 모두 보기" }).click();
   await expect(workbox.getByRole("listitem")).toHaveCount(40);
   await expect(workbox.getByRole("listitem", { name: firstTitle! })).toBeVisible();
 

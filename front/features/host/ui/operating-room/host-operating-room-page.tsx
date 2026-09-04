@@ -81,6 +81,9 @@ export function HostOperatingRoomPage({
   LinkComponent = DefaultLink,
 }: HostOperatingRoomPageProps) {
   const compactViewport = useOperatingRoomCompactViewport();
+  // The notice keeps its place in the layout even when empty, but an empty live region
+  // would announce nothing and collide with the page's real status regions.
+  const phaseNotice = phaseNormalizationReason ?? view.nextAction.note ?? "";
   if (!view.meeting || !headerLinks) {
     return (
       <main className="rm-host-operating-room rm-host-operating-room--empty">
@@ -141,10 +144,14 @@ export function HostOperatingRoomPage({
 
           <p
             className="rm-host-operating-room__phase-notice"
-            role="status"
-            aria-label={phaseNormalizationReason ? "운영 단계 이동 안내" : "필요한 상태 안내"}
+            {...(phaseNotice
+              ? {
+                role: "status",
+                "aria-label": phaseNormalizationReason ? "운영 단계 이동 안내" : "필요한 상태 안내",
+              }
+              : {})}
           >
-            {phaseNormalizationReason ?? view.nextAction.note ?? ""}
+            {phaseNotice}
           </p>
 
           {recovery?.kind === "conflict" ? (

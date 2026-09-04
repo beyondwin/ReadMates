@@ -568,7 +568,6 @@ function operatingRoomCurrent(
 export function buildHostApprovedOperatingRoomCurrent(
   selection: "OPEN" | "UPCOMING_DRAFT" | "CLOSING_REQUIRED" = "OPEN",
 ): HostOperatingRoomCurrentResponse {
-  const closing = selection === "CLOSING_REQUIRED";
   return {
     currentMeeting: {
       sessionId: HOST_APPROVED_SESSION_ID,
@@ -722,7 +721,7 @@ export function isApprovedHostPreviewPost(request: {
   if (request.method.toUpperCase() !== "POST" || request.path !== PREVIEW_NOTIFICATION_PATH) {
     return false;
   }
-  let clubSlug: string | null = null;
+  let clubSlug: string | null;
   try {
     clubSlug = new URL(request.url ?? "", "https://visual-authority.readmates.invalid").searchParams.get("clubSlug");
   } catch {
@@ -793,7 +792,19 @@ function manualNotificationOptions(): ManualNotificationOptionsResponse {
       })),
       nextCursor: null,
     },
-    recentDispatches: preview.duplicates.recentDispatches,
+    recentDispatches: preview.duplicates.recentDispatches.map((dispatch) => ({
+      ...dispatch,
+      eventId: `event-${dispatch.manualDispatchId}`,
+      source: "MANUAL" as const,
+      sessionId: HOST_APPROVED_SESSION_ID,
+      sessionNumber: session?.sessionNumber ?? 28,
+      bookTitle: session?.bookTitle ?? "지구 끝의 온실",
+      audience: preview.audience.baseGroup,
+      resend: false,
+      expectedInAppCount: dispatch.targetCount,
+      expectedEmailCount: dispatch.targetCount,
+      eventStatus: "PUBLISHED" as const,
+    })),
   };
 }
 

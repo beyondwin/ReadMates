@@ -29,6 +29,8 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Fixed
 
+- **좁은 화면 처리 기록 열람:** `/admin/audit`는 좁은 화면에서 기록을 눌러 상세로 들어가고 `목록으로`로 되돌아올 수 있습니다. 한 화면 높이에 고정하던 두 단 배치를 데스크톱 폭에서만 적용해, 좁은 화면에서 목록이 잘리거나 하단 메뉴가 기록 클릭을 가로채지 않습니다. 데스크톱 선택 주소(`?event=...`)는 그대로입니다.
+- **운영실 상태 안내 접근성:** 모임 운영실의 상태 안내 문단은 안내할 내용이 있을 때만 live region으로 알립니다. 빈 문단이 계속 상태 영역으로 노출되어 보조기술이 빈 알림을 읽거나 다른 상태 영역과 뒤섞이던 문제를 고쳤습니다.
 - **전환 authority·정적 분석 fail-closed 보강:** 실제 `GlobalSpaceTransitionController`가 accepted publication의 current-generation probe를 `useTransitionSafetyOwner`까지 필수 전달해 host/platform 권한 상실이 async await 중 발생해도 원 요청을 재실행하거나 cache·refetch·UI·receipt/copy/navigation/return-target/session-storage를 발행하지 않습니다. Mutation producer inventory는 eager top-level initializer와 anonymous default export를 추적하되 dormant function/arrow body는 실행으로 보지 않습니다. Admin primary-language 검사는 127/128 alias depth exhaustion과 injected contract filename 충돌을 명시적으로 차단하고, action 기술 정보에는 lifecycle 변환 전 값을 보존합니다.
 - **릴리즈 게이트 안정성:** 호스트 운영실 서비스·조회 fixture의 Detekt 책임 경계를 동작 변경 없이 분리했습니다. Testcontainers 전체 lane은 Java 25의 Spring/Kotlin class metadata 누적을 bounded worker·context cache와 integration 전용 heap으로 제한하고, 일반 test context에서는 tracing을 끄되 tracing 계약만 명시적으로 opt-in합니다. 알림 stale lease 회수는 `SKIP LOCKED`로 선점한 exact delivery만 갱신해 동시 claim의 deadlock을 피하고, avatar CT는 이미지 decode polling과 단일 raster 검사를 분리해 Linux renderer 부하에서도 같은 투명도 계약을 검증합니다.
 - **오늘 큐 작업 후 진행:** 잠시 미룸·처리함 성공 뒤에는 다음 케이스로 넘어가고 마지막 항목이면 큐 요약으로 포커스를 돌립니다. 화면 행동은 서버 `allowedActions`와 wire contract에 있는 의미만 사용합니다.

@@ -12,6 +12,13 @@ const visualAuthoritySmokeOnly =
 const jammyVisualRenderer =
   process.env.READMATES_VISUAL_AUTHORITY_RENDERER_IMAGE ===
   "mcr.microsoft.com/playwright:v1.61.1-jammy";
+// Actual-route authorities compare against immutable approved PNGs rendered by the pinned
+// jammy image. Any other renderer cannot produce a valid report, so the default sharded
+// E2E run must not collect them.
+const actualRouteAuthoritySpecs = [
+  "tests/e2e/admin-approved-routes.spec.ts",
+  "tests/e2e/host-approved-routes.spec.ts",
+];
 const jammyLaunchOptions = jammyVisualRenderer
   ? {
       launchOptions: {
@@ -47,6 +54,7 @@ function envAssignment(name: string, value: string | number) {
 export default defineConfig({
   testDir: ".",
   testMatch: ["tests/e2e/**/*.spec.ts"],
+  testIgnore: jammyVisualRenderer ? [] : actualRouteAuthoritySpecs,
   fullyParallel: true,
   workers,
   forbidOnly: Boolean(process.env.CI),

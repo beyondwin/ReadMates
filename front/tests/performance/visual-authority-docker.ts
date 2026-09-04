@@ -1,7 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 import {
-  APPROVED_MOCKUPS,
   approvedMockupIdsAffectedBy,
   unmappedVisualSensitivePaths,
   type ApprovedMockupId,

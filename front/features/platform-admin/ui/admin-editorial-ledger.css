@@ -1604,16 +1604,53 @@
     position: static;
   }
 
+  /* admin-processing-records.css pins the two-pane desktop audit layout to one viewport
+     height. These overrides carry the `.admin-shell:has()` prefix so they out-specify it
+     and let a compact shell scroll the document instead of clipping the record. */
+  .admin-shell:has(.admin-audit) .admin-shell__main,
+  .admin-shell:has(.admin-audit) .admin-audit,
+  .admin-shell:has(.admin-audit) .admin-page-context,
+  .admin-shell:has(.admin-audit) .admin-page-frame,
+  .admin-shell:has(.admin-audit) .admin-audit__body,
+  .admin-shell:has(.admin-audit) .admin-audit__rows,
+  .admin-shell:has(.admin-audit) .admin-audit__list,
+  .admin-shell:has(.admin-audit) .admin-audit__detail {
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .admin-shell:has(.admin-audit) .admin-page-frame {
+    grid-template-rows: auto minmax(0, auto);
+  }
+
+  .admin-shell:has(.admin-audit) .admin-audit__body {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-shell:has(.admin-audit) .admin-audit__list,
+  .admin-shell:has(.admin-audit) .admin-audit__detail {
+    border-right: 0;
+    border-left: 0;
+  }
+
   .admin-audit__body[data-detail-open="false"] .admin-audit__detail,
 .admin-audit__body[data-detail-open="true"] .admin-audit__rows {
     display: none;
   }
 
-  .admin-audit__back {
+  /* The desktop audit pane has no back control, so it is visually hidden there. A
+     compact shell shows one pane at a time and needs a real exit target. */
+  .admin-shell:has(.admin-audit) .admin-audit__back {
+    position: static;
     display: inline-flex;
+    width: auto;
     min-width: 44px;
-    min-height: 44px;
     height: auto;
+    min-height: 44px;
+    overflow: visible;
+    clip: auto;
     margin-bottom: 16px;
   }
 

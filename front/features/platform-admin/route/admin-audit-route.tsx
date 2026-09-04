@@ -12,6 +12,7 @@ import {
   adminAuditDetailOpenFromSearchParams,
   adminAuditEventFromSearchParams,
 } from "./admin-audit-data";
+import { ADMIN_SHELL_LAYOUT_MEDIA_QUERY } from "@/features/platform-admin/model/admin-route-catalog";
 import { canAdmin } from "@/features/platform-admin/model/platform-admin-capabilities";
 import {
   platformAdminAuditKeys,
@@ -25,6 +26,12 @@ import {
 import { AdminAuditLedger } from "@/features/platform-admin/ui/admin-audit-ledger";
 
 const GENERIC_ERROR = "처리 기록을 불러오지 못했습니다. 다시 시도해 주세요.";
+
+function compactAdminShellLayout(): boolean {
+  return typeof window !== "undefined"
+    && typeof window.matchMedia === "function"
+    && window.matchMedia(ADMIN_SHELL_LAYOUT_MEDIA_QUERY).matches;
+}
 
 type SensitiveSearchRequest = { requestSequence: number; sensitiveTarget: string };
 
@@ -81,8 +88,10 @@ export function AdminAuditRoute() {
   function selectEvent(item: AdminAuditLedgerItem) {
     const next = adminAuditSearchFromFilters(filters);
     if (next.get("range") === "7d") next.delete("range");
-    if (next.get("mode") === "detail") next.delete("mode");
+    next.delete("mode");
     next.set("event", item.id);
+    // A compact shell shows one pane at a time, so selecting a record must drill in.
+    if (compactAdminShellLayout()) next.set("mode", "detail");
     setSearchParams(next);
   }
 

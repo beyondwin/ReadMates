@@ -32,16 +32,16 @@ test("Today L1 uses explicit allowedActions rather than role", async ({ page }) 
   await page.goto("/admin/today?case=case-notification");
   await expectReducedMotion(page);
 
-  await expect(page.getByRole("heading", { name: "오늘 할 일" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "오늘 할 일", level: 1 })).toBeVisible();
   await expect(page.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
   await expect(page.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "확인함" })).toBeEnabled();
-  await expect(page.getByRole("button", { name: "해결 확인" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "1시간 보류" })).toHaveCount(0);
+  const actions = page.getByRole("group", { name: "작업" });
+  await expect(actions.getByRole("button")).toHaveCount(1);
+  await expect(actions.getByRole("button", { name: "다시 보내기 검토" })).toBeEnabled();
   await expect(page.locator(".admin-receipt-timeline")).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 
-  const acknowledge = page.getByRole("button", { name: "확인함" });
+  const acknowledge = actions.getByRole("button", { name: "다시 보내기 검토" });
   await acknowledge.focus();
   await expectVisibleFocus(acknowledge);
   await expectMinimumTargetSize(acknowledge);
@@ -69,22 +69,20 @@ test("Clubs list-detail-return restores focus inside /admin", async ({ page }) =
   await page.goto("/admin/clubs");
   await expectReducedMotion(page);
 
-  await expect(page.getByRole("heading", { name: "클럽", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "클럽 찾기", level: 1 })).toBeVisible();
   await expect(page.getByRole("link", { name: "Broken Club" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await expectMinimumTargetSize(page.getByRole("link", { name: "새 클럽" }));
 
   await page.getByRole("link", { name: "Broken Club" }).click();
-  await expect(page).toHaveURL(/\/admin\/clubs\/club-1/);
-  await expect(page).toHaveURL(/returnTo=/);
-  await expect(page).toHaveURL(/focusId=club-1/);
+  await expect(page).toHaveURL(/\/admin\/clubs\/club-1$/);
   await expect(page.getByRole("link", { name: "← 클럽 목록" })).toBeVisible();
 
   const backToList = page.getByRole("link", { name: "← 클럽 목록" });
   await backToList.focus();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/admin\/clubs/);
-  await expect(page.getByRole("link", { name: "Broken Club" })).toBeFocused();
+  await expect(page.locator("#admin-club-row-club-1")).toBeFocused();
 });
 
 test("Health is read-only evidence without commands", async ({ page }) => {
@@ -115,7 +113,7 @@ test("Audit URL owns the review docket", async ({ page }) => {
   await page.goto("/admin/audit");
   await expectReducedMotion(page);
 
-  await expect(page.getByRole("heading", { name: "운영 처리 기록" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "처리 기록", level: 1 })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await page.getByRole("button", { name: /지원 접근 권한을 부여했습니다/ }).click();
   await expect(page).toHaveURL(/event=platform_audit_events%3Aevent-2|event=platform_audit_events:event-2/);

@@ -263,9 +263,9 @@ test("host data is not requested before authorization completes", async ({ page 
   await installApprovedRouteCatchAllAudit(page, requestAudit);
   await installHostAuthScopeFixtures(page, requestAudit);
 
-  let releaseAuth = () => undefined;
+  let releaseAuth: () => void = () => undefined;
   const authGate = new Promise<void>((resolve) => {
-    releaseAuth = resolve;
+    releaseAuth = () => resolve();
   });
   let authCompleted = false;
   const hostBeforeAuth: string[] = [];

@@ -114,7 +114,7 @@ export type RequiredVisualAuthorityInteractionName =
   | "show-all-workbox-url"
   | "back-restores-capped-workbox"
   | "prep-retry"
-  | "attendance-undo-keyboard-reachable"
+  | "attendance-choice-keyboard-reachable"
   | "closing-destination"
   | "meeting-view-tab"
   | "meeting-status-tab"
@@ -487,7 +487,10 @@ const CLOSING_DESTINATION: VisualAuthorityInteraction = {
   restoreCanonicalState: true,
 };
 
-function hostOperatingRoomRegions(body = HOST_PREP_PHASE_PANEL_DESKTOP_GEOMETRY, workbox = HOST_OR_WORKBOX_DESKTOP_GEOMETRY) {
+function hostOperatingRoomRegions(
+  body: Geometry = HOST_PREP_PHASE_PANEL_DESKTOP_GEOMETRY,
+  workbox: Geometry = HOST_OR_WORKBOX_DESKTOP_GEOMETRY,
+) {
   return [
     HOST_HEADER,
     {
