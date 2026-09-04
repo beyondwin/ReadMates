@@ -67,7 +67,10 @@ describe("actual-route visual authority scenarios", () => {
   });
 
   it("selects all ids by default and only named ids when filtered", () => {
-    expect(visualAuthoritySelected("admin-today-desktop", "")).toBe(true);
+    expect(visualAuthoritySelected("admin-today-desktop")).toBe(true);
+    expect(visualAuthoritySelected("admin-today-desktop", undefined)).toBe(true);
+    expect(visualAuthoritySelected("admin-today-desktop", "")).toBe(false);
+    expect(visualAuthoritySelected("admin-today-desktop", "  \n")).toBe(false);
     expect(visualAuthoritySelected(
       "admin-today-desktop",
       "host-prep-mobile,admin-today-desktop",
@@ -90,6 +93,10 @@ describe("actual-route visual authority scenarios", () => {
     expect(() => parseVisualAuthoritySelection("admin-today-desktop,admin-today-desktop"))
       .toThrow(/duplicate/i);
     expect(parseVisualAuthoritySelection(undefined).size).toBe(18);
+    expect(parseVisualAuthoritySelection("").size).toBe(0);
+    expect(parseVisualAuthoritySelection(" \n\t ")).toEqual(new Set());
+    expect([...parseVisualAuthoritySelection(" admin-today-desktop ")]).toEqual(["admin-today-desktop"]);
+    expect(() => parseVisualAuthoritySelection("admin-today-desktop, host-prep-mobile")).toThrow(/blank/i);
     expect(visualAuthorityScenario("admin-today-desktop").id).toBe("admin-today-desktop");
   });
 

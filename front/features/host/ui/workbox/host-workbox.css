@@ -197,6 +197,7 @@
 .rm-host-work-item__row {
   display: grid;
   gap: var(--space-xs);
+  width: 100%;
   min-width: 0;
 }
 
@@ -218,12 +219,13 @@
 
 .rm-host-work-item__destination {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(72px, 1fr) auto;
   grid-template-areas:
     "label meta"
     "title meta";
   align-items: center;
   column-gap: var(--space-sm);
+  width: 100%;
   min-height: 44px;
   min-width: 0;
   color: var(--text);
@@ -244,8 +246,34 @@
 .rm-host-work-item__destination strong,
 .rm-host-work-item__title {
   grid-area: title;
-  min-width: 0;
+  display: block;
+  justify-self: stretch;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 72px;
   overflow-wrap: anywhere;
+}
+
+@media (min-width: 320px) {
+  .rm-host-work-item__destination {
+    grid-template-columns: minmax(120px, 1fr) auto;
+  }
+
+  .rm-host-work-item__destination strong,
+  .rm-host-work-item__title {
+    min-width: 120px;
+  }
+}
+
+@media (min-width: 390px) {
+  .rm-host-work-item__destination {
+    grid-template-columns: minmax(192px, 1fr) auto;
+  }
+
+  .rm-host-work-item__destination strong,
+  .rm-host-work-item__title {
+    min-width: 192px;
+  }
 }
 
 .rm-host-work-item__meta {

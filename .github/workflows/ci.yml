@@ -352,11 +352,7 @@ jobs:
           mkdir -p .tmp
           git diff --name-only "$base_sha" HEAD > .tmp/visual-authority-changed-paths.txt
           ids="$(pnpm --dir front --silent visual-authority:affected -- --changed-paths-file .tmp/visual-authority-changed-paths.txt)"
-          {
-            echo "READMATES_VISUAL_AUTHORITY_IDS<<EOF"
-            printf '%s\n' "$ids"
-            echo "EOF"
-          } >> "$GITHUB_ENV"
+          printf 'READMATES_VISUAL_AUTHORITY_IDS=%s\n' "$ids" >> "$GITHUB_ENV"
 
       - name: Run affected actual-route visual authorities
         if: env.READMATES_VISUAL_AUTHORITY_IDS != ''

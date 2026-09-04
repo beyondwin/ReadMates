@@ -421,19 +421,32 @@ export function HostDashboardRoute({
         return;
       }
       const writeState = meetingDayAttendanceWriteStateFromError(error);
-      await publishTransitionAction(handle, "errorCopy", () => setAttendanceWriteState(expectedSessionId, membershipIds, writeState));
+      const currentDetail = detailQuery.data ?? null;
+      await publishTransitionAction(handle, "errorCopy", () => {
+        setAttendanceWriteState(expectedSessionId, membershipIds, writeState);
+        if (writeState === "conflict") {
+          setAttendanceConflict({
+            ...attempt,
+            canonicalLabel: attendanceAttemptCanonicalLabel(currentDetail, membershipIds),
+          });
+        }
+      });
       if (writeState === "conflict") {
         const refreshed = await refreshExactDetail(expectedSessionId);
         if (currentSessionIdRef.current !== expectedSessionId) return;
-        await publishTransitionAction(handle, "errorCopy", () => {
-          setAttendanceConflict({
-            ...attempt,
-            canonicalLabel: attendanceAttemptCanonicalLabel(refreshed, membershipIds),
+        try {
+          await publishTransitionAction(handle, "errorCopy", () => {
+            setAttendanceConflict({
+              ...attempt,
+              canonicalLabel: attendanceAttemptCanonicalLabel(refreshed, membershipIds),
+            });
           });
-        });
+        } catch (publicationError) {
+          if (!(publicationError instanceof TransitionOwnerObsoleteError)) throw publicationError;
+        }
       }
     }
-  }, [attendanceMutation, context, queryClient, refreshExactDetail, sessionId, setAttendanceWriteState, transitionOwner]);
+  }, [attendanceMutation, context, detailQuery, queryClient, refreshExactDetail, sessionId, setAttendanceWriteState, transitionOwner]);
 
   const reconcileUnknownAttendance = useCallback(async () => {
     const attempt = activeAttendanceUnknown;

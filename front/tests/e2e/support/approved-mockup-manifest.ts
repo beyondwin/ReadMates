@@ -74,9 +74,13 @@ const UNIVERSAL_DEPENDENCY_PATHS = [
   "front/tests/e2e/support/approved-route-request-audit.ts",
   "front/tests/e2e/support/approved-route-geometry.ts",
   "front/tests/performance/visual-authority-docker.ts",
+  "front/tests/performance/visual-authority-docker.test.ts",
   "front/scripts/run-visual-authority-docker.ts",
   "front/scripts/list-affected-visual-authorities.ts",
   "front/tests/e2e/approved-route-stress.spec.ts",
+  "front/tests/e2e/support/approved-route-scenarios.test.ts",
+  "front/tests/e2e/support/approved-route-request-audit.test.ts",
+  "front/tests/unit/approved-mockup-contract.test.ts",
 ] as const;
 
 const ADMIN_SHARED_DEPENDENCIES = [
@@ -432,6 +436,8 @@ function isVisualSensitivePath(path: string): boolean {
   if (normalized === "front/tests/e2e/host-approved-routes.spec.ts") return true;
   if (normalized.startsWith("front/tests/e2e/approved-route-")) return true;
   if (normalized === "front/tests/performance/visual-authority-docker.ts") return true;
+  if (normalized === "front/tests/performance/visual-authority-docker.test.ts") return true;
+  if (normalized === "front/tests/unit/approved-mockup-contract.test.ts") return true;
   if (normalized === "front/scripts/run-visual-authority-docker.ts") return true;
   if (normalized === "front/scripts/list-affected-visual-authorities.ts") return true;
   return false;
@@ -451,6 +457,7 @@ function idsForRolePartition(path: string): ApprovedMockupId[] {
     || path === "front/src/app/routes/admin.tsx"
     || path === "front/tests/e2e/admin-approved-routes.spec.ts"
     || path === "front/tests/e2e/support/admin-approved-route-fixtures.ts"
+    || path === "front/tests/e2e/support/admin-approved-route-fixtures.test.ts"
   ) {
     return [...ADMIN_IDS];
   }
@@ -460,6 +467,7 @@ function idsForRolePartition(path: string): ApprovedMockupId[] {
     || pathMatchesPrefix(path, "front/src/app/host-routes")
     || path === "front/tests/e2e/host-approved-routes.spec.ts"
     || path === "front/tests/e2e/support/host-approved-route-fixtures.ts"
+    || path === "front/tests/e2e/support/host-approved-route-fixtures.test.ts"
   ) {
     return [...HOST_IDS];
   }

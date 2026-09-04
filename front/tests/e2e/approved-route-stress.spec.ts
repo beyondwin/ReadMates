@@ -49,6 +49,40 @@ async function assertNoHorizontalOverflow(page: Page): Promise<void> {
   expect(overflow, "horizontal overflow").toBeLessThanOrEqual(MAX_OVERFLOW_PX);
 }
 
+async function assertRowsNotClipped(rows: Locator, list?: Locator): Promise<void> {
+  const clipped = await rows.evaluateAll((nodes) => nodes.map((node) => {
+    let ancestor = node.parentElement;
+    while (ancestor) {
+      const style = getComputedStyle(ancestor);
+      const clips = style.overflowY === "hidden" || style.overflowY === "clip";
+      if (clips) {
+        const row = node.getBoundingClientRect();
+        const box = ancestor.getBoundingClientRect();
+        const unreachable = row.bottom - box.bottom > 1 || box.top - row.top > 1;
+        const hiddenOverflow = ancestor.scrollHeight - ancestor.clientHeight > 1
+          && style.overflowY !== "auto"
+          && style.overflowY !== "scroll";
+        if (unreachable || hiddenOverflow) return true;
+      }
+      ancestor = ancestor.parentElement;
+    }
+    return false;
+  }));
+  expect(clipped.every((item) => item === false), "rows are clipped by overflow:hidden").toBe(true);
+  if (!list) return;
+  const listOverflow = await list.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return {
+      overflowY: style.overflowY,
+      hiddenByScroll: node.scrollHeight - node.clientHeight > 1,
+    };
+  });
+  expect(["visible", "clip"]).toContain(listOverflow.overflowY);
+  if (listOverflow.overflowY !== "visible") {
+    expect(listOverflow.hiddenByScroll, "capped rows are inside a clipping list").toBe(false);
+  }
+}
+
 async function assertMinWidth(locator: Locator, minWidth: number): Promise<void> {
   await expect.poll(async () => locator.evaluate((node) => {
     const rect = node.getBoundingClientRect();
@@ -139,16 +173,22 @@ async function assertAdminGeometry(
     return;
   }
   const title = page.locator(".admin-operations-queue__title").first();
-  const row = page.locator(".admin-operations-queue__row").first();
+  const rows = page.locator(".admin-operations-queue__row");
+  const row = rows.first();
   await expect(title).toBeVisible();
   await assertNoHorizontalOverflow(page);
   await assertMinWidth(title, titleMinWidth(width));
   await assertBoundedHeight(row);
-  const primary = options.disclosure
-    ? page.getByRole("button", { name: /전체 .*보기/ })
-    : row;
-  await expect(primary).toBeVisible();
-  await assertKeyboardReachable(page, primary);
+  if (options.disclosure) {
+    await expect(rows).toHaveCount(3);
+    const disclosure = page.getByRole("button", { name: /전체 .*보기/ });
+    await expect(disclosure).toBeVisible();
+    await assertRowsNotClipped(rows, page.locator(".admin-operations-queue__list"));
+    await assertKeyboardReachable(page, disclosure);
+  } else {
+    await expect(row).toBeVisible();
+    await assertKeyboardReachable(page, row);
+  }
   await assertSafeArea(page, width, page.locator(".admin-mobile-navigation"));
 }
 
@@ -188,17 +228,25 @@ async function assertHostGeometry(
     await assertSafeArea(page, width, page.locator('[data-club-shell-region="mobile-primary"] .m-tabbar'));
     return;
   }
-  const title = page.locator(".rm-host-workbox__items .rm-host-work-item__destination").first();
-  const row = page.locator(".rm-host-workbox__items .rm-host-work-item").first();
+  const title = page.locator(".rm-host-workbox__items .rm-host-work-item__title").first();
+  const rows = page.locator(".rm-host-workbox__items .rm-host-work-item");
+  const row = rows.first();
   await expect(title).toBeVisible();
   await assertNoHorizontalOverflow(page);
   await assertMinWidth(title, titleMinWidth(width));
   await assertBoundedHeight(row);
-  const primary = options.disclosure
-    ? page.getByRole("button", { name: "작업함 모두 보기" })
-    : page.locator(".rm-operating-room-next-action__primary").first();
-  await expect(primary).toBeVisible();
-  await assertKeyboardReachable(page, primary);
+  if (options.disclosure) {
+    const cap = width <= 767 ? 3 : 4;
+    await expect(rows).toHaveCount(cap);
+    const disclosure = page.getByRole("button", { name: "작업함 모두 보기" });
+    await expect(disclosure).toBeVisible();
+    await assertRowsNotClipped(rows, page.locator(".rm-host-workbox__items"));
+    await assertKeyboardReachable(page, disclosure);
+  } else {
+    const primary = page.locator(".rm-operating-room-next-action__primary").first();
+    await expect(primary).toBeVisible();
+    await assertKeyboardReachable(page, primary);
+  }
   await assertSafeArea(page, width, page.locator('[data-club-shell-region="mobile-primary"] .m-tabbar'));
 }
 
@@ -259,7 +307,12 @@ test.describe("approved-route stress", () => {
       "/admin/today?case=case-notification&mode=detail",
     );
     await expect(page.getByText("최신 상태가 아닙니다. 다시 확인한 뒤 작업을 이어가세요.")).toBeVisible();
+    const back = page.getByRole("button", { name: "목록으로" });
+    await expect(back).toBeVisible();
     await assertNoHorizontalOverflow(page);
+    const detailTitle = page.getByRole("heading", { name: "! 알림 전달 지연" }).first();
+    await assertMinWidth(detailTitle, titleMinWidth(390));
+    await assertKeyboardReachable(page, back);
     await assertSafeArea(page, 390, page.locator(".admin-mobile-navigation"));
   });
 
@@ -342,25 +395,31 @@ test.describe("approved-route stress", () => {
     await expect(choice).toBeVisible();
     await choice.click();
     const recovery = page.getByRole("alert", { name: "출석 변경 충돌" });
-    const rowConflict = page.getByRole("alert").filter({ hasText: "최신 출석 상태와 충돌했습니다" });
-    await expect(recovery.or(rowConflict)).toBeVisible({ timeout: 10_000 });
-    await assertNoHorizontalOverflow(page);
-    await assertSafeArea(page, 390, page.locator('[data-club-shell-region="mobile-primary"] .m-tabbar'));
+    await expect(recovery).toBeVisible({ timeout: 10_000 });
+    await expect(recovery.getByRole("button", { name: "내 선택으로 다시 저장" })).toBeVisible();
+    await assertHostGeometry(page, 390, { workboxItems: 4, disclosure: hostDisclosure(4, 390) });
+    await assertKeyboardReachable(page, recovery.getByRole("button", { name: "내 선택으로 다시 저장" }));
   });
 
   test("Host live unknown outcome at 1440", async ({ page }) => {
-    await openHost(page, 390, HOST_LIVE, {
+    await openHost(page, 1440, HOST_LIVE, {
       workboxItems: 4,
       liveMutation: "unknown" as HostApprovedLiveMutation,
     });
+    await expect(page.locator(".rm-host-operating-room")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("region", { name: "현장 현황" })).toBeVisible();
+    await assertHostGeometry(page, 1440, { workboxItems: 4, disclosure: false });
+    await page.setViewportSize({ width: 390, height: HOST_MOBILE_HEIGHT });
     const choice = page.getByRole("button", { name: "김하늘 불참" });
     await expect(choice).toBeVisible();
     await choice.click();
-    await expect(page.getByRole("status", { name: "출석 변경 결과 확인" })).toBeVisible();
     await page.setViewportSize({ width: 1440, height: HOST_DESKTOP_HEIGHT });
-    await expect(page.getByRole("status", { name: "출석 변경 결과 확인" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "최신 출석 확인" })).toBeVisible();
+    const unknown = page.getByRole("status", { name: "출석 변경 결과 확인" });
+    await expect(unknown).toBeVisible({ timeout: 10_000 });
+    const reconcile = page.getByRole("button", { name: "최신 출석 확인" });
+    await expect(reconcile).toBeVisible();
     await assertNoHorizontalOverflow(page);
+    await assertKeyboardReachable(page, reconcile);
   });
 });
 

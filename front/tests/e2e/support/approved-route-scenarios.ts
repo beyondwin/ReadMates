@@ -1571,10 +1571,14 @@ const APPROVED_ID_SET = new Set(APPROVED_MOCKUPS.map((entry) => entry.id));
 export function parseVisualAuthoritySelection(
   rawSelection = process.env.READMATES_VISUAL_AUTHORITY_IDS,
 ): ReadonlySet<ApprovedMockupId> {
-  if (rawSelection == null || rawSelection.trim() === "") {
+  if (rawSelection == null) {
     return new Set(APPROVED_MOCKUPS.map((entry) => entry.id));
   }
-  const members = rawSelection.split(",");
+  const trimmed = rawSelection.trim();
+  if (trimmed === "") {
+    return new Set();
+  }
+  const members = trimmed.split(",");
   const selected = new Set<ApprovedMockupId>();
   for (const member of members) {
     if (member.trim() === "" || member !== member.trim()) {

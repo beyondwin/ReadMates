@@ -279,6 +279,10 @@ describe("visual authority invalidation", () => {
   it("treats a non-empty selection as at least one test and rejects malformed filters", () => {
     const selected = parseVisualAuthoritySelection("admin-today-desktop,host-prep-mobile");
     expect(selected.size).toBeGreaterThan(0);
+    expect(parseVisualAuthoritySelection("").size).toBe(0);
+    expect(parseVisualAuthoritySelection(" \n ")).toEqual(new Set());
+    expect([...parseVisualAuthoritySelection(" host-prep-mobile ")]).toEqual(["host-prep-mobile"]);
+    expect(() => parseVisualAuthoritySelection("admin-today-desktop, host-prep-mobile")).toThrow(/blank/i);
     expect(() => parseVisualAuthoritySelection("not-an-id")).toThrow(/Unknown visual authority id/);
     expect(() => parseVisualAuthoritySelection("admin-today-desktop,admin-today-desktop")).toThrow(/duplicate/i);
   });

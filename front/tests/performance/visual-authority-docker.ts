@@ -49,8 +49,7 @@ function lastCount(output: string, label: string): number {
 export function assertPlaywrightRunExecutedMatchingTests(output: string): void {
   const passed = lastCount(output, "passed");
   const failed = lastCount(output, "failed");
-  const skipped = lastCount(output, "skipped");
-  if (skipped > 0 && passed + failed === 0) {
+  if (passed + failed === 0) {
     throw new Error("Non-empty visual authority selection executed no matching tests");
   }
 }
