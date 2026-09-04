@@ -4,7 +4,9 @@
 승인된 Admin `01`–`07`·Host `07`–`17` PNG가 page composition의 시각 권위다.
 code-native UI는 편집·runtime source다. tracked CT snapshot은 보조 회귀 cache이며 snapshot 갱신만으로 합격하지 않는다.
 token, shared CSS/component, fixture 변경은 영향 reference 증거를 무효화한다.
-Host 첫 화면 독립 시각 검토는 `docs/reports/2026-09-02-host-approved-first-viewport-acceptance.md` 기준 11/11 PASS-with-font-raster다. 픽셀 비율 0.02는 측정값으로 유지하고, 사람 30초 gate는 `pending_external_human_evidence`다. ADR-0053은 `Proposed`이며 픽셀 수락 완료가 아니다. Public, guest, member composition은 이 문서로 바꾸지 않는다.
+**실제 authenticated route가 18개 reference 전부의 최종 시각 권위다.** Component fixture와 tracked CT snapshot은 보조 회귀 근거일 뿐 최종 승인 receipt를 만들지 않는다. 전체 capture에 적용하던 broad font-raster 예외(0.10/0.15)는 제거했고 gate는 18/18 `maxDiffPixelRatio` 0.02 fail-closed다. mask는 없다.
+
+현재 시각 권위 기록은 `docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md`다. 그 기록에서 composition·geometry·typography·first viewport·interaction·request audit는 18/18 통과했고, strict pixel은 18/18 `not_passed_0.02`다. 사람 30초 gate는 `pending_external_human_evidence`, Chrome 200%·VoiceOver/Safari·NVDA/Chrome은 `not_measured`, 원격 CI는 `pending_remote_ci`다. ADR-0053은 `Proposed`이며 픽셀 수락 완료가 아니다. Public, guest, member composition은 이 문서로 바꾸지 않는다.
 
 - ADR-0044: Superseded by ADR-0046 (단일 주 행동 계산 규칙은 운영실에 계승)
 - ADR-0045: Accepted — host/admin 공유 paper/ink primitive
@@ -14,7 +16,7 @@ Host 첫 화면 독립 시각 검토는 `docs/reports/2026-09-02-host-approved-f
 - ADR-0049: Accepted — 독립 schedule-seen revision과 명시적 검토·발송 흐름의 현재 권위
 - ADR-0050: Accepted — 오늘 할 일 중심 운영 데스크 + 클럽 관리·서비스 상태·처리 기록 4축
 - ADR-0051: Accepted — 플랫폼 운영·내 클럽 two-level 전역 공간 전환
-- ADR-0053: Proposed — 승인 PNG를 Admin·Host 픽셀 근접 합격 기준으로 사용. Host 첫 화면 독립 시각 검토 11/11 PASS-with-font-raster(`docs/reports/2026-09-02-host-approved-first-viewport-acceptance.md`). 픽셀 비율 0.02는 측정 FAIL. Admin 잔여 FAIL과 사람 30초 gate `pending_external_human_evidence`가 남아 픽셀 수락 완료가 아니다.
+- ADR-0053: Proposed — 승인 PNG를 page composition 권위로, 실제 authenticated route를 최종 실행 권위로 사용. 18/18 composition·geometry·typography·first viewport·interaction 통과, strict pixel 18/18 `not_passed_0.02`(`docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md`). 사람 30초 gate `pending_external_human_evidence`, 보조기술 `not_measured`, 원격 CI `pending_remote_ci`가 남아 픽셀 수락 완료가 아니다.
 - Token source: `design/system/src/styles/tokens.css`
 - Viewport contract: `front/tests/e2e/support/visual-authority-contract.ts`
 - Approved mockup manifest: `front/tests/e2e/support/approved-mockup-manifest.ts`
@@ -143,7 +145,7 @@ Contract widths: 320, 390, 768, 900, 1024, 1440px. keyboard, visible focus, 44px
 
 Host lifecycle의 code-native source는 `front/features/host/ui/operating-room/host-operating-room-responsive.ct.tsx`, `front/features/host/ui/meeting-workspace/host-lifecycle-responsive.ct.tsx`, `front/features/host/ui/shell/host-shell.ct.tsx`다. Real-route continuity와 recovery widths는 `front/tests/e2e/host-lifecycle-route-continuity.spec.ts`, `front/tests/e2e/host-authority-loss.spec.ts`, `front/tests/e2e/host-workbox-stage4.spec.ts`가 맡는다. semantic/geometry/DOM 계약은 이 code-native tests가 잠근다. 승인 PNG를 runtime 배경으로 쓰지 않으며 tracked snapshot은 보조 회귀 cache다.
 
-Admin·Host 승인 PNG 비교는 `front/tests/e2e/support/approved-mockup-manifest.ts`와 `pnpm --dir front test:ct:approved`가 담당한다. token, shared CSS/component, fixture 변경은 영향 id의 기존 승인을 무효화하고 approved reference·candidate·overlay·diff·measurement와 독립 검토가 다시 필요하다. Host 첫 화면 독립 시각 검토는 `docs/reports/2026-09-02-host-approved-first-viewport-acceptance.md`의 11/11 PASS-with-font-raster다. 픽셀 비율 0.02와 사람 30초 gate는 남아 픽셀 수락 완료가 아니다. Admin 잔여 실패는 `docs/reports/2026-09-02-admin-host-pixel-fidelity-acceptance.md`를 따른다. ADR-0053은 `Proposed`다.
+Admin·Host 승인 PNG 비교는 `front/tests/e2e/support/approved-mockup-manifest.ts`와 실제 authenticated route를 candidate로 쓰는 `pnpm --dir front test:e2e:approved-routes:docker`가 담당한다. `pnpm --dir front test:ct:docker`는 보조 component 회귀 suite이며 승인 receipt를 만들지 않는다. token, shared CSS/component, fixture 변경은 `pnpm --dir front visual-authority:affected`가 계산한 영향 id의 기존 승인을 무효화하고 approved reference·candidate·overlay·diff·measurement report와 독립 검토가 다시 필요하다. 현재 결과는 `docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md`를 따른다: composition·geometry·typography·first viewport·interaction·request audit 18/18 통과, strict pixel 18/18 `not_passed_0.02`. 2026-09-02 두 보고서는 component fixture 기반 역사적 기록이다. ADR-0053은 `Proposed`다.
 
 Admin tracked screenshots는 대표 상태의 보조 cache다. 1024px는 viewport contract와 browser smoke에 있고, Admin 시각 권위 PNG는 `design/mockups/2026-08-30-admin-operations-redesign/` `01`–`07`이다.
 

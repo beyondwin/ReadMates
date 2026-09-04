@@ -1,5 +1,7 @@
 # Host Approved First-Viewport Acceptance
 
+> **역사적 기록.** 이 보고서의 11/11 `PASS-with-font-raster`는 test-only shell과 component fixture 첫 화면 검토 결과이며 실제 authenticated route 대표성이 없다. 현재 시각 권위 기록은 [`2026-09-04-admin-host-actual-route-visual-authority-acceptance.md`](2026-09-04-admin-host-actual-route-visual-authority-acceptance.md)다. 아래 `test:ct:approved`, `allowFontRasterException`, `skipMismatchRatioAssertion` 언급은 모두 역사적 서술이다. 해당 예외 API와 package script는 제거됐고 현재 gate는 18/18 `0.02` fail-closed다. 아래 내용은 당시 결과를 보존하기 위해 수정하지 않는다.
+
 작성일: 2026-09-03. 이 문서는 Task 10 자동화·독립 시각 검토 snapshot이다. 전체 수락이 아니다. ADR-0053은 `Proposed`로 남는다. 첫 화면 독립 시각 검토는 11/11 PASS-with-font-raster다. 사람 30초 5인 gate는 아직 `pending_external_human_evidence`다.
 
 ## Source binding

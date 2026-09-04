@@ -6,13 +6,13 @@
 - 작성자: product/design/front
 - 관련: ADR-0045, ADR-0048, ADR-0050, ADR-0051, `docs/superpowers/specs/2026-09-02-admin-host-pixel-fidelity-design.md`, `docs/superpowers/specs/2026-09-02-host-approved-first-viewport-design.md`, `docs/superpowers/specs/2026-09-04-admin-host-actual-route-visual-authority-convergence-design.md`, `front/DESIGN.md`
 
-> 제품 구성은 ADR-0048·0050을 유지한다. 승인 PNG를 page composition 권위로, 실제 authenticated route를 최종 실행 권위로 사용한다. Component fixture와 tracked snapshot은 보조 회귀 근거일 뿐 최종 수락을 대신하지 않는다. 실제 route strict gate, Admin 잔여 시각 실패, 사람 30초 gate와 수동 보조기술 검증이 남아 `Proposed`다.
+> 제품 구성은 ADR-0048·0050을 유지한다. 승인 PNG를 page composition 권위로, 실제 authenticated route를 최종 실행 권위로 사용한다. Component fixture와 tracked snapshot은 보조 회귀 근거일 뿐 최종 수락을 대신하지 않는다. Composition·geometry·typography·first viewport·interaction은 18/18 통과했지만 strict pixel 18/18 `not_passed_0.02`, lint·CT·cross-browser·focused E2E 실패, 사람 30초 gate, 수동 보조기술 검증, 원격 CI가 남아 `Proposed`다.
 
 ## 컨텍스트
 
 ADR-0048은 Host를 현재 모임 생애주기 운영실+작업함으로, ADR-0050은 Admin을 오늘 할 일 중심 운영 데스크로 고정했다. 기능, 권한, 회복성, responsive geometry 검증은 폭넓게 구현됐지만 현재 화면은 승인 시안의 정보 위계와 밀도에서 벗어났다.
 
-현재 18개 authority capture는 모두 strict mismatch ratio 0.02를 초과한다. 보고된 PASS는 desktop/Admin 0.10, Host mobile 0.15까지 허용하는 `allowFontRasterException`에 의존한다. 이 예외는 glyph raster뿐 아니라 spacing, 배경, control geometry 차이까지 전체 이미지 비율로 흡수할 수 있어 픽셀 근접 수락의 의미를 보장하지 못한다.
+이 결정 시점에 18개 authority capture는 모두 strict mismatch ratio 0.02를 초과했고, 보고된 PASS는 desktop/Admin 0.10, Host mobile 0.15까지 허용하는 당시의 `allowFontRasterException`에 의존했다(이 예외 API는 이후 제거됐다. §검증 참고). 이 예외는 glyph raster뿐 아니라 spacing, 배경, control geometry 차이까지 전체 이미지 비율로 흡수할 수 있어 픽셀 근접 수락의 의미를 보장하지 못한다.
 
 Host 비교는 실제 authenticated route가 아니라 `HostApprovedShell`과 정돈된 component fixture를 최종 candidate로 사용한다. 반대로 실제 route에는 단계 보정, partial failure, 12건 작업함 같은 runtime 상태가 함께 나타나 첫 화면 구성과 노출량이 승인 시안에서 벗어난다. Admin mobile 실제 route는 locator가 추가된 queue DOM과 이를 반영하지 않은 fixture/grid 계약이 갈라져 제목 열이 한 글자 너비로 붕괴한다.
 
@@ -65,7 +65,27 @@ Token, shared CSS/component, fixture, route 또는 baseline 변경은 영향 ref
 
 ## 검증
 
-`Proposed`를 유지한다. 비교 harness와 18-entry manifest는 구현됐지만 모든 authority capture가 0.02를 초과하고 broad font-raster exception으로만 통과한다. Host 11장은 test-only shell/fixture 첫 화면 검토에서 PASS-with-font-raster를 받았지만 실제 route 대표성이 없고, Admin 5장은 수동 시각 실패가 남아 있다. 사람 30초 gate는 `pending_external_human_evidence`, VoiceOver/Safari와 NVDA/Chrome은 `not measured`다. 이 조건이 닫히기 전에는 `Accepted`로 올리지 않는다.
+`Proposed`를 유지한다.
+
+2026-09-04 실제 authenticated route 수렴 이후의 측정 상태는 `docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md`에 있다. 진전된 부분:
+
+- 18개 `VisualAuthorityScenario`가 실제 authenticated route를 candidate로 소유한다. Test-only shell을 최종 candidate로 쓰지 않는다.
+- Broad font-raster exception API(`allowFontRasterException`, `fontRasterExceptionMaxRatio`, `skipMismatchRatioAssertion`)는 코드에서 제거됐고 unit 검사가 재도입을 막는다. 18/18이 `0.02` fail-closed이며 mask는 18/18 `null`이다.
+- Composition, major region 4px, repeated alignment 2px, typography, first viewport, item cap, interaction, request audit가 18/18 통과했다. 가로 overflow는 18/18 0px이고 unmatched·effecting 요청은 0건이다.
+- 18/18 산출물(reference/candidate/overlay/diff/report.json)이 완전하고 `referenceSha256`는 manifest와 18/18 일치한다.
+- `approvedMockupsAffectedBy(changedPaths)`가 CI의 실제 diff와 연결돼 영향 승인을 만료시킨다.
+
+닫히지 않은 조건:
+
+- Strict pixel은 18/18 `not_passed_0.02`다. 승인 AI PNG 대비 raster 잔여가 남는다.
+- `pnpm --dir front lint`가 error 4건으로 실패한다(제품 route 파일의 `react-hooks/refs` 포함).
+- `pnpm --dir front test:ct:docker`가 18건 실패한다. 보조 회귀 suite의 geometry·semantic·tracked snapshot이 새 composition과 어긋난다.
+- Cross-browser smoke 9건과 focused E2E 7건(+2 did not run)이 실패한다. 기존 Admin heading 계약과 Host 작업함 기대치가 새 밀도·disclosure 계약으로 갱신되지 않았다.
+- 사람 30초 discovery gate는 `pending_external_human_evidence`다.
+- Chrome toolbar 200% 실측과 VoiceOver/Safari, NVDA/Chrome은 `not_measured`다.
+- 원격 CI는 `pending_remote_ci`다. 로컬 parity로 CI 성공을 추정하지 않는다.
+
+이 조건이 모두 닫히기 전에는 `Accepted`로 올리지 않는다. 자동화 테스트나 AI 검토를 사람·보조기술·원격 CI 증거로 대신 쓰지 않는다.
 
 `docs/superpowers/specs/2026-09-04-admin-host-actual-route-visual-authority-convergence-design.md`가 이후 수렴 작업의 current approved design이다. 이전 Host 슬라이스의 test-only fixture 합격은 역사적 근거로 보존하지만 전체 또는 실제 route 수락으로 사용하지 않는다.
 
