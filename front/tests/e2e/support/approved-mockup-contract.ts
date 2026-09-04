@@ -20,13 +20,7 @@ export type ApprovedComparisonInput = {
   entry: ApprovedMockupEntry;
   candidate: Locator;
   regions: readonly ApprovedRegion[];
-  allowFontRasterException?: boolean;
-  fontRasterExceptionMaxRatio?: number;
-  skipMismatchRatioAssertion?: boolean;
 };
-
-export const FONT_RASTER_EXCEPTION_MAX_RATIO = 0.10;
-export const HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO = 0.15;
 
 export type ApprovedComparisonReport = {
   id: string;
@@ -61,23 +55,11 @@ export function assertApprovedMismatchRatio(input: {
   id: string;
   mismatchPixelRatio: number;
   maxDiffPixelRatio: number;
-  allowFontRasterException?: boolean;
-  fontRasterExceptionMaxRatio?: number;
-  skipMismatchRatioAssertion?: boolean;
 }): void {
-  if (input.skipMismatchRatioAssertion === true) return;
   if (input.mismatchPixelRatio <= input.maxDiffPixelRatio) return;
-  const exceptionCeiling = input.fontRasterExceptionMaxRatio ?? FONT_RASTER_EXCEPTION_MAX_RATIO;
-  if (
-    input.allowFontRasterException === true
-    && input.mismatchPixelRatio <= exceptionCeiling
-  ) {
-    return;
-  }
-  const ceiling = input.allowFontRasterException === true
-    ? exceptionCeiling
-    : input.maxDiffPixelRatio;
-  throw new Error(`${input.id} mismatch ratio ${input.mismatchPixelRatio} exceeds ${ceiling}`);
+  throw new Error(
+    `${input.id} mismatch ratio ${input.mismatchPixelRatio} exceeds ${input.maxDiffPixelRatio}`,
+  );
 }
 
 export function expectGeometryWithinTolerance(
@@ -244,9 +226,6 @@ export async function captureApprovedComparison(input: ApprovedComparisonInput):
     id: entry.id,
     mismatchPixelRatio: report.mismatchPixelRatio,
     maxDiffPixelRatio: entry.maxDiffPixelRatio,
-    allowFontRasterException: input.allowFontRasterException,
-    fontRasterExceptionMaxRatio: input.fontRasterExceptionMaxRatio,
-    skipMismatchRatioAssertion: input.skipMismatchRatioAssertion,
   });
   return report;
 }

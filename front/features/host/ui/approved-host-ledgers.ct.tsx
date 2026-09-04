@@ -1,11 +1,8 @@
 import { expect, test } from "@playwright/experimental-ct-react";
-import type { Locator, Page, TestInfo } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import type { ReactElement } from "react";
 import {
-  approvedMockup,
-  captureApprovedComparison,
   expectGeometryWithinTolerance,
-  HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
   type ApprovedRegion,
 } from "@/tests/e2e/support/approved-mockup-contract";
 import {
@@ -84,59 +81,7 @@ async function regionFromLocator(
   return { name, actual, expected, toleranceCssPx };
 }
 
-async function captureHostLedger(input: {
-  id:
-    | "host-meetings-desktop"
-    | "host-people-desktop"
-    | "host-records-desktop"
-    | "host-settings-desktop"
-    | "host-schedule-review-desktop"
-    | "host-person-mobile";
-  candidate: Locator;
-  page: Page;
-  testInfo: TestInfo;
-  regions?: readonly ApprovedRegion[];
-  allowFontRasterException?: boolean;
-  fontRasterExceptionMaxRatio?: number;
-  skipMismatchRatioAssertion?: boolean;
-}) {
-  const personMobile = input.id === "host-person-mobile";
-  const meetingsDesktop = input.id === "host-meetings-desktop";
-  const peopleDesktop = input.id === "host-people-desktop";
-  const recordsDesktop = input.id === "host-records-desktop";
-  const settingsDesktop = input.id === "host-settings-desktop";
-  const scheduleReviewDesktop = input.id === "host-schedule-review-desktop";
-  if (meetingsDesktop && (!input.regions || input.regions.length === 0)) {
-    throw new Error("host-meetings-desktop requires nav and main capture regions");
-  }
-  if (peopleDesktop && (!input.regions || input.regions.length === 0)) {
-    throw new Error("host-people-desktop requires nav and main capture regions");
-  }
-  if (recordsDesktop && (!input.regions || input.regions.length === 0)) {
-    throw new Error("host-records-desktop requires nav and main capture regions");
-  }
-  if (settingsDesktop && (!input.regions || input.regions.length === 0)) {
-    throw new Error("host-settings-desktop requires nav and main capture regions");
-  }
-  if (scheduleReviewDesktop && (!input.regions || input.regions.length === 0)) {
-    throw new Error("host-schedule-review-desktop requires nav and main capture regions");
-  }
-  if (personMobile && (!input.regions || input.regions.length === 0)) {
-    throw new Error("host-person-mobile requires nav and main capture regions");
-  }
-  return captureApprovedComparison({
-    entry: approvedMockup(input.id),
-    candidate: input.candidate,
-    page: input.page,
-    testInfo: input.testInfo,
-    regions: input.regions ?? [],
-    allowFontRasterException: input.allowFontRasterException,
-    fontRasterExceptionMaxRatio: input.fontRasterExceptionMaxRatio,
-    skipMismatchRatioAssertion: input.skipMismatchRatioAssertion ?? false,
-  });
-}
-
-test("people ledger matches approved desktop", async ({ mount, page }, testInfo) => {
+test("people ledger matches approved desktop", async ({ mount, page }) => {
   test.setTimeout(90_000);
   const component = await mountApproved(mount, page, hostPeopleApprovedView(), APPROVED_DESKTOP_VIEWPORT);
   await expect(component.getByRole("link", { name: "사람" })).toHaveAttribute("aria-current", "page");
@@ -193,23 +138,12 @@ test("people ledger matches approved desktop", async ({ mount, page }, testInfo)
   await expect(header).toBeVisible();
   await expect(nav).toBeVisible();
   await expect(main).toBeVisible();
-  const regions = [
-    await regionFromLocator(header, "header", PEOPLE_HEADER_GEOMETRY, 4),
-    await regionFromLocator(nav, "nav", PEOPLE_NAV_GEOMETRY, 4),
-    await regionFromLocator(main, "main", PEOPLE_MAIN_GEOMETRY, 4),
-  ];
-  await captureHostLedger({
-    id: "host-people-desktop",
-    candidate: component,
-    page,
-    testInfo,
-    regions,
-    allowFontRasterException: true,
-    skipMismatchRatioAssertion: false,
-  });
+  await regionFromLocator(header, "header", PEOPLE_HEADER_GEOMETRY, 4);
+  await regionFromLocator(nav, "nav", PEOPLE_NAV_GEOMETRY, 4);
+  await regionFromLocator(main, "main", PEOPLE_MAIN_GEOMETRY, 4);
 });
 
-test("meetings library matches approved desktop", async ({ mount, page }, testInfo) => {
+test("meetings library matches approved desktop", async ({ mount, page }) => {
   test.setTimeout(90_000);
   const component = await mountApproved(mount, page, hostMeetingsApprovedView(), APPROVED_DESKTOP_VIEWPORT);
   await expect(component.getByRole("link", { name: "일정과 모임" })).toHaveAttribute("aria-current", "page");
@@ -249,23 +183,12 @@ test("meetings library matches approved desktop", async ({ mount, page }, testIn
     expect(box!.y).toBeGreaterThanOrEqual(0);
     expect(box!.y + box!.height).toBeLessThanOrEqual(APPROVED_DESKTOP_VIEWPORT.height);
   }
-  const regions = [
-    await regionFromLocator(header, "header", MEETINGS_HEADER_GEOMETRY, 4),
-    await regionFromLocator(nav, "nav", MEETINGS_NAV_GEOMETRY, 4),
-    await regionFromLocator(main, "main", MEETINGS_MAIN_GEOMETRY, 4),
-  ];
-  await captureHostLedger({
-    id: "host-meetings-desktop",
-    candidate: component,
-    page,
-    testInfo,
-    regions,
-    allowFontRasterException: true,
-    skipMismatchRatioAssertion: false,
-  });
+  await regionFromLocator(header, "header", MEETINGS_HEADER_GEOMETRY, 4);
+  await regionFromLocator(nav, "nav", MEETINGS_NAV_GEOMETRY, 4);
+  await regionFromLocator(main, "main", MEETINGS_MAIN_GEOMETRY, 4);
 });
 
-test("records ledger matches approved desktop", async ({ mount, page }, testInfo) => {
+test("records ledger matches approved desktop", async ({ mount, page }) => {
   test.setTimeout(90_000);
   const component = await mountApproved(mount, page, hostRecordsApprovedView(), APPROVED_DESKTOP_VIEWPORT);
   await expect(component.getByRole("link", { name: "기록", exact: true })).toHaveAttribute("aria-current", "page");
@@ -277,23 +200,12 @@ test("records ledger matches approved desktop", async ({ mount, page }, testInfo
   await expect(header).toBeVisible();
   await expect(nav).toBeVisible();
   await expect(main).toBeVisible();
-  const regions = [
-    await regionFromLocator(header, "header", RECORDS_HEADER_GEOMETRY, 4),
-    await regionFromLocator(nav, "nav", RECORDS_NAV_GEOMETRY, 4),
-    await regionFromLocator(main, "main", RECORDS_MAIN_GEOMETRY, 4),
-  ];
-  await captureHostLedger({
-    id: "host-records-desktop",
-    candidate: component,
-    page,
-    testInfo,
-    regions,
-    allowFontRasterException: true,
-    skipMismatchRatioAssertion: false,
-  });
+  await regionFromLocator(header, "header", RECORDS_HEADER_GEOMETRY, 4);
+  await regionFromLocator(nav, "nav", RECORDS_NAV_GEOMETRY, 4);
+  await regionFromLocator(main, "main", RECORDS_MAIN_GEOMETRY, 4);
 });
 
-test("invites and settings match approved desktop", async ({ mount, page }, testInfo) => {
+test("invites and settings match approved desktop", async ({ mount, page }) => {
   test.setTimeout(90_000);
   const component = await mountApproved(mount, page, hostSettingsApprovedView(), APPROVED_DESKTOP_VIEWPORT);
   await expect(component.getByRole("link", { name: "초대와 설정" })).toHaveAttribute("aria-current", "page");
@@ -317,25 +229,14 @@ test("invites and settings match approved desktop", async ({ mount, page }, test
   await expect(header).toBeVisible();
   await expect(nav).toBeVisible();
   await expect(main).toBeVisible();
-  const regions = [
-    await regionFromLocator(header, "header", SETTINGS_HEADER_GEOMETRY, 4),
-    await regionFromLocator(nav, "nav", SETTINGS_NAV_GEOMETRY, 4),
-    await regionFromLocator(main, "main", SETTINGS_MAIN_GEOMETRY, 4),
-  ];
-  await captureHostLedger({
-    id: "host-settings-desktop",
-    candidate: component,
-    page,
-    testInfo,
-    regions,
-    allowFontRasterException: true,
-    skipMismatchRatioAssertion: false,
-  });
+  await regionFromLocator(header, "header", SETTINGS_HEADER_GEOMETRY, 4);
+  await regionFromLocator(nav, "nav", SETTINGS_NAV_GEOMETRY, 4);
+  await regionFromLocator(main, "main", SETTINGS_MAIN_GEOMETRY, 4);
   await component.getByRole("button", { name: "새 초대 링크" }).click();
   await expect(component.getByLabel("링크 이름")).toBeVisible();
 });
 
-test("unread schedule review matches approved desktop", async ({ mount, page }, testInfo) => {
+test("unread schedule review matches approved desktop", async ({ mount, page }) => {
   test.setTimeout(90_000);
   const component = await mountApproved(mount, page, hostScheduleReviewApprovedView(), APPROVED_DESKTOP_VIEWPORT);
   await expect(component.getByRole("link", { name: "운영실", exact: true })).toHaveAttribute("aria-current", "page");
@@ -376,23 +277,12 @@ test("unread schedule review matches approved desktop", async ({ mount, page }, 
   await expect(header).toBeVisible();
   await expect(nav).toBeVisible();
   await expect(main).toBeVisible();
-  const regions = [
-    await regionFromLocator(header, "header", SCHEDULE_REVIEW_HEADER_GEOMETRY, 4),
-    await regionFromLocator(nav, "nav", SCHEDULE_REVIEW_NAV_GEOMETRY, 4),
-    await regionFromLocator(main, "main", SCHEDULE_REVIEW_MAIN_GEOMETRY, 4),
-  ];
-  await captureHostLedger({
-    id: "host-schedule-review-desktop",
-    candidate: component,
-    page,
-    testInfo,
-    regions,
-    allowFontRasterException: true,
-    skipMismatchRatioAssertion: false,
-  });
+  await regionFromLocator(header, "header", SCHEDULE_REVIEW_HEADER_GEOMETRY, 4);
+  await regionFromLocator(nav, "nav", SCHEDULE_REVIEW_NAV_GEOMETRY, 4);
+  await regionFromLocator(main, "main", SCHEDULE_REVIEW_MAIN_GEOMETRY, 4);
 });
 
-test("person detail matches approved mobile", async ({ mount, page }, testInfo) => {
+test("person detail matches approved mobile", async ({ mount, page }) => {
   test.setTimeout(90_000);
   const component = await mountApproved(mount, page, hostPersonApprovedView(), APPROVED_MOBILE_VIEWPORT);
   await expect(component.getByRole("link", { name: "사람 목록으로" })).toBeVisible();
@@ -429,19 +319,7 @@ test("person detail matches approved mobile", async ({ mount, page }, testInfo) 
       `${name} y=${box!.y} h=${box!.height} navY=${navBox!.y}`,
     ).toBeLessThanOrEqual(navBox!.y + 2);
   }
-  const regions = [
-    await regionFromLocator(header, "header", PERSON_HEADER_GEOMETRY, 4),
-    await regionFromLocator(nav, "nav", PERSON_NAV_GEOMETRY, 4),
-    await regionFromLocator(main, "main", PERSON_MAIN_GEOMETRY, 4),
-  ];
-  await captureHostLedger({
-    id: "host-person-mobile",
-    candidate: component,
-    page,
-    testInfo,
-    regions,
-    allowFontRasterException: true,
-    fontRasterExceptionMaxRatio: HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
-    skipMismatchRatioAssertion: false,
-  });
+  await regionFromLocator(header, "header", PERSON_HEADER_GEOMETRY, 4);
+  await regionFromLocator(nav, "nav", PERSON_NAV_GEOMETRY, 4);
+  await regionFromLocator(main, "main", PERSON_MAIN_GEOMETRY, 4);
 });

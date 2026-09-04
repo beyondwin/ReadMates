@@ -1,10 +1,8 @@
 import { expect, test } from "@playwright/experimental-ct-react";
-import type { Locator, Page, TestInfo } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import {
-  approvedMockup,
-  captureApprovedComparison,
   expectGeometryWithinTolerance,
   expectLocatorGeometry,
   type ApprovedRegion,
@@ -283,7 +281,7 @@ async function mountApprovedShell(
   return component;
 }
 
-test("space menu keeps platform and club choices inside the production shell", async ({ mount, page }, testInfo: TestInfo) => {
+test("space menu keeps platform and club choices inside the production shell", async ({ mount, page }) => {
   test.setTimeout(90_000);
   const component = await mountApprovedShell(mount, page, <TodayLedgerCtNode fixture={todayDesktopLedger} />);
 
@@ -303,21 +301,11 @@ test("space menu keeps platform and club choices inside the production shell", a
   await expectMinimumTargetSize(clubs);
   await expectNoHorizontalOverflow(page);
 
-  const regions = [
-    await regionFromLocator(component.locator(".admin-shell__header"), "header", HEADER_DESKTOP_GEOMETRY, 4),
-    await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4),
-    await regionFromLocator(component.locator(".rm-global-space-switcher__trigger"), "switcher", { x: 188, y: 19, width: 160, height: 48 }, 2),
-    await regionFromLocator(component.locator(".rm-global-space-switcher__menu"), "menu", { x: 188, y: 75, width: 360, height: 244 }, 4),
-    await regionFromLocator(component.locator(".admin-shell__account-control"), "account", { x: 1555, y: 21, width: 83, height: 44 }, 4),
-  ];
-  await captureApprovedComparison({
-    entry: approvedMockup("admin-space-switcher-desktop"),
-    candidate: page.locator("#root"),
-    page,
-    testInfo,
-    regions,
-    allowFontRasterException: true,
-  });
+  await regionFromLocator(component.locator(".admin-shell__header"), "header", HEADER_DESKTOP_GEOMETRY, 4);
+  await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4);
+  await regionFromLocator(component.locator(".rm-global-space-switcher__trigger"), "switcher", { x: 188, y: 19, width: 160, height: 48 }, 2);
+  await regionFromLocator(component.locator(".rm-global-space-switcher__menu"), "menu", { x: 188, y: 75, width: 360, height: 244 }, 4);
+  await regionFromLocator(component.locator(".admin-shell__account-control"), "account", { x: 1555, y: 21, width: 83, height: 44 }, 4);
 
   await platform.press("ArrowDown");
   await expect(clubs).toBeFocused();

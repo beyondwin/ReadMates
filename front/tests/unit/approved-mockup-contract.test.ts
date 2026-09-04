@@ -1,8 +1,7 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { APPROVED_MOCKUPS, approvedMockupsAffectedBy } from "../e2e/support/approved-mockup-manifest";
 import {
-  FONT_RASTER_EXCEPTION_MAX_RATIO,
-  HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
   assertApprovedMismatchRatio,
   expectGeometryWithinTolerance,
   verifyApprovedReference,
@@ -24,65 +23,24 @@ describe("approved mockup contract", () => {
     )).toThrow(/width delta 4.01px/);
   });
 
-  it("fails closed above maxDiffPixelRatio without a font-raster exception", () => {
+  it.each([
+    ["admin-today-desktop", 0.020001],
+    ["host-prep-desktop", 0.08],
+    ["host-live-mobile", 0.15],
+  ])("rejects %s above the exact 0.02 ceiling", (id, mismatchPixelRatio) => {
     expect(() => assertApprovedMismatchRatio({
-      id: "admin-today-desktop",
-      mismatchPixelRatio: 0.0201,
+      id,
+      mismatchPixelRatio,
       maxDiffPixelRatio: 0.02,
-    })).toThrow(/admin-today-desktop mismatch ratio 0.0201 exceeds 0.02/);
+    })).toThrow(new RegExp(`${id} mismatch ratio .* exceeds 0.02`));
   });
 
-  it("accepts a documented font-raster exception at or below 0.10", () => {
-    expect(() => assertApprovedMismatchRatio({
-      id: "admin-today-desktop",
-      mismatchPixelRatio: 0.057,
-      maxDiffPixelRatio: 0.02,
-      allowFontRasterException: true,
-    })).not.toThrow();
-  });
-
-  it("still fails a font-raster exception above 0.10 as structural", () => {
-    expect(FONT_RASTER_EXCEPTION_MAX_RATIO).toBe(0.10);
-    expect(() => assertApprovedMismatchRatio({
-      id: "admin-today-desktop",
-      mismatchPixelRatio: 0.1001,
-      maxDiffPixelRatio: 0.02,
-      allowFontRasterException: true,
-    })).toThrow(/admin-today-desktop mismatch ratio 0.1001 exceeds 0.1/);
-    expect(() => assertApprovedMismatchRatio({
-      id: "host-prep-desktop",
-      mismatchPixelRatio: 0.1001,
-      maxDiffPixelRatio: 0.02,
-      allowFontRasterException: true,
-    })).toThrow(/host-prep-desktop mismatch ratio 0.1001 exceeds 0.1/);
-  });
-
-  it("accepts a host-mobile font-raster exception at or below 0.15 after copy match", () => {
-    expect(HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO).toBe(0.15);
-    expect(() => assertApprovedMismatchRatio({
-      id: "host-prep-mobile",
-      mismatchPixelRatio: 0.103,
-      maxDiffPixelRatio: 0.02,
-      allowFontRasterException: true,
-      fontRasterExceptionMaxRatio: HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
-    })).not.toThrow();
-    expect(() => assertApprovedMismatchRatio({
-      id: "host-live-mobile",
-      mismatchPixelRatio: 0.132,
-      maxDiffPixelRatio: 0.02,
-      allowFontRasterException: true,
-      fontRasterExceptionMaxRatio: HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
-    })).not.toThrow();
-  });
-
-  it("still fails a host-mobile font-raster exception above 0.15", () => {
-    expect(() => assertApprovedMismatchRatio({
-      id: "host-live-mobile",
-      mismatchPixelRatio: 0.1501,
-      maxDiffPixelRatio: 0.02,
-      allowFontRasterException: true,
-      fontRasterExceptionMaxRatio: HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
-    })).toThrow(/host-live-mobile mismatch ratio 0.1501 exceeds 0.15/);
+  it("does not expose broad ratio bypass fields in the contract source", () => {
+    const contractSource = readFileSync(
+      new URL("../e2e/support/approved-mockup-contract.ts", import.meta.url),
+      "utf8",
+    );
+    expect(contractSource).not.toMatch(/allowFontRasterException|fontRasterExceptionMaxRatio|skipMismatchRatioAssertion/);
   });
 
   it("maps shared visual dependencies to every downstream authority", () => {
@@ -107,20 +65,12 @@ describe("approved mockup contract", () => {
       .toHaveLength(18);
   });
 
-  it("does not throw above 0.02 when skipMismatchRatioAssertion is true", () => {
-    expect(() => assertApprovedMismatchRatio({
-      id: "host-prep-desktop",
-      mismatchPixelRatio: 0.08,
-      maxDiffPixelRatio: 0.02,
-      skipMismatchRatioAssertion: true,
-    })).not.toThrow();
-  });
-
-  it("still throws above 0.02 when skipMismatchRatioAssertion is omitted", () => {
-    expect(() => assertApprovedMismatchRatio({
-      id: "host-prep-desktop",
-      mismatchPixelRatio: 0.08,
-      maxDiffPixelRatio: 0.02,
-    })).toThrow(/host-prep-desktop mismatch ratio 0.08 exceeds 0.02/);
+  it("keeps test:ct:docker and removes ct:approved package scripts", () => {
+    const packageJson = JSON.parse(readFileSync(
+      new URL("../../package.json", import.meta.url),
+      "utf8",
+    )) as { scripts: Record<string, string> };
+    expect(packageJson.scripts["test:ct:docker"]).toBeTruthy();
+    expect(Object.keys(packageJson.scripts).some((name) => name.includes("ct:approved"))).toBe(false);
   });
 });

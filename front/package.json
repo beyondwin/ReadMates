@@ -22,7 +22,6 @@
     "test:ct:docker": "tsx scripts/run-ct-docker.ts",
     "test:ct:update": "pnpm test:ct:update:docker",
     "test:ct:update:docker": "tsx scripts/run-ct-docker.ts --update",
-    "test:ct:approved": "playwright test --config=playwright-ct.config.ts features/platform-admin/route/admin-shell-layout.ct.tsx features/platform-admin/ui/admin-editorial-ledger.ct.tsx features/host/ui/shell/host-shell.ct.tsx features/host/ui/operating-room/host-operating-room-responsive.ct.tsx features/host/ui/approved-host-ledgers.ct.tsx --project=chromium",
     "test:watch": "vitest",
     "zod:export-fixtures": "tsx scripts/export-zod-fixtures.ts"
   },

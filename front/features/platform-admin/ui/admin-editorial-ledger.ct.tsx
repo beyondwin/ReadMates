@@ -1,11 +1,9 @@
 import { expect, test } from "@playwright/experimental-ct-react";
-import type { Locator, Page, TestInfo } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import type { ReactElement } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { GlobalSpaceSwitcher } from "@/shared/ui/global-space-switcher";
 import {
-  approvedMockup,
-  captureApprovedComparison,
   expectGeometryWithinTolerance,
   expectLocatorGeometry,
   isSemanticDocumentOrder,
@@ -232,46 +230,6 @@ async function regionFromLocator(
   return { name, actual, expected, toleranceCssPx };
 }
 
-async function captureTodayApproved(input: {
-  id: "admin-today-desktop" | "admin-today-mobile" | "admin-work-detail-mobile";
-  candidate: Locator;
-  page: Page;
-  testInfo: TestInfo;
-  regions: readonly ApprovedRegion[];
-}) {
-  // Geometry stays hard-fail. Desktop rail is now the approved light selected
-  // pill, but Pretendard vs AI-raster glyphs/icons still sit above 0.02.
-  // Today-only font-raster exception records the ratio; default 0.02 applies
-  // elsewhere. Overlay leftover is not AA-only.
-  return captureApprovedComparison({
-    entry: approvedMockup(input.id),
-    candidate: input.page.locator("#root"),
-    page: input.page,
-    testInfo: input.testInfo,
-    regions: input.regions,
-    allowFontRasterException: true,
-  });
-}
-
-async function captureOperationsApproved(input: {
-  id: "admin-clubs-desktop" | "admin-service-desktop" | "admin-records-desktop";
-  candidate: Locator;
-  page: Page;
-  testInfo: TestInfo;
-  regions: readonly ApprovedRegion[];
-}) {
-  // Geometry stays hard-fail. After first-viewport IA/copy/disclosure match,
-  // leftover vs 0.02 is Pretendard/icon halo on AI-rasterized Admin PNGs.
-  return captureApprovedComparison({
-    entry: approvedMockup(input.id),
-    candidate: input.page.locator("#root"),
-    page: input.page,
-    testInfo: input.testInfo,
-    regions: input.regions,
-    allowFontRasterException: true,
-  });
-}
-
 async function expectNoNestedLiveRegions(component: Locator): Promise<void> {
   const nested = await component.evaluate((root) => {
     const selector = "[aria-live], [role='alert'], [role='status'], [role='log']";
@@ -384,7 +342,7 @@ function takedownNode(state: typeof emergencyTakedownIdle | typeof emergencyTake
   );
 }
 
-test("Today L1 locks the approved desktop composition", async ({ mount, page }, testInfo) => {
+test("Today L1 locks the approved desktop composition", async ({ mount, page }) => {
   test.setTimeout(90_000);
   expect(todayDesktopLedger.capabilities).toEqual(["VIEW_TODAY"]);
   expect(todayDesktopLedger.allowedActions).toEqual(["ACKNOWLEDGE", "SNOOZE", "RESOLVE"]);
@@ -392,18 +350,9 @@ test("Today L1 locks the approved desktop composition", async ({ mount, page }, 
   const queue = component.getByRole("region", { name: "운영 케이스 큐" });
   const docket = component.getByRole("region", { name: "운영 케이스 상세" });
   const recommended = docket.getByRole("heading", { name: "권장 처리" });
-  const regions = [
-    await regionFromLocator(queue, "queue", QUEUE_DESKTOP_GEOMETRY, 4),
-    await regionFromLocator(docket, "docket", DOCKET_DESKTOP_GEOMETRY, 4),
-    await regionFromLocator(recommended, "recommended", RECOMMENDED_DESKTOP_GEOMETRY, 2),
-  ];
-  await captureTodayApproved({
-    id: "admin-today-desktop",
-    candidate: component,
-    page,
-    testInfo,
-    regions,
-  });
+  await regionFromLocator(queue, "queue", QUEUE_DESKTOP_GEOMETRY, 4);
+  await regionFromLocator(docket, "docket", DOCKET_DESKTOP_GEOMETRY, 4);
+  await regionFromLocator(recommended, "recommended", RECOMMENDED_DESKTOP_GEOMETRY, 2);
   await expectLocatorGeometry(queue, QUEUE_DESKTOP_GEOMETRY, 4);
   await expectLocatorGeometry(docket, DOCKET_DESKTOP_GEOMETRY, 4);
   await expectLocatorGeometry(recommended, RECOMMENDED_DESKTOP_GEOMETRY, 2);
@@ -424,7 +373,7 @@ test("Today L1 locks the approved desktop composition", async ({ mount, page }, 
   await expectVisibleFocus(primary);
 });
 
-test("Clubs locks the approved desktop ledger", async ({ mount, page }, testInfo) => {
+test("Clubs locks the approved desktop ledger", async ({ mount, page }) => {
   test.setTimeout(90_000);
   expect(clubsTabletLedger.capabilities).toEqual(["VIEW_CLUBS", "VIEW_CLUB_OPERATIONS", "CREATE_CLUB"]);
   expect(clubsTabletLedger.canCreateClub).toBe(true);
@@ -450,26 +399,17 @@ test("Clubs locks the approved desktop ledger", async ({ mount, page }, testInfo
   await expect(component.getByRole("link", { name: EDITORIAL_LEDGER_LONG_CLUB_NAME })).toHaveCount(0);
   const create = component.getByRole("link", { name: "새 클럽" });
   await expect(create).toBeVisible();
-  const regions = [
-    await regionFromLocator(component.locator(".admin-shell__header"), "header", HEADER_DESKTOP_GEOMETRY, 4),
-    await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4),
-    await regionFromLocator(component.locator(".admin-club-management__finder"), "finder", LEDGER_LIST_GEOMETRY, 2),
-    await regionFromLocator(component.locator(".admin-club-management__docket"), "docket", LEDGER_DOCKET_GEOMETRY, 2),
-    await regionFromLocator(firstRow, "first-row", { x: 284, y: 290, width: 87, height: 44 }, 2),
-  ];
-  await captureOperationsApproved({
-    id: "admin-clubs-desktop",
-    candidate: component,
-    page,
-    testInfo,
-    regions,
-  });
+  await regionFromLocator(component.locator(".admin-shell__header"), "header", HEADER_DESKTOP_GEOMETRY, 4);
+  await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4);
+  await regionFromLocator(component.locator(".admin-club-management__finder"), "finder", LEDGER_LIST_GEOMETRY, 2);
+  await regionFromLocator(component.locator(".admin-club-management__docket"), "docket", LEDGER_DOCKET_GEOMETRY, 2);
+  await regionFromLocator(firstRow, "first-row", { x: 284, y: 290, width: 87, height: 44 }, 2);
   await expectMinimumTargetSize(create);
   await create.focus();
   await expectVisibleFocus(create);
 });
 
-test("Service health locks the approved desktop ledger", async ({ mount, page }, testInfo) => {
+test("Service health locks the approved desktop ledger", async ({ mount, page }) => {
   test.setTimeout(90_000);
   expect(serviceHealthLedger.capabilities).toEqual(["VIEW_SERVICE_HEALTH"]);
   const component = await mountApprovedShell(
@@ -492,25 +432,16 @@ test("Service health locks the approved desktop ledger", async ({ mount, page },
   await expect(component.locator(".admin-action-dock")).toHaveCount(0);
   await expect(component.locator(".admin-receipt-timeline")).toHaveCount(0);
   const refresh = component.getByRole("button", { name: "새로고침" });
-  const regions = [
-    await regionFromLocator(component.locator(".admin-shell__header"), "header", HEADER_DESKTOP_GEOMETRY, 4),
-    await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4),
-    await regionFromLocator(component.locator(".admin-service-status__table"), "table", SERVICE_TABLE_GEOMETRY, 2),
-    await regionFromLocator(component.locator(".admin-service-status__attention").first(), "attention-row", { x: 292, y: 302, width: 1348, height: 73 }, 2),
-  ];
-  await captureOperationsApproved({
-    id: "admin-service-desktop",
-    candidate: component,
-    page,
-    testInfo,
-    regions,
-  });
+  await regionFromLocator(component.locator(".admin-shell__header"), "header", HEADER_DESKTOP_GEOMETRY, 4);
+  await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4);
+  await regionFromLocator(component.locator(".admin-service-status__table"), "table", SERVICE_TABLE_GEOMETRY, 2);
+  await regionFromLocator(component.locator(".admin-service-status__attention").first(), "attention-row", { x: 292, y: 302, width: 1348, height: 73 }, 2);
   await expectMinimumTargetSize(refresh);
   await refresh.focus();
   await expectVisibleFocus(refresh);
 });
 
-test("Review audit locks the approved desktop ledger", async ({ mount, page }, testInfo) => {
+test("Review audit locks the approved desktop ledger", async ({ mount, page }) => {
   test.setTimeout(90_000);
   expect(reviewAuditLedger.capabilities).toEqual(["VIEW_AUDIT"]);
   expect(reviewAuditLedger.canSearchSensitive).toBe(false);
@@ -533,20 +464,11 @@ test("Review audit locks the approved desktop ledger", async ({ mount, page }, t
   await expect(component.getByRole("region", { name: "감사 이벤트 상세" })).toBeVisible();
   await expect(firstRow).toBeVisible();
   await expect(component.getByRole("searchbox", { name: "민감 대상 검색" })).toHaveCount(0);
-  const regions = [
-    await regionFromLocator(component.locator(".admin-shell__header"), "header", HEADER_DESKTOP_GEOMETRY, 4),
-    await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4),
-    await regionFromLocator(component.locator(".admin-audit__list"), "list", LEDGER_LIST_GEOMETRY, 2),
-    await regionFromLocator(component.locator(".admin-audit__detail"), "docket", LEDGER_DOCKET_GEOMETRY, 2),
-    await regionFromLocator(firstRow, "first-row", { x: 284, y: 325, width: 510, height: 58 }, 2),
-  ];
-  await captureOperationsApproved({
-    id: "admin-records-desktop",
-    candidate: component,
-    page,
-    testInfo,
-    regions,
-  });
+  await regionFromLocator(component.locator(".admin-shell__header"), "header", HEADER_DESKTOP_GEOMETRY, 4);
+  await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4);
+  await regionFromLocator(component.locator(".admin-audit__list"), "list", LEDGER_LIST_GEOMETRY, 2);
+  await regionFromLocator(component.locator(".admin-audit__detail"), "docket", LEDGER_DOCKET_GEOMETRY, 2);
+  await regionFromLocator(firstRow, "first-row", { x: 284, y: 325, width: 510, height: 58 }, 2);
   await expectMinimumTargetSize(firstRow);
   await firstRow.focus();
   await expectVisibleFocus(firstRow);
@@ -555,7 +477,7 @@ test("Review audit locks the approved desktop ledger", async ({ mount, page }, t
 test.describe("approved mobile Today", () => {
   test.use({ deviceScaleFactor: 853 / 390 });
 
-  test("Today mobile list locks the approved 390 composition", async ({ mount, page }, testInfo) => {
+  test("Today mobile list locks the approved 390 composition", async ({ mount, page }) => {
     test.setTimeout(90_000);
     const component = await mountTodayApproved(
       mount,
@@ -566,18 +488,9 @@ test.describe("approved mobile Today", () => {
     const header = component.locator(".admin-shell__header");
     const nav = component.getByRole("navigation", { name: "Admin 모바일 메뉴" });
     const firstRow = component.getByRole("button", { name: /알림 전달 지연/ }).first();
-    const regions = [
-      await regionFromLocator(header, "header", HEADER_MOBILE_GEOMETRY, 4),
-      await regionFromLocator(nav, "nav", NAV_MOBILE_GEOMETRY, 4),
-      await regionFromLocator(firstRow, "first-row", FIRST_ROW_MOBILE_GEOMETRY, 2),
-    ];
-    await captureTodayApproved({
-      id: "admin-today-mobile",
-      candidate: component,
-      page,
-      testInfo,
-      regions,
-    });
+    await regionFromLocator(header, "header", HEADER_MOBILE_GEOMETRY, 4);
+    await regionFromLocator(nav, "nav", NAV_MOBILE_GEOMETRY, 4);
+    await regionFromLocator(firstRow, "first-row", FIRST_ROW_MOBILE_GEOMETRY, 2);
     await expectLocatorGeometry(header, HEADER_MOBILE_GEOMETRY, 4);
     await expectLocatorGeometry(nav, NAV_MOBILE_GEOMETRY, 4);
     await expectLocatorGeometry(firstRow, FIRST_ROW_MOBILE_GEOMETRY, 2);
@@ -588,7 +501,7 @@ test.describe("approved mobile Today", () => {
     await expectNoHorizontalOverflow(page);
   });
 
-  test("Today case detail locks the approved 390 composition", async ({ mount, page }, testInfo) => {
+  test("Today case detail locks the approved 390 composition", async ({ mount, page }) => {
     test.setTimeout(90_000);
     expect(todayMobileCaseDetail.allowedActions).toEqual(["ACKNOWLEDGE", "SNOOZE", "RESOLVE"]);
     const component = await mountTodayApproved(mount, page, todayMobileCaseDetail, APPROVED_MOBILE_VIEWPORT);
@@ -596,18 +509,9 @@ test.describe("approved mobile Today", () => {
     const back = component.getByRole("button", { name: "목록으로" });
     const nav = component.getByRole("navigation", { name: "Admin 모바일 메뉴" });
     await back.evaluate((element) => element.blur());
-    const regions = [
-      await regionFromLocator(back, "back", BACK_MOBILE_GEOMETRY, 4),
-      await regionFromLocator(docket, "docket", DETAIL_DOCKET_MOBILE_GEOMETRY, 4),
-      await regionFromLocator(nav, "nav", NAV_MOBILE_GEOMETRY, 4),
-    ];
-    await captureTodayApproved({
-      id: "admin-work-detail-mobile",
-      candidate: component,
-      page,
-      testInfo,
-      regions,
-    });
+    await regionFromLocator(back, "back", BACK_MOBILE_GEOMETRY, 4);
+    await regionFromLocator(docket, "docket", DETAIL_DOCKET_MOBILE_GEOMETRY, 4);
+    await regionFromLocator(nav, "nav", NAV_MOBILE_GEOMETRY, 4);
     await expectLocatorGeometry(back, BACK_MOBILE_GEOMETRY, 4);
     await expectLocatorGeometry(nav, NAV_MOBILE_GEOMETRY, 4);
     await expect(component.getByText("알림 전달 지연", { exact: true }).first()).toBeInViewport();

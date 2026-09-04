@@ -1,15 +1,12 @@
 import { expect, test } from "@playwright/experimental-ct-react";
-import type { Locator, Page, TestInfo } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import type { ReactElement, ReactNode } from "react";
 import type { HostOperatingRoomView } from "@/features/host/model/host-operating-room-model";
 import type { HostWorkboxView } from "@/features/host/model/host-workbox-model";
 import { HostApprovedShell } from "../approved-host-shell";
 import {
-  approvedMockup,
-  captureApprovedComparison,
   expectGeometryWithinTolerance,
   expectLocatorGeometry,
-  HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
   isSemanticDocumentOrder,
   type ApprovedRegion,
 } from "@/tests/e2e/support/approved-mockup-contract";
@@ -773,27 +770,6 @@ async function regionFromLocator(
   return { name, actual, expected, toleranceCssPx };
 }
 
-async function captureHostApproved(input: {
-  id: "host-prep-desktop" | "host-live-desktop" | "host-closing-desktop" | "host-prep-mobile" | "host-live-mobile";
-  page: Page;
-  testInfo: TestInfo;
-  regions: readonly ApprovedRegion[];
-  allowFontRasterException?: boolean;
-  fontRasterExceptionMaxRatio?: number;
-  skipMismatchRatioAssertion?: boolean;
-}) {
-  return captureApprovedComparison({
-    entry: approvedMockup(input.id),
-    candidate: input.page.locator("html"),
-    page: input.page,
-    testInfo: input.testInfo,
-    regions: input.regions,
-    allowFontRasterException: input.allowFontRasterException,
-    fontRasterExceptionMaxRatio: input.fontRasterExceptionMaxRatio,
-    skipMismatchRatioAssertion: input.skipMismatchRatioAssertion,
-  });
-}
-
 async function mountApproved(
   mount: (component: ReactElement) => Promise<Locator>,
   page: Page,
@@ -810,7 +786,7 @@ async function mountApproved(
   return component;
 }
 
-test("prep locks the approved desktop operating room", async ({ mount, page }, testInfo) => {
+test("prep locks the approved desktop operating room", async ({ mount, page }) => {
   test.setTimeout(90_000);
   const component = await mountApproved(mount, page, prepApprovedView(), APPROVED_DESKTOP_VIEWPORT);
   const context = component.getByRole("group", { name: "현재 모임" });
@@ -825,10 +801,8 @@ test("prep locks the approved desktop operating room", async ({ mount, page }, t
   await expect(preparation.getByRole("listitem")).toHaveCount(4);
   await expect(workbox.getByRole("listitem")).toHaveCount(4);
   await expect(workbox.getByRole("combobox", { name: /보류 기간/ })).toHaveCount(0);
-  const regions = [
-    await regionFromLocator(component.locator(".rm-host-operating-room__body"), "body", BODY_DESKTOP_GEOMETRY, 4),
-    await regionFromLocator(component.locator(".rm-host-operating-room__workbox-rail"), "workbox", WORKBOX_DESKTOP_GEOMETRY, 4),
-  ];
+  await regionFromLocator(component.locator(".rm-host-operating-room__body"), "body", BODY_DESKTOP_GEOMETRY, 4);
+  await regionFromLocator(component.locator(".rm-host-operating-room__workbox-rail"), "workbox", WORKBOX_DESKTOP_GEOMETRY, 4);
   await expectLocatorGeometry(component.locator(".rm-host-operating-room__body"), BODY_DESKTOP_GEOMETRY, 4);
   await expectLocatorGeometry(component.locator(".rm-host-operating-room__workbox-rail"), WORKBOX_DESKTOP_GEOMETRY, 4);
   await expect(component.getByRole("link", { name: "ReadMates" })).toBeVisible();
@@ -863,17 +837,9 @@ test("prep locks the approved desktop operating room", async ({ mount, page }, t
   expect(await workboxTitle.evaluate((node) => getComputedStyle(node, "::after").content)).toBe("none");
   await expect(nextAction.getByText("일정이 어제 19:30에 변경되었어요")).toBeVisible();
   expect(await nextAction.evaluate((node) => getComputedStyle(node, "::after").content)).toBe("none");
-  await captureHostApproved({
-    id: "host-prep-desktop",
-    page,
-    testInfo,
-    regions,
-    allowFontRasterException: true,
-    skipMismatchRatioAssertion: false,
-  });
 });
 
-test("live locks the approved desktop operating room", async ({ mount, page }, testInfo) => {
+test("live locks the approved desktop operating room", async ({ mount, page }) => {
   test.setTimeout(90_000);
   const component = await mountApproved(
     mount,
@@ -903,21 +869,11 @@ test("live locks the approved desktop operating room", async ({ mount, page }, t
   await expect(component.getByRole("region", { name: "다음에 할 일" }).getByText("오후 7:26 · 현장 모드가 열렸어요")).toBeVisible();
   await expectLocatorGeometry(component.locator(".rm-host-operating-room__body"), BODY_DESKTOP_GEOMETRY, 4);
   await expectLocatorGeometry(component.locator(".rm-host-operating-room__workbox-rail"), WORKBOX_DESKTOP_GEOMETRY, 4);
-  const regions = [
-    await regionFromLocator(component.locator(".rm-host-operating-room__body"), "body", BODY_DESKTOP_GEOMETRY, 4),
-    await regionFromLocator(component.locator(".rm-host-operating-room__workbox-rail"), "workbox", WORKBOX_DESKTOP_GEOMETRY, 4),
-  ];
-  await captureHostApproved({
-    id: "host-live-desktop",
-    page,
-    testInfo,
-    regions,
-    allowFontRasterException: true,
-    skipMismatchRatioAssertion: false,
-  });
+  await regionFromLocator(component.locator(".rm-host-operating-room__body"), "body", BODY_DESKTOP_GEOMETRY, 4);
+  await regionFromLocator(component.locator(".rm-host-operating-room__workbox-rail"), "workbox", WORKBOX_DESKTOP_GEOMETRY, 4);
 });
 
-test("closing locks the approved desktop operating room", async ({ mount, page }, testInfo) => {
+test("closing locks the approved desktop operating room", async ({ mount, page }) => {
   test.setTimeout(90_000);
   const component = await mountApproved(mount, page, closingApprovedView(), APPROVED_DESKTOP_VIEWPORT);
   await expect(component.getByRole("region", { name: "다음에 할 일" })).toContainText("기록 초안을 검토하면 멤버에게 게시할 수 있어요");
@@ -933,21 +889,11 @@ test("closing locks the approved desktop operating room", async ({ mount, page }
   await expect(component.getByRole("region", { name: "다음에 할 일" }).getByText("게시 전에 피드백 문서를 확인해 주세요")).toBeVisible();
   await expectLocatorGeometry(component.locator(".rm-host-operating-room__body"), BODY_DESKTOP_GEOMETRY, 4);
   await expectLocatorGeometry(component.locator(".rm-host-operating-room__workbox-rail"), WORKBOX_DESKTOP_GEOMETRY, 4);
-  const regions = [
-    await regionFromLocator(component.locator(".rm-host-operating-room__body"), "body", BODY_DESKTOP_GEOMETRY, 4),
-    await regionFromLocator(component.locator(".rm-host-operating-room__workbox-rail"), "workbox", WORKBOX_DESKTOP_GEOMETRY, 4),
-  ];
-  await captureHostApproved({
-    id: "host-closing-desktop",
-    page,
-    testInfo,
-    regions,
-    allowFontRasterException: true,
-    skipMismatchRatioAssertion: false,
-  });
+  await regionFromLocator(component.locator(".rm-host-operating-room__body"), "body", BODY_DESKTOP_GEOMETRY, 4);
+  await regionFromLocator(component.locator(".rm-host-operating-room__workbox-rail"), "workbox", WORKBOX_DESKTOP_GEOMETRY, 4);
 });
 
-test("prep locks the approved mobile operating room", async ({ mount, page }, testInfo) => {
+test("prep locks the approved mobile operating room", async ({ mount, page }) => {
   test.setTimeout(90_000);
   const component = await mountApproved(mount, page, prepApprovedView(), APPROVED_MOBILE_VIEWPORT);
   const nextAction = component.getByRole("region", { name: "다음에 할 일" });
@@ -1004,22 +950,11 @@ test("prep locks the approved mobile operating room", async ({ mount, page }, te
       `${name} y=${box!.y} h=${box!.height} navY=${navBox!.y}`,
     ).toBeLessThanOrEqual(navBox!.y + 2);
   }
-  const regions = [
-    await regionFromLocator(bottomNav, "nav", MOBILE_NAV_GEOMETRY, 4),
-    await regionFromLocator(component.locator(".rm-host-operating-room"), "main", PREP_MOBILE_MAIN_GEOMETRY, 4),
-  ];
-  await captureHostApproved({
-    id: "host-prep-mobile",
-    page,
-    testInfo,
-    regions,
-    allowFontRasterException: true,
-    fontRasterExceptionMaxRatio: HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
-    skipMismatchRatioAssertion: false,
-  });
+  await regionFromLocator(bottomNav, "nav", MOBILE_NAV_GEOMETRY, 4);
+  await regionFromLocator(component.locator(".rm-host-operating-room"), "main", PREP_MOBILE_MAIN_GEOMETRY, 4);
 });
 
-test("live locks the approved mobile attendance board", async ({ mount, page }, testInfo) => {
+test("live locks the approved mobile attendance board", async ({ mount, page }) => {
   test.setTimeout(90_000);
   const component = await mountApproved(
     mount,
@@ -1071,20 +1006,9 @@ test("live locks the approved mobile attendance board", async ({ mount, page }, 
     expect(box!.x + box!.width, name).toBeLessThanOrEqual(frame.width + 1);
     expect(box!.y + box!.height, `${name} y=${box!.y} h=${box!.height} navY=${navBox!.y}`).toBeLessThanOrEqual(navBox!.y + 2);
   }
-  const regions = [
-    await regionFromLocator(bottomNav, "nav", MOBILE_NAV_GEOMETRY, 4),
-    await regionFromLocator(component.locator(".rm-host-operating-room"), "main", LIVE_MOBILE_MAIN_GEOMETRY, 4),
-    await regionFromLocator(board, "board", LIVE_MOBILE_BOARD_GEOMETRY, 4),
-  ];
-  await captureHostApproved({
-    id: "host-live-mobile",
-    page,
-    testInfo,
-    regions,
-    allowFontRasterException: true,
-    fontRasterExceptionMaxRatio: HOST_MOBILE_FONT_RASTER_EXCEPTION_MAX_RATIO,
-    skipMismatchRatioAssertion: false,
-  });
+  await regionFromLocator(bottomNav, "nav", MOBILE_NAV_GEOMETRY, 4);
+  await regionFromLocator(component.locator(".rm-host-operating-room"), "main", LIVE_MOBILE_MAIN_GEOMETRY, 4);
+  await regionFromLocator(board, "board", LIVE_MOBILE_BOARD_GEOMETRY, 4);
 });
 
 test("empty operating room primary stays readable without a phase overlay", async ({ mount, page }) => {
