@@ -1,12 +1,36 @@
+export type ApprovedMockupId =
+  | "admin-today-desktop"
+  | "admin-clubs-desktop"
+  | "admin-service-desktop"
+  | "admin-records-desktop"
+  | "admin-space-switcher-desktop"
+  | "admin-today-mobile"
+  | "admin-work-detail-mobile"
+  | "host-prep-desktop"
+  | "host-live-desktop"
+  | "host-closing-desktop"
+  | "host-meetings-desktop"
+  | "host-people-desktop"
+  | "host-records-desktop"
+  | "host-settings-desktop"
+  | "host-schedule-review-desktop"
+  | "host-prep-mobile"
+  | "host-live-mobile"
+  | "host-person-mobile";
+
+export type ApprovedMockupOwnerTest =
+  | "front/tests/e2e/admin-approved-routes.spec.ts"
+  | "front/tests/e2e/host-approved-routes.spec.ts";
+
 export type ApprovedMockupEntry = {
-  id: string;
+  id: ApprovedMockupId;
   role: "admin" | "host";
   referencePath: string;
   sha256: string;
   referenceSize: { width: number; height: number };
   cssViewport: { width: number; height: number };
   dependencyPaths: readonly string[];
-  ownerTest: string;
+  ownerTest: ApprovedMockupOwnerTest;
   maxDiffPixelRatio: 0.02;
   maxChannelDelta: 51;
   majorRegionToleranceCssPx: 4;
@@ -27,111 +51,146 @@ const HOST_DESKTOP_SIZE = { width: 1536, height: 1024 } as const;
 const HOST_MOBILE_REFERENCE_SIZE = { width: 866, height: 1846 } as const;
 const HOST_MOBILE_VIEWPORT = { width: 390, height: 832 } as const;
 
+const ADMIN_OWNER_TEST = "front/tests/e2e/admin-approved-routes.spec.ts" as const;
+const HOST_OWNER_TEST = "front/tests/e2e/host-approved-routes.spec.ts" as const;
+
 const TYPOGRAPHY_TOKEN_PATHS = [
-  "src/styles/globals.css",
+  "front/src/styles/globals.css",
   "design/system/src/styles/tokens.css",
 ] as const;
 
+const UNIVERSAL_DEPENDENCY_PATHS = [
+  "package.json",
+  "front/package.json",
+  "pnpm-lock.yaml",
+  "front/playwright.config.ts",
+  ".github/workflows/ci.yml",
+  "front/src/styles/globals.css",
+  "design/system/src/styles/tokens.css",
+  "front/tests/e2e/support/approved-mockup-manifest.ts",
+  "front/tests/e2e/support/approved-mockup-contract.ts",
+  "front/tests/e2e/support/approved-route-scenarios.ts",
+  "front/tests/e2e/support/approved-route-harness.ts",
+  "front/tests/e2e/support/approved-route-request-audit.ts",
+  "front/tests/e2e/support/approved-route-geometry.ts",
+  "front/tests/performance/visual-authority-docker.ts",
+  "front/scripts/run-visual-authority-docker.ts",
+  "front/scripts/list-affected-visual-authorities.ts",
+  "front/tests/e2e/approved-route-stress.spec.ts",
+] as const;
+
 const ADMIN_SHARED_DEPENDENCIES = [
-  "features/platform-admin/ui/admin-shell.css",
-  "features/platform-admin/ui/admin-page-patterns.css",
-  "features/platform-admin/ui/admin-editorial-ledger.css",
-  "features/platform-admin/route/admin-shell-layout.tsx",
+  "front/features/platform-admin/ui/admin-shell.css",
+  "front/features/platform-admin/ui/admin-page-patterns.css",
+  "front/features/platform-admin/ui/admin-editorial-ledger.css",
+  "front/features/platform-admin/route/admin-shell-layout.tsx",
+  "front/src/app/routes/admin.tsx",
+  "front/tests/e2e/admin-approved-routes.spec.ts",
+  "front/tests/e2e/support/admin-approved-route-fixtures.ts",
+  "front/tests/e2e/approved-route-auth-scope.spec.ts",
   ...TYPOGRAPHY_TOKEN_PATHS,
 ] as const;
 
 const ADMIN_TODAY_DEPENDENCIES = [
-  "features/platform-admin/ui/admin-today-ledger.tsx",
-  "features/platform-admin/ui/admin-today-controls.tsx",
-  "features/platform-admin/ui/admin-operations-queue.tsx",
-  "features/platform-admin/ui/admin-case-docket.tsx",
-  "features/platform-admin/ui/admin-operation-mobile-detail.tsx",
-  "features/platform-admin/ui/admin-editorial-ledger.fixtures.ts",
-  "features/platform-admin/ui/admin-editorial-ledger.ct.tsx",
-  "features/platform-admin/route/admin-today-route.tsx",
+  "front/features/platform-admin/ui/admin-today-ledger.tsx",
+  "front/features/platform-admin/ui/admin-today-controls.tsx",
+  "front/features/platform-admin/ui/admin-operations-queue.tsx",
+  "front/features/platform-admin/ui/admin-case-docket.tsx",
+  "front/features/platform-admin/ui/admin-operation-mobile-detail.tsx",
+  "front/features/platform-admin/ui/admin-editorial-ledger.fixtures.ts",
+  "front/features/platform-admin/ui/admin-editorial-ledger.ct.tsx",
+  "front/features/platform-admin/route/admin-today-route.tsx",
+  "front/features/platform-admin/ui/admin-today.css",
+  "front/features/platform-admin/model/platform-admin-operations-model.ts",
+  "front/features/platform-admin/route/use-admin-today-controller.ts",
 ] as const;
 
 const ADMIN_CLUBS_DEPENDENCIES = [
-  "features/platform-admin/ui/admin-club-management.css",
-  "features/platform-admin/ui/admin-clubs-ledger.tsx",
-  "features/platform-admin/route/admin-clubs-route.tsx",
+  "front/features/platform-admin/ui/admin-club-management.css",
+  "front/features/platform-admin/ui/admin-clubs-ledger.tsx",
+  "front/features/platform-admin/route/admin-clubs-route.tsx",
 ] as const;
 
 const ADMIN_SERVICE_DEPENDENCIES = [
-  "features/platform-admin/ui/admin-service-status.css",
-  "features/platform-admin/ui/admin-health-grid.tsx",
-  "features/platform-admin/route/admin-health-route.tsx",
+  "front/features/platform-admin/ui/admin-service-status.css",
+  "front/features/platform-admin/ui/admin-health-grid.tsx",
+  "front/features/platform-admin/route/admin-health-route.tsx",
 ] as const;
 
 const ADMIN_RECORDS_DEPENDENCIES = [
-  "features/platform-admin/ui/admin-processing-records.css",
-  "features/platform-admin/ui/admin-audit-ledger.tsx",
-  "features/platform-admin/route/admin-audit-route.tsx",
+  "front/features/platform-admin/ui/admin-processing-records.css",
+  "front/features/platform-admin/ui/admin-audit-ledger.tsx",
+  "front/features/platform-admin/route/admin-audit-route.tsx",
 ] as const;
 
 const ADMIN_SPACE_SWITCHER_DEPENDENCIES = [
-  "shared/ui/global-space-switcher.tsx",
-  "features/platform-admin/route/admin-shell-layout.ct.tsx",
+  "front/shared/ui/global-space-switcher.tsx",
+  "front/features/platform-admin/route/admin-shell-layout.ct.tsx",
 ] as const;
 
 const HOST_SHARED_DEPENDENCIES = [
-  "shared/ui/app-club-shell.tsx",
-  "features/host/ui/shell/host-shell.css",
-  "features/host/ui/shell/host-primary-navigation.tsx",
-  "features/host/ui/shell/host-shell.ct.tsx",
-  "features/host/ui/host-editorial-ledger.css",
+  "front/shared/ui/app-club-shell.tsx",
+  "front/features/host/ui/shell/host-shell.css",
+  "front/features/host/ui/shell/host-primary-navigation.tsx",
+  "front/features/host/ui/shell/host-shell.ct.tsx",
+  "front/features/host/ui/host-editorial-ledger.css",
+  "front/src/app/routes/host.tsx",
+  "front/tests/e2e/host-approved-routes.spec.ts",
+  "front/tests/e2e/support/host-approved-route-fixtures.ts",
   ...TYPOGRAPHY_TOKEN_PATHS,
 ] as const;
 
 const HOST_OPERATING_ROOM_DEPENDENCIES = [
-  "features/host/ui/operating-room/host-operating-room-page.tsx",
-  "features/host/ui/operating-room/operating-room.css",
-  "features/host/ui/operating-room/host-operating-room-responsive.ct.tsx",
-  "features/host/ui/workbox/host-workbox.css",
-  "features/host/ui/workbox/host-workbox.tsx",
-  "features/host/ui/workbox/host-work-item.tsx",
-  "features/host/ui/session-closing-board.tsx",
-  "features/host/ui/session-closing-board.css",
+  "front/features/host/ui/operating-room/host-operating-room-page.tsx",
+  "front/features/host/ui/operating-room/operating-room.css",
+  "front/features/host/ui/operating-room/host-operating-room-responsive.ct.tsx",
+  "front/features/host/ui/workbox/host-workbox.css",
+  "front/features/host/ui/workbox/host-workbox.tsx",
+  "front/features/host/ui/workbox/host-work-item.tsx",
+  "front/features/host/ui/session-closing-board.tsx",
+  "front/features/host/ui/session-closing-board.css",
+  "front/features/host/model/host-workbox-model.ts",
+  "front/features/host/route/host-dashboard-route.tsx",
 ] as const;
 
 const HOST_MEETINGS_DEPENDENCIES = [
-  "features/host/ui/meeting-list/host-meeting-list.tsx",
-  "features/host/ui/meeting-list/meeting-toc.css",
-  "features/host/route/host-meeting-list-route.tsx",
+  "front/features/host/ui/meeting-list/host-meeting-list.tsx",
+  "front/features/host/ui/meeting-list/meeting-toc.css",
+  "front/features/host/route/host-meeting-list-route.tsx",
 ] as const;
 
 const HOST_PEOPLE_DEPENDENCIES = [
-  "features/host/ui/members/member-list.tsx",
-  "features/host/ui/members/member-ledger.css",
-  "features/host/ui/host-members.tsx",
-  "features/host/route/host-members-route.tsx",
+  "front/features/host/ui/members/member-list.tsx",
+  "front/features/host/ui/members/member-ledger.css",
+  "front/features/host/ui/host-members.tsx",
+  "front/features/host/route/host-members-route.tsx",
 ] as const;
 
 const HOST_RECORDS_DEPENDENCIES = [
-  "features/host/ui/host-session-ledger.tsx",
-  "features/host/route/host-session-ledger-route.tsx",
+  "front/features/host/ui/host-session-ledger.tsx",
+  "front/features/host/route/host-session-ledger-route.tsx",
 ] as const;
 
 const HOST_SETTINGS_DEPENDENCIES = [
-  "features/host/ui/settings/host-club-settings.tsx",
-  "features/host/ui/settings/host-invitation-links.tsx",
-  "features/host/ui/host-invitations.tsx",
-  "features/host/route/host-settings-route.tsx",
-  "features/host/route/host-invitations-route.tsx",
+  "front/features/host/ui/settings/host-club-settings.tsx",
+  "front/features/host/ui/settings/host-invitation-links.tsx",
+  "front/features/host/ui/host-invitations.tsx",
+  "front/features/host/route/host-settings-route.tsx",
+  "front/features/host/route/host-invitations-route.tsx",
 ] as const;
 
 const HOST_SCHEDULE_REVIEW_DEPENDENCIES = [
-  "features/host/ui/schedule-review/host-schedule-review-header.tsx",
-  "features/host/ui/schedule-review/host-schedule-review-page.tsx",
-  "features/host/ui/schedule-review/host-schedule-review.css",
-  "features/host/ui/notifications/manual-notification-preview.tsx",
-  "features/host/route/host-schedule-review-route.tsx",
+  "front/features/host/ui/schedule-review/host-schedule-review-header.tsx",
+  "front/features/host/ui/schedule-review/host-schedule-review-page.tsx",
+  "front/features/host/ui/schedule-review/host-schedule-review.css",
+  "front/features/host/ui/notifications/manual-notification-preview.tsx",
+  "front/features/host/route/host-schedule-review-route.tsx",
 ] as const;
 
 const HOST_PERSON_DEPENDENCIES = [
-  "features/host/ui/person/host-person-detail.tsx",
-  "features/host/ui/person/host-person-detail.css",
-  "features/host/route/host-person-detail-route.tsx",
+  "front/features/host/ui/person/host-person-detail.tsx",
+  "front/features/host/ui/person/host-person-detail.css",
+  "front/features/host/route/host-person-detail-route.tsx",
 ] as const;
 
 function entry(
@@ -155,7 +214,7 @@ export const APPROVED_MOCKUPS: readonly ApprovedMockupEntry[] = [
     referenceSize: ADMIN_DESKTOP_SIZE,
     cssViewport: ADMIN_DESKTOP_SIZE,
     dependencyPaths: [...ADMIN_SHARED_DEPENDENCIES, ...ADMIN_TODAY_DEPENDENCIES],
-    ownerTest: "admin-editorial-ledger.ct.tsx",
+    ownerTest: ADMIN_OWNER_TEST,
   }),
   entry({
     id: "admin-clubs-desktop",
@@ -165,7 +224,7 @@ export const APPROVED_MOCKUPS: readonly ApprovedMockupEntry[] = [
     referenceSize: ADMIN_DESKTOP_SIZE,
     cssViewport: ADMIN_DESKTOP_SIZE,
     dependencyPaths: [...ADMIN_SHARED_DEPENDENCIES, ...ADMIN_CLUBS_DEPENDENCIES],
-    ownerTest: "admin-editorial-ledger.ct.tsx",
+    ownerTest: ADMIN_OWNER_TEST,
   }),
   entry({
     id: "admin-service-desktop",
@@ -175,7 +234,7 @@ export const APPROVED_MOCKUPS: readonly ApprovedMockupEntry[] = [
     referenceSize: ADMIN_DESKTOP_SIZE,
     cssViewport: ADMIN_DESKTOP_SIZE,
     dependencyPaths: [...ADMIN_SHARED_DEPENDENCIES, ...ADMIN_SERVICE_DEPENDENCIES],
-    ownerTest: "admin-editorial-ledger.ct.tsx",
+    ownerTest: ADMIN_OWNER_TEST,
   }),
   entry({
     id: "admin-records-desktop",
@@ -185,7 +244,7 @@ export const APPROVED_MOCKUPS: readonly ApprovedMockupEntry[] = [
     referenceSize: ADMIN_DESKTOP_SIZE,
     cssViewport: ADMIN_DESKTOP_SIZE,
     dependencyPaths: [...ADMIN_SHARED_DEPENDENCIES, ...ADMIN_RECORDS_DEPENDENCIES],
-    ownerTest: "admin-editorial-ledger.ct.tsx",
+    ownerTest: ADMIN_OWNER_TEST,
   }),
   entry({
     id: "admin-space-switcher-desktop",
@@ -195,7 +254,7 @@ export const APPROVED_MOCKUPS: readonly ApprovedMockupEntry[] = [
     referenceSize: ADMIN_DESKTOP_SIZE,
     cssViewport: ADMIN_DESKTOP_SIZE,
     dependencyPaths: [...ADMIN_SHARED_DEPENDENCIES, ...ADMIN_SPACE_SWITCHER_DEPENDENCIES],
-    ownerTest: "admin-shell-layout.ct.tsx",
+    ownerTest: ADMIN_OWNER_TEST,
   }),
   entry({
     id: "admin-today-mobile",
@@ -205,7 +264,7 @@ export const APPROVED_MOCKUPS: readonly ApprovedMockupEntry[] = [
     referenceSize: ADMIN_MOBILE_REFERENCE_SIZE,
     cssViewport: ADMIN_MOBILE_VIEWPORT,
     dependencyPaths: [...ADMIN_SHARED_DEPENDENCIES, ...ADMIN_TODAY_DEPENDENCIES],
-    ownerTest: "admin-editorial-ledger.ct.tsx",
+    ownerTest: ADMIN_OWNER_TEST,
   }),
   entry({
     id: "admin-work-detail-mobile",
@@ -215,7 +274,7 @@ export const APPROVED_MOCKUPS: readonly ApprovedMockupEntry[] = [
     referenceSize: ADMIN_MOBILE_REFERENCE_SIZE,
     cssViewport: ADMIN_MOBILE_VIEWPORT,
     dependencyPaths: [...ADMIN_SHARED_DEPENDENCIES, ...ADMIN_TODAY_DEPENDENCIES],
-    ownerTest: "admin-editorial-ledger.ct.tsx",
+    ownerTest: ADMIN_OWNER_TEST,
   }),
   entry({
     id: "host-prep-desktop",
@@ -225,7 +284,7 @@ export const APPROVED_MOCKUPS: readonly ApprovedMockupEntry[] = [
     referenceSize: HOST_DESKTOP_SIZE,
     cssViewport: HOST_DESKTOP_SIZE,
     dependencyPaths: [...HOST_SHARED_DEPENDENCIES, ...HOST_OPERATING_ROOM_DEPENDENCIES],
-    ownerTest: "host-operating-room-responsive.ct.tsx",
+    ownerTest: HOST_OWNER_TEST,
   }),
   entry({
     id: "host-live-desktop",
@@ -235,7 +294,7 @@ export const APPROVED_MOCKUPS: readonly ApprovedMockupEntry[] = [
     referenceSize: HOST_DESKTOP_SIZE,
     cssViewport: HOST_DESKTOP_SIZE,
     dependencyPaths: [...HOST_SHARED_DEPENDENCIES, ...HOST_OPERATING_ROOM_DEPENDENCIES],
-    ownerTest: "host-operating-room-responsive.ct.tsx",
+    ownerTest: HOST_OWNER_TEST,
   }),
   entry({
     id: "host-closing-desktop",
@@ -245,7 +304,7 @@ export const APPROVED_MOCKUPS: readonly ApprovedMockupEntry[] = [
     referenceSize: HOST_DESKTOP_SIZE,
     cssViewport: HOST_DESKTOP_SIZE,
     dependencyPaths: [...HOST_SHARED_DEPENDENCIES, ...HOST_OPERATING_ROOM_DEPENDENCIES],
-    ownerTest: "host-operating-room-responsive.ct.tsx",
+    ownerTest: HOST_OWNER_TEST,
   }),
   entry({
     id: "host-meetings-desktop",
@@ -255,7 +314,7 @@ export const APPROVED_MOCKUPS: readonly ApprovedMockupEntry[] = [
     referenceSize: HOST_DESKTOP_SIZE,
     cssViewport: HOST_DESKTOP_SIZE,
     dependencyPaths: [...HOST_SHARED_DEPENDENCIES, ...HOST_MEETINGS_DEPENDENCIES],
-    ownerTest: "approved-host-ledgers.ct.tsx",
+    ownerTest: HOST_OWNER_TEST,
   }),
   entry({
     id: "host-people-desktop",
@@ -265,7 +324,7 @@ export const APPROVED_MOCKUPS: readonly ApprovedMockupEntry[] = [
     referenceSize: HOST_DESKTOP_SIZE,
     cssViewport: HOST_DESKTOP_SIZE,
     dependencyPaths: [...HOST_SHARED_DEPENDENCIES, ...HOST_PEOPLE_DEPENDENCIES],
-    ownerTest: "approved-host-ledgers.ct.tsx",
+    ownerTest: HOST_OWNER_TEST,
   }),
   entry({
     id: "host-records-desktop",
@@ -275,7 +334,7 @@ export const APPROVED_MOCKUPS: readonly ApprovedMockupEntry[] = [
     referenceSize: HOST_DESKTOP_SIZE,
     cssViewport: HOST_DESKTOP_SIZE,
     dependencyPaths: [...HOST_SHARED_DEPENDENCIES, ...HOST_RECORDS_DEPENDENCIES],
-    ownerTest: "approved-host-ledgers.ct.tsx",
+    ownerTest: HOST_OWNER_TEST,
   }),
   entry({
     id: "host-settings-desktop",
@@ -285,7 +344,7 @@ export const APPROVED_MOCKUPS: readonly ApprovedMockupEntry[] = [
     referenceSize: HOST_DESKTOP_SIZE,
     cssViewport: HOST_DESKTOP_SIZE,
     dependencyPaths: [...HOST_SHARED_DEPENDENCIES, ...HOST_SETTINGS_DEPENDENCIES],
-    ownerTest: "approved-host-ledgers.ct.tsx",
+    ownerTest: HOST_OWNER_TEST,
   }),
   entry({
     id: "host-schedule-review-desktop",
@@ -295,7 +354,7 @@ export const APPROVED_MOCKUPS: readonly ApprovedMockupEntry[] = [
     referenceSize: HOST_DESKTOP_SIZE,
     cssViewport: HOST_DESKTOP_SIZE,
     dependencyPaths: [...HOST_SHARED_DEPENDENCIES, ...HOST_SCHEDULE_REVIEW_DEPENDENCIES],
-    ownerTest: "approved-host-ledgers.ct.tsx",
+    ownerTest: HOST_OWNER_TEST,
   }),
   entry({
     id: "host-prep-mobile",
@@ -305,7 +364,7 @@ export const APPROVED_MOCKUPS: readonly ApprovedMockupEntry[] = [
     referenceSize: HOST_MOBILE_REFERENCE_SIZE,
     cssViewport: HOST_MOBILE_VIEWPORT,
     dependencyPaths: [...HOST_SHARED_DEPENDENCIES, ...HOST_OPERATING_ROOM_DEPENDENCIES],
-    ownerTest: "host-operating-room-responsive.ct.tsx",
+    ownerTest: HOST_OWNER_TEST,
   }),
   entry({
     id: "host-live-mobile",
@@ -315,7 +374,7 @@ export const APPROVED_MOCKUPS: readonly ApprovedMockupEntry[] = [
     referenceSize: HOST_MOBILE_REFERENCE_SIZE,
     cssViewport: HOST_MOBILE_VIEWPORT,
     dependencyPaths: [...HOST_SHARED_DEPENDENCIES, ...HOST_OPERATING_ROOM_DEPENDENCIES],
-    ownerTest: "host-operating-room-responsive.ct.tsx",
+    ownerTest: HOST_OWNER_TEST,
   }),
   entry({
     id: "host-person-mobile",
@@ -329,11 +388,118 @@ export const APPROVED_MOCKUPS: readonly ApprovedMockupEntry[] = [
       ...HOST_PERSON_DEPENDENCIES,
       ...HOST_PEOPLE_DEPENDENCIES,
     ],
-    ownerTest: "approved-host-ledgers.ct.tsx",
+    ownerTest: HOST_OWNER_TEST,
   }),
 ];
 
+const UNIVERSAL_DEPENDENCY_SET = new Set<string>(UNIVERSAL_DEPENDENCY_PATHS);
+const ADMIN_IDS = APPROVED_MOCKUPS.filter((entry) => entry.role === "admin").map((entry) => entry.id);
+const HOST_IDS = APPROVED_MOCKUPS.filter((entry) => entry.role === "host").map((entry) => entry.id);
+const ALL_IDS = APPROVED_MOCKUPS.map((entry) => entry.id);
+
+function canonicalizeRepositoryPath(path: string): string {
+  return path.replace(/^\.\//, "").replace(/\\/g, "/");
+}
+
+export function approvedReferenceRepositoryPath(entry: ApprovedMockupEntry): string {
+  if (entry.referencePath.startsWith("../")) {
+    return entry.referencePath.replace(/^\.\.\//, "");
+  }
+  return canonicalizeRepositoryPath(entry.referencePath);
+}
+
+function pathMatchesPrefix(path: string, prefix: string): boolean {
+  return path === prefix || path.startsWith(`${prefix}/`);
+}
+
+function isVisualSensitivePath(path: string): boolean {
+  const normalized = canonicalizeRepositoryPath(path);
+  if (UNIVERSAL_DEPENDENCY_SET.has(normalized)) return true;
+  if (pathMatchesPrefix(normalized, "front/features/platform-admin")) return true;
+  if (pathMatchesPrefix(normalized, "front/features/host")) return true;
+  if (pathMatchesPrefix(normalized, "front/src/app/routes") && /(?:^|\/)(admin|host)\.tsx$/.test(normalized)) return true;
+  if (pathMatchesPrefix(normalized, "front/src/app/host-routes")) return true;
+  if (pathMatchesPrefix(normalized, "front/src/app/layouts")) return true;
+  if (pathMatchesPrefix(normalized, "front/shared/ui")) return true;
+  if (pathMatchesPrefix(normalized, "front/shared/auth")) return true;
+  if (pathMatchesPrefix(normalized, "front/shared/styles")) return true;
+  if (pathMatchesPrefix(normalized, "front/src/styles")) return true;
+  if (pathMatchesPrefix(normalized, "design/system")) return true;
+  if (pathMatchesPrefix(normalized, "design/mockups/2026-08-30-admin-operations-redesign")) return true;
+  if (pathMatchesPrefix(normalized, "docs/development/host-redesign-mockups")) return true;
+  if (pathMatchesPrefix(normalized, "front/tests/e2e/support") && normalized.includes("approved-")) return true;
+  if (normalized === "front/tests/e2e/admin-approved-routes.spec.ts") return true;
+  if (normalized === "front/tests/e2e/host-approved-routes.spec.ts") return true;
+  if (normalized.startsWith("front/tests/e2e/approved-route-")) return true;
+  if (normalized === "front/tests/performance/visual-authority-docker.ts") return true;
+  if (normalized === "front/scripts/run-visual-authority-docker.ts") return true;
+  if (normalized === "front/scripts/list-affected-visual-authorities.ts") return true;
+  return false;
+}
+
+function idsForExactDependency(path: string): ApprovedMockupId[] {
+  return APPROVED_MOCKUPS
+    .filter((entry) =>
+      entry.dependencyPaths.includes(path) || approvedReferenceRepositoryPath(entry) === path,
+    )
+    .map((entry) => entry.id);
+}
+
+function idsForRolePartition(path: string): ApprovedMockupId[] {
+  if (
+    pathMatchesPrefix(path, "front/features/platform-admin")
+    || path === "front/src/app/routes/admin.tsx"
+    || path === "front/tests/e2e/admin-approved-routes.spec.ts"
+    || path === "front/tests/e2e/support/admin-approved-route-fixtures.ts"
+  ) {
+    return [...ADMIN_IDS];
+  }
+  if (
+    pathMatchesPrefix(path, "front/features/host")
+    || path === "front/src/app/routes/host.tsx"
+    || pathMatchesPrefix(path, "front/src/app/host-routes")
+    || path === "front/tests/e2e/host-approved-routes.spec.ts"
+    || path === "front/tests/e2e/support/host-approved-route-fixtures.ts"
+  ) {
+    return [...HOST_IDS];
+  }
+  if (
+    pathMatchesPrefix(path, "front/shared/ui")
+    || pathMatchesPrefix(path, "front/shared/auth")
+    || pathMatchesPrefix(path, "front/shared/styles")
+    || pathMatchesPrefix(path, "front/src/app/layouts")
+  ) {
+    return [...ALL_IDS];
+  }
+  return [];
+}
+
+export function approvedMockupIdsAffectedBy(changedPaths: readonly string[]): readonly ApprovedMockupId[] {
+  const ids = new Set<ApprovedMockupId>();
+  for (const changedPath of changedPaths) {
+    const path = canonicalizeRepositoryPath(changedPath);
+    if (UNIVERSAL_DEPENDENCY_SET.has(path)) {
+      for (const id of ALL_IDS) ids.add(id);
+      continue;
+    }
+    const exact = idsForExactDependency(path);
+    if (exact.length > 0) {
+      for (const id of exact) ids.add(id);
+      continue;
+    }
+    for (const id of idsForRolePartition(path)) ids.add(id);
+  }
+  return APPROVED_MOCKUPS.map((entry) => entry.id).filter((id) => ids.has(id));
+}
+
 export function approvedMockupsAffectedBy(changedPaths: readonly string[]): readonly ApprovedMockupEntry[] {
-  const normalized = new Set(changedPaths.map((path) => path.replace(/^front\//, "")));
-  return APPROVED_MOCKUPS.filter((entry) => entry.dependencyPaths.some((path) => normalized.has(path)));
+  const ids = new Set(approvedMockupIdsAffectedBy(changedPaths));
+  return APPROVED_MOCKUPS.filter((entry) => ids.has(entry.id));
+}
+
+export function unmappedVisualSensitivePaths(changedPaths: readonly string[]): readonly string[] {
+  return changedPaths.filter((changedPath) => {
+    const path = canonicalizeRepositoryPath(changedPath);
+    return isVisualSensitivePath(path) && approvedMockupIdsAffectedBy([path]).length === 0;
+  });
 }

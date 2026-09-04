@@ -25,15 +25,17 @@ import {
   HostOperatingRoomPage,
   type AttendanceRecoveryView,
 } from "./host-operating-room-page";
+import {
+  HOST_BODY_DESKTOP_GEOMETRY as BODY_DESKTOP_GEOMETRY,
+  HOST_LIVE_MOBILE_BOARD_GEOMETRY as LIVE_MOBILE_BOARD_GEOMETRY,
+  HOST_LIVE_MOBILE_MAIN_GEOMETRY as LIVE_MOBILE_MAIN_GEOMETRY,
+  HOST_MOBILE_NAV_GEOMETRY as MOBILE_NAV_GEOMETRY,
+  HOST_PREP_MOBILE_MAIN_GEOMETRY as PREP_MOBILE_MAIN_GEOMETRY,
+  HOST_WORKBOX_DESKTOP_GEOMETRY as WORKBOX_DESKTOP_GEOMETRY,
+} from "@/tests/e2e/support/approved-route-geometry";
 
 const APPROVED_DESKTOP_VIEWPORT = { width: 1536, height: 1024 } as const;
 const APPROVED_MOBILE_VIEWPORT = { width: 390, height: 832 } as const;
-const BODY_DESKTOP_GEOMETRY = { x: 36, y: 319, width: 1465, height: 665 } as const;
-const WORKBOX_DESKTOP_GEOMETRY = { x: 988, y: 319, width: 513, height: 665 } as const;
-const MOBILE_NAV_GEOMETRY = { x: 0, y: 768, width: 390, height: 64 } as const;
-const PREP_MOBILE_MAIN_GEOMETRY = { x: 19, y: 58, width: 352, height: 902 } as const;
-const LIVE_MOBILE_MAIN_GEOMETRY = { x: 19, y: 58, width: 352, height: 806 } as const;
-const LIVE_MOBILE_BOARD_GEOMETRY = { x: 19, y: 200, width: 352, height: 600 } as const;
 
 const phaseLinks = [
   { id: "prep", label: "준비실", availability: "available", blockedReason: null, href: "?phase=prep" },

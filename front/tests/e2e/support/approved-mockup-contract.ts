@@ -22,13 +22,79 @@ export type ApprovedComparisonInput = {
   regions: readonly ApprovedRegion[];
 };
 
+export const CANONICAL_RENDERER_IMAGE = "mcr.microsoft.com/playwright:v1.61.1-jammy";
+export const APPROVED_COMPARISON_REPORT_SCHEMA_VERSION = 1 as const;
+
 export type ApprovedComparisonReport = {
+  schemaVersion: typeof APPROVED_COMPARISON_REPORT_SCHEMA_VERSION;
   id: string;
   referenceSha256: string;
   candidateSha256: string;
   normalizedSize: { width: number; height: number };
   mismatchPixelRatio: number;
+  mismatchPassed: boolean;
   regions: Array<ApprovedRegion & { deltas: { x: number; y: number; width: number; height: number } }>;
+  renderer: {
+    image: string;
+    browser: string;
+    playwrightVersion: string;
+    nodeVersion: string;
+    pnpmVersion: string;
+    dpr: number;
+    pretendardFaces: string[];
+  };
+  viewport: { width: number; height: number };
+  geometry: Array<ApprovedRegion & { deltas: { x: number; y: number; width: number; height: number }; passed: boolean }>;
+  typography: Array<{
+    name: string;
+    selector: string;
+    passed: boolean;
+    actual: { fontFamily: string; fontSizePx: number; fontWeight: string; lineHeightPx: number | "normal"; color: string };
+    expected: { fontFamilyIncludes: "Pretendard"; fontSizePx: number; fontWeight: readonly number[]; lineHeightPx: number | "normal"; color: string };
+  }>;
+  firstViewport: Array<{ name: string; selector: string; visibility: "fully-visible" | "intersects"; passed: boolean }>;
+  defaultVisibleCount: { selector: string; expected: 3 | 4; actual: number; passed: boolean } | null;
+  overflow: { horizontalCssPx: number; passed: boolean };
+  interactions: Array<{ name: string; passed: boolean; detail: string }>;
+  requestAudit: { unmatched: number; effecting: number; preview: number; passed: boolean };
+  mask: null;
+  verdict: "pass" | "fail";
+};
+
+export type ApprovedRouteAssertionResults = {
+  geometry: ApprovedComparisonReport["geometry"];
+  typography: ApprovedComparisonReport["typography"];
+  firstViewport: ApprovedComparisonReport["firstViewport"];
+  defaultVisibleCount: ApprovedComparisonReport["defaultVisibleCount"];
+  overflow: ApprovedComparisonReport["overflow"];
+  interactions: ApprovedComparisonReport["interactions"];
+  requestAudit: ApprovedComparisonReport["requestAudit"];
+};
+
+export const APPROVED_COMPARISON_REPORT_REQUIRED_FIELDS = [
+  "schemaVersion",
+  "id",
+  "referenceSha256",
+  "candidateSha256",
+  "normalizedSize",
+  "mismatchPixelRatio",
+  "mismatchPassed",
+  "regions",
+  "renderer",
+  "viewport",
+  "geometry",
+  "typography",
+  "firstViewport",
+  "defaultVisibleCount",
+  "overflow",
+  "interactions",
+  "requestAudit",
+  "mask",
+  "verdict",
+] as const satisfies readonly (keyof ApprovedComparisonReport)[];
+
+export type ArtifactWriter = {
+  outputPath: (...segments: string[]) => string;
 };
 
 export function approvedMockup(id: string): ApprovedMockupEntry {
@@ -161,24 +227,79 @@ export async function compareApprovedPngs({ referenceBase64, candidateBase64, si
   };
 }
 
-function buildApprovedComparisonReport(
-  entry: ApprovedMockupEntry,
-  candidatePng: Buffer,
-  mismatchPixelRatio: number,
-  regions: readonly ApprovedRegion[],
-): ApprovedComparisonReport {
+function regionDeltas(region: ApprovedRegion): { x: number; y: number; width: number; height: number } {
+  return Object.fromEntries((["x", "y", "width", "height"] as const).map((key) =>
+    [key, Math.abs(region.actual[key] - region.expected[key])],
+  )) as { x: number; y: number; width: number; height: number };
+}
+
+function passedResultsFromRegions(regions: readonly ApprovedRegion[]): ApprovedRouteAssertionResults {
   return {
-    id: entry.id,
-    referenceSha256: entry.sha256,
-    candidateSha256: createHash("sha256").update(candidatePng).digest("hex"),
-    normalizedSize: entry.referenceSize,
-    mismatchPixelRatio,
-    regions: regions.map((region) => ({
-      ...region,
-      deltas: Object.fromEntries((["x", "y", "width", "height"] as const).map((key) =>
-        [key, Math.abs(region.actual[key] - region.expected[key])],
-      )) as ApprovedComparisonReport["regions"][number]["deltas"],
-    })),
+    geometry: regions.map((region) => {
+      const deltas = regionDeltas(region);
+      const passed = (["x", "y", "width", "height"] as const).every((key) => deltas[key] <= region.toleranceCssPx);
+      return { ...region, deltas, passed };
+    }),
+    typography: [],
+    firstViewport: [],
+    defaultVisibleCount: null,
+    overflow: { horizontalCssPx: 0, passed: true },
+    interactions: [],
+    requestAudit: { unmatched: 0, effecting: 0, preview: 0, passed: true },
+  };
+}
+
+function processFingerprint(): ApprovedComparisonReport["renderer"] {
+  return {
+    image: CANONICAL_RENDERER_IMAGE,
+    browser: process.env.READMATES_VISUAL_AUTHORITY_BROWSER ?? "chromium",
+    playwrightVersion: process.env.READMATES_VISUAL_AUTHORITY_PLAYWRIGHT_VERSION ?? "1.61.1",
+    nodeVersion: process.version.replace(/^v/, ""),
+    pnpmVersion: process.env.READMATES_VISUAL_AUTHORITY_PNPM_VERSION ?? "11.13.1",
+    dpr: Number(process.env.READMATES_VISUAL_AUTHORITY_DPR ?? "1"),
+    pretendardFaces: ["Pretendard Variable"],
+  };
+}
+
+function buildApprovedComparisonReport(input: {
+  entry: ApprovedMockupEntry;
+  candidatePng: Buffer;
+  mismatchPixelRatio: number;
+  regions: readonly ApprovedRegion[];
+  results: ApprovedRouteAssertionResults;
+  fingerprint: ApprovedComparisonReport["renderer"];
+  viewport: { width: number; height: number };
+}): ApprovedComparisonReport {
+  const mismatchPassed = input.mismatchPixelRatio <= input.entry.maxDiffPixelRatio;
+  const subResultsPassed = input.results.geometry.every((item) => item.passed)
+    && input.results.typography.every((item) => item.passed)
+    && input.results.firstViewport.every((item) => item.passed)
+    && (input.results.defaultVisibleCount?.passed ?? true)
+    && input.results.overflow.passed
+    && input.results.interactions.every((item) => item.passed)
+    && input.results.requestAudit.passed
+    && input.results.requestAudit.unmatched === 0
+    && input.results.requestAudit.effecting === 0;
+  return {
+    schemaVersion: APPROVED_COMPARISON_REPORT_SCHEMA_VERSION,
+    id: input.entry.id,
+    referenceSha256: input.entry.sha256,
+    candidateSha256: createHash("sha256").update(input.candidatePng).digest("hex"),
+    normalizedSize: input.entry.referenceSize,
+    mismatchPixelRatio: input.mismatchPixelRatio,
+    mismatchPassed,
+    regions: input.regions.map((region) => ({ ...region, deltas: regionDeltas(region) })),
+    renderer: input.fingerprint,
+    viewport: input.viewport,
+    geometry: input.results.geometry,
+    typography: input.results.typography,
+    firstViewport: input.results.firstViewport,
+    defaultVisibleCount: input.results.defaultVisibleCount,
+    overflow: input.results.overflow,
+    interactions: input.results.interactions,
+    requestAudit: input.results.requestAudit,
+    mask: null,
+    verdict: mismatchPassed && subResultsPassed ? "pass" : "fail",
   };
 }
 
@@ -190,8 +311,8 @@ function decodePngDataUrl(value: string): Buffer {
   return decoded;
 }
 
-function writeApprovedArtifacts(
-  testInfo: TestInfo,
+export function writeApprovedArtifacts(
+  testInfo: ArtifactWriter,
   id: string,
   reference: Buffer,
   rendered: { candidate: string; overlay: string; diff: string },
@@ -206,26 +327,137 @@ function writeApprovedArtifacts(
   writeFileSync(output("report.json"), `${JSON.stringify(report, null, 2)}\n`);
 }
 
+function rendererFingerprintComplete(renderer: ApprovedComparisonReport["renderer"] | undefined): boolean {
+  if (!renderer) return false;
+  return Boolean(
+    renderer.image
+    && renderer.browser
+    && renderer.playwrightVersion
+    && renderer.nodeVersion
+    && renderer.pnpmVersion
+    && Number.isFinite(renderer.dpr)
+    && Array.isArray(renderer.pretendardFaces),
+  );
+}
+
+export function assertApprovedRouteReport(report: ApprovedComparisonReport): void {
+  for (const field of APPROVED_COMPARISON_REPORT_REQUIRED_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(report, field) || report[field] === undefined) {
+      throw new Error(`Missing report field: ${field}`);
+    }
+  }
+  if (report.schemaVersion !== APPROVED_COMPARISON_REPORT_SCHEMA_VERSION) {
+    throw new Error("schemaVersion must be 1");
+  }
+  if (report.mask !== null) {
+    throw new Error("mask must be null");
+  }
+  if (!rendererFingerprintComplete(report.renderer)) {
+    throw new Error("renderer fingerprint is incomplete");
+  }
+  assertApprovedMismatchRatio({
+    id: report.id,
+    mismatchPixelRatio: report.mismatchPixelRatio,
+    maxDiffPixelRatio: 0.02,
+  });
+  if (report.verdict !== "pass" || !report.mismatchPassed) {
+    throw new Error(`${report.id} visual authority verdict is ${report.verdict}`);
+  }
+  const failed = [
+    ...report.geometry.filter((item) => !item.passed).map((item) => `geometry:${item.name}`),
+    ...report.typography.filter((item) => !item.passed).map((item) => `typography:${item.name}`),
+    ...report.firstViewport.filter((item) => !item.passed).map((item) => `firstViewport:${item.name}`),
+    ...(report.defaultVisibleCount && !report.defaultVisibleCount.passed ? ["defaultVisibleCount"] : []),
+    ...(!report.overflow.passed ? ["overflow"] : []),
+    ...report.interactions.filter((item) => !item.passed).map((item) => `interaction:${item.name}`),
+    ...(!report.requestAudit.passed ? ["requestAudit"] : []),
+  ];
+  if (failed.length > 0) {
+    throw new Error(`${report.id} failed sub-results: ${failed.join(", ")}`);
+  }
+}
+
+export async function compareAndWriteApprovedArtifacts(input: {
+  page: Page;
+  testInfo: ArtifactWriter;
+  entry: ApprovedMockupEntry;
+  candidatePng: Buffer;
+  regions: readonly ApprovedRegion[];
+  results: ApprovedRouteAssertionResults;
+  fingerprint?: ApprovedComparisonReport["renderer"];
+  viewport?: { width: number; height: number };
+  assertAfterWrite?: boolean;
+}): Promise<ApprovedComparisonReport> {
+  verifyApprovedReference(input.entry);
+  const reference = readFileSync(resolve(process.cwd(), input.entry.referencePath));
+  const rendered = await input.page.evaluate(compareApprovedPngs, {
+    referenceBase64: reference.toString("base64"),
+    candidateBase64: input.candidatePng.toString("base64"),
+    size: input.entry.referenceSize,
+    maxChannelDelta: input.entry.maxChannelDelta,
+  });
+  const report = buildApprovedComparisonReport({
+    entry: input.entry,
+    candidatePng: input.candidatePng,
+    mismatchPixelRatio: rendered.mismatchPixelRatio,
+    regions: input.regions,
+    results: input.results,
+    fingerprint: input.fingerprint ?? processFingerprint(),
+    viewport: input.viewport ?? input.entry.cssViewport,
+  });
+  writeApprovedArtifacts(input.testInfo, input.entry.id, reference, rendered, report);
+  if (input.assertAfterWrite !== false) assertApprovedRouteReport(report);
+  return report;
+}
+
+export async function captureApprovedViewportComparison(input: {
+  page: Page;
+  testInfo: TestInfo;
+  entry: ApprovedMockupEntry;
+  regions: readonly ApprovedRegion[];
+  results: ApprovedRouteAssertionResults;
+}): Promise<ApprovedComparisonReport> {
+  await input.page.evaluate(() => document.fonts.ready);
+  await input.page.evaluate(() => window.scrollTo({ top: 0, left: 0, behavior: "auto" }));
+  const candidatePng = await input.page.screenshot({ animations: "disabled", fullPage: false });
+  const fingerprint = await readRendererFingerprint(input.page);
+  return compareAndWriteApprovedArtifacts({
+    ...input,
+    candidatePng,
+    fingerprint,
+    viewport: input.entry.cssViewport,
+    assertAfterWrite: false,
+  });
+}
+
+async function readRendererFingerprint(page: Page): Promise<ApprovedComparisonReport["renderer"]> {
+  const measured = await page.evaluate(() => ({
+    dpr: window.devicePixelRatio,
+    pretendardFaces: [...document.fonts]
+      .filter((font) => font.family.includes("Pretendard"))
+      .map((font) => font.family),
+    browser: navigator.userAgent,
+  }));
+  return {
+    ...processFingerprint(),
+    dpr: measured.dpr,
+    pretendardFaces: measured.pretendardFaces,
+    browser: measured.browser,
+  };
+}
+
 export async function captureApprovedComparison(input: ApprovedComparisonInput): Promise<ApprovedComparisonReport> {
   const { page, testInfo, entry, candidate, regions } = input;
-  verifyApprovedReference(entry);
   for (const region of regions) {
     expectGeometryWithinTolerance(region.actual, region.expected, region.toleranceCssPx);
   }
-  const reference = readFileSync(resolve(process.cwd(), entry.referencePath));
   const candidatePng = await candidate.screenshot({ animations: "disabled" });
-  const rendered = await page.evaluate(compareApprovedPngs, {
-    referenceBase64: reference.toString("base64"),
-    candidateBase64: candidatePng.toString("base64"),
-    size: entry.referenceSize,
-    maxChannelDelta: entry.maxChannelDelta,
+  return compareAndWriteApprovedArtifacts({
+    page,
+    testInfo,
+    entry,
+    candidatePng,
+    regions,
+    results: passedResultsFromRegions(regions),
   });
-  const report = buildApprovedComparisonReport(entry, candidatePng, rendered.mismatchPixelRatio, regions);
-  writeApprovedArtifacts(testInfo, entry.id, reference, rendered, report);
-  assertApprovedMismatchRatio({
-    id: entry.id,
-    mismatchPixelRatio: report.mismatchPixelRatio,
-    maxDiffPixelRatio: entry.maxDiffPixelRatio,
-  });
-  return report;
 }

@@ -21,11 +21,14 @@ import {
   ADMIN_SHELL_VISUAL_SPACE_OPTIONS,
   todayDesktopLedger,
 } from "../ui/admin-editorial-ledger.fixtures";
+import {
+  ADMIN_HEADER_DESKTOP_GEOMETRY as HEADER_DESKTOP_GEOMETRY,
+  ADMIN_HEADER_MOBILE_GEOMETRY,
+  ADMIN_RAIL_DESKTOP_GEOMETRY as NAV_DESKTOP_GEOMETRY,
+} from "@/tests/e2e/support/approved-route-geometry";
 import { AdminShellLayout } from "./admin-shell-layout";
 
 const APPROVED_DESKTOP_VIEWPORT = { width: 1672, height: 941 } as const;
-const HEADER_DESKTOP_GEOMETRY = { x: 0, y: 0, width: 1672, height: 86 } as const;
-const NAV_DESKTOP_GEOMETRY = { x: 0, y: 86, width: 260, height: 855 } as const;
 
 function shellFixture(
   outlet: ReactNode,
@@ -106,8 +109,8 @@ test("Admin desktop shell matches approved 1672 geometry", async ({ mount, page 
   await page.setViewportSize({ width: 1672, height: 941 });
   const component = await mount(shellFixture(todayShellContent));
 
-  await expectLocatorGeometry(component.locator(".admin-shell__header"), { x: 0, y: 0, width: 1672, height: 86 }, 4);
-  await expectLocatorGeometry(component.locator(".admin-shell__nav"), { x: 0, y: 86, width: 260, height: 855 }, 4);
+  await expectLocatorGeometry(component.locator(".admin-shell__header"), HEADER_DESKTOP_GEOMETRY, 4);
+  await expectLocatorGeometry(component.locator(".admin-shell__nav"), NAV_DESKTOP_GEOMETRY, 4);
   await expectNoHorizontalOverflow(page);
 });
 
@@ -115,7 +118,7 @@ test("Admin mobile shell matches approved 390 geometry", async ({ mount, page })
   await page.setViewportSize({ width: 390, height: 844 });
   const component = await mount(shellFixture(todayShellContent));
 
-  await expectLocatorGeometry(component.locator(".admin-shell__header"), { x: 0, y: 0, width: 390, height: 70 }, 4);
+  await expectLocatorGeometry(component.locator(".admin-shell__header"), ADMIN_HEADER_MOBILE_GEOMETRY, 4);
   await expect(component.getByRole("navigation", { name: "Admin 모바일 메뉴" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });

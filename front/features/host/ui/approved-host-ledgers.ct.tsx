@@ -13,27 +13,29 @@ import {
   hostScheduleReviewApprovedView,
   hostSettingsApprovedView,
 } from "./approved-host-ledgers.fixtures";
+import {
+  HOST_MEETINGS_HEADER_GEOMETRY as MEETINGS_HEADER_GEOMETRY,
+  HOST_MEETINGS_MAIN_GEOMETRY as MEETINGS_MAIN_GEOMETRY,
+  HOST_MEETINGS_NAV_GEOMETRY as MEETINGS_NAV_GEOMETRY,
+  HOST_MOBILE_NAV_GEOMETRY as PERSON_NAV_GEOMETRY,
+  HOST_PEOPLE_HEADER_GEOMETRY as PEOPLE_HEADER_GEOMETRY,
+  HOST_PEOPLE_MAIN_GEOMETRY as PEOPLE_MAIN_GEOMETRY,
+  HOST_PEOPLE_NAV_GEOMETRY as PEOPLE_NAV_GEOMETRY,
+  HOST_PERSON_HEADER_GEOMETRY as PERSON_HEADER_GEOMETRY,
+  HOST_PERSON_MAIN_GEOMETRY as PERSON_MAIN_GEOMETRY,
+  HOST_RECORDS_HEADER_GEOMETRY as RECORDS_HEADER_GEOMETRY,
+  HOST_RECORDS_MAIN_GEOMETRY as RECORDS_MAIN_GEOMETRY,
+  HOST_RECORDS_NAV_GEOMETRY as RECORDS_NAV_GEOMETRY,
+  HOST_SCHEDULE_REVIEW_HEADER_GEOMETRY as SCHEDULE_REVIEW_HEADER_GEOMETRY,
+  HOST_SCHEDULE_REVIEW_MAIN_GEOMETRY as SCHEDULE_REVIEW_MAIN_GEOMETRY,
+  HOST_SCHEDULE_REVIEW_NAV_GEOMETRY as SCHEDULE_REVIEW_NAV_GEOMETRY,
+  HOST_SETTINGS_HEADER_GEOMETRY as SETTINGS_HEADER_GEOMETRY,
+  HOST_SETTINGS_MAIN_GEOMETRY as SETTINGS_MAIN_GEOMETRY,
+  HOST_SETTINGS_NAV_GEOMETRY as SETTINGS_NAV_GEOMETRY,
+} from "@/tests/e2e/support/approved-route-geometry";
 
 const APPROVED_DESKTOP_VIEWPORT = { width: 1536, height: 1024 } as const;
 const APPROVED_MOBILE_VIEWPORT = { width: 390, height: 832 } as const;
-const MEETINGS_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
-const MEETINGS_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
-const MEETINGS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1086 } as const;
-const PEOPLE_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
-const PEOPLE_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
-const PEOPLE_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1062 } as const;
-const RECORDS_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
-const RECORDS_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
-const RECORDS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 990 } as const;
-const SETTINGS_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
-const SETTINGS_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
-const SETTINGS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1052 } as const;
-const SCHEDULE_REVIEW_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
-const SCHEDULE_REVIEW_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
-const SCHEDULE_REVIEW_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 943 } as const;
-const PERSON_HEADER_GEOMETRY = { x: 17, y: 58, width: 356, height: 143 } as const;
-const PERSON_NAV_GEOMETRY = { x: 0, y: 768, width: 390, height: 64 } as const;
-const PERSON_MAIN_GEOMETRY = { x: 1, y: 58, width: 388, height: 737 } as const;
 
 function boxesOverlap(
   left: { x: number; y: number; width: number; height: number },

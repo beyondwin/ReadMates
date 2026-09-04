@@ -55,22 +55,24 @@ import {
 } from "./admin-editorial-ledger.fixtures";
 import { AdminHealthGrid } from "./admin-health-grid";
 import { AdminPublicTakedownWorkbench } from "./admin-public-takedown-workbench";
+import {
+  ADMIN_BACK_MOBILE_GEOMETRY as BACK_MOBILE_GEOMETRY,
+  ADMIN_DETAIL_DOCKET_MOBILE_GEOMETRY as DETAIL_DOCKET_MOBILE_GEOMETRY,
+  ADMIN_DOCKET_DESKTOP_GEOMETRY as DOCKET_DESKTOP_GEOMETRY,
+  ADMIN_FIRST_ROW_MOBILE_GEOMETRY as FIRST_ROW_MOBILE_GEOMETRY,
+  ADMIN_HEADER_DESKTOP_GEOMETRY as HEADER_DESKTOP_GEOMETRY,
+  ADMIN_HEADER_MOBILE_GEOMETRY as HEADER_MOBILE_GEOMETRY,
+  ADMIN_LEDGER_DOCKET_GEOMETRY as LEDGER_DOCKET_GEOMETRY,
+  ADMIN_LEDGER_LIST_GEOMETRY as LEDGER_LIST_GEOMETRY,
+  ADMIN_NAV_MOBILE_GEOMETRY as NAV_MOBILE_GEOMETRY,
+  ADMIN_QUEUE_DESKTOP_GEOMETRY as QUEUE_DESKTOP_GEOMETRY,
+  ADMIN_RAIL_DESKTOP_GEOMETRY as NAV_DESKTOP_GEOMETRY,
+  ADMIN_SERVICE_TABLE_GEOMETRY as SERVICE_TABLE_GEOMETRY,
+} from "@/tests/e2e/support/approved-route-geometry";
 
 const APPROVED_DESKTOP_VIEWPORT = { width: 1672, height: 941 } as const;
 const APPROVED_MOBILE_VIEWPORT = { width: 390, height: 844 } as const;
-const HEADER_DESKTOP_GEOMETRY = { x: 0, y: 0, width: 1672, height: 86 } as const;
-const NAV_DESKTOP_GEOMETRY = { x: 0, y: 86, width: 260, height: 855 } as const;
-const LEDGER_LIST_GEOMETRY = { x: 260, y: 154, width: 559, height: 787 } as const;
-const LEDGER_DOCKET_GEOMETRY = { x: 819, y: 154, width: 853, height: 787 } as const;
-const SERVICE_TABLE_GEOMETRY = { x: 292, y: 154, width: 1348, height: 763 } as const;
-const QUEUE_DESKTOP_GEOMETRY = { x: 260, y: 86, width: 559, height: 855 } as const;
-const DOCKET_DESKTOP_GEOMETRY = { x: 819, y: 86, width: 853, height: 855 } as const;
-const HEADER_MOBILE_GEOMETRY = { x: 0, y: 0, width: 390, height: 70 } as const;
-const NAV_MOBILE_GEOMETRY = { x: 0, y: 734, width: 390, height: 110 } as const;
 const RECOMMENDED_DESKTOP_GEOMETRY = { x: 859, y: 621, width: 773, height: 24 } as const;
-const FIRST_ROW_MOBILE_GEOMETRY = { x: 20, y: 220, width: 350, height: 94 } as const;
-const BACK_MOBILE_GEOMETRY = { x: 0, y: 0, width: 390, height: 67 } as const;
-const DETAIL_DOCKET_MOBILE_GEOMETRY = { x: 20, y: 67, width: 350, height: 761 } as const;
 const INTERMEDIATE_VIEWPORTS = [
   { width: 320, height: 720 },
   { width: 768, height: 900 },
