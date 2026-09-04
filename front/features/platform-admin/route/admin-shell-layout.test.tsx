@@ -596,14 +596,27 @@ describe("AdminShellLayout", () => {
     const clubManagementCss = existsSync(clubManagementCssPath)
       ? readFileSync(clubManagementCssPath, "utf8")
       : "";
+    const todayCss = readFileSync(
+      path.resolve("features/platform-admin/ui/admin-today.css"),
+      "utf8",
+    );
     expect(shellCss).toContain(".admin-shell");
     expect(shellCss).toContain(".admin-layout-nav");
     expect(shellCss).toContain("min-height: 86px");
+    expect(shellCss).toContain("min-height: 70px");
     expect(shellCss).toContain("padding: 0 34px");
     expect(shellCss).toContain("grid-template-columns: 260px minmax(0, 1fr)");
     expect(shellCss).toContain("top: 86px");
     expect(shellCss).toContain("min-height: calc(100vh - 86px)");
     expect(shellCss).toContain("padding: 32px 16px");
+    expect(shellCss).toMatch(/\.admin-shell__wordmark\s*\{[^}]*font-size:\s*12px/s);
+    expect(shellCss).toMatch(/\.admin-shell__wordmark\s*\{[^}]*font-weight:\s*650/s);
+    expect(shellCss).toMatch(/\.admin-shell__wordmark\s*\{[^}]*line-height:\s*16\.8px/s);
+    expect(shellCss).toMatch(/\.admin-shell__space-control[\s\S]*?overflow:\s*visible/);
+    expect(shellCss).toMatch(/\.admin-shell__space-control[\s\S]*?z-index:\s*40/);
+    expect(todayCss).toMatch(/\.admin-shell__space-control[\s\S]*?opacity:\s*1/);
+    expect(todayCss).toMatch(/\.admin-shell__space-control[\s\S]*?overflow:\s*visible/);
+    expect(todayCss).not.toMatch(/\.admin-shell__space-control[\s\S]{0,240}opacity:\s*0/);
     expect(shellCss).toMatch(/\.admin-shell__main\s*\{[^}]*width:\s*100%;[^}]*max-width:\s*none;/s);
     expect(pageCss).toContain(".admin-page-frame");
     expect(pageCss).toContain(".admin-state-panel");

@@ -1,8 +1,16 @@
 import { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { adminTodayLoaderFactory } from "./admin-today-data";
+import { requirePlatformAdminLoaderAuth } from "@/shared/auth/platform-admin-loader";
 
 const operationsApi = vi.hoisted(() => ({ fetchCases: vi.fn() }));
+
+vi.mock("@/shared/auth/platform-admin-loader", () => ({
+  requirePlatformAdminLoaderAuth: vi.fn(async () => ({
+    authenticated: true,
+    platformAdmin: { role: "OPERATOR" },
+  })),
+}));
 
 vi.mock("@/features/platform-admin/api/platform-admin-operations-api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/platform-admin/api/platform-admin-operations-api")>()),
@@ -11,6 +19,10 @@ vi.mock("@/features/platform-admin/api/platform-admin-operations-api", async (im
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(requirePlatformAdminLoaderAuth).mockResolvedValue({
+    authenticated: true,
+    platformAdmin: { role: "OPERATOR" },
+  } as never);
   operationsApi.fetchCases.mockResolvedValue({
     schema: "admin.operation_cases.v1",
     generatedAt: "2026-08-04T10:00:00Z",
@@ -22,6 +34,18 @@ beforeEach(() => {
 });
 
 describe("adminTodayLoaderFactory", () => {
+  it("does not prefetch protected Admin cases when platform-admin auth is rejected", async () => {
+    vi.mocked(requirePlatformAdminLoaderAuth).mockRejectedValue(new Error("redirect /app"));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    await expect(adminTodayLoaderFactory(client)({
+      request: new Request("https://readmates.example/admin/today"),
+    } as never)).rejects.toThrow("redirect /app");
+
+    expect(requirePlatformAdminLoaderAuth).toHaveBeenCalledOnce();
+    expect(operationsApi.fetchCases).not.toHaveBeenCalled();
+  });
+
   it("prefetches only the operation case list for the parsed URL filter", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 

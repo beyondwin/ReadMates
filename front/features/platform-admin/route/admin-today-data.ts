@@ -9,9 +9,11 @@ import {
   parseAdminOperationsSearch,
 } from "@/features/platform-admin/model/platform-admin-operations-model";
 import { platformAdminOperationCasePagesQuery } from "@/features/platform-admin/queries/platform-admin-operations-queries";
+import { requirePlatformAdminLoaderAuth } from "@/shared/auth/platform-admin-loader";
 
 export function adminTodayLoaderFactory(queryClient: QueryClient) {
   return async function loadAdminToday({ request }: LoaderFunctionArgs) {
+    await requirePlatformAdminLoaderAuth({ request });
     const search = parseAdminOperationsSearch(new URL(request.url).searchParams);
     const filter = { ...effectiveAdminOperationsFilter(search) };
     delete filter.cursor;

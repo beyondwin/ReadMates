@@ -274,6 +274,13 @@ async function activateTarget(page: Page, target: string, via: "click" | "Enter"
   await page.keyboard.press(via);
 }
 
+export function isCanonicalRootSpaceSwitcherOpen(input: {
+  menuVisible: boolean;
+  platformRootChoiceVisible: boolean;
+}): boolean {
+  return input.menuVisible && input.platformRootChoiceVisible;
+}
+
 async function restoreCanonical(
   page: Page,
   scenario: VisualAuthorityScenario,
@@ -291,8 +298,20 @@ async function restoreCanonical(
     }
   }
   if (scenario.preparationKey === "open-space-switcher") {
-    const menu = page.locator('[role="menu"]');
-    if (onCanonical && await menu.first().isVisible().catch(() => false)) {
+    const menu = page.locator('[role="menu"]').first();
+    const platformRoot = page.getByRole("menuitemradio", { name: /플랫폼 운영/ });
+    const menuVisible = onCanonical && await menu.isVisible().catch(() => false);
+    const rootVisible = await platformRoot.isVisible().catch(() => false);
+    if (isCanonicalRootSpaceSwitcherOpen({
+      menuVisible: Boolean(menuVisible),
+      platformRootChoiceVisible: Boolean(rootVisible),
+    })) {
+      return { key: "open-space-switcher", previewPosted: false };
+    }
+    const back = page.getByRole("button", { name: "범위 선택으로 돌아가기" });
+    if (onCanonical && await back.isVisible().catch(() => false)) {
+      await back.click();
+      await platformRoot.waitFor({ state: "visible" });
       return { key: "open-space-switcher", previewPosted: false };
     }
   }

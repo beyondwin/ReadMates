@@ -39,7 +39,7 @@ export const ADMIN_FIRST_ROW_DESKTOP_GEOMETRY = {
   x: ADMIN_QUEUE_DESKTOP_GEOMETRY.x,
   y: ADMIN_LEDGER_LIST_GEOMETRY.y,
   width: ADMIN_QUEUE_DESKTOP_GEOMETRY.width,
-  height: ADMIN_FIRST_ROW_MOBILE_GEOMETRY.height,
+  height: 122,
 } as const;
 
 export const ADMIN_TODAY_HEADING_MOBILE_GEOMETRY = {
@@ -57,17 +57,17 @@ export const ADMIN_QUEUE_MOBILE_GEOMETRY = {
 } as const;
 
 export const ADMIN_SPACE_TRIGGER_GEOMETRY = {
-  x: ADMIN_RAIL_DESKTOP_GEOMETRY.width,
-  y: 16,
-  width: 280,
-  height: ADMIN_HEADER_DESKTOP_GEOMETRY.height - 32,
+  x: 188,
+  y: 19,
+  width: 160,
+  height: 48,
 } as const;
 
 export const ADMIN_ROOT_SPACE_MENU_GEOMETRY = {
-  x: ADMIN_RAIL_DESKTOP_GEOMETRY.width,
-  y: ADMIN_HEADER_DESKTOP_GEOMETRY.height - 16,
-  width: 360,
-  height: 420,
+  x: 201,
+  y: 88,
+  width: 334,
+  height: 218,
 } as const;
 
 export const ADMIN_DETAIL_HEADING_MOBILE_GEOMETRY = {

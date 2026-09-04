@@ -11,6 +11,7 @@ import {
 import {
   APPROVED_ROUTE_PREPARATIONS,
   executeKeyboardMenuSequence,
+  isCanonicalRootSpaceSwitcherOpen,
   performHistoryRestore,
   runActualRouteAuthority,
 } from "./approved-route-harness";
@@ -245,6 +246,45 @@ describe("actual-route visual authority scenarios", () => {
     });
     expect(assertedExpandedAt).toBe("Enter,ArrowDown");
     expect(assertedEscapeAt).toBe("Enter,ArrowDown,Escape");
+  });
+
+  it("measures admin space-switcher regions from jammy painted boxes, not rail-derived guesses", () => {
+    const scenario = visualAuthorityScenario("admin-space-switcher-desktop");
+    expect(scenario.regions.map((region) => region.name)).toEqual([
+      "admin-header",
+      "space-trigger",
+      "root-space-menu",
+      "admin-rail",
+      "first-priority-item",
+    ]);
+    expect(scenario.regions.find((region) => region.name === "space-trigger")?.expected)
+      .toEqual({ x: 188, y: 19, width: 160, height: 48 });
+    expect(scenario.regions.find((region) => region.name === "root-space-menu")?.expected)
+      .toEqual({ x: 201, y: 88, width: 334, height: 218 });
+    expect(scenario.regions.find((region) => region.name === "first-priority-item")?.expected)
+      .toEqual({ x: 260, y: 154, width: 559, height: 122 });
+    const keyboard = scenario.interactions.find((item) => item.name === "keyboard-root-menu");
+    expect(keyboard).toMatchObject({
+      kind: "keyboard-menu",
+      keys: ["Enter", "ArrowDown", "Escape"],
+      expectedFocused: 'role=menuitem[name="내 클럽"]',
+      expectedExpanded: true,
+    });
+  });
+
+  it("treats only the platform root menu as the canonical space-switcher capture", () => {
+    expect(isCanonicalRootSpaceSwitcherOpen({
+      menuVisible: true,
+      platformRootChoiceVisible: true,
+    })).toBe(true);
+    expect(isCanonicalRootSpaceSwitcherOpen({
+      menuVisible: true,
+      platformRootChoiceVisible: false,
+    })).toBe(false);
+    expect(isCanonicalRootSpaceSwitcherOpen({
+      menuVisible: false,
+      platformRootChoiceVisible: false,
+    })).toBe(false);
   });
 
   it("does not restore a ratio bypass in the contract source", () => {

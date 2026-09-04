@@ -85,3 +85,41 @@ for (const id of ["admin-today-desktop", "admin-today-mobile", "admin-work-detai
     expect(report).not.toHaveProperty("exception");
   });
 }
+
+test("admin-space-switcher-desktop matches its approved actual route", async ({ page }, testInfo) => {
+  test.skip(
+    !visualAuthoritySelected("admin-space-switcher-desktop"),
+    "not affected: admin-space-switcher-desktop",
+  );
+  const scenario = visualAuthorityScenario("admin-space-switcher-desktop");
+  const requestAudit = createApprovedRouteRequestAudit();
+  await page.setViewportSize(scenario.viewport);
+  await installAdminApprovedRoutes(page, scenario.fixtureKey, requestAudit);
+  await page.goto(scenario.route, { waitUntil: "domcontentloaded" });
+
+  await page.getByRole("button", { name: "공간 전환, 현재 플랫폼 운영" }).click();
+  await expect(page.getByRole("menu")).toBeVisible();
+  await expect(page.getByRole("menuitemradio", { name: /플랫폼 운영/ })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("menuitem", { name: "내 클럽" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: /샘플 독서모임/ })).toHaveCount(0);
+
+  await page.getByRole("menuitem", { name: "내 클럽" }).click();
+  await expect(page.getByRole("group", { name: "샘플 독서모임" })).toBeVisible();
+  await expect(page.getByRole("menuitemradio", { name: "샘플 독서모임 멤버로 보기" })).toBeVisible();
+  await expect(page.getByRole("menuitemradio", { name: "샘플 독서모임 호스트로 운영" })).toBeVisible();
+  await expect(page.getByRole("menuitemradio", { name: /플랫폼 운영/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "범위 선택으로 돌아가기" }).click();
+  await expect(page.getByRole("menuitem", { name: "내 클럽" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "공간 전환, 현재 플랫폼 운영" })).toBeFocused();
+
+  const report = await runActualRouteAuthority({
+    page,
+    testInfo,
+    scenario,
+    installFixtures: (installPage, fixtureKey, audit) =>
+      installAdminApprovedRoutes(installPage, fixtureKey, audit),
+  });
+  expect(report.mask).toBeNull();
+  expect(report).not.toHaveProperty("exception");
+});

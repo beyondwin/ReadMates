@@ -742,11 +742,13 @@
   position: absolute;
   left: 188px;
   top: 19px;
-  z-index: 30;
-  width: 160px;
-  height: 48px;
-  opacity: 0;
-  overflow: hidden;
+  z-index: 40;
+  width: auto;
+  min-width: 160px;
+  height: auto;
+  min-height: 48px;
+  opacity: 1;
+  overflow: visible;
 }
 
 .admin-shell:has(.admin-today-ledger) .admin-shell__header-actions {

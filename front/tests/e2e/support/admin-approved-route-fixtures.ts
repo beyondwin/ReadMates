@@ -2,6 +2,8 @@ import type { Page, Route } from "@playwright/test";
 import type { AdminOperationAction, AdminOperationCase } from "@/features/platform-admin/api/platform-admin-operations-contracts";
 import type { AdminOperationCasePresentation } from "@/features/platform-admin/model/platform-admin-operations-model";
 import type { PlatformAdminCapability } from "@/features/platform-admin/model/platform-admin-capabilities";
+import type { PlatformAdminRole } from "@/features/platform-admin/api/platform-admin-contracts";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import {
   routeAdminEditorialLedgerShell,
   routeAdminHealthSnapshot,
@@ -32,6 +34,16 @@ const ADMIN_TODAY_FIXTURE_PATHS = [
   "/api/bff/api/admin/operations/cases",
 ] as const;
 const FRONTEND_OBSERVABILITY_PATH = "/api/bff/observability/frontend-events";
+
+export const ADMIN_APPROVED_SAMPLE_CLUB = {
+  clubId: "club-sample-reading",
+  clubSlug: "sample-reading",
+  clubName: "샘플 독서모임",
+} as const;
+
+export const ADMIN_APPROVED_SAMPLE_CLUB_PERSPECTIVES = ["MEMBER", "HOST"] as const;
+
+const ADMIN_APPROVED_FIXTURE_KEYS = new Set<ApprovedRouteFixtureKey>(["admin-today"]);
 
 async function json(route: Route, status: number, body: unknown): Promise<void> {
   await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -238,12 +250,107 @@ async function routeAdminTodayPriorityCases(page: Page): Promise<void> {
   });
 }
 
+export function buildAdminApprovedAuth(
+  overrides: Partial<AuthMeResponse> = {},
+  role: PlatformAdminRole = "OPERATOR",
+): AuthMeResponse {
+  const account = role.toLowerCase();
+  const sampleMembership = {
+    clubId: ADMIN_APPROVED_SAMPLE_CLUB.clubId,
+    clubSlug: ADMIN_APPROVED_SAMPLE_CLUB.clubSlug,
+    clubName: ADMIN_APPROVED_SAMPLE_CLUB.clubName,
+    membershipId: "membership-sample-reading",
+    role: "HOST" as const,
+    status: "ACTIVE" as const,
+    approvalState: "ACTIVE" as const,
+    primaryHost: null,
+  };
+  return {
+    authenticated: true,
+    userId: `platform-${account}`,
+    membershipId: null,
+    clubId: null,
+    email: `${account}@example.test`,
+    displayName: `${role} admin`,
+    accountName: `${role} admin`,
+    role: null,
+    membershipStatus: null,
+    approvalState: "INACTIVE",
+    currentMembership: null,
+    joinedClubs: [sampleMembership],
+    platformAdmin: {
+      userId: `platform-${account}`,
+      email: `${account}@example.test`,
+      role,
+    },
+    availableSpaces: {
+      version: 1,
+      kinds: ["PLATFORM", "CLUBS"],
+      clubs: [{
+        clubId: ADMIN_APPROVED_SAMPLE_CLUB.clubId,
+        clubSlug: ADMIN_APPROVED_SAMPLE_CLUB.clubSlug,
+        clubName: ADMIN_APPROVED_SAMPLE_CLUB.clubName,
+        perspectives: [...ADMIN_APPROVED_SAMPLE_CLUB_PERSPECTIVES],
+      }],
+    },
+    recommendedAppEntryUrl: "/admin",
+    ...overrides,
+  };
+}
+
+export function buildMemberAuthWithoutPlatformAdmin(): AuthMeResponse {
+  return {
+    authenticated: true,
+    userId: "member-sample-reading",
+    membershipId: "membership-sample-reading",
+    clubId: ADMIN_APPROVED_SAMPLE_CLUB.clubId,
+    email: "member@example.test",
+    displayName: "샘플 멤버",
+    accountName: "샘플 멤버",
+    role: "MEMBER",
+    membershipStatus: "ACTIVE",
+    approvalState: "ACTIVE",
+    currentMembership: {
+      membershipId: "membership-sample-reading",
+      clubId: ADMIN_APPROVED_SAMPLE_CLUB.clubId,
+      clubSlug: ADMIN_APPROVED_SAMPLE_CLUB.clubSlug,
+      displayName: "샘플 멤버",
+      role: "MEMBER",
+      membershipStatus: "ACTIVE",
+      approvalState: "ACTIVE",
+      avatarKey: "banana-green-book",
+    },
+    joinedClubs: [{
+      clubId: ADMIN_APPROVED_SAMPLE_CLUB.clubId,
+      clubSlug: ADMIN_APPROVED_SAMPLE_CLUB.clubSlug,
+      clubName: ADMIN_APPROVED_SAMPLE_CLUB.clubName,
+      membershipId: "membership-sample-reading",
+      role: "MEMBER",
+      status: "ACTIVE",
+      approvalState: "ACTIVE",
+      primaryHost: null,
+    }],
+    platformAdmin: null,
+    availableSpaces: {
+      version: 1,
+      kinds: ["CLUBS"],
+      clubs: [{
+        clubId: ADMIN_APPROVED_SAMPLE_CLUB.clubId,
+        clubSlug: ADMIN_APPROVED_SAMPLE_CLUB.clubSlug,
+        clubName: ADMIN_APPROVED_SAMPLE_CLUB.clubName,
+        perspectives: ["MEMBER"],
+      }],
+    },
+    recommendedAppEntryUrl: `/clubs/${ADMIN_APPROVED_SAMPLE_CLUB.clubSlug}/app`,
+  };
+}
+
 export async function installAdminApprovedRoutes(
   page: Page,
   fixtureKey: ApprovedRouteFixtureKey,
   requestAudit: ApprovedRouteRequestAudit,
 ): Promise<void> {
-  if (fixtureKey !== "admin-today") {
+  if (!ADMIN_APPROVED_FIXTURE_KEYS.has(fixtureKey)) {
     throw new Error(`Unsupported Admin fixture key: ${fixtureKey}`);
   }
 
@@ -262,6 +369,7 @@ export async function installAdminApprovedRoutes(
     capabilities: ADMIN_TODAY_CAPABILITIES,
     authRole: "OPERATOR",
   });
+  await page.route("**/api/bff/api/auth/me**", (route) => json(route, 200, buildAdminApprovedAuth()));
   await routeAdminHealthSnapshot(page);
   await routeAdminTodayHealthySnapshot(page);
   await routeAdminTodayCases(page, { allowedActions: TODAY_LIFECYCLE_ACTIONS });

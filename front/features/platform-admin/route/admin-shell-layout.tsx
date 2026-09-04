@@ -57,7 +57,7 @@ export function AdminShellLayout({
       </a>
       <header className="admin-shell__header">
         <span className="admin-shell__wordmark">ReadMates</span>
-        <div key={spaceControlEpoch} className="admin-shell__space-control">
+        <div key={spaceControlEpoch} className="admin-shell__space-control admin-shell__space-switcher">
           {spaceSwitcher}
         </div>
         <AdminBreadcrumb routePath={routePath} extra={breadcrumbExtra} />

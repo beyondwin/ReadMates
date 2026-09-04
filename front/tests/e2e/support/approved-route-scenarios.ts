@@ -863,7 +863,6 @@ export const REQUIRED_VISUAL_AUTHORITY_COVERAGE: Record<ApprovedMockupId, Requir
     preparationKey: "open-space-switcher",
     regions: [
       ADMIN_HEADER,
-      ADMIN_RAIL,
       {
         name: "space-trigger",
         selector: SPACE_TRIGGER,
@@ -876,6 +875,7 @@ export const REQUIRED_VISUAL_AUTHORITY_COVERAGE: Record<ApprovedMockupId, Requir
         expected: ADMIN_ROOT_SPACE_MENU_GEOMETRY,
         toleranceCssPx: 4,
       },
+      ADMIN_RAIL,
       {
         name: "first-priority-item",
         selector: ".admin-operations-queue__row",
@@ -901,7 +901,7 @@ export const REQUIRED_VISUAL_AUTHORITY_COVERAGE: Record<ApprovedMockupId, Requir
         kind: "keyboard-menu",
         trigger: SPACE_TRIGGER,
         keys: ["Enter", "ArrowDown", "Escape"],
-        expectedFocused: '[role="menuitemradio"]',
+        expectedFocused: 'role=menuitem[name="내 클럽"]',
         expectedExpanded: true,
         expectedFocusAfterEscape: SPACE_TRIGGER,
         restoreCanonicalState: true,
@@ -911,7 +911,7 @@ export const REQUIRED_VISUAL_AUTHORITY_COVERAGE: Record<ApprovedMockupId, Requir
         kind: "activate",
         target: 'role=menuitem[name="내 클럽"]',
         via: "click",
-        expectedVisible: 'role=menuitem[name=/샘플 독서모임/]',
+        expectedVisible: 'role=group[name="샘플 독서모임"]',
         restoreCanonicalState: true,
       },
       {

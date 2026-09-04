@@ -193,7 +193,15 @@ export function GlobalSpaceSwitcher({
   const onTriggerKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
     if (event.key !== "Enter" && event.key !== " " && event.key !== "ArrowDown") return;
     event.preventDefault();
-    openMenu();
+    if (!open) {
+      openMenu();
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      setActiveIndex((current) => nextMenuIndex(current, rootItemCount, "ArrowDown"));
+      return;
+    }
+    itemRefs.current[activeIndex]?.focus();
   };
 
   const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {

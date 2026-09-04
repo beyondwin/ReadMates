@@ -197,6 +197,18 @@ describe("GlobalSpaceSwitcher", () => {
     expect(screen.getByRole("menu", { name: "ReadMates 공간 전환" })).toBeInTheDocument();
   });
 
+  it("moves from an already-open trigger to 내 클럽 with Enter then ArrowDown", async () => {
+    const user = userEvent.setup();
+    renderSwitcher();
+    const trigger = screen.getByRole("button", { name: "공간 전환, 현재 플랫폼 운영" });
+
+    await user.click(trigger);
+    trigger.focus();
+    await user.keyboard("{Enter}{ArrowDown}");
+
+    expect(screen.getByRole("menuitem", { name: "내 클럽" })).toHaveFocus();
+  });
+
   it("uses separate first- and second-level roving focus and Escape returns one level before closing", async () => {
     const user = userEvent.setup();
     renderSwitcher();
@@ -314,5 +326,39 @@ describe("GlobalSpaceSwitcher", () => {
 
     expect(onSelect).not.toHaveBeenCalled();
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("keeps 샘플 독서모임 in the club subflow and restores the root trigger", async () => {
+    const sampleMember: GlobalSpaceSwitcherOption = {
+      identity: {
+        productSpace: "clubs",
+        clubId: "club-sample-reading",
+        clubSlug: "sample-reading",
+        perspective: "member",
+      },
+      clubName: "샘플 독서모임",
+    };
+    const sampleHost: GlobalSpaceSwitcherOption = {
+      identity: { ...sampleMember.identity, perspective: "host" },
+      clubName: "샘플 독서모임",
+    };
+    const user = userEvent.setup();
+    renderSwitcher({ options: [platform, sampleMember, sampleHost] });
+    const trigger = screen.getByRole("button", { name: "공간 전환, 현재 플랫폼 운영" });
+
+    await user.click(trigger);
+    expect(screen.getByRole("menuitemradio", { name: /플랫폼 운영/ })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("menuitem", { name: "내 클럽" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /샘플 독서모임/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("menuitem", { name: "내 클럽" }));
+    expect(screen.getByRole("group", { name: "샘플 독서모임" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: "샘플 독서모임 멤버로 보기" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: "샘플 독서모임 호스트로 운영" })).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("menuitem", { name: "내 클럽" })).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(trigger).toHaveFocus();
   });
 });
