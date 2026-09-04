@@ -47,7 +47,7 @@ ADR impact: update — ADR-0048·0050·0051의 제품 구성은 유지한다. AD
 
 Tracked snapshot은 직전 구현 대비 회귀 cache다. Snapshot 갱신만으로 승인하지 않으며 승인 reference, 실제 route candidate, overlay, diff, measurement, 독립 검토가 함께 있어야 한다.
 
-의도한 code-native UI 변경으로 CT snapshot이 달라지면, 해당 실제 route가 먼저 strict GREEN을 통과하고 독립 diff 검토가 끝난 뒤에만 Docker update mode로 영향 snapshot을 갱신할 수 있다. 승인 reference PNG와 sidecar는 이 절차의 갱신 대상이 아니다. CT snapshot 갱신은 실제 route 승인 증거를 보완할 뿐 대체하지 않는다.
+의도한 code-native UI 변경으로 CT snapshot이 달라지면, 해당 실제 route가 먼저 strict GREEN을 통과하고 독립 diff 검토가 끝난 뒤에만 Docker update mode로 영향 snapshot을 갱신할 수 있다. Host workbox snapshot은 density 변경 직후가 아니라, 운영실 실제 route 5개가 strict GREEN인 뒤에 operating-room/shell snapshot과 함께 갱신한다. 승인 reference PNG와 sidecar는 이 절차의 갱신 대상이 아니다. CT snapshot 갱신은 실제 route 승인 증거를 보완할 뿐 대체하지 않는다.
 
 ## 4. 승인 자산과 실제 route 시나리오
 
@@ -61,7 +61,20 @@ Tracked snapshot은 직전 구현 대비 회귀 cache다. Snapshot 갱신만으�
 - 첫 화면 필수 region과 순서
 - 기본 노출 항목 수
 - 허용되는 데이터 변화와 금지되는 구성 변화
-- pixel·geometry·typography(size, weight, line-height, color)·interaction assertion
+- pixel·geometry·typography(size, weight, line-height, color)·interaction assertion as exact objects, not name lists
+
+Each `VisualAuthorityScenario` asserts objects:
+
+- every region: `name`, production `selector`, expected `Geometry`, `toleranceCssPx` 2|4
+- every typography entry: `name`, `selector`, `fontFamilyIncludes: "Pretendard"`, `fontSizePx`, `fontWeight`, `lineHeightPx`, `color`
+- every first-viewport entry: `name`, `selector`, `visibility: "fully-visible" | "intersects"`
+- `defaultVisibleItems`: `selector` and `count` 3|4 when required
+- every interaction: discriminant `kind` plus the kind-specific outcome fields
+- every `history-restore` interaction: `expectedUrlAfterActivate`, `expectedUrlAfterBack`, `expectedUrlAfterForward`, and optional restored focus after Back and after Forward
+
+Registry tests must assert that every required selector exists on the scenario and that every interaction object has the discriminant-specific expected fields. Comparing sorted name lists is not sufficient. Selectors come from the current production DOM; do not invent a parallel page tree.
+
+Harness and both Admin/Host fixture installers use one signature: `installFixtures(page, fixtureKey, requestAudit)`. The harness always installs the catch-all BFF audit first, then calls `installFixtures(page, scenario.fixtureKey, requestAudit)`.
 
 | id | 승인 파일 | 실제 route 표면 |
 | --- | --- | --- |
@@ -153,7 +166,7 @@ UI는 기존 route-first dependency를 유지한다. `ui`는 props/callback만 �
 - desktop/mobile 기본 노출 항목 수 준수
 - 제목 최소 폭과 최대 행 높이 준수
 - 수평 overflow 없음
-- keyboard focus, 선택, back/forward 복원
+- keyboard focus, 선택, Back then Forward restoration of the activated URL/state
 
 Pretendard와 icon font는 CI image에 고정한다. 전체 capture에 0.10/0.15 font-raster ceiling을 적용하지 않는다. 불가피한 glyph raster 차이는 해당 glyph 영역, 환경, 근거, reviewer를 기록한 좁은 mask만 허용한다. Mask는 composition, background, spacing, control geometry를 덮을 수 없으며 승인 id와 함께 versioned contract로 관리한다.
 

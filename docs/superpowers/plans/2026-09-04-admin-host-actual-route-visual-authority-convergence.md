@@ -20,7 +20,7 @@ ADR impact: update — ADR-0053 remains `Proposed` until code, tests, active doc
 - The approved PNG fixes composition, hierarchy, first-viewport disclosure, and interaction. Runtime book, club, member, status, time, count, and copy values remain data-driven.
 - The final authority is the real authenticated route. `HostApprovedShell`, presentation fixture JSX, and tracked CT snapshots cannot produce a final PASS.
 - Admin Today shows three priority items by default. Host workbox shows four on desktop and three on mobile. Excess data uses an explicit `전체 보기` interaction; it is not hidden in an internal scroll container and is not all pushed into the first viewport.
-- Every actual-route scenario must pass `mismatchPixelRatio <= 0.02`, major-region delta `<= 4 CSS px`, repeated-row alignment/spacing delta `<= 2 CSS px`, registered typography, first-viewport ordering, item-cap, title-width, no-overflow, keyboard, focus, and Back/Forward restoration checks.
+- Every actual-route scenario must pass `mismatchPixelRatio <= 0.02`, major-region delta `<= 4 CSS px`, repeated-row alignment/spacing delta `<= 2 CSS px`, registered typography, first-viewport ordering, item-cap, title-width, no-overflow, keyboard, focus, and Back then Forward restoration checks.
 - Delete the broad `0.10`/`0.15` font-raster escape and the ratio-skip escape. A glyph mask may be added only in a separately reviewed change that names one authority id, one glyph-only rectangle, the fixed renderer fingerprint, reason, and reviewer; this plan adds no masks.
 - The canonical renderer is `mcr.microsoft.com/playwright:v1.61.1-jammy` with repository `pnpm@11.13.1` and bundled Pretendard. Do not approve a local macOS screenshot as the strict receipt.
 - Admin typography uses `Pretendard Variable`, desktop scale `36/28/20/17/16/14/12px`, mobile scale `28/20/17/16/14/12px`, body line-height `1.6`, and main content max-width `1240px` where the approved composition uses a bounded content column.
@@ -30,6 +30,7 @@ ADR impact: update — ADR-0053 remains `Proposed` until code, tests, active doc
 - Use Corepack for all repository commands. If Corepack is unavailable, record the exact fallback rather than silently using another pnpm version.
 - Before every task, run `git status --short --branch --untracked-files=all`. Stop if an owned path contains pre-existing work, never stage a directory or glob, and stage only the exact files changed by that task.
 - Each task starts with RED evidence, makes the smallest production change, runs focused GREEN, receives an independent review, and commits only its owned files.
+- Harness and both Admin/Host installers share `installFixtures(page: Page, fixtureKey: ApprovedRouteFixtureKey, requestAudit: ApprovedRouteRequestAudit) => Promise<void>`. Specs must not close over a different arity.
 
 ---
 
@@ -215,7 +216,7 @@ git commit -m "test: remove broad visual authority exceptions"
 - Produces in the manifest: `ApprovedMockupId`, an explicit union of all 18 ids, and actual-route `ownerTest` values.
 - Produces: `VisualAuthorityScenario`, `VISUAL_AUTHORITY_SCENARIOS`, `visualAuthorityScenario(id)`, `parseVisualAuthoritySelection(rawSelection?)`, `visualAuthoritySelected(id, rawSelection?)`.
 - Produces: `captureApprovedViewportComparison({ page, testInfo, entry, regions, results }): Promise<ApprovedComparisonReport>`.
-- Produces: `runActualRouteAuthority({ page, testInfo, scenario, installFixtures }): Promise<ApprovedComparisonReport>`; the harness resolves the registered preparation and interaction executors from the scenario keys.
+- Produces: `runActualRouteAuthority({ page, testInfo, scenario, installFixtures }): Promise<ApprovedComparisonReport>`; `installFixtures` has exactly this signature: `(page: Page, fixtureKey: ApprovedRouteFixtureKey, requestAudit: ApprovedRouteRequestAudit) => Promise<void>`. The harness installs the catch-all BFF audit first, then calls `installFixtures(page, scenario.fixtureKey, requestAudit)`. Specs must not close over a different arity. The harness resolves the registered preparation and interaction executors from the scenario keys. Every `history-restore` interaction executes Activate, then Back, then Forward, and reasserts the activated URL/state after Forward.
 - Produces: versioned `ApprovedComparisonReport` with renderer/font/DPR fingerprint and every strict sub-result; evidence is written before the final assertion throws.
 - Produces: request audit that permits only registered fixture traffic and an explicitly validated preview POST.
 - Consumes: unchanged reference path/hash/size values from `APPROVED_MOCKUPS`.
@@ -237,16 +238,35 @@ describe("actual-route visual authority scenarios", () => {
       expect(scenario.actor).toEqual(required.actor);
       expect(scenario.fixtureKey).toBe(required.fixtureKey);
       expect(scenario.preparationKey).toBe(required.preparationKey);
-      expect(scenario.regions.map(({ name }) => name).sort())
-        .toEqual([...required.regionNames].sort());
-      expect(scenario.typography.map(({ name }) => name).sort())
-        .toEqual([...required.typographyNames].sort());
-      expect(scenario.firstViewport.map(({ name }) => name).sort())
-        .toEqual([...required.firstViewportNames].sort());
-      expect(scenario.interactions.map(({ name }) => name).sort())
-        .toEqual([...required.interactionNames].sort());
-      expect(scenario.defaultVisibleItems?.count)
-        .toBe(required.defaultVisibleCount);
+      expect(scenario.regions).toEqual(required.regions);
+      expect(scenario.typography).toEqual(required.typography);
+      expect(scenario.firstViewport).toEqual(required.firstViewport);
+      expect(scenario.interactions).toEqual(required.interactions);
+      expect(scenario.defaultVisibleItems).toEqual(required.defaultVisibleItems);
+      for (const region of required.regions) {
+        expect(region.selector.length).toBeGreaterThan(0);
+        expect(scenario.regions.some((item) => item.selector === region.selector)).toBe(true);
+      }
+      for (const entry of required.typography) {
+        expect(entry.fontFamilyIncludes).toBe("Pretendard");
+        expect(scenario.typography.some((item) => item.selector === entry.selector)).toBe(true);
+      }
+      for (const entry of required.firstViewport) {
+        expect(["fully-visible", "intersects"]).toContain(entry.visibility);
+        expect(scenario.firstViewport.some((item) => item.selector === entry.selector)).toBe(true);
+      }
+      if (required.defaultVisibleItems) {
+        expect(required.defaultVisibleItems.selector.length).toBeGreaterThan(0);
+        expect([3, 4]).toContain(required.defaultVisibleItems.count);
+      }
+      for (const interaction of required.interactions) {
+        expect(interaction.kind).toEqual(expect.any(String));
+        if (interaction.kind === "history-restore") {
+          expect(interaction.expectedUrlAfterActivate).toMatch(/^\//);
+          expect(interaction.expectedUrlAfterBack).toMatch(/^\//);
+          expect(interaction.expectedUrlAfterForward).toBe(interaction.expectedUrlAfterActivate);
+        }
+      }
       if (scenario.actor.kind === "club-host") {
         expect(scenario.actor.clubSlug).toBe("visual-authority");
         expect(scenario.actor.perspective).toBe("HOST");
@@ -340,11 +360,11 @@ export type RequiredScenarioCoverage = {
   actor: VisualAuthorityScenario["actor"];
   fixtureKey: ApprovedRouteFixtureKey;
   preparationKey: VisualAuthorityScenario["preparationKey"];
-  regionNames: readonly string[];
-  typographyNames: readonly string[];
-  firstViewportNames: readonly string[];
-  interactionNames: readonly string[];
-  defaultVisibleCount: 3 | 4 | undefined;
+  regions: VisualAuthorityScenario["regions"];
+  typography: VisualAuthorityScenario["typography"];
+  firstViewport: VisualAuthorityScenario["firstViewport"];
+  interactions: VisualAuthorityScenario["interactions"];
+  defaultVisibleItems: VisualAuthorityScenario["defaultVisibleItems"];
 };
 
 export type RequiredVisualAuthorityInteractionName =
@@ -398,7 +418,9 @@ export type VisualAuthorityInteraction =
       activate: string;
       expectedUrlAfterActivate: string;
       expectedUrlAfterBack: string;
-      expectedRestoredFocus?: string;
+      expectedUrlAfterForward: string;
+      expectedRestoredFocusAfterBack?: string;
+      expectedRestoredFocusAfterForward?: string;
       restoreCanonicalState: true;
     }
   | {
@@ -429,32 +451,97 @@ export function visualAuthoritySelected(
 ): boolean;
 ```
 
-`REQUIRED_VISUAL_AUTHORITY_COVERAGE` is a `Record<ApprovedMockupId, RequiredScenarioCoverage>` and is the authority for exact assertion-name completeness. Shared names are expanded before comparison; registry tests compare exact sets, not `length > 0`.
+`REQUIRED_VISUAL_AUTHORITY_COVERAGE` is a `Record<ApprovedMockupId, RequiredScenarioCoverage>` and is the authority for exact object completeness. Registry tests compare the objects themselves (`regions`, `typography`, `firstViewport`, `interactions`, `defaultVisibleItems`), not sorted name lists. Shared region/typography/interaction objects are expanded before comparison. Every required selector must exist on the scenario, and every interaction object must include the discriminant-specific expected fields. Comparing sorted name lists is not sufficient.
 
 The actor/fixture/preparation portion is exact as well:
 
 - Every Admin id uses role `OPERATOR` with the four shell/navigation view capabilities `VIEW_TODAY`, `VIEW_CLUBS`, `VIEW_SERVICE_HEALTH`, and `VIEW_AUDIT`. `admin-clubs-desktop` additionally has `VIEW_CLUB_OPERATIONS` and `CREATE_CLUB`; no other Admin scenario gains mutation or sensitive-audit capabilities. Fixture keys are `admin-today`, `admin-clubs`, `admin-health`, or `admin-audit` by route. Preparation is `open-space-switcher` only for `admin-space-switcher-desktop`, otherwise `none`.
 - Every Host id uses `{ kind: "club-host", clubSlug: "visual-authority", perspective: "HOST" }` and the route-specific key under the closed `host-approved` fixture-key union. Preparation is `preview-schedule-notification` only for `host-schedule-review-desktop`, otherwise `none`.
 
-| id group | Required region names | Required typography names | Required first-viewport names | Required interaction names | Default count |
-| --- | --- | --- | --- | --- | --- |
-| `admin-today-desktop` | `admin-header`, `admin-rail`, `today-heading`, `priority-queue`, `selected-work` | `wordmark`, `page-title`, `queue-title`, `body-copy` | `three-priority-items`, `show-all`, `primary-lifecycle-action` | `select-work`, `show-all-url`, `back-restores-priority`, `keyboard-work-row` | `3` |
-| `admin-clubs-desktop` | `admin-header`, `admin-rail`, `clubs-heading`, `club-finder`, `club-docket`, `club-detail` | `wordmark`, `page-title`, `row-title`, `body-copy` | `finder`, `first-club-row`, `selected-club-detail` | `select-club`, `back-restores-club-focus`, `club-pagination` | none |
-| `admin-service-desktop` | `admin-header`, `admin-rail`, `service-heading`, `service-table`, `service-evidence` | `wordmark`, `page-title`, `row-title`, `body-copy` | `service-table`, `service-evidence`, `no-command-control` | `keyboard-service-row`, `select-service-evidence` | none |
-| `admin-records-desktop` | `admin-header`, `admin-rail`, `records-heading`, `audit-list`, `audit-detail` | `wordmark`, `page-title`, `row-title`, `body-copy` | `first-audit-row`, `selected-audit-detail` | `select-audit`, `back-restores-audit-focus`, `audit-pagination` | none |
-| `admin-space-switcher-desktop` | `admin-header`, `admin-rail`, `space-trigger`, `root-space-menu`, `first-priority-item` | `wordmark`, `space-trigger-label`, `menu-label`, `body-copy` | `platform-root-choice`, `my-club-root-choice`, `first-priority-item` | `keyboard-root-menu`, `club-subflow`, `escape-restores-trigger` | none |
-| `admin-today-mobile` | `mobile-header`, `today-heading`, `priority-queue`, `first-queue-row`, `mobile-nav` | `wordmark`, `page-title`, `queue-title`, `mobile-meta` | `three-priority-items`, `show-all`, `mobile-nav` | `select-mobile-work`, `show-all-url`, `back-restores-mobile-row` | `3` |
-| `admin-work-detail-mobile` | `mobile-header`, `detail-heading`, `detail-body`, `primary-action`, `mobile-nav` | `wordmark`, `page-title`, `detail-title`, `body-copy` | `detail-title`, `primary-lifecycle-action`, `mobile-nav` | `primary-action-keyboard-reachable` | none |
-| `host-prep-desktop`, `host-live-desktop`, `host-closing-desktop` | `host-header`, `host-nav`, `current-meeting`, `phase-navigation`, `phase-status`, `primary-next-action`, `phase-panel`, `workbox` | `wordmark`, `page-title`, `phase-label`, `work-item-title`, `body-copy` | `current-phase`, `primary-next-action`, `four-workbox-items`, `show-all-workbox` | `phase-roving-tabs`, `show-all-workbox-url`, `back-restores-capped-workbox`, plus phase-specific `prep-retry` / `attendance-undo-keyboard-reachable` / `closing-destination` | `4` |
-| `host-meetings-desktop` | `host-header`, `host-nav`, `meetings-heading`, `meeting-tabs`, `meeting-ledger` | `wordmark`, `page-title`, `tab-label`, `row-title`, `body-copy` | `meeting-tabs`, `first-meeting-row`, `status` | `meeting-view-tab`, `meeting-status-tab`, `meeting-pagination` | none |
-| `host-people-desktop` | `host-header`, `host-nav`, `people-heading`, `pending-review`, `member-table` | `wordmark`, `page-title`, `row-title`, `body-copy` | `pending-review`, `first-member-row`, `member-status` | `select-member`, `back-restores-member-focus`, `member-pagination` | none |
-| `host-records-desktop` | `host-header`, `host-nav`, `records-heading`, `record-ledger`, `closing-link` | `wordmark`, `page-title`, `row-title`, `body-copy` | `first-record-row`, `closing-link` | `open-closing-record`, `back-restores-record-focus`, `record-pagination` | none |
-| `host-settings-desktop` | `host-header`, `host-nav`, `settings-heading`, `invitation-region`, `club-settings` | `wordmark`, `page-title`, `section-title`, `body-copy` | `invitation-action`, `settings-status` | `open-invitation-form`, `escape-restores-invitation-focus` | none |
-| `host-schedule-review-desktop` | `host-header`, `host-nav`, `review-heading`, `recipient-region`, `preview-region` | `wordmark`, `page-title`, `recipient-label`, `preview-copy` | `recipient-selection`, `preview-action`, `preview-confirmation` | `preview-notification-post` | none |
-| `host-prep-mobile`, `host-live-mobile` | `mobile-header`, `current-meeting`, `phase-navigation`, `phase-status`, `primary-next-action`, `phase-panel`, `workbox`, `mobile-nav` | `wordmark`, `page-title`, `phase-label`, `work-item-title`, `body-copy` | `primary-next-action`, `three-workbox-items`, `show-all-workbox`, `mobile-nav`, plus live `attendance-board`, `undo-action` | `phase-roving-tabs`, `show-all-workbox-url`, `back-restores-capped-workbox`, plus phase-specific `prep-retry` / `attendance-undo-keyboard-reachable` | `3` |
-| `host-person-mobile` | `mobile-header`, `person-heading`, `person-status`, `person-history`, `mobile-nav` | `wordmark`, `page-title`, `status-label`, `history-copy` | `person-status`, `first-history-row`, `mobile-nav` | `person-history-pagination`, `person-status-keyboard-reachable` | none |
+Shared measured geometry (copy into `approved-route-geometry.ts`; do not invent a parallel page tree):
 
-For rows containing “plus phase-specific,” the registry expands the named per-id suffix and tests the final exact set. It also asserts that every selector named by the required coverage exists in the scenario and that every interaction object has the discriminant-specific expected outcome fields shown above.
+```ts
+export const ADMIN_HEADER_DESKTOP_GEOMETRY = { x: 0, y: 0, width: 1672, height: 86 } as const;
+export const ADMIN_RAIL_DESKTOP_GEOMETRY = { x: 0, y: 86, width: 260, height: 855 } as const;
+export const ADMIN_QUEUE_DESKTOP_GEOMETRY = { x: 260, y: 86, width: 559, height: 855 } as const;
+export const ADMIN_DOCKET_DESKTOP_GEOMETRY = { x: 819, y: 86, width: 853, height: 855 } as const;
+export const ADMIN_LEDGER_LIST_GEOMETRY = { x: 260, y: 154, width: 559, height: 787 } as const;
+export const ADMIN_LEDGER_DOCKET_GEOMETRY = { x: 819, y: 154, width: 853, height: 787 } as const;
+export const ADMIN_SERVICE_TABLE_GEOMETRY = { x: 292, y: 154, width: 1348, height: 763 } as const;
+export const ADMIN_HEADER_MOBILE_GEOMETRY = { x: 0, y: 0, width: 390, height: 70 } as const;
+export const ADMIN_NAV_MOBILE_GEOMETRY = { x: 0, y: 734, width: 390, height: 110 } as const;
+export const ADMIN_FIRST_ROW_MOBILE_GEOMETRY = { x: 20, y: 220, width: 350, height: 94 } as const;
+export const ADMIN_BACK_MOBILE_GEOMETRY = { x: 0, y: 0, width: 390, height: 67 } as const;
+export const ADMIN_DETAIL_DOCKET_MOBILE_GEOMETRY = { x: 20, y: 67, width: 350, height: 761 } as const;
+export const ADMIN_PAGE_HEADING_DESKTOP_GEOMETRY = { x: 260, y: 86, width: 1412, height: 68 } as const; // derived: rail right edge + header bottom through ledger-list y
+export const HOST_BODY_DESKTOP_GEOMETRY = { x: 36, y: 319, width: 1465, height: 665 } as const;
+export const HOST_WORKBOX_DESKTOP_GEOMETRY = { x: 988, y: 319, width: 513, height: 665 } as const;
+export const HOST_MOBILE_NAV_GEOMETRY = { x: 0, y: 768, width: 390, height: 64 } as const;
+export const HOST_PREP_MOBILE_MAIN_GEOMETRY = { x: 19, y: 58, width: 352, height: 902 } as const;
+export const HOST_LIVE_MOBILE_MAIN_GEOMETRY = { x: 19, y: 58, width: 352, height: 806 } as const;
+export const HOST_LIVE_MOBILE_BOARD_GEOMETRY = { x: 19, y: 200, width: 352, height: 600 } as const;
+export const HOST_MEETINGS_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
+export const HOST_MEETINGS_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
+export const HOST_MEETINGS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1086 } as const;
+export const HOST_PEOPLE_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
+export const HOST_PEOPLE_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
+export const HOST_PEOPLE_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1062 } as const;
+export const HOST_RECORDS_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
+export const HOST_RECORDS_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
+export const HOST_RECORDS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 990 } as const;
+export const HOST_SETTINGS_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
+export const HOST_SETTINGS_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
+export const HOST_SETTINGS_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 1052 } as const;
+export const HOST_SCHEDULE_REVIEW_HEADER_GEOMETRY = { x: 0, y: 0, width: 1536, height: 91 } as const;
+export const HOST_SCHEDULE_REVIEW_NAV_GEOMETRY = { x: 800, y: 23, width: 235, height: 44 } as const;
+export const HOST_SCHEDULE_REVIEW_MAIN_GEOMETRY = { x: 0, y: 91, width: 1536, height: 943 } as const;
+export const HOST_PERSON_HEADER_GEOMETRY = { x: 17, y: 58, width: 356, height: 143 } as const;
+export const HOST_PERSON_MAIN_GEOMETRY = { x: 1, y: 58, width: 388, height: 737 } as const;
+```
+
+Shared production-DOM objects. Typography color is light-theme `--ink-900` / `--text`. Line-heights are token products (`36 * 1.15`, `16 * 1.6`, `12 * 1.4`).
+
+```ts
+const INK = "oklch(0.18 0.020 255)";
+const ADMIN_HEADER = { name: "admin-header", selector: ".admin-shell__header", expected: ADMIN_HEADER_DESKTOP_GEOMETRY, toleranceCssPx: 4 as const };
+const ADMIN_RAIL = { name: "admin-rail", selector: ".admin-shell__nav", expected: ADMIN_RAIL_DESKTOP_GEOMETRY, toleranceCssPx: 4 as const };
+const ADMIN_MOBILE_HEADER = { name: "mobile-header", selector: ".admin-shell__header", expected: ADMIN_HEADER_MOBILE_GEOMETRY, toleranceCssPx: 4 as const };
+const ADMIN_MOBILE_NAV = { name: "mobile-nav", selector: ".admin-mobile-navigation", expected: ADMIN_NAV_MOBILE_GEOMETRY, toleranceCssPx: 4 as const };
+const HOST_HEADER = { name: "host-header", selector: "header.topnav", expected: HOST_MEETINGS_HEADER_GEOMETRY, toleranceCssPx: 4 as const };
+const HOST_NAV = { name: "host-nav", selector: 'nav[aria-label="호스트 주 메뉴"]', expected: HOST_MEETINGS_NAV_GEOMETRY, toleranceCssPx: 4 as const };
+const HOST_MOBILE_NAV = { name: "mobile-nav", selector: '[data-club-shell-region="mobile-primary"] .m-tabbar', expected: HOST_MOBILE_NAV_GEOMETRY, toleranceCssPx: 4 as const };
+const HOST_MOBILE_HEADER = { name: "mobile-header", selector: '[data-club-shell-region="mobile-context"]', expected: HOST_PERSON_HEADER_GEOMETRY, toleranceCssPx: 4 as const };
+
+const TYPO_ADMIN_WORDMARK = { name: "wordmark", selector: ".admin-shell__wordmark", fontFamilyIncludes: "Pretendard" as const, fontSizePx: 12, fontWeight: [650], lineHeightPx: 16.8, color: INK };
+const TYPO_ADMIN_PAGE_TITLE = { name: "page-title", selector: ".admin-page-frame h1", fontFamilyIncludes: "Pretendard" as const, fontSizePx: 36, fontWeight: [600], lineHeightPx: 41.4, color: INK };
+const TYPO_ADMIN_PAGE_TITLE_MOBILE = { name: "page-title", selector: ".admin-page-frame h1", fontFamilyIncludes: "Pretendard" as const, fontSizePx: 28, fontWeight: [600], lineHeightPx: 33.6, color: INK };
+const TYPO_QUEUE_TITLE = { name: "queue-title", selector: ".admin-operations-queue__title", fontFamilyIncludes: "Pretendard" as const, fontSizePx: 17, fontWeight: [600], lineHeightPx: 23.8, color: INK };
+const TYPO_BODY = { name: "body-copy", selector: ".admin-page-frame__description, .admin-operations-inspector, .rm-host-operating-room", fontFamilyIncludes: "Pretendard" as const, fontSizePx: 16, fontWeight: [400, 500], lineHeightPx: 25.6, color: INK };
+const TYPO_HOST_WORDMARK = { name: "wordmark", selector: "header.topnav .editorial", fontFamilyIncludes: "Pretendard" as const, fontSizePx: 12, fontWeight: [650], lineHeightPx: 16.8, color: INK };
+const TYPO_HOST_PAGE_TITLE = { name: "page-title", selector: "main h1, .rm-host-operating-room h1, .admin-page-frame h1", fontFamilyIncludes: "Pretendard" as const, fontSizePx: 36, fontWeight: [600], lineHeightPx: 41.4, color: INK };
+```
+
+Per-id `REQUIRED_VISUAL_AUTHORITY_COVERAGE` objects. Keep the previous name inventory as the `name` field of each object. History-restore interactions always include Back and Forward.
+
+| id | regions (name / selector / expected / tol) | typography | firstViewport (name / selector / visibility) | defaultVisibleItems | interactions |
+| --- | --- | --- | --- | --- | --- |
+| `admin-today-desktop` | `admin-header` `.admin-shell__header` `ADMIN_HEADER_DESKTOP` 4; `admin-rail` `.admin-shell__nav` `ADMIN_RAIL_DESKTOP` 4; `today-heading` `.admin-page-frame h1` `ADMIN_PAGE_HEADING_DESKTOP` 4; `priority-queue` `.admin-operations-queue` `ADMIN_QUEUE_DESKTOP` 4; `selected-work` `[aria-label="운영 케이스 상세"]` `ADMIN_DOCKET_DESKTOP` 4 | `TYPO_ADMIN_WORDMARK`, `TYPO_ADMIN_PAGE_TITLE`, `TYPO_QUEUE_TITLE`, `TYPO_BODY` | `three-priority-items` `.admin-operations-queue__row` fully-visible; `show-all` `role=button[name=/전체 .*보기/]` fully-visible; `primary-lifecycle-action` `[aria-label="운영 케이스 상세"] button` fully-visible | `{ selector: ".admin-operations-queue__row", count: 3 }` | `select-work` activate `.admin-operations-queue__row` click expectedVisible `[aria-label="운영 케이스 상세"]` expectedUrl `/admin/today?case=case-closing-risk` restoreCanonicalState; `show-all-url` activate `role=button[name=/전체 .*보기/]` click expectedUrl `/admin/today?queue=all`; `back-restores-priority` history-restore activate `role=button[name=/전체 .*보기/]` expectedUrlAfterActivate `/admin/today?queue=all` expectedUrlAfterBack `/admin/today` expectedUrlAfterForward `/admin/today?queue=all` expectedRestoredFocusAfterBack `.admin-operations-queue__row`; `keyboard-work-row` focus-control target `.admin-operations-queue__row` expectedFocused `.admin-operations-queue__row` |
+| `admin-clubs-desktop` | header+rail as above; `clubs-heading` `.admin-page-frame h1` `ADMIN_PAGE_HEADING_DESKTOP` 4; `club-finder` `.admin-club-management__finder` `ADMIN_LEDGER_LIST` 2; `club-docket` `.admin-club-management__docket` `ADMIN_LEDGER_DOCKET` 2; `club-detail` `.admin-club-management__docket` `ADMIN_LEDGER_DOCKET` 4 | wordmark, page-title, `row-title` `.admin-club-management__row` 17/600/23.8/`INK`, body-copy | `finder` `.admin-club-management__finder` fully-visible; `first-club-row` `.admin-club-management__row` fully-visible; `selected-club-detail` `.admin-club-management__docket` fully-visible | none | `select-club` activate `.admin-club-management__row` click expectedVisible `.admin-club-management__docket`; `back-restores-club-focus` history-restore activate `.admin-club-management__row` expectedUrlAfterActivate `/admin/clubs` (selected) expectedUrlAfterBack `/admin/clubs` expectedUrlAfterForward selected URL expectedRestoredFocusAfterBack `.admin-club-management__row`; `club-pagination` activate existing next-page control expectedVisible `.admin-club-management__list` |
+| `admin-service-desktop` | header+rail; `service-heading` `.admin-page-frame h1` `ADMIN_PAGE_HEADING_DESKTOP` 4; `service-table` `.admin-service-status__table` `ADMIN_SERVICE_TABLE` 2; `service-evidence` `.admin-service-status` sibling evidence region `ADMIN_LEDGER_DOCKET` 4 | wordmark, page-title, row-title, body-copy | `service-table` `.admin-service-status__table` fully-visible; `service-evidence` evidence region fully-visible; `no-command-control` absence of command buttons intersects | none | `keyboard-service-row` focus-control; `select-service-evidence` activate |
+| `admin-records-desktop` | header+rail; `records-heading` `.admin-page-frame h1` `ADMIN_PAGE_HEADING_DESKTOP` 4; `audit-list` `.admin-audit__list` `ADMIN_LEDGER_LIST` 2; `audit-detail` `.admin-audit__detail` `ADMIN_LEDGER_DOCKET` 2 | wordmark, page-title, `row-title` `.admin-audit__row-title` 17/600/23.8/`INK`, body-copy | `first-audit-row` `.admin-audit__row` fully-visible; `selected-audit-detail` `.admin-audit__detail` fully-visible | none | `select-audit` activate; `back-restores-audit-focus` history-restore with Back and Forward URLs; `audit-pagination` activate |
+| `admin-space-switcher-desktop` | header+rail; `space-trigger` `[aria-label="공간 전환, 현재 플랫폼 운영"]` header cluster 4; `root-space-menu` `role=menu` overlay 4; `first-priority-item` `.admin-operations-queue__row` `ADMIN_FIRST_ROW` equivalent desktop first row 4 | wordmark, `space-trigger-label` trigger 12/650, `menu-label` `role=menuitemradio` 14/500, body-copy | `platform-root-choice` `role=menuitemradio[name=/플랫폼 운영/]` fully-visible; `my-club-root-choice` `role=menuitem[name="내 클럽"]` fully-visible; `first-priority-item` `.admin-operations-queue__row` intersects | none | `keyboard-root-menu` keyboard-menu trigger space-trigger keys Enter/ArrowDown/Escape expectedFocusAfterEscape trigger; `club-subflow` activate `내 클럽` expectedVisible named-club menuitem; `escape-restores-trigger` keyboard-menu Escape |
+| `admin-today-mobile` | `mobile-header` `.admin-shell__header` `ADMIN_HEADER_MOBILE` 4; `today-heading` `.admin-page-frame h1` heading box 4; `priority-queue` `.admin-operations-queue` 4; `first-queue-row` `.admin-operations-queue__row` `ADMIN_FIRST_ROW_MOBILE` 2; `mobile-nav` `.admin-mobile-navigation` `ADMIN_NAV_MOBILE` 4 | wordmark, `TYPO_ADMIN_PAGE_TITLE_MOBILE`, queue-title, `mobile-meta` `.admin-operations-queue__mobile-meta` 12/500/16.8/`INK` | `three-priority-items` `.admin-operations-queue__row` fully-visible; `show-all` `전체 .*보기` fully-visible; `mobile-nav` `.admin-mobile-navigation` fully-visible | `{ selector: ".admin-operations-queue__row", count: 3 }` | `select-mobile-work` activate first row expectedUrl `/admin/today?case=case-notification&mode=detail`; `show-all-url` activate; `back-restores-mobile-row` history-restore expectedUrlAfterActivate detail URL expectedUrlAfterBack `/admin/today` expectedUrlAfterForward detail URL expectedRestoredFocusAfterBack first row |
+| `admin-work-detail-mobile` | `mobile-header` `ADMIN_BACK_MOBILE` 4 via `role=button[name="목록으로"]` / header; `detail-heading` detail title 4; `detail-body` `[aria-label="운영 케이스 상세"]` `ADMIN_DETAIL_DOCKET_MOBILE` 4; `primary-action` primary lifecycle button 4; `mobile-nav` `ADMIN_NAV_MOBILE` 4 | wordmark, mobile page-title, `detail-title` 20/600/26/`INK`, body-copy | `detail-title` fully-visible; `primary-lifecycle-action` fully-visible; `mobile-nav` fully-visible | none | `primary-action-keyboard-reachable` focus-control |
+| `host-prep-desktop`, `host-live-desktop`, `host-closing-desktop` | `host-header` `header.topnav` ledger header 4; `host-nav` `nav[aria-label="호스트 주 메뉴"]` ledger nav 4; `current-meeting` current-meeting header 4; `phase-navigation` phase tabs 4; `phase-status` `.rm-host-operating-room__phase-notice` or status line 4; `primary-next-action` next-action region 4; `phase-panel` `.rm-host-operating-room__phase-panel` `HOST_BODY_DESKTOP` 4; `workbox` `.rm-host-operating-room__workbox-rail` `HOST_WORKBOX_DESKTOP` 4 | `TYPO_HOST_WORDMARK`, `TYPO_HOST_PAGE_TITLE`, `phase-label` phase tab 14/600, `work-item-title` `.rm-host-workbox` item 17/600, body-copy | `current-phase` fully-visible; `primary-next-action` fully-visible; `four-workbox-items` `.rm-host-workbox__items > *` fully-visible; `show-all-workbox` `작업함 모두 보기` fully-visible | `{ selector: ".rm-host-workbox__items > *", count: 4 }` | `phase-roving-tabs` tab-selection; `show-all-workbox-url` activate expectedUrl `workbox=all`; `back-restores-capped-workbox` history-restore expectedUrlAfterActivate with `workbox=all` expectedUrlAfterBack without it expectedUrlAfterForward with it; plus phase-specific `prep-retry` activate / `attendance-undo-keyboard-reachable` focus-control / `closing-destination` activate |
+| `host-meetings-desktop` | header/nav `HOST_MEETINGS_*`; `meetings-heading` `main h1` 4; `meeting-tabs` tablist 4; `meeting-ledger` `main` `HOST_MEETINGS_MAIN` 4 | wordmark, page-title, `tab-label` 14/600, row-title, body-copy | `meeting-tabs` fully-visible; `first-meeting-row` fully-visible; `status` intersects | none | `meeting-view-tab` tab-selection; `meeting-status-tab` tab-selection; `meeting-pagination` activate |
+| `host-people-desktop` | header/nav `HOST_PEOPLE_*`; `people-heading` `main h1` 4; `pending-review` `[aria-label="가입 승인 대기"]` 4; `member-table` `main` `HOST_PEOPLE_MAIN` 4 | wordmark, page-title, row-title, body-copy | `pending-review` fully-visible; `first-member-row` fully-visible; `member-status` intersects | none | `select-member` activate; `back-restores-member-focus` history-restore Back+Forward; `member-pagination` activate |
+| `host-records-desktop` | header/nav `HOST_RECORDS_*`; `records-heading` `main h1` 4; `record-ledger` `main` `HOST_RECORDS_MAIN` 4; `closing-link` closing record link 4 | wordmark, page-title, row-title, body-copy | `first-record-row` fully-visible; `closing-link` fully-visible | none | `open-closing-record` activate; `back-restores-record-focus` history-restore Back+Forward; `record-pagination` activate |
+| `host-settings-desktop` | header/nav `HOST_SETTINGS_*`; `settings-heading` `main h1` 4; `invitation-region` invitation section 4; `club-settings` `main` `HOST_SETTINGS_MAIN` 4 | wordmark, page-title, section-title, body-copy | `invitation-action` fully-visible; `settings-status` intersects | none | `open-invitation-form` activate; `escape-restores-invitation-focus` keyboard-menu Escape |
+| `host-schedule-review-desktop` | header/nav `HOST_SCHEDULE_REVIEW_*`; `review-heading` `main h1` 4; `recipient-region` recipient region 4; `preview-region` preview region `HOST_SCHEDULE_REVIEW_MAIN` 4 | wordmark, page-title, recipient-label, preview-copy | `recipient-selection` fully-visible; `preview-action` fully-visible; `preview-confirmation` fully-visible | none | `preview-notification-post` prepared-request `preview-schedule-notification` POST `/api/bff/api/host/notifications/manual/preview` forbiddenEffectKinds confirm/send |
+| `host-prep-mobile`, `host-live-mobile` | `mobile-header` `[data-club-shell-region="mobile-context"]`; `current-meeting`; phase tabs/status/next-action/panel/workbox using `HOST_PREP_MOBILE_MAIN` or `HOST_LIVE_MOBILE_MAIN`; `mobile-nav` `HOST_MOBILE_NAV` 4; live also `attendance-board` `HOST_LIVE_MOBILE_BOARD` 4 | wordmark, mobile page-title 28/600/33.6, phase-label, work-item-title, body-copy | `primary-next-action` fully-visible; `three-workbox-items` fully-visible; `show-all-workbox` fully-visible; `mobile-nav` fully-visible; live adds `attendance-board` and `undo-action` fully-visible | `{ selector: ".rm-host-workbox__items > *", count: 3 }` | same workbox history-restore Back+Forward; plus `prep-retry` / `attendance-undo-keyboard-reachable` |
+| `host-person-mobile` | `mobile-header` `HOST_PERSON_HEADER` 4; `person-heading` heading 4; `person-status` status 4; `person-history` history `HOST_PERSON_MAIN` 4; `mobile-nav` `HOST_MOBILE_NAV` 4 | wordmark, mobile page-title, status-label, history-copy | `person-status` fully-visible; `first-history-row` fully-visible; `mobile-nav` fully-visible | none | `person-history-pagination` activate; `person-status-keyboard-reachable` focus-control |
+
+For rows containing “plus phase-specific,” the registry expands the named per-id suffix into the final exact interaction object set. Host desktop header/nav geometry uses the per-ledger constants from `approved-host-ledgers.ct.tsx` (`HOST_MEETINGS_*` through `HOST_SCHEDULE_REVIEW_*`), not a single meetings box on every Host desktop id.
 
 `parseVisualAuthoritySelection` returns all 18 ids when the variable is absent or empty, but throws for blank members, duplicates, or any id outside the manifest. It must never turn a malformed non-empty filter into an all-skipped successful run.
 
@@ -503,7 +590,7 @@ Extract the shared comparison/write body from `captureApprovedComparison` into `
 
 - [ ] **Step 5: Implement route settle, geometry, typography, and first-viewport checks**
 
-`runActualRouteAuthority({ page, testInfo, scenario, installFixtures })` performs this order: set viewport; install the catch-all BFF request audit; call `installFixtures(page, scenario.fixtureKey, requestAudit)`; navigate; verify actor and club scope before protected data resolves; resolve and run `APPROVED_ROUTE_PREPARATIONS[scenario.preparationKey]`; wait for `document.fonts.ready`, the scenario root, and the scenario-specific ready selector; wait for `[aria-busy="true"]` to disappear; assert pathname/search/hash; measure every required region and typography entry including computed color; measure required document order and full/intersection visibility; count only rendered visible default items; measure overflow; execute every declarative `scenario.interactions` entry by its discriminant and restore the registered canonical route/preparation state after each; consume a `prepared-request` result from the single preparation execution rather than clicking twice; reassert the canonical state; capture and write all artifacts; assert no unmatched/effecting request; then evaluate the report's strict verdict. Callers never supply independent preparation or interaction arrays.
+`runActualRouteAuthority({ page, testInfo, scenario, installFixtures })` performs this order: set viewport; install the catch-all BFF request audit; call `installFixtures(page, scenario.fixtureKey, requestAudit)` where `installFixtures` is `(page, fixtureKey, requestAudit) => Promise<void>`; navigate; verify actor and club scope before protected data resolves; resolve and run `APPROVED_ROUTE_PREPARATIONS[scenario.preparationKey]`; wait for `document.fonts.ready`, the scenario root, and the scenario-specific ready selector; wait for `[aria-busy="true"]` to disappear; assert pathname/search/hash; measure every required region and typography entry including computed color; measure required document order and full/intersection visibility; count only rendered visible default items; measure overflow; execute every declarative `scenario.interactions` entry by its discriminant and restore the registered canonical route/preparation state after each; for `history-restore`, activate, assert `expectedUrlAfterActivate`, go Back and assert `expectedUrlAfterBack` plus optional restored focus, then go Forward and assert `expectedUrlAfterForward` equals the activated URL/state plus optional restored focus; consume a `prepared-request` result from the single preparation execution rather than clicking twice; reassert the canonical state; capture and write all artifacts; assert no unmatched/effecting request; then evaluate the report's strict verdict. Callers never supply independent preparation or interaction arrays. Specs must not close over a different installer arity.
 
 ```ts
 const intersectsViewport = await locator.evaluate((element) => {
@@ -561,6 +648,7 @@ git commit -m "test: register actual-route visual authorities"
 - Produces: `AdminQueueDisclosureMode = "priority" | "all"`.
 - Adds: `queueDisclosure: AdminQueueDisclosureMode` to `AdminOperationsSearchState`, its parser, serializer, and input contract.
 - Produces: `AdminOperationsQueue` props `visibleLimit`, `expanded`, `onShowAll`.
+- Produces: `installAdminApprovedRoutes(page, fixtureKey, requestAudit)` matching the shared three-argument installer signature.
 - Produces: actual-route strict tests for `admin-today-desktop`, `admin-today-mobile`, `admin-work-detail-mobile`.
 
 - [ ] **Step 1: Write RED model and component tests**
@@ -638,7 +726,8 @@ for (const id of ["admin-today-desktop", "admin-today-mobile", "admin-work-detai
       page,
       testInfo,
       scenario: visualAuthorityScenario(id),
-      installFixtures: installAdminApprovedToday,
+      installFixtures: (page, fixtureKey, requestAudit) =>
+        installAdminApprovedRoutes(page, fixtureKey, requestAudit),
     });
   });
 }
@@ -821,6 +910,7 @@ git commit -m "feat: converge admin ledger actual routes"
 - Produces: URL-backed `workbox=all` behavior owned by `HostDashboardRoute`.
 - Produces: source warnings passed to `HostOperatingRoomPage.optionalFailureActions` instead of a large duplicate panel in the rail.
 - Produces: focused Host auth/club-scope coverage and a request audit that fails on unmatched BFF calls or effecting writes.
+- Produces: `installHostApprovedRoutes(page, fixtureKey, requestAudit, options?)`. Callers wrap it as `installFixtures: (page, fixtureKey, requestAudit) => installHostApprovedRoutes(page, fixtureKey, requestAudit, options)`.
 
 - [ ] **Step 1: Write RED model/UI/route tests**
 
@@ -886,11 +976,10 @@ Run: `corepack pnpm --dir front exec playwright test --config=playwright-ct.conf
 
 Run: `READMATES_VISUAL_AUTHORITY_SMOKE_ONLY=true corepack pnpm --dir front exec playwright test tests/e2e/approved-route-auth-scope.spec.ts --project=chromium --grep host`
 
-Only after the actual Host auth/scope and workbox behavior are GREEN, run `corepack pnpm --dir front test:ct:update:docker`. Inspect only the tracked workbox screenshots reported by that component test, reject any unrelated change, and rerun `corepack pnpm --dir front test:ct:docker`. Never modify approved references.
+Task 6 GREEN is those host-workbox-model / host-dashboard-route / host-workbox unit-route tests, Host auth/scope E2E, and workbox CT semantic assertions that do not require snapshot refresh. Do not run `corepack pnpm --dir front test:ct:update:docker`. Do not stage or commit workbox CT snapshots. If workbox CT screenshots fail after the density change, leave tracked snapshots untouched and carry that drift to Task 7.
 
 ```bash
 git add front/tests/e2e/support/host-approved-route-fixtures.ts front/tests/e2e/approved-route-auth-scope.spec.ts front/features/host/model/host-workbox-model.ts front/features/host/model/host-workbox-model.test.ts front/features/host/route/host-dashboard-route.tsx front/features/host/route/host-dashboard-route.test.tsx front/features/host/ui/workbox/host-workbox.tsx front/features/host/ui/workbox/host-workbox.test.tsx front/features/host/ui/workbox/host-workbox.ct.tsx front/features/host/ui/workbox/host-work-item.tsx front/features/host/ui/workbox/host-workbox.css
-# Add only the exact tracked workbox snapshot files shown by `git status --short` after independent inspection.
 git commit -m "feat: bound host workbox first-viewport density"
 ```
 
@@ -933,7 +1022,8 @@ for (const id of [
       page,
       testInfo,
       scenario: visualAuthorityScenario(id),
-      installFixtures: (target) => installHostApprovedRoutes(target, { workboxItems: 12 }),
+      installFixtures: (page, fixtureKey, requestAudit) =>
+        installHostApprovedRoutes(page, fixtureKey, requestAudit, { workboxItems: 12 }),
     });
   });
 }
@@ -967,11 +1057,11 @@ Run: `READMATES_VISUAL_AUTHORITY_SMOKE_ONLY=true corepack pnpm --dir front exec 
 
 Expected: five scenarios PASS strict 0.02 with first-viewport count and geometry PASS.
 
-Only after those actual routes are strict GREEN, run `corepack pnpm --dir front test:ct:update:docker`. Inspect only the tracked Host operating-room/shell snapshot files reported by `git status --short`, reject unrelated changes, confirm approved-reference hashes remain unchanged, and rerun `corepack pnpm --dir front test:ct:docker` before staging the exact approved snapshot files.
+Only after those five Host operating-room actual-route scenarios are strict GREEN, run `corepack pnpm --dir front test:ct:update:docker`. Inspect the exact workbox plus operating-room/shell snapshot files reported by `git status --short`, reject unrelated diffs, never touch approved reference PNGs, rerun `corepack pnpm --dir front test:ct:docker`, then stage those exact snapshot files. Carry any workbox snapshot drift left untouched by Task 6 into this update.
 
 ```bash
 git add front/tests/e2e/host-approved-routes.spec.ts front/tests/e2e/support/host-approved-route-fixtures.ts front/features/host/ui/operating-room/host-operating-room-page.tsx front/features/host/ui/operating-room/operating-room.css front/features/host/ui/operating-room/current-meeting-header.test.tsx front/features/host/ui/operating-room/host-next-action.test.tsx front/features/host/ui/operating-room/meeting-phase-tabs.test.tsx front/features/host/ui/operating-room/preparation-ledger.test.tsx front/features/host/ui/operating-room/phase-status-ledger.test.tsx front/features/host/ui/shell/host-shell.css front/features/host/route/host-dashboard-route.tsx
-# Add only the exact tracked Host CT snapshot files shown by `git status --short` after independent inspection.
+# Add only the exact tracked workbox + operating-room/shell CT snapshot files shown by `git status --short` after independent inspection.
 git commit -m "feat: converge host operating room actual routes"
 ```
 
