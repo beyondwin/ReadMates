@@ -67,6 +67,9 @@ type Props = {
   onQueryChange?: (value: string) => void;
   onApplyPending?: () => void;
   onBackToList?: () => void;
+  visibleLimit?: number;
+  queueExpanded?: boolean;
+  onShowAll?: () => void;
 };
 
 export function AdminTodayLedger({
@@ -99,6 +102,9 @@ export function AdminTodayLedger({
   onQueryChange,
   onApplyPending,
   onBackToList,
+  visibleLimit,
+  queueExpanded = false,
+  onShowAll,
 }: Props) {
   const { ref: ledgerRef, layout: contentLayout, width: contentWidth } = useAdminContentWidth<HTMLDivElement>();
   const flowLayout = contentLayout === "flow";
@@ -229,6 +235,10 @@ export function AdminTodayLedger({
       hasNextPage={hasNextPage}
       loadingMore={loadingMore}
       onLoadMore={onLoadMore}
+      visibleLimit={visibleLimit}
+      expanded={queueExpanded}
+      onShowAll={onShowAll}
+      showBack={mode !== "detail"}
     />
   ) : (
     <div className="admin-today-ledger__columns">
@@ -242,20 +252,36 @@ export function AdminTodayLedger({
         hasNextPage={hasNextPage}
         loadingMore={loadingMore}
         onLoadMore={onLoadMore}
+        visibleLimit={visibleLimit}
+        expanded={queueExpanded}
+        onShowAll={onShowAll}
         secondaryControls={queueControls}
       />
       {inspector}
     </div>
   );
 
+  const detailMode = flowLayout && mode === "detail";
+  const detailBack = detailMode && onBackToList ? (
+    <button
+      type="button"
+      className="admin-operation-mobile-detail__back admin-operation-control--touch"
+      aria-label="목록으로"
+      onClick={onBackToList}
+    >
+      <span aria-hidden="true">오늘 할 일</span>
+    </button>
+  ) : null;
+
   return (
     <AdminPageContext
-      eyebrow="오늘"
-      heading={ADMIN_TODAY_HEADING}
-      description={ADMIN_TODAY_DESCRIPTION}
-      freshness={`${view.generatedAtLabel} 기준`}
-      scope={view.sourceStatusLabel}
-      action={
+      eyebrow={detailMode ? false : "오늘"}
+      heading={detailMode ? (view.selectedCase?.summary.title ?? false) : ADMIN_TODAY_HEADING}
+      description={detailMode ? false : ADMIN_TODAY_DESCRIPTION}
+      freshness={detailMode ? false : `${view.generatedAtLabel} 기준`}
+      scope={detailMode ? false : view.sourceStatusLabel}
+      leading={detailBack}
+      action={detailMode ? false : (
         <p
           className="admin-today-ledger__summary"
           tabIndex={-1}
@@ -263,7 +289,7 @@ export function AdminTodayLedger({
         >
           {view.mobileSummary.open} · {view.mobileSummary.critical} · {view.mobileSummary.assignedToMe}
         </p>
-      }
+      )}
     >
       <div
         className="admin-today-ledger"

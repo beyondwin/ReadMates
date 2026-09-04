@@ -427,7 +427,13 @@ export async function captureApprovedViewportComparison(input: {
   results: ApprovedRouteAssertionResults;
 }): Promise<ApprovedComparisonReport> {
   await input.page.evaluate(() => document.fonts.ready);
-  await input.page.evaluate(() => window.scrollTo({ top: 0, left: 0, behavior: "auto" }));
+  await input.page.evaluate(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== document.body) {
+      active.blur();
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  });
   const candidatePng = await input.page.screenshot({ animations: "disabled", fullPage: false });
   const fingerprint = await readRendererFingerprint(input.page);
   return compareAndWriteApprovedArtifacts({

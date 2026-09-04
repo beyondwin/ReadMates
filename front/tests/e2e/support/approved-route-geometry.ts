@@ -9,7 +9,7 @@ export const ADMIN_HEADER_MOBILE_GEOMETRY = { x: 0, y: 0, width: 390, height: 70
 export const ADMIN_NAV_MOBILE_GEOMETRY = { x: 0, y: 734, width: 390, height: 110 } as const;
 export const ADMIN_FIRST_ROW_MOBILE_GEOMETRY = { x: 20, y: 220, width: 350, height: 94 } as const;
 export const ADMIN_BACK_MOBILE_GEOMETRY = { x: 0, y: 0, width: 390, height: 67 } as const;
-export const ADMIN_DETAIL_DOCKET_MOBILE_GEOMETRY = { x: 20, y: 67, width: 350, height: 761 } as const;
+export const ADMIN_DETAIL_DOCKET_MOBILE_GEOMETRY = { x: 20, y: 67, width: 350, height: 706 } as const;
 export const ADMIN_PAGE_HEADING_DESKTOP_GEOMETRY = { x: 260, y: 86, width: 1412, height: 68 } as const;
 export const HOST_BODY_DESKTOP_GEOMETRY = { x: 36, y: 319, width: 1465, height: 665 } as const;
 export const HOST_WORKBOX_DESKTOP_GEOMETRY = { x: 988, y: 319, width: 513, height: 665 } as const;
@@ -72,14 +72,14 @@ export const ADMIN_ROOT_SPACE_MENU_GEOMETRY = {
 
 export const ADMIN_DETAIL_HEADING_MOBILE_GEOMETRY = {
   x: ADMIN_DETAIL_DOCKET_MOBILE_GEOMETRY.x,
-  y: ADMIN_BACK_MOBILE_GEOMETRY.height,
+  y: 91,
   width: ADMIN_DETAIL_DOCKET_MOBILE_GEOMETRY.width,
   height: 48,
 } as const;
 
 export const ADMIN_PRIMARY_ACTION_MOBILE_GEOMETRY = {
   x: ADMIN_DETAIL_DOCKET_MOBILE_GEOMETRY.x,
-  y: ADMIN_NAV_MOBILE_GEOMETRY.y - 48,
+  y: 587,
   width: ADMIN_DETAIL_DOCKET_MOBILE_GEOMETRY.width,
   height: 44,
 } as const;

@@ -155,10 +155,6 @@ async function assertActorScope(page: Page, scenario: VisualAuthorityScenario): 
   }
 }
 
-async function pageLocation(page: Page): Promise<string> {
-  return approvedLocation(page.url());
-}
-
 async function firstMatching(page: Page, selector: string): Promise<Locator> {
   const locator = page.locator(selector);
   const count = await locator.count();
@@ -408,7 +404,7 @@ export async function runActualRouteAuthority(input: {
   await installFixtures(page, scenario.fixtureKey, requestAudit);
   await page.goto(scenario.route, { waitUntil: "domcontentloaded" });
   await assertActorScope(page, scenario);
-  let preparation = await APPROVED_ROUTE_PREPARATIONS[scenario.preparationKey]({
+  const preparation = await APPROVED_ROUTE_PREPARATIONS[scenario.preparationKey]({
     page,
     scenario,
     requestAudit,

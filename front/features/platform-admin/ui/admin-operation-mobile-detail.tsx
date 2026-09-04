@@ -31,6 +31,10 @@ type Props = {
   onSelectCase: (caseId: string, options?: { mode?: "list" | "detail" }) => void;
   onBack?: () => void;
   onLoadMore?: () => void;
+  visibleLimit?: number;
+  expanded?: boolean;
+  onShowAll?: () => void;
+  showBack?: boolean;
 };
 
 export function AdminOperationMobileDetail({
@@ -51,6 +55,10 @@ export function AdminOperationMobileDetail({
   onSelectCase,
   onBack,
   onLoadMore,
+  visibleLimit,
+  expanded,
+  onShowAll,
+  showBack = true,
 }: Props) {
   const [detailCaseId, setDetailCaseId] = useState<string | null>(null);
   const listContainerRef = useRef<HTMLDivElement>(null);
@@ -69,7 +77,10 @@ export function AdminOperationMobileDetail({
   }, [showDetail]);
 
   useEffect(() => {
-    if (showDetail) backButtonRef.current?.focus({ preventScroll: true });
+    if (!showDetail) return;
+    const backControl = backButtonRef.current
+      ?? document.querySelector<HTMLElement>('button[aria-label="목록으로"]');
+    backControl?.focus({ preventScroll: true });
   }, [showDetail]);
 
   useEffect(() => {
@@ -89,19 +100,21 @@ export function AdminOperationMobileDetail({
   if (showDetail && view.selectedCase) {
     return (
       <div className="admin-operation-mobile-detail">
-        <button
-          ref={backButtonRef}
-          type="button"
-          className="admin-operation-mobile-detail__back admin-operation-control--touch"
-          aria-label="목록으로"
-          onClick={() => {
-            restoreSelectionRef.current = true;
-            if (onBack) onBack();
-            else setDetailCaseId(null);
-          }}
-        >
-          <span aria-hidden="true">오늘 할 일</span>
-        </button>
+        {showBack ? (
+          <button
+            ref={backButtonRef}
+            type="button"
+            className="admin-operation-mobile-detail__back admin-operation-control--touch"
+            aria-label="목록으로"
+            onClick={() => {
+              restoreSelectionRef.current = true;
+              if (onBack) onBack();
+              else setDetailCaseId(null);
+            }}
+          >
+            <span aria-hidden="true">오늘 할 일</span>
+          </button>
+        ) : null}
         <AdminOperationsInspector
           selectedCase={view.selectedCase}
           auditHref={auditHref}
@@ -131,6 +144,9 @@ export function AdminOperationMobileDetail({
         hasNextPage={hasNextPage}
         loadingMore={loadingMore}
         onLoadMore={onLoadMore}
+        visibleLimit={visibleLimit}
+        expanded={expanded}
+        onShowAll={onShowAll}
         secondaryControls={queueControls}
       />
     </div>

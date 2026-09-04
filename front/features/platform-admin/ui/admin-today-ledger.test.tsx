@@ -16,7 +16,10 @@ import {
   resetAdminEditorialLedgerPerformanceStateForTests,
 } from "@/shared/observability/admin-editorial-ledger-performance";
 import { findNestedLiveRegions } from "@/shared/testing/accessibility-checks";
-import { AdminTodayLedger as ProductionAdminTodayLedger } from "./admin-today-ledger";
+import {
+  ADMIN_TODAY_DESCRIPTION,
+  AdminTodayLedger as ProductionAdminTodayLedger,
+} from "./admin-today-ledger";
 
 type AdminTodayLedgerProps = Omit<
   ComponentProps<typeof ProductionAdminTodayLedger>,
@@ -30,7 +33,7 @@ function AdminTodayLedger({
   return <ProductionAdminTodayLedger auditHref={auditHref} {...props} />;
 }
 
-const LEDGER_CSS = readFileSync(path.resolve("features/platform-admin/ui/admin-editorial-ledger.css"), "utf8");
+const LEDGER_CSS = readFileSync(path.resolve("features/platform-admin/ui/admin-today.css"), "utf8");
 const SCOPED_ADMIN_CSS =
   readFileSync(path.resolve("features/platform-admin/ui/admin-page-patterns.css"), "utf8") +
   LEDGER_CSS;
@@ -220,6 +223,34 @@ describe("AdminTodayLedger", () => {
       </MemoryRouter>,
     );
     expect(performance.getEntriesByName(ADMIN_EDITORIAL_LEDGER_PERFORMANCE_METRICS.routeDataToUsable)).toHaveLength(1);
+  });
+
+  it("shows three rows and an explicit all-items action by default", async () => {
+    const user = userEvent.setup();
+    const onShowAll = vi.fn();
+    const items = Array.from({ length: 10 }, (_, index) => operationCase({
+      id: `case-${index + 1}`,
+      locatorLabel: String(10 - index).padStart(2, "0"),
+    }));
+    render(
+      <MemoryRouter>
+        <AdminTodayLedger
+          view={populatedView(items[0], { items, selectedCase: items[0], selectedCaseId: items[0]!.id })}
+          filters={{ state: "", severity: "", source: "", assignee: "" }}
+          history={[]}
+          lifecycleControls={null}
+          visibleLimit={3}
+          queueExpanded={false}
+          onShowAll={onShowAll}
+          onFilterChange={vi.fn()}
+          onSelectCase={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getAllByRole("button", { name: /현재 상태/ })).toHaveLength(3);
+    await user.click(screen.getByRole("button", { name: "전체 10건 보기" }));
+    expect(onShowAll).toHaveBeenCalledOnce();
   });
 
   it("renders a compact command heading, filters, and an honest empty state", () => {
@@ -522,6 +553,8 @@ describe("AdminTodayLedger", () => {
     expect(LEDGER_CSS).toMatch(/\.admin-today-ledger[\s\S]*min-height:\s*44px/);
     expect(SCOPED_ADMIN_CSS).toContain('[data-content-layout="flow"]');
     expect(LEDGER_CSS).toContain("overflow-wrap: anywhere");
+    expect(LEDGER_CSS).toMatch(/admin-operations-queue__title[\s\S]*min-width:\s*12rem/);
+    expect(LEDGER_CSS).toMatch(/grid-template-columns:\s*56px\s+minmax\(0,\s*1fr\)\s+44px/);
   });
 
   it("composes a persistent desktop ledger and docket without a receipt timeline", () => {
@@ -606,6 +639,10 @@ describe("AdminTodayLedger", () => {
 
     expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "목록으로" })).toHaveFocus();
+    expect(screen.getByRole("heading", { level: 1, name: "알림 전달 실패가 반복되고 있습니다" })).toBeVisible();
+    expect(screen.queryByRole("heading", { level: 1, name: "오늘 할 일" })).not.toBeInTheDocument();
+    expect(screen.queryByText(ADMIN_TODAY_DESCRIPTION)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("운영 케이스 요약")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "목록으로" }));
     expect(onBackToList).toHaveBeenCalledOnce();

@@ -126,11 +126,45 @@ describe("actual-route visual authority scenarios", () => {
     expect(history[index]).toBe("/admin/today?queue=all");
   });
 
+  it("selects the first notification row on desktop Today", () => {
+    const selectWork = visualAuthorityScenario("admin-today-desktop").interactions
+      .find((item) => item.name === "select-work");
+    expect(selectWork).toMatchObject({
+      kind: "activate",
+      expectedUrl: "/admin/today?case=case-notification",
+    });
+    expect(selectWork).not.toMatchObject({
+      expectedUrl: "/admin/today?case=case-closing-risk",
+    });
+  });
+
+  it("measures work-detail primary action from the in-flow jammy box, not nav.y-48", () => {
+    const primary = visualAuthorityScenario("admin-work-detail-mobile").regions
+      .find((region) => region.name === "primary-action");
+    expect(primary?.expected).toEqual({ x: 20, y: 587, width: 350, height: 44 });
+    expect(primary?.expected.y).not.toBe(734 - 48);
+    expect(primary?.toleranceCssPx).toBe(4);
+  });
+
+  it("measures work-detail heading as the case title, not the list page h1 copy", () => {
+    const detail = visualAuthorityScenario("admin-work-detail-mobile");
+    expect(detail.regions.find((region) => region.name === "detail-heading")?.selector)
+      .toBe(".admin-page-frame h1");
+    expect(detail.firstViewport.find((entry) => entry.name === "detail-title")?.selector)
+      .toBe(".admin-page-frame h1");
+    expect(detail.typography.find((entry) => entry.name === "page-title")).toMatchObject({
+      selector: ".admin-page-frame h1",
+      fontSizePx: 20,
+    });
+    expect(detail.regions.find((region) => region.name === "detail-heading")?.expected)
+      .toEqual({ x: 20, y: 91, width: 350, height: 48 });
+  });
+
   it("retargets typography and absence checks to live production selectors", () => {
     const today = visualAuthorityScenario("admin-today-desktop");
     expect(today.typography.find((entry) => entry.name === "queue-title")?.selector)
-      .toBe(".admin-operations-queue__header h2");
-    expect(today.typography.some((entry) => entry.selector.includes("admin-operations-queue__title"))).toBe(false);
+      .toBe(".admin-operations-queue__title");
+    expect(today.typography.some((entry) => entry.selector.includes("admin-operations-queue__header h2"))).toBe(false);
 
     const records = visualAuthorityScenario("admin-records-desktop");
     expect(records.regions.some((region) => region.selector === ".admin-audit__list")).toBe(true);

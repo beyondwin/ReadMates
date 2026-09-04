@@ -188,12 +188,14 @@ function Probe({ location, onCompletion, onObservation }: ProbeProps) {
     <div>
       <output aria-label="status">{controller.status}</output>
       <output aria-label="selection">{controller.view?.selectedCaseId ?? "none"}</output>
+      <output aria-label="queue-disclosure">{controller.searchState.queueDisclosure}</output>
       <output aria-label="rows">{controller.view?.items.map((item) => item.id).join(",") ?? ""}</output>
       <output aria-label="pending-new">{controller.pendingCount}</output>
       <output aria-label="action-state">{controller.actionState}</output>
       <output aria-label="action-message">{controller.actionMessage?.text ?? "none"}</output>
       <output aria-label="mutation-target">{controller.mutationTarget?.caseId ?? "none"}</output>
       <button type="button" onClick={() => controller.selectCase("case-b")}>select-b</button>
+      <button type="button" onClick={() => controller.showAllQueue()}>show-all-queue</button>
       <button type="button" onClick={() => navigate(-1)}>back</button>
       <button type="button" onClick={() => navigate(1)}>forward</button>
       <button type="button" onClick={controller.acceptPending}>apply-pending</button>
@@ -312,6 +314,41 @@ beforeEach(() => {
 });
 
 describe("useAdminTodayController", () => {
+  it("does not persist an auto-selected first case into the canonical URL", async () => {
+    const items = [operationCase("case-a"), operationCase("case-b")];
+    renderController(seededClient(items), "/admin/today");
+
+    expect(await screen.findByLabelText("selection")).toHaveTextContent("case-a");
+    expect(screen.getByLabelText("location")).toHaveTextContent("/admin/today");
+    expect(screen.getByLabelText("location")).not.toHaveTextContent("case=");
+    expect(screen.getByLabelText("queue-disclosure")).toHaveTextContent("priority");
+  });
+
+  it("writes queue=all through the allowlisted serializer and keeps it across selection and Back", async () => {
+    const user = userEvent.setup();
+    const items = [operationCase("case-a"), operationCase("case-b")];
+    renderController(seededClient(items), "/admin/today?case=case-a");
+
+    expect(await screen.findByLabelText("queue-disclosure")).toHaveTextContent("priority");
+    await user.click(screen.getByRole("button", { name: "show-all-queue" }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("location")).toHaveTextContent("queue=all");
+      expect(screen.getByLabelText("queue-disclosure")).toHaveTextContent("all");
+    });
+
+    await user.click(screen.getByRole("button", { name: "select-b" }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("location")).toHaveTextContent("case=case-b");
+      expect(screen.getByLabelText("location")).toHaveTextContent("queue=all");
+    });
+
+    await user.click(screen.getByRole("button", { name: "back" }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("location")).toHaveTextContent("case=case-a");
+      expect(screen.getByLabelText("location")).toHaveTextContent("queue=all");
+    });
+  });
+
   it("keeps URL selection authoritative across selection and browser Back", async () => {
     const user = userEvent.setup();
     const items = [operationCase("case-a"), operationCase("case-b")];

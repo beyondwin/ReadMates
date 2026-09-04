@@ -1,8 +1,12 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { AdminOperationCaseView } from "@/features/platform-admin/model/platform-admin-operations-model";
 import { AdminOperationsQueue } from "./admin-operations-queue";
+
+const QUEUE_CSS = readFileSync(path.resolve("features/platform-admin/ui/admin-today.css"), "utf8");
 
 function queueItem(overrides: Partial<AdminOperationCaseView> = {}): AdminOperationCaseView {
   return {
@@ -42,7 +46,94 @@ function queueItem(overrides: Partial<AdminOperationCaseView> = {}): AdminOperat
   };
 }
 
+function tenQueueItems(): AdminOperationCaseView[] {
+  return Array.from({ length: 10 }, (_, index) => queueItem({
+    id: `case-${index + 1}`,
+    locatorLabel: String(10 - index).padStart(2, "0"),
+  }));
+}
+
 describe("AdminOperationsQueue", () => {
+  it("shows three rows and an explicit all-items action by default", async () => {
+    const user = userEvent.setup();
+    const onShowAll = vi.fn();
+    render(
+      <AdminOperationsQueue
+        items={tenQueueItems()}
+        selectedCaseId="case-1"
+        visibleLimit={3}
+        expanded={false}
+        onShowAll={onShowAll}
+        onSelectCase={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByRole("button", { name: /현재 상태/ })).toHaveLength(3);
+    await user.click(screen.getByRole("button", { name: "전체 10건 보기" }));
+    expect(onShowAll).toHaveBeenCalledOnce();
+  });
+
+  it("places a dedicated title between locator and severity", () => {
+    render(
+      <AdminOperationsQueue
+        items={[queueItem({ locatorLabel: "03" })]}
+        selectedCaseId="case-notification"
+        onSelectCase={vi.fn()}
+      />,
+    );
+
+    const row = screen.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ });
+    const locator = row.querySelector(".admin-operations-queue__locator");
+    const title = row.querySelector(".admin-operations-queue__title");
+    const severity = row.querySelector(".admin-operations-queue__severity");
+    expect(title).not.toBeNull();
+    expect(locator?.compareDocumentPosition(title!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(title?.compareDocumentPosition(severity!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("uses approved orange selection chrome instead of accent blue", () => {
+    const selectedBlock = QUEUE_CSS.match(
+      /\.admin-operations-queue__row\[aria-pressed="true"\]\s*\{[^}]+\}/,
+    )?.[0];
+    expect(selectedBlock).toMatch(/var\(--warning/);
+    expect(selectedBlock).toMatch(/inset|border-left|box-shadow/);
+    expect(selectedBlock).not.toMatch(/var\(--accent\)/);
+    expect(QUEUE_CSS).not.toMatch(
+      /\.admin-operations-queue__row\[aria-pressed="true"\][\s\S]{0,180}text-decoration:\s*underline/,
+    );
+    const todaySelected = QUEUE_CSS.match(
+      /\.admin-today-ledger \.admin-operations-queue__row\[aria-pressed="true"\]\s*\{[^}]+\}/,
+    )?.[0];
+    expect(todaySelected).toMatch(/#f68103|#f59d36|#f27f00/);
+  });
+
+  it("keeps mobile detail actions and 처리 방법 in document flow", () => {
+    expect(QUEUE_CSS).not.toMatch(
+      /\[data-content-layout="flow"\][\s\S]{0,360}btn-primary[\s\S]{0,200}position:\s*fixed/,
+    );
+    expect(QUEUE_CSS).not.toMatch(
+      /\[data-content-layout="flow"\][\s\S]{0,240}admin-operation-actions__other[\s\S]{0,80}position:\s*fixed/,
+    );
+    expect(QUEUE_CSS).not.toMatch(/bottom:\s*114px|bottom:\s*168px/);
+    expect(QUEUE_CSS).not.toMatch(
+      /\.admin-today-ledger\[data-content-layout="flow"\] \.admin-operations-inspector__lifecycle > \.h3[\s\S]{0,160}clip:\s*rect/,
+    );
+    const flowDocket = QUEUE_CSS.match(
+      /\.admin-today-ledger\[data-content-layout="flow"\] \.admin-case-docket\s*\{[^}]+\}/,
+    )?.[0];
+    expect(flowDocket).not.toMatch(/height:\s*761px/);
+    expect(flowDocket).not.toMatch(/padding-bottom:\s*168px|padding:\s*56px 0 168px/);
+  });
+
+  it("paints the Today queue badge as a filled orange mark", () => {
+    const badgeBlock = QUEUE_CSS.match(
+      /\.admin-today-ledger \.admin-operations-queue__badge\s*\{[^}]+\}/,
+    )?.[0];
+    expect(badgeBlock).toMatch(/#f59d36|#f5a024|var\(--warn/);
+    expect(badgeBlock).toMatch(/background:\s*(#f59d36|#f5a024|var\(--warn)/);
+    expect(badgeBlock).not.toMatch(/background:\s*transparent/);
+  });
+
   it("shows the decision fields and exposes the selected row state", async () => {
     const user = userEvent.setup();
     const onSelectCase = vi.fn();

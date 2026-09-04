@@ -89,7 +89,7 @@ function operationsView(
 describe("AdminOperationMobileDetail", () => {
   it("uses an actual list to detail to back DOM flow and restores the selected row marker", async () => {
     const user = userEvent.setup();
-    const selected = operationCase();
+    const selected = operationCase({ locatorLabel: "02" });
     Object.defineProperty(window, "scrollX", { configurable: true, value: 12 });
     Object.defineProperty(window, "scrollY", { configurable: true, value: 320 });
 
@@ -111,6 +111,12 @@ describe("AdminOperationMobileDetail", () => {
     render(<MemoryRouter><Harness /></MemoryRouter>);
 
     const row = screen.getByRole("button", { name: /긴 한글 운영 케이스 제목/ });
+    const locator = row.querySelector(".admin-operations-queue__locator");
+    const title = row.querySelector(".admin-operations-queue__title");
+    const severity = row.querySelector(".admin-operations-queue__severity");
+    expect(title).not.toBeNull();
+    expect(locator?.compareDocumentPosition(title!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(title?.compareDocumentPosition(severity!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "운영 케이스 상세" })).not.toBeInTheDocument();
 

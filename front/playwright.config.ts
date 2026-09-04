@@ -9,6 +9,16 @@ const workers = Number(process.env.PLAYWRIGHT_WORKERS ?? 1);
 const visualAuthoritySmokeOnly =
   process.env.READMATES_VISUAL_AUTHORITY_SMOKE_ONLY === "true" ||
   process.env.READMATES_HOST_WORKSPACE_SMOKE_ONLY === "true";
+const jammyVisualRenderer =
+  process.env.READMATES_VISUAL_AUTHORITY_RENDERER_IMAGE ===
+  "mcr.microsoft.com/playwright:v1.61.1-jammy";
+const jammyLaunchOptions = jammyVisualRenderer
+  ? {
+      launchOptions: {
+        args: ["--disable-gpu", "--disable-dev-shm-usage", "--no-sandbox"],
+      },
+    }
+  : {};
 const baseURL = `http://localhost:${port}`;
 const loopbackBaseURL = `http://127.0.0.1:${port}`;
 const allowedOrigins = `${baseURL},${loopbackBaseURL}`;
@@ -47,6 +57,7 @@ export default defineConfig({
   use: {
     baseURL,
     trace: "on-first-retry",
+    ...jammyLaunchOptions,
   },
   webServer: visualAuthoritySmokeOnly ? [
     {
@@ -93,7 +104,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: { ...devices["Desktop Chrome"], ...jammyLaunchOptions },
     },
     {
       name: "firefox-host",

@@ -31,6 +31,9 @@ const SOURCE_TYPES: readonly AdminOperationSourceType[] = [
 const ASSIGNEES: readonly AdminOperationAssigneeFilter[] = ["ME"];
 const WORK_VIEW_IDS = ["briefing", "mine", "snoozed", "resolved-today"] as const;
 const SEARCH_MODES = ["list", "detail"] as const;
+const QUEUE_DISCLOSURE_MODES = ["priority", "all"] as const;
+
+export const ADMIN_TODAY_PRIORITY_LIMIT = 3;
 
 const SUMMARY_LABELS: Record<AdminOperationSummaryCode, AdminOperationSummaryLabel> = {
   CLUB_SETUP_REQUIRED: {
@@ -104,16 +107,19 @@ export type AdminOperationsWorkViewId = (typeof WORK_VIEW_IDS)[number];
 
 export type AdminOperationsSearchMode = (typeof SEARCH_MODES)[number];
 
+export type AdminQueueDisclosureMode = (typeof QUEUE_DISCLOSURE_MODES)[number];
+
 export type AdminOperationsSearchState = {
   caseId: string | null;
   mode: AdminOperationsSearchMode;
   workView: AdminOperationsWorkViewId;
   query: string;
   filter: AdminOperationCaseFilter;
+  queueDisclosure: AdminQueueDisclosureMode;
 };
 
 type AdminOperationsSearchInput = Pick<AdminOperationsSearchState, "caseId" | "filter"> &
-  Partial<Pick<AdminOperationsSearchState, "mode" | "workView" | "query">>;
+  Partial<Pick<AdminOperationsSearchState, "mode" | "workView" | "query" | "queueDisclosure">>;
 
 export type AdminOperationSummaryLabel = {
   title: string;
@@ -191,6 +197,7 @@ export function parseAdminOperationsSearch(params: URLSearchParams): AdminOperat
       ...(assignee ? { assignee } : {}),
       ...(cursor ? { cursor } : {}),
     },
+    queueDisclosure: parseQueueDisclosure(params.get("queue")),
   };
 }
 
@@ -205,6 +212,7 @@ export function serializeAdminOperationsSearch(state: AdminOperationsSearchInput
   const sources = allowlistedValues(state.filter.sources, SOURCE_TYPES);
   const assignee = parseAllowedValue(state.filter.assignee ?? null, ASSIGNEES);
   const cursor = nonBlank(state.filter.cursor ?? null);
+  const queueDisclosure = state.queueDisclosure === "all" ? "all" : "priority";
 
   if (caseId) params.set("case", caseId);
   if (workView !== "briefing") params.set("view", workView);
@@ -215,6 +223,7 @@ export function serializeAdminOperationsSearch(state: AdminOperationsSearchInput
   setListParam(params, "source", sources);
   if (assignee) params.set("assignee", assignee.toLowerCase());
   if (cursor) params.set("cursor", cursor);
+  if (queueDisclosure === "all") params.set("queue", "all");
   return params;
 }
 
@@ -318,21 +327,53 @@ export function buildAdminOperationsView(
   };
 }
 
+export type AdminOperationCasePresentation = {
+  summaryTitle?: string;
+  summaryDescription?: string;
+  evidenceLines?: readonly string[];
+  recommendation?: string;
+  scopeLabel?: string;
+  impactLabel?: string;
+};
+
+function casePresentation(item: AdminOperationCase): AdminOperationCasePresentation {
+  const extra = item as AdminOperationCase & AdminOperationCasePresentation;
+  return {
+    summaryTitle: typeof extra.summaryTitle === "string" ? extra.summaryTitle : undefined,
+    summaryDescription: typeof extra.summaryDescription === "string" ? extra.summaryDescription : undefined,
+    evidenceLines: Array.isArray(extra.evidenceLines) ? extra.evidenceLines : undefined,
+    recommendation: typeof extra.recommendation === "string" ? extra.recommendation : undefined,
+    scopeLabel: typeof extra.scopeLabel === "string" ? extra.scopeLabel : undefined,
+    impactLabel: typeof extra.impactLabel === "string" ? extra.impactLabel : undefined,
+  };
+}
+
 function buildCaseView(
   item: AdminOperationCase,
   now: Date,
   clubNames: ReadonlyMap<string, string>,
 ): Omit<AdminOperationCaseView, "locatorLabel"> {
+  const presentation = casePresentation(item);
+  const labeled = adminOperationSummaryLabel(item.summaryCode);
+  const scopeLabel = presentation.scopeLabel
+    ?? (item.clubId ? clubNames.get(item.clubId) ?? "클럽 정보 확인 필요" : "플랫폼 전체");
+  const ageLabel = formatAge(item.firstObservedAt, now);
   return {
     ...item,
-    scopeLabel: item.clubId ? clubNames.get(item.clubId) ?? "클럽 정보 확인 필요" : "플랫폼 전체",
-    summary: adminOperationSummaryLabel(item.summaryCode),
+    scopeLabel,
+    mobileMetaLabel: `${scopeLabel} · ${ageLabel}`,
+    summary: {
+      title: presentation.summaryTitle ?? labeled.title,
+      description: presentation.summaryDescription ?? labeled.description,
+    },
     severityLabel: SEVERITY_LABELS[item.severity] ?? "상태 확인",
     stateLabel: adminCaseLifecycleLanguage(item.state).primaryText,
     sourceLabel: SOURCE_LABELS[item.sourceType] ?? "운영 신호",
-    impactLabel: `영향 ${item.impactCount}건`,
-    ageLabel: formatAge(item.firstObservedAt, now),
+    impactLabel: presentation.impactLabel ?? `영향 ${item.impactCount}건`,
+    ageLabel,
     lastObservedLabel: formatTime(item.lastObservedAt),
+    evidenceLines: presentation.evidenceLines,
+    recommendation: presentation.recommendation,
   };
 }
 
@@ -435,6 +476,12 @@ function parseSearchMode(value: string | null): AdminOperationsSearchMode {
   return normalized && SEARCH_MODES.includes(normalized as AdminOperationsSearchMode)
     ? normalized as AdminOperationsSearchMode
     : "list";
+}
+
+function parseQueueDisclosure(value: string | null): AdminQueueDisclosureMode {
+  return QUEUE_DISCLOSURE_MODES.includes(value as AdminQueueDisclosureMode)
+    ? value as AdminQueueDisclosureMode
+    : "priority";
 }
 
 function parseAllowedList<T extends string>(value: string | null, allowed: readonly T[]): T[] {

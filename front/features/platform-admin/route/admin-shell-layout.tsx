@@ -13,6 +13,7 @@ import { AdminMobileNavigation } from "@/features/platform-admin/ui/admin-mobile
 import "@/features/platform-admin/ui/admin-shell.css";
 import "@/features/platform-admin/ui/admin-page-patterns.css";
 import "@/features/platform-admin/ui/admin-editorial-ledger.css";
+import "@/features/platform-admin/ui/admin-today.css";
 import "@/features/platform-admin/ui/admin-club-management.css";
 
 export type AdminShellOutletContext = { authorityEpoch: number };

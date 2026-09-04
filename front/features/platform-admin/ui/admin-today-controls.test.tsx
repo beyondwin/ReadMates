@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { findNestedLiveRegions, findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 import { AdminTodayControls } from "./admin-today-controls";
 
-const CSS_PATH = path.resolve("features/platform-admin/ui/admin-editorial-ledger.css");
+const CSS_PATH = path.resolve("features/platform-admin/ui/admin-today.css");
 
 const workViews = [
   { id: "briefing", label: "오늘의 브리핑", count: 8 },

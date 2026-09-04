@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useInsertionEffect, useMemo, useReducer, useRef } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "react-router";
+import { useSearchParams, useLocation } from "react-router";
 import type {
   AdminOperationCaseFilter,
   AdminOperationCaseState,
@@ -74,6 +74,7 @@ export function useAdminTodayController() {
   const queryClient = useQueryClient();
   const transitionOwner = useTransitionSafetyOwner("admin-today-cases");
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const searchState = useMemo(() => parseAdminOperationsSearch(searchParams), [searchParams]);
   const [state, dispatch] = useReducer(
     adminTodayReducer,
@@ -243,24 +244,37 @@ export function useAdminTodayController() {
 
   useEffect(() => {
     if (!view || view.selectionExcluded || view.selectedCaseId === searchState.caseId) return;
+    if (searchState.caseId === null) return;
     setSearchParams(serializeAdminOperationsSearch({
       caseId: view.selectedCaseId,
       filter: searchState.filter,
       workView: searchState.workView,
       query: searchState.query,
       mode: searchState.mode,
+      queueDisclosure: searchState.queueDisclosure,
     }), { replace: true });
   }, [searchState, setSearchParams, view]);
 
   const writeSearch = useCallback((next: Partial<AdminOperationsSearchState>) => {
-    setSearchParams(serializeAdminOperationsSearch({
+    const params = serializeAdminOperationsSearch({
       caseId: next.caseId !== undefined ? next.caseId : searchState.caseId,
       filter: next.filter ?? searchState.filter,
       workView: next.workView ?? searchState.workView,
       query: next.query ?? searchState.query,
       mode: next.mode ?? searchState.mode,
-    }));
-  }, [searchState, setSearchParams]);
+      queueDisclosure: next.queueDisclosure ?? searchState.queueDisclosure,
+    });
+    const search = params.toString();
+    const nextHref = `${location.pathname}${search ? `?${search}` : ""}`;
+    const browserHref = `${window.location.pathname}${window.location.search}`;
+    const mirroredBrowserHistory = window.location.pathname === location.pathname
+      && browserHref !== nextHref;
+    if (mirroredBrowserHistory) {
+      window.history.pushState(window.history.state, "", nextHref);
+      previousQueueDisclosureRef.current = next.queueDisclosure ?? searchState.queueDisclosure;
+    }
+    setSearchParams(params, { replace: mirroredBrowserHistory, flushSync: true });
+  }, [location.pathname, searchState, setSearchParams]);
 
   const currentCase = view?.selectedCase ?? null;
   const confirmationKey = currentCase
@@ -274,6 +288,26 @@ export function useAdminTodayController() {
     document.querySelector<HTMLElement>('[aria-label="운영 케이스 요약"]')?.focus();
     dispatch({ type: "queue-summary-focus-consumed" });
   }, [state.focusQueueSummary]);
+  const previousQueueDisclosureRef = useRef(searchState.queueDisclosure);
+  const focusPriorityQueueRow = useCallback(() => {
+    document.querySelector<HTMLElement>(".admin-operations-queue__row")?.focus({ preventScroll: true });
+  }, []);
+  useEffect(() => {
+    const previous = previousQueueDisclosureRef.current;
+    previousQueueDisclosureRef.current = searchState.queueDisclosure;
+    if (previous !== "all" || searchState.queueDisclosure !== "priority") return;
+    focusPriorityQueueRow();
+  }, [focusPriorityQueueRow, searchState.queueDisclosure]);
+  useEffect(() => {
+    const onPopState = () => {
+      const next = new URLSearchParams(window.location.search).get("queue") === "all" ? "all" : "priority";
+      const previous = previousQueueDisclosureRef.current;
+      previousQueueDisclosureRef.current = next;
+      if (previous === "all" && next === "priority") focusPriorityQueueRow();
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [focusPriorityQueueRow]);
 
   const reconcileAuthoritativeState = useCallback(async (caseId: string) => {
     await Promise.all([
@@ -545,6 +579,7 @@ export function useAdminTodayController() {
       || actionState === "complete",
     hasNextPage: listQuery.hasNextPage,
     loadingMore: listQuery.isFetchingNextPage,
+    queueExpanded: searchState.queueDisclosure === "all",
     acknowledgeCurrent,
     snoozeCurrent,
     resolveCurrent,
@@ -557,6 +592,7 @@ export function useAdminTodayController() {
       workView: id as AdminOperationsWorkViewId,
     }),
     changeQuery: (query: string) => writeSearch({ query, caseId: searchState.caseId }),
+    showAllQueue: () => writeSearch({ queueDisclosure: "all" }),
     loadMore: () => void listQuery.fetchNextPage(),
     retrySource: () => void listQuery.refetch(),
     retryCapabilities: () => void capabilitiesQuery.refetch(),

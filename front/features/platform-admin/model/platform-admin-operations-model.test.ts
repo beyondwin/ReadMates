@@ -70,6 +70,18 @@ describe("platform admin operations model", () => {
 
     expect(labels).toEqual(["확인 전", "확인함", "잠시 미룸", "처리함"]);
   });
+  it("uses three priority rows until queue=all is present", () => {
+    expect(parseAdminOperationsSearch(new URLSearchParams("case=case-1")).queueDisclosure)
+      .toBe("priority");
+    expect(parseAdminOperationsSearch(new URLSearchParams("queue=all")).queueDisclosure)
+      .toBe("all");
+    expect(serializeAdminOperationsSearch({
+      caseId: "case-1",
+      filter: {},
+      queueDisclosure: "all",
+    }).toString()).toBe("case=case-1&queue=all");
+  });
+
   it("round-trips case state severity source assignee and cursor filters", () => {
     const parsed = parseAdminOperationsSearch(
       new URLSearchParams(
@@ -89,6 +101,7 @@ describe("platform admin operations model", () => {
         assignee: "ME",
         cursor: "opaque+/=cursor",
       },
+      queueDisclosure: "priority",
     });
     expect(serializeAdminOperationsSearch(parsed).toString()).toBe(
       "case=case-notification&state=open%2Cacknowledged&severity=critical%2Cwarning&source=notification%2Cai_job&assignee=me&cursor=opaque%2B%2F%3Dcursor",
@@ -112,6 +125,7 @@ describe("platform admin operations model", () => {
         severities: ["CRITICAL"],
         sources: ["NOTIFICATION"],
       },
+      queueDisclosure: "priority",
     });
     expect(serializeAdminOperationsSearch(parsed).toString()).toBe(
       "state=open&severity=critical&source=notification",
@@ -157,6 +171,7 @@ describe("platform admin operations model", () => {
         assignee: "ME",
         cursor: "opaque+/=cursor",
       },
+      queueDisclosure: "priority",
     });
     expect(serializeAdminOperationsSearch(parsed).toString()).toBe(
       "case=case-notification&view=snoozed&q=%EC%95%8C%EB%A6%BC&mode=detail&state=open%2Cacknowledged&severity=critical%2Cwarning&source=notification%2Cai_job&assignee=me&cursor=opaque%2B%2F%3Dcursor",
@@ -174,6 +189,7 @@ describe("platform admin operations model", () => {
       workView: "briefing",
       query: "",
       filter: {},
+      queueDisclosure: "priority",
     });
     expect(serializeAdminOperationsSearch(parsed).toString()).toBe("");
     expect(adminOperationsScopeKey(parsed.workView, parsed.filter)).toBe(
@@ -339,6 +355,53 @@ describe("platform admin operations model", () => {
     ]);
     expect(view.items[0]?.severityLabel).toBe("긴급");
     expect(view.items[0]?.ageLabel).toBe("1일 전");
+  });
+
+  it("keeps SUMMARY_LABELS when a case has no presentation extras", () => {
+    const view = buildAdminOperationsView(
+      response({ items: [operationCase({ clubId: null, impactCount: 2 })] }),
+      null,
+      new Date(generatedAt),
+    );
+
+    expect(view.items[0]?.summary).toEqual({
+      title: "알림 전달 실패가 반복되고 있습니다",
+      description: "같은 원인의 실패를 확인하세요.",
+    });
+    expect(view.items[0]?.scopeLabel).toBe("플랫폼 전체");
+    expect(view.items[0]?.impactLabel).toBe("영향 2건");
+    expect(view.items[0]?.evidenceLines).toBeUndefined();
+    expect(view.items[0]?.recommendation).toBeUndefined();
+  });
+
+  it("applies optional case presentation without rewriting SUMMARY_LABELS", () => {
+    const item = {
+      ...operationCase({ clubId: null, impactCount: 2 }),
+      summaryTitle: "알림 전달 지연",
+      summaryDescription: "일부 안내가 늦게 전달되고 있습니다.",
+      scopeLabel: "클럽 2곳 · 멤버 6명",
+      impactLabel: "클럽 2곳 · 멤버 6명",
+      evidenceLines: ["데이터 손실 없음", "마지막 정상 전달 13:52"],
+      recommendation: "중복 발송을 확인한 뒤 실패한 안내만 다시 보냅니다.",
+    };
+    const view = buildAdminOperationsView(
+      response({ items: [item] }),
+      null,
+      new Date(generatedAt),
+    );
+
+    expect(adminOperationSummaryLabel("NOTIFICATION_DELIVERY_FAILURE")).toEqual({
+      title: "알림 전달 실패가 반복되고 있습니다",
+      description: "같은 원인의 실패를 확인하세요.",
+    });
+    expect(view.items[0]?.summary).toEqual({
+      title: "알림 전달 지연",
+      description: "일부 안내가 늦게 전달되고 있습니다.",
+    });
+    expect(view.items[0]?.scopeLabel).toBe("클럽 2곳 · 멤버 6명");
+    expect(view.items[0]?.impactLabel).toBe("클럽 2곳 · 멤버 6명");
+    expect(view.items[0]?.evidenceLines).toEqual(["데이터 손실 없음", "마지막 정상 전달 13:52"]);
+    expect(view.items[0]?.recommendation).toBe("중복 발송을 확인한 뒤 실패한 안내만 다시 보냅니다.");
   });
 
   it("uses a safe age fallback for an invalid observed timestamp", () => {

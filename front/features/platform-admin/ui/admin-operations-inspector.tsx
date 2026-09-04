@@ -107,7 +107,6 @@ export function AdminOperationsInspector({
   return (
     <AdminCaseDocket
       label="운영 케이스 상세"
-      nav={traversal ? <DocketNav traversal={traversal} /> : null}
       title={<span className="admin-operation-wrap">{selectedCase.summary.title}</span>}
       evidence={
         <div className="admin-operations-inspector">
@@ -199,6 +198,7 @@ export function AdminOperationsInspector({
               현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.
             </p>
           )}
+          {traversal ? <DocketNav traversal={traversal} /> : null}
           <AdminTechnicalDisclosure
             summary="기술 정보 펼치기"
             items={[

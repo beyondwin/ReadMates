@@ -326,7 +326,7 @@ const TYPO_ADMIN_PAGE_TITLE_MOBILE = {
 };
 const TYPO_QUEUE_TITLE = {
   name: "queue-title",
-  selector: ".admin-operations-queue__header h2",
+  selector: ".admin-operations-queue__title",
   fontFamilyIncludes: "Pretendard" as const,
   fontSizePx: 17,
   fontWeight: [600],
@@ -627,7 +627,7 @@ export const REQUIRED_VISUAL_AUTHORITY_COVERAGE: Record<ApprovedMockupId, Requir
         target: ".admin-operations-queue__row",
         via: "click",
         expectedVisible: '[aria-label="운영 케이스 상세"]',
-        expectedUrl: "/admin/today?case=case-closing-risk",
+        expectedUrl: "/admin/today?case=case-notification",
         restoreCanonicalState: true,
       },
       {
@@ -1028,7 +1028,7 @@ export const REQUIRED_VISUAL_AUTHORITY_COVERAGE: Record<ApprovedMockupId, Requir
     ],
     typography: [
       TYPO_ADMIN_WORDMARK,
-      TYPO_ADMIN_PAGE_TITLE_MOBILE,
+      typo("page-title", ".admin-page-frame h1", 20, [600], 26),
       typo("detail-title", '[aria-label="운영 케이스 상세"] h1, [aria-label="운영 케이스 상세"] h2', 20, [600], 26),
       TYPO_BODY,
     ],
