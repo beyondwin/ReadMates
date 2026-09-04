@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
@@ -289,6 +289,39 @@ describe("AdminClubsLedger", () => {
     expect(CLUB_MANAGEMENT_CSS).toMatch(
       /\.admin-shell:has\(\.admin-clubs-ledger\) \.admin-page-frame > \.admin-page-frame__header h1[\s\S]*width:\s*100%[\s\S]*height:\s*68px/,
     );
+  });
+
+  it("exposes one tab stop per club row and reactivates from restored focus", async () => {
+    const onActivateClub = vi.fn();
+    const { container } = renderLedger({ focusId: "c-1", onActivateClub });
+    const row = container.querySelector(".admin-club-management__row") as HTMLElement;
+    const nameLink = screen.getByRole("link", { name: "Alpha" });
+
+    expect(row).toHaveAttribute("tabIndex", "0");
+    expect(nameLink).toHaveAttribute("tabIndex", "-1");
+    await waitFor(() => expect(row).toHaveFocus());
+
+    fireEvent.keyDown(row, { key: "Enter" });
+    expect(onActivateClub).toHaveBeenCalledWith("c-1");
+  });
+
+  it.each([
+    ["meta", { metaKey: true }],
+    ["ctrl", { ctrlKey: true }],
+    ["shift", { shiftKey: true }],
+    ["alt", { altKey: true }],
+    ["middle", { button: 1 }],
+  ] as const)("lets %s-click use native name-link navigation", (_label, init) => {
+    const onActivateClub = vi.fn();
+    renderLedger({
+      onActivateClub,
+      clubs: [{ ...club, href: "#native-nav" }],
+    });
+    const nameLink = screen.getByRole("link", { name: "Alpha" });
+    const event = createEvent.click(nameLink, init);
+    fireEvent(nameLink, event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(onActivateClub).not.toHaveBeenCalled();
   });
 
   it("lets a keyboard operator focus a club row", () => {

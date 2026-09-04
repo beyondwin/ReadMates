@@ -183,6 +183,19 @@ describe("AdminAuditRoute", () => {
     expect(screen.getByLabelText("location")).not.toHaveTextContent("mode=detail");
   });
 
+  it("keeps an operator-chosen from/to window when selecting an event", async () => {
+    const user = userEvent.setup();
+    renderRoute("/admin/audit?from=2026-08-01T00:00:00.000Z&to=2026-08-20T00:00:00.000Z");
+    await user.click(await screen.findByRole("button", { name: /AI 작업 반영을 다시 시도했습니다/ }));
+
+    const location = decodeURIComponent(screen.getByLabelText("location").textContent ?? "");
+    expect(location).toContain("event=event-1");
+    expect(location).toContain("from=2026-08-01T00:00:00.000Z");
+    expect(location).toContain("to=2026-08-20T00:00:00.000Z");
+    expect(location).not.toContain("range=");
+    expect(location).not.toContain("mode=detail");
+  });
+
   it("does not put a sensitive target into the event URL or query key after a row is selected", async () => {
     const user = userEvent.setup();
     const { queryClient } = renderRoute();

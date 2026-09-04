@@ -13,6 +13,7 @@ import {
 import {
   APPROVED_COMPARISON_REPORT_REQUIRED_FIELDS,
   CANONICAL_RENDERER_IMAGE,
+  areNodesInSemanticDocumentOrder,
   assertApprovedMismatchRatio,
   assertApprovedRouteReport,
   expectGeometryWithinTolerance,
@@ -62,6 +63,23 @@ describe("approved mockup contract", () => {
     expect(APPROVED_MOCKUPS.filter((entry) => entry.role === "host")).toHaveLength(11);
     expect(new Set(APPROVED_MOCKUPS.map((entry) => entry.id)).size).toBe(18);
     for (const entry of APPROVED_MOCKUPS) verifyApprovedReference(entry);
+  });
+
+  it("treats a repeated node as document-ordered and still rejects reversed distinct nodes", () => {
+    const following = 4;
+    const first = {
+      compareDocumentPosition(other: { id: string }) {
+        return other === second ? following : 0;
+      },
+    };
+    const second = {
+      compareDocumentPosition() {
+        return 0;
+      },
+    };
+    expect(areNodesInSemanticDocumentOrder([first as Node, first as Node])).toBe(true);
+    expect(areNodesInSemanticDocumentOrder([first as Node, second as Node])).toBe(true);
+    expect(areNodesInSemanticDocumentOrder([second as Node, first as Node])).toBe(false);
   });
 
   it("fails closed above the 4 CSS px major-region tolerance", () => {

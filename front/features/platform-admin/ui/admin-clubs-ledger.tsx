@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { Link } from "react-router";
 import {
   ADMIN_COPY,
@@ -318,11 +318,23 @@ export function AdminClubsLedger({
                           setSelectedId(club.clubId);
                           onActivateClub?.(club.clubId);
                         }}
+                        onKeyDown={(event) => {
+                          if (event.target !== event.currentTarget) return;
+                          if (event.key !== "Enter" && event.key !== " ") return;
+                          event.preventDefault();
+                          setSelectedId(club.clubId);
+                          onActivateClub?.(club.clubId);
+                        }}
                       >
                         <div className="admin-club-management__identity">
                           <Link
                             to={club.href}
+                            tabIndex={-1}
                             onClick={(event) => {
+                              if (isModifiedNavigationClick(event)) {
+                                event.stopPropagation();
+                                return;
+                              }
                               if (!onActivateClub) {
                                 event.stopPropagation();
                                 return;
@@ -441,6 +453,16 @@ function ClubDocket({ club }: { club: AdminClubsLedgerClub | null }) {
       </section>
       <AdminTechnicalDisclosure items={club.technicalDisclosure} />
     </aside>
+  );
+}
+
+function isModifiedNavigationClick(event: MouseEvent) {
+  return (
+    event.button === 1 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
   );
 }
 

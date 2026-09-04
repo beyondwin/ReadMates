@@ -57,17 +57,21 @@ export function AdminClubsRoute() {
     return `?${next.toString()}`;
   }, [searchParams]);
   const returnTo = platformAdminClubListHref(searchParams);
+  const restoreParamsValue = restoreParams(searchParams, location.state, returnTo);
   const parsedRestore = parseAdminRouteReturnState(
-    restoreParams(searchParams, location.state, returnTo),
+    restoreParamsValue,
     CLUBS_ALLOWED,
   );
   const sessionRestore = readClubsFocusRestore();
   const restorePending = consumedRestoreKey !== location.key;
+  const parsedScrollTop = restoreParamsValue.has("scrollTop")
+    ? parsedRestore.scrollTop
+    : null;
   const restore = restorePending
     ? {
         ...parsedRestore,
         focusId: parsedRestore.focusId ?? sessionRestore?.focusId ?? null,
-        scrollTop: parsedRestore.scrollTop || sessionRestore?.scrollTop || 0,
+        scrollTop: parsedScrollTop ?? sessionRestore?.scrollTop ?? 0,
       }
     : { ...parsedRestore, focusId: null, scrollTop: 0 };
   const consumeRestore = useCallback(() => {
@@ -202,17 +206,34 @@ function deriveClubsPageState({
   return "ready";
 }
 
-function writeClubsFocusRestore(value: { focusId: string; scrollTop: number }) {
-  sessionStorage.setItem(ADMIN_CLUBS_FOCUS_RESTORE_KEY, JSON.stringify(value));
+export function writeClubsFocusRestore(value: { focusId: string; scrollTop: number }) {
+  const params = new URLSearchParams();
+  params.set("returnTo", CLUBS_ALLOWED.allowedPath);
+  params.set("focusId", value.focusId);
+  params.set("scrollTop", String(value.scrollTop));
+  const sanitized = parseAdminRouteReturnState(params, CLUBS_ALLOWED);
+  if (!sanitized.focusId) return;
+  sessionStorage.setItem(
+    ADMIN_CLUBS_FOCUS_RESTORE_KEY,
+    JSON.stringify({
+      focusId: sanitized.focusId,
+      scrollTop: sanitized.scrollTop,
+    }),
+  );
 }
 
-function readClubsFocusRestore(): { focusId: string; scrollTop: number } | null {
+export function readClubsFocusRestore(): { focusId: string; scrollTop: number } | null {
   const raw = sessionStorage.getItem(ADMIN_CLUBS_FOCUS_RESTORE_KEY);
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as { focusId?: unknown; scrollTop?: unknown };
-    if (typeof parsed.focusId !== "string" || typeof parsed.scrollTop !== "number") return null;
-    return { focusId: parsed.focusId, scrollTop: parsed.scrollTop };
+    const params = new URLSearchParams();
+    params.set("returnTo", CLUBS_ALLOWED.allowedPath);
+    if (typeof parsed.focusId === "string") params.set("focusId", parsed.focusId);
+    if (typeof parsed.scrollTop === "number") params.set("scrollTop", String(parsed.scrollTop));
+    const sanitized = parseAdminRouteReturnState(params, CLUBS_ALLOWED);
+    if (!sanitized.focusId) return null;
+    return { focusId: sanitized.focusId, scrollTop: sanitized.scrollTop };
   } catch {
     return null;
   }

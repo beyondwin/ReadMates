@@ -151,6 +151,19 @@ export async function expectLocatorGeometry(
   expectGeometryWithinTolerance(actual, expected, toleranceCssPx);
 }
 
+const DOCUMENT_POSITION_FOLLOWING = 4;
+
+export function areNodesInSemanticDocumentOrder(
+  nodes: readonly Pick<Node, "compareDocumentPosition">[],
+): boolean {
+  return nodes.every((node, index) => {
+    if (index === 0) return true;
+    const previous = nodes[index - 1]!;
+    if (previous === node) return true;
+    return Boolean(previous.compareDocumentPosition(node as Node) & DOCUMENT_POSITION_FOLLOWING);
+  });
+}
+
 export async function isSemanticDocumentOrder(locators: readonly Locator[]): Promise<boolean> {
   const handles = await Promise.all(locators.map((locator) => locator.elementHandle()));
   if (handles.some((handle) => handle === null)) throw new Error("Semantic order locator is missing");

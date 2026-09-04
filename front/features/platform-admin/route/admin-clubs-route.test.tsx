@@ -14,7 +14,12 @@ import {
   platformAdminClubsInfiniteQuery,
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
-import { AdminClubsRoute, ADMIN_CLUBS_FOCUS_RESTORE_KEY } from "./admin-clubs-route";
+import {
+  AdminClubsRoute,
+  ADMIN_CLUBS_FOCUS_RESTORE_KEY,
+  readClubsFocusRestore,
+  writeClubsFocusRestore,
+} from "./admin-clubs-route";
 
 vi.mock(
   "@/features/platform-admin/api/platform-admin-api",
@@ -303,6 +308,56 @@ describe("AdminClubsRoute", () => {
     expect(href).not.toContain("onboarding%3D1");
     expect(href).toContain("focusId=c-1");
     expect(href).toContain("scrollTop=240");
+  });
+
+  it("sanitizes clubs session restore on write and read", () => {
+    writeClubsFocusRestore({ focusId: "../evil", scrollTop: 12 });
+    expect(readClubsFocusRestore()).toBeNull();
+
+    writeClubsFocusRestore({ focusId: "c-1", scrollTop: 1_000_001 });
+    expect(readClubsFocusRestore()).toEqual({ focusId: "c-1", scrollTop: 0 });
+
+    writeClubsFocusRestore({ focusId: "c-1", scrollTop: 240 });
+    expect(readClubsFocusRestore()).toEqual({ focusId: "c-1", scrollTop: 240 });
+  });
+
+  it("keeps an explicit zero scrollTop instead of a stale session offset", async () => {
+    sessionStorage.setItem(
+      ADMIN_CLUBS_FOCUS_RESTORE_KEY,
+      JSON.stringify({ focusId: "c-1", scrollTop: 240 }),
+    );
+    const { container } = renderRoute(
+      [club],
+      "/admin/clubs",
+      ["VIEW_CLUBS", "CREATE_CLUB"],
+      undefined,
+      { focusId: "c-1", scrollTop: 0 },
+    );
+
+    await waitFor(() =>
+      expect(container.querySelector(".admin-club-management__row")).toHaveFocus(),
+    );
+    expect(
+      (container.querySelector(".admin-clubs-ledger__scroller") as HTMLElement)
+        .scrollTop,
+    ).toBe(0);
+  });
+
+  it("ignores an unsanitized session focus id", async () => {
+    sessionStorage.setItem(
+      ADMIN_CLUBS_FOCUS_RESTORE_KEY,
+      JSON.stringify({ focusId: "../evil", scrollTop: 240 }),
+    );
+    const { container } = renderRoute();
+
+    await waitFor(() =>
+      expect(screen.getByRole("link", { name: "Alpha" })).not.toHaveFocus(),
+    );
+    expect(container.querySelector(".admin-club-management__row")).not.toHaveFocus();
+    expect(
+      (container.querySelector(".admin-clubs-ledger__scroller") as HTMLElement)
+        .scrollTop,
+    ).toBe(0);
   });
 
   it("restores row focus from a pending list return even without location state", async () => {
