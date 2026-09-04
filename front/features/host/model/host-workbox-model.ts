@@ -52,6 +52,26 @@ export type HostWorkboxView = {
   nextCursor: string | null;
 };
 
+export type HostWorkboxDisclosure = {
+  visibleItems: HostWorkboxItemView[];
+  hiddenCount: number;
+  hasMore: boolean;
+  expanded: boolean;
+};
+
+export function buildHostWorkboxDisclosure(
+  view: HostWorkboxView,
+  options: { limit: 3 | 4; expanded: boolean },
+): HostWorkboxDisclosure {
+  const visibleItems = options.expanded ? view.items : view.items.slice(0, options.limit);
+  return {
+    visibleItems,
+    hiddenCount: Math.max(0, view.items.length - visibleItems.length),
+    hasMore: visibleItems.length < view.items.length || view.nextCursor !== null,
+    expanded: options.expanded,
+  };
+}
+
 export function buildHostWorkboxView(page: HostWorkboxPage): HostWorkboxView {
   return {
     state: page.state,

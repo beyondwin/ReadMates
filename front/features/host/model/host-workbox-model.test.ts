@@ -4,7 +4,7 @@ import type {
   HostWorkboxPage,
   HostWorkboxState,
 } from "../api/host-workbox-contracts";
-import { buildHostWorkboxView } from "./host-workbox-model";
+import { buildHostWorkboxDisclosure, buildHostWorkboxView } from "./host-workbox-model";
 
 const TYPE_EXPECTATIONS = [
   ["SCHEDULE_UNSEEN", "일정 미열람 확인", "schedule-review"],
@@ -105,4 +105,41 @@ describe("buildHostWorkboxView", () => {
       );
     },
   );
+});
+
+function viewWithTwelveItems() {
+  const base = buildHostWorkboxView(page());
+  const types = TYPE_EXPECTATIONS.map(([type]) => type);
+  return {
+    ...base,
+    items: Array.from({ length: 12 }, (_, index) => {
+      const [type, operationalLabel, destinationCategory] = TYPE_EXPECTATIONS[index % TYPE_EXPECTATIONS.length];
+      return {
+        ...base.items[index % base.items.length],
+        key: `${types[index % types.length]}:resource-${index}:g1`,
+        type,
+        title: `서버 제목 ${index}`,
+        count: index,
+        countLabel: String(index),
+        destinationHref: `/app/host/destination/${index}`,
+        operationalLabel,
+        destinationCategory,
+      };
+    }),
+  };
+}
+
+describe("buildHostWorkboxDisclosure", () => {
+  it("shows four desktop items or three mobile items until explicitly expanded", () => {
+    expect(buildHostWorkboxDisclosure(viewWithTwelveItems(), { limit: 4, expanded: false }))
+      .toMatchObject({ visibleItems: expect.any(Array), hiddenCount: 8, hasMore: true, expanded: false });
+    expect(buildHostWorkboxDisclosure(viewWithTwelveItems(), { limit: 3, expanded: false }).visibleItems)
+      .toHaveLength(3);
+  });
+
+  it("keeps the source order and exposes all loaded items when expanded", () => {
+    const result = buildHostWorkboxDisclosure(viewWithTwelveItems(), { limit: 4, expanded: true });
+    expect(result.visibleItems.map((item) => item.key))
+      .toEqual(viewWithTwelveItems().items.map((item) => item.key));
+  });
 });

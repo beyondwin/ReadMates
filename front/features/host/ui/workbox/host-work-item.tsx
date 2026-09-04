@@ -97,7 +97,7 @@ export function HostWorkItem({
       <div className="rm-host-work-item__row">
         <LinkComponent to={item.destinationHref} className="rm-host-work-item__destination">
           <span className="rm-host-work-item__label" aria-hidden="true">{item.operationalLabel}</span>
-          <strong>{item.title}</strong>
+          <strong className="rm-host-work-item__title">{item.title}</strong>
           <span className="rm-host-work-item__meta" aria-hidden="true">
             <span>{item.countLabel}</span>
             {due ? <span data-overdue={due === "기한 지남" ? "true" : undefined}>{due}</span> : null}

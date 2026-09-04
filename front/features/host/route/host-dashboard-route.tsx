@@ -32,7 +32,7 @@ import {
   type HostOperatingRoomSource,
   type HostOperatingRoomView,
 } from "@/features/host/model/host-operating-room-model";
-import { buildHostWorkboxView } from "@/features/host/model/host-workbox-model";
+import { buildHostWorkboxDisclosure, buildHostWorkboxView } from "@/features/host/model/host-workbox-model";
 import type { SessionClosingStatusInput } from "@/features/host/model/session-closing-model";
 import {
   hostSessionChangeUndoDescription,
@@ -73,6 +73,7 @@ import {
   type AttendanceRecoveryView,
 } from "@/features/host/ui/operating-room/host-operating-room-page";
 import { PhaseStatusLedger } from "@/features/host/ui/operating-room/phase-status-ledger";
+import { useOperatingRoomCompactViewport } from "@/features/host/ui/operating-room/use-operating-room-compact-viewport";
 import { HostWorkbox } from "@/features/host/ui/workbox/host-workbox";
 import type { HostWorkboxDeferralOption } from "@/features/host/ui/workbox/host-work-item";
 import type { WorkspacePendingUndo } from "@/features/host/ui/session-workspace/workspace-undo-bar";
@@ -245,8 +246,13 @@ export function HostDashboardRoute({
     };
   }, [detailOverride, detailQuery.data, loaderData.currentMeeting, loaderData.operatingRoom.currentMeeting, sessionId]);
 
+  const compactViewport = useOperatingRoomCompactViewport();
   const requestedPhase = useMemo(
     () => new URLSearchParams(location.search).get("phase"),
+    [location.search],
+  );
+  const workboxExpanded = useMemo(
+    () => new URLSearchParams(location.search).get("workbox") === "all",
     [location.search],
   );
   const closingSource = useMemo(
@@ -314,8 +320,16 @@ export function HostDashboardRoute({
   const phaseHref = useCallback((phase: HostMeetingPhase) => {
     const search = new URLSearchParams(location.search);
     search.set("phase", phase);
-    return `${location.pathname}?${search.toString()}${location.hash}`;
+    const query = search.toString();
+    return `${location.pathname}${query ? `?${query}` : ""}${location.hash}`;
   }, [location.hash, location.pathname, location.search]);
+
+  const showAllWorkbox = useCallback(() => {
+    const search = new URLSearchParams(location.search);
+    search.set("workbox", "all");
+    const query = search.toString();
+    void navigate(`${location.pathname}${query ? `?${query}` : ""}${location.hash}`);
+  }, [location.hash, location.pathname, location.search, navigate]);
 
   useEffect(() => {
     if (requestedPhase === view.phase || (!view.meeting && requestedPhase === null)) return;
@@ -580,8 +594,24 @@ export function HostDashboardRoute({
     [rootWorkboxPage, workboxQueries, workboxState],
   );
   const workboxView = loadedWorkboxPage ? buildHostWorkboxView(loadedWorkboxPage) : null;
+  const workboxDisclosure = workboxView
+    ? buildHostWorkboxDisclosure(workboxView, {
+      limit: compactViewport ? 3 : 4,
+      expanded: workboxExpanded,
+    })
+    : null;
   const workboxLoading = workboxQueries.some((query) => query.isPending || query.isFetching);
   const workboxError = workboxQueries.some((query) => query.isError);
+  const retryWorkbox = useCallback(() => {
+    void Promise.all(workboxQueries.map((query) => query.refetch()));
+  }, [workboxQueries]);
+  const workboxWarningActions = (workboxView?.partialWarnings ?? []).map((warning) => ({
+    key: `workbox:${warning.type}`,
+    message: warning.message,
+    label: `${warning.operationalLabel} 다시 불러오기`,
+    busy: workboxLoading,
+    onRetry: retryWorkbox,
+  }));
 
   const deferWorkItem = useCallback(async (
     workItemKey: string,
@@ -649,20 +679,23 @@ export function HostDashboardRoute({
     <HostWorkbox
       state={workboxState}
       view={workboxView}
+      disclosure={workboxDisclosure}
       loading={workboxLoading}
       error={workboxError ? "작업함을 불러오지 못했습니다." : null}
       pendingKey={workboxPendingKey}
       rowError={workboxRowError}
+      showPartialWarnings={false}
       onStateChange={(nextState) => {
         setWorkboxState(nextState);
         setWorkboxCursors([null]);
         setWorkboxRowError(null);
       }}
-      onRetry={() => { void Promise.all(workboxQueries.map((query) => query.refetch())); }}
+      onRetry={retryWorkbox}
       onLoadMore={(cursor) => {
         setWorkboxCursors((current) => current.includes(cursor) ? current : [...current, cursor]);
         setWorkboxRowError(null);
       }}
+      onShowAll={showAllWorkbox}
       onDefer={(key, option) => { void deferWorkItem(key, option); }}
       onUndoDeferral={(key) => { void undoWorkItemDeferral(key); }}
       LinkComponent={LinkComponent}
@@ -677,28 +710,31 @@ export function HostDashboardRoute({
       phaseLinks={phaseLinks}
       phaseNormalizationReason={phaseReasonFromState(location.state)}
       optionalFailureMessages={optionalFailureMessages}
-      optionalFailureActions={notificationFailure && !notificationRecovered ? [{
-        key: "notification-health",
-        message: notificationFailure.message,
-        label: notificationRetry?.failureKey === notificationFailureKey
-          && notificationRetry.state === "retrying"
-          ? "알림 상태 불러오는 중"
-          : "알림 상태 다시 불러오기",
-        busy: notificationRetry?.failureKey === notificationFailureKey
-          && notificationRetry.state === "retrying",
-        onRetry: () => {
-          if (!notificationFailureKey) return;
-          setNotificationRetry({ failureKey: notificationFailureKey, state: "retrying" });
-          void queryClient.fetchQuery({
-            ...hostNotificationHealthQuery(context),
-            staleTime: 0,
-          }).then(() => {
-            setNotificationRetry({ failureKey: notificationFailureKey, state: "recovered" });
-          }).catch(() => {
-            setNotificationRetry(null);
-          });
-        },
-      }] : []}
+      optionalFailureActions={[
+        ...workboxWarningActions,
+        ...(notificationFailure && !notificationRecovered ? [{
+          key: "notification-health",
+          message: notificationFailure.message,
+          label: notificationRetry?.failureKey === notificationFailureKey
+            && notificationRetry.state === "retrying"
+            ? "알림 상태 불러오는 중"
+            : "알림 상태 다시 불러오기",
+          busy: notificationRetry?.failureKey === notificationFailureKey
+            && notificationRetry.state === "retrying",
+          onRetry: () => {
+            if (!notificationFailureKey) return;
+            setNotificationRetry({ failureKey: notificationFailureKey, state: "retrying" });
+            void queryClient.fetchQuery({
+              ...hostNotificationHealthQuery(context),
+              staleTime: 0,
+            }).then(() => {
+              setNotificationRetry({ failureKey: notificationFailureKey, state: "recovered" });
+            }).catch(() => {
+              setNotificationRetry(null);
+            });
+          },
+        }] : []),
+      ]}
       recovery={recovery}
       liveContent={liveContent}
       compactLiveContent={compactLiveContent}

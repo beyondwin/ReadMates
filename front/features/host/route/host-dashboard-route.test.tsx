@@ -920,4 +920,93 @@ describe("HostDashboardRoute", () => {
       attendance: [{ membershipId: "member-8", attendanceStatus: "ATTENDED" }],
     });
   });
+
+  it("keeps workbox=all across workbox tab changes and restores the capped view on Browser Back", async () => {
+    routeMocks.workboxPages.set("NOW:root", workboxPageWithItems(12));
+    routeMocks.workboxPages.set("DEFERRED:root", {
+      ...workboxPageWithItems(0),
+      state: "DEFERRED",
+      items: [],
+    });
+    const user = userEvent.setup();
+    const { router } = renderRoute("/clubs/reading-sai/app/host?phase=prep");
+
+    const workbox = await screen.findByRole("region", { name: "작업함" });
+    expect(within(workbox).getAllByRole("listitem")).toHaveLength(4);
+    await user.click(within(workbox).getByRole("button", { name: "작업함 모두 보기" }));
+    await waitFor(() => expect(router.state.location.search).toBe("?phase=prep&workbox=all"));
+    expect(within(workbox).getAllByRole("listitem")).toHaveLength(12);
+
+    await user.click(within(workbox).getByRole("tab", { name: "보류" }));
+    await waitFor(() => expect(router.state.location.search).toBe("?phase=prep&workbox=all"));
+
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    await waitFor(() => expect(router.state.location.search).toBe("?phase=prep"));
+    await user.click(within(workbox).getByRole("tab", { name: /지금/ }));
+    expect(within(workbox).getAllByRole("listitem")).toHaveLength(4);
+  });
+
+  it("shows three workbox items in a compact viewport until expanded", async () => {
+    stubCompactViewport(true);
+    routeMocks.workboxPages.set("NOW:root", workboxPageWithItems(12));
+    renderRoute("/clubs/reading-sai/app/host?phase=prep");
+
+    const workbox = await screen.findByRole("region", { name: "작업함" });
+    expect(within(workbox).getAllByRole("listitem")).toHaveLength(3);
+    expect(within(workbox).getByRole("button", { name: "작업함 모두 보기" })).toBeVisible();
+  });
+
+  it("announces workbox source warnings once in the compact state-summary channel", async () => {
+    routeMocks.workboxPages.set("NOW:root", {
+      ...workboxPageWithItems(1),
+      sourceAvailability: [
+        { type: "SCHEDULE_UNSEEN", state: "AVAILABLE" },
+        { type: "MEMBER_APPROVAL", state: "AVAILABLE" },
+        { type: "RECORD_CLOSING", state: "UNAVAILABLE", failureCode: "RECORD_SOURCE_UNAVAILABLE" },
+        { type: "INVITATION_EXPIRY", state: "AVAILABLE" },
+        { type: "NOTIFICATION_FAILURE", state: "AVAILABLE" },
+      ],
+    });
+    renderRoute("/clubs/reading-sai/app/host?phase=prep");
+
+    const summary = await screen.findByRole("region", { name: "일부 운영 정보 불러오기 실패" });
+    expect(summary).toHaveTextContent("지난 모임 기록 마감 정보를 불러오지 못했어요.");
+    expect(within(summary).getByRole("button", { name: "지난 모임 기록 마감 다시 불러오기" })).toBeVisible();
+    const workbox = screen.getByRole("region", { name: "작업함" });
+    expect(within(workbox).queryByRole("alert")).not.toBeInTheDocument();
+  });
 });
+
+function workboxPageWithItems(count: number, nextCursor: string | null = null): HostWorkboxPage {
+  const types = [
+    "SCHEDULE_UNSEEN",
+    "MEMBER_APPROVAL",
+    "RECORD_CLOSING",
+    "INVITATION_EXPIRY",
+    "NOTIFICATION_FAILURE",
+  ] as const;
+  return {
+    state: "NOW",
+    evaluatedAt: "2026-08-30T09:00:00Z",
+    sourceAvailability: types.map((type) => ({ type, state: "AVAILABLE" as const })),
+    items: Array.from({ length: count }, (_, index) => {
+      const type = types[index % types.length];
+      return {
+        key: `${type}:resource-${index}:g1`,
+        type,
+        state: "NOW" as const,
+        title: `작업 ${index + 1}`,
+        description: `설명 ${index + 1}`,
+        count: index + 1,
+        dueAt: null,
+        deferredUntil: null,
+        resolvedAt: null,
+        destinationHref: `/app/host/destination/${index}`,
+        receiptSummary: null,
+      };
+    }),
+    nextCursor,
+  };
+}

@@ -1,5 +1,5 @@
 import type { ComponentType, KeyboardEvent, ReactNode } from "react";
-import type { HostWorkboxView } from "@/features/host/model/host-workbox-model";
+import type { HostWorkboxDisclosure, HostWorkboxView } from "@/features/host/model/host-workbox-model";
 import { HostWorkItem, type HostWorkboxDeferralOption } from "./host-work-item";
 import "./host-workbox.css";
 
@@ -20,13 +20,16 @@ const tabs = [
 export type HostWorkboxProps = {
   state: HostWorkboxState;
   view: HostWorkboxView | null;
+  disclosure?: HostWorkboxDisclosure | null;
   loading: boolean;
   error: string | null;
   pendingKey: string | null;
   rowError?: { key: string; message: string } | null;
+  showPartialWarnings?: boolean;
   onStateChange: (state: HostWorkboxState) => void;
   onRetry: () => void;
   onLoadMore: (cursor: string) => void;
+  onShowAll?: () => void;
   onDefer: (key: string, option: HostWorkboxDeferralOption) => void;
   onUndoDeferral: (key: string) => void;
   LinkComponent?: ComponentType<WorkboxLinkProps>;
@@ -35,13 +38,16 @@ export type HostWorkboxProps = {
 export function HostWorkbox({
   state,
   view,
+  disclosure = null,
   loading,
   error,
   pendingKey,
   rowError = null,
+  showPartialWarnings = true,
   onStateChange,
   onRetry,
   onLoadMore,
+  onShowAll,
   onDefer,
   onUndoDeferral,
   LinkComponent,
@@ -49,6 +55,13 @@ export function HostWorkbox({
   const loadedView = !loading && !error && view?.state === state ? view : null;
   const activeCount = loadedView?.items.length ?? null;
   const hasContinuation = loadedView?.nextCursor !== null && loadedView !== null;
+  const visibleItems = disclosure?.visibleItems ?? view?.items ?? [];
+  const showAllVisible = Boolean(
+    onShowAll
+    && disclosure
+    && !disclosure.expanded
+    && (disclosure.hiddenCount > 0 || disclosure.hasMore),
+  );
 
   const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     let nextIndex: number | null = null;
@@ -113,7 +126,7 @@ export function HostWorkbox({
             <p className="rm-host-workbox__page-count">
               현재 묶음 기준 · {view.nextCursor ? "다음 묶음 있음" : `끝 · ${view.items.length}건`}
             </p>
-            {view.partialWarnings.length > 0 ? (
+            {showPartialWarnings && view.partialWarnings.length > 0 ? (
               <div className="rm-host-workbox__partial" role="alert">
                 <ul>
                   {view.partialWarnings.map((warning) => <li key={warning.type}>{warning.message}</li>)}
@@ -122,13 +135,13 @@ export function HostWorkbox({
               </div>
             ) : null}
 
-            {view.items.length === 0 && view.partialWarnings.length === 0 ? (
+            {view.items.length === 0 && (view.partialWarnings.length === 0 || !showPartialWarnings) ? (
               <p className="rm-host-workbox__empty">{emptyMessage(state)}</p>
             ) : null}
 
-            {view.items.length > 0 ? (
+            {visibleItems.length > 0 ? (
               <ul className="rm-host-workbox__items">
-                {view.items.map((item) => (
+                {visibleItems.map((item) => (
                   <HostWorkItem
                     key={item.key}
                     item={item}
@@ -140,6 +153,16 @@ export function HostWorkbox({
                   />
                 ))}
               </ul>
+            ) : null}
+
+            {showAllVisible ? (
+              <button
+                type="button"
+                className="rm-host-workbox__show-all"
+                onClick={onShowAll}
+              >
+                작업함 모두 보기
+              </button>
             ) : null}
 
             {view.nextCursor ? (

@@ -98,3 +98,90 @@ for (const viewport of [
     });
   });
 }
+
+const DENSITY_TYPES = [
+  "SCHEDULE_UNSEEN",
+  "MEMBER_APPROVAL",
+  "RECORD_CLOSING",
+  "INVITATION_EXPIRY",
+  "NOTIFICATION_FAILURE",
+] as const;
+
+function densityItems(count: number): HostWorkboxView["items"] {
+  return Array.from({ length: count }, (_, index) => ({
+    ...view.items[0],
+    key: `${DENSITY_TYPES[index % DENSITY_TYPES.length]}:resource-${index}:g1`,
+    type: DENSITY_TYPES[index % DENSITY_TYPES.length],
+    title: `작업 ${index + 1}`,
+    count: index + 1,
+    countLabel: String(index + 1),
+    destinationHref: `/app/host/destination/${index}`,
+  }));
+}
+
+test("desktop workbox shows four items and 작업함 모두 보기 until expanded", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const items = densityItems(12);
+  const component = await mount(
+    <main className="rm-host-operating-room">
+      <aside className="rm-host-operating-room__workbox-rail">
+        <HostWorkbox
+          state="NOW"
+          view={{ ...view, items, nextCursor: "workbox-next" }}
+          disclosure={{
+            visibleItems: items.slice(0, 4),
+            hiddenCount: 8,
+            hasMore: true,
+            expanded: false,
+          }}
+          loading={false}
+          error={null}
+          pendingKey={null}
+          onStateChange={() => undefined}
+          onRetry={() => undefined}
+          onLoadMore={() => undefined}
+          onShowAll={() => undefined}
+          onDefer={() => undefined}
+          onUndoDeferral={() => undefined}
+        />
+      </aside>
+    </main>,
+  );
+
+  await expect(component.getByRole("listitem")).toHaveCount(4);
+  await expect(component.getByRole("button", { name: "작업함 모두 보기" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "작업 5" })).toHaveCount(0);
+});
+
+test("mobile workbox shows three items and 작업함 모두 보기 until expanded", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const items = densityItems(12);
+  const component = await mount(
+    <main className="rm-host-operating-room">
+      <aside className="rm-host-operating-room__workbox-rail">
+        <HostWorkbox
+          state="NOW"
+          view={{ ...view, items, nextCursor: null }}
+          disclosure={{
+            visibleItems: items.slice(0, 3),
+            hiddenCount: 9,
+            hasMore: true,
+            expanded: false,
+          }}
+          loading={false}
+          error={null}
+          pendingKey={null}
+          onStateChange={() => undefined}
+          onRetry={() => undefined}
+          onLoadMore={() => undefined}
+          onShowAll={() => undefined}
+          onDefer={() => undefined}
+          onUndoDeferral={() => undefined}
+        />
+      </aside>
+    </main>,
+  );
+
+  await expect(component.getByRole("listitem")).toHaveCount(3);
+  await expect(component.getByRole("button", { name: "작업함 모두 보기" })).toBeVisible();
+});

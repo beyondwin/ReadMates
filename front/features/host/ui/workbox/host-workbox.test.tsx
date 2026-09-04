@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { HostWorkboxView } from "@/features/host/model/host-workbox-model";
+import type { HostWorkboxDisclosure, HostWorkboxItemView, HostWorkboxView } from "@/features/host/model/host-workbox-model";
 import { HostWorkbox } from "./host-workbox";
 
 const page: HostWorkboxView = {
@@ -229,6 +229,61 @@ describe("HostWorkbox", () => {
     const enabled = within(enabledRow).getByRole("button", { name: "일정 확인이 필요한 멤버 보류 해제" });
     await userEvent.click(enabled);
     expect(onUndoDeferral).toHaveBeenCalledWith("SCHEDULE_UNSEEN:opaque/server:key:r7");
+  });
+
+  it("renders only disclosure.visibleItems and exposes 작업함 모두 보기 until expanded", async () => {
+    const items = Array.from({ length: 12 }, (_, index): HostWorkboxItemView => ({
+      ...page.items[0],
+      key: `SCHEDULE_UNSEEN:resource-${index}:g1`,
+      title: `작업 ${index + 1}`,
+      count: index + 1,
+      countLabel: String(index + 1),
+      destinationHref: `/app/host/destination/${index}`,
+    }));
+    const view: HostWorkboxView = { ...page, items, partialWarnings: [], nextCursor: "opaque-next-page" };
+    const disclosure: HostWorkboxDisclosure = {
+      visibleItems: items.slice(0, 4),
+      hiddenCount: 8,
+      hasMore: true,
+      expanded: false,
+    };
+    const onShowAll = vi.fn();
+    renderWorkbox({ view, disclosure, onShowAll, showPartialWarnings: false });
+
+    expect(screen.getAllByRole("listitem")).toHaveLength(4);
+    expect(screen.getByRole("link", { name: "작업 1" })).toBeVisible();
+    expect(screen.queryByRole("link", { name: "작업 5" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "작업함 모두 보기" }));
+    expect(onShowAll).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "다음 묶음 불러오기" })).toBeVisible();
+  });
+
+  it("exposes every loaded item in source order when disclosure is expanded", async () => {
+    const items = Array.from({ length: 12 }, (_, index): HostWorkboxItemView => ({
+      ...page.items[0],
+      key: `SCHEDULE_UNSEEN:resource-${index}:g1`,
+      title: `작업 ${index + 1}`,
+      count: index + 1,
+      countLabel: String(index + 1),
+      destinationHref: `/app/host/destination/${index}`,
+    }));
+    const view: HostWorkboxView = { ...page, items, partialWarnings: [], nextCursor: "opaque-next-page" };
+    const props = renderWorkbox({
+      view,
+      disclosure: {
+        visibleItems: items,
+        hiddenCount: 0,
+        hasMore: true,
+        expanded: true,
+      },
+    });
+
+    expect(screen.getAllByRole("listitem").map((item) => item.getAttribute("aria-label")))
+      .toEqual(items.map((item) => item.title));
+    expect(screen.queryByRole("button", { name: "작업함 모두 보기" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "다음 묶음 불러오기" }));
+    expect(props.onLoadMore).toHaveBeenCalledWith("opaque-next-page");
   });
 
   it("renders completed receipt summaries as read-only server evidence", async () => {

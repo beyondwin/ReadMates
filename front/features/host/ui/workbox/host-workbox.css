@@ -113,6 +113,7 @@
   display: grid;
   gap: var(--space-sm);
   padding: var(--space-md) var(--space-lg) var(--space-lg);
+  overflow: visible;
 }
 
 .rm-host-workbox__page-count {
@@ -139,6 +140,7 @@
 .rm-host-workbox__partial button,
 .rm-host-workbox__error button,
 .rm-host-workbox__load-more,
+.rm-host-workbox__show-all,
 .rm-host-work-item__deferral button,
 .rm-host-work-item__undo {
   min-height: 44px;
@@ -159,14 +161,20 @@
 }
 
 .rm-host-workbox__empty {
-  padding-block: var(--space-lg);
+  padding-block: var(--space-md);
   color: var(--text-2);
+}
+
+.rm-host-workbox__show-all {
+  justify-self: start;
+  padding-inline: var(--space-sm);
 }
 
 .rm-host-workbox__items {
   display: grid;
   margin: 0;
   padding: 0;
+  overflow: visible;
   border-top: 1px solid var(--line);
   list-style: none;
 }
@@ -175,8 +183,8 @@
   position: relative;
   z-index: 0;
   display: grid;
-  gap: var(--space-xs);
-  padding-block: var(--space-md);
+  gap: 2px;
+  padding-block: var(--space-sm);
   padding-inline-end: 44px;
   border-bottom: 1px solid var(--line-soft);
   background: var(--bg-sub);
@@ -221,7 +229,7 @@
   color: var(--text);
   font-size: var(--type-size-body-emphasis);
   font-weight: 700;
-  line-height: 1.35;
+  line-height: 1.25;
   text-decoration-color: var(--accent-line);
   text-underline-offset: 4px;
 }
@@ -233,7 +241,8 @@
   font-weight: 650;
 }
 
-.rm-host-work-item__destination strong {
+.rm-host-work-item__destination strong,
+.rm-host-work-item__title {
   grid-area: title;
   min-width: 0;
   overflow-wrap: anywhere;
