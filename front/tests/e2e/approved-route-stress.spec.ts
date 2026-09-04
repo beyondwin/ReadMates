@@ -396,6 +396,7 @@ test.describe("approved-route stress", () => {
     await choice.click();
     const recovery = page.getByRole("alert", { name: "출석 변경 충돌" });
     await expect(recovery).toBeVisible({ timeout: 10_000 });
+    await expect(recovery.locator("dd").nth(1)).toHaveText("불참");
     await expect(recovery.getByRole("button", { name: "내 선택으로 다시 저장" })).toBeVisible();
     await assertHostGeometry(page, 390, { workboxItems: 4, disclosure: hostDisclosure(4, 390) });
     await assertKeyboardReachable(page, recovery.getByRole("button", { name: "내 선택으로 다시 저장" }));

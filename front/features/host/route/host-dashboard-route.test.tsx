@@ -33,7 +33,7 @@ vi.mock("@tanstack/react-query", () => ({
     isError: false,
     isFetching: false,
     refetch: async () => {
-      routeMocks.refetchDetail();
+      await routeMocks.refetchDetail();
       return { data: routeMocks.detailRefetchData ?? query.testData };
     },
   }),
@@ -860,12 +860,20 @@ describe("HostDashboardRoute", () => {
         ? { ...attendee, attendanceStatus: "ABSENT" as const, attendanceRevision: 2 }
         : attendee),
     };
+    let releaseRefetch: (() => void) | undefined;
+    routeMocks.refetchDetail.mockImplementation(() => new Promise<void>((resolve) => {
+      releaseRefetch = resolve;
+    }));
     renderRoute("/clubs/reading-sai/app/host?phase=live");
 
     await user.click(await screen.findByRole("button", { name: "지후 참석" }));
+    await waitFor(() => expect(routeMocks.refetchDetail).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole("alert", { name: "출석 변경 충돌" })).not.toBeInTheDocument();
+    await act(async () => {
+      releaseRefetch?.();
+    });
 
     const comparison = await screen.findByRole("alert", { name: "출석 변경 충돌" });
-    expect(routeMocks.refetchDetail).toHaveBeenCalledTimes(1);
     expect(within(comparison).getByText("내가 선택한 값").nextElementSibling).toHaveTextContent("출석");
     expect(within(comparison).getByText("최신 값").nextElementSibling).toHaveTextContent("불참");
 

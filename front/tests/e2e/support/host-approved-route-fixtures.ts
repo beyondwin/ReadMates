@@ -882,6 +882,7 @@ export async function installHostApprovedRoutes(
   }
 
   const workboxItems = options?.workboxItems ?? DEFAULT_WORKBOX_ITEMS;
+  let conflictRefetchAbsentsSky = false;
   allowHostFixturePaths(requestAudit);
   await installApprovedRouteCatchAllAudit(page, requestAudit);
   await routeHostEditorShell(page, HOST_APPROVED_CLUB.clubSlug);
@@ -1067,7 +1068,14 @@ export async function installHostApprovedRoutes(
           await route.fallback();
           return;
         }
-        await json(route, 200, detail);
+        await json(route, 200, conflictRefetchAbsentsSky
+          ? {
+            ...detail,
+            attendees: detail.attendees.map((attendee) => attendee.membershipId === HOST_APPROVED_PERSON_ID
+              ? { ...attendee, attendanceStatus: "ABSENT" as const, attendanceRevision: attendee.attendanceRevision + 1 }
+              : attendee),
+          }
+          : detail);
         return;
       }
       if (rest === "closing-status") {
@@ -1211,6 +1219,7 @@ export async function installHostApprovedRoutes(
         return;
       }
       if (liveMutation === "conflict") {
+        conflictRefetchAbsentsSky = true;
         await new Promise((resolve) => setTimeout(resolve, 150));
         await json(route, 409, {
           code: "REVISION_CONFLICT",
