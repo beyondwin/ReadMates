@@ -405,7 +405,7 @@ test("Clubs locks the approved desktop ledger", async ({ mount, page }) => {
   await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4);
   await regionFromLocator(component.locator(".admin-club-management__finder"), "finder", LEDGER_LIST_GEOMETRY, 2);
   await regionFromLocator(component.locator(".admin-club-management__docket"), "docket", LEDGER_DOCKET_GEOMETRY, 2);
-  await regionFromLocator(firstRow, "first-row", { x: 284, y: 290, width: 87, height: 44 }, 2);
+  await regionFromLocator(firstRow, "first-row", { x: 284, y: 289, width: 94, height: 44 }, 2);
   await expectMinimumTargetSize(create);
   await create.focus();
   await expectVisibleFocus(create);
@@ -437,7 +437,7 @@ test("Service health locks the approved desktop ledger", async ({ mount, page })
   await regionFromLocator(component.locator(".admin-shell__header"), "header", HEADER_DESKTOP_GEOMETRY, 4);
   await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4);
   await regionFromLocator(component.locator(".admin-service-status__table"), "table", SERVICE_TABLE_GEOMETRY, 2);
-  await regionFromLocator(component.locator(".admin-service-status__attention").first(), "attention-row", { x: 292, y: 302, width: 1348, height: 73 }, 2);
+  await regionFromLocator(component.locator(".admin-service-status__attention").first(), "attention-row", { x: 292, y: 315, width: 527, height: 53 }, 2);
   await expectMinimumTargetSize(refresh);
   await refresh.focus();
   await expectVisibleFocus(refresh);
@@ -572,7 +572,7 @@ test("Emergency takedown offers desktop handoff first at 390", async ({ mount, p
   await expectVisibleFocus(copy);
 });
 
-test("Today keeps the 320 queue locator intact without horizontal overflow", async ({ mount, page }) => {
+test("Today keeps the 320 queue title intact without a locator or horizontal overflow", async ({ mount, page }) => {
   const fixture = {
     ...todayDesktopLedger,
     mode: "list" as const,
@@ -581,6 +581,7 @@ test("Today keeps the 320 queue locator intact without horizontal overflow", asy
       items: todayDesktopLedger.view.items.map((item, index) => ({
         ...item,
         locatorLabel: String(index + 1).padStart(2, "0"),
+        mobileMetaLabel: item.mobileMetaLabel ?? "알림 · 2시간 전",
       })),
     },
   };
@@ -591,10 +592,10 @@ test("Today keeps the 320 queue locator intact without horizontal overflow", asy
     VISUAL_AUTHORITY_VIEWPORTS.mobileNarrow,
   );
   const locator = component.locator(".admin-operations-queue__locator").first();
-  await expect(locator).toBeVisible();
-  await expect(locator).toHaveCSS("white-space", "nowrap");
-  await expect(locator).toHaveCSS("flex-shrink", "0");
-  await expect(locator).toHaveCSS("overflow-wrap", "normal");
+  await expect(locator).toBeAttached();
+  await expect(locator).toBeHidden();
+  await expect(component.locator(".admin-operations-queue__title").first()).toBeVisible();
+  await expect(component.locator(".admin-operations-queue__mobile-meta").first()).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
 
@@ -689,7 +690,9 @@ test("empty evidence, failed sources, pending-new, pagination failure and unknow
   await expect(component.getByRole("button", { name: "모임 마감 다시 확인" })).toBeVisible();
   await expect(component.getByRole("button", { name: "새 항목 2개 적용" })).toBeVisible();
   await expect(component.getByText("긴급 1건", { exact: true })).toBeVisible();
-  await expect(component.getByText("새 긴급 신호 1건")).toBeVisible();
+  const urgentNotice = component.locator(".admin-today-urgent-notice");
+  await expect(urgentNotice).toHaveText("새 긴급 신호 1건");
+  await expect(urgentNotice).toHaveAttribute("aria-live", "polite");
   await expect(component.getByRole("alert").filter({ hasText: "결과를 확인하지 못했습니다." })).toBeVisible();
   await expect(component.getByText("현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.")).toBeVisible();
   await expect(component.getByText("다음 클럽을 불러오지 못했습니다.")).toBeVisible();

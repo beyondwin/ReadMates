@@ -27,8 +27,8 @@ import {
 } from "./host-operating-room-page";
 import {
   HOST_BODY_DESKTOP_GEOMETRY as BODY_DESKTOP_GEOMETRY,
-  HOST_LIVE_MOBILE_BOARD_GEOMETRY as LIVE_MOBILE_BOARD_GEOMETRY,
-  HOST_LIVE_MOBILE_MAIN_GEOMETRY as LIVE_MOBILE_MAIN_GEOMETRY,
+  HOST_CT_LIVE_MOBILE_BOARD_GEOMETRY as CT_LIVE_MOBILE_BOARD_GEOMETRY,
+  HOST_OR_LIVE_MOBILE_MAIN_GEOMETRY as LIVE_MOBILE_MAIN_GEOMETRY,
   HOST_MOBILE_NAV_GEOMETRY as MOBILE_NAV_GEOMETRY,
   HOST_PREP_MOBILE_MAIN_GEOMETRY as PREP_MOBILE_MAIN_GEOMETRY,
   HOST_WORKBOX_DESKTOP_GEOMETRY as WORKBOX_DESKTOP_GEOMETRY,
@@ -655,35 +655,38 @@ const liveAttendees = [
 ];
 
 function approvedAttendanceBoard() {
+  const preview = liveAttendees.slice(0, 1);
   return (
-    <MeetingResponseLedger
-      presentation="attendanceBoard"
-      agendaHref="/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=agenda"
-      attendanceCensus={liveAttendanceCensus}
-      rows={liveAttendees.map((attendee) => ({
-        membershipId: attendee.membershipId,
-        displayName: attendee.displayName,
-        secondaryLabel: attendee.displayName,
-        avatarKey: attendee.avatarKey,
-        response: attendee.rsvpStatus === "GOING"
-          ? "GOING"
-          : attendee.rsvpStatus === "DECLINED"
-            ? "NOT_GOING"
-            : "NO_RESPONSE",
-        attendance: attendee.attendanceStatus,
-        attendanceRevision: attendee.attendanceRevision,
-        questionCount: null,
-        recentResponseLabel: null,
-      }))}
-      onAttendanceChange={() => undefined}
-      onBulkAttendanceChange={() => undefined}
-      pendingUndo={{
-        description: "출석 8명 저장됨",
-        onUndo: () => undefined,
-        onOpenHistory: () => undefined,
-        onDismiss: () => undefined,
-      }}
-    />
+    <>
+      <MeetingResponseLedger
+        presentation="attendanceBoard"
+        agendaHref="/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=agenda"
+        attendanceCensus={liveAttendanceCensus}
+        rows={preview.map((attendee) => ({
+          membershipId: attendee.membershipId,
+          displayName: attendee.displayName,
+          secondaryLabel: attendee.displayName,
+          avatarKey: attendee.avatarKey,
+          response: attendee.rsvpStatus === "GOING"
+            ? "GOING"
+            : attendee.rsvpStatus === "DECLINED"
+              ? "NOT_GOING"
+              : "NO_RESPONSE",
+          attendance: attendee.attendanceStatus,
+          attendanceRevision: attendee.attendanceRevision,
+          questionCount: null,
+          recentResponseLabel: null,
+        }))}
+        onAttendanceChange={() => undefined}
+        onBulkAttendanceChange={() => undefined}
+      />
+      <a
+        className="rm-host-operating-room__attendance-disclose"
+        href="/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=attendance"
+      >
+        {`출석 ${liveAttendanceCensus.all}명 모두 보기`}
+      </a>
+    </>
   );
 }
 
@@ -967,7 +970,7 @@ test("live locks the approved mobile attendance board", async ({ mount, page }) 
   await expect(component.getByRole("button", { name: /참석|출석/ }).first()).toBeVisible();
   await expect(component.getByText(/8\s*\/\s*12/)).toBeVisible();
   await expect(component.getByText(/확인 필요 3/)).toBeVisible();
-  await expect(component.getByText(/나머지 3명/)).toBeVisible();
+  await expect(component.getByRole("link", { name: "출석 12명 모두 보기" })).toBeVisible();
   await expect(component.getByRole("navigation", { name: "호스트 주 메뉴 모바일" })).toBeVisible();
   await expect(component.getByRole("link", { name: "멤버 시야" })).toBeVisible();
   await expect(component.getByText("진행 중")).toBeVisible();
@@ -977,18 +980,14 @@ test("live locks the approved mobile attendance board", async ({ mount, page }) 
   await expect(component.getByRole("button", { name: "박서윤 참석" })).toHaveAttribute("aria-pressed", "true");
   await expect(component.getByRole("button", { name: "박서윤 불참" })).toBeVisible();
   await expect(component.getByRole("button", { name: "박서윤 미확인" })).toBeVisible();
-  await expect(component.getByRole("button", { name: "이하린 미확인" })).toHaveAttribute("aria-pressed", "true");
-  await expect(component.getByText("미응답").first()).toBeVisible();
-  await expect(component.getByRole("button", { name: "나머지 3명 모두 참석으로 표시" })).toBeVisible();
+  await expect(component.getByRole("button", { name: "이하린 미확인" })).toHaveCount(0);
+  await expect(component.getByRole("button", { name: /나머지 .*명 모두 참석/ })).toHaveCount(0);
   await expect(component.locator(".rm-meeting-response-ledger--attendance-board .rm-avatar-chip").first()).toBeVisible();
-  await expect(component.getByText("선택하면 바로 저장돼요.")).toBeVisible();
-  await expect(component.getByRole("button", { name: "실행 취소" })).toBeVisible();
-  await expect(component.getByText("출석 8명 저장됨")).toBeVisible();
+  await expect(component.getByRole("button", { name: "실행 취소" })).toHaveCount(0);
   const board = component.locator(".rm-meeting-response-ledger--attendance-board");
   const roster = board.getByRole("listitem");
-  await expect(roster).toHaveCount(7);
-  const bulk = component.getByRole("button", { name: "나머지 3명 모두 참석으로 표시" });
-  const undo = component.locator(".rm-workspace-undo-bar");
+  await expect(roster).toHaveCount(1);
+  const disclose = component.getByRole("link", { name: "출석 12명 모두 보기" });
   const bottomNav = component.locator('[data-club-shell-region="mobile-primary"]');
   const frame = { x: 0, y: 0, width: 390, height: 832 };
   await expect(bottomNav).toHaveCSS("position", "fixed");
@@ -997,9 +996,8 @@ test("live locks the approved mobile attendance board", async ({ mount, page }) 
   expect(navBox!.y).toBeGreaterThanOrEqual(frame.height - 140);
   expect(navBox!.y + navBox!.height).toBeLessThanOrEqual(frame.height + 1);
   for (const [name, locator] of [
-    ["roster-row-7", roster.nth(6)],
-    ["bulk", bulk],
-    ["undo", undo],
+    ["roster-row-1", roster.first()],
+    ["disclose", disclose],
   ] as const) {
     const box = await locator.boundingBox();
     expect(box, name).not.toBeNull();
@@ -1010,7 +1008,7 @@ test("live locks the approved mobile attendance board", async ({ mount, page }) 
   }
   await regionFromLocator(bottomNav, "nav", MOBILE_NAV_GEOMETRY, 4);
   await regionFromLocator(component.locator(".rm-host-operating-room"), "main", LIVE_MOBILE_MAIN_GEOMETRY, 4);
-  await regionFromLocator(board, "board", LIVE_MOBILE_BOARD_GEOMETRY, 4);
+  await regionFromLocator(board, "board", CT_LIVE_MOBILE_BOARD_GEOMETRY, 4);
 });
 
 test("empty operating room primary stays readable without a phase overlay", async ({ mount, page }) => {

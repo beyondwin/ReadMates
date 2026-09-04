@@ -798,6 +798,7 @@ describe("HostDashboardRoute", () => {
     );
     expect(screen.getByText("지후")).toBeVisible();
     expect(screen.queryByText("서연")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /나머지 .*명 모두 참석/ })).not.toBeInTheDocument();
   });
 
   it("keeps successful meeting content when optional sources fail and exposes scoped retry", async () => {

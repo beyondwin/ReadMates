@@ -214,7 +214,7 @@ describe("MeetingResponseLedger", () => {
     );
 
     expect(screen.getByText("실제 출석 8 / 12 · 확인 필요 3")).toBeVisible();
-    expect(screen.getByRole("button", { name: "나머지 3명 모두 참석으로 표시" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /나머지 .*명 모두 참석/ })).not.toBeInTheDocument();
     expect(screen.getAllByRole("listitem")).toHaveLength(meetingDayRows.length);
   });
 });

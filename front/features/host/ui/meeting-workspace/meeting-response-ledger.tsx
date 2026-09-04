@@ -159,6 +159,7 @@ function AttendanceBoardLedger({
   const boardUndo = pendingUndo
     ? { ...pendingUndo, undoLabel: pendingUndo.undoLabel ?? "실행 취소" }
     : null;
+  const previewTruncated = attendanceCensus != null && rows.length < attendanceCensus.all;
 
   return (
     <section
@@ -230,7 +231,7 @@ function AttendanceBoardLedger({
         </ul>
       )}
 
-      {counts.pending > 0 ? (
+      {counts.pending > 0 && !previewTruncated ? (
         <div className="rm-meeting-response-ledger__bulk rm-meeting-response-ledger__bulk--meeting-day">
           <button
             type="button"

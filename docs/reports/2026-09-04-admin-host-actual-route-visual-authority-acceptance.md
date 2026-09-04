@@ -9,7 +9,7 @@
 | 항목 | 값 |
 | --- | --- |
 | Branch | `feat/admin-host-actual-route-visual-authority` |
-| HEAD | `c04ac0672e825cdfbbc304050c2a720c07bc2c58` (`fix: bind host 409 recovery to refreshed detail`) |
+| HEAD | closeout after `3ec56dda0` (`fix: keep visual-authority specs off default e2e and restore lint`). 정확한 commit hash는 이 기록을 포함한 커밋을 따른다. |
 | Base | `origin/main` `595ebf057c9d45ecb294c6b4d851e307eda4eda2` |
 | Design | `docs/superpowers/specs/2026-09-04-admin-host-actual-route-visual-authority-convergence-design.md` |
 | ADR-0053 | `Proposed` — 이 기록으로 `Accepted`로 올리지 않는다 |
@@ -38,6 +38,22 @@
 | 8 | `pnpm --dir front exec playwright test <5 specs> --project=chromium` | **1** | **FAIL** — 12 passed / 7 failed / 2 did not run |
 
 명령 6은 `DOCKER_CONTEXT` 격리 context에서 두 번 실행했고 두 번 모두 exit 1과 동일한 비율을 냈다. `pnpm install --frozen-lockfile`은 성공했다.
+
+### Closeout (같은 날, lint·CT·lifecycle 재측정)
+
+아래는 이후 closeout에서 `CI=true npx --yes corepack@0.35.0 pnpm --dir front ...`로 다시 잰 값이다. 승인 PNG는 수정하지 않았고 pixel docker는 다시 돌리지 않았다.
+
+| # | 명령 | exit | 결과 |
+| --- | --- | ---: | --- |
+| 1 | `pnpm --dir front lint` | 0 | PASS — error 0건, Fast Refresh warning 5건 |
+| 2 | `pnpm --dir front test` | 0 | PASS — 480 files / 4754 tests |
+| 3 | `pnpm --dir front build` | 0 | PASS |
+| 5 | `DOCKER_CONTEXT=colima-readmates-va pnpm --dir front test:ct:docker` | 0 | PASS — 177 passed |
+| 8a | `pnpm --dir front exec playwright test tests/e2e/host-lifecycle-operating-room.spec.ts --project=chromium --retries=0` | 0 | PASS — 1 passed |
+| 6 | `pnpm --dir front test:e2e:approved-routes:docker` | — | **재실행하지 않음.** 직전 측정 18/18 `not_passed_0.02`를 유지한다. |
+| 7 | visual-authority browser smoke | — | **재실행하지 않음.** 직전 FAIL를 통과로 읽지 않는다. |
+
+Compact live 출석 미리보기는 1행 + `출석 N명 모두 보기`이며, census보다 행이 짧으면 일괄 `나머지 N명`을 숨긴다. 전체 출석·되돌리기·모임 마치기는 session workspace가 소유한다. 마감 다음 행동 `기록 초안 검토`는 canonical `/app/host/records`다.
 
 ### 1. lint FAIL 상세 (error 4건)
 
@@ -176,7 +192,7 @@ Component CT는 **보조 회귀 suite**다. 최종 수락 권위가 아니다. �
 
 **`pending_remote_ci`.**
 
-push·merge·PR 생성 권한이 이 작업 범위에 없다. 원격 CI 실행 기록이 없다. 로컬 parity로 CI 성공을 추정하지 않는다.
+이 closeout은 로컬 `main` 머지를 목표로 한다. `origin/main` push와 원격 CI 실행 기록은 없다. 로컬 parity로 CI 성공을 추정하지 않는다. pixel job이 있는 채 `origin/main`에 push하면 `frontend-visual-regression`이 실패한다.
 
 ## 의도한 차이
 
@@ -191,16 +207,16 @@ push·merge·PR 생성 권한이 이 작업 범위에 없다. 원격 CI 실행 �
 
 이 기록은 **full acceptance가 아니다.**
 
-1. **strict pixel `not_passed_0.02` (18/18).** composition/geometry/typography/first viewport/interaction/request audit는 통과했지만 승인 AI PNG 대비 raster 잔여가 남는다.
-2. **`pnpm --dir front lint` FAIL (error 4건).** 그중 하나는 제품 route 파일의 `react-hooks/refs`다.
-3. **`test:ct:docker` FAIL (18건).** geometry·semantic·tracked snapshot이 새 composition과 어긋난다. snapshot을 갱신해 덮지 않았다.
-4. **cross-browser smoke FAIL (9건)과 focused E2E FAIL (7건 + 2 did not run).** 기존 Admin heading/`확인함` 계약과 Host 작업함 40건 기대치가 새 밀도·disclosure 계약으로 갱신되지 않았다. `front/tests/e2e/host-authority-loss.spec.ts`는 focused set에 없어 **이번 수렴에서 실행하지 않았다.** 통과로 읽지 않는다.
-5. **사람 30초 gate `pending_external_human_evidence`.**
-6. **Chrome 200%·VoiceOver/Safari·NVDA/Chrome `not_measured`.**
-7. **원격 CI `pending_remote_ci`.**
-8. **Candidate capture가 byte 단위로 완전 결정적이지 않다.** `admin-today-desktop`, `admin-space-switcher-desktop`, `host-live-mobile` 세 id는 같은 실행의 재시도 간 candidate PNG hash가 달랐다(비율은 동일). immutable receipt를 주장하기 전에 원인을 확인해야 한다.
-9. ADR-0053은 `Proposed`로 유지한다. 위 9개 항목 중 하나라도 열려 있으면 `Accepted`로 올리지 않는다.
+1. **strict pixel `not_passed_0.02` (18/18).** composition/geometry/typography/first viewport/interaction/request audit는 통과했지만 승인 AI PNG 대비 raster 잔여가 남는다. **origin/main push는 이 job을 빨갛게 만든다.**
+2. **사람 30초 gate `pending_external_human_evidence`.**
+3. **Chrome 200%·VoiceOver/Safari·NVDA/Chrome `not_measured`.**
+4. **원격 CI `pending_remote_ci`.** 로컬 lint/unit/build/CT/lifecycle 통과로 원격 성공을 추정하지 않는다.
+5. **Cross-browser smoke와 나머지 focused E2E는 closeout에서 재실행하지 않았다.** 직전 기록의 FAIL를 통과로 읽지 않는다.
+6. **Candidate capture가 byte 단위로 완전 결정적이지 않다.** `admin-today-desktop`, `admin-space-switcher-desktop`, `host-live-mobile` 세 id는 같은 실행의 재시도 간 candidate PNG hash가 달랐다(비율은 동일).
+7. ADR-0053은 `Proposed`로 유지한다. 위 항목이 열려 있으면 `Accepted`로 올리지 않는다.
+
+로컬에서 닫힌 항목: lint error 0, unit 4754, build, `test:ct:docker` 177, host lifecycle E2E. 보조 CT snapshot 3장(`admin-shell-mobile-390.png`, `admin-shell-long-copy-320.png`, `editorial-ledger-emergency-takedown-390.png`)은 현재 composition 회귀 기준이며 승인 PNG가 아니다.
 
 API/BFF/server/deploy는 이 작업에서 바꾸지 않았다. 공개 저장소에 실제 회원 데이터·secret·private domain·로컬 절대 경로·OCID·token 형태 예시를 넣지 않았다. Playwright 산출물(`front/test-results/`, `playwright-report/`)은 gitignore이며 커밋하지 않는다.
 
-릴리스 경계: 실제 authenticated route가 18개 reference 전부의 candidate가 됐고 broad raster 예외는 사라졌다. 그러나 strict pixel, lint, CT, cross-browser, focused E2E, 사람 gate, 보조기술, 원격 CI가 열려 있다. **시각 계약을 닫지 않으며 ADR-0053을 수락하지 않는다.**
+릴리스 경계: 실제 authenticated route가 18개 reference 전부의 candidate가 됐고 broad raster 예외는 사라졌다. 로컬 lint·unit·build·CT·host lifecycle은 닫혔다. 그러나 strict pixel, 사람 gate, 보조기술, 원격 CI가 열려 있고 pixel job이 있는 채 `origin/main`에 push하면 CI가 실패한다. **시각 계약을 닫지 않으며 ADR-0053을 수락하지 않는다.**
