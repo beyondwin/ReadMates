@@ -73,6 +73,39 @@ describe("AdminOperationsQueue", () => {
     expect(onShowAll).toHaveBeenCalledOnce();
   });
 
+  it("exposes every row once the queue is expanded", () => {
+    render(
+      <AdminOperationsQueue
+        items={tenQueueItems()}
+        selectedCaseId="case-1"
+        visibleLimit={3}
+        expanded
+        onSelectCase={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByRole("button", { name: /현재 상태/ })).toHaveLength(10);
+    expect(screen.queryByRole("button", { name: /전체 .*보기/ })).not.toBeInTheDocument();
+  });
+
+  it("lets expanded Today rows escape the 100vh/664px overflow clip", () => {
+    expect(QUEUE_CSS).toMatch(
+      /\.admin-shell:has\(\.admin-today-ledger\[data-queue-disclosure="all"\]\)\s*\{[^}]*overflow:\s*visible/,
+    );
+    expect(QUEUE_CSS).toMatch(
+      /\[data-queue-disclosure="all"\]\[data-content-layout="split"\][\s\S]{0,120}overflow:\s*visible/,
+    );
+    expect(QUEUE_CSS).toMatch(
+      /\[data-content-layout="flow"\]\[data-queue-disclosure="all"\][\s\S]{0,220}overflow:\s*visible/,
+    );
+    expect(QUEUE_CSS).not.toMatch(
+      /\.admin-shell:has\(\.admin-today-ledger\[data-queue-disclosure="all"\]\)\s*\{[^}]*overflow:\s*hidden/,
+    );
+    expect(QUEUE_CSS).not.toMatch(
+      /\.admin-operations-queue__list[\s\S]{0,80}overflow-y:\s*auto/,
+    );
+  });
+
   it("places a dedicated title between locator and severity", () => {
     render(
       <AdminOperationsQueue

@@ -296,6 +296,7 @@ export function AdminTodayLedger({
         ref={ledgerRef}
         data-content-layout={contentLayout}
         data-content-width={contentWidth}
+        data-queue-disclosure={queueExpanded ? "all" : "priority"}
       >
         {view.items.length === 0 ? queueControls : null}
 

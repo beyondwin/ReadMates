@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useInsertionEffect, useMemo, useReducer, useRef } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams, useLocation } from "react-router";
+import { useSearchParams } from "react-router";
 import type {
   AdminOperationCaseFilter,
   AdminOperationCaseState,
@@ -74,7 +74,6 @@ export function useAdminTodayController() {
   const queryClient = useQueryClient();
   const transitionOwner = useTransitionSafetyOwner("admin-today-cases");
   const [searchParams, setSearchParams] = useSearchParams();
-  const location = useLocation();
   const searchState = useMemo(() => parseAdminOperationsSearch(searchParams), [searchParams]);
   const [state, dispatch] = useReducer(
     adminTodayReducer,
@@ -164,7 +163,7 @@ export function useAdminTodayController() {
     : null;
   const listView = useMemo(
     () => state.snapshot
-      ? buildAdminTodayView(state.snapshot, searchState, new Date(), pinnedMutationCaseId)
+      ? buildAdminTodayView(state.snapshot, searchState, undefined, pinnedMutationCaseId)
       : null,
     [pinnedMutationCaseId, searchState, state.snapshot],
   );
@@ -195,7 +194,7 @@ export function useAdminTodayController() {
         },
       },
       searchState,
-      new Date(),
+      undefined,
       pinnedMutationCaseId,
     );
   }, [detailQuery.data, listView, pinnedMutationCaseId, searchState, state.snapshot]);
@@ -264,17 +263,8 @@ export function useAdminTodayController() {
       mode: next.mode ?? searchState.mode,
       queueDisclosure: next.queueDisclosure ?? searchState.queueDisclosure,
     });
-    const search = params.toString();
-    const nextHref = `${location.pathname}${search ? `?${search}` : ""}`;
-    const browserHref = `${window.location.pathname}${window.location.search}`;
-    const mirroredBrowserHistory = window.location.pathname === location.pathname
-      && browserHref !== nextHref;
-    if (mirroredBrowserHistory) {
-      window.history.pushState(window.history.state, "", nextHref);
-      previousQueueDisclosureRef.current = next.queueDisclosure ?? searchState.queueDisclosure;
-    }
-    setSearchParams(params, { replace: mirroredBrowserHistory, flushSync: true });
-  }, [location.pathname, searchState, setSearchParams]);
+    setSearchParams(params, { flushSync: true });
+  }, [searchState, setSearchParams]);
 
   const currentCase = view?.selectedCase ?? null;
   const confirmationKey = currentCase
@@ -298,16 +288,6 @@ export function useAdminTodayController() {
     if (previous !== "all" || searchState.queueDisclosure !== "priority") return;
     focusPriorityQueueRow();
   }, [focusPriorityQueueRow, searchState.queueDisclosure]);
-  useEffect(() => {
-    const onPopState = () => {
-      const next = new URLSearchParams(window.location.search).get("queue") === "all" ? "all" : "priority";
-      const previous = previousQueueDisclosureRef.current;
-      previousQueueDisclosureRef.current = next;
-      if (previous === "all" && next === "priority") focusPriorityQueueRow();
-    };
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, [focusPriorityQueueRow]);
 
   const reconcileAuthoritativeState = useCallback(async (caseId: string) => {
     await Promise.all([

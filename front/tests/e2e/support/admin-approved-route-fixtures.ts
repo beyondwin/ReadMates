@@ -37,8 +37,8 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
   await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 }
 
-function minutesAgo(minutes: number): string {
-  return new Date(Date.now() - minutes * 60_000).toISOString();
+function minutesBeforeGenerated(minutes: number): string {
+  return new Date(Date.parse(GENERATED_AT) - minutes * 60_000).toISOString();
 }
 
 function availableSource(sourceType: AdminOperationCase["sourceType"]) {
@@ -81,7 +81,7 @@ export function buildAdminTodayOperationCases(): AdminOperationCase[] {
       sourceType: "NOTIFICATION",
       summaryCode: "NOTIFICATION_DELIVERY_FAILURE",
       severity: "CRITICAL",
-      firstObservedAt: minutesAgo(10),
+      firstObservedAt: minutesBeforeGenerated(10),
       summaryTitle: "알림 전달 지연",
       summaryDescription: "일부 안내가 늦게 전달되고 있습니다.",
       scopeLabel: "클럽 2곳 · 멤버 6명",
@@ -94,7 +94,7 @@ export function buildAdminTodayOperationCases(): AdminOperationCase[] {
       sourceType: "CLOSING_RISK",
       summaryCode: "SESSION_CLOSING_BLOCKED",
       severity: "CRITICAL",
-      firstObservedAt: minutesAgo(35),
+      firstObservedAt: minutesBeforeGenerated(35),
       detailHref: "/admin/clubs",
       summaryTitle: "공개 기록 확인",
       summaryDescription: "새로 생성된 공개 기록을 확인하세요.",
@@ -106,7 +106,7 @@ export function buildAdminTodayOperationCases(): AdminOperationCase[] {
       sourceType: "AI_JOB",
       summaryCode: "AI_JOB_FAILED",
       severity: "CRITICAL",
-      firstObservedAt: minutesAgo(60),
+      firstObservedAt: minutesBeforeGenerated(60),
       detailHref: "/admin/health",
       summaryTitle: "요약 결과 확인",
       summaryDescription: "요약 결과를 확인하세요.",

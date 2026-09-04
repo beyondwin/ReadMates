@@ -1,10 +1,38 @@
 import { expect, test } from "@playwright/test";
 import { installAdminApprovedRoutes } from "./support/admin-approved-route-fixtures";
 import { runActualRouteAuthority } from "./support/approved-route-harness";
+import { createApprovedRouteRequestAudit } from "./support/approved-route-request-audit";
 import {
   visualAuthorityScenario,
   visualAuthoritySelected,
 } from "./support/approved-route-scenarios";
+
+async function assertQueueRowsReachable(
+  page: Parameters<typeof runActualRouteAuthority>[0]["page"],
+  expectedCount: number,
+): Promise<void> {
+  const rows = page.locator(".admin-operations-queue__row");
+  await expect(rows).toHaveCount(expectedCount);
+  const clipped = await rows.evaluateAll((nodes) => nodes.map((node) => {
+    let ancestor = node.parentElement;
+    while (ancestor) {
+      const style = getComputedStyle(ancestor);
+      const clips = style.overflowY === "hidden" || style.overflowY === "clip";
+      if (clips) {
+        const row = node.getBoundingClientRect();
+        const box = ancestor.getBoundingClientRect();
+        const unreachable = row.bottom - box.bottom > 1 || box.top - row.top > 1;
+        const hiddenOverflow = ancestor.scrollHeight - ancestor.clientHeight > 1
+          && style.overflowY !== "auto"
+          && style.overflowY !== "scroll";
+        if (unreachable || hiddenOverflow) return true;
+      }
+      ancestor = ancestor.parentElement;
+    }
+    return false;
+  }));
+  expect(clipped.every((item) => item === false), "queue rows are clipped by overflow:hidden").toBe(true);
+}
 
 async function assertAdminTodayAuthoritySurface(
   page: Parameters<typeof runActualRouteAuthority>[0]["page"],
@@ -15,9 +43,11 @@ async function assertAdminTodayAuthoritySurface(
     return;
   }
 
-  const rows = page.locator(".admin-operations-queue__row");
-  await expect(rows).toHaveCount(3);
+  await assertQueueRowsReachable(page, 3);
   await expect(page.getByRole("button", { name: /전체 .*보기/ })).toBeVisible();
+  await expect(page.locator(".admin-operations-queue__age").nth(0)).toHaveText("10분 전");
+  await expect(page.locator(".admin-operations-queue__age").nth(1)).toHaveText("35분 전");
+  await expect(page.locator(".admin-operations-queue__age").nth(2)).toHaveText("1시간 전");
 
   const listOverflow = await page.locator(".admin-operations-queue__list").evaluate((node) => {
     const style = getComputedStyle(node);
@@ -26,7 +56,7 @@ async function assertAdminTodayAuthoritySurface(
       hiddenByScroll: node.scrollHeight - node.clientHeight > 1,
     };
   });
-  expect(["visible", "clip", "hidden"]).toContain(listOverflow.overflowY);
+  expect(["visible", "clip"]).toContain(listOverflow.overflowY);
   expect(listOverflow.hiddenByScroll).toBe(false);
 
   if (id === "admin-today-mobile") {
@@ -39,15 +69,19 @@ for (const id of ["admin-today-desktop", "admin-today-mobile", "admin-work-detai
   test(`${id} matches its approved actual route`, async ({ page }, testInfo) => {
     test.skip(!visualAuthoritySelected(id), `not affected: ${id}`);
     const scenario = visualAuthorityScenario(id);
+    const requestAudit = createApprovedRouteRequestAudit();
+    await page.setViewportSize(scenario.viewport);
+    await installAdminApprovedRoutes(page, scenario.fixtureKey, requestAudit);
+    await page.goto(scenario.route, { waitUntil: "domcontentloaded" });
+    await assertAdminTodayAuthoritySurface(page, id);
     const report = await runActualRouteAuthority({
       page,
       testInfo,
       scenario,
-      installFixtures: (page, fixtureKey, requestAudit) =>
-        installAdminApprovedRoutes(page, fixtureKey, requestAudit),
+      installFixtures: (installPage, fixtureKey, audit) =>
+        installAdminApprovedRoutes(installPage, fixtureKey, audit),
     });
     expect(report.mask).toBeNull();
     expect(report).not.toHaveProperty("exception");
-    await assertAdminTodayAuthoritySurface(page, id);
   });
 }

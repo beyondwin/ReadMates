@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { useState } from "react";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -322,6 +324,39 @@ describe("useAdminTodayController", () => {
     expect(screen.getByLabelText("location")).toHaveTextContent("/admin/today");
     expect(screen.getByLabelText("location")).not.toHaveTextContent("case=");
     expect(screen.getByLabelText("queue-disclosure")).toHaveTextContent("priority");
+  });
+
+  it("does not mirror queue history with window.history.pushState or a popstate listener", () => {
+    const source = readFileSync(
+      path.resolve("features/platform-admin/route/use-admin-today-controller.ts"),
+      "utf8",
+    );
+    expect(source).not.toMatch(/window\.history\.pushState/);
+    expect(source).not.toMatch(/addEventListener\(\s*["']popstate["']/);
+  });
+
+  it("lets setSearchParams own queue=all history so Back and Forward restore disclosure", async () => {
+    const user = userEvent.setup();
+    const items = [operationCase("case-a"), operationCase("case-b")];
+    renderController(seededClient(items), "/admin/today");
+
+    expect(await screen.findByLabelText("queue-disclosure")).toHaveTextContent("priority");
+    await user.click(screen.getByRole("button", { name: "show-all-queue" }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("location")).toHaveTextContent("queue=all");
+    });
+
+    await user.click(screen.getByRole("button", { name: "back" }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("location")).not.toHaveTextContent("queue=all");
+      expect(screen.getByLabelText("queue-disclosure")).toHaveTextContent("priority");
+    });
+
+    await user.click(screen.getByRole("button", { name: "forward" }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("location")).toHaveTextContent("queue=all");
+      expect(screen.getByLabelText("queue-disclosure")).toHaveTextContent("all");
+    });
   });
 
   it("writes queue=all through the allowlisted serializer and keeps it across selection and Back", async () => {

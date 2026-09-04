@@ -253,6 +253,33 @@ describe("AdminTodayLedger", () => {
     expect(onShowAll).toHaveBeenCalledOnce();
   });
 
+  it("marks expanded disclosure and paints more than three unclipped rows", () => {
+    const items = Array.from({ length: 10 }, (_, index) => operationCase({
+      id: `case-${index + 1}`,
+      locatorLabel: String(10 - index).padStart(2, "0"),
+    }));
+    const { container } = render(
+      <MemoryRouter>
+        <AdminTodayLedger
+          view={populatedView(items[0], { items, selectedCase: items[0], selectedCaseId: items[0]!.id })}
+          filters={{ state: "", severity: "", source: "", assignee: "" }}
+          history={[]}
+          lifecycleControls={null}
+          visibleLimit={3}
+          queueExpanded
+          onFilterChange={vi.fn()}
+          onSelectCase={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(container.querySelector(".admin-today-ledger")).toHaveAttribute(
+      "data-queue-disclosure",
+      "all",
+    );
+    expect(screen.getAllByRole("button", { name: /현재 상태/ })).toHaveLength(10);
+  });
+
   it("renders a compact command heading, filters, and an honest empty state", () => {
     const { container } = render(
       <MemoryRouter>

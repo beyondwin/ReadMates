@@ -70,6 +70,26 @@ describe("platform admin operations model", () => {
 
     expect(labels).toEqual(["확인 전", "확인함", "잠시 미룸", "처리함"]);
   });
+
+  it("ages cases from generatedAt when the caller does not pass a wall clock", () => {
+    const view = buildAdminOperationsView(
+      response({
+        generatedAt: "2026-08-26T10:00:00Z",
+        items: [
+          operationCase({ id: "ten", firstObservedAt: "2026-08-26T09:50:00Z" }),
+          operationCase({ id: "thirty-five", firstObservedAt: "2026-08-26T09:25:00Z" }),
+          operationCase({ id: "hour", firstObservedAt: "2026-08-26T09:00:00Z" }),
+        ],
+      }),
+      null,
+      undefined,
+      new Map(),
+      "preserve",
+    );
+
+    expect(view.items.map((item) => item.ageLabel)).toEqual(["10분 전", "35분 전", "1시간 전"]);
+  });
+
   it("uses three priority rows until queue=all is present", () => {
     expect(parseAdminOperationsSearch(new URLSearchParams("case=case-1")).queueDisclosure)
       .toBe("priority");

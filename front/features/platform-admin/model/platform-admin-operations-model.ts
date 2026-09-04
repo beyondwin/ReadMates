@@ -292,11 +292,12 @@ export function adminOperationSummaryLabel(code: string): AdminOperationSummaryL
 export function buildAdminOperationsView(
   response: AdminOperationCasesResponse,
   requestedCaseId: string | null,
-  now: Date = new Date(),
+  now?: Date,
   clubNames: ReadonlyMap<string, string> = new Map(),
   orderMode: "sorted" | "preserve" = "sorted",
 ): AdminOperationsView {
-  const caseViews = response.items.map((item) => buildCaseView(item, now, clubNames));
+  const clock = now ?? new Date(response.generatedAt);
+  const caseViews = response.items.map((item) => buildCaseView(item, clock, clubNames));
   const orderedItems = orderMode === "preserve" ? caseViews : [...caseViews].sort(compareOperationCases);
   const items = orderedItems.map((item, index) => ({
     ...item,
