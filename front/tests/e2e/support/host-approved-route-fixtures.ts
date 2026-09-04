@@ -432,7 +432,7 @@ export function buildHostApprovedAuth(overrides: Partial<AuthMeResponse> = {}): 
     platformAdmin: null,
     availableSpaces: {
       version: 1,
-      kinds: ["PLATFORM", "CLUBS"],
+      kinds: ["CLUBS"],
       clubs: [{
         clubId: HOST_APPROVED_CLUB.clubId,
         clubSlug: HOST_APPROVED_CLUB.clubSlug,

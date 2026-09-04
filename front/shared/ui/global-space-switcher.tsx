@@ -159,7 +159,7 @@ export function GlobalSpaceSwitcher({
   }, [open]);
 
   if (productKinds.size <= 1) {
-    return <span className="rm-sr-only">{currentLabel}</span>;
+    return <span className="rm-sr-only rm-global-space-switcher__current-space">{currentLabel}</span>;
   }
 
   const openMenu = () => {

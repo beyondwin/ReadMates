@@ -342,16 +342,23 @@ button.rm-host-workspace-switcher__choice {
   content: none;
 }
 
-.rm-app-club-shell[data-workspace="host"] [data-club-shell-region="mobile-context"] .rm-global-space-switcher__trigger {
-  min-height: 44px;
-  padding: 4px 10px;
+.rm-app-club-shell[data-workspace="host"] .rm-club-shell-mobile-context:has(> .rm-club-shell-mobile-context__inner > .rm-sr-only:only-child) {
+  display: block;
 }
 
-.rm-app-club-shell[data-workspace="host"] [data-club-shell-region="mobile-context"] .rm-global-space-switcher__trigger strong {
-  font-size: 12px !important;
-  font-weight: 650 !important;
-  line-height: 16.8px !important;
-  color: oklch(0.18 0.020 255) !important;
+.rm-app-club-shell[data-workspace="host"] [data-club-shell-region="mobile-context"] .rm-global-space-switcher__current-space {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 16.8px;
+  color: oklch(0.18 0.020 255);
 }
 
 .rm-app-club-shell[data-workspace="host"] .topnav-global-context > a.row > span > .tiny {

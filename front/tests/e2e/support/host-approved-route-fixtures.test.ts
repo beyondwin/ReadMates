@@ -106,8 +106,8 @@ describe("host approved route fixtures", () => {
     expect(resolveHostApprovedCursorPage(members, "cursor-unknown")).toBeNull();
   });
 
-  it("exposes platform and club kinds so the mobile space-switcher trigger remains measurable", () => {
-    expect(buildHostApprovedAuth().availableSpaces?.kinds).toEqual(["PLATFORM", "CLUBS"]);
+  it("uses production clubs-only host auth without a platform space", () => {
+    expect(buildHostApprovedAuth().availableSpaces?.kinds).toEqual(["CLUBS"]);
     expect(buildHostApprovedAuth().platformAdmin).toBeNull();
   });
 

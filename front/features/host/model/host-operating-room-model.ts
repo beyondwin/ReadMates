@@ -279,7 +279,7 @@ function scheduleSeenRow(
   const summary = hostScheduleSeenSummary(meeting);
   const href = hostSessionPath(basePath, meeting.sessionId, "/schedule-review");
   if (summary.availability === "UNAVAILABLE") {
-    if (meeting.state === "DRAFT") {
+    if (meeting.state !== "OPEN") {
       return unavailableRow("schedule-seen", "일정 확인", "아직 멤버에게 공개되지 않음", "멤버 공개 뒤 집계가 시작됩니다.", null);
     }
     failures.push({ source: "schedule-seen", message: "일정 확인 집계를 불러오지 못했습니다.", retryable: true });
@@ -343,10 +343,11 @@ function questionRow(
   failures: OperatingRoomFailure[],
 ): PreparationLedgerRowView {
   const href = hostSessionPath(basePath, meeting.sessionId, "?section=responses&focus=questions");
+  if (source.state === "absent") {
+    return unavailableRow("questions", "발제 질문", "집계 준비 중", "질문 집계를 다시 불러오세요.", href);
+  }
   if (source.state !== "ready") {
-    failures.push(source.state === "failed"
-      ? source.failure
-      : { source: "questions", message: "발제 질문 집계 계약이 없습니다.", retryable: true });
+    failures.push(source.failure);
     return unavailableRow("questions", "발제 질문", "집계 준비 중", "질문 집계를 다시 불러오세요.", href);
   }
   const { respondingMemberCount, eligibleMemberCount, questionCount } = source.data;
@@ -452,7 +453,9 @@ function resolveNextAction(context: {
       label: context.closing.primaryAction.label,
       ctaLabel: "기록 초안 검토",
       reason: context.closing.primaryAction.reason,
-      href: context.closing.primaryAction.href,
+      href: context.closing.primaryAction.label === "기록 패키지 검토"
+        ? `${context.input.basePath}/records`
+        : context.closing.primaryAction.href,
     });
   }
 

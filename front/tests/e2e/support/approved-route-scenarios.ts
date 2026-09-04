@@ -366,7 +366,7 @@ const TYPO_HOST_WORDMARK = {
 };
 const TYPO_HOST_WORDMARK_MOBILE = {
   name: "wordmark",
-  selector: '[data-club-shell-region="mobile-context"] .rm-global-space-switcher__trigger strong',
+  selector: '[data-club-shell-region="mobile-context"] .rm-global-space-switcher__current-space',
   fontFamilyIncludes: "Pretendard" as const,
   fontSizePx: 12,
   fontWeight: [650],
@@ -466,12 +466,12 @@ const PREP_RETRY: VisualAuthorityInteraction = {
   restoreCanonicalState: true,
 };
 
-const ATTENDANCE_UNDO: VisualAuthorityInteraction = {
-  name: "attendance-undo-keyboard-reachable",
+const ATTENDANCE_CHOICE: VisualAuthorityInteraction = {
+  name: "attendance-choice-keyboard-reachable",
   kind: "focus-control",
-  target: 'role=button[name="실행 취소"]',
+  target: ".rm-meeting-response-ledger__attendance-choice",
   expectedVisible: true,
-  expectedFocused: 'role=button[name="실행 취소"]',
+  expectedFocused: ".rm-meeting-response-ledger__attendance-choice",
   restoreCanonicalState: true,
 };
 
@@ -1102,7 +1102,7 @@ export const REQUIRED_VISUAL_AUTHORITY_COVERAGE: Record<ApprovedMockupId, Requir
     typography: HOST_OPERATING_TYPOGRAPHY,
     firstViewport: HOST_OPERATING_FIRST_VIEWPORT,
     defaultVisibleItems: { selector: WORKBOX_ITEMS, count: 4 },
-    interactions: [PHASE_ROVING_TABS, showAllWorkbox(LIVE_ROUTE), restoreCappedWorkbox(LIVE_ROUTE), ATTENDANCE_UNDO],
+    interactions: [PHASE_ROVING_TABS, showAllWorkbox(LIVE_ROUTE), restoreCappedWorkbox(LIVE_ROUTE)],
   },
   "host-closing-desktop": {
     actor: HOST_ACTOR,
@@ -1461,10 +1461,9 @@ export const REQUIRED_VISUAL_AUTHORITY_COVERAGE: Record<ApprovedMockupId, Requir
       { name: "show-all-workbox", selector: WORKBOX_SHOW_ALL, visibility: "fully-visible" },
       { name: "mobile-nav", selector: '[data-club-shell-region="mobile-primary"] .m-tabbar', visibility: "fully-visible" },
       { name: "attendance-board", selector: ".rm-meeting-response-ledger--attendance-board", visibility: "fully-visible" },
-      { name: "undo-action", selector: 'role=button[name="실행 취소"]', visibility: "fully-visible" },
     ],
     defaultVisibleItems: { selector: WORKBOX_ITEMS, count: 3 },
-    interactions: [showAllWorkbox(LIVE_ROUTE), restoreCappedWorkbox(LIVE_ROUTE), ATTENDANCE_UNDO],
+    interactions: [showAllWorkbox(LIVE_ROUTE), restoreCappedWorkbox(LIVE_ROUTE), ATTENDANCE_CHOICE],
   },
   "host-person-mobile": {
     actor: HOST_ACTOR,

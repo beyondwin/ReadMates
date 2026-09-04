@@ -700,6 +700,15 @@ describe("HostDashboardRoute", () => {
     expect(screen.getByRole("link", { name: "모임 진행 보기" })).toBeVisible();
   });
 
+  it("does not render a live undo bar from GET attendance when there is no write receipt", async () => {
+    renderRoute("/clubs/reading-sai/app/host?phase=live");
+
+    expect(await screen.findByRole("region", { name: "현장 현황" })).toBeVisible();
+    expect(meetingDetail.attendees.some((attendee) => attendee.attendanceStatus === "ATTENDED")).toBe(true);
+    expect(screen.queryByRole("button", { name: "실행 취소" })).not.toBeInTheDocument();
+    expect(screen.queryByText("출석 8명 저장됨")).not.toBeInTheDocument();
+  });
+
   it("keeps live attendance writes and the existing restore receipt flow in the operating room", async () => {
     stubCompactViewport(true);
     const user = userEvent.setup();

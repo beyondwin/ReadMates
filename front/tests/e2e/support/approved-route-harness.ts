@@ -437,8 +437,9 @@ export async function runActualRouteAuthority(input: {
   testInfo: TestInfo;
   scenario: VisualAuthorityScenario;
   installFixtures: ApprovedRouteFixtureInstaller;
+  beforeCapture?: (page: Page) => Promise<void>;
 }): Promise<ApprovedComparisonReport> {
-  const { page, testInfo, scenario, installFixtures } = input;
+  const { page, testInfo, scenario, installFixtures, beforeCapture } = input;
   await page.setViewportSize(scenario.viewport);
   const requestAudit = createApprovedRouteRequestAudit();
   await installApprovedRouteCatchAllAudit(page, requestAudit);
@@ -559,6 +560,8 @@ export async function runActualRouteAuthority(input: {
 
   await restoreCanonical(page, scenario, requestAudit);
   assertApprovedLocation(page.url(), scenario.route, `${scenario.id} restored canonical url`);
+  await waitForFontsAndIdle(page, scenario);
+  if (beforeCapture) await beforeCapture(page);
 
   const unmatched = requestAudit.unmatched().length;
   const effecting = requestAudit.effecting().length;

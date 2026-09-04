@@ -221,7 +221,7 @@ describe("buildHostOperatingRoomView", () => {
     expect(view.nextAction.kind).not.toBe("schedule-seen");
   });
 
-  it("uses 집계 준비 중 only for an absent or failed expected contract and reports each failure", () => {
+  it("uses 집계 준비 중 for an absent questions contract without reporting it as a failure", () => {
     const view = buildHostOperatingRoomView(input({
       currentMeeting: session({ state: "CLOSED", date: "2026-08-29" }),
       questions: { state: "absent" },
@@ -234,8 +234,20 @@ describe("buildHostOperatingRoomView", () => {
       numerator: null,
       denominator: null,
     });
-    expect(view.partialFailures.map(({ source }) => source)).toEqual(["questions", "closing"]);
+    expect(view.partialFailures.map(({ source }) => source)).toEqual(["closing"]);
     expect(view.nextAction).toMatchObject({ state: "unknown", kind: "closing", workItemKey: null });
+  });
+
+  it("reports a failed questions contract", () => {
+    const view = buildHostOperatingRoomView(input({
+      questions: {
+        state: "failed",
+        failure: { source: "questions", message: "발제 질문 집계를 불러오지 못했습니다.", retryable: true },
+      },
+    }));
+
+    expect(view.partialFailures.map(({ source }) => source)).toEqual(["questions"]);
+    expect(view.preparation.find(({ id }) => id === "questions")?.state).toBe("unavailable");
   });
 
   it.each([
@@ -297,7 +309,33 @@ describe("buildHostOperatingRoomView", () => {
       kind: "closing",
       label: "기록 패키지 검토",
       ctaLabel: "기록 초안 검토",
+      href: "/clubs/book-club/app/host/records",
     });
+  });
+
+  it("does not treat absent questions or closed schedule-seen as optional failures", () => {
+    const questionsAbsent = buildHostOperatingRoomView(input({
+      questions: { state: "absent" },
+    }));
+    expect(questionsAbsent.partialFailures).toEqual([]);
+    expect(questionsAbsent.preparation.find(({ id }) => id === "questions")?.state).toBe("unavailable");
+
+    const closedUnavailable = buildHostOperatingRoomView(input({
+      currentMeeting: session({
+        state: "CLOSED",
+        date: "2026-08-29",
+        scheduleSeenAvailability: "UNAVAILABLE",
+        scheduleSeenSummary: {
+          currentCount: null,
+          staleCount: null,
+          unseenCount: null,
+          eligibleCount: null,
+        },
+      }),
+      closing: ready(closing("IN_PROGRESS", "IMPORT_RECORDS")),
+    }));
+    expect(closedUnavailable.partialFailures).toEqual([]);
+    expect(closedUnavailable.nextAction.href).toBe("/clubs/book-club/app/host/records");
   });
 
   it("does not synthesize authority or defer from a locally predictable key", () => {

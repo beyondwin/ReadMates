@@ -318,18 +318,7 @@ export function HostDashboardRoute({
     sessionId,
   ]);
 
-  const view = useMemo<HostOperatingRoomView>(() => {
-    if (resolvedView.phase === "closing" && resolvedView.nextAction.kind === "closing" && resolvedView.nextAction.href) {
-      return {
-        ...resolvedView,
-        nextAction: {
-          ...resolvedView.nextAction,
-          href: `${paths.hostBasePath}/records`,
-        },
-      };
-    }
-    return resolvedView;
-  }, [paths.hostBasePath, resolvedView]);
+  const view = resolvedView;
 
   const phaseHref = useCallback((phase: HostMeetingPhase) => {
     const search = new URLSearchParams(location.search);
@@ -523,22 +512,7 @@ export function HostDashboardRoute({
       onDismiss: () => setPendingAttendanceUndo(null),
     }
     : null;
-  const seededLiveUndo: WorkspacePendingUndo | null = writeUndo == null
-    && view.phase === "live"
-    && selectedDetail
-    && selectedDetail.attendees.some((attendee) => attendee.attendanceStatus === "ATTENDED")
-    ? {
-      description: "출석 8명 저장됨",
-      undoLabel: "실행 취소",
-      onUndo: () => undefined,
-      onOpenHistory: () => {
-        if (!selectedDetail || currentSessionIdRef.current !== selectedDetail.sessionId) return;
-        void navigate(hostSessionHref(paths.hostBasePath, selectedDetail.sessionId, "?section=history"));
-      },
-      onDismiss: () => undefined,
-    }
-    : null;
-  const pendingUndo = writeUndo ?? seededLiveUndo;
+  const pendingUndo = writeUndo;
 
   const liveRows = selectedDetail
     ? buildLivePhaseStatusRows(selectedDetail, paths.hostBasePath)
@@ -554,19 +528,33 @@ export function HostDashboardRoute({
       />
     </>
   ) : null;
+  const compactAttendanceRows = selectedDetail
+    ? meetingResponseLedgerRowsFromAttendees(selectedDetail.attendees, activeAttendanceWriteStates)
+    : [];
+  const compactAttendancePreview = compactAttendanceRows.slice(0, 1);
   const compactLiveContent = selectedDetail ? (
-    <MeetingResponseLedger
-      presentation="attendanceBoard"
-      agendaHref={hostSessionHref(paths.hostBasePath, selectedDetail.sessionId, "?section=agenda")}
-      rows={meetingResponseLedgerRowsFromAttendees(selectedDetail.attendees, activeAttendanceWriteStates)}
-      onAttendanceChange={(membershipId, attendance) => {
-        void commitAttendance([membershipId], attendance);
-      }}
-      onBulkAttendanceChange={(membershipIds, attendance) => {
-        void commitAttendance(membershipIds, attendance);
-      }}
-      pendingUndo={pendingUndo}
-    />
+    <>
+      <MeetingResponseLedger
+        presentation="attendanceBoard"
+        agendaHref={hostSessionHref(paths.hostBasePath, selectedDetail.sessionId, "?section=agenda")}
+        rows={compactAttendancePreview}
+        onAttendanceChange={(membershipId, attendance) => {
+          void commitAttendance([membershipId], attendance);
+        }}
+        onBulkAttendanceChange={(membershipIds, attendance) => {
+          void commitAttendance(membershipIds, attendance);
+        }}
+        pendingUndo={pendingUndo}
+      />
+      {compactAttendanceRows.length > compactAttendancePreview.length ? (
+        <LinkComponent
+          to={hostSessionHref(paths.hostBasePath, selectedDetail.sessionId, "?section=attendance")}
+          className="rm-host-operating-room__attendance-disclose"
+        >
+          {`출석 ${compactAttendanceRows.length}명 모두 보기`}
+        </LinkComponent>
+      ) : null}
+    </>
   ) : null;
 
   const closingContent = view.closing ? (
@@ -848,10 +836,7 @@ function uniqueFailureMessages(
   loaderData: HostDashboardRouteData,
   view: HostOperatingRoomView,
 ): readonly string[] {
-  const messages = [...view.partialFailures
-    .filter((failure) => failure.source !== "questions")
-    .filter((failure) => view.phase !== "closing" || failure.source !== "schedule-seen")
-    .map(({ message }) => message)];
+  const messages = [...view.partialFailures.map(({ message }) => message)];
   for (const source of [
     loaderData.recordAttention,
     loaderData.clubOperations,

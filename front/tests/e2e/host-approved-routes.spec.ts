@@ -1,7 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { isSemanticDocumentOrder } from "./support/approved-mockup-contract";
 import { runActualRouteAuthority } from "./support/approved-route-harness";
-import { createApprovedRouteRequestAudit } from "./support/approved-route-request-audit";
 import {
   visualAuthorityScenario,
   visualAuthoritySelected,
@@ -59,18 +58,34 @@ async function assertHostOperatingRoomAuthoritySurface(
   if (id === "host-live-mobile") {
     const nav = page.locator('[data-club-shell-region="mobile-primary"] .m-tabbar').first();
     const board = page.locator(".rm-meeting-response-ledger--attendance-board").first();
-    const undo = page.getByRole("button", { name: "실행 취소" }).first();
     await expect(board).toBeVisible();
-    await expect(undo).toBeVisible();
     await expect(nav).toBeVisible();
     const navBox = await nav.boundingBox();
     const boardBox = await board.boundingBox();
-    const undoBox = await undo.boundingBox();
     expect(navBox, "mobile nav").not.toBeNull();
     expect(boardBox, "attendance board").not.toBeNull();
-    expect(undoBox, "undo action").not.toBeNull();
     expect(boardBox!.y + boardBox!.height).toBeLessThanOrEqual(navBox!.y + 1);
-    expect(undoBox!.y + undoBox!.height).toBeLessThanOrEqual(navBox!.y + 1);
+
+    const rows = page.locator(".rm-meeting-response-ledger--attendance-board .rm-meeting-response-ledger__row--board");
+    const clipped = await rows.evaluateAll((nodes) => nodes.map((node) => {
+      let ancestor = node.parentElement;
+      while (ancestor) {
+        const style = getComputedStyle(ancestor);
+        const clips = style.overflowY === "hidden" || style.overflowY === "clip";
+        if (clips) {
+          const row = node.getBoundingClientRect();
+          const box = ancestor.getBoundingClientRect();
+          const unreachable = row.bottom - box.bottom > 1 || box.top - row.top > 1;
+          const hiddenOverflow = ancestor.scrollHeight - ancestor.clientHeight > 1
+            && style.overflowY !== "auto"
+            && style.overflowY !== "scroll";
+          if (unreachable || hiddenOverflow) return true;
+        }
+        ancestor = ancestor.parentElement;
+      }
+      return false;
+    }));
+    expect(clipped.every((item) => item === false), "attendance names are clipped by overflow:hidden").toBe(true);
   }
 }
 
@@ -78,18 +93,13 @@ for (const id of HOST_OPERATING_IDS) {
   test(`${id} matches its approved actual route`, async ({ page }, testInfo) => {
     test.setTimeout(120_000);
     test.skip(!visualAuthoritySelected(id), `not affected: ${id}`);
-    const scenario = visualAuthorityScenario(id);
-    const requestAudit = createApprovedRouteRequestAudit();
-    await page.setViewportSize(scenario.viewport);
-    await installHostApprovedRoutes(page, scenario.fixtureKey, requestAudit, { workboxItems: 12 });
-    await page.goto(scenario.route, { waitUntil: "domcontentloaded" });
-    await assertHostOperatingRoomAuthoritySurface(page, id);
     const report = await runActualRouteAuthority({
       page,
       testInfo,
-      scenario,
+      scenario: visualAuthorityScenario(id),
       installFixtures: (installPage, fixtureKey, audit) =>
         installHostApprovedRoutes(installPage, fixtureKey, audit, { workboxItems: 12 }),
+      beforeCapture: (capturePage) => assertHostOperatingRoomAuthoritySurface(capturePage, id),
     });
     expect(report.mask).toBeNull();
     expect(report).not.toHaveProperty("exception");

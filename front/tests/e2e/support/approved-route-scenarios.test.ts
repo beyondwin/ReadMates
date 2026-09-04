@@ -192,7 +192,7 @@ describe("actual-route visual authority scenarios", () => {
     for (const id of ["host-prep-mobile", "host-live-mobile", "host-person-mobile"] as const) {
       const wordmark = visualAuthorityScenario(id).typography.find((entry) => entry.name === "wordmark");
       expect(wordmark?.selector, id).toBe(
-        '[data-club-shell-region="mobile-context"] .rm-global-space-switcher__trigger strong',
+        '[data-club-shell-region="mobile-context"] .rm-global-space-switcher__current-space',
       );
       expect(wordmark?.selector, id).not.toMatch(/m-hdr-heading|m-hdr-brand|header\.topnav/);
     }

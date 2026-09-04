@@ -400,8 +400,17 @@ h1.rm-operating-room-header__title {
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-meeting-response-ledger__rows {
-    max-height: 80px;
-    overflow: hidden;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .rm-host-operating-room[data-phase="live"] .rm-host-operating-room__attendance-disclose {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    margin-top: 2px;
+    font-size: 0.8125rem;
+    font-weight: 600;
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-workspace-undo-bar {
@@ -1277,14 +1286,8 @@ h1.rm-operating-room-header__title {
   .rm-host-operating-room[data-phase="live"] .rm-meeting-response-ledger__note,
   .rm-host-operating-room[data-phase="live"] .rm-meeting-response-ledger__save-hint,
   .rm-host-operating-room[data-phase="live"] .rm-meeting-response-ledger__bulk,
-  .rm-host-operating-room[data-phase="live"] .rm-meeting-response-ledger__agenda,
-  .rm-host-operating-room[data-phase="live"] .rm-meeting-response-ledger__summary {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
+  .rm-host-operating-room[data-phase="live"] .rm-meeting-response-ledger__agenda {
+    display: none;
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-operating-room-header__title {
