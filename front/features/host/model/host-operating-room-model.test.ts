@@ -215,6 +215,18 @@ describe("buildHostOperatingRoomView", () => {
     ]);
   });
 
+  it("keeps the question count in detail and warns an incomplete member ratio", () => {
+    const row = buildHostOperatingRoomView(input()).preparation.find(({ id }) => id === "questions");
+
+    expect(row).toMatchObject({
+      value: "3 / 4",
+      detail: expect.stringContaining("5개"),
+      state: "warning",
+    });
+    expect(row?.detail).not.toMatch(/질문 작성/);
+    expect(row?.value).not.toContain("5개");
+  });
+
   it("does not invent a schedule denominator or work item for an unpublished future draft", () => {
     const view = buildHostOperatingRoomView(input({
       currentMeeting: session({

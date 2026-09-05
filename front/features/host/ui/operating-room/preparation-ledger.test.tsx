@@ -137,6 +137,33 @@ describe("PreparationLedger", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
+  it("shows the question count in detail and does not paint an incomplete ratio complete", () => {
+    render(
+      <PreparationLedger
+        rows={[{
+          id: "questions",
+          label: "발제 질문",
+          state: "warning",
+          value: "3 / 4",
+          detail: "발제 질문 5개",
+          numerator: 3,
+          denominator: 4,
+          href: "/session-27?section=responses&focus=questions",
+          workItemKey: null,
+          actionLabel: "질문 보기",
+        }]}
+      />,
+    );
+
+    const questions = screen.getByRole("listitem", { name: "발제 질문" });
+    expect(within(questions).getByText("3 / 4")).toBeVisible();
+    expect(within(questions).getByText("발제 질문 5개")).toBeVisible();
+    expect(questions).toHaveAttribute("data-state", "warning");
+    expect(questions).not.toHaveAttribute("data-state", "complete");
+    expect(questions).not.toHaveAttribute("data-tone", "ok");
+    expect(within(questions).queryByText("질문 작성 3/4 · 5개")).not.toBeInTheDocument();
+  });
+
   it("renders column head, specific action labels, and hides generic state words", () => {
     render(<PreparationLedger rows={rows} />);
     expect(screen.getByText("세부 내용")).toBeTruthy();

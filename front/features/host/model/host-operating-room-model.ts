@@ -359,12 +359,13 @@ function questionRow(
     return unavailableRow("questions", "발제 질문", "집계 준비 중", "질문 집계를 다시 불러오세요.", href);
   }
   const { respondingMemberCount, eligibleMemberCount, questionCount } = source.data;
+  const tone = ratioTone(respondingMemberCount, eligibleMemberCount, questionCount === 0 ? 1 : 0);
   return {
     id: "questions",
     label: "발제 질문",
-    state: questionCount > 0 ? "complete" : "warning",
+    state: tone === "ok" ? "complete" : "warning",
     value: ratioLabel(respondingMemberCount, eligibleMemberCount),
-    detail: questionCount > 0 ? "발제 질문이 모였습니다." : "첫 발제 질문을 준비하세요.",
+    detail: questionCount > 0 ? `발제 질문 ${questionCount}개` : "첫 발제 질문을 준비하세요.",
     numerator: respondingMemberCount,
     denominator: eligibleMemberCount,
     href,
