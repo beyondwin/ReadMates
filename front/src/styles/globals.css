@@ -6479,3 +6479,17 @@ at the mobile breakpoint. */
     min-block-size: 44px;
   }
 }
+
+/* ReadmatesIcon primitive (ADR-0045 update 2026-09-05) */
+.rm-icon { flex: none; display: inline-block; vertical-align: middle; }
+.rm-icon-badge {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--bg-sub); color: var(--text-2);
+}
+.rm-icon-badge[data-size="40"] { width: 40px; height: 40px; }
+.rm-icon-badge[data-tone="warn"]   { background: color-mix(in oklch, var(--warn) 22%, var(--bg)); color: var(--warn); }
+.rm-icon-badge[data-tone="ok"]     { background: color-mix(in oklch, var(--ok) 20%, var(--bg)); color: var(--ok); }
+.rm-icon-badge[data-tone="info"]   { background: color-mix(in oklch, var(--accent) 16%, var(--bg)); color: var(--accent); }
+.rm-icon-badge[data-tone="danger"] { background: color-mix(in oklch, var(--danger) 18%, var(--bg)); color: var(--danger); }
+.rm-icon-badge[data-tone="accent"] { background: var(--accent); color: #fff; }
