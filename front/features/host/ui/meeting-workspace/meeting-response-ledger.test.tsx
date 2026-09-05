@@ -218,7 +218,7 @@ describe("MeetingResponseLedger", () => {
     expect(screen.getAllByRole("listitem")).toHaveLength(meetingDayRows.length);
   });
 
-  it("attendanceBoard shows icons only on the selected choice and keeps a truncated one-row preview", () => {
+  it("attendanceBoard shows the selected choice label with its icon and keeps a truncated one-row preview", () => {
     render(
       <MeetingResponseLedger
         presentation="attendanceBoard"
@@ -231,7 +231,10 @@ describe("MeetingResponseLedger", () => {
 
     const attended = screen.getByRole("button", { name: "서연 참석" });
     expect(attended.querySelector(".rm-attendance-choice [data-icon='check-circle']")).toBeTruthy();
+    expect(attended).toHaveTextContent("참석");
+    expect(screen.getByRole("button", { name: "서연 불참" })).toHaveTextContent("불참");
     expect(screen.getByRole("button", { name: "서연 불참" }).querySelector("[data-icon]")).toBeNull();
+    expect(screen.getByRole("button", { name: "서연 미확인" })).toHaveTextContent("미확인");
     expect(screen.getByRole("button", { name: "서연 미확인" }).querySelector("[data-icon]")).toBeNull();
     expect(screen.getAllByRole("listitem")).toHaveLength(1);
     expect(screen.queryByText(/나머지 \d+명/)).toBeNull();
@@ -247,8 +250,13 @@ describe("MeetingResponseLedger", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "하준 불참" }).querySelector(".rm-attendance-choice [data-icon='x-circle']")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "지후 미확인" }).querySelector(".rm-attendance-choice [data-icon='question-circle']")).toBeTruthy();
+    const absent = screen.getByRole("button", { name: "하준 불참" });
+    const unknown = screen.getByRole("button", { name: "지후 미확인" });
+    expect(absent.querySelector(".rm-attendance-choice [data-icon='x-circle']")).toBeTruthy();
+    expect(absent).toHaveTextContent("불참");
+    expect(unknown.querySelector(".rm-attendance-choice [data-icon='question-circle']")).toBeTruthy();
+    expect(unknown).toHaveTextContent("미확인");
+    expect(screen.getByRole("button", { name: "하준 참석" })).toHaveTextContent("참석");
     expect(screen.getByRole("button", { name: "하준 참석" }).querySelector("[data-icon]")).toBeNull();
   });
 });

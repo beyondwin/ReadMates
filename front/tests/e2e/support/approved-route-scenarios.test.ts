@@ -307,7 +307,7 @@ describe("actual-route visual authority scenarios", () => {
   it("measures host ledger regions from actual-route boxes instead of CT main stubs", () => {
     const meetings = visualAuthorityScenario("host-meetings-desktop");
     expect(meetings.regions.find((region) => region.name === "host-nav")?.expected)
-      .toEqual({ x: 678, y: 23, width: 233, height: 44 });
+      .toEqual({ x: 676, y: 23, width: 290, height: 44 });
     expect(meetings.regions.find((region) => region.name === "meeting-ledger")?.selector)
       .toBe(".rm-meeting-toc__layout");
 
@@ -339,7 +339,7 @@ describe("actual-route visual authority scenarios", () => {
 
     const review = visualAuthorityScenario("host-schedule-review-desktop");
     expect(review.regions.find((region) => region.name === "host-nav")?.expected)
-      .toEqual({ x: 678, y: 23, width: 233, height: 44 });
+      .toEqual({ x: 676, y: 23, width: 290, height: 44 });
     expect(review.regions.find((region) => region.name === "review-heading")?.expected)
       .toEqual({ x: 48, y: 171, width: 1440, height: 41 });
     expect(review.firstViewport.find((entry) => entry.name === "preview-confirmation")?.selector)

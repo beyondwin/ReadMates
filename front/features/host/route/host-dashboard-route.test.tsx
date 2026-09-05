@@ -808,7 +808,9 @@ describe("HostDashboardRoute", () => {
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7?section=attendance",
     );
-    expect(screen.getByRole("button", { name: "지후 미확인" }).querySelector(".rm-attendance-choice [data-icon='question-circle']")).toBeTruthy();
+    const unknown = screen.getByRole("button", { name: "지후 미확인" });
+    expect(unknown.querySelector(".rm-attendance-choice [data-icon='question-circle']")).toBeTruthy();
+    expect(unknown).toHaveTextContent("미확인");
     expect(screen.getAllByRole("listitem").filter((item) => item.classList.contains("rm-meeting-response-ledger__row"))).toHaveLength(1);
     expect(screen.getByText("지후")).toBeVisible();
     expect(screen.queryByText("서연")).not.toBeInTheDocument();

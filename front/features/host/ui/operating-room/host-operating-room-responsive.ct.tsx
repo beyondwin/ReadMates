@@ -51,7 +51,7 @@ const view: HostOperatingRoomView = {
     title: "경계가 긴 한글 모임 제목과 A deliberately long English meeting title without clipping",
     bookTitle: "이미지가 없어도 운영 문맥을 잃지 않는 아주 긴 책 제목",
     bookAuthor: "Long Public-safe Author Name",
-    bookImageUrl: "/covers/operating-room.png",
+    bookImageUrl: "/assets/avatars/book-club/milk-green-book.webp",
     date: "2026-09-01",
     startTime: "19:30",
     endTime: "21:30",
@@ -449,7 +449,7 @@ const approvedMeeting = {
   title: "지구 끝의 온실",
   bookTitle: "지구 끝의 온실",
   bookAuthor: "김초엽",
-  bookImageUrl: "/covers/operating-room.png",
+  bookImageUrl: "/assets/avatars/book-club/milk-green-book.webp",
   date: "2026-09-01",
   startTime: "19:30",
   endTime: "21:30",
@@ -987,6 +987,7 @@ test("prep locks the approved mobile operating room", async ({ mount, page }) =>
   for (const [name, locator] of [
     ["next-action", nextAction],
     ["prep-row-1", preparation.getByRole("listitem").first()],
+    ["prep-row-4", preparation.getByRole("listitem").nth(3)],
   ] as const) {
     const box = await locator.boundingBox();
     expect(box, name).not.toBeNull();
@@ -1037,8 +1038,10 @@ test("live locks the approved mobile attendance board", async ({ mount, page }) 
   expect(navBox, "bottom-nav").not.toBeNull();
   expect(navBox!.y).toBeGreaterThanOrEqual(frame.height - 140);
   expect(navBox!.y + navBox!.height).toBeLessThanOrEqual(frame.height + 1);
+  const disclose = component.getByRole("link", { name: "출석 12명 모두 보기" });
   for (const [name, locator] of [
     ["roster-row-1", roster.first()],
+    ["disclose", disclose],
   ] as const) {
     const box = await locator.boundingBox();
     expect(box, name).not.toBeNull();

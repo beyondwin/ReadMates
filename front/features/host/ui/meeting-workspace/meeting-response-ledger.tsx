@@ -247,6 +247,7 @@ function AttendanceBoardLedger({
                       {selected ? (
                         <span className="rm-attendance-choice">
                           <ReadmatesIcon name={choice.icon} size={20} />
+                          {choice.label}
                         </span>
                       ) : (
                         choice.label

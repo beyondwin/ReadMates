@@ -166,7 +166,7 @@ export const approvedRecordItems: HostSessionLedgerItem[] = [
     title: "스물여덟 번째 모임",
     bookTitle: "지구 끝의 온실",
     bookAuthor: "김초엽",
-    bookImageUrl: "/covers/operating-room.png",
+    bookImageUrl: "/assets/avatars/book-club/milk-green-book.webp",
     date: "2026-09-01",
     startTime: "19:30",
     endTime: "21:30",

@@ -44,7 +44,7 @@ export function HostWorkItem({
     <li className="rm-host-work-item" aria-label={item.title} data-state={item.state}>
       <LinkComponent to={item.destinationHref} className="rm-host-work-item__destination">
         <ReadmatesIconBadge name={icon.name} tone={icon.tone} size={40} />
-        <strong className="rm-host-work-item__title">{item.title}</strong>
+        <strong className="rm-host-work-item__title rm-host-work-item__label">{item.title}</strong>
         <span className="rm-host-work-item__meta" aria-hidden="true">
           <span>{item.countLabel}</span>
           {due ? <span data-overdue={due === "기한 지남" ? "true" : undefined}>{due}</span> : null}
