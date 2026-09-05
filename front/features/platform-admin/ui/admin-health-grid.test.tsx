@@ -178,9 +178,48 @@ function renderGrid(props: Partial<GridProps> = {}) {
   return { onRefresh: (props.onRefresh ?? defaultProps.onRefresh) as ReturnType<typeof vi.fn> };
 }
 
+function notificationAttentionSnapshot(): PlatformHealthSnapshot {
+  return snapshotWith(
+    HEALTH_SNAPSHOT.cards.map((item) => {
+      if (item.id === "outbox_backlog") {
+        return {
+          ...item,
+          status: "WARN" as const,
+          metric: { value: 120, unit: "rows", label: "pending" },
+        };
+      }
+      if (item.id === "kafka_consumer_lag" || item.id === "redis") {
+        return {
+          ...item,
+          status: "OK" as const,
+          reason: null,
+          metric: item.metric ?? { value: 0, unit: "rows", label: "ok" },
+        };
+      }
+      return item;
+    }),
+  );
+}
+
 describe("AdminHealthGrid", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("renders a full-width status table with five columns, quiet ok rows, and an expandable summary", () => {
+    renderGrid({ snapshot: notificationAttentionSnapshot() });
+    expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
+      "서비스",
+      "상태",
+      "마지막 확인",
+      "영향",
+      "조치",
+      "",
+    ]);
+    expect(within(screen.getByRole("row", { name: /앱과 API/ })).queryByRole("img")).toBeNull();
+    expect(screen.getByRole("button", { name: "알림 상세 접기" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("영향 범위").closest(".admin-service-status__facts")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "최근에 바뀐 것" })).toBeNull();
   });
 
   it("composes page context and an evidence ledger without case lifecycle chrome", () => {
@@ -196,10 +235,9 @@ describe("AdminHealthGrid", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { level: 1, name: "서비스 건강" })).toBeInTheDocument();
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(screen.getByText("서비스 상태")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "서비스 건강" })).toHaveClass("admin-page-frame");
+    expect(screen.queryByRole("heading", { level: 1, name: "서비스 건강" })).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("heading", { level: 1 })).toHaveLength(0);
+    expect(screen.getByRole("table", { name: "서비스 상태" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "서비스 신호" })).toHaveClass("admin-evidence-ledger");
     expect(screen.getByText("현재 자료로 확인했습니다.")).toBeInTheDocument();
     expect(container.querySelector(".admin-case-docket")).toBeNull();
@@ -224,7 +262,7 @@ describe("AdminHealthGrid", () => {
     expect(within(normalSources).getByText("AI 제공자")).toBeInTheDocument();
     expect(within(normalSources).getByText("외부 연결 보호")).toBeInTheDocument();
     expect(normalSources.querySelector(".admin-health-card__pill--ok")).toBeNull();
-    expect(screen.getByRole("heading", { name: "최근에 바뀐 것" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "최근에 바뀐 것" })).not.toBeInTheDocument();
   });
 
   it("labels generated-at separately from the actual last successful refresh", () => {
@@ -248,16 +286,16 @@ describe("AdminHealthGrid", () => {
 
     renderGrid({ onRefresh });
 
-    await user.click(screen.getByRole("button", { name: "새로고침" }));
+    await user.click(screen.getAllByRole("button", { name: "새로 확인" })[0]!);
 
     expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 
-  it("does not offer a per-row 새로 확인 command on the actual health route", () => {
+  it("offers a per-row 새로 확인 command instead of a page-level 새로고침", () => {
     renderGrid();
 
-    expect(screen.queryByRole("button", { name: "새로 확인" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "새로고침" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "새로 확인" }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "새로고침" })).not.toBeInTheDocument();
   });
 
   it("lets a keyboard operator focus a service row", () => {
@@ -275,16 +313,14 @@ describe("AdminHealthGrid", () => {
     );
   });
 
-  it("keeps the service table in the list column so the evidence strip does not intercept row clicks", () => {
+  it("keeps the service table full width after removing the recent-changes column", () => {
     expect(SERVICE_STATUS_CSS).toMatch(
-      /\.admin-service-status__table\s*\{[^}]*width:\s*1348px[^}]*overflow:\s*hidden/,
+      /\.admin-service-status table\s*\{[^}]*width:\s*100%/,
     );
     expect(SERVICE_STATUS_CSS).toMatch(
-      /\.admin-service-status__row[\s\S]*width:\s*527px/,
+      /\.admin-service-status\s*\{[^}]*padding:\s*24px 32px/,
     );
-    expect(SERVICE_STATUS_CSS).toMatch(
-      /\.admin-service-status\s*\{[^}]*padding:\s*0/,
-    );
+    expect(SERVICE_STATUS_CSS).not.toMatch(/width:\s*1348px/);
   });
 
   it.each([
@@ -309,7 +345,7 @@ describe("AdminHealthGrid", () => {
     renderGrid({ fetching: true });
 
     expect(screen.getByText("현재 자료로 확인했습니다.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "요청 중" })).toBeDisabled();
+    expect(screen.getAllByRole("button", { name: "요청 중" })[0]).toBeDisabled();
   });
 
   it("keeps successful cards when a partial source is unavailable", () => {
@@ -322,7 +358,7 @@ describe("AdminHealthGrid", () => {
     expect(within(redis).queryByText("정상")).not.toBeInTheDocument();
     expect(screen.queryByRole("article", { name: "알림 대기열" })).not.toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "정상 범위 서비스" })).getByText("알림 대기열")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "최근에 바뀐 것" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "최근에 바뀐 것" })).not.toBeInTheDocument();
   });
 
   it("keeps card evidence when every source is unavailable", () => {
@@ -339,7 +375,7 @@ describe("AdminHealthGrid", () => {
     expect(screen.getByTestId("admin-health-grid")).toHaveAttribute("data-page-state", "unavailable");
     expect(screen.getByRole("heading", { name: "알림 대기열" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Redis" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "최근에 바뀐 것" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "최근에 바뀐 것" })).not.toBeInTheDocument();
     expect(screen.getAllByText("확인 불가").length).toBeGreaterThan(1);
     expect(document.querySelector(".admin-health-card__pill--ok")).toBeNull();
     expect(screen.queryByText("42 rows")).not.toBeInTheDocument();
@@ -475,8 +511,9 @@ describe("AdminHealthGrid", () => {
       ),
     });
 
-    expect(screen.getByRole("heading", { name: "최근에 바뀐 것" })).toBeInTheDocument();
-    const deploy = screen.getByRole("region", { name: "최근에 바뀐 것" });
+    expect(screen.getByText("기술 정보 펼치기")).toBeInTheDocument();
+    const deploy = document.querySelector(".admin-health-grid__strip") as HTMLElement;
+    expect(deploy).toBeTruthy();
     expect(within(deploy).getByText("상태를 확인할 수 없습니다")).toBeInTheDocument();
     expect(within(deploy).getByText("원천에서 상태 자료를 받지 못했습니다.")).toBeInTheDocument();
     expect(within(deploy).getByText("최근 변경의 적용 상태를 확인하기 어렵습니다.")).toBeInTheDocument();
@@ -493,7 +530,7 @@ describe("AdminHealthGrid", () => {
       snapshot: snapshotWith(HEALTH_SNAPSHOT.cards.filter((item) => item.id !== "deploy_attempts_strip")),
     });
 
-    expect(screen.getByRole("heading", { name: "최근에 바뀐 것" })).toBeInTheDocument();
+    expect(screen.getByText("기술 정보 펼치기")).toBeInTheDocument();
     expect(screen.getByText("배포 원장을 확인할 수 없습니다.")).toBeInTheDocument();
     expect(screen.queryByText("성공")).not.toBeInTheDocument();
   });
@@ -545,9 +582,9 @@ describe("AdminHealthGrid", () => {
     );
   });
 
-  it("fills the approved page-heading band with the health h1", () => {
-    expect(SERVICE_STATUS_CSS).toMatch(
-      /\.admin-service-status \.admin-page-frame > \.admin-page-frame__header h1[\s\S]*width:\s*100%[\s\S]*height:\s*68px/,
+  it("does not fill a page-heading band now that the health h1 is removed", () => {
+    expect(SERVICE_STATUS_CSS).not.toMatch(
+      /\.admin-service-status \.admin-page-frame > \.admin-page-frame__header h1[\s\S]*height:\s*68px/,
     );
   });
 
@@ -631,11 +668,12 @@ describe("AdminHealthGrid", () => {
     expect(screen.queryByRole("article", { name: "알림 대기열" })).not.toBeInTheDocument();
   });
 
-  it("names the deploy strip 최근에 바뀐 것", () => {
+  it("moves deploy history into 기술 정보 펼치기 instead of naming 최근에 바뀐 것", () => {
     renderGrid();
 
-    expect(screen.getByRole("heading", { name: "최근에 바뀐 것" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "최근에 바뀐 것" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "최근 deploy" })).not.toBeInTheDocument();
+    expect(screen.getByText("기술 정보 펼치기")).toBeInTheDocument();
   });
 
   it("does not import route, query, or API modules", () => {
@@ -690,7 +728,8 @@ describe("AdminHealthGrid", () => {
         },
       });
 
-      const deploy = screen.getByRole("region", { name: "최근에 바뀐 것" });
+      const deploy = document.querySelector(".admin-health-grid__strip") as HTMLElement;
+      expect(deploy).toBeTruthy();
       expect(within(deploy).getByText("1건")).toBeInTheDocument();
       expect(within(deploy).getByText(refreshState === "STALE" ? "오래됨" : "확인 불가")).toBeInTheDocument();
       expect(deploy.querySelector(".admin-health-card__pill--ok")).toBeNull();

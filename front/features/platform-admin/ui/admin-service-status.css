@@ -5,6 +5,21 @@
   max-width: 1240px;
   min-width: 0;
   margin: 0 auto;
+  padding: 24px 32px;
+}
+
+.admin-service-status table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 16px;
+}
+
+.admin-service-status th {
+  padding: 0 0 18px;
+  color: var(--text-2);
+  font-weight: 500;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
 }
 
 .admin-service-status__normal {
@@ -16,22 +31,6 @@
   border-inline-start: 3px solid var(--attention);
 }
 
-.admin-service-status__table {
-  display: grid;
-  min-width: 0;
-}
-
-.admin-service-status__head,
-.admin-service-status__row {
-  display: grid;
-  grid-template-columns: minmax(7rem, 1.1fr) minmax(6rem, 0.7fr) minmax(7rem, 0.9fr) minmax(7rem, 1fr) minmax(7rem, 0.8fr);
-  gap: 12px;
-  align-items: center;
-  min-height: 44px;
-  padding: 14px 8px;
-  border-bottom: 1px solid var(--line);
-}
-
 .admin-service-status__row {
   font-size: 17px;
   font-weight: 600;
@@ -39,23 +38,81 @@
   color: var(--ink-900);
 }
 
-.admin-service-status__head {
-  color: var(--text-3);
-  font-size: var(--type-size-supporting);
-  font-weight: 700;
+.admin-service-status__row td {
+  padding: 30px 0;
+  border-bottom: 1px solid var(--line-soft);
+  min-height: 44px;
 }
 
-.admin-service-status__source-heading {
-  margin: 4px 0 0;
-  color: var(--text-3);
-  font-size: var(--type-size-supporting);
-  font-weight: 500;
+.admin-service-status__row td:first-child {
+  font-weight: 600;
 }
 
-.admin-service-status__expand {
-  padding: 16px 20px 24px;
-  border-bottom: 1px solid var(--line);
-  background: var(--bg-sub);
+.admin-service-status__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-service-status__status .rm-icon {
+  color: var(--warn);
+}
+
+.admin-service-status__expanded td {
+  padding: 0 0 24px;
+}
+
+.admin-service-status__expanded > td > div {
+  padding: 24px 32px;
+  border: 1px solid var(--line);
+  background: color-mix(in oklch, var(--warn) 6%, var(--bg));
+}
+
+.admin-service-status__facts {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 32px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line-soft);
+  justify-content: start;
+}
+
+.admin-service-status__facts > div + div {
+  padding-left: 32px;
+  border-left: 1px solid var(--line);
+}
+
+.admin-service-status__facts dt {
+  color: var(--text-2);
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.admin-service-status__recheck,
+.admin-service-status__toggle {
+  min-height: 44px;
+}
+
+.admin-service-status__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+}
+
+.admin-service-status__toggle[aria-expanded="true"] .rm-icon {
+  transform: rotate(180deg);
+}
+
+.admin-service-status__recheck:focus-visible,
+.admin-service-status__toggle:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .admin-service-status .admin-health-grid__ok-signals,
@@ -63,9 +120,13 @@
 .admin-service-status .admin-page-context__eyebrow,
 .admin-service-status .admin-page-frame__description,
 .admin-service-status .admin-page-frame__action,
+.admin-service-status .admin-page-frame__header,
+.admin-service-status .admin-page-context__meta,
 .admin-service-status .admin-evidence-ledger > header,
 .admin-service-status .admin-state-panel__notice,
-.admin-service-status .admin-health-grid__stale {
+.admin-service-status .admin-health-grid__stale,
+.admin-service-status .admin-health-grid__narrative,
+.admin-service-status__card-row {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -475,100 +536,9 @@
   }
 }
 
-.admin-service-status {
-  max-width: none;
-  padding: 0;
-}
-
-.admin-service-status .admin-page-frame {
-  position: relative;
-}
-
-.admin-service-status .admin-page-frame > .admin-page-frame__header {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 68px;
-  min-height: 68px;
-  overflow: visible;
-  clip: auto;
-  padding: 0;
-  border: 0;
-  box-shadow: inset 0 -1px 0 var(--line);
-}
-
-.admin-service-status .admin-page-frame > .admin-page-frame__header h1 {
-  position: absolute;
-  inset: 0;
-  left: 0;
-  display: flex;
-  align-items: center;
-  width: 100%;
-  height: 68px;
-  overflow: visible;
-  clip: auto;
-  margin: 0;
-  padding: 0 32px;
-  box-sizing: border-box;
-  color: var(--ink-900);
-  font-size: 36px;
-  font-weight: 600;
-  line-height: 41.4px;
-  letter-spacing: -0.02em;
-}
-
-.admin-service-status .admin-page-frame > .admin-page-frame__header .admin-page-frame__action {
-  position: absolute;
-  right: 32px;
-  top: 50%;
-  left: auto;
-  width: auto;
-  height: auto;
-  overflow: visible;
-  clip: auto;
-  transform: translateY(-50%);
-}
-
-.admin-service-status .admin-page-frame .admin-page-frame__description,
-.admin-service-status__banner,
-.admin-service-status__asof {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  color: var(--ink-900);
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 25.6px;
-}
-
-.admin-service-status__table {
-  position: absolute;
-  top: 68px;
-  left: 32px;
-  z-index: 1;
-  width: 1348px;
-  height: 763px;
-  min-height: 763px;
-  overflow: hidden;
-}
-
-.admin-service-status__head,
-.admin-service-status__row,
-.admin-service-status__expand {
-  width: 527px;
-  max-width: 527px;
-}
-
 .admin-service-status .admin-health-grid__strip {
-  position: absolute;
-  top: 68px;
-  left: 559px;
-  z-index: 2;
-  width: 853px;
-  height: 787px;
-  overflow: hidden;
-  background: var(--surface);
   clip: auto;
+  padding: 20px 0 0;
+  border: 0;
+  background: transparent;
 }

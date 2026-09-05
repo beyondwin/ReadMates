@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router";
 import type { HealthCard } from "@/features/platform-admin/model/platform-admin-health-model";
-import { AdminHealthCard } from "@/features/platform-admin/ui/admin-health-card";
+import { AdminHealthCard, AdminHealthStatusMark } from "@/features/platform-admin/ui/admin-health-card";
 
 function card(overrides: Partial<HealthCard> = {}): HealthCard {
   return {
@@ -41,6 +41,13 @@ function articleNamed(name: string) {
 }
 
 describe("AdminHealthCard", () => {
+  it("keeps an ok reading quiet and marks warn with a filled alert icon", () => {
+    const { rerender } = render(<AdminHealthStatusMark attention={false} label="정상" />);
+    expect(document.querySelector('[data-icon="alert-circle-filled"]')).toBeNull();
+    rerender(<AdminHealthStatusMark attention label="확인 필요" />);
+    expect(document.querySelector('[data-icon="alert-circle-filled"]')).not.toBeNull();
+  });
+
   it("explains a known abnormal source with reason, observation, impact, and next action", () => {
     renderCard(card());
 

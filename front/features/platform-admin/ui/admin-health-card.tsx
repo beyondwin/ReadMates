@@ -14,6 +14,22 @@ import {
   type PlatformHealthRefreshState,
 } from "@/features/platform-admin/model/platform-admin-health-model";
 import { AdminTechnicalDisclosure } from "@/features/platform-admin/ui/admin-technical-disclosure";
+import { ReadmatesIcon } from "@/shared/ui/icon";
+
+export function AdminHealthStatusMark({
+  attention,
+  label,
+}: {
+  attention: boolean;
+  label: string;
+}) {
+  return (
+    <span className="admin-service-status__status">
+      {attention ? <ReadmatesIcon name="alert-circle-filled" size={20} /> : null}
+      {label}
+    </span>
+  );
+}
 
 export type AdminHealthCardProps = {
   card: HealthCard;

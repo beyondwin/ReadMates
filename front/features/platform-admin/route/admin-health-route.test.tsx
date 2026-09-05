@@ -150,12 +150,11 @@ describe("AdminHealthRoute", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the full health snapshot and deploy strip under 서비스 건강", async () => {
+  it("renders the full health snapshot without a 서비스 건강 page title", async () => {
     const fetchSpy = vi.spyOn(api, "fetchPlatformAdminHealthSnapshot").mockResolvedValueOnce(HEALTH_SNAPSHOT);
     const { container } = renderRoute();
-    expect(screen.getByRole("heading", { name: "서비스 건강" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "서비스 건강" })).toHaveClass("admin-page-frame");
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.queryByRole("heading", { name: "서비스 건강" })).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("heading", { level: 1 })).toHaveLength(0);
     expect(await screen.findByRole("heading", { name: "AI 작업 대기열" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "서비스 신호" })).toHaveClass("admin-evidence-ledger");
     expect(container.querySelector(".admin-case-docket")).toBeNull();
@@ -170,7 +169,7 @@ describe("AdminHealthRoute", () => {
     expect(screen.queryByRole("heading", { name: "데이터베이스 연결" })).not.toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "정상 범위 서비스" })).getByText("알림 대기열")).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "정상 범위 서비스" })).getByText("외부 연결 보호")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "최근에 바뀐 것" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "최근에 바뀐 것" })).not.toBeInTheDocument();
     expect(screen.getByText("주의해서 살펴볼 서비스가 1곳 있습니다. 현재 자료로 확인했습니다.")).toBeInTheDocument();
     expect(screen.getByText(/생성 시각/)).toBeInTheDocument();
     expect(screen.queryByText(/NaN/)).toBeNull();
@@ -182,7 +181,6 @@ describe("AdminHealthRoute", () => {
     vi.spyOn(api, "fetchPlatformAdminHealthSnapshot").mockImplementation(() => new Promise(() => {}));
     renderRoute();
 
-    expect(screen.getByRole("heading", { name: "서비스 건강" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "서비스 신호" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toBeInTheDocument();
     expect(screen.getByTestId("admin-health-skeleton")).toBeInTheDocument();
@@ -216,7 +214,7 @@ describe("AdminHealthRoute", () => {
 
     expect(await screen.findByText("현재 자료로 확인했습니다.")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "서비스 신호" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "새로고침" }));
+    await user.click(screen.getAllByRole("button", { name: "새로 확인" })[0]!);
 
     expect(await screen.findByText("마지막 확인 자료가 2분 5초 전입니다.")).toBeInTheDocument();
     expect(fetchSpy).toHaveBeenCalledTimes(2);

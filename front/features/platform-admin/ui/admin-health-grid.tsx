@@ -1,39 +1,59 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { ADMIN_COPY } from "@/features/platform-admin/model/admin-copy";
 import {
   DEPLOY_ATTEMPTS_CARD_ID,
   HEALTH_OK_SIGNALS_LABEL,
   HEALTH_PAGE_DESCRIPTION,
-  HEALTH_PAGE_HEADING,
   aggregateHealthPageState,
   canRetryHealthCard,
   formatGeneratedAtLabel,
   formatHealthNarrative,
-  formatHealthTimestamp,
   formatLastEvidenceLabel,
   formatLastSuccessfulLabel,
   formatRefreshStateLabel,
   healthCardEvidenceState,
+  healthCardOperatorView,
   healthCardsForPage,
   healthEvidenceLabel,
-  healthCardOperatorView,
   healthFailedSources,
   healthFreshnessLabel,
   isLastKnownHealthEvidence,
   missingDeployCard,
   partitionHealthServiceCards,
   type HealthCard,
+  type HealthEvidenceState,
   type PlatformHealthSnapshot,
 } from "@/features/platform-admin/model/platform-admin-health-model";
 import { adminHealthAvailabilityLanguage } from "@/features/platform-admin/model/admin-status-language";
 import { AdminTechnicalDisclosure } from "@/features/platform-admin/ui/admin-technical-disclosure";
+import { ReadmatesIcon } from "@/shared/ui/icon";
 import { AdminEvidenceLedger } from "./admin-evidence-ledger";
-import { AdminHealthCard } from "./admin-health-card";
+import { AdminHealthCard, AdminHealthStatusMark } from "./admin-health-card";
 import { AdminHealthDeployStrip } from "./admin-health-deploy-strip";
 import { AdminPageContext } from "./admin-page-context";
 import type { AdminPageState } from "./admin-state-panel";
 import "./admin-service-status.css";
+
+export type AdminServiceStatusRow = {
+  id: string;
+  title: string;
+  attention: boolean;
+  statusLabel: string;
+  lastChecked: string;
+  impactLabel: string;
+  summary: string;
+  impactScope: string;
+  lastOkDelivery: string;
+  recoveryLabel: string;
+  recoveryHref: string | null;
+  cardIds: readonly string[];
+};
+
+export type AdminServiceStatusView = {
+  rows: readonly AdminServiceStatusRow[];
+  defaultExpandedId: string | null;
+};
 
 export type AdminHealthGridProps = {
   snapshot: PlatformHealthSnapshot | null;
@@ -42,10 +62,29 @@ export type AdminHealthGridProps = {
   fetching: boolean;
   onRefresh: () => void;
   onRetryCard?: (cardId: string) => void;
+  statusView?: AdminServiceStatusView;
 };
 
 const SKELETON_CARD_COUNT = 6;
 const EVIDENCE_LEDGER_LABEL = "서비스 신호";
+const RECOVERY_LABEL = "실패한 안내만 다시 보내기";
+
+const SERVICE_STATUS_GROUPS = [
+  { id: "app-api", title: "앱과 API", cardIds: ["db_pool"] },
+  { id: "notifications", title: "알림", cardIds: ["outbox_backlog", "notification_dispatch_success"] },
+  { id: "summaries", title: "요약 작업", cardIds: ["kafka_consumer_lag", "ai_provider_availability"] },
+  { id: "public-record", title: "공개 기록", cardIds: [DEPLOY_ATTEMPTS_CARD_ID] },
+  { id: "domain", title: "도메인", cardIds: ["redis", "outbound-resilience"] },
+] as const;
+
+const EVIDENCE_RANK: Record<HealthEvidenceState, number> = {
+  crit: 5,
+  warn: 4,
+  unavailable: 3,
+  empty: 2,
+  disabled: 1,
+  ok: 0,
+};
 
 export function AdminHealthGrid({
   snapshot,
@@ -54,6 +93,7 @@ export function AdminHealthGrid({
   fetching,
   onRefresh,
   onRetryCard,
+  statusView,
 }: AdminHealthGridProps) {
   if (loading) {
     return (
@@ -112,9 +152,10 @@ export function AdminHealthGrid({
     if (onRetryCard) onRetryCard(cardId);
     else onRefresh();
   };
+  const view = statusView ?? presentServiceStatusView(snapshot);
 
   return (
-    <div
+    <section
       className="admin-health-grid admin-service-status"
       data-testid="admin-health-grid"
       data-page-state={pageState}
@@ -133,25 +174,8 @@ export function AdminHealthGrid({
           </span>
         }
         scope={<HealthScope snapshot={snapshot} />}
-        action={
-          <button
-            type="button"
-            className="admin-health-grid__refresh"
-            disabled={fetching}
-            onClick={onRefresh}
-          >
-            {fetching ? "요청 중" : "새로고침"}
-          </button>
-        }
       >
-        <p className="admin-health-grid__narrative admin-service-status__banner">
-          {notificationAttention(cards)
-            ? "대체로 정상이며, 알림 전달을 확인해야 합니다."
-            : formatHealthNarrative(cards, null, snapshot.refreshState)}
-        </p>
-        {notificationAttention(cards) ? (
-          <p className="admin-service-status__asof">마지막 전체 확인 오늘 14:22</p>
-        ) : null}
+        <p className="admin-health-grid__narrative">{formatHealthNarrative(cards, null, snapshot.refreshState)}</p>
         <AdminEvidenceLedger
           label={EVIDENCE_LEDGER_LABEL}
           state={ledgerState}
@@ -174,8 +198,11 @@ export function AdminHealthGrid({
             </div>
           ) : null}
           <ServiceStatusTable
+            view={view}
             cards={cards}
             refreshState={snapshot.refreshState}
+            fetching={fetching}
+            onRecheck={onRefresh}
             onRetry={retryCard}
           />
           {okSignals.length > 0 ? (
@@ -186,13 +213,13 @@ export function AdminHealthGrid({
               <p>{HEALTH_OK_SIGNALS_LABEL}</p>
               <ul>
                 {okSignals.map((card) => {
-                  const view = healthCardOperatorView(card);
+                  const operator = healthCardOperatorView(card);
                   return (
                     <li key={card.id}>
                       {card.drill ? (
-                        <Link to={card.drill.target}>{view.label}</Link>
+                        <Link to={card.drill.target}>{operator.label}</Link>
                       ) : (
-                        view.label
+                        operator.label
                       )}
                     </li>
                   );
@@ -200,36 +227,32 @@ export function AdminHealthGrid({
               </ul>
             </section>
           ) : null}
-          <DeployEvidence
+          <DeployTechnicalFooter
             card={deployCard}
             refreshState={snapshot.refreshState}
             onRetry={canRetryHealthCard(deployCard) ? retryCard : undefined}
           />
         </AdminEvidenceLedger>
       </HealthPage>
-    </div>
+    </section>
   );
 }
 
 function HealthPage({
   freshness,
   scope,
-  action,
   children,
 }: {
   freshness?: ReactNode;
   scope?: ReactNode;
-  action?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <AdminPageContext
       eyebrow={ADMIN_COPY.eyebrow.pipeline}
-      heading={HEALTH_PAGE_HEADING}
       description={HEALTH_PAGE_DESCRIPTION}
       freshness={freshness}
       scope={scope}
-      action={action}
     >
       {children}
     </AdminPageContext>
@@ -254,96 +277,205 @@ function HealthScope({ snapshot }: { snapshot: PlatformHealthSnapshot }) {
   );
 }
 
-const SERVICE_TABLE_ROWS = [
-  { title: "앱과 API", cardIds: ["db_pool"], lastChecked: "오늘 14:22", impactAttention: "영향 없음" },
-  { title: "알림", cardIds: ["outbox_backlog", "notification_dispatch_success"], lastChecked: "오늘 14:10", impactAttention: "일부 알림 지연" },
-  { title: "요약 작업", cardIds: ["kafka_consumer_lag", "ai_provider_availability"], lastChecked: "오늘 14:22", impactAttention: "영향 없음" },
-  { title: "공개 기록", cardIds: ["deploy_attempts_strip"], lastChecked: "오늘 14:22", impactAttention: "영향 없음" },
-  { title: "도메인", cardIds: ["redis", "outbound-resilience"], lastChecked: "오늘 13:46", impactAttention: "일부 접속 지연" },
-] as const;
-
-function notificationAttention(cards: readonly HealthCard[]): boolean {
-  return cards.some((card) => {
-    if (card.id !== "outbox_backlog" && card.id !== "notification_dispatch_success") return false;
-    const evidence = healthCardEvidenceState(card);
-    return evidence === "warn" || evidence === "crit";
+function presentServiceStatusView(snapshot: PlatformHealthSnapshot): AdminServiceStatusView {
+  const cards = healthCardsForPage(snapshot);
+  const rows = SERVICE_STATUS_GROUPS.map((group) => {
+    const matched = cards.filter((card) => group.cardIds.includes(card.id));
+    const worst = pickWorstCard(matched);
+    const evidence = worst ? healthCardEvidenceState(worst) : "ok";
+    const attention = evidence !== "ok" && evidence !== "disabled";
+    const operator = worst ? healthCardOperatorView(worst) : null;
+    return {
+      id: group.id,
+      title: group.title,
+      attention,
+      statusLabel: statusLabelFor(evidence),
+      lastChecked: worst ? formatLastEvidenceLabel(worst.lastCheckedAt) : "확인 시각 없음",
+      impactLabel: attention ? (operator?.impact ?? "확인 필요") : "영향 없음",
+      summary: operator?.stateSentence ?? "",
+      impactScope: operator?.impact ?? "—",
+      lastOkDelivery: "—",
+      recoveryLabel: RECOVERY_LABEL,
+      recoveryHref: worst?.drill?.target ?? null,
+      cardIds: group.cardIds,
+    };
   });
+  return {
+    rows,
+    defaultExpandedId: rows.find((row) => row.attention)?.id ?? null,
+  };
 }
 
 function ServiceStatusTable({
+  view,
   cards,
   refreshState,
+  fetching,
+  onRecheck,
   onRetry,
 }: {
+  view: AdminServiceStatusView;
   cards: readonly HealthCard[];
   refreshState: PlatformHealthSnapshot["refreshState"];
+  fetching: boolean;
+  onRecheck: () => void;
   onRetry: (cardId: string) => void;
 }) {
+  const [expandedId, setExpandedId] = useState<string | null | undefined>(undefined);
+  const openId = expandedId === undefined ? view.defaultExpandedId : expandedId;
+
   return (
-    <div className="admin-service-status__table" role="table" aria-label="서비스 상태 표">
-      <div className="admin-service-status__head" role="row">
-        {["서비스", "상태", "마지막 확인", "영향", "조치"].map((label) => (
-          <span key={label} role="columnheader">{label}</span>
-        ))}
-      </div>
-      {SERVICE_TABLE_ROWS.map((row) => {
-        const matched = cards.filter((card) => row.cardIds.includes(card.id as typeof row.cardIds[number]));
-        const worst = matched.find((card) => healthCardEvidenceState(card) !== "ok") ?? matched[0];
-        const evidence = worst ? healthCardEvidenceState(worst) : "ok";
-        const attention = evidence !== "ok" && evidence !== "disabled";
-        const expanded = row.title === "알림" && (evidence === "warn" || evidence === "crit");
-        return (
-          <div key={row.title} role="rowgroup">
-            <div
-              className={attention ? "admin-service-status__row admin-service-status__attention" : "admin-service-status__row admin-service-status__normal"}
-              role="row"
-              tabIndex={0}
-            >
-              <span role="cell">
-                <strong>{row.title}</strong>
-              </span>
-              <span role="cell">{attention ? (evidence === "unavailable" ? "확인 지연" : "확인 필요") : "정상"}</span>
-              <span role="cell">{row.lastChecked}</span>
-              <span role="cell">{attention ? row.impactAttention : "영향 없음"}</span>
-              <span role="cell" />
-            </div>
-            {expanded && worst ? (
-              <div className="admin-service-status__expand">
-                <p>알림 일부가 12분째 전달을 기다리고 있습니다.</p>
-                <dl>
-                  <div>
-                    <dt>영향 범위</dt>
-                    <dd>클럽 2곳 · 멤버 6명</dd>
-                  </div>
-                  <div>
-                    <dt>최근 정상 전달</dt>
-                    <dd>13:52</dd>
-                  </div>
-                  <div>
-                    <dt>복구 조치</dt>
-                    <dd>
-                      {worst.drill ? (
-                        <Link to={worst.drill.target} className="btn btn-secondary">실패한 안내만 다시 보내기</Link>
-                      ) : (
-                        <span>실패한 안내만 다시 보내기</span>
-                      )}
-                    </dd>
-                  </div>
-                </dl>
+    <table>
+      <caption className="rm-sr-only">서비스 상태</caption>
+      <thead>
+        <tr>
+          <th scope="col">서비스</th>
+          <th scope="col">상태</th>
+          <th scope="col">마지막 확인</th>
+          <th scope="col">영향</th>
+          <th scope="col">조치</th>
+          <th scope="col" />
+        </tr>
+      </thead>
+      <tbody>
+        {view.rows.map((row) => {
+          const expanded = openId === row.id;
+          const matched = cards.filter((card) => row.cardIds.includes(card.id));
+          return (
+            <ServiceStatusRowGroup
+              key={row.id}
+              row={row}
+              expanded={expanded}
+              matched={matched}
+              refreshState={refreshState}
+              fetching={fetching}
+              onRecheck={onRecheck}
+              onRetry={onRetry}
+              onToggle={() => {
+                setExpandedId((current) => {
+                  const open = current === undefined ? view.defaultExpandedId : current;
+                  return open === row.id ? null : row.id;
+                });
+              }}
+            />
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function ServiceStatusRowGroup({
+  row,
+  expanded,
+  matched,
+  refreshState,
+  fetching,
+  onRecheck,
+  onRetry,
+  onToggle,
+}: {
+  row: AdminServiceStatusRow;
+  expanded: boolean;
+  matched: readonly HealthCard[];
+  refreshState: PlatformHealthSnapshot["refreshState"];
+  fetching: boolean;
+  onRecheck: () => void;
+  onRetry: (cardId: string) => void;
+  onToggle: () => void;
+}) {
+  const deviationCards = matched.filter((card) => healthCardEvidenceState(card) !== "ok");
+  return (
+    <>
+      <tr
+        className={
+          row.attention
+            ? "admin-service-status__row admin-service-status__attention"
+            : "admin-service-status__row admin-service-status__normal"
+        }
+        tabIndex={0}
+      >
+        <td>{row.title}</td>
+        <td>
+          <AdminHealthStatusMark attention={row.attention} label={row.statusLabel} />
+        </td>
+        <td>{row.lastChecked}</td>
+        <td>{row.impactLabel}</td>
+        <td>
+          <button
+            type="button"
+            className="admin-service-status__recheck"
+            disabled={fetching}
+            onClick={onRecheck}
+          >
+            {fetching ? "요청 중" : "새로 확인"}
+          </button>
+        </td>
+        <td>
+          <button
+            type="button"
+            className="admin-service-status__toggle"
+            aria-expanded={expanded}
+            aria-label={expanded ? `${row.title} 상세 접기` : `${row.title} 상세 펼치기`}
+            onClick={onToggle}
+          >
+            <ReadmatesIcon name="chevron-down" size={16} />
+          </button>
+        </td>
+      </tr>
+      {expanded ? (
+        <tr className="admin-service-status__expanded">
+          <td colSpan={6}>
+            <div>
+              <p>
+                {row.attention ? <ReadmatesIcon name="alert-circle-filled" size={20} /> : null}
+                {row.summary}
+              </p>
+              <div className="admin-service-status__facts">
+                <div>
+                  <dt>영향 범위</dt>
+                  <dd>{row.impactScope}</dd>
+                </div>
+                <div>
+                  <dt>최근 정상 전달</dt>
+                  <dd>{row.lastOkDelivery}</dd>
+                </div>
+                <div>
+                  <dt>복구 조치</dt>
+                  <dd>
+                    {row.recoveryHref ? (
+                      <Link to={row.recoveryHref} className="btn btn-secondary">{row.recoveryLabel}</Link>
+                    ) : (
+                      <span>{row.recoveryLabel}</span>
+                    )}
+                  </dd>
+                </div>
               </div>
-            ) : null}
-            {matched.filter((card) => healthCardEvidenceState(card) !== "ok").map((card) => (
+              {deviationCards.map((card) => (
+                <AdminHealthCard
+                  key={card.id}
+                  card={card}
+                  refreshState={refreshState}
+                  onRetry={canRetryHealthCard(card) ? onRetry : undefined}
+                />
+              ))}
+            </div>
+          </td>
+        </tr>
+      ) : (
+        deviationCards.map((card) => (
+          <tr key={card.id} className="admin-service-status__card-row">
+            <td colSpan={6}>
               <AdminHealthCard
-                key={card.id}
                 card={card}
                 refreshState={refreshState}
                 onRetry={canRetryHealthCard(card) ? onRetry : undefined}
               />
-            ))}
-          </div>
-        );
-      })}
-    </div>
+            </td>
+          </tr>
+        ))
+      )}
+    </>
   );
 }
 
@@ -352,7 +484,7 @@ function ledgerStateFor(pageState: ReturnType<typeof aggregateHealthPageState>):
   return "ready";
 }
 
-function DeployEvidence({
+function DeployTechnicalFooter({
   card,
   refreshState,
   onRetry,
@@ -363,55 +495,12 @@ function DeployEvidence({
 }) {
   const evidence = healthCardEvidenceState(card);
   const view = healthCardOperatorView(card);
-  const lastEvidenceStamp = formatHealthTimestamp(card.lastCheckedAt);
   const lastKnown = isLastKnownHealthEvidence(evidence, refreshState);
 
   return (
-    <section
-      className={`admin-health-grid__strip admin-health-grid__strip--${evidence}`}
-      data-evidence={evidence}
-      aria-labelledby="admin-health-deploy-heading"
-    >
-      <header className="admin-health-grid__strip-header">
-        <div>
-          <h2 id="admin-health-deploy-heading">{ADMIN_COPY.heading.recentChanges}</h2>
-          <p className="admin-health-grid__strip-reading">
-            {evidence === "ok" && card.deployStrip ? `${card.deployStrip.length}건` : view.stateSentence}
-          </p>
-        </div>
-        {evidence !== "ok" || lastKnown ? (
-          <span className={`admin-health-card__pill admin-health-card__pill--${lastKnown ? "last-known" : evidence}`}>
-            {lastKnown ? healthFreshnessLabel(refreshState) : healthEvidenceLabel(evidence)}
-          </span>
-        ) : null}
-      </header>
-      <dl className="admin-health-card__narrative">
-        <div>
-          <dt>이유</dt>
-          <dd>{view.reason}</dd>
-        </div>
-        <div>
-          <dt>확인 시각</dt>
-          <dd>
-            <time dateTime={lastEvidenceStamp ? card.lastCheckedAt : undefined}>
-              {formatLastEvidenceLabel(card.lastCheckedAt)}
-            </time>
-          </dd>
-        </div>
-        {view.impact && evidence !== "ok" && evidence !== "disabled" ? (
-          <div>
-            <dt>영향</dt>
-            <dd>{view.impact}</dd>
-          </div>
-        ) : null}
-        {view.nextAction && evidence !== "ok" && evidence !== "disabled" ? (
-          <div>
-            <dt>다음 확인</dt>
-            <dd>{view.nextAction}</dd>
-          </div>
-        ) : null}
-      </dl>
+    <footer className={`admin-health-grid__strip admin-health-grid__strip--${evidence}`} data-evidence={evidence}>
       <AdminTechnicalDisclosure
+        summary="기술 정보 펼치기"
         items={[
           { label: "원천 ID", value: card.id },
           { label: "원천 제목", value: card.title },
@@ -419,14 +508,38 @@ function DeployEvidence({
           { label: "자료 원천", value: card.source },
           { label: "최신성 코드", value: refreshState },
           { label: "상태 사유", value: card.reason },
+          { label: "이유", value: view.reason },
+          { label: "확인 시각", value: formatLastEvidenceLabel(card.lastCheckedAt) },
+          { label: "영향", value: evidence !== "ok" && evidence !== "disabled" ? view.impact : null },
+          { label: "다음 확인", value: evidence !== "ok" && evidence !== "disabled" ? view.nextAction : null },
+          { label: "배포 건수", value: evidence === "ok" && card.deployStrip ? `${card.deployStrip.length}건` : view.stateSentence },
         ]}
       />
+      {evidence !== "ok" || lastKnown ? (
+        <span className={`admin-health-card__pill admin-health-card__pill--${lastKnown ? "last-known" : evidence}`}>
+          {lastKnown ? healthFreshnessLabel(refreshState) : healthEvidenceLabel(evidence)}
+        </span>
+      ) : null}
       <AdminHealthDeployStrip entries={card.deployStrip} evidenceState={evidence} lastKnown={lastKnown} />
       {onRetry ? (
         <button type="button" className="admin-health-card__retry" onClick={() => onRetry(card.id)}>
-          {`${ADMIN_COPY.heading.recentChanges} 다시 확인`}
+          {`${view.label} 다시 확인`}
         </button>
       ) : null}
-    </section>
+    </footer>
   );
+}
+
+function pickWorstCard(cards: readonly HealthCard[]): HealthCard | undefined {
+  return [...cards].sort(
+    (left, right) =>
+      EVIDENCE_RANK[healthCardEvidenceState(right)] - EVIDENCE_RANK[healthCardEvidenceState(left)],
+  )[0];
+}
+
+function statusLabelFor(evidence: HealthEvidenceState): string {
+  if (evidence === "ok") return "정상";
+  if (evidence === "disabled") return "사용 안 함";
+  if (evidence === "unavailable" || evidence === "empty") return "확인 지연";
+  return "확인 필요";
 }

@@ -10,6 +10,7 @@ import {
 } from "@/features/platform-admin/model/platform-admin-health-model";
 import { platformAdminHealthSnapshotQuery } from "@/features/platform-admin/queries/platform-admin-health-queries";
 import { AdminHealthGrid } from "@/features/platform-admin/ui/admin-health-grid";
+import { buildAdminServiceStatusView } from "./admin-health-data";
 import { useAdminShellStatus, type AdminShellStatus } from "./admin-shell-status-context";
 
 const SEOUL_CLOCK = new Intl.DateTimeFormat("ko-KR", {
@@ -44,6 +45,7 @@ export function AdminHealthRoute() {
   return (
     <AdminHealthGrid
       snapshot={query.data ?? null}
+      statusView={query.data ? buildAdminServiceStatusView(query.data) : undefined}
       loading={query.isLoading}
       error={query.isError}
       fetching={query.isFetching}
