@@ -8,6 +8,8 @@ token, shared CSS/component, fixture 변경은 영향 reference 증거를 무효
 
 현재 시각 권위 기록은 `docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md`다. 그 기록에서 composition·geometry·typography·first viewport·interaction·request audit는 18/18 통과했고, strict pixel은 18/18 `not_passed_0.02`다. 로컬 lint·unit·build와 Docker CT 177건, host lifecycle E2E는 이후 closeout에서 통과했다. 사람 30초 gate는 `pending_external_human_evidence`, Chrome 200%·VoiceOver/Safari·NVDA/Chrome은 `not_measured`, 원격 CI는 `pending_remote_ci`다. ADR-0053은 `Proposed`이며 픽셀 수락 완료가 아니다. Public, guest, member composition은 이 문서로 바꾸지 않는다.
 
+구성 수렴 다음의 시각 충실도(빠진 아이콘·여백, geometry PASS를 시안 일치로 읽지 말 것, 출석 1행 유지, `origin/main` 미푸시)는 `docs/superpowers/specs/2026-09-05-admin-host-visual-fidelity-next-slice-design.md`가 다음 슬라이스 핸드오프다. 그 문서는 구현 계획이 아니다.
+
 - ADR-0044: Superseded by ADR-0046 (단일 주 행동 계산 규칙은 운영실에 계승)
 - ADR-0045: Accepted — host/admin 공유 paper/ink primitive
 - ADR-0046: Superseded by ADR-0048
