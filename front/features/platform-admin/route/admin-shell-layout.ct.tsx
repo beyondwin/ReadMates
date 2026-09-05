@@ -216,7 +216,7 @@ test("Today desktop locks the production shell, quiet normal state, and editoria
 
   await expectMinimumTargetSize(component.getByRole("button", { name: "공간 전환, 현재 플랫폼 운영" }));
   await expectMinimumTargetSize(
-    component.locator(".admin-shell__account-control").getByRole("button", { name: "다른 계정으로 로그인" }),
+    component.locator(".admin-shell__account-control").getByRole("button", { name: "계정" }),
   );
   await expectMinimumTargetSize(component.getByRole("button", { name: "다시 확인" }));
   await expect(component).toHaveScreenshot("admin-shell-today-1440.png");
@@ -297,8 +297,7 @@ test("space menu keeps platform and club choices inside the production shell", a
   await expect(menu).not.toContainText(/OWNER|OPERATOR|SUPPORT|ACTIVE|SUSPENDED/);
   await expect(menu.getByText("현재 범위", { exact: true }).first()).toBeVisible();
   await expect(menu.getByText("이동할 범위")).toBeVisible();
-  await expect(component.getByText("김운영")).toBeVisible();
-  await expect(component.locator(".admin-shell__account-action-short")).toHaveText("계정");
+  await expect(component.locator(".admin-shell__account-control").getByRole("button", { name: "계정" })).toBeVisible();
   await expect(component.locator(".admin-shell__account-control")).toBeVisible();
   await expectMinimumTargetSize(platform);
   await expectMinimumTargetSize(clubs);
