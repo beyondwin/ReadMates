@@ -136,6 +136,7 @@ function HostScheduleReviewSession({
   const [previewSnapshot, setPreviewSnapshot] = useState<PreviewSnapshot | null>(null);
   const [receipt, setReceipt] = useState<DurableReceipt | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deferError, setDeferError] = useState<string | null>(null);
   const [authorityRecovery, setAuthorityRecovery] = useState<"idle" | "refreshing" | "failed">("idle");
   const currentSessionRef = useRef(sessionId);
   const transitionOwner = useTransitionSafetyOwner(
@@ -446,17 +447,32 @@ function HostScheduleReviewSession({
 
   const deferReview = async () => {
     if (!workItemKey || deferMutation.isPending) return;
-    setError(null);
+    setDeferError(null);
     try {
-      await deferMutation.mutateAsync({
-        key: workItemKey,
-        deferredUntil: tomorrowMorningIso(),
-      });
-      await queryClient.invalidateQueries({ queryKey: hostWorkboxKeys.scope(context) });
-      await queryClient.invalidateQueries({ queryKey: hostSessionKeys.operatingRoomCurrent(context) });
-      navigate(returnHref);
-    } catch {
-      setError("작업을 보류하지 못했습니다. 다시 시도해 주세요.");
+      await executeAccepted(
+        `host-schedule-review:defer:${workItemKey}`,
+        () => deferMutation.mutateAsync({
+          key: workItemKey,
+          deferredUntil: tomorrowMorningIso(),
+        }),
+        async (_result, handle) => {
+          await publishTransitionAction(handle, "cache", async () => {
+            await queryClient.invalidateQueries({ queryKey: hostWorkboxKeys.scope(context) });
+            await queryClient.invalidateQueries({ queryKey: hostSessionKeys.operatingRoomCurrent(context) });
+          });
+          await publishTransitionAction(handle, "ui", () => {
+            navigate(returnHref);
+          });
+        },
+        async (_requestError, handle) => {
+          await publishTransitionAction(handle, "errorCopy", () => {
+            setDeferError("작업을 보류하지 못했습니다. 다시 시도해 주세요.");
+          });
+        },
+      );
+    } catch (requestError) {
+      if (requestError instanceof TransitionOwnerObsoleteError) return;
+      throw requestError;
     }
   };
 
@@ -486,6 +502,7 @@ function HostScheduleReviewSession({
       requestedChannels={draft.requestedChannels}
       busy={busy}
       error={error}
+      deferError={deferError}
       preview={previewSnapshot?.response ?? null}
       previewPending={previewMutation.isPending}
       confirmBusy={confirmMutation.isPending}

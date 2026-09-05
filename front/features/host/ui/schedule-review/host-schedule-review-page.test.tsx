@@ -149,4 +149,16 @@ describe("HostScheduleReviewPage", () => {
     expect(screen.getByDisplayValue(preview.template.bodyPreview)).toBeVisible();
     expect(screen.getByText("최종 대상")).not.toBeVisible();
   });
+
+  it("keeps send enabled when only a defer error is present", () => {
+    renderPage({
+      deferError: "작업을 보류하지 못했습니다. 다시 시도해 주세요.",
+      onDefer: vi.fn(),
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("작업을 보류하지 못했습니다");
+    expect(screen.getByRole("button", { name: "4명에게 안내 보내기" })).toBeEnabled();
+    expect(screen.getByRole("region", { name: "발송 전 확인" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "미리보기 다시 만들기" })).not.toBeInTheDocument();
+  });
 });

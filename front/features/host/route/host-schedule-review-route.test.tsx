@@ -23,12 +23,23 @@ vi.mock("@/features/host/api/host-api", async (importOriginal) => ({
   confirmManualNotification: vi.fn(),
 }));
 
+vi.mock("@/features/host/api/host-workbox-api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/host/api/host-workbox-api")>()),
+  fetchHostWorkboxPage: vi.fn(),
+  deferHostWorkboxItem: vi.fn(),
+}));
+
 import {
   confirmManualNotification,
   fetchHostSessionDetail,
   fetchManualNotificationOptions,
   previewManualNotification,
 } from "@/features/host/api/host-api";
+import {
+  deferHostWorkboxItem,
+  fetchHostWorkboxPage,
+} from "@/features/host/api/host-workbox-api";
+import type { HostWorkboxPage } from "@/features/host/api/host-workbox-contracts";
 import { hostNotificationKeys } from "@/features/host/queries/host-notification-queries";
 import { hostSessionKeys } from "@/features/host/queries/host-session-queries";
 import { hostWorkboxKeys } from "@/features/host/queries/host-workbox-queries";
@@ -154,6 +165,41 @@ const preview: ManualNotificationPreviewResponse = {
   warnings: [],
 };
 
+const scheduleUnseenKey = "SCHEDULE_UNSEEN:session-7:r7";
+
+function workboxPage(overrides: Partial<HostWorkboxPage> = {}): HostWorkboxPage {
+  return {
+    state: "NOW",
+    evaluatedAt: "2026-08-30T09:00:00Z",
+    sourceAvailability: [
+      { type: "SCHEDULE_UNSEEN", state: "AVAILABLE", failureCode: null },
+      { type: "MEMBER_APPROVAL", state: "AVAILABLE", failureCode: null },
+      { type: "RECORD_CLOSING", state: "AVAILABLE", failureCode: null },
+      { type: "INVITATION_EXPIRY", state: "AVAILABLE", failureCode: null },
+      { type: "NOTIFICATION_FAILURE", state: "AVAILABLE", failureCode: null },
+    ],
+    items: [],
+    nextCursor: null,
+    ...overrides,
+  };
+}
+
+function scheduleUnseenItem(destinationHref = "/app/host/sessions/session-7/schedule-review") {
+  return {
+    key: scheduleUnseenKey,
+    type: "SCHEDULE_UNSEEN" as const,
+    state: "NOW" as const,
+    title: "일정 확인",
+    description: "확인이 필요한 멤버가 있어요.",
+    count: 1,
+    dueAt: null,
+    deferredUntil: null,
+    resolvedAt: null,
+    destinationHref,
+    receiptSummary: null,
+  };
+}
+
 const confirmed: ManualNotificationConfirmResponse = {
   manualDispatchId: "dispatch-7",
   eventId: "event-7",
@@ -182,6 +228,7 @@ function renderRoute(transitionPort?: TransitionSafetyRegistrationPort) {
   }
   render(
     <Routes>
+      <Route path="/clubs/:clubSlug/app/host" element={<p>운영실 홈</p>} />
       <Route
         path="/clubs/:clubSlug/app/host/sessions/:sessionId/schedule-review"
         element={<HostScheduleReviewRoute />}
@@ -205,6 +252,11 @@ beforeEach(() => {
   vi.mocked(fetchManualNotificationOptions).mockReset().mockResolvedValue(options);
   vi.mocked(previewManualNotification).mockReset().mockResolvedValue(preview);
   vi.mocked(confirmManualNotification).mockReset().mockResolvedValue(confirmed);
+  vi.mocked(fetchHostWorkboxPage).mockReset().mockResolvedValue(workboxPage());
+  vi.mocked(deferHostWorkboxItem).mockReset().mockResolvedValue({
+    key: scheduleUnseenKey,
+    deferredUntil: "2026-09-07T00:00:00.000Z",
+  });
 });
 
 describe("HostScheduleReviewRoute", () => {
@@ -534,6 +586,50 @@ describe("HostScheduleReviewRoute", () => {
     expect(storageWrite).not.toHaveBeenCalled();
     await expect(capturedHandle?.reconcile()).resolves.toEqual(expect.objectContaining({ outcome: "authority-lost" }));
     storageWrite.mockRestore();
+  });
+
+  it("defers the matching NOW SCHEDULE_UNSEEN item and returns to the operating room", async () => {
+    vi.mocked(fetchHostWorkboxPage).mockResolvedValue(workboxPage({ items: [scheduleUnseenItem()] }));
+    renderRoute();
+
+    const defer = await screen.findByRole("button", { name: "내일 09:00까지 보류" });
+    expect(defer).toBeEnabled();
+    await userEvent.click(defer);
+
+    await waitFor(() => expect(deferHostWorkboxItem).toHaveBeenCalledWith(
+      scheduleUnseenKey,
+      { deferredUntil: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T.+(Z|[+-]\d{2}:\d{2})$/) },
+      context,
+    ));
+    expect(await screen.findByText("운영실 홈")).toBeVisible();
+  });
+
+  it("keeps defer disabled when the workbox item is missing or targets another session", async () => {
+    vi.mocked(fetchHostWorkboxPage).mockResolvedValue(workboxPage({
+      items: [scheduleUnseenItem("/app/host/sessions/session-9/schedule-review")],
+    }));
+    renderRoute();
+
+    expect(await screen.findByRole("button", { name: "내일 09:00까지 보류" })).toBeDisabled();
+    expect(deferHostWorkboxItem).not.toHaveBeenCalled();
+  });
+
+  it("shows a defer-only alert after a failed defer without blocking preview confirm", async () => {
+    vi.mocked(fetchHostWorkboxPage).mockResolvedValue(workboxPage({ items: [scheduleUnseenItem()] }));
+    vi.mocked(deferHostWorkboxItem).mockRejectedValueOnce(new Error("defer failed"));
+    renderRoute();
+    await screen.findByRole("heading", { name: "일정 미열람 안내" });
+    await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
+    expect(await screen.findByRole("region", { name: "발송 전 확인" })).toBeVisible();
+
+    await userEvent.click(screen.getByRole("button", { name: "내일 09:00까지 보류" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("작업을 보류하지 못했습니다");
+    expect(screen.getByRole("region", { name: "발송 전 확인" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "2명에게 안내 보내기" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "미리보기 다시 만들기" })).not.toBeInTheDocument();
+    expect(deferHostWorkboxItem).toHaveBeenCalledTimes(1);
+    expect(confirmManualNotification).not.toHaveBeenCalled();
   });
 });
 

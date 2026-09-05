@@ -45,6 +45,7 @@ export type HostScheduleReviewPageProps = {
   requestedChannels: ManualNotificationRequestedChannels;
   busy?: boolean;
   error?: string | null;
+  deferError?: string | null;
   preview?: ManualNotificationPreviewResponse | null;
   previewPending?: boolean;
   confirmBusy?: boolean;
@@ -89,6 +90,7 @@ export function HostScheduleReviewPage({
   requestedChannels,
   busy = false,
   error = null,
+  deferError = null,
   preview = null,
   previewPending = false,
   confirmBusy = false,
@@ -362,6 +364,7 @@ export function HostScheduleReviewPage({
               />
             ) : null}
 
+            {deferError ? <p className="rm-schedule-review__error" role="alert">{deferError}</p> : null}
             <div className="rm-schedule-review__actions">
               <button
                 type="button"
