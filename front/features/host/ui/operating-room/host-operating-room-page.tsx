@@ -4,7 +4,11 @@ import type {
   HostOperatingRoomView,
 } from "@/features/host/model/host-operating-room-model";
 import type { HostLinkComponent } from "@/features/host/ui/host-link-types";
-import { CurrentMeetingHeader, type CurrentMeetingHeaderLinks } from "./current-meeting-header";
+import {
+  CurrentMeetingHeader,
+  type CurrentMeetingBadge,
+  type CurrentMeetingHeaderLinks,
+} from "./current-meeting-header";
 import { HostNextAction, type HostNextActionSecondary } from "./host-next-action";
 import { MeetingPhaseTabs, type MeetingPhaseTabLink } from "./meeting-phase-tabs";
 import { PreparationLedger } from "./preparation-ledger";
@@ -31,7 +35,7 @@ const DefaultLink: HostLinkComponent = ({ to, children, ...props }) => (
 
 export type HostOperatingRoomPageProps = {
   view: HostOperatingRoomView;
-  dDayLabel: string | null;
+  badge: CurrentMeetingBadge;
   headerLinks: CurrentMeetingHeaderLinks | null;
   phaseLinks: readonly MeetingPhaseTabLink[];
   phaseNormalizationReason: string | null;
@@ -60,7 +64,7 @@ export type HostOperatingRoomPageProps = {
 
 export function HostOperatingRoomPage({
   view,
-  dDayLabel,
+  badge,
   headerLinks,
   phaseLinks,
   phaseNormalizationReason,
@@ -108,7 +112,7 @@ export function HostOperatingRoomPage({
     <main className="rm-host-operating-room" data-phase={view.phase}>
       <CurrentMeetingHeader
         meeting={view.meeting}
-        dDayLabel={dDayLabel}
+        badge={badge}
         links={headerLinks}
         LinkComponent={LinkComponent}
       />

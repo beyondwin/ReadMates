@@ -68,6 +68,57 @@ export function formatDateOnlyLabel(value: string | null | undefined, fallback =
   return isValidDateOnly(year, month, day) ? dateOnlyLabel(year, month, day) : fallback;
 }
 
+export function formatDateWithWeekday(value: string | null | undefined, fallback = "날짜 미정") {
+  const text = displayText(value, fallback);
+  if (text === fallback) {
+    return fallback;
+  }
+
+  const match = DATE_ONLY_PATTERN.exec(text);
+  if (!match) {
+    return fallback;
+  }
+
+  const [, year, month, day] = match;
+  if (!isValidDateOnly(year, month, day)) {
+    return fallback;
+  }
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    month: "long",
+    day: "numeric",
+    weekday: "long",
+  }).format(new Date(`${year}-${month}-${day}T12:00:00+09:00`));
+}
+
+const CLOCK_TIME_PATTERN = /^(\d{1,2}):(\d{2})$/;
+
+export function formatKoreanTime(value: string | null | undefined, fallback = "시간 미정") {
+  const text = displayText(value, fallback);
+  if (text === fallback) {
+    return fallback;
+  }
+
+  const match = CLOCK_TIME_PATTERN.exec(text);
+  if (!match) {
+    return fallback;
+  }
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) {
+    return fallback;
+  }
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(`1970-01-01T${String(hour).padStart(2, "0")}:${match[2]}:00+09:00`));
+}
+
 export function formatDateTimeLabel(
   value: string | null | undefined,
   fallback = "시간 미정",

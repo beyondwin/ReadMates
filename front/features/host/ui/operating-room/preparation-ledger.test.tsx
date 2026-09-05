@@ -71,7 +71,7 @@ describe("PreparationLedger", () => {
 
     expect(region.querySelector("svg[data-icon='calendar']")).not.toBeNull();
     expect(region.querySelector("svg[data-icon='people']")).not.toBeNull();
-    expect(region.querySelector("svg[data-icon='chat']")).not.toBeNull();
+    expect(region.querySelector("svg[data-icon='notes']")).not.toBeNull();
     expect(region.querySelector("svg[data-icon='pin']")).not.toBeNull();
     expect(items.map((item) => item.querySelector("[data-prep-index]")?.textContent)).toEqual([
       "01",

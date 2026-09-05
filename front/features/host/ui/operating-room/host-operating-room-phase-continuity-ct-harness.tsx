@@ -44,11 +44,12 @@ export function OperatingRoomPhaseContinuityStory() {
   return (
     <HostOperatingRoomPage
       view={{ ...view, phase }}
-      dDayLabel="D-1"
+      badge={{ kind: "dday", label: "D-1" }}
       headerLinks={{
         infoHref: "/clubs/public-safe/app/host/sessions/public-safe-session-27?section=basic",
         scheduleHref: "/clubs/public-safe/app/host/sessions/public-safe-session-27?section=basic&edit=1",
         historyHref: "/clubs/public-safe/app/host/sessions/public-safe-session-27?section=history",
+        previewHref: null,
         memberViewHref: "/clubs/public-safe/app/sessions/public-safe-session-27",
       }}
       phaseLinks={phaseLinks}

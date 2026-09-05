@@ -14,6 +14,20 @@ type BookCoverProps = {
   decorative?: boolean;
 };
 
+function safeCoverImageUrl(value: string | null | undefined): string | null {
+  const httpsUrl = safeExternalHttpsUrl(value);
+  if (httpsUrl) {
+    return httpsUrl;
+  }
+
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//") || trimmed.includes("\\")) {
+    return null;
+  }
+
+  return trimmed;
+}
+
 export function BookCover({
   title,
   author,
@@ -25,7 +39,7 @@ export function BookCover({
 }: BookCoverProps) {
   const safeTitle = displayText(title, "도서 제목 미정");
   const safeAuthor = displayText(author, "저자 미상");
-  const normalizedImageUrl = safeExternalHttpsUrl(imageUrl) ?? "";
+  const normalizedImageUrl = safeCoverImageUrl(imageUrl) ?? "";
   const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
   const shouldRenderImage = normalizedImageUrl.length > 0 && failedImageUrl !== normalizedImageUrl;
   const coverClassName = className ? `rm-book-cover m-cover ${className}` : "rm-book-cover m-cover";
@@ -41,6 +55,7 @@ export function BookCover({
     >
       {shouldRenderImage ? (
         <img
+          className="rm-book-cover__image"
           src={normalizedImageUrl}
           alt={decorative ? "" : `${safeTitle} 표지`}
           onError={() => setFailedImageUrl(normalizedImageUrl)}

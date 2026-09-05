@@ -1,7 +1,6 @@
 import type { ComponentType, ReactNode } from "react";
 import type { HostNextActionView } from "@/features/host/model/host-operating-room-model";
 import { ReadmatesIcon } from "@/shared/ui/icon";
-import { OperatingRoomGlyph } from "./operating-room-glyph";
 import "./operating-room.css";
 
 type NextActionLinkProps = {
@@ -81,7 +80,7 @@ export function HostNextAction({
               to={secondaryAction.href}
               className="rm-operating-room-next-action__secondary"
             >
-              <OperatingRoomGlyph name="list" />
+              <ReadmatesIcon name="list" size={16} />
               {secondaryAction.label}
             </LinkComponent>
           ) : null}

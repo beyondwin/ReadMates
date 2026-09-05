@@ -25,6 +25,7 @@ import {
   HostOperatingRoomPage,
   type AttendanceRecoveryView,
 } from "./host-operating-room-page";
+import type { CurrentMeetingBadge } from "./current-meeting-header";
 import {
   HOST_BODY_DESKTOP_GEOMETRY as BODY_DESKTOP_GEOMETRY,
   HOST_CT_LIVE_MOBILE_BOARD_GEOMETRY as CT_LIVE_MOBILE_BOARD_GEOMETRY,
@@ -207,11 +208,12 @@ function operatingRoomFixture(
   return (
     <HostOperatingRoomPage
       view={view}
-      dDayLabel="D-1"
+      badge={{ kind: "dday", label: "D-1" }}
       headerLinks={{
         infoHref: "/clubs/public-safe/app/host/sessions/public-safe-session-27?section=basic",
         scheduleHref: "/clubs/public-safe/app/host/sessions/public-safe-session-27?section=basic&edit=1",
         historyHref: "/clubs/public-safe/app/host/sessions/public-safe-session-27?section=history",
+        previewHref: null,
         memberViewHref: "/clubs/public-safe/app/sessions/public-safe-session-27",
       }}
       phaseLinks={phaseLinks}
@@ -457,6 +459,7 @@ const approvedHeaderLinks = {
   infoHref: "/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=basic",
   scheduleHref: "/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=basic&edit=1",
   historyHref: "/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=history",
+  previewHref: null as string | null,
   memberViewHref: "/clubs/reading-sai/app/sessions/public-safe-session-27",
 };
 
@@ -524,7 +527,7 @@ function phaseStatusLedger(
 
 function approvedOperatingRoom(input: {
   phase: HostOperatingRoomView["phase"];
-  dDayLabel: string;
+  badge: CurrentMeetingBadge;
   nextAction: HostOperatingRoomView["nextAction"];
   nextActionSecondary?: { href: string; label: string };
   liveContent?: ReactNode;
@@ -595,8 +598,13 @@ function approvedOperatingRoom(input: {
     <HostApprovedShell destination="operating-room">
       <HostOperatingRoomPage
         view={view}
-        dDayLabel={input.dDayLabel}
-        headerLinks={approvedHeaderLinks}
+        badge={input.badge}
+        headerLinks={{
+          ...approvedHeaderLinks,
+          previewHref: input.phase === "closing"
+            ? "/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=records"
+            : null,
+        }}
         phaseLinks={approvedPhaseLinks}
         phaseNormalizationReason={null}
         optionalFailureMessages={[]}
@@ -711,7 +719,7 @@ function approvedLiveContent() {
 function prepApprovedView() {
   return approvedOperatingRoom({
     phase: "prep",
-    dDayLabel: "D-3",
+    badge: { kind: "dday", label: "D-3" },
     nextAction: {
       kind: "schedule-seen",
       state: "actionable",
@@ -726,10 +734,10 @@ function prepApprovedView() {
   });
 }
 
-function liveApprovedView() {
+function liveApprovedView(badge: CurrentMeetingBadge = { kind: "today", label: "오늘" }) {
   return approvedOperatingRoom({
     phase: "live",
-    dDayLabel: "오늘",
+    badge,
     nextAction: {
       kind: "attendance",
       state: "actionable",
@@ -753,7 +761,7 @@ function liveApprovedView() {
 function closingApprovedView() {
   return approvedOperatingRoom({
     phase: "closing",
-    dDayLabel: "D+1",
+    badge: { kind: "dday", label: "D+1" },
     nextAction: {
       kind: "closing",
       state: "actionable",
@@ -843,13 +851,14 @@ test("prep locks the approved desktop operating room", async ({ mount, page }) =
   const prepIcons = component.getByRole("region", { name: "준비 현황" });
   await expect(prepIcons.locator("svg[data-icon='calendar']")).toBeVisible();
   await expect(prepIcons.locator("svg[data-icon='people']")).toBeVisible();
-  await expect(prepIcons.locator("svg[data-icon='chat']")).toBeVisible();
+  await expect(prepIcons.locator("svg[data-icon='notes']")).toBeVisible();
   await expect(prepIcons.locator("svg[data-icon='pin']")).toBeVisible();
   const headerActions = component.getByRole("navigation", { name: "현재 모임 작업" });
   await expect(headerActions.locator("svg[data-icon='info']")).toBeVisible();
   await expect(headerActions.locator("svg[data-icon='edit']")).toBeVisible();
   await expect(headerActions.locator("svg[data-icon='history']")).toBeVisible();
-  await expect(headerActions.locator("svg[data-icon='eye']")).toBeVisible();
+  await expect(headerActions.locator("svg[data-icon='eye']")).toHaveCount(0);
+  await expect(headerActions).not.toContainText("멤버 시야");
   const workboxTitle = workbox.getByRole("heading", { name: "작업함" });
   await expect(workboxTitle).toBeVisible();
   expect(await workboxTitle.evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize))).toBeGreaterThan(10);
@@ -978,7 +987,7 @@ test("live locks the approved mobile attendance board", async ({ mount, page }) 
   const component = await mountApproved(
     mount,
     page,
-    liveApprovedView(),
+    liveApprovedView({ kind: "live", label: "진행 중" }),
     APPROVED_MOBILE_VIEWPORT,
   );
   await expect(component.getByRole("button", { name: /참석|출석/ }).first()).toBeVisible();
@@ -1045,7 +1054,7 @@ test("empty operating room primary stays readable without a phase overlay", asyn
         partialFailures: [],
         closing: null,
       }}
-      dDayLabel={null}
+      badge={null}
       headerLinks={null}
       phaseLinks={[]}
       phaseNormalizationReason={null}

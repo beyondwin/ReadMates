@@ -1,8 +1,9 @@
 import type { ComponentType, ReactNode } from "react";
 import type { CurrentMeetingHeaderView } from "@/features/host/model/host-operating-room-model";
+import type { ReadmatesIconName } from "@/shared/ui/icon";
+import { ReadmatesIcon } from "@/shared/ui/icon";
 import { BookCover } from "@/shared/ui/book-cover";
-import { displayText, formatDateOnlyLabel } from "@/shared/ui/readmates-display";
-import { OperatingRoomGlyph, type OperatingRoomGlyphName } from "./operating-room-glyph";
+import { displayText, formatDateWithWeekday, formatKoreanTime } from "@/shared/ui/readmates-display";
 import "./operating-room.css";
 
 export type CurrentMeetingHeaderMeeting = Omit<
@@ -22,18 +23,27 @@ export type CurrentMeetingHeaderLinks = {
   infoHref: string;
   scheduleHref: string;
   historyHref: string;
-  memberViewHref: string;
+  previewHref: string | null;
+  memberViewHref?: string;
 };
+
+export type CurrentMeetingBadge =
+  | { kind: "dday"; label: string }
+  | { kind: "today"; label: "오늘" }
+  | { kind: "live"; label: "진행 중" }
+  | { kind: "closing"; label: string }
+  | null;
 
 type MeetingHeaderLinkProps = {
   to: string;
   className?: string;
+  "aria-label"?: string;
   children: ReactNode;
 };
 
 export type CurrentMeetingHeaderProps = {
   meeting: CurrentMeetingHeaderMeeting;
-  dDayLabel: string | null;
+  badge: CurrentMeetingBadge;
   links: CurrentMeetingHeaderLinks;
   LinkComponent?: ComponentType<MeetingHeaderLinkProps>;
 };
@@ -42,34 +52,22 @@ const DefaultLink: ComponentType<MeetingHeaderLinkProps> = ({ to, children, ...p
   <a {...props} href={to}>{children}</a>
 );
 
-function meetingTimeLabel(startTime: string | null, endTime: string | null): string {
-  const start = startTime?.trim() ?? "";
-  const end = endTime?.trim() ?? "";
-
-  if (start && end) return `${start}–${end}`;
-  return start || end || "시간 미정";
-}
-
 export function CurrentMeetingHeader({
   meeting,
-  dDayLabel,
+  badge,
   links,
   LinkComponent = DefaultLink,
 }: CurrentMeetingHeaderProps) {
-  const title = displayText(meeting.title, "모임 제목 미정");
-  const bookTitle = displayText(meeting.bookTitle, "도서 제목 미정");
-  const bookAuthor = displayText(meeting.bookAuthor, "저자 미상");
-  const dateLabel = formatDateOnlyLabel(meeting.date, "날짜 미정");
-  const timeLabel = meetingTimeLabel(meeting.startTime, meeting.endTime);
+  const title = displayText(meeting.bookTitle, displayText(meeting.title, "모임 제목 미정"));
+  const kicker = [displayText(meeting.title, ""), displayText(meeting.bookAuthor, "")].filter(Boolean).join(" · ");
   const placeLabel = displayText(meeting.locationLabel, "장소 미정");
-  const normalizedDday = dDayLabel?.trim() || null;
-
   const actions = [
-    { label: "모임 정보", href: links.infoHref, glyph: "info" as OperatingRoomGlyphName },
-    { label: "일정 편집", href: links.scheduleHref, glyph: "edit" as OperatingRoomGlyphName },
-    { label: "변경 이력", href: links.historyHref, glyph: "history" as OperatingRoomGlyphName },
-    { label: "멤버 시야", href: links.memberViewHref, glyph: "eye" as OperatingRoomGlyphName },
-  ] as const;
+    { label: "모임 정보", href: links.infoHref, icon: "info" as const },
+    links.previewHref
+      ? { label: "기록 미리보기", href: links.previewHref, icon: "document" as const }
+      : { label: "일정 편집", href: links.scheduleHref, icon: "edit" as const },
+    { label: "변경 이력", href: links.historyHref, icon: "history" as const },
+  ] satisfies ReadonlyArray<{ label: string; href: string; icon: ReadmatesIconName }>;
 
   return (
     <header
@@ -90,33 +88,40 @@ export function CurrentMeetingHeader({
       <div className="rm-operating-room-header__identity">
         <div className="rm-operating-room-header__title-row">
           <h1 className="h1 editorial rm-operating-room-header__title">{title}</h1>
-          {normalizedDday ? (
-            <span className="rm-operating-room-header__dday mono">{normalizedDday}</span>
+          {badge ? (
+            <span className="rm-operating-room-header__lifecycle" data-badge={badge.kind}>
+              {badge.label}
+            </span>
           ) : null}
-          <span className="rm-operating-room-header__lifecycle">
-            <span aria-hidden="true" className="rm-operating-room-header__lifecycle-mark" />
-            {meeting.lifecycleLabel}
-          </span>
         </div>
-        <p className="rm-operating-room-header__book">
-          {bookTitle} · {bookAuthor}
-        </p>
+        {kicker ? <p className="rm-operating-room-header__kicker">{kicker}</p> : null}
       </div>
 
       <ul className="rm-operating-room-header__facts" aria-label="모임 일정과 장소">
         <li>
-          <span className="rm-operating-room-header__fact-label">날짜</span>
-          <time dateTime={meeting.date?.trim() || undefined}>{dateLabel}</time>
+          <ReadmatesIcon name="calendar" size={16} />
+          <time dateTime={meeting.date ?? undefined}>{formatDateWithWeekday(meeting.date, "날짜 미정")}</time>
         </li>
         <li>
-          <span className="rm-operating-room-header__fact-label">시간</span>
-          <span className="mono">{timeLabel}</span>
+          <ReadmatesIcon name="clock" size={16} />
+          <span>{formatKoreanTime(meeting.startTime, "시간 미정")}</span>
         </li>
         <li>
-          <span className="rm-operating-room-header__fact-label">장소</span>
+          <ReadmatesIcon name="pin" size={16} />
           <span>{placeLabel}</span>
         </li>
       </ul>
+
+      {links.memberViewHref ? (
+        <LinkComponent
+          to={links.memberViewHref}
+          className="rm-operating-room-header__member-view"
+          aria-label="멤버 시야"
+        >
+          <ReadmatesIcon name="eye" size={16} />
+          멤버 시야
+        </LinkComponent>
+      ) : null}
 
       <nav className="rm-operating-room-header__actions" aria-label="현재 모임 작업">
         {actions.map((action) => (
@@ -125,7 +130,7 @@ export function CurrentMeetingHeader({
             to={action.href}
             className="rm-operating-room-header__action"
           >
-            <OperatingRoomGlyph name={action.glyph} />
+            <ReadmatesIcon name={action.icon} size={16} />
             {action.label}
           </LinkComponent>
         ))}

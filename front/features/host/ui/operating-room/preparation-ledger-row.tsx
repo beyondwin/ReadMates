@@ -1,6 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
 import type { PreparationLedgerRowView, PreparationRowId } from "@/features/host/model/host-operating-room-model";
-import { OperatingRoomGlyph, type OperatingRoomGlyphName } from "./operating-room-glyph";
+import type { ReadmatesIconName } from "@/shared/ui/icon";
+import { ReadmatesIcon } from "@/shared/ui/icon";
 
 export type PreparationLedgerLinkProps = {
   to: string;
@@ -27,10 +28,10 @@ const rowStateLabels: Record<PreparationLedgerRowView["state"], string> = {
   unavailable: "불러오지 못함",
 };
 
-const rowGlyphs: Record<PreparationRowId, OperatingRoomGlyphName> = {
+const rowGlyphs: Record<PreparationRowId, ReadmatesIconName> = {
   "schedule-seen": "calendar",
   rsvp: "people",
-  questions: "chat",
+  questions: "notes",
   place: "pin",
 };
 
@@ -52,7 +53,7 @@ export function PreparationLedgerRow({
             {String(index + 1).padStart(2, "0")}
           </span>
         ) : null}
-        <OperatingRoomGlyph name={rowGlyphs[row.id]} />
+        <ReadmatesIcon name={rowGlyphs[row.id]} size={16} />
         {row.label}
       </span>
       <span className="rm-preparation-ledger-row__value">{row.value}</span>

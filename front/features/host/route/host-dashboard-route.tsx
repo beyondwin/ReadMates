@@ -72,6 +72,7 @@ import {
   HostOperatingRoomPage,
   type AttendanceRecoveryView,
 } from "@/features/host/ui/operating-room/host-operating-room-page";
+import type { CurrentMeetingBadge } from "@/features/host/ui/operating-room/current-meeting-header";
 import { PhaseStatusLedger } from "@/features/host/ui/operating-room/phase-status-ledger";
 import { useOperatingRoomCompactViewport } from "@/features/host/ui/operating-room/use-operating-room-compact-viewport";
 import { HostWorkbox } from "@/features/host/ui/workbox/host-workbox";
@@ -616,11 +617,14 @@ export function HostDashboardRoute({
     infoHref: hostSessionHref(paths.hostBasePath, view.meeting.sessionId, "?section=basic"),
     scheduleHref: hostSessionHref(paths.hostBasePath, view.meeting.sessionId, "?section=basic&edit=1"),
     historyHref: hostSessionHref(paths.hostBasePath, view.meeting.sessionId, "?section=history"),
+    previewHref: view.phase === "closing"
+      ? hostSessionHref(paths.hostBasePath, view.meeting.sessionId, "?section=records")
+      : null,
     memberViewHref: `${paths.appBasePath}/sessions/${encodeURIComponent(view.meeting.sessionId)}`,
   } : null;
   const phaseLinks = view.phases.map((phase) => ({ ...phase, href: phaseHref(phase.id) }));
-  const dDayLabel = view.meeting
-    ? formatSessionKicker(view.meeting.sessionNumber, view.meeting.date).split(" · ")[1] ?? null
+  const badge = view.meeting
+    ? currentMeetingBadge(view.phase, view.meeting, compactViewport)
     : null;
   const loadedWorkboxPage = useMemo(
     () => mergeCoherentWorkboxPages(
@@ -745,7 +749,7 @@ export function HostDashboardRoute({
   return (
     <HostOperatingRoomPage
       view={view}
-      dDayLabel={dDayLabel}
+      badge={badge}
       headerLinks={headerLinks}
       phaseLinks={phaseLinks}
       phaseNormalizationReason={phaseReasonFromState(location.state)}
@@ -911,6 +915,21 @@ function hostRoutePaths(clubSlug: string): HostRoutePaths {
     hostBasePath,
     newMeetingHref: `${hostBasePath}/sessions/new`,
   };
+}
+
+function currentMeetingBadge(
+  phase: HostMeetingPhase,
+  meeting: { sessionNumber: number; date: string | null },
+  compactViewport: boolean,
+): CurrentMeetingBadge {
+  if (phase === "live") {
+    return compactViewport
+      ? { kind: "live", label: "진행 중" }
+      : { kind: "today", label: "오늘" };
+  }
+
+  const dday = formatSessionKicker(meeting.sessionNumber, meeting.date ?? "").split(" · ")[1] ?? null;
+  return dday ? { kind: "dday", label: dday } : null;
 }
 
 function hostSessionHref(hostBasePath: string, sessionId: string, suffix = ""): string {

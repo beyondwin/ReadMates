@@ -5,10 +5,10 @@ import { CurrentMeetingHeader, type CurrentMeetingHeaderProps } from "./current-
 const meeting: CurrentMeetingHeaderProps["meeting"] = {
   sessionId: "session-27",
   sessionNumber: 27,
-  title: "지구 끝의 온실",
+  title: "스물여덟 번째 모임",
   bookTitle: "지구 끝의 온실",
   bookAuthor: "김초엽",
-  bookImageUrl: null,
+  bookImageUrl: "/covers/x.webp",
   date: "2026-09-01",
   startTime: "19:30",
   endTime: "21:30",
@@ -19,38 +19,66 @@ const meeting: CurrentMeetingHeaderProps["meeting"] = {
 };
 
 const links: CurrentMeetingHeaderProps["links"] = {
-  infoHref: "/clubs/reading-sai/app/host/sessions/session-27?section=basic",
-  scheduleHref: "/clubs/reading-sai/app/host/sessions/session-27?section=basic&edit=1",
-  historyHref: "/clubs/reading-sai/app/host/sessions/session-27?section=history",
-  memberViewHref: "/clubs/reading-sai/app/sessions/session-27",
+  infoHref: "/i",
+  scheduleHref: "/s",
+  historyHref: "/h",
+  previewHref: null,
 };
 
 describe("CurrentMeetingHeader", () => {
-  it("keeps the selected meeting identity and all route-owned destinations discoverable", () => {
-    render(<CurrentMeetingHeader meeting={meeting} dDayLabel="D-3" links={links} />);
+  it("uses the book title as h1, meeting title as kicker, icon facts, and three actions without member view", () => {
+    render(
+      <CurrentMeetingHeader
+        meeting={meeting}
+        badge={{ kind: "dday", label: "D-3" }}
+        links={links}
+      />,
+    );
 
-    const header = screen.getByRole("group", { name: "현재 모임" });
-    expect(header).toHaveAttribute("data-lifecycle", "OPEN");
-    expect(within(header).getByRole("heading", { level: 1, name: "지구 끝의 온실" })).toBeVisible();
-    expect(within(header).getByText("지구 끝의 온실 · 김초엽", { exact: true })).toBeVisible();
-    expect(within(header).getByText("D-3")).toBeVisible();
-    expect(within(header).getByText("준비 중")).toBeVisible();
-    expect(within(header).getByText("2026.09.01")).toHaveAttribute("datetime", "2026-09-01");
-    expect(within(header).getByText("19:30–21:30")).toBeVisible();
-    expect(within(header).getByText("을지로 북살롱")).toBeVisible();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("지구 끝의 온실");
+    expect(screen.getByText(/스물여덟 번째 모임/)).toBeTruthy();
+    expect(screen.getByRole("img", { name: /지구 끝의 온실/ })).toBeTruthy();
+    expect(screen.getByRole("list", { name: "모임 일정과 장소" }).querySelectorAll("[data-icon]")).toHaveLength(3);
+    const actions = within(screen.getByRole("navigation", { name: "현재 모임 작업" })).getAllByRole("link");
+    expect(actions.map((a) => a.textContent)).toEqual(["모임 정보", "일정 편집", "변경 이력"]);
+    expect(screen.getByText("D-3")).toBeTruthy();
+    expect(screen.getByText("9월 1일 화요일")).toHaveAttribute("datetime", "2026-09-01");
+    expect(screen.getByText("오후 7:30")).toBeTruthy();
+    expect(screen.queryByText(/21:30/)).not.toBeInTheDocument();
+    expect(screen.queryByText("준비 중")).not.toBeInTheDocument();
+    expect(within(screen.getByRole("navigation", { name: "현재 모임 작업" })).queryByRole("link", { name: "멤버 시야" })).not.toBeInTheDocument();
+  });
 
-    const actions = within(header).getByRole("navigation", { name: "현재 모임 작업" });
-    expect(within(actions).getByRole("link", { name: "모임 정보" })).toHaveAttribute("href", links.infoHref);
-    expect(within(actions).getByRole("link", { name: "일정 편집" })).toHaveAttribute("href", links.scheduleHref);
-    expect(within(actions).getByRole("link", { name: "변경 이력" })).toHaveAttribute("href", links.historyHref);
-    expect(within(actions).getByRole("link", { name: "멤버 시야" })).toHaveAttribute("href", links.memberViewHref);
-    expect(actions.querySelector("svg[data-icon='info']")).not.toBeNull();
-    expect(actions.querySelector("svg[data-icon='edit']")).not.toBeNull();
-    expect(actions.querySelector("svg[data-icon='history']")).not.toBeNull();
-    expect(actions.querySelector("svg[data-icon='eye']")).not.toBeNull();
-    const cover = header.querySelector(".rm-operating-room-header__cover .rm-book-cover");
-    expect(cover).not.toBeNull();
-    expect(cover?.querySelector(".rm-book-cover__fallback")).not.toBeNull();
+  it("shows 기록 미리보기 when previewHref is given", () => {
+    render(
+      <CurrentMeetingHeader
+        meeting={meeting}
+        badge={{ kind: "dday", label: "D+1" }}
+        links={{ ...links, previewHref: "/p" }}
+      />,
+    );
+
+    const actions = within(screen.getByRole("navigation", { name: "현재 모임 작업" })).getAllByRole("link");
+    expect(actions.map((a) => a.textContent)).toEqual(["모임 정보", "기록 미리보기", "변경 이력"]);
+    expect(actions[1]).toHaveAttribute("href", "/p");
+    expect(actions[1].querySelector("[data-icon='document']")).not.toBeNull();
+  });
+
+  it("places optional member view outside desktop actions", () => {
+    render(
+      <CurrentMeetingHeader
+        meeting={meeting}
+        badge={{ kind: "live", label: "진행 중" }}
+        links={{ ...links, memberViewHref: "/m" }}
+      />,
+    );
+
+    const memberView = screen.getByRole("link", { name: "멤버 시야" });
+    expect(memberView).toHaveClass("rm-operating-room-header__member-view");
+    expect(memberView).toHaveAttribute("href", "/m");
+    expect(memberView.querySelector("[data-icon='eye']")).not.toBeNull();
+    expect(screen.getByText("진행 중").closest("[data-badge]")).toHaveAttribute("data-badge", "live");
+    expect(within(screen.getByRole("navigation", { name: "현재 모임 작업" })).queryByRole("link", { name: "멤버 시야" })).not.toBeInTheDocument();
   });
 
   it("renders the established cover fallback and explicit labels for partial meeting fields", () => {
@@ -67,7 +95,7 @@ describe("CurrentMeetingHeader", () => {
           endTime: "",
           locationLabel: "",
         }}
-        dDayLabel={null}
+        badge={null}
         links={links}
       />,
     );

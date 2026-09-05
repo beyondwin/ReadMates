@@ -1,6 +1,7 @@
 import type { HostLinkComponent } from "@/features/host/ui/host-link-types";
 import type { PhaseStatusLedgerRowView } from "@/features/host/model/host-operating-room-model";
-import { OperatingRoomGlyph, type OperatingRoomGlyphName } from "./operating-room-glyph";
+import type { ReadmatesIconName } from "@/shared/ui/icon";
+import { ReadmatesIcon } from "@/shared/ui/icon";
 import "./operating-room.css";
 
 const DefaultLink: HostLinkComponent = ({ to, children, ...props }) => (
@@ -47,7 +48,7 @@ export function PhaseStatusLedger({
                     {index + 1}
                   </span>
                 ) : glyph ? (
-                  <OperatingRoomGlyph name={glyph} />
+                  <ReadmatesIcon name={glyph} size={16} />
                 ) : null}
                 {row.label}
               </span>
@@ -72,7 +73,7 @@ export function PhaseStatusLedger({
   );
 }
 
-function liveGlyph(label: string): OperatingRoomGlyphName | null {
+function liveGlyph(label: string): ReadmatesIconName | null {
   if (label === "실제 출석") return "person";
   if (label === "참석 응답") return "people";
   if (label === "진행 순서") return "list";

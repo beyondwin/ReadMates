@@ -658,10 +658,13 @@ describe("HostDashboardRoute", () => {
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7?section=basic&edit=1",
     );
+    const headerActions = screen.getByRole("navigation", { name: "현재 모임 작업" });
+    expect(within(headerActions).queryByRole("link", { name: "멤버 시야" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "멤버 시야" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/sessions/session-7",
     );
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("파도와 바람의 기록");
     expect(screen.getByRole("link", { name: "출석 확인 시작" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7?section=attendance",
@@ -696,6 +699,7 @@ describe("HostDashboardRoute", () => {
     expect(await screen.findByRole("region", { name: "현장 현황" })).toBeVisible();
     expect(screen.queryByRole("region", { name: "출석 확인" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "모임 진행 보기" })).toBeVisible();
+    expect(screen.getByText("오늘").closest("[data-badge]")).toHaveAttribute("data-badge", "today");
   });
 
   it("does not render a live undo bar from GET attendance when there is no write receipt", async () => {
@@ -746,6 +750,10 @@ describe("HostDashboardRoute", () => {
     expect(checklist).toHaveTextContent("출석 확정");
     expect(checklist).toHaveTextContent("기록 초안");
     expect(screen.getByRole("region", { name: "다음에 할 일" })).toHaveTextContent("기록 패키지 검토");
+    expect(screen.getByRole("link", { name: "기록 미리보기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-7?section=records",
+    );
     expect(screen.getByRole("link", { name: "기록 초안 검토" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/records",
@@ -790,6 +798,7 @@ describe("HostDashboardRoute", () => {
 
     expect(await screen.findByRole("region", { name: "출석 확인" })).toBeVisible();
     expect(screen.getByText("실제 출석 1 / 2 · 확인 필요 1")).toBeVisible();
+    expect(screen.getByText("진행 중").closest("[data-badge]")).toHaveAttribute("data-badge", "live");
     expect(screen.getByRole("link", { name: "출석 2명 모두 보기" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7?section=attendance",
@@ -966,7 +975,7 @@ describe("HostDashboardRoute", () => {
     routeMocks.updateAttendance.mockResolvedValue({ changeReceipt: null });
     await act(async () => router.revalidate());
 
-    await screen.findByRole("heading", { name: "여덟 번째 독서모임" });
+    await screen.findByText(/여덟 번째 독서모임/);
     expect(screen.queryByRole("alert", { name: "출석 변경 충돌" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "내 선택으로 다시 저장" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "지후 참석" })).not.toBeInTheDocument();

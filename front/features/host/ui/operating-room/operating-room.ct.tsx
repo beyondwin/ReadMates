@@ -39,6 +39,7 @@ const links = {
   infoHref: "/clubs/reading-sai/app/host/sessions/session-27?section=basic",
   scheduleHref: "/clubs/reading-sai/app/host/sessions/session-27?section=basic&edit=1",
   historyHref: "/clubs/reading-sai/app/host/sessions/session-27?section=history",
+  previewHref: null,
   memberViewHref: "/clubs/reading-sai/app/sessions/session-27",
 };
 
@@ -116,7 +117,7 @@ function fixture(
 ) {
   return (
     <main className="rm-operating-room-ct-shell">
-      <CurrentMeetingHeader meeting={meeting} dDayLabel="D-3" links={links} />
+      <CurrentMeetingHeader meeting={meeting} badge={{ kind: "dday", label: "D-3" }} links={links} />
       <MeetingPhaseTabs phases={phases} currentPhase={currentPhase} />
       <section id="host-operating-room-phase-panel" aria-label="선택한 운영 단계">
         선택한 단계 내용
@@ -134,10 +135,10 @@ for (const viewport of [
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     const component = await mount(fixture(longMeeting));
 
-    await expect(component.getByRole("heading", { level: 1 })).toContainText("경계가 긴 한글 모임 제목");
+    await expect(component.getByRole("heading", { level: 1 })).toContainText(LONG_BOOK_TITLE);
     await expect(component.locator(".rm-book-cover__fallback")).toBeVisible();
-    await expect(component.locator(".rm-operating-room-header__book")).toHaveText(
-      `${LONG_BOOK_TITLE} · ${LONG_BOOK_AUTHOR}`,
+    await expect(component.locator(".rm-operating-room-header__kicker")).toHaveText(
+      `${longMeeting.title} · ${LONG_BOOK_AUTHOR}`,
     );
     await expect(component.getByText("출석을 확정하고 모임을 마친 뒤 사용할 수 있습니다.")).toBeAttached();
     await expectNoHorizontalOverflow(page);
@@ -174,10 +175,10 @@ test("meeting context stays usable at the 200 percent zoom proxy", async ({ moun
   await page.setViewportSize({ width: 320, height: 700 });
   const component = await mount(fixture(longMeeting));
 
-  await expect(component.getByRole("navigation", { name: "현재 모임 작업" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "멤버 시야" })).toBeVisible();
   await expect(component.getByRole("tablist", { name: "모임 운영 단계" })).toBeVisible();
-  await expect(component.locator(".rm-operating-room-header__book")).toHaveText(
-    `${LONG_BOOK_TITLE} · ${LONG_BOOK_AUTHOR}`,
+  await expect(component.locator(".rm-operating-room-header__kicker")).toHaveText(
+    `${longMeeting.title} · ${LONG_BOOK_AUTHOR}`,
   );
   await expectNoHorizontalOverflow(page);
   await expectReducedMotion(page);
