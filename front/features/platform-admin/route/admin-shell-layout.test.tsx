@@ -361,6 +361,21 @@ describe("AdminShellLayout", () => {
     expect(screen.queryByText("도메인 조치")).not.toBeInTheDocument();
   });
 
+  it("shows the alarm sentence in the header with a check icon and hides login copy", () => {
+    renderShell("/admin/today", {
+      operations: {
+        ...quietOperations,
+        counts: { open: 3, critical: 0, assignedToMe: 0, snoozed: 0 },
+      },
+    });
+    const status = screen.getByText("서비스는 정상이며, 확인할 일이 3건 있습니다.").closest(".admin-shell__status")!;
+    expect(status.querySelector('[data-icon="check-circle"]')).toBeTruthy();
+    expect(within(screen.getByRole("banner")).queryByText("다른 계정으로 로그인")).toBeNull();
+    expect(
+      within(screen.getByRole("banner")).getByRole("button", { name: "계정" }).querySelector('[data-icon="person-circle"]'),
+    ).toBeTruthy();
+  });
+
   it("keeps the account and space controls in the header while exposing four mobile operating jobs", () => {
     vi.stubGlobal(
       "matchMedia",
@@ -394,7 +409,8 @@ describe("AdminShellLayout", () => {
     expect(within(mobileNav).queryByRole("link", { name: "긴급 공개 회수" })).not.toBeInTheDocument();
     expect(within(mobileNav).queryByText("플랫폼 운영")).not.toBeInTheDocument();
     expect(within(mobileNav).queryByText("다른 계정으로 로그인")).not.toBeInTheDocument();
-    expect(screen.getAllByText("OWNER admin", { selector: ".admin-shell__account-label" })).toHaveLength(1);
+    expect(within(screen.getByRole("banner")).getByRole("button", { name: "계정" })).toBeInTheDocument();
+    expect(screen.queryByText("OWNER admin", { selector: ".admin-shell__account-label" })).not.toBeInTheDocument();
   });
 
   it("uses one pathname-owned current state for emergency even when onboarding is present", () => {
@@ -483,7 +499,9 @@ describe("AdminShellLayout", () => {
     expect(screen.getByRole("link", { name: "오늘 할 일" })).toBeInTheDocument();
     expect(document.querySelector(".admin-command-status")).toBeNull();
     await waitFor(() => {
-      expect(screen.getByRole("status")).toHaveTextContent("신호 확인 불가");
+      const status = document.querySelector(".admin-shell__status");
+      expect(status).toHaveTextContent("신호 확인 불가");
+      expect(status?.querySelector('[data-icon="alert-circle"]')).toBeTruthy();
     });
     expect(screen.getByRole("link", { name: "오늘 열기" })).toHaveAttribute(
       "href",
@@ -604,14 +622,15 @@ describe("AdminShellLayout", () => {
     expect(shellCss).toContain(".admin-layout-nav");
     expect(shellCss).toContain("min-height: 86px");
     expect(shellCss).toContain("min-height: 70px");
-    expect(shellCss).toContain("padding: 0 34px");
+    expect(shellCss).toContain("padding: 0 32px 0 0");
     expect(shellCss).toContain("grid-template-columns: 260px minmax(0, 1fr)");
     expect(shellCss).toContain("top: 86px");
     expect(shellCss).toContain("min-height: calc(100vh - 86px)");
     expect(shellCss).toContain("padding: 32px 16px");
-    expect(shellCss).toMatch(/\.admin-shell__wordmark\s*\{[^}]*font-size:\s*12px/s);
-    expect(shellCss).toMatch(/\.admin-shell__wordmark\s*\{[^}]*font-weight:\s*650/s);
-    expect(shellCss).toMatch(/\.admin-shell__wordmark\s*\{[^}]*line-height:\s*16\.8px/s);
+    expect(shellCss).toMatch(/\.admin-shell__wordmark\s*\{[^}]*font-size:\s*20px/s);
+    expect(shellCss).toMatch(/\.admin-shell__wordmark\s*\{[^}]*font-weight:\s*700/s);
+    expect(shellCss).toContain(".admin-shell__status");
+    expect(shellCss).toContain(".admin-shell__account-button");
     expect(shellCss).toMatch(/\.admin-shell__space-control[\s\S]*?overflow:\s*visible/);
     expect(shellCss).toMatch(/\.admin-shell__space-control[\s\S]*?z-index:\s*40/);
     expect(todayCss).toMatch(/\.admin-shell__space-control[\s\S]*?opacity:\s*1/);
@@ -685,7 +704,7 @@ describe("AdminShellLayout", () => {
       screen
         .getAllByRole("navigation")
         .map((nav) => nav.getAttribute("aria-label")),
-    ).toEqual(["현재 위치", "Admin 콘솔"]);
+    ).toEqual(["Admin 콘솔", "현재 위치"]);
     const main = screen.getByRole("main");
     expect(main).toHaveAttribute("id", "admin-main");
     expect(main).toHaveAttribute("tabindex", "-1");
@@ -700,8 +719,11 @@ describe("AdminShellLayout", () => {
     renderShell("/admin/today");
 
     expect(screen.getByRole("button", { name: "주입된 공간 전환" })).toBeInTheDocument();
-    expect(screen.getByText("OWNER admin", { selector: ".admin-shell__account-label" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "다른 계정으로 로그인" })).toBeInTheDocument();
+    const header = screen.getByRole("banner");
+    expect(within(header).getByRole("button", { name: "계정" })).toBeInTheDocument();
+    expect(within(header).queryByText("다른 계정으로 로그인")).not.toBeInTheDocument();
+    expect(header.querySelector(".admin-shell__account-label")).toBeNull();
+    expect(within(header).queryByText("OWNER admin")).not.toBeInTheDocument();
   });
 
   it.each([
@@ -718,8 +740,9 @@ describe("AdminShellLayout", () => {
     });
 
     const spaceControl = screen.getByTestId("space-control");
-    expect(screen.getByText(expected, { selector: ".admin-shell__account-label" })).toBeInTheDocument();
     expect(within(spaceControl).queryByText(expected)).not.toBeInTheDocument();
+    expect(within(screen.getByRole("banner")).getByRole("button", { name: "계정" })).toBeInTheDocument();
+    expect(screen.queryByText(expected, { selector: ".admin-shell__account-label" })).not.toBeInTheDocument();
   });
 
   it("sends other-account login through logout and a safe admin return path", async () => {
@@ -730,7 +753,7 @@ describe("AdminShellLayout", () => {
     vi.stubGlobal("location", { assign });
 
     renderShell("/admin/clubs?filter=ready#top");
-    fireEvent.click(screen.getByRole("button", { name: "다른 계정으로 로그인" }));
+    fireEvent.click(screen.getByRole("button", { name: "계정" }));
 
     await waitFor(() => {
       expect(logoutCurrentSession).toHaveBeenCalledTimes(1);
@@ -747,7 +770,7 @@ describe("AdminShellLayout", () => {
     vi.stubGlobal("location", { assign });
     const { unmount } = renderShell("/admin/today");
 
-    const accountLogin = screen.getByRole("button", { name: "다른 계정으로 로그인" });
+    const accountLogin = within(screen.getByRole("banner")).getByRole("button", { name: "계정" });
     fireEvent.click(accountLogin);
     expect(logoutCurrentSession).toHaveBeenCalledTimes(1);
     expect(accountLogin).toBeDisabled();
@@ -771,7 +794,7 @@ describe("AdminShellLayout", () => {
       spaceSwitcher: <div data-testid="space-control">플랫폼 운영</div>,
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "다른 계정으로 로그인" }));
+    fireEvent.click(within(screen.getByRole("banner")).getByRole("button", { name: "계정" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "로그아웃에 실패했습니다. 다시 시도해 주세요.",

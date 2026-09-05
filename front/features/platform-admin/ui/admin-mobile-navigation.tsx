@@ -4,10 +4,18 @@ import {
   type AdminRouteOwner,
 } from "@/features/platform-admin/model/admin-route-catalog";
 import type { PlatformAdminCapabilities } from "@/features/platform-admin/model/platform-admin-capabilities";
+import { ReadmatesIcon, type ReadmatesIconName } from "@/shared/ui/icon";
 import {
   AdminShellCompactSlot,
   type AdminNavigationLinkRenderer,
 } from "./admin-layout-nav";
+
+const ADMIN_MOBILE_ICONS: Record<string, ReadmatesIconName> = {
+  today: "calendar",
+  clubs: "people",
+  service: "shield-check",
+  records: "document",
+};
 
 export function AdminMobileNavigation({
   capabilities,
@@ -93,12 +101,14 @@ function AdminMobileNavigationContent({
                   ariaLabel: area.label,
                   style: {
                     display: "flex",
+                    flexDirection: "column",
                     minWidth: 0,
-                    minHeight: 44,
+                    minHeight: 110,
                     width: "100%",
                     alignItems: "center",
                     justifyContent: "center",
-                    padding: "12px 4px 10px",
+                    gap: 4,
+                    padding: "16px 4px 8px",
                     borderTop: active ? "3px solid var(--accent)" : "3px solid transparent",
                     color: active ? "var(--text)" : "var(--text-2)",
                     font: "inherit",
@@ -107,7 +117,12 @@ function AdminMobileNavigationContent({
                     textDecoration: "none",
                     whiteSpace: "normal",
                   },
-                  children: MOBILE_SHORT_LABELS[area.id] ?? area.label,
+                  children: (
+                    <>
+                      <ReadmatesIcon name={ADMIN_MOBILE_ICONS[area.id] ?? "document"} size={24} />
+                      <span>{MOBILE_SHORT_LABELS[area.id] ?? area.label}</span>
+                    </>
+                  ),
                 })}
               </li>
             );

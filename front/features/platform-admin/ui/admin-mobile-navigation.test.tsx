@@ -114,11 +114,12 @@ describe("AdminMobileNavigation", () => {
       expect(link).not.toHaveAttribute("role");
       expect(link).not.toHaveAttribute("tabindex");
       expect(link).toHaveStyle({
-        minHeight: "44px",
+        minHeight: "110px",
         minWidth: "0",
         overflowWrap: "anywhere",
         whiteSpace: "normal",
       });
+      expect(link.querySelector("[data-icon]")).toBeTruthy();
     }
     expect(nav.querySelector("ul")).toHaveStyle({
       gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
