@@ -93,7 +93,6 @@ h1.rm-operating-room-header__title {
   font-size: 16px;
 }
 
-.rm-operating-room-phases__state,
 .rm-operating-room-next-action__state,
 .rm-preparation-ledger-row__state,
 .rm-host-operating-room .rm-host-workbox__header p,
@@ -455,6 +454,10 @@ h1.rm-operating-room-header__title {
     min-width: 0;
     padding: 14px 8px;
     font-size: 18px;
+  }
+
+  .rm-operating-room-phases__tab::after {
+    inset-inline: 8px;
   }
 
   .rm-operating-room-next-action {
