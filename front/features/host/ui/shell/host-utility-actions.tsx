@@ -1,5 +1,6 @@
 import { useId } from "react";
 import type { ClubShellLinkComponent } from "@/shared/model/app-club-shell";
+import { ReadmatesIcon, type ReadmatesIconName } from "@/shared/ui/icon";
 import "./host-shell.css";
 
 export type HostUtilityActionId = "settings" | "member-view" | "notifications" | "new-meeting";
@@ -23,6 +24,13 @@ export type HostUtilityActionsProps = {
 const DefaultLink: ClubShellLinkComponent = ({ to, children, ...props }) => (
   <a {...props} href={to}>{children}</a>
 );
+
+const ICONS: Record<HostUtilityActionId, ReadmatesIconName | null> = {
+  settings: "person-plus",
+  "member-view": "eye",
+  notifications: "bell",
+  "new-meeting": null,
+};
 
 export function HostUtilityActions({
   settingsHref,
@@ -58,6 +66,13 @@ export function HostUtilityActions({
             action.id === "new-meeting" ? "is-create" : "",
             disabledReason ? "is-disabled" : "",
           ].filter(Boolean).join(" ");
+          const iconName = ICONS[action.id];
+          const icon = iconName ? <ReadmatesIcon name={iconName} size={20} /> : null;
+          const label = action.id === "notifications"
+            ? (unreadCount > 0
+              ? <span className="rm-host-utility-actions__dot" aria-hidden="true" />
+              : null)
+            : <span>{action.label}</span>;
 
           return (
             <li key={action.id}>
@@ -65,6 +80,7 @@ export function HostUtilityActions({
                 <>
                   <span
                     className={className}
+                    data-action={action.id}
                     aria-disabled="true"
                     aria-describedby={reasonId}
                   >
@@ -78,15 +94,12 @@ export function HostUtilityActions({
                 <LinkComponent
                   to={action.href}
                   className={className}
+                  data-action={action.id}
                   aria-label={notificationLabel}
                   aria-current={action.id === currentId ? "page" : undefined}
                 >
-                  <span>{action.label}</span>
-                  {action.id === "notifications" && unreadCount > 0 ? (
-                    <span className="rm-host-utility-actions__count" aria-hidden="true">
-                      {unreadCount}
-                    </span>
-                  ) : null}
+                  {icon}
+                  {label}
                 </LinkComponent>
               )}
             </li>

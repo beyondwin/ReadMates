@@ -67,6 +67,7 @@ export type ClubShellLinkProps = {
   title?: string;
   style?: CSSProperties;
   onClick?: MouseEventHandler<HTMLAnchorElement>;
+  "data-action"?: string;
 };
 
 export type ClubShellLinkComponent = ComponentType<ClubShellLinkProps>;

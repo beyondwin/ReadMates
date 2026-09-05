@@ -66,6 +66,20 @@ function renderSwitcher({
 }
 
 describe("GlobalSpaceSwitcher", () => {
+  it("renders a club-variant host pill even when only one product kind is authorized", () => {
+    render(
+      <GlobalSpaceSwitcher
+        variant="club"
+        currentIdentity={readingHost.identity}
+        options={[readingMember, readingHost]}
+        onSelect={async () => ({ status: "selected" })}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: /공간 전환/ });
+    expect(trigger).toHaveTextContent("읽는사이 · 호스트 운영실");
+  });
+
   it.each([
     {
       label: "platform-only",

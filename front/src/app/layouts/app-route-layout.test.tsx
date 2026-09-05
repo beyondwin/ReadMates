@@ -389,8 +389,11 @@ describe("AppRouteLayout host session navigation", () => {
       expect(screen.getAllByRole("link", { name: utilityLabel }).length).toBeGreaterThan(0);
     }
 
-    expect(screen.getAllByText("현재 공간 내 클럽, 읽는사이 호스트로 운영")).toHaveLength(2);
-    expect(screen.queryByRole("button", { name: /공간 전환/ })).not.toBeInTheDocument();
+    const hostSpaceTriggers = screen.getAllByRole("button", { name: /공간 전환/ });
+    expect(hostSpaceTriggers).toHaveLength(2);
+    for (const trigger of hostSpaceTriggers) {
+      expect(trigger).toHaveTextContent("읽는사이 · 호스트 운영실");
+    }
     expect(screen.queryByRole("navigation", { name: "클럽 선택" })).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "공간 선택" })).not.toBeInTheDocument();
   });

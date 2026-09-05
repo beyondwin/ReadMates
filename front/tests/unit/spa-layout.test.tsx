@@ -679,8 +679,9 @@ describe("SPA AppRouteLayout", () => {
 
     await waitFor(() => expect(screen.getByText("host child")).toBeInTheDocument());
 
-    expect(screen.queryByRole("button", { name: /^공간 전환/ })).not.toBeInTheDocument();
-    expect(screen.getAllByText("현재 공간 내 클럽, 읽는사이 호스트로 운영")).toHaveLength(2);
+    const hostSpaceTriggers = screen.getAllByRole("button", { name: /^공간 전환/ });
+    expect(hostSpaceTriggers.length).toBeGreaterThan(0);
+    expect(hostSpaceTriggers[0]).toHaveTextContent("읽는사이 · 호스트 운영실");
 
     const tabs = screen.getByRole("navigation", { name: "호스트 주 메뉴 모바일" });
     expect(within(tabs).getByRole("link", { name: "모임" })).toHaveAttribute(

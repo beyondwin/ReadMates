@@ -82,6 +82,7 @@ function approvedPrimaryItems(destination: HostApprovedDestination): PrimaryNavi
 function HostApprovedSpaceSwitcher() {
   return (
     <GlobalSpaceSwitcher
+      variant="club"
       currentIdentity={{
         productSpace: "clubs",
         clubId: "club-reading-sai",

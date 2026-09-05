@@ -85,8 +85,7 @@ test("public to Google fixture login to host smoke flow", async ({ page }) => {
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
   await expect(page.getByRole("group", { name: "현재 모임" })).toBeVisible();
   await expect(page.locator("[data-app-route-security-controller]")).toHaveCount(1);
-  await expect(page.locator('[data-global-space-switcher]')).toHaveCount(0);
-  await expect(page.getByText("현재 공간 내 클럽, 읽는사이 호스트로 운영", { exact: true })).toHaveCount(2);
+  await expect(page.getByRole("button", { name: /공간 전환/ }).first()).toContainText("읽는사이 · 호스트 운영실");
   await expect(
     page.getByRole("navigation", { name: "호스트 유틸리티" }).getByRole("link", { name: "멤버 시야" }),
   ).toHaveAttribute("href", "/clubs/reading-sai/app");

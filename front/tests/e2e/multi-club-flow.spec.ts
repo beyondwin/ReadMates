@@ -71,7 +71,7 @@ test("URL-authoritative club navigation changes context while preserving indepen
   expect(readingSaiAuth.currentMembership.clubSlug).toBe("reading-sai");
   expect(readingSaiAuth.currentMembership.role).toBe("HOST");
 
-  await expect(page.getByRole("button", { name: /공간 전환/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /공간 전환/ }).first()).toContainText("읽는사이 · 호스트 운영실");
   await page.goto("/clubs/sample-book-club/app/archive");
 
   await expect(page).toHaveURL(/\/clubs\/sample-book-club\/app\/archive$/);

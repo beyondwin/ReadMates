@@ -13,6 +13,12 @@ async function expectPracticalTapTarget(locator: Locator) {
 }
 
 async function expectSingleKindSpaceLabel(page: Page, label: string) {
+  if (label.includes("호스트로 운영")) {
+    const trigger = page.getByRole("button", { name: /공간 전환/ }).first();
+    await expect(trigger).toBeVisible();
+    await expect(trigger).toContainText("호스트 운영실");
+    return;
+  }
   await expect(page.getByRole("button", { name: /공간 전환/ })).toHaveCount(0);
   await expect(page.getByText(label, { exact: true })).toHaveCount(2);
 }

@@ -91,6 +91,7 @@ function hostPrimaryCurrentId(destination: HostApprovedStoryDestination): string
 function StoryHostSpaceSwitcher() {
   return (
     <GlobalSpaceSwitcher
+      variant="club"
       currentIdentity={{
         productSpace: "clubs",
         clubId: "club-reading-sai",

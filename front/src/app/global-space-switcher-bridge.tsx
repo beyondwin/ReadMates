@@ -47,10 +47,16 @@ export function AppGlobalSpaceSwitcherBridge({ auth }: { auth: AuthMeResponse })
     [auth, controller.availableIdentities],
   );
 
+  const variant = controller.currentIdentity?.productSpace === "clubs"
+    && controller.currentIdentity.perspective === "host"
+    ? "club"
+    : undefined;
+
   return (
     <GlobalSpaceSwitcher
       currentIdentity={controller.currentIdentity}
       options={options}
+      variant={variant}
       onSelect={async (identity) => selectionResult((await controller.requestTransition(identity)).status)}
     />
   );

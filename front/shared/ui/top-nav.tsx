@@ -226,7 +226,6 @@ function Brand({ href, LinkComponent, variant }: { href: string; LinkComponent: 
         <span
           className="editorial"
           style={{
-            fontSize: "16px",
             lineHeight: 1,
             letterSpacing: "-0.025em",
             fontWeight: 600,
@@ -291,8 +290,8 @@ function TopNavFrame({
   variant?: TopNavVariant;
 }) {
   return (
-    <header className="topnav">
-      <div className="container topnav-inner">
+    <header className="topnav" data-variant={variant}>
+      <div className={variant === "host" ? "topnav-inner topnav-inner--fluid" : "container topnav-inner"}>
         <div className="topnav-global-context">
           <Brand href={brandHref} LinkComponent={LinkComponent} variant={variant} />
           {contextControl}

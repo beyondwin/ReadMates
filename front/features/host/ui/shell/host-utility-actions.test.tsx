@@ -26,6 +26,27 @@ describe("HostUtilityActions", () => {
     expect(within(navigation).getByRole("link", { name: "새 모임" })).toHaveAttribute("href", hrefs.newMeetingHref);
   });
 
+  it("renders icon utilities, an icon-only bell with unread dot, and a bordered create action", () => {
+    render(
+      <HostUtilityActions
+        settingsHref="/s"
+        memberViewHref="/m"
+        notificationsHref="/n"
+        newMeetingHref="/new"
+        unreadNotifications={2}
+        permissionLimits={[]}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "초대와 설정" }).querySelector('[data-icon="person-plus"]')).toBeTruthy();
+    expect(screen.getByRole("link", { name: "멤버 시야" }).querySelector('[data-icon="eye"]')).toBeTruthy();
+    const bell = screen.getByRole("link", { name: "알림, 읽지 않은 알림 2개" });
+    expect(bell.querySelector('[data-icon="bell"]')).toBeTruthy();
+    expect(bell.querySelector(".rm-host-utility-actions__dot")).toBeTruthy();
+    expect(bell.textContent?.trim()).toBe("");
+    expect(screen.getByRole("link", { name: "새 모임" })).toHaveClass("is-create");
+  });
+
   it("announces unread notifications without relying on the visible count alone", () => {
     render(
       <HostUtilityActions
@@ -35,8 +56,10 @@ describe("HostUtilityActions", () => {
       />,
     );
 
-    expect(screen.getByRole("link", { name: "알림, 읽지 않은 알림 12개" })).toBeInTheDocument();
-    expect(screen.getByText("12")).toHaveAttribute("aria-hidden", "true");
+    const bell = screen.getByRole("link", { name: "알림, 읽지 않은 알림 12개" });
+    expect(bell.querySelector(".rm-host-utility-actions__dot")).toHaveAttribute("aria-hidden", "true");
+    expect(bell.querySelector(".rm-host-utility-actions__count")).toBeNull();
+    expect(screen.queryByText("12")).not.toBeInTheDocument();
   });
 
   it("shows permission-limited actions and their recovery reason without exposing a false link", () => {

@@ -760,8 +760,7 @@ test("scoped account navigation preserves local avatar identity across mobile an
   await page.goto(`${APP_BASE}/host`);
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 15_000 }).toMatch(/\/app\/host(\/sessions\/[^/]+)?$/);
   const hostHeader = page.getByRole("banner");
-  await expect(page.getByRole("button", { name: /공간 전환/ })).toHaveCount(0);
-  await expect(page.getByText("현재 공간 내 클럽, 읽는사이 호스트로 운영", { exact: true })).toHaveCount(2);
+  await expect(page.getByRole("button", { name: /공간 전환/ }).first()).toContainText("읽는사이 · 호스트 운영실");
   await expect(hostHeader.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` })).toBeVisible();
   await hostHeader.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` }).click();
   await expect(page.getByRole("dialog", { name: MEMBER_NAME }).getByRole("button", { name: "로그아웃" })).toBeVisible();

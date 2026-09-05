@@ -23,6 +23,7 @@ export type GlobalSpaceSwitcherProps = {
   currentIdentity: SpaceIdentity | null;
   options: ReadonlyArray<GlobalSpaceSwitcherOption>;
   onSelect: (identity: SpaceIdentity) => Promise<GlobalSpaceSelectionResult>;
+  variant?: "club";
 };
 
 type ClubOptionGroup = {
@@ -47,7 +48,17 @@ function currentSpaceLabel(
   return `현재 공간 내 클럽, ${clubName} ${perspective}`;
 }
 
-function visibleTriggerLabel(currentIdentity: SpaceIdentity | null) {
+function visibleTriggerLabel(
+  currentIdentity: SpaceIdentity | null,
+  options: ReadonlyArray<GlobalSpaceSwitcherOption>,
+  variant?: "club",
+) {
+  if (variant === "club" && currentIdentity?.productSpace === "clubs") {
+    const current = options.find((option) => sameSpaceIdentity(option.identity, currentIdentity));
+    const clubName = current?.clubName?.trim() || "현재 클럽";
+    const room = currentIdentity.perspective === "host" ? "호스트 운영실" : "멤버 공간";
+    return `${clubName} · ${room}`;
+  }
   return currentIdentity?.productSpace === "clubs" ? "내 클럽" : "플랫폼 운영";
 }
 
@@ -102,10 +113,12 @@ export function GlobalSpaceSwitcher({
   currentIdentity,
   options,
   onSelect,
+  variant,
 }: GlobalSpaceSwitcherProps) {
   const normalizedOptions = useMemo(() => normalizeOptions(options), [options]);
   const productKinds = new Set(normalizedOptions.map((option) => option.identity.productSpace));
   const currentLabel = currentSpaceLabel(currentIdentity, normalizedOptions);
+  const showClubIdentityChrome = variant === "club" && currentIdentity?.productSpace === "clubs";
   const [open, setOpen] = useState(false);
   const [level, setLevel] = useState<MenuLevel>("root");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -158,7 +171,7 @@ export function GlobalSpaceSwitcher({
     };
   }, [open]);
 
-  if (productKinds.size <= 1) {
+  if (productKinds.size <= 1 && !showClubIdentityChrome) {
     return <span className="rm-sr-only rm-global-space-switcher__current-space">{currentLabel}</span>;
   }
 
@@ -293,7 +306,7 @@ export function GlobalSpaceSwitcher({
         onClick={() => open ? closeMenu() : openMenu()}
         onKeyDown={onTriggerKeyDown}
       >
-        <strong>{visibleTriggerLabel(currentIdentity)}</strong>
+        <strong>{visibleTriggerLabel(currentIdentity, normalizedOptions, variant)}</strong>
         <SelectorChevron />
       </button>
       {open ? (
