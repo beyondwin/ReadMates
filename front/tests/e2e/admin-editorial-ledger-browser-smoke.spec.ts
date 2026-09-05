@@ -37,11 +37,11 @@ test("Today L1 uses explicit allowedActions rather than role", async ({ page }) 
   await expect(page.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
   const actions = page.getByRole("group", { name: "작업" });
   await expect(actions.getByRole("button")).toHaveCount(1);
-  await expect(actions.getByRole("button", { name: "다시 보내기 검토" })).toBeEnabled();
+  await expect(actions.getByRole("button", { name: "확인함" })).toBeEnabled();
   await expect(page.locator(".admin-receipt-timeline")).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 
-  const acknowledge = actions.getByRole("button", { name: "다시 보내기 검토" });
+  const acknowledge = actions.getByRole("button", { name: "확인함" });
   await acknowledge.focus();
   await expectVisibleFocus(acknowledge);
   await expectMinimumTargetSize(acknowledge);

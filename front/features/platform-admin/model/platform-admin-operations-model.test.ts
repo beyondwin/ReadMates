@@ -5,6 +5,7 @@ import type {
   AdminOperationSummaryCode,
 } from "@/features/platform-admin/api/platform-admin-operations-contracts";
 import {
+  actionCopyFor,
   adminOperationSummaryLabel,
   adminOperationsScopeKey,
   buildAdminOperationWorkViews,
@@ -60,6 +61,15 @@ function response(overrides: Partial<AdminOperationCasesResponse> = {}): AdminOp
 }
 
 describe("platform admin operations model", () => {
+  it("uses mockup copy only for notification-delay cases and server meaning elsewhere", () => {
+    expect(actionCopyFor("NOTIFICATION", "ACKNOWLEDGE")).toBe("다시 보내기 검토");
+    expect(actionCopyFor("NOTIFICATION", "SNOOZE")).toBe("30분 뒤 다시 보기");
+    expect(actionCopyFor("NOTIFICATION", "RESOLVE")).toBe("자세히 보기");
+    expect(actionCopyFor("CLUB_READINESS", "ACKNOWLEDGE")).toBe("확인함");
+    expect(actionCopyFor("AI_JOB", "SNOOZE")).toBe("잠시 미룸");
+    expect(actionCopyFor("CLOSING_RISK", "RESOLVE")).toBe("처리함");
+  });
+
   it("uses the centralized case lifecycle language in actual case views", () => {
     const states = ["OPEN", "ACKNOWLEDGED", "SNOOZED", "RESOLVED"] as const;
     const labels = states.map((state) => buildAdminOperationsView(

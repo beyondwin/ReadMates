@@ -6,14 +6,14 @@ import type {
   HealthCard,
   PlatformHealthSnapshot,
 } from "@/features/platform-admin/model/platform-admin-health-model";
-import type {
-  AdminOperationCaseView,
-  AdminOperationsSearchMode,
-  AdminOperationsView,
-  AdminOperationSourceFreshnessView,
-  AdminOperationsWorkViewId,
+import {
+  actionCopyFor,
+  type AdminOperationCaseView,
+  type AdminOperationsSearchMode,
+  type AdminOperationsView,
+  type AdminOperationSourceFreshnessView,
+  type AdminOperationsWorkViewId,
 } from "@/features/platform-admin/model/platform-admin-operations-model";
-import { APPROVED_TODAY_ACTION_COPY } from "./admin-operation-state-actions";
 import type { AdminSafeActionState } from "./admin-action-dock";
 import type { AdminClubsLedgerClub, AdminClubsLedgerFilters } from "./admin-clubs-ledger";
 import type { AdminTodayFilters } from "./admin-today-controls";
@@ -328,7 +328,13 @@ function todayFixture(input: TodayFixtureInput): TodayLedgerFixture {
     mode: input.mode,
     query: input.query ?? "",
     workView: input.workView ?? "briefing",
-    actionCopy: input.actionCopy,
+    actionCopy: input.actionCopy ?? (selectedCase
+      ? {
+          ACKNOWLEDGE: actionCopyFor(selectedCase.sourceType, "ACKNOWLEDGE"),
+          SNOOZE: actionCopyFor(selectedCase.sourceType, "SNOOZE"),
+          RESOLVE: actionCopyFor(selectedCase.sourceType, "RESOLVE"),
+        }
+      : undefined),
   };
 }
 
@@ -378,7 +384,6 @@ export const todayDesktopLedger = todayFixture({
   allowedActions: TODAY_L1_ALLOWED_ACTIONS,
   items: APPROVED_TODAY_CASES,
   selectedCase: APPROVED_TODAY_CASES[0],
-  actionCopy: APPROVED_TODAY_ACTION_COPY,
 });
 
 export const todayMobileCaseDetail = todayFixture({
@@ -387,7 +392,6 @@ export const todayMobileCaseDetail = todayFixture({
   items: APPROVED_TODAY_CASES,
   selectedCase: APPROVED_TODAY_CASES[0],
   mode: "detail",
-  actionCopy: APPROVED_TODAY_ACTION_COPY,
 });
 
 export const todayEmptyEvidence = todayFixture({

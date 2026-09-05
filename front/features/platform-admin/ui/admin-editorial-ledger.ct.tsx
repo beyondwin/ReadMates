@@ -367,9 +367,9 @@ test("Today L1 locks the approved desktop composition", async ({ mount, page }) 
     docket.getByRole("heading", { name: "권장 처리" }),
     docket.getByRole("heading", { name: "처리 방법" }),
   ])).toBe(true);
-  await expect(component.getByRole("button", { name: "다시 보내기 검토" })).toBeEnabled();
+  await expect(component.getByRole("button", { name: "확인함" })).toBeEnabled();
   await expect(component.locator(".admin-receipt-timeline")).toHaveCount(0);
-  const primary = component.getByRole("button", { name: "다시 보내기 검토" });
+  const primary = component.getByRole("button", { name: "확인함" });
   await expectMinimumTargetSize(primary);
   await primary.focus();
   await expectVisibleFocus(primary);
@@ -529,7 +529,7 @@ test.describe("approved mobile Today", () => {
       docket.getByRole("heading", { name: "처리 방법" }),
     ])).toBe(true);
     await expect(component.getByRole("button", { name: "목록으로" })).toBeVisible();
-    await expect(component.getByRole("button", { name: "다시 보내기 검토" })).toBeEnabled();
+    await expect(component.getByRole("button", { name: "확인함" })).toBeEnabled();
     await expect(component.getByText("다른 처리")).toBeVisible();
     await expect(component.locator(".admin-today-ledger__columns")).toHaveCount(0);
     await expect(component.locator(".admin-receipt-timeline")).toHaveCount(0);

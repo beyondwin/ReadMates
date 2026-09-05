@@ -156,7 +156,7 @@ test("owner sees the durable operations queue inside the admin shell", async ({ 
 
   await page.goto("/admin/today?case=case-notification");
 
-  await expect(page.getByRole("heading", { name: "오늘 할 일" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "오늘 할 일" })).toBeVisible();
   await expect(page.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
   await expect(page.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
   await expect(page.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ })).toHaveAttribute(
@@ -193,7 +193,7 @@ test("768px uses mobile drill-in instead of stacked columns", async ({ page }) =
   await routePlatformAdminToday(page, "OWNER");
   await page.goto("/admin/today?case=case-notification");
 
-  await expect(page.getByRole("heading", { name: "오늘 할 일" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "오늘 할 일" })).toBeVisible();
   await expect(page.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
   await expect(page.getByRole("region", { name: "운영 케이스 상세" })).toHaveCount(0);
   await expect(page.locator(".admin-today-ledger__columns")).toHaveCount(0);

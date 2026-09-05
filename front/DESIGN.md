@@ -67,8 +67,8 @@ Lifecycle·audience·public placement를 한 stepper로 합치지 않는다. 다
 | 폭 | composition |
 | --- | --- |
 | `390px`(mobile) | 현재 모임 → 단계 → 다음 행동 → 준비 현황 → 작업함의 단일 열이다. 네 영역 mobile tab bar와 `safe-area-inset-bottom` 공간을 보존하며 보이는 control은 최소 44px다. 예외: live compact 출석판 choice는 40px, undo bar는 36px다. mockup-16 closer를 탭 바 위에 두기 위한 named leftover이며 이 보드의 모든 390 control이 44px라고 주장하지 않는다. |
-| `768–1199px` | 같은 semantic 순서를 유지하고 primary 뒤에 작업함을 쌓는다. 68/32 rail을 억지로 축소하지 않으며 768px부터 desktop chrome을 사용하되 bottom safe area는 침범하지 않는다. |
-| `1200px+` | main 작업은 약 68%, 작업함 rail은 약 32%의 두 열이다. DOM/읽기 순서는 mobile과 동일하며 작업함만 오른쪽에 배치한다. |
+| `768–1199px` | 같은 semantic 순서를 유지하고 primary 뒤에 작업함을 쌓는다. 62/38 rail을 억지로 축소하지 않으며 768px부터 desktop chrome을 사용하되 bottom safe area는 침범하지 않는다. |
+| `1200px+` | main 작업은 약 62%, 작업함 rail은 약 38%의 두 열이다. DOM/읽기 순서는 mobile과 동일하며 작업함만 오른쪽에 배치한다. |
 
 390·767·768·1024·1199·1200·1440px와 320×350 200% zoom proxy에서 가로 overflow, 44px target(live compact 출석 choice 40px / undo 36px leftover), 순서, keyboard roving, visible focus와 reduced motion은 이 문서가 규정하는 계약이다. 보조 CT는 `host-shell.ct.tsx`와 `host-operating-room-responsive.ct.tsx`가 현재 composition geometry를 잠근다. Phase와 workbox tab은 방향키와 Home/End를 지원하고, focus/return state는 route/panel을 닫거나 Back/Forward할 때 원래 control로 돌아간다.
 
@@ -119,7 +119,7 @@ Today layout은 viewport breakpoint가 아니라 `ResizeObserver`로 측정한 c
 Back은 `returnTo`/`focusId`/`scrollTop`으로 복원한다.
 
 일반 command 권한은 서버 exact capability다. `OWNER`/`OPERATOR`/`SUPPORT` 이름으로 새 권한을 만들지 않는다.
-Today lifecycle은 서버 `allowedActions`에 있는 `확인함`·`잠시 미룸`·`처리함`만 사용한다. 서버 의미가 없는 `무시`·`병합`이나 전송하지 않는 사유 입력을 만들지 않는다. Analytics CSV는 `EXPORT_ANALYTICS`, 알림 replay는 `REPLAY_NOTIFICATIONS`가 없으면 request를 시작하지 않는다.
+Today lifecycle은 서버 `allowedActions`에 있는 `확인함`·`잠시 미룸`·`처리함`만 사용한다. 접근성 이름은 그 서버 의미이고, 알림 지연 케이스(`sourceType === "NOTIFICATION"`)만 시안 01 카피(`다시 보내기 검토`·`30분 뒤 다시 보기`·`자세히 보기`)를 시각 텍스트로 쓴다. 서버 의미가 없는 `무시`·`병합`이나 전송하지 않는 사유 입력을 만들지 않는다. Analytics CSV는 `EXPORT_ANALYTICS`, 알림 replay는 `REPLAY_NOTIFICATIONS`가 없으면 request를 시작하지 않는다.
 401/403은 platform-admin state와 pending preview를 폐기한다.
 
 L1은 capability·concurrency·source 재검증·atomic history, L2는 preview/confirm/receipt, L3는 receipt/convergence/resume다.

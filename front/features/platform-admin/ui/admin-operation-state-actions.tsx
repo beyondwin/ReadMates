@@ -1,4 +1,4 @@
-import { Fragment, useRef, useState } from "react";
+import { Fragment, useId, useRef, useState } from "react";
 import { adminOperationActionLanguage } from "@/features/platform-admin/model/admin-status-language";
 import { AdminModalDialog } from "./admin-modal-dialog";
 
@@ -8,12 +8,6 @@ export type AdminOperationActionMessage = {
   kind: "conflict" | "error" | "success" | "unknown-outcome";
   text: string;
 };
-
-export const APPROVED_TODAY_ACTION_COPY = {
-  ACKNOWLEDGE: "다시 보내기 검토",
-  SNOOZE: "30분 뒤 다시 보기",
-  RESOLVE: "자세히 보기",
-} as const;
 
 type Props = {
   allowedActions: readonly LifecycleAction[];
@@ -55,6 +49,7 @@ export function AdminOperationStateActions({
   onSnooze,
   onResolve,
 }: Props) {
+  const actionId = useId();
   const [openConfirmationKey, setOpenConfirmationKey] = useState<string | null>(null);
   const [openSnoozeKey, setOpenSnoozeKey] = useState<string | null>(null);
   const [holdHours, setHoldHours] = useState(4);
@@ -75,16 +70,30 @@ export function AdminOperationStateActions({
     onResolve();
   }
 
-  function actionLabel(action: LifecycleAction) {
-    return actionCopy?.[action] ?? adminOperationActionLanguage(action).primaryText;
+  function actionPresentation(action: LifecycleAction) {
+    const accessibleName = adminOperationActionLanguage(action).primaryText;
+    const visual = actionCopy?.[action] ?? accessibleName;
+    const described = visual !== accessibleName;
+    return {
+      accessibleName,
+      visual,
+      described,
+      descriptionId: `${actionId}-${action}`,
+    };
   }
 
   function actionControl(action: LifecycleAction, primary: boolean) {
-    const buttonClass = `btn ${primary ? "btn-primary" : action === "RESOLVE" && actionCopy?.RESOLVE ? "btn-quiet" : "btn-secondary"}`;
+    const { accessibleName, visual, described, descriptionId } = actionPresentation(action);
+    const buttonClass = `btn ${primary ? "btn-primary" : action === "RESOLVE" && described ? "btn-quiet" : "btn-secondary"}`;
+    const nameProps = {
+      "aria-label": accessibleName,
+      ...(described ? { "aria-describedby": descriptionId } : {}),
+    };
+    const label = described ? <span id={descriptionId}>{visual}</span> : visual;
     if (action === "ACKNOWLEDGE") {
       return (
-        <button type="button" className={buttonClass} disabled={locked} onClick={onAcknowledge}>
-          {actionLabel(action)}
+        <button type="button" className={buttonClass} disabled={locked} onClick={onAcknowledge} {...nameProps}>
+          {label}
         </button>
       );
     }
@@ -97,8 +106,9 @@ export function AdminOperationStateActions({
             disabled={locked}
             aria-pressed={snoozeOpen}
             onClick={() => setOpenSnoozeKey(snoozeOpen ? null : snoozeKey)}
+            {...nameProps}
           >
-            {actionLabel(action)}
+            {label}
           </button>
           {snoozeOpen ? (
             <>
@@ -136,8 +146,9 @@ export function AdminOperationStateActions({
         className={buttonClass}
         disabled={locked}
         onClick={() => setOpenConfirmationKey(activeConfirmationKey)}
+        {...nameProps}
       >
-        {actionLabel(action)}
+        {label}
       </button>
     );
   }

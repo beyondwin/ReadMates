@@ -1,4 +1,5 @@
 import type {
+  AdminOperationAction,
   AdminOperationAssigneeFilter,
   AdminOperationCase,
   AdminOperationCaseCounts,
@@ -13,6 +14,7 @@ import type {
 import {
   adminCaseLifecycleLanguage,
   adminHealthAvailabilityLanguage,
+  adminOperationActionLanguage,
 } from "@/features/platform-admin/model/admin-status-language";
 
 const CASE_STATES: readonly AdminOperationCaseState[] = [
@@ -34,6 +36,21 @@ const SEARCH_MODES = ["list", "detail"] as const;
 const QUEUE_DISCLOSURE_MODES = ["priority", "all"] as const;
 
 export const ADMIN_TODAY_PRIORITY_LIMIT = 3;
+
+const NOTIFICATION_DELAY_ACTION_COPY: Record<AdminOperationAction, string> = {
+  ACKNOWLEDGE: "다시 보내기 검토",
+  SNOOZE: "30분 뒤 다시 보기",
+  RESOLVE: "자세히 보기",
+};
+
+export function actionCopyFor(
+  sourceType: AdminOperationSourceType,
+  action: AdminOperationAction,
+): string {
+  return sourceType === "NOTIFICATION"
+    ? NOTIFICATION_DELAY_ACTION_COPY[action]
+    : adminOperationActionLanguage(action).primaryText;
+}
 
 const SUMMARY_LABELS: Record<AdminOperationSummaryCode, AdminOperationSummaryLabel> = {
   CLUB_SETUP_REQUIRED: {

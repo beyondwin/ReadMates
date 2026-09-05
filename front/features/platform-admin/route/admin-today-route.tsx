@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
-import { ADMIN_TODAY_PRIORITY_LIMIT } from "@/features/platform-admin/model/platform-admin-operations-model";
 import {
-  AdminOperationStateActions,
-  APPROVED_TODAY_ACTION_COPY,
-} from "@/features/platform-admin/ui/admin-operation-state-actions";
+  ADMIN_TODAY_PRIORITY_LIMIT,
+  actionCopyFor,
+} from "@/features/platform-admin/model/platform-admin-operations-model";
+import { AdminOperationStateActions } from "@/features/platform-admin/ui/admin-operation-state-actions";
 import { AdminPageFrame } from "@/features/platform-admin/ui/admin-page-frame";
 import { AdminStatePanel, type AdminPageState } from "@/features/platform-admin/ui/admin-state-panel";
 import {
@@ -75,6 +75,13 @@ export function AdminTodayRoute() {
   }
 
   const currentCase = controller.view.selectedCase;
+  const actionCopy = currentCase
+    ? {
+        ACKNOWLEDGE: actionCopyFor(currentCase.sourceType, "ACKNOWLEDGE"),
+        SNOOZE: actionCopyFor(currentCase.sourceType, "SNOOZE"),
+        RESOLVE: actionCopyFor(currentCase.sourceType, "RESOLVE"),
+      }
+    : undefined;
   const lifecycleControls = !controller.permissionDenied
     && currentCase
     && (currentCase.allowedActions.length > 0 || controller.actionMessage) ? (
@@ -84,7 +91,7 @@ export function AdminTodayRoute() {
         disabled={controller.actionDisabled}
         message={controller.actionMessage}
         confirmationKey={controller.confirmationKey}
-        actionCopy={APPROVED_TODAY_ACTION_COPY}
+        actionCopy={actionCopy}
         onAcknowledge={() => void controller.acknowledgeCurrent()}
         onSnooze={(snoozedUntil) => void controller.snoozeCurrent(snoozedUntil)}
         onResolve={() => void controller.resolveCurrent()}
@@ -100,7 +107,7 @@ export function AdminTodayRoute() {
         message={controller.actionMessage}
         confirmationKey={controller.confirmationKey}
         presentation="prioritized"
-        actionCopy={APPROVED_TODAY_ACTION_COPY}
+        actionCopy={actionCopy}
         onAcknowledge={() => void controller.acknowledgeCurrent()}
         onSnooze={(snoozedUntil) => void controller.snoozeCurrent(snoozedUntil)}
         onResolve={() => void controller.resolveCurrent()}

@@ -34,6 +34,7 @@ describe("AdminOperationStateActions", () => {
     expect(screen.getByRole("button", { name: "canonical:ACKNOWLEDGE" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "canonical:SNOOZE" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "canonical:RESOLVE" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "canonical:ACKNOWLEDGE" })).not.toHaveAttribute("aria-describedby");
     expect(screen.queryByRole("button", { name: "무시" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "병합" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
@@ -149,5 +150,30 @@ describe("AdminOperationStateActions", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent("명령 응답을 확인하지 못했습니다.");
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("keeps the server action as the accessible name when mockup visual copy differs", () => {
+    renderActions({
+      actionCopy: {
+        ACKNOWLEDGE: "다시 보내기 검토",
+        SNOOZE: "30분 뒤 다시 보기",
+        RESOLVE: "자세히 보기",
+      },
+    });
+
+    const acknowledge = screen.getByRole("button", { name: "canonical:ACKNOWLEDGE" });
+    const snooze = screen.getByRole("button", { name: "canonical:SNOOZE" });
+    const resolve = screen.getByRole("button", { name: "canonical:RESOLVE" });
+
+    expect(acknowledge).toHaveTextContent("다시 보내기 검토");
+    expect(snooze).toHaveTextContent("30분 뒤 다시 보기");
+    expect(resolve).toHaveTextContent("자세히 보기");
+    expect(acknowledge.getAttribute("aria-label")).toBe("canonical:ACKNOWLEDGE");
+    expect(acknowledge.getAttribute("aria-label")).not.toContain("·");
+    expect(acknowledge).toHaveAttribute("aria-describedby");
+    expect(snooze).toHaveAttribute("aria-describedby");
+    expect(resolve).toHaveAttribute("aria-describedby");
+    expect(document.getElementById(acknowledge.getAttribute("aria-describedby") ?? "")).toHaveTextContent("다시 보내기 검토");
+    expect(screen.queryByRole("button", { name: "다시 보내기 검토" })).not.toBeInTheDocument();
   });
 });
