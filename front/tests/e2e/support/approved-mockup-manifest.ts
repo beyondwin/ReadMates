@@ -73,6 +73,8 @@ const UNIVERSAL_DEPENDENCY_PATHS = [
   "front/tests/e2e/support/approved-route-harness.ts",
   "front/tests/e2e/support/approved-route-request-audit.ts",
   "front/tests/e2e/support/approved-route-geometry.ts",
+  "front/tests/e2e/support/approved-route-structure.ts",
+  "front/tests/e2e/support/approved-route-structure.test.ts",
   "front/tests/performance/visual-authority-docker.ts",
   "front/tests/performance/visual-authority-docker.test.ts",
   "front/scripts/run-visual-authority-docker.ts",

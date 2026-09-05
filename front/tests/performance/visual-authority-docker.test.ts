@@ -31,6 +31,8 @@ const TASK_PATH_TABLE = [
   ["front/tests/e2e/support/approved-mockup-contract.ts", 18],
   ["front/tests/e2e/support/approved-route-scenarios.ts", 18],
   ["front/tests/e2e/support/approved-route-harness.ts", 18],
+  ["front/tests/e2e/support/approved-route-structure.ts", 18],
+  ["front/tests/e2e/support/approved-route-structure.test.ts", 18],
   ["front/tests/e2e/support/approved-route-request-audit.ts", 18],
   ["front/tests/e2e/support/approved-route-geometry.ts", 18],
   ["front/tests/e2e/support/approved-route-scenarios.test.ts", 18],

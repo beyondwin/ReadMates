@@ -13,6 +13,7 @@ import {
   installApprovedRouteCatchAllAudit,
   type ApprovedRouteRequestAudit,
 } from "./approved-route-request-audit";
+import { APPROVED_ROUTE_STRUCTURE, measureStructure } from "./approved-route-structure";
 import type {
   ApprovedRouteFixtureKey,
   VisualAuthorityInteraction,
@@ -564,6 +565,8 @@ export async function runActualRouteAuthority(input: {
     });
   }
 
+  const structure = await measureStructure(page, APPROVED_ROUTE_STRUCTURE[scenario.id]);
+
   await restoreCanonical(page, scenario, requestAudit);
   assertApprovedLocation(page.url(), scenario.route, `${scenario.id} restored canonical url`);
   await waitForFontsAndIdle(page, scenario);
@@ -578,6 +581,7 @@ export async function runActualRouteAuthority(input: {
     defaultVisibleCount,
     overflow,
     interactions,
+    structure,
     requestAudit: {
       unmatched,
       effecting,

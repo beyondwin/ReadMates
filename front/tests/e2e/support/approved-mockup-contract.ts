@@ -56,6 +56,7 @@ export type ApprovedComparisonReport = {
   defaultVisibleCount: { selector: string; expected: 3 | 4; actual: number; passed: boolean } | null;
   overflow: { horizontalCssPx: number; passed: boolean };
   interactions: Array<{ name: string; passed: boolean; detail: string }>;
+  structure: Array<{ name: string; selector: string; presence: "present" | "absent" | "text-absent"; passed: boolean; detail: string }>;
   requestAudit: { unmatched: number; effecting: number; preview: number; passed: boolean };
   mask: null;
   verdict: "pass" | "fail";
@@ -68,6 +69,7 @@ export type ApprovedRouteAssertionResults = {
   defaultVisibleCount: ApprovedComparisonReport["defaultVisibleCount"];
   overflow: ApprovedComparisonReport["overflow"];
   interactions: ApprovedComparisonReport["interactions"];
+  structure: ApprovedComparisonReport["structure"];
   requestAudit: ApprovedComparisonReport["requestAudit"];
 };
 
@@ -88,6 +90,7 @@ export const APPROVED_COMPARISON_REPORT_REQUIRED_FIELDS = [
   "defaultVisibleCount",
   "overflow",
   "interactions",
+  "structure",
   "requestAudit",
   "mask",
   "verdict",
@@ -261,6 +264,7 @@ function passedResultsFromRegions(regions: readonly ApprovedRegion[]): ApprovedR
     defaultVisibleCount: null,
     overflow: { horizontalCssPx: 0, passed: true },
     interactions: [],
+    structure: [],
     requestAudit: { unmatched: 0, effecting: 0, preview: 0, passed: true },
   };
 }
@@ -299,6 +303,7 @@ function buildApprovedComparisonReport(input: {
     && (input.results.defaultVisibleCount?.passed ?? true)
     && input.results.overflow.passed
     && input.results.interactions.every((item) => item.passed)
+    && input.results.structure.every((item) => item.passed)
     && input.results.requestAudit.passed
     && input.results.requestAudit.unmatched === 0
     && input.results.requestAudit.effecting === 0;
@@ -319,6 +324,7 @@ function buildApprovedComparisonReport(input: {
     defaultVisibleCount: input.results.defaultVisibleCount,
     overflow: input.results.overflow,
     interactions: input.results.interactions,
+    structure: input.results.structure,
     requestAudit: input.results.requestAudit,
     mask: null,
     verdict: mismatchPassed && subResultsPassed ? "pass" : "fail",
@@ -392,6 +398,7 @@ export function assertApprovedRouteReport(report: ApprovedComparisonReport): voi
     ...(report.defaultVisibleCount && !report.defaultVisibleCount.passed ? ["defaultVisibleCount"] : []),
     ...(!report.overflow.passed ? ["overflow"] : []),
     ...report.interactions.filter((item) => !item.passed).map((item) => `interaction:${item.name}`),
+    ...report.structure.filter((item) => !item.passed).map((item) => `structure:${item.name}`),
     ...(!report.requestAudit.passed ? ["requestAudit"] : []),
   ];
   if (failed.length > 0) {

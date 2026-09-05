@@ -50,6 +50,7 @@ function validReport(overrides: Partial<ApprovedComparisonReport> = {}): Approve
     defaultVisibleCount: null,
     overflow: { horizontalCssPx: 0, passed: true },
     interactions: [],
+    structure: [],
     requestAudit: { unmatched: 0, effecting: 0, preview: 0, passed: true },
     mask: null,
     verdict: "pass",
@@ -190,6 +191,16 @@ describe("approved mockup contract", () => {
         passed: false,
       }],
     }))).toThrow(/geometry:admin-header/);
+    expect(() => assertApprovedRouteReport(validReport({
+      verdict: "fail",
+      structure: [{
+        name: "nav-icons",
+        selector: ".admin-layout-nav__item [data-icon]",
+        presence: "present",
+        passed: false,
+        detail: "count=0 min=4",
+      }],
+    }))).toThrow(/structure:nav-icons/);
   });
 
   it("rejects a local renderer fingerprint that is not the pinned Jammy image", () => {
@@ -231,6 +242,8 @@ describe("visual authority invalidation", () => {
     ["front/tests/e2e/support/approved-mockup-contract.ts", 18],
     ["front/tests/e2e/support/approved-route-scenarios.ts", 18],
     ["front/tests/e2e/support/approved-route-harness.ts", 18],
+    ["front/tests/e2e/support/approved-route-structure.ts", 18],
+    ["front/tests/e2e/support/approved-route-structure.test.ts", 18],
     ["front/tests/e2e/support/approved-route-request-audit.ts", 18],
     ["front/tests/performance/visual-authority-docker.ts", 18],
     ["front/scripts/run-visual-authority-docker.ts", 18],
