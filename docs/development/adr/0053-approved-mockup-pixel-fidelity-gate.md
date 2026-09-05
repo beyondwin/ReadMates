@@ -2,11 +2,11 @@
 
 - 상태: Proposed
 - 결정일: 2026-09-02
-- 갱신일: 2026-09-04
+- 갱신일: 2026-09-06
 - 작성자: product/design/front
 - 관련: ADR-0045, ADR-0048, ADR-0050, ADR-0051, `docs/superpowers/specs/2026-09-02-admin-host-pixel-fidelity-design.md`, `docs/superpowers/specs/2026-09-02-host-approved-first-viewport-design.md`, `docs/superpowers/specs/2026-09-04-admin-host-actual-route-visual-authority-convergence-design.md`, `front/DESIGN.md`
 
-> 제품 구성은 ADR-0048·0050을 유지한다. 승인 PNG를 page composition 권위로, 실제 authenticated route를 최종 실행 권위로 사용한다. Component fixture와 tracked snapshot은 보조 회귀 근거일 뿐 최종 수락을 대신하지 않는다. Composition·geometry·typography·first viewport·interaction은 18/18 통과했지만 strict pixel 18/18 `not_passed_0.02`, 사람 30초 gate, 수동 보조기술 검증, 원격 CI가 남아 `Proposed`다. 로컬 lint·unit·build와 `test:ct:docker` 177건, host lifecycle E2E는 이후 closeout에서 통과했다.
+> 제품 구성은 ADR-0048·0050을 유지한다. 승인 PNG를 page composition 권위로, 실제 authenticated route를 최종 실행 권위로 사용한다. Component fixture와 tracked snapshot은 보조 회귀 근거일 뿐 최종 수락을 대신하지 않는다. 2026-09-06 최종 게이트는 lint error 0, unit 5 failed / 4868 passed, CT 168 passed / 10 failed, approved-routes 18 failed, pixel 18/18 `not_passed_0.02`, structurePass 12 true / 6 false, focused E2E leftover(sticky header; H1 책 제목 vs 모임 제목)다. 사람 30초 gate, 수동 보조기술 검증, 원격 CI가 남아 `Proposed`다. 2026-09-04의 composition·geometry·typography·first viewport·interaction 18/18 통과와 CT 177·host lifecycle E2E 통과는 당시 측정이다.
 
 ## 컨텍스트
 
@@ -69,7 +69,17 @@ Token, shared CSS/component, fixture, route 또는 baseline 변경은 영향 ref
 
 `Proposed`를 유지한다.
 
-2026-09-04 실제 authenticated route 수렴 이후의 측정 상태는 `docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md`에 있다. 진전된 부분:
+**2026-09-06 측정** (punch-list 최종 게이트 / CHANGELOG Verification). 현재 closeout 숫자다. `maxDiffPixelRatio` 0.02는 올리지 않았다.
+
+- `CI=true npx --yes corepack@0.35.0 pnpm --dir front lint` exit 0 (error 0, Fast Refresh warning 5)
+- `test` exit 1 (5 failed / 4868 passed)
+- `build` exit 0
+- `DOCKER_CONTEXT=colima-readmates-va CI=true … test:ct:docker` exit 1 (168 passed / 10 failed)
+- `… test:e2e:approved-routes:docker` exit 1 (Playwright 18 failed, pixel 18/18 `not_passed_0.02`, structurePass 12 true / 6 false)
+- focused E2E trio (`admin-today` · `host-lifecycle-operating-room` · `host-workbox-stage4`, chromium `--retries=0`) leftover: Today `전체 처리 기록 보기` sticky header intercept; lifecycle·workbox H1이 모임 제목을 주장(제품 H1은 책 제목)
+- 사람 30초 discovery gate, VoiceOver/Safari, NVDA/Chrome, 원격 CI는 `not measured`
+
+2026-09-04 실제 authenticated route 수렴 이후의 **당시** 측정은 `docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md`에 있다. 진전된 부분(2026-09-04 기록, 현재 게이트가 아님):
 
 - 18개 `VisualAuthorityScenario`가 실제 authenticated route를 candidate로 소유한다. Test-only shell을 최종 candidate로 쓰지 않는다.
 - Broad font-raster exception API(`allowFontRasterException`, `fontRasterExceptionMaxRatio`, `skipMismatchRatioAssertion`)는 코드에서 제거됐고 unit 검사가 재도입을 막는다. 18/18이 `0.02` fail-closed이며 mask는 18/18 `null`이다.
@@ -80,10 +90,8 @@ Token, shared CSS/component, fixture, route 또는 baseline 변경은 영향 ref
 닫히지 않은 조건:
 
 - Strict pixel은 18/18 `not_passed_0.02`다. 승인 AI PNG 대비 raster 잔여가 남는다. threshold를 올리지 않았고 mask를 추가하지 않았다.
-- 로컬 `pnpm --dir front lint`는 error 0건(Fast Refresh warning 5건), `test` 480 files / 4754, `build`는 통과했다.
-- `DOCKER_CONTEXT=colima-readmates-va pnpm --dir front test:ct:docker`는 177 passed다. 보조 CT snapshot 3장은 현재 composition을 기록한 것이며 승인 PNG가 아니다.
-- Host lifecycle E2E(`host-lifecycle-operating-room.spec.ts`)는 compact 출석 disclose → workspace 출석/되돌리기 → 나머지 출석 마감 → 모임 마치기 → 기록 원장(`/records`)까지 통과했다.
-- Cross-browser smoke와 나머지 focused E2E는 이 closeout에서 다시 돌리지 않았다. 이전 기록의 9건·7건 실패를 통과로 읽지 않는다.
+- 2026-09-04 당시 lint error 0(`test` 480 files / 4754, `build` 통과), CT 177 passed, host lifecycle E2E 통과는 역사적 기록이다. 현재 숫자는 위 2026-09-06 측정을 따른다.
+- 2026-09-04 closeout은 cross-browser smoke와 나머지 focused E2E를 다시 돌리지 않았다. 이전 기록의 9건·7건 실패를 통과로 읽지 않는다.
 - 사람 30초 discovery gate는 `pending_external_human_evidence`다.
 - Chrome toolbar 200% 실측과 VoiceOver/Safari, NVDA/Chrome은 `not_measured`다.
 - 원격 CI는 `pending_remote_ci`다. 로컬 parity로 CI 성공을 추정하지 않는다.

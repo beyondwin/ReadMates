@@ -19,7 +19,7 @@ token, shared CSS/component, fixture 변경은 영향 reference 증거를 무효
 - ADR-0049: Accepted — 독립 schedule-seen revision과 명시적 검토·발송 흐름의 현재 권위
 - ADR-0050: Accepted — 오늘 할 일 중심 운영 데스크 + 클럽 관리·서비스 상태·처리 기록 4축
 - ADR-0051: Accepted — 플랫폼 운영·내 클럽 two-level 전역 공간 전환
-- ADR-0053: Proposed — 승인 PNG를 page composition 권위로, 실제 authenticated route를 최종 실행 권위로 사용. 18/18 composition·geometry·typography·first viewport·interaction 통과, strict pixel 18/18 `not_passed_0.02`(`docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md`). 사람 30초 gate `pending_external_human_evidence`, 보조기술 `not_measured`, 원격 CI `pending_remote_ci`가 남아 픽셀 수락 완료가 아니다.
+- ADR-0053: Proposed — 승인 PNG를 page composition 권위로, 실제 authenticated route를 최종 실행 권위로 사용. 2026-09-06 최종 게이트는 lint error 0, unit 5 failed / 4868 passed, CT 168/10, approved-routes 18 failed, pixel 18/18 `not_passed_0.02`, structurePass 12 true / 6 false다. composition 18/18 GREEN이 아니다. 사람 30초 gate `pending_external_human_evidence`, 보조기술 `not_measured`, 원격 CI `pending_remote_ci`가 남아 픽셀 수락 완료가 아니다. 2026-09-04 보고의 composition·geometry·typography·first viewport·interaction 18/18 통과는 역사적 기록이다(`docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md`).
 - Token source: `design/system/src/styles/tokens.css`
 - Viewport contract: `front/tests/e2e/support/visual-authority-contract.ts`
 - Approved mockup manifest: `front/tests/e2e/support/approved-mockup-manifest.ts`
