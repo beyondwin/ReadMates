@@ -57,6 +57,34 @@ const sentencesClub: AdminClubsLedgerClub = {
   },
 };
 
+const routeShapedClub: AdminClubsLedgerClub = {
+  clubId: "club-sample",
+  name: "샘플 독서모임",
+  href: "/admin/clubs/club-sample",
+  currentState: "활성 · 공개",
+  requiredAction: null,
+  recentSignal: null,
+  emphasis: "quiet",
+  technicalDisclosure: [
+    { label: "클럽 ID", value: "club-sample" },
+    { label: "Slug", value: "sample-reading" },
+    { label: "수명주기 값", value: "ACTIVE" },
+    { label: "공개 상태 값", value: "PUBLIC" },
+  ],
+  facts: [
+    { icon: "people", label: "호스트", value: "1명" },
+    { icon: "link", label: "도메인", value: "연결됨" },
+  ],
+  operationsFacts: {
+    hostsLabel: "호스트 1명",
+    membersLabel: "",
+    recordsLabel: "",
+    domainLabel: "도메인 연결됨",
+    reviewLabel: "활성 · 공개",
+    ageLabel: "",
+  },
+};
+
 const saturdayClub: AdminClubsLedgerClub = {
   clubId: "club-saturday",
   name: "토요일의 책",
@@ -120,6 +148,24 @@ describe("AdminClubsLedger", () => {
     ) as HTMLElement;
     expect(selectedRow).toBeTruthy();
     expect(selectedRow).not.toHaveAttribute("aria-selected");
+  });
+
+  it("keeps four fact icons and does not echo empty member or record labels as values", () => {
+    renderLedger({
+      clubs: [routeShapedClub],
+      filters: {},
+      searchDraft: "",
+    });
+    const facts = screen.getByRole("list", { name: "운영 상태" });
+    expect(facts.querySelectorAll("[data-icon]")).toHaveLength(4);
+    expect(facts.textContent ?? "").not.toMatch(/멤버\s*멤버/);
+    expect(facts.textContent ?? "").not.toMatch(/공개 기록\s*공개 기록/);
+    const member = facts.querySelector('[data-icon="person"]')?.closest("li");
+    const records = facts.querySelector('[data-icon="document"]')?.closest("li");
+    expect(member?.querySelector("span")).toHaveTextContent("멤버");
+    expect(member?.querySelector("strong")).toHaveTextContent("—");
+    expect(records?.querySelector("span")).toHaveTextContent("공개 기록");
+    expect(records?.querySelector("strong")).toHaveTextContent("—");
   });
 
   it("composes page context, work-view filters, and an evidence ledger", () => {

@@ -453,7 +453,7 @@ function ClubDocket({ club }: { club: AdminClubsLedgerClub | null }) {
             <li key={fact.icon}>
               <ReadmatesIcon name={fact.icon} size={16} />
               <span>{fact.label}</span>
-              <strong>{fact.value}</strong>
+              <strong>{fact.value && fact.value !== fact.label ? fact.value : "—"}</strong>
             </li>
           ))}
         </ul>
@@ -499,17 +499,17 @@ function factItems(club: AdminClubsLedgerClub): AdminClubLedgerFact[] {
     {
       icon: "people",
       label: "호스트",
-      value: factValue(ops?.hostsLabel, "호스트", "호스트"),
+      value: factValue(ops?.hostsLabel, "호스트"),
     },
     {
       icon: "person",
       label: "멤버",
-      value: factValue(ops?.membersLabel, "멤버", "멤버"),
+      value: factValue(ops?.membersLabel, "멤버"),
     },
     {
       icon: "document",
       label: "공개 기록",
-      value: factValue(ops?.recordsLabel, "공개 기록", "공개 기록"),
+      value: factValue(ops?.recordsLabel, "공개 기록"),
     },
     {
       icon: "link",
@@ -519,9 +519,19 @@ function factItems(club: AdminClubsLedgerClub): AdminClubLedgerFact[] {
   ].map((fallback) => provided.get(fallback.icon) ?? fallback);
 }
 
-function factValue(raw: string | undefined, prefix: string, fallback: string) {
-  if (!raw) return fallback;
-  return raw.startsWith(prefix) ? raw.slice(prefix.length).trim() || fallback : raw;
+function factValue(raw: string | undefined, prefix: string, fallback?: string) {
+  return stripFactPrefix(raw, prefix) || stripFactPrefix(fallback, prefix) || "—";
+}
+
+function stripFactPrefix(raw: string | undefined, prefix: string) {
+  if (!raw?.trim()) return "";
+  const trimmed = raw.trim();
+  if (trimmed === prefix) return "";
+  if (trimmed.startsWith(prefix)) {
+    const rest = trimmed.slice(prefix.length).trim();
+    return rest && rest !== prefix ? rest : "";
+  }
+  return trimmed;
 }
 
 function reviewCopy(club: AdminClubsLedgerClub): readonly { text: string }[] {
