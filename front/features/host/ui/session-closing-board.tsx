@@ -63,7 +63,7 @@ export function SessionClosingBoard({
                   </span>
                   <strong>{item.label}</strong>
                 </div>
-                <span className="rm-session-closing-board__status" data-status={item.stateLabel}>
+                <span className="rm-session-closing-board__status" data-tone={item.tone}>
                   {item.stateLabel}
                 </span>
                 {item.completedStamp ? (

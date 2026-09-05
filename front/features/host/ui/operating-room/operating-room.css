@@ -961,23 +961,22 @@ h1.rm-operating-room-header__title {
 }
 
 .rm-preparation-ledger-row[data-state="complete"] .rm-preparation-ledger-row__value,
-.rm-preparation-ledger-row[data-state="normal"] .rm-preparation-ledger-row__value,
-.rm-phase-status-ledger-row[data-state="complete"] .rm-phase-status-ledger-row__value,
-.rm-phase-status-ledger-row[data-state="normal"] .rm-phase-status-ledger-row__value {
+.rm-phase-status-ledger-row[data-tone="ok"] .rm-phase-status-ledger-row__value {
   color: var(--ok);
 }
 
 .rm-preparation-ledger-row[data-state="warning"] .rm-preparation-ledger-row__value,
-.rm-phase-status-ledger-row[data-state="warning"] .rm-phase-status-ledger-row__value {
+.rm-preparation-ledger-row[data-state="unavailable"] .rm-preparation-ledger-row__value,
+.rm-phase-status-ledger-row[data-tone="warn"] .rm-phase-status-ledger-row__value {
   color: var(--warn);
 }
 
-.rm-phase-status-ledger-row[data-state="in-progress"] .rm-phase-status-ledger-row__value {
-  color: var(--accent);
+.rm-phase-status-ledger-row[data-tone="danger"] .rm-phase-status-ledger-row__value {
+  color: var(--danger);
 }
 
-.rm-phase-status-ledger-row[data-state="pending"] .rm-phase-status-ledger-row__value {
-  color: var(--text-3);
+.rm-phase-status-ledger-row[data-tone="muted"] .rm-phase-status-ledger-row__value {
+  color: var(--text-2);
 }
 
 .rm-preparation-ledger-row__detail,

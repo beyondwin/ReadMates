@@ -75,7 +75,7 @@ const view: HostOperatingRoomView = {
       id: "schedule-seen",
       label: "현재 일정 확인",
       state: "warning",
-      value: "현재 일정 확인 0/12,345",
+      value: "0 / 12,345",
       detail: "변경 전 확인 1 · 미열람 12,344",
       numerator: 0,
       denominator: 12_345,
@@ -87,7 +87,7 @@ const view: HostOperatingRoomView = {
       id: "rsvp",
       label: "참석 응답",
       state: "complete",
-      value: "응답 12,345/12,345",
+      value: "12,345 / 12,345",
       detail: "모든 참여자가 응답했습니다.",
       numerator: 12_345,
       denominator: 12_345,
@@ -266,7 +266,7 @@ for (const viewport of viewports) {
     await expect(nextAction).toBeVisible();
     await expect(preparation).toBeVisible();
     await expect(workbox).toBeVisible();
-    await expect(component.getByText("현재 일정 확인 0/12,345")).toBeVisible();
+    await expect(component.getByText("0 / 12,345")).toBeVisible();
     await expect(workbox.locator("li.rm-host-work-item")).toHaveCount(2);
     await expect(component.getByText("알림 실패 확인 일부 행을 불러오지 못했어요.")).toBeVisible();
     for (const row of await workbox.locator("li.rm-host-work-item").all()) {
@@ -524,6 +524,7 @@ function phaseStatusLedger(
     detail: string;
     href: string;
     action: string;
+    tone: "ok" | "warn" | "danger" | "muted";
   }[],
 ) {
   return <PhaseStatusLedger title={title} rows={rows} />;
@@ -654,10 +655,10 @@ const closingWorkboxItems = [
 ] as const;
 
 const liveStatusRows = [
-  { label: "실제 출석", value: "8 / 12", detail: "참석 8 · 알린 불참 1 · 확인 필요 3", href: "?section=attendance", action: "출석 보기" },
-  { label: "참석 응답", value: "9 / 12", detail: "참석 7 · 불참 2 · 미응답 3", href: "?section=responses", action: "응답 보기" },
-  { label: "진행 순서", value: "2 / 5", detail: "첫 질문 나누는 중", href: "?section=agenda", action: "진행 보기" },
-  { label: "현장 메모", value: "3개", detail: "호스트만 볼 수 있어요", href: "?section=notes", action: "메모 열기" },
+  { label: "실제 출석", value: "8 / 12", detail: "참석 8 · 알린 불참 1 · 확인 필요 3", href: "?section=attendance", action: "출석 보기", tone: "warn" },
+  { label: "참석 응답", value: "9 / 12", detail: "참석 7 · 불참 2 · 미응답 3", href: "?section=responses", action: "응답 보기", tone: "warn" },
+  { label: "진행 순서", value: "2 / 5", detail: "첫 질문 나누는 중", href: "?section=agenda", action: "진행 보기", tone: "muted" },
+  { label: "현장 메모", value: "3개", detail: "호스트만 볼 수 있어요", href: "?section=notes", action: "메모 열기", tone: "muted" },
 ] as const;
 
 const liveAttendanceCensus = {
@@ -667,11 +668,11 @@ const liveAttendanceCensus = {
 } as const;
 
 const closingStatusRows = [
-  { label: "출석 확정", value: "완료", detail: "9명 · 어제 21:42", href: "?section=attendance", action: "출석 보기" },
-  { label: "소감 수집", value: "8 / 12", detail: "미작성 4명", href: "?section=notes", action: "대상 보기" },
-  { label: "기록 초안", value: "작성 중", detail: "마지막 저장 오늘 10:18", href: "?section=records", action: "초안 열기" },
-  { label: "피드백 문서", value: "확인 필요", detail: "파일 1개", href: "?section=feedback", action: "문서 확인" },
-  { label: "멤버 게시", value: "대기", detail: "앞선 2단계 남음", href: "?section=publish", action: "게시 조건" },
+  { label: "출석 확정", value: "완료", detail: "9명 · 어제 21:42", href: "?section=attendance", action: "출석 보기", tone: "ok" },
+  { label: "소감 수집", value: "8 / 12", detail: "미작성 4명", href: "?section=notes", action: "대상 보기", tone: "warn" },
+  { label: "기록 초안", value: "작성 중", detail: "마지막 저장 오늘 10:18", href: "?section=records", action: "초안 열기", tone: "muted" },
+  { label: "피드백 문서", value: "확인 필요", detail: "파일 1개", href: "?section=feedback", action: "문서 확인", tone: "warn" },
+  { label: "멤버 게시", value: "대기", detail: "앞선 2단계 남음", href: "?section=publish", action: "게시 조건", tone: "muted" },
 ] as const;
 
 const liveAttendees = [

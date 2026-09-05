@@ -156,4 +156,35 @@ describe("SessionClosingBoard", () => {
     expect(indices).toEqual(["1", "2"]);
     expect(screen.getByRole("link", { name: "수동 발송" }).querySelector("svg[data-icon='chevron-right']")).not.toBeNull();
   });
+
+  it("colors checklist status from tone so attention rows are not success-green", () => {
+    render(
+      <SessionClosingBoard
+        view={{
+          ...view,
+          checklist: [
+            ...view.checklist,
+            {
+              id: "FEEDBACK_DOCUMENT_READY",
+              label: "피드백 문서",
+              detail: "없음",
+              state: "BLOCKED",
+              stateLabel: "차단",
+              tone: "danger",
+              href: null,
+              actionLabel: "상태 확인",
+              completedStamp: null,
+            },
+          ],
+        }}
+        embedded
+      />,
+    );
+
+    expect(screen.getByText("완료")).toHaveAttribute("data-tone", "ok");
+    expect(screen.getByText("조치 필요")).toHaveAttribute("data-tone", "warn");
+    expect(screen.getByText("차단")).toHaveAttribute("data-tone", "danger");
+    expect(screen.getByText("조치 필요")).not.toHaveAttribute("data-tone", "ok");
+    expect(screen.getByText("차단")).not.toHaveAttribute("data-tone", "ok");
+  });
 });

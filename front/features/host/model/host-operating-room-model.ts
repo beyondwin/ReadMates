@@ -87,12 +87,15 @@ export type PreparationLedgerRowView = {
   actionLabel: string;
 };
 
+export type PhaseStatusLedgerTone = "ok" | "warn" | "danger" | "muted";
+
 export type PhaseStatusLedgerRowView = {
   label: string;
   value: string;
   detail: string;
   href: string | null;
   action: string;
+  tone: PhaseStatusLedgerTone;
 };
 
 export type HostOperatingRoomView = {
@@ -300,7 +303,7 @@ function scheduleSeenRow(
     id: "schedule-seen",
     label: "현재 일정 확인",
     state: pendingCount > 0 ? "warning" : "complete",
-    value: `현재 일정 확인 ${countFor(summary, "CURRENT")}/${summary.eligibleCount}`,
+    value: ratioLabel(countFor(summary, "CURRENT"), summary.eligibleCount),
     detail: pendingCount > 0 ? `미열람 ${unseenCount} · 변경 전 확인 ${staleCount}` : "모두 최신 일정을 확인했습니다.",
     numerator: countFor(summary, "CURRENT"),
     denominator: summary.eligibleCount,
@@ -330,7 +333,7 @@ function rsvpRow(
     id: "rsvp",
     label: "참석 응답",
     state: missing > 0 ? "warning" : "complete",
-    value: `응답 ${responded}/${participants.length}`,
+    value: ratioLabel(responded, participants.length),
     detail: missing > 0 ? `미응답 ${missing}` : "모든 참여자가 응답했습니다.",
     numerator: responded,
     denominator: participants.length,
@@ -360,7 +363,7 @@ function questionRow(
     id: "questions",
     label: "발제 질문",
     state: questionCount > 0 ? "complete" : "warning",
-    value: `질문 작성 ${respondingMemberCount}/${eligibleMemberCount} · ${questionCount}개`,
+    value: ratioLabel(respondingMemberCount, eligibleMemberCount),
     detail: questionCount > 0 ? "발제 질문이 모였습니다." : "첫 발제 질문을 준비하세요.",
     numerator: respondingMemberCount,
     denominator: eligibleMemberCount,
@@ -609,6 +612,7 @@ export function buildLivePhaseStatusRows(
       detail: `참석 ${attended} · 알린 불참 ${absent} · 확인 필요 ${unknown}`,
       href: hostSessionPath(basePath, meeting.sessionId, "?section=attendance"),
       action: "출석 보기",
+      tone: ratioTone(attended, total, unknown),
     },
     {
       label: "참석 응답",
@@ -616,6 +620,7 @@ export function buildLivePhaseStatusRows(
       detail: rsvpDetail,
       href: hostSessionPath(basePath, meeting.sessionId, "?section=responses"),
       action: "응답 보기",
+      tone: ratioTone(responded, total, noResponse),
     },
     {
       label: "진행 순서",
@@ -623,6 +628,7 @@ export function buildLivePhaseStatusRows(
       detail: "진행 순서는 모임 작업에서 확인할 수 있어요",
       href: hostSessionPath(basePath, meeting.sessionId, "?section=agenda"),
       action: "진행 보기",
+      tone: "muted",
     },
     {
       label: "현장 메모",
@@ -630,6 +636,7 @@ export function buildLivePhaseStatusRows(
       detail: "호스트만 볼 수 있어요",
       href: hostSessionPath(basePath, meeting.sessionId, "?section=notes"),
       action: "메모 열기",
+      tone: "muted",
     },
   ];
 }
@@ -643,6 +650,7 @@ export function buildClosingPhaseStatusRows(
     detail: item.completedStamp ?? item.detail,
     href: item.href,
     action: closingLedgerAction(item.label),
+    tone: closingTone(item.tone),
   }));
 }
 
@@ -657,6 +665,26 @@ function closingLedgerAction(label: string): string {
   if (label === "피드백 문서 확인" || label === "피드백 문서") return "문서 확인";
   if (label === "멤버 게시") return "게시 조건";
   return "열기";
+}
+
+function ratioLabel(numerator: number, denominator: number): string {
+  return `${numerator} / ${denominator}`;
+}
+
+function ratioTone(
+  numerator: number,
+  denominator: number,
+  pending = 0,
+): PhaseStatusLedgerTone {
+  if (pending > 0 || denominator === 0 || numerator < denominator) return "warn";
+  return "ok";
+}
+
+function closingTone(tone: SessionClosingBoardView["checklist"][number]["tone"]): PhaseStatusLedgerTone {
+  if (tone === "ok") return "ok";
+  if (tone === "warn") return "warn";
+  if (tone === "danger") return "danger";
+  return "muted";
 }
 
 function preparationActionLabel(id: PreparationRowId): string {

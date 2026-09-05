@@ -208,9 +208,9 @@ describe("buildHostOperatingRoomView", () => {
       value: row.value,
       actionLabel: row.actionLabel,
     }))).toEqual([
-      { id: "schedule-seen", numerator: 2, denominator: 4, value: "현재 일정 확인 2/4", actionLabel: "멤버 보기" },
-      { id: "rsvp", numerator: 2, denominator: 4, value: "응답 2/4", actionLabel: "응답 보기" },
-      { id: "questions", numerator: 3, denominator: 4, value: "질문 작성 3/4 · 5개", actionLabel: "질문 보기" },
+      { id: "schedule-seen", numerator: 2, denominator: 4, value: "2 / 4", actionLabel: "멤버 보기" },
+      { id: "rsvp", numerator: 2, denominator: 4, value: "2 / 4", actionLabel: "응답 보기" },
+      { id: "questions", numerator: 3, denominator: 4, value: "3 / 4", actionLabel: "질문 보기" },
       { id: "place", numerator: null, denominator: null, value: "작은 서재", actionLabel: "정보 보기" },
     ]);
   });
@@ -468,9 +468,9 @@ describe("buildHostOperatingRoomView", () => {
     }));
 
     expect(view.preparation.slice(0, 3).map(({ numerator, denominator, value }) => ({ numerator, denominator, value }))).toEqual([
-      { numerator: 2, denominator: 4, value: "현재 일정 확인 2/4" },
-      { numerator: 0, denominator: 0, value: "응답 0/0" },
-      { numerator: 0, denominator: 0, value: "질문 작성 0/0 · 0개" },
+      { numerator: 2, denominator: 4, value: "2 / 4" },
+      { numerator: 0, denominator: 0, value: "0 / 0" },
+      { numerator: 0, denominator: 0, value: "0 / 0" },
     ]);
     expect(view.preparation.some(({ value }) => value === "집계 준비 중")).toBe(false);
   });
@@ -551,14 +551,17 @@ describe("operating-room phase status rows", () => {
       detail: "참석 1 · 알린 불참 1 · 확인 필요 2",
       action: "출석 보기",
       href: "/clubs/book-club/app/host/sessions/session-12?section=attendance",
+      tone: "warn",
     });
     expect(rows[1]).toMatchObject({
       value: "2 / 4",
       detail: "참석 1 · 불참 1 · 미응답 2",
       action: "응답 보기",
+      tone: "warn",
     });
-    expect(rows[2]?.value).toBe("확인 전");
+    expect(rows[2]).toMatchObject({ value: "확인 전", tone: "muted" });
     expect(rows[3]?.detail).toBe("호스트만 볼 수 있어요");
+    expect(rows[3]?.tone).toBe("muted");
   });
 
   it("maps the closing checklist into the approved 마감 현황 composition", () => {
@@ -586,6 +589,7 @@ describe("operating-room phase status rows", () => {
         label: "출석 확정",
         value: "완료",
         action: "출석 보기",
+        tone: "ok",
       }),
       expect.objectContaining({
         label: "기록 초안",
@@ -593,6 +597,7 @@ describe("operating-room phase status rows", () => {
         detail: "정리본을 검토하세요.",
         action: "초안 열기",
         href: "/clubs/book-club/app/host/sessions/session-12?section=records",
+        tone: "warn",
       }),
     ]));
   });

@@ -14,6 +14,7 @@ describe("PhaseStatusLedger", () => {
             detail: "참석 8 · 알린 불참 1 · 확인 필요 3",
             href: "/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=attendance",
             action: "출석 보기",
+            tone: "warn",
           },
           {
             label: "참석 응답",
@@ -21,6 +22,7 @@ describe("PhaseStatusLedger", () => {
             detail: "참석 7 · 불참 2 · 미응답 3",
             href: "/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=responses",
             action: "응답 보기",
+            tone: "warn",
           },
         ]}
       />,
@@ -44,11 +46,11 @@ describe("PhaseStatusLedger", () => {
       <PhaseStatusLedger
         title="마감 현황"
         rows={[
-          { label: "출석 확정", value: "완료", detail: "9명 · 어제 21:42", href: "?section=attendance", action: "출석 보기" },
-          { label: "소감 수집", value: "8 / 12", detail: "미작성 4명", href: "?section=notes", action: "대상 보기" },
-          { label: "기록 초안", value: "작성 중", detail: "마지막 저장 오늘 10:18", href: "?section=records", action: "초안 열기" },
-          { label: "피드백 문서", value: "확인 필요", detail: "파일 1개", href: "?section=feedback", action: "문서 확인" },
-          { label: "멤버 게시", value: "대기", detail: "앞선 2단계 남음", href: "?section=publish", action: "게시 조건" },
+          { label: "출석 확정", value: "완료", detail: "9명 · 어제 21:42", href: "?section=attendance", action: "출석 보기", tone: "ok" },
+          { label: "소감 수집", value: "8 / 12", detail: "미작성 4명", href: "?section=notes", action: "대상 보기", tone: "warn" },
+          { label: "기록 초안", value: "작성 중", detail: "마지막 저장 오늘 10:18", href: "?section=records", action: "초안 열기", tone: "muted" },
+          { label: "피드백 문서", value: "확인 필요", detail: "파일 1개", href: "?section=feedback", action: "문서 확인", tone: "warn" },
+          { label: "멤버 게시", value: "대기", detail: "앞선 2단계 남음", href: "?section=publish", action: "게시 조건", tone: "muted" },
         ]}
       />,
     );
@@ -63,5 +65,48 @@ describe("PhaseStatusLedger", () => {
     expect(screen.getByText("세부 내용")).toBeTruthy();
     expect(screen.queryByRole("link", { name: /자세히 보기/ })).toBeNull();
     expect(region.querySelector("svg[data-icon='chevron-right']")).not.toBeNull();
+  });
+
+  it("does not paint incomplete live counts or attention closing rows as success-green", () => {
+    const { rerender } = render(
+      <PhaseStatusLedger
+        title="현장 현황"
+        rows={[
+          {
+            label: "실제 출석",
+            value: "8 / 12",
+            detail: "참석 8 · 알린 불참 1 · 확인 필요 3",
+            href: "?section=attendance",
+            action: "출석 보기",
+            tone: "warn",
+          },
+        ]}
+      />,
+    );
+
+    const live = screen.getByRole("listitem", { name: "실제 출석" });
+    expect(live).toHaveAttribute("data-tone", "warn");
+    expect(live).not.toHaveAttribute("data-tone", "ok");
+    expect(live).not.toHaveAttribute("data-state", "complete");
+    expect(live).not.toHaveAttribute("data-state", "normal");
+
+    rerender(
+      <PhaseStatusLedger
+        title="마감 현황"
+        rows={[
+          { label: "소감 수집", value: "조치 필요", detail: "미작성 4명", href: "?section=notes", action: "대상 보기", tone: "warn" },
+          { label: "피드백 문서", value: "차단", detail: "파일 없음", href: "?section=feedback", action: "문서 확인", tone: "danger" },
+        ]}
+      />,
+    );
+
+    const required = screen.getByRole("listitem", { name: "소감 수집" });
+    const blocked = screen.getByRole("listitem", { name: "피드백 문서" });
+    expect(required).toHaveAttribute("data-tone", "warn");
+    expect(blocked).toHaveAttribute("data-tone", "danger");
+    expect(required).not.toHaveAttribute("data-tone", "ok");
+    expect(blocked).not.toHaveAttribute("data-tone", "ok");
+    expect(required).not.toHaveAttribute("data-state", "complete");
+    expect(blocked).not.toHaveAttribute("data-state", "complete");
   });
 });

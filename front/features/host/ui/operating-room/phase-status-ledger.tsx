@@ -50,7 +50,8 @@ export function PhaseStatusLedger({
               key={row.label}
               className="rm-preparation-ledger-row rm-phase-status-ledger-row"
               aria-label={row.label}
-              data-state={phaseValueState(row.value)}
+              data-tone={row.tone}
+              data-state={toneState(row.tone)}
             >
               <span className="rm-preparation-ledger-row__label rm-phase-status-ledger-row__label">
                 {numbered ? (
@@ -92,10 +93,9 @@ function liveGlyph(label: string): ReadmatesIconName | null {
   return null;
 }
 
-function phaseValueState(value: string): string {
-  if (value === "완료") return "complete";
-  if (value === "작성 중") return "in-progress";
-  if (value === "확인 필요") return "warning";
-  if (value === "대기" || value === "확인 전") return "pending";
-  return "normal";
+function toneState(tone: PhaseStatusLedgerRowView["tone"]): string {
+  if (tone === "ok") return "complete";
+  if (tone === "warn") return "warning";
+  if (tone === "danger") return "unavailable";
+  return "muted";
 }

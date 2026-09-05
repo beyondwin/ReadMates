@@ -9,7 +9,7 @@ const rows: readonly PreparationLedgerRowView[] = [
     id: "schedule-seen",
     label: "현재 일정 확인",
     state: "warning",
-    value: "현재 일정 확인 0/12",
+    value: "0 / 12",
     detail: "미열람 12 · 변경 전 확인 0",
     numerator: 0,
     denominator: 12,
@@ -21,7 +21,7 @@ const rows: readonly PreparationLedgerRowView[] = [
     id: "rsvp",
     label: "참석 응답",
     state: "complete",
-    value: "응답 12/12",
+    value: "12 / 12",
     detail: "모든 참여자가 응답했습니다.",
     numerator: 12,
     denominator: 12,
@@ -89,7 +89,8 @@ describe("PreparationLedger", () => {
     render(<PreparationLedger rows={rows} />);
 
     const schedule = screen.getByRole("listitem", { name: "현재 일정 확인" });
-    expect(within(schedule).getByText("현재 일정 확인 0/12")).toBeVisible();
+    expect(within(schedule).getByText("0 / 12")).toBeVisible();
+    expect(within(schedule).queryByText("현재 일정 확인 0/12")).not.toBeInTheDocument();
     expect(within(schedule).getByText("확인 필요")).toHaveClass("rm-sr-only");
 
     const questions = screen.getByRole("listitem", { name: "발제 질문" });
@@ -125,7 +126,8 @@ describe("PreparationLedger", () => {
 
     expect(onRetry).toHaveBeenCalledOnce();
     expect(onRetry).toHaveBeenCalledWith("questions");
-    expect(screen.queryByRole("button", { name: "일정 확인 다시 불러오기" })).not.toBeInTheDocument();
+    const schedule = screen.getByRole("listitem", { name: "현재 일정 확인" });
+    expect(within(schedule).queryByRole("button", { name: "현재 일정 확인 다시 불러오기" })).not.toBeInTheDocument();
   });
 
   it("does not invent links or retry actions when their owner did not supply them", () => {

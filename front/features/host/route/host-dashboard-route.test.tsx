@@ -588,7 +588,7 @@ describe("HostDashboardRoute", () => {
     );
 
     const ledger = await screen.findByRole("region", { name: "준비 현황" });
-    expect(within(ledger).getByText("현재 일정 확인 1/2")).toBeVisible();
+    expect(within(ledger).getByText("1 / 2")).toBeVisible();
     expect(screen.getByRole("region", { name: "다음에 할 일" })).toHaveTextContent("최신 일정을 아직 보지 않은 1명이 있어요");
     expect(screen.getByRole("link", { name: "대상과 문구 검토" })).toHaveAttribute(
       "href",
@@ -649,7 +649,7 @@ describe("HostDashboardRoute", () => {
     expect(screen.getByRole("region", { name: "다음에 할 일" })).toHaveTextContent("최신 일정을 아직 보지 않은 1명이 있어요");
     const ledger = screen.getByRole("region", { name: "준비 현황" });
     expect(within(ledger).getAllByRole("listitem")).toHaveLength(4);
-    expect(within(ledger).getByText("현재 일정 확인 1/2")).toBeVisible();
+    expect(within(ledger).getByText("1 / 2")).toBeVisible();
     expect(screen.getByRole("link", { name: "모임 정보" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7?section=basic",

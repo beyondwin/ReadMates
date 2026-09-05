@@ -47,19 +47,20 @@
   white-space: nowrap;
 }
 
-.rm-session-closing-board__status[data-status="완료"] {
+.rm-session-closing-board__status[data-tone="ok"] {
   color: var(--ok);
 }
 
-.rm-session-closing-board__status[data-status="작성 중"] {
-  color: var(--accent);
-}
-
-.rm-session-closing-board__status[data-status="확인 필요"] {
+.rm-session-closing-board__status[data-tone="warn"] {
   color: var(--warn);
 }
 
-.rm-session-closing-board__status[data-status="대기"] {
+.rm-session-closing-board__status[data-tone="danger"] {
+  color: var(--danger);
+}
+
+.rm-session-closing-board__status[data-tone="muted"],
+.rm-session-closing-board__status[data-tone="accent"] {
   color: var(--text-3);
 }
 
