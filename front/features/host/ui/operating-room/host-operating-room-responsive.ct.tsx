@@ -184,6 +184,22 @@ function hostWorkbox(overrides: {
   );
 }
 
+async function expectApprovedWorkboxRow(row: Locator) {
+  await expect(row).toBeVisible();
+  await expect(row).toHaveClass(/rm-host-work-item/);
+  await expect(row.locator("details")).toHaveCount(0);
+  await expect(row).not.toContainText("세부 조작");
+  const destination = row.locator("a.rm-host-work-item__destination");
+  await expect(destination).toBeVisible();
+  await expect(destination.locator(".rm-icon-badge")).toBeVisible();
+  await expect(destination.locator(".rm-host-work-item__title")).toBeVisible();
+  await expect(destination.locator(".rm-host-work-item__meta")).toBeVisible();
+  await expect(destination.locator('[data-icon="chevron-right"]')).toBeVisible();
+  await expect(row.locator(".rm-host-work-item__deferral")).toHaveCount(0);
+  await expect(row.getByRole("combobox", { name: /보류 기간/ })).toHaveCount(0);
+  await expect(row.getByRole("button", { name: /보류$/ })).toHaveCount(0);
+}
+
 function operatingRoomFixture(
   recovery: AttendanceRecoveryView | null = null,
   workboxContent: ReactNode = hostWorkbox(),
@@ -245,9 +261,12 @@ for (const viewport of viewports) {
     await expect(preparation).toBeVisible();
     await expect(workbox).toBeVisible();
     await expect(component.getByText("현재 일정 확인 0/12,345")).toBeVisible();
-    await expect(workbox.locator(".rm-host-work-item")).toHaveCount(2);
+    await expect(workbox.locator("li.rm-host-work-item")).toHaveCount(2);
     await expect(component.getByText("알림 실패 확인 일부 행을 불러오지 못했어요.")).toBeVisible();
-    await expect(workbox.locator("details.rm-host-work-item__secondary").first()).not.toHaveAttribute("open");
+    for (const row of await workbox.locator("li.rm-host-work-item").all()) {
+      await expectApprovedWorkboxRow(row);
+    }
+    await expect(workbox).not.toContainText("세부 조작");
     await expect(component.getByRole("combobox", { name: /보류 기간/ })).toHaveCount(0);
 
     const order = [context, phases, nextAction, preparation, workbox];
@@ -367,8 +386,7 @@ test("operating room partial warning keeps unaffected rows usable", async ({ mou
   await expect(component.getByRole("button", { name: "현재 묶음 다시 불러오기" })).toBeVisible();
   await expect(component.getByRole("listitem", { name: workboxView.items[0]!.title })).toBeVisible();
   const row = component.getByRole("listitem", { name: workboxView.items[1]!.title });
-  await expect(row).toBeVisible();
-  await expect(row.locator("details.rm-host-work-item__secondary")).not.toHaveAttribute("open");
+  await expectApprovedWorkboxRow(row);
   await expectNoHorizontalOverflow(page);
 });
 
