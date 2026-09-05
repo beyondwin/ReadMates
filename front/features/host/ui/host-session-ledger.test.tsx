@@ -151,6 +151,39 @@ describe("HostSessionLedger", () => {
     expect(screen.queryByRole("button", { name: "다음 묶음 불러오기" })).not.toBeInTheDocument();
   });
 
+  it("hides records rail show-all when four or fewer items include a notification failure", () => {
+    render(
+      <HostSessionLedger
+        items={items}
+        filters={filters}
+        nextCursor={null}
+        loadingMore={false}
+        onFiltersChange={vi.fn()}
+        onLoadMore={vi.fn()}
+        workbox={{
+          ...workboxView,
+          items: [
+            workboxView.items[0],
+            {
+              ...workboxView.items[0],
+              key: "NOTIFICATION_FAILURE:session-28",
+              type: "NOTIFICATION_FAILURE",
+              title: "피드백 문서 확인",
+              operationalLabel: "알림 실패 확인",
+              destinationCategory: "notifications",
+            },
+          ],
+        }}
+        LinkComponent={({ to, children, ...props }) => <a {...props} href={to}>{children}</a>}
+      />,
+    );
+
+    const rail = document.querySelector(".rm-record-ledger__rail");
+    expect(rail).toBeTruthy();
+    expect(within(rail as HTMLElement).getAllByRole("listitem")).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "작업함 모두 보기" })).not.toBeInTheDocument();
+  });
+
   it("submits normalized search and exposes filter state changes", async () => {
     const user = userEvent.setup();
     const onFiltersChange = vi.fn();

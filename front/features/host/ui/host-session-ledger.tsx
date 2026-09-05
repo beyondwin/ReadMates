@@ -633,7 +633,9 @@ export function HostSessionLedger({
               }}
               onRetry={onWorkboxRetry ?? noopWorkboxHandler}
               onLoadMore={onWorkboxLoadMore ?? noopWorkboxHandler}
-              onShowAll={() => setWorkboxExpanded(true)}
+              onShowAll={workboxDisclosure && workboxDisclosure.hiddenCount > 0
+                ? () => setWorkboxExpanded(true)
+                : undefined}
               LinkComponent={LinkComponent}
             />
           </aside>
