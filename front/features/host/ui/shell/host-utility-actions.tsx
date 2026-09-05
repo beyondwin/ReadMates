@@ -18,6 +18,7 @@ export type HostUtilityActionsProps = {
   unreadNotifications: number;
   permissionLimits: readonly UtilityLimit[];
   currentId?: HostUtilityActionId;
+  compact?: boolean;
   LinkComponent?: ClubShellLinkComponent;
 };
 
@@ -40,20 +41,26 @@ export function HostUtilityActions({
   unreadNotifications,
   permissionLimits,
   currentId,
+  compact = false,
   LinkComponent = DefaultLink,
 }: HostUtilityActionsProps) {
   const instanceId = useId();
   const unreadCount = Math.max(0, Math.trunc(unreadNotifications));
   const limitations = new Map(permissionLimits.map((limit) => [limit.id, limit.reason]));
-  const actions = [
-    { id: "settings" as const, label: "초대와 설정", href: settingsHref },
-    { id: "member-view" as const, label: "멤버 시야", href: memberViewHref },
-    { id: "notifications" as const, label: "알림", href: notificationsHref },
-    { id: "new-meeting" as const, label: "새 모임", href: newMeetingHref },
-  ];
+  const actions = compact
+    ? [{ id: "notifications" as const, label: "알림", href: notificationsHref }]
+    : [
+      { id: "settings" as const, label: "초대와 설정", href: settingsHref },
+      { id: "member-view" as const, label: "멤버 시야", href: memberViewHref },
+      { id: "notifications" as const, label: "알림", href: notificationsHref },
+      { id: "new-meeting" as const, label: "새 모임", href: newMeetingHref },
+    ];
 
   return (
-    <nav className="rm-host-utility-actions" aria-label="호스트 유틸리티">
+    <nav
+      className={compact ? "rm-host-utility-actions rm-host-utility-actions--compact" : "rm-host-utility-actions"}
+      aria-label="호스트 유틸리티"
+    >
       <ul>
         {actions.map((action) => {
           const disabledReason = limitations.get(action.id);

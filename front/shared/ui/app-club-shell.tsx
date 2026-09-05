@@ -24,6 +24,8 @@ export type AppClubShellProps = {
   spaceSwitcher: GlobalSpaceSwitcherSlot;
   primarySlot?: ClubShellResponsiveSlot;
   utilitySlot?: ClubShellResponsiveSlot;
+  mobileHeaderSpaceControl?: ReactNode;
+  mobileHeaderUtility?: ReactNode;
   beforeContent?: ReactNode;
   securityController?: ReactNode;
   desktopFooter?: ReactNode;
@@ -42,6 +44,8 @@ export function AppClubShell({
   spaceSwitcher,
   primarySlot,
   utilitySlot,
+  mobileHeaderSpaceControl,
+  mobileHeaderUtility,
   beforeContent,
   securityController,
   desktopFooter,
@@ -51,6 +55,15 @@ export function AppClubShell({
   const mobileNavLabel = `${desktopNavLabel} 모바일`;
   const desktopContextControl = spaceSwitcher.desktop;
   const mobileContextControl = spaceSwitcher.mobile ?? spaceSwitcher.desktop;
+  const headerSpaceControl = mobileHeaderSpaceControl ?? (workspace === "host" ? mobileContextControl : undefined);
+  const mobileContextChildren = workspace === "host"
+    ? null
+    : (
+      <>
+        {mobileContextControl}
+        {utilitySlot?.mobile}
+      </>
+    );
 
   return (
     <div className="app-shell rm-app-club-shell" data-workspace={workspace}>
@@ -78,12 +91,13 @@ export function AppClubShell({
           }}
           LinkComponent={LinkComponent}
           accountControl={account.control}
+          spaceControl={headerSpaceControl}
+          utilityControl={mobileHeaderUtility}
         />
       </div>
       <div className="mobile-only rm-club-shell-mobile-context" data-club-shell-region="mobile-context">
         <div className="rm-club-shell-mobile-context__inner">
-          {mobileContextControl}
-          {utilitySlot?.mobile}
+          {mobileContextChildren}
         </div>
       </div>
       <div className="app-content" data-club-shell-region="content">

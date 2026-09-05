@@ -8,6 +8,7 @@ import {
 import { hasHostRecordsReturnState } from "@/shared/routing/readmates-route-state";
 import { HOST_ROUTE_HREFS } from "@/shared/routing/host-route-destinations";
 import type { PrimaryNavigationItem } from "@/shared/model/app-club-shell";
+import { ReadmatesIcon, type ReadmatesIconName } from "./icon";
 
 export type MobileTabBarVariant = "member" | "host";
 
@@ -33,18 +34,21 @@ type MobileTabBarProps = {
   navLabel?: string;
 };
 
-export type TabIconName =
-  | "home"
-  | "session"
-  | "notes"
-  | "archive"
-  | "notifications"
-  | "me"
-  | "host"
-  | "edit"
-  | "notify"
-  | "invite"
-  | "approve";
+export type TabIconName = ReadmatesIconName;
+
+const LEGACY_TAB_ICON: Record<string, ReadmatesIconName> = {
+  session: "calendar",
+  notes: "notes",
+  archive: "document",
+  me: "person",
+  host: "home",
+  notify: "bell",
+  invite: "mail",
+  approve: "people",
+  edit: "edit",
+  notifications: "bell",
+  home: "home",
+};
 
 type TabLink = {
   key: string;
@@ -57,7 +61,7 @@ type TabLink = {
     onRetry: () => void;
     pending: boolean;
   };
-  icon: TabIconName;
+  icon: TabIconName | string;
   current: (pathname: string) => boolean;
 };
 
@@ -138,14 +142,14 @@ function hostTabs({
       key: "host-operating-room",
       href: HOST_ROUTE_HREFS.operatingRoom,
       label: READMATES_MOBILE_TAB_LABELS.hostOperatingRoom,
-      icon: "host",
+      icon: "home",
       current: (pathname) => pathname === "/app/host" || pathname === "/app/host/operations",
     },
     {
       key: "host-meetings",
       href: HOST_ROUTE_HREFS.meetings,
       label: READMATES_MOBILE_TAB_LABELS.hostMeetings,
-      icon: "session",
+      icon: "calendar",
       current: (pathname) =>
         pathname === "/app/host/sessions"
         || pathname === "/app/host/sessions/new"
@@ -155,7 +159,7 @@ function hostTabs({
       key: "host-people",
       href: HOST_ROUTE_HREFS.people,
       label: READMATES_MOBILE_TAB_LABELS.hostPeople,
-      icon: "approve",
+      icon: "people",
       current: (pathname) => pathname === "/app/host/people"
         || pathname.startsWith("/app/host/people/")
         || pathname === "/app/host/members",
@@ -164,103 +168,16 @@ function hostTabs({
       key: "host-records",
       href: HOST_ROUTE_HREFS.records,
       label: READMATES_MOBILE_TAB_LABELS.hostRecords,
-      icon: "archive",
+      icon: "document",
       current: (pathname) => pathname === "/app/host/records"
         || /^\/app\/host\/sessions\/[^/]+\/(?:closing|feedback-document)$/.test(pathname),
     },
   ];
 }
 
-export function TabIcon({ name }: { name: TabIconName }) {
-  const common = {
-    width: 24,
-    height: 24,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 1.6,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-    "aria-hidden": true,
-  };
-
-  switch (name) {
-    case "home":
-      return (
-        <svg {...common}>
-          <path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-7H9v7H5a1 1 0 0 1-1-1z" />
-        </svg>
-      );
-    case "session":
-      return (
-        <svg {...common}>
-          <rect x="3" y="4" width="18" height="17" rx="2" />
-          <path d="M8 2v4M16 2v4M3 10h18M8 15h2M12 15h4M8 18h8" />
-        </svg>
-      );
-    case "notes":
-      return (
-        <svg {...common}>
-          <path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v16H7.5A2.5 2.5 0 0 0 5 21.5z" />
-          <path d="M5 5.5v16M9 7h6M9 11h6M9 15h4" />
-        </svg>
-      );
-    case "archive":
-      return (
-        <svg {...common}>
-          <rect x="3" y="3" width="18" height="4" rx="1" />
-          <path d="M5 7v13a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7M10 11h4" />
-        </svg>
-      );
-    case "notifications":
-      return (
-        <svg {...common}>
-          <path d="M6 10a6 6 0 0 1 12 0c0 4 1.5 5 2 6H4c.5-1 2-2 2-6z" />
-          <path d="M9.5 19a2.7 2.7 0 0 0 5 0" />
-        </svg>
-      );
-    case "me":
-      return (
-        <svg {...common}>
-          <circle cx="12" cy="8" r="4" />
-          <path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" />
-        </svg>
-      );
-    case "host":
-      return (
-        <svg {...common}>
-          <path d="M4 20V10l8-6 8 6v10a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z" />
-        </svg>
-      );
-    case "edit":
-      return (
-        <svg {...common}>
-          <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z" />
-          <path d="M13.5 7.5l3 3" />
-        </svg>
-      );
-    case "notify":
-      return (
-        <svg {...common}>
-          <path d="M6 10a6 6 0 0 1 12 0c0 4 1.5 5.5 2.5 6.5H3.5C4.5 15.5 6 14 6 10z" />
-          <path d="M10 20a2.2 2.2 0 0 0 4 0" />
-        </svg>
-      );
-    case "invite":
-      return (
-        <svg {...common}>
-          <path d="M4 7h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" />
-          <path d="m4 7 8 6 8-6M16 4v6M13 7h6" />
-        </svg>
-      );
-    case "approve":
-      return (
-        <svg {...common}>
-          <circle cx="9" cy="8" r="3.5" />
-          <path d="M3.5 20c1.1-4 3-6 5.5-6 1.6 0 2.9.8 4 2.3M15 18l2 2 4-5" />
-        </svg>
-      );
-  }
+export function TabIcon({ name }: { name: TabIconName | string }) {
+  const resolved = LEGACY_TAB_ICON[name] ?? (name as ReadmatesIconName);
+  return <ReadmatesIcon name={resolved} size={24} strokeWidth={1.6} />;
 }
 
 function MobileTabBarFrame({
@@ -278,7 +195,7 @@ function MobileTabBarFrame({
 }) {
   return (
     <nav
-      className="m-tabbar"
+      className="m-tabbar rm-mobile-tab-bar"
       data-variant={variant}
       aria-label={navLabel}
       style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}

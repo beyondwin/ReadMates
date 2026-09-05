@@ -115,6 +115,25 @@ describe("HostUtilityActions", () => {
     expect(mobileAction).toHaveAccessibleDescription("모바일 설정 권한이 필요합니다.");
   });
 
+  it("renders only the notification bell when compact", () => {
+    render(
+      <HostUtilityActions
+        {...hrefs}
+        unreadNotifications={0}
+        permissionLimits={[]}
+        compact
+      />,
+    );
+
+    const navigation = screen.getByRole("navigation", { name: "호스트 유틸리티" });
+    expect(navigation).toHaveClass("rm-host-utility-actions--compact");
+    expect(within(navigation).getByRole("link", { name: "알림" })).toHaveAttribute("href", hrefs.notificationsHref);
+    expect(within(navigation).getByRole("link", { name: "알림" }).querySelector('[data-icon="bell"]')).toBeTruthy();
+    expect(within(navigation).queryByRole("link", { name: "초대와 설정" })).not.toBeInTheDocument();
+    expect(within(navigation).queryByRole("link", { name: "멤버 시야" })).not.toBeInTheDocument();
+    expect(within(navigation).queryByRole("link", { name: "새 모임" })).not.toBeInTheDocument();
+  });
+
   it("marks the selected utility as the current page", () => {
     render(
       <HostUtilityActions

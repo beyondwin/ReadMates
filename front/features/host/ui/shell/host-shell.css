@@ -163,6 +163,10 @@ button.rm-host-workspace-switcher__choice {
   align-items: center;
 }
 
+.rm-host-utility-actions--compact ul {
+  gap: 0;
+}
+
 .rm-host-primary-navigation__item,
 .rm-host-utility-actions__item {
   min-width: 44px;
@@ -338,6 +342,10 @@ button.rm-host-workspace-switcher__choice {
   }
 }
 
+.rm-app-club-shell[data-workspace="host"] {
+  --rm-mobile-context-h: 0px;
+}
+
 .rm-app-club-shell[data-workspace="host"] .app-content {
   background: var(--paper-50);
 }
@@ -359,34 +367,6 @@ button.rm-host-workspace-switcher__choice {
     min-height: calc(var(--m-nav-h) + var(--m-safe-bottom));
     background: var(--paper-50);
     border-block-start: 1px solid var(--line);
-  }
-
-  .rm-app-club-shell[data-workspace="host"] [data-club-shell-region="mobile-spine"] {
-    position: absolute;
-    inset: var(--m-safe-top) 8px auto auto;
-    z-index: 45;
-    width: auto;
-    min-height: 0;
-    border: 0;
-    background: transparent;
-  }
-
-  .rm-app-club-shell[data-workspace="host"] .m-hdr {
-    min-height: 44px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-  }
-
-  .rm-app-club-shell[data-workspace="host"] .m-hdr-side--left,
-  .rm-app-club-shell[data-workspace="host"] .m-hdr-brand {
-    display: none;
-  }
-
-  .rm-app-club-shell[data-workspace="host"] [data-club-shell-region="mobile-context"] {
-    position: sticky;
-    top: 0;
-    padding-inline-end: 52px;
   }
 }
 

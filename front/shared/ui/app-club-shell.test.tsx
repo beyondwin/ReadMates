@@ -169,6 +169,36 @@ describe("AppClubShell", () => {
     );
   });
 
+  it("puts the host space trigger in MobileHeader and leaves mobile-context empty", () => {
+    const { container } = render(
+      <AppClubShell
+        workspace="host"
+        primaryItems={primaryItems("host")}
+        account={{ control: <span className="rm-avatar-chip">계정 메뉴</span> }}
+        brandHref="/clubs/reading-sai/app/host"
+        mobileTitle="운영실"
+        LinkComponent={LinkComponent}
+        spaceSwitcher={{
+          desktop: <button type="button">데스크톱 공간 전환</button>,
+          mobile: <button type="button" className="rm-mobile-header__space">읽는사이 · 호스트 운영실</button>,
+        }}
+        mobileHeaderUtility={<a href="/n" aria-label="알림"><svg data-icon="bell" /></a>}
+      >
+        <main>host content</main>
+      </AppClubShell>,
+    );
+
+    const mobileSpine = container.querySelector('[data-club-shell-region="mobile-spine"]');
+    const mobileContext = container.querySelector('[data-club-shell-region="mobile-context"]');
+    expect(mobileSpine?.querySelector(".rm-mobile-header__space")).toHaveTextContent("읽는사이 · 호스트 운영실");
+    expect(mobileSpine?.querySelector('[data-icon="bell"]')).toBeTruthy();
+    expect(mobileSpine?.querySelector(".rm-avatar-chip")).toBeTruthy();
+    expect(mobileSpine?.textContent).not.toContain("…");
+    expect(mobileSpine?.textContent).not.toContain("⋯");
+    expect(mobileContext?.querySelector(".rm-club-shell-mobile-context__inner")?.childElementCount).toBe(0);
+    expect(mobileContext?.querySelector(".rm-mobile-header__space")).toBeNull();
+  });
+
   it("does not paint Host mobile-context sr-only current-space copy as visible chrome", () => {
     const host = {
       productSpace: "clubs" as const,
@@ -197,11 +227,9 @@ describe("AppClubShell", () => {
       </AppClubShell>,
     );
 
-    const currentSpace = container.querySelector(
-      '[data-club-shell-region="mobile-context"] .rm-global-space-switcher__current-space',
-    );
-    expect(currentSpace).toHaveClass("rm-sr-only");
-    expect(currentSpace).toHaveTextContent("현재 공간 내 클럽, 샘플 독서모임 호스트로 운영");
+    const mobileContext = container.querySelector('[data-club-shell-region="mobile-context"]');
+    expect(mobileContext?.querySelector(".rm-club-shell-mobile-context__inner")?.childElementCount).toBe(0);
+    expect(mobileContext?.querySelector(".rm-global-space-switcher__current-space")).toBeNull();
 
     const hostShellCss = readFileSync("features/host/ui/shell/host-shell.css", "utf8");
     expect(hostShellCss).not.toMatch(

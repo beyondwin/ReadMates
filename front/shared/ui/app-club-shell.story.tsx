@@ -77,7 +77,7 @@ type HostApprovedStoryDestination =
 const hostPrimaryItems: PrimaryNavigationItem[] = [
   { id: "operating-room", label: "운영실", href: "/clubs/reading-sai/host", icon: "host", current: true },
   { id: "meetings", label: "일정과 모임", mobileLabel: "모임", href: "/clubs/reading-sai/host/meetings", icon: "session", current: false },
-  { id: "people", label: "사람", href: "/clubs/reading-sai/host/people", icon: "me", current: false },
+  { id: "people", label: "사람", href: "/clubs/reading-sai/host/people", icon: "approve", current: false },
   { id: "records", label: "기록", href: "/clubs/reading-sai/host/records", icon: "archive", current: false },
 ];
 

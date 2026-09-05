@@ -8,7 +8,7 @@ import {
   HostPrimaryNavigation,
   type HostPrimaryDestination,
 } from "@/features/host/ui/shell/host-primary-navigation";
-import { HostUtilityActions } from "@/features/host/ui/shell/host-utility-actions";
+import { HostUtilityActions, type HostUtilityActionsProps } from "@/features/host/ui/shell/host-utility-actions";
 import { GuestNavigationLink } from "@/features/guest-browse/ui/guest-navigation-dialog";
 import type { ClubAppAudience } from "@/features/guest-browse/model/club-app-audience";
 import { guestNavigationCapability } from "@/features/guest-browse/model/club-app-audience";
@@ -327,15 +327,8 @@ function primaryNavigationItems({
   }));
 }
 
-function HostMobileUtilityMenu({ children }: { children: React.ReactNode }) {
-  return (
-    <details className="rm-host-mobile-utility">
-      <summary className="rm-host-mobile-utility__trigger" aria-label="호스트 도구">
-        <span aria-hidden="true">⋯</span>
-      </summary>
-      <div className="rm-host-mobile-utility__menu">{children}</div>
-    </details>
-  );
+function HostMobileBell(props: HostUtilityActionsProps) {
+  return <HostUtilityActions {...props} compact />;
 }
 
 function appMobileTitle(workspace: ShellClubWorkspace, appPath: string, recordOwned: boolean) {
@@ -740,17 +733,16 @@ export function AppRouteLayout({
     recordOwned,
   });
   const brandHref = scopedAppPath(basePath, desktopVariant === "host" ? "/app/host" : "/app");
-  const hostUtilityActions = desktopVariant === "host" ? (
-    <HostUtilityActions
-      settingsHref={scopedAppPath(basePath, HOST_ROUTE_HREFS.settings)}
-      memberViewHref={roleSwitchAction?.href ?? scopedAppPath(basePath, "/app")}
-      notificationsHref={scopedAppPath(basePath, HOST_ROUTE_HREFS.notifications)}
-      newMeetingHref={scopedAppPath(basePath, HOST_ROUTE_HREFS.newSession)}
-      unreadNotifications={0}
-      permissionLimits={[]}
-      LinkComponent={AppLinkComponent}
-    />
-  ) : null;
+  const hostUtilityProps: HostUtilityActionsProps | null = desktopVariant === "host" ? {
+    settingsHref: scopedAppPath(basePath, HOST_ROUTE_HREFS.settings),
+    memberViewHref: roleSwitchAction?.href ?? scopedAppPath(basePath, "/app"),
+    notificationsHref: scopedAppPath(basePath, HOST_ROUTE_HREFS.notifications),
+    newMeetingHref: scopedAppPath(basePath, HOST_ROUTE_HREFS.newSession),
+    unreadNotifications: 0,
+    permissionLimits: [],
+    LinkComponent: AppLinkComponent,
+  } : null;
+  const hostUtilityActions = hostUtilityProps ? <HostUtilityActions {...hostUtilityProps} /> : null;
 
   return (
     <GlobalSpaceTransitionController
@@ -779,9 +771,9 @@ export function AppRouteLayout({
             />
           ),
         } : undefined}
+        mobileHeaderUtility={hostUtilityProps ? <HostMobileBell {...hostUtilityProps} /> : undefined}
         utilitySlot={hostUtilityActions ? {
           desktop: hostUtilityActions,
-          mobile: <HostMobileUtilityMenu>{hostUtilityActions}</HostMobileUtilityMenu>,
         } : undefined}
         beforeContent={expiryRecovery}
         securityController={<AppRouteSecurityController workspace={desktopVariant} />}

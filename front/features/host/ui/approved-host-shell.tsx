@@ -32,7 +32,7 @@ const PRIMARY_HREFS: Record<HostPrimaryDestinationId, string> = {
 const PRIMARY_LABELS: Record<HostPrimaryDestinationId, { desktop: string; mobile: string; icon: PrimaryNavigationItem["icon"] }> = {
   "operating-room": { desktop: "운영실", mobile: "운영실", icon: "host" },
   meetings: { desktop: "일정과 모임", mobile: "모임", icon: "session" },
-  people: { desktop: "사람", mobile: "사람", icon: "me" },
+  people: { desktop: "사람", mobile: "사람", icon: "approve" },
   records: { desktop: "기록", mobile: "기록", icon: "archive" },
 };
 
@@ -106,7 +106,7 @@ function HostApprovedSpaceSwitcher() {
   );
 }
 
-function HostApprovedUtility({ currentId }: { currentId?: "settings" }) {
+function HostApprovedUtility({ currentId, compact }: { currentId?: "settings"; compact?: boolean }) {
   return (
     <HostUtilityActions
       settingsHref={`${HOST_BASE}/settings`}
@@ -116,19 +116,9 @@ function HostApprovedUtility({ currentId }: { currentId?: "settings" }) {
       unreadNotifications={0}
       permissionLimits={[]}
       currentId={currentId}
+      compact={compact}
       LinkComponent={ApprovedShellLink}
     />
-  );
-}
-
-function HostApprovedMobileUtility({ children }: { children: ReactNode }) {
-  return (
-    <details className="rm-host-mobile-utility">
-      <summary className="rm-host-mobile-utility__trigger" aria-label="호스트 도구">
-        <span aria-hidden="true">⋯</span>
-      </summary>
-      <div className="rm-host-mobile-utility__menu">{children}</div>
-    </details>
   );
 }
 
@@ -171,9 +161,9 @@ export function HostApprovedShell({
           />
         ),
       }}
+      mobileHeaderUtility={<HostApprovedUtility currentId={destination === "settings" ? "settings" : undefined} compact />}
       utilitySlot={{
         desktop: utility,
-        mobile: <HostApprovedMobileUtility>{utility}</HostApprovedMobileUtility>,
       }}
     >
       {children}

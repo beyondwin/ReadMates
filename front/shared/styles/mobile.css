@@ -24,8 +24,41 @@
   backdrop-filter: saturate(1.25) blur(12px);
 }
 
-.rm-club-shell-mobile-context:has(> .rm-club-shell-mobile-context__inner > .rm-sr-only:only-child) {
+.rm-club-shell-mobile-context:has(> .rm-club-shell-mobile-context__inner > .rm-sr-only:only-child),
+.rm-club-shell-mobile-context:has(> .rm-club-shell-mobile-context__inner:empty) {
   display: none;
+}
+
+.rm-mobile-header[data-variant="host"] {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.rm-mobile-header[data-variant="host"]:has(.rm-mobile-header__back) {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.rm-mobile-header__space {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.rm-mobile-header__space .rm-global-space-switcher,
+.rm-mobile-header__space .rm-global-space-switcher__trigger {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.rm-mobile-header__utility {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.rm-mobile-header__back {
+  min-height: 44px;
+  gap: 2px;
 }
 
 .rm-club-shell-mobile-context__inner {

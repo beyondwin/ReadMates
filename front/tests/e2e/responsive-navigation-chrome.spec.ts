@@ -393,7 +393,8 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
     "href",
     `${baselineClubHostPath}/sessions`,
   );
-  await expect(mobileHeader.getByRole("link", { name: "뒤로" })).toHaveText("");
+  await expect(mobileHeader.getByRole("link", { name: "뒤로" })).toContainText("모임");
+  await expect(mobileHeader.getByRole("link", { name: "뒤로" }).locator('[data-icon="arrow-left"]')).toBeVisible();
   await expectSingleKindSpaceLabel(page, "현재 공간 내 클럽, 읽는사이 호스트로 운영");
   await page.goto(`${baselineClubAppPath}/archive`);
   await expect(page).toHaveURL(`${baselineClubAppPath}/archive`);

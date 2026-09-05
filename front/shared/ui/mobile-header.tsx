@@ -4,6 +4,7 @@ import { useLocation } from "react-router";
 import { usePublicAuthAction } from "./public-auth-action-state";
 import { ReadmatesBrandMark } from "./readmates-brand-mark";
 import { READMATES_MOBILE_TAB_LABELS, READMATES_NAV_LABELS } from "./readmates-copy";
+import { ReadmatesIcon } from "./icon";
 import { TabIcon, type TabIconName } from "./mobile-tab-bar";
 import { WorkspaceSwitchIcon } from "./workspace-switch-icon";
 import {
@@ -55,7 +56,7 @@ type ReadmatesNavigationContinuity = {
   readmatesReturnState: (target: ReadmatesReturnTarget) => ReadmatesReturnState;
 };
 
-type MobileHeaderProps = {
+export type MobileHeaderProps = {
   variant: MobileHeaderVariant;
   workspaceAction?: MobileWorkspaceAction | null;
   authenticated?: boolean;
@@ -64,6 +65,8 @@ type MobileHeaderProps = {
   LinkComponent?: AppLinkComponent;
   navigationContinuity?: ReadmatesNavigationContinuity;
   accountControl?: ReactNode;
+  spaceControl?: ReactNode;
+  utilityControl?: ReactNode;
   presentation?: {
     title: string;
     kicker?: string | null;
@@ -424,6 +427,8 @@ function HeaderShell({
   accountControl,
   brandHref,
   LinkComponent,
+  spaceControl,
+  utilityControl,
 }: {
   workspace: MobileHeaderVariant;
   title: string;
@@ -433,12 +438,51 @@ function HeaderShell({
   accountControl?: ReactNode;
   brandHref?: string;
   LinkComponent: AppLinkComponent;
+  spaceControl?: ReactNode;
+  utilityControl?: ReactNode;
 }) {
   const resolvedBrandHref = brandHref ?? (workspace === "host" ? "/app/host" : workspace === "member" ? "/app" : "/");
   const actionTitle = rightAction?.ariaLabel ?? rightAction?.label;
+  const hostChrome = workspace === "host" && (spaceControl != null || utilityControl != null);
+  const heading = (
+    <div className={spaceControl ? "m-hdr-heading rm-sr-only" : "m-hdr-heading"}>
+      {kicker ? <div className="m-hdr-kicker">{kicker}</div> : null}
+      <div className="m-hdr-title">{title}</div>
+    </div>
+  );
+
+  if (hostChrome) {
+    return (
+      <header
+        className={`m-hdr m-hdr--${workspace} rm-mobile-header`}
+        data-workspace={workspace}
+        data-variant={workspace}
+      >
+        {backTarget ? (
+          <LinkComponent
+            to={backTarget.href}
+            state={backTarget.state}
+            className="m-hdr-back rm-mobile-header__back"
+            aria-label="뒤로"
+          >
+            <ReadmatesIcon name="arrow-left" size={20} />
+            <span className="m-hdr-back__label">{backTarget.label}</span>
+          </LinkComponent>
+        ) : null}
+        <div className="rm-mobile-header__space">
+          {spaceControl}
+          {heading}
+        </div>
+        <div className="m-hdr-side m-hdr-side--right rm-mobile-header__utility">
+          {utilityControl}
+          {accountControl}
+        </div>
+      </header>
+    );
+  }
 
   return (
-    <header className={`m-hdr m-hdr--${workspace}`} data-workspace={workspace}>
+    <header className={`m-hdr m-hdr--${workspace}`} data-workspace={workspace} data-variant={workspace}>
       <div className="m-hdr-side m-hdr-side--left">
         {backTarget ? (
           <LinkComponent
@@ -457,10 +501,7 @@ function HeaderShell({
           </LinkComponent>
         )}
       </div>
-      <div className="m-hdr-heading">
-        {kicker ? <div className="m-hdr-kicker">{kicker}</div> : null}
-        <div className="m-hdr-title">{title}</div>
-      </div>
+      {heading}
       <div className="m-hdr-side m-hdr-side--right">
         {rightAction ? (
           <LinkComponent
@@ -545,6 +586,8 @@ function AppMobileHeader({
   navigationContinuity,
   accountControl,
   presentation,
+  spaceControl,
+  utilityControl,
 }: {
   variant: Exclude<MobileHeaderVariant, "guest">;
   workspaceAction?: MobileWorkspaceAction | null;
@@ -553,6 +596,8 @@ function AppMobileHeader({
   navigationContinuity: ReadmatesNavigationContinuity;
   accountControl?: ReactNode;
   presentation?: MobileHeaderProps["presentation"];
+  spaceControl?: ReactNode;
+  utilityControl?: ReactNode;
 }) {
   const location = useLocation();
   const pathname = location.pathname;
@@ -574,6 +619,8 @@ function AppMobileHeader({
       accountControl={accountControl}
       brandHref={presentation?.brandHref ?? prefixedAppPath(appBasePath, variant === "host" ? "/app/host" : "/app")}
       LinkComponent={LinkComponent}
+      spaceControl={spaceControl}
+      utilityControl={utilityControl}
     />
   );
 }
@@ -588,6 +635,8 @@ export function MobileHeader({
   navigationContinuity = defaultNavigationContinuity,
   accountControl,
   presentation,
+  spaceControl,
+  utilityControl,
 }: MobileHeaderProps) {
   if (variant === "guest") {
     return (
@@ -611,6 +660,8 @@ export function MobileHeader({
         accountControl={accountControl}
         brandHref={presentation.brandHref}
         LinkComponent={LinkComponent}
+        spaceControl={spaceControl}
+        utilityControl={utilityControl}
       />
     );
   }
@@ -624,6 +675,8 @@ export function MobileHeader({
       navigationContinuity={navigationContinuity}
       accountControl={accountControl}
       presentation={presentation}
+      spaceControl={spaceControl}
+      utilityControl={utilityControl}
     />
   );
 }

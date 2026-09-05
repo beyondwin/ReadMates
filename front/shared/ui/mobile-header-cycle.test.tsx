@@ -55,3 +55,40 @@ describe("MobileHeader cyclic return state", () => {
     );
   });
 });
+
+describe("MobileHeader host chrome", () => {
+  it("host mobile header shows space trigger, bell, and avatar without an ellipsis menu", () => {
+    render(
+      <MobileHeader
+        variant="host"
+        presentation={{ title: "운영실", brandHref: "/app/host" }}
+        accountControl={<span className="rm-avatar-chip" />}
+        spaceControl={<button className="rm-mobile-header__space">읽는사이 · 호스트 운영실</button>}
+        utilityControl={<a href="/n" aria-label="알림"><svg data-icon="bell" /></a>}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "읽는사이 · 호스트 운영실" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "알림" })).toBeTruthy();
+    expect(screen.queryByText("…")).toBeNull();
+  });
+
+  it("renders host back with an arrow-left icon and keeps the space trigger", () => {
+    render(
+      <MobileHeader
+        variant="host"
+        presentation={{ title: "사람", brandHref: "/app/host", backTarget: { href: "/app/host/people", label: "사람" } }}
+        accountControl={<span className="rm-avatar-chip" />}
+        spaceControl={<button className="rm-mobile-header__space">읽는사이 · 호스트 운영실</button>}
+        utilityControl={<a href="/n" aria-label="알림"><svg data-icon="bell" /></a>}
+      />,
+    );
+
+    const header = document.querySelector("header.rm-mobile-header");
+    expect(header).toHaveAttribute("data-variant", "host");
+    const back = screen.getByRole("link", { name: "뒤로" });
+    expect(back).toHaveClass("rm-mobile-header__back");
+    expect(back.querySelector('[data-icon="arrow-left"]')).toBeTruthy();
+    expect(back).toHaveTextContent("사람");
+    expect(header?.querySelector(".rm-mobile-header__utility [data-icon=\"bell\"]")).toBeTruthy();
+  });
+});
