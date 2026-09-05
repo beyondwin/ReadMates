@@ -4,11 +4,11 @@ import { useLoaderData, useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import HostMembers, { type HostMembersLinkComponent } from "@/features/host/ui/host-members";
-import { createHostInvitationsActions } from "./host-invitations-data";
 import { createHostMembersActions, type HostMembersRouteData } from "./host-members-data";
 import type { HostMembersActions } from "@/features/host/model/host-member-actions";
+import { scopedAppPath } from "@/shared/auth/member-app-loader";
+import { HOST_ROUTE_HREFS } from "@/shared/routing/host-route-destinations";
 import { TransitionOwnerObsoleteError, useTransitionSafetyOwner } from "@/shared/ui/use-transition-safety-owner";
-import { registerHostInvitationActions } from "./host-invitations-route";
 
 export function registerHostMemberActions(
   actions: HostMembersActions,
@@ -44,7 +44,7 @@ export function registerHostMemberActions(
 }
 
 export function HostMembersRoute({ LinkComponent }: { LinkComponent?: HostMembersLinkComponent }) {
-  const { members, invitations } = useLoaderData() as HostMembersRouteData;
+  const { members } = useLoaderData() as HostMembersRouteData;
   const { clubSlug = "" } = useParams<{ clubSlug: string }>();
   const queryClient = useQueryClient();
   const context = requireHostClubContext(clubSlug);
@@ -52,27 +52,17 @@ export function HostMembersRoute({ LinkComponent }: { LinkComponent?: HostMember
     () => createHostMembersActions(queryClient, context),
     [context, queryClient],
   );
-  const invitationActions = useMemo(
-    () => createHostInvitationsActions(queryClient, context),
-    [context, queryClient],
-  );
   const memberOwner = useTransitionSafetyOwner("host-members");
-  const invitationOwner = useTransitionSafetyOwner("host-member-invitations");
   const registeredActions = useMemo(
     () => registerHostMemberActions(actions, memberOwner),
     [actions, memberOwner],
-  );
-  const registeredInvitationActions = useMemo(
-    () => registerHostInvitationActions(invitationActions, invitationOwner),
-    [invitationActions, invitationOwner],
   );
 
   return (
     <HostMembers
       initialMembers={members}
       actions={registeredActions}
-      initialInvitations={invitations}
-      invitationActions={registeredInvitationActions}
+      settingsHref={`${scopedAppPath(clubSlug)}${HOST_ROUTE_HREFS.settings.replace(/^\/app/, "")}`}
       LinkComponent={LinkComponent}
     />
   );

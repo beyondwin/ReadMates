@@ -82,9 +82,9 @@ describe("space transition mutation-producer inventory", () => {
       {},
     )).toEqual({
       register: 30,
-      modify: 42,
+      modify: 40,
       "verified-no-change": 24,
-      "out-of-domain": 9,
+      "out-of-domain": 11,
     });
     expect(auditMutationProducerInventory(productionSources(), mountedOwners)).toEqual({
       unclassifiedPaths: [],

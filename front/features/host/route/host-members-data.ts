@@ -1,15 +1,12 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { LoaderFunctionArgs } from "react-router";
 import {
-  fetchHostInvitations,
   fetchHostMembers,
   submitHostMemberLifecycle,
   submitHostMemberProfile,
   submitHostViewerAction,
 } from "@/features/host/api/host-api";
 import type {
-  HostInvitationListItem,
-  HostInvitationListPage,
   HostMemberListItem,
   HostMemberListPage,
 } from "@/features/host/api/host-contracts";
@@ -18,7 +15,6 @@ import {
   type HostMembersActions,
 } from "@/features/host/model/host-member-actions";
 import type { HostMemberProfileErrorCode } from "@/features/host/model/host-view-types";
-import { hostInvitationListQuery } from "@/features/host/queries/host-invitation-queries";
 import { hostMemberListQuery, invalidateHostMembers } from "@/features/host/queries/host-members-queries";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 import { requireHostLoaderAuth } from "./host-loader-auth";
@@ -29,20 +25,12 @@ import {
 } from "@/shared/api/host-authority-event";
 
 const HOST_MEMBERS_PAGE_LIMIT = 50;
-const HOST_INVITATIONS_PAGE_LIMIT = 50;
 
 export type HostMembersRouteData = {
   members: HostMemberListPage;
-  invitations: HostInvitationListPage;
 };
 
 function normalizeMemberPage(value: HostMemberListPage | HostMemberListItem[]): HostMemberListPage {
-  return Array.isArray(value) ? { items: value, nextCursor: null } : value;
-}
-
-function normalizeInvitationPage(
-  value: HostInvitationListPage | HostInvitationListItem[],
-): HostInvitationListPage {
   return Array.isArray(value) ? { items: value, nextCursor: null } : value;
 }
 
@@ -52,18 +40,11 @@ export function hostMembersLoaderFactory(client: QueryClient) {
 
     const context = requireHostClubContext(clubSlugFromLoaderArgs(args));
     const pageRequest = { limit: HOST_MEMBERS_PAGE_LIMIT };
-    const invitationPageRequest = { limit: HOST_INVITATIONS_PAGE_LIMIT };
-    const [rawMembers, rawInvitations] = await Promise.all([
-      fetchHostMembers(context, pageRequest),
-      fetchHostInvitations(context, invitationPageRequest),
-    ]);
-    const members = normalizeMemberPage(rawMembers);
-    const invitations = normalizeInvitationPage(rawInvitations);
+    const members = normalizeMemberPage(await fetchHostMembers(context, pageRequest));
 
     client.setQueryData(hostMemberListQuery(pageRequest, context).queryKey, members);
-    client.setQueryData(hostInvitationListQuery(invitationPageRequest, context).queryKey, invitations);
 
-    return { members, invitations };
+    return { members };
   };
 }
 

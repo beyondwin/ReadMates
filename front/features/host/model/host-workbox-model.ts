@@ -61,6 +61,17 @@ export type HostWorkboxDisclosure = {
   expanded: boolean;
 };
 
+const DESTINATION_OWNED_DEFERRAL = new Set<HostWorkboxDestinationCategory>([
+  "schedule-review",
+  "records",
+]);
+
+export function workboxOwnsDeferral(item: HostWorkboxItemView): boolean {
+  if (item.state === "DEFERRED") return true;
+  if (item.state !== "NOW") return false;
+  return !DESTINATION_OWNED_DEFERRAL.has(item.destinationCategory);
+}
+
 export function buildHostWorkboxDisclosure(
   view: HostWorkboxView,
   options: { limit: 3 | 4; expanded: boolean },

@@ -236,22 +236,15 @@ async function approveViewerThroughBff(page: Page): Promise<number> {
   }, { membershipId: VIEWER_MEMBERSHIP_ID, clubSlug: CLUB_SLUG });
 }
 
-async function deferWorkboxItemThroughBff(page: Page, key: string): Promise<{ status: number; deferredUntil: string }> {
-  return page.evaluate(async ({ workItemKey, clubSlug }) => {
-    const deferredUntil = new Date(Date.now() + 86_400_000).toISOString();
-    const response = await fetch(
-      `/api/bff/api/host/workbox/items/${encodeURIComponent(workItemKey)}/deferral?clubSlug=${encodeURIComponent(clubSlug)}`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Readmates-Client-Contract": "v3",
-        },
-        body: JSON.stringify({ deferredUntil }),
-      },
-    );
-    return { status: response.status, deferredUntil };
-  }, { workItemKey: key, clubSlug: CLUB_SLUG });
+async function openWorkboxManagement(page: Page) {
+  const showAll = page.getByRole("button", { name: "작업함 모두 보기" });
+  if (await showAll.count()) {
+    await showAll.click();
+    return;
+  }
+  const url = new URL(page.url());
+  url.searchParams.set("workbox", "all");
+  await page.goto(`${url.pathname}${url.search}`);
 }
 
 test.beforeEach(() => {
@@ -279,9 +272,18 @@ test("authoritative workbox key survives defer, expiry and source-owned completi
   await expect(row.locator("details")).toHaveCount(0);
   await expect(row.getByRole("button", { name: "가입 승인 요청 보류" })).toHaveCount(0);
   await expect(row.getByRole("link", { name: "가입 승인 요청" })).toBeVisible();
-  const deferred = await deferWorkboxItemThroughBff(page, authoritativeKey);
-  expect(deferred.status).toBe(200);
-  expect(deferred.deferredUntil).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  await openWorkboxManagement(page);
+  const managedRow = page.getByRole("listitem", { name: "가입 승인 요청" });
+  const defer = managedRow.getByRole("button", { name: "가입 승인 요청 보류" });
+  await expect(defer).toBeVisible();
+  const deferralResponse = page.waitForResponse((response) => (
+    response.request().method() === "PUT"
+      && response.url().includes(`/api/host/workbox/items/${encodeURIComponent(authoritativeKey)}/deferral`)
+  ));
+  await defer.click();
+  const deferred = await deferralResponse;
+  expect(deferred.status()).toBe(200);
+  expect(deferred.request().postDataJSON()).toMatchObject({ deferredUntil: expect.any(String) });
 
   const deferredPagePromise = workboxResponse(page, "DEFERRED");
   await page.getByRole("tab", { name: /^보류/ }).click();

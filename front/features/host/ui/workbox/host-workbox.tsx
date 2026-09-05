@@ -1,7 +1,12 @@
 import type { ComponentType, KeyboardEvent, ReactNode } from "react";
-import type { HostWorkboxDisclosure, HostWorkboxFooterNote, HostWorkboxView } from "@/features/host/model/host-workbox-model";
+import {
+  workboxOwnsDeferral,
+  type HostWorkboxDisclosure,
+  type HostWorkboxFooterNote,
+  type HostWorkboxView,
+} from "@/features/host/model/host-workbox-model";
 import { ReadmatesIcon } from "@/shared/ui/icon";
-import { HostWorkItem } from "./host-work-item";
+import { HostWorkItem, type HostWorkboxDeferralOption } from "./host-work-item";
 import "./host-workbox.css";
 
 type HostWorkboxState = HostWorkboxView["state"];
@@ -28,7 +33,7 @@ export type HostWorkboxProps = {
   disclosure?: HostWorkboxDisclosure | null;
   loading: boolean;
   error: string | null;
-  pendingKey: string | null;
+  pendingKey?: string | null;
   rowError?: { key: string; message: string } | null;
   showPartialWarnings?: boolean;
   footerNote?: HostWorkboxFooterNote | null;
@@ -36,6 +41,8 @@ export type HostWorkboxProps = {
   onRetry: () => void;
   onLoadMore: (cursor: string) => void;
   onShowAll?: () => void;
+  onDefer?: (key: string, option: HostWorkboxDeferralOption) => void;
+  onUndoDeferral?: (key: string) => void;
   LinkComponent?: ComponentType<WorkboxLinkProps>;
 };
 
@@ -45,6 +52,7 @@ export function HostWorkbox({
   disclosure = null,
   loading,
   error,
+  pendingKey = null,
   rowError = null,
   showPartialWarnings = true,
   footerNote = null,
@@ -52,17 +60,21 @@ export function HostWorkbox({
   onRetry,
   onLoadMore,
   onShowAll,
+  onDefer,
+  onUndoDeferral,
   LinkComponent = DefaultLink,
 }: HostWorkboxProps) {
   const loadedView = !loading && !error && view?.state === state ? view : null;
   const activeCount = loadedView?.items.length ?? null;
   const hasContinuation = loadedView?.nextCursor !== null && loadedView !== null;
   const visibleItems = disclosure?.visibleItems ?? view?.items ?? [];
+  const expanded = disclosure?.expanded === true;
+  const needsWorkboxDeferral = (view?.items ?? []).some(workboxOwnsDeferral);
   const showAllVisible = Boolean(
     onShowAll
     && disclosure
-    && !disclosure.expanded
-    && disclosure.hiddenCount > 0,
+    && !expanded
+    && (disclosure.hiddenCount > 0 || needsWorkboxDeferral),
   );
 
   const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -147,7 +159,11 @@ export function HostWorkbox({
                   <HostWorkItem
                     key={item.key}
                     item={item}
+                    pending={pendingKey === item.key}
                     error={rowError?.key === item.key ? rowError.message : null}
+                    showDeferral={expanded && workboxOwnsDeferral(item)}
+                    onDefer={onDefer}
+                    onUndoDeferral={onUndoDeferral}
                     LinkComponent={LinkComponent}
                   />
                 ))}
@@ -178,7 +194,7 @@ export function HostWorkbox({
         ) : null}
       </div>
 
-      {footerNote ? (
+      {footerNote?.text ? (
         <footer className="rm-host-workbox__footer">
           <ReadmatesIcon name="clock" size={16} />
           <span>{footerNote.text}</span>

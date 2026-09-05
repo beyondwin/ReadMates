@@ -4,7 +4,7 @@ import type {
   HostWorkboxPage,
   HostWorkboxState,
 } from "../api/host-workbox-contracts";
-import { buildHostWorkboxDisclosure, buildHostWorkboxView } from "./host-workbox-model";
+import { buildHostWorkboxDisclosure, buildHostWorkboxView, workboxOwnsDeferral } from "./host-workbox-model";
 
 const TYPE_EXPECTATIONS = [
   ["SCHEDULE_UNSEEN", "일정 미열람 확인", "schedule-review"],
@@ -128,6 +128,22 @@ function viewWithTwelveItems() {
     }),
   };
 }
+
+describe("workboxOwnsDeferral", () => {
+  it("owns NOW deferral only when the destination does not", () => {
+    const view = buildHostWorkboxView(page());
+    expect(workboxOwnsDeferral(view.items.find((item) => item.type === "SCHEDULE_UNSEEN")!)).toBe(false);
+    expect(workboxOwnsDeferral(view.items.find((item) => item.type === "RECORD_CLOSING")!)).toBe(false);
+    expect(workboxOwnsDeferral(view.items.find((item) => item.type === "MEMBER_APPROVAL")!)).toBe(true);
+    expect(workboxOwnsDeferral(view.items.find((item) => item.type === "INVITATION_EXPIRY")!)).toBe(true);
+    expect(workboxOwnsDeferral(view.items.find((item) => item.type === "NOTIFICATION_FAILURE")!)).toBe(true);
+  });
+
+  it("owns undo for every deferred item because destinations do not", () => {
+    const view = buildHostWorkboxView(page("DEFERRED"));
+    expect(view.items.every(workboxOwnsDeferral)).toBe(true);
+  });
+});
 
 describe("buildHostWorkboxDisclosure", () => {
   it("shows four desktop items or three mobile items until explicitly expanded", () => {

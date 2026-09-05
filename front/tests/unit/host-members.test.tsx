@@ -7,14 +7,10 @@ import { RouterProvider } from "react-router/dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { HostMembersActions } from "@/features/host/model/host-member-actions";
-import type {
-  HostInvitationsActions,
-  RegisteredHostInvitationsActions,
-} from "@/features/host/model/host-invitation-actions";
 import HostMembers from "@/features/host/ui/host-members";
 import { createHostMembersActions, hostMembersLoaderFactory } from "@/features/host";
 import HostMembersPage from "@/src/pages/host-members";
-import type { HostInvitationListItem, HostMemberListItem } from "@/features/host/api/host-contracts";
+import type { HostMemberListItem } from "@/features/host/api/host-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { __resetHostClientContractCapabilityForTest } from "@/shared/api/host-client-contract";
 
@@ -152,77 +148,20 @@ const noopHostMembersActions = {
   submitProfile: vi.fn(async () => members[0]),
 } satisfies HostMembersActions;
 
-const noopHostInvitationsActions = {
-  listInvitations: vi.fn(async () => new Response(JSON.stringify({ items: [], nextCursor: null }))),
-  refreshInvitations: vi.fn(async () => ({ items: [], nextCursor: null })),
-  publishInvitations: vi.fn(),
-  createInvitation: vi.fn(async () => new Response(JSON.stringify({}), { status: 201 })),
-  revokeInvitation: vi.fn(async () => new Response(JSON.stringify({}), { status: 200 })),
-  parseInvitation: vi.fn(async (response) => response.json()),
-  parseInvitationList: vi.fn(async (response) => response.json()),
-} satisfies HostInvitationsActions;
-
 type HostMembersProps = Parameters<typeof HostMembers>[0];
-
-function registerTestInvitationActions(actions: HostInvitationsActions): RegisteredHostInvitationsActions {
-  return {
-    listInvitations: actions.listInvitations,
-    parseInvitationList: actions.parseInvitationList,
-    createInvitation: async (request) => {
-      const response = await actions.createInvitation(request);
-      if (!response.ok) {
-        const failure = new Error(`create-invitation-${response.status}`) as Error & {
-          status: number;
-          publishUi: (publish: (error: Error) => void) => "published";
-        };
-        failure.status = response.status;
-        failure.publishUi = (publish) => (publish(failure), "published");
-        throw failure;
-      }
-      const created = await actions.parseInvitation(response);
-      const refreshed = await actions.refreshInvitations({ limit: 50 });
-      actions.publishInvitations(refreshed, { limit: 50 });
-      const result = { created, refreshed };
-      return { ...result, publishUi: (publish) => (publish(result), "published") };
-    },
-    revokeInvitation: async (invitationId) => {
-      const response = await actions.revokeInvitation(invitationId);
-      if (!response.ok) {
-        const failure = new Error(`revoke-invitation-${response.status}`) as Error & {
-          status: number;
-          publishUi: (publish: (error: Error) => void) => "published";
-        };
-        failure.status = response.status;
-        failure.publishUi = (publish) => (publish(failure), "published");
-        throw failure;
-      }
-      const revoked = await actions.parseInvitation(response);
-      const refreshed = await actions.refreshInvitations({ limit: 50 });
-      actions.publishInvitations(refreshed, { limit: 50 });
-      const result = { revoked, refreshed };
-      return { ...result, publishUi: (publish) => (publish(result), "published") };
-    },
-  };
-}
 
 function HostMembersForTest({
   actions,
-  invitationActions,
   initialMembers,
-  initialInvitations = [],
   ...props
-}: Omit<HostMembersProps, "actions" | "invitationActions" | "initialInvitations"> & {
+}: Omit<HostMembersProps, "actions"> & {
   actions?: HostMembersActions;
-  invitationActions?: HostInvitationsActions;
-  initialInvitations?: HostMembersProps["initialInvitations"];
 }) {
   return (
     <HostMembers
       {...props}
       initialMembers={initialMembers}
-      initialInvitations={initialInvitations}
       actions={actions ?? noopHostMembersActions}
-      invitationActions={registerTestInvitationActions(invitationActions ?? noopHostInvitationsActions)}
     />
   );
 }
@@ -242,13 +181,6 @@ function memberListItemResponse(member: HostMemberListItem, status = 200) {
 }
 
 function memberListResponse(items: HostMemberListItem[]) {
-  return new Response(JSON.stringify({ items, nextCursor: null }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-function invitationListResponse(items: HostInvitationListItem[] = []) {
   return new Response(JSON.stringify({ items, nextCursor: null }), {
     status: 200,
     headers: { "Content-Type": "application/json" },
@@ -291,8 +223,7 @@ function renderHostMembersPage(extraResponses: Array<Response | Promise<Response
   const fetchMock = vi
     .fn()
     .mockResolvedValueOnce(authResponse(activeHostAuth))
-    .mockResolvedValueOnce(memberListResponse(initialMembers))
-    .mockResolvedValueOnce(invitationListResponse());
+    .mockResolvedValueOnce(memberListResponse(initialMembers));
 
   for (const response of extraResponses) {
     fetchMock.mockResolvedValueOnce(response);
@@ -383,20 +314,36 @@ describe("HostMembersPage", () => {
     expect(screen.getByRole("button", { name: "가입 승인 검토" })).toBeVisible();
     expect(screen.getByRole("button", { name: "검토" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "거절" })).not.toBeInTheDocument();
-    expect(await screen.findByRole("tab", { name: "활성 멤버" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "쉬는 중" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "탈퇴/비활성" })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: /활동/ })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /쉬는 중/ })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "탈퇴/비활성" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "둘러보기 멤버" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "초대" })).not.toBeInTheDocument();
     expect(screen.getByText("멤버1")).toBeInTheDocument();
-    expect(screen.getByLabelText("멤버 운영 요약")).toHaveTextContent("활동 2명 · 둘러보기 1명 · 쉬는 중 1명");
-    expect(screen.getByLabelText("멤버 운영 요약")).not.toHaveTextContent("이번 모임");
     expect(memberLedgerRow("멤버1").getByText("이번 모임 참여")).toBeInTheDocument();
     expect(memberLedgerRow("새").getByText("이번 모임 미포함")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "가입 승인 대기" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "초대" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "초대와 설정 열기 ›" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/settings",
+    );
+    expect(screen.queryByRole("region", { name: "초대" })).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/members?limit=50&clubSlug=reading-sai", expect.objectContaining({ cache: "no-store" }));
-    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/invitations?limit=50&clubSlug=reading-sai", expect.objectContaining({ cache: "no-store" }));
+    expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/host/invitations?limit=50&clubSlug=reading-sai", expect.anything());
+  });
+
+  it("sends people invitation work to club-scoped 초대와 설정", async () => {
+    const fetchMock = renderHostMembersPage();
+
+    expect(await screen.findByRole("link", { name: "초대와 설정 열기 ›" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/settings",
+    );
+    expect(screen.queryByRole("region", { name: "초대" })).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      "/api/bff/api/host/invitations?limit=50&clubSlug=reading-sai",
+      expect.anything(),
+    );
   });
 
   it("renders each member row with identity, status, and current-session state", async () => {
@@ -435,7 +382,7 @@ describe("HostMembersPage", () => {
     expect(outsideRow.getByText("이번 모임 미포함")).toBeInTheDocument();
     expect(outsideRow.getByText("접속 기록 없음")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("tab", { name: "쉬는 중" }));
+    await user.click(screen.getByRole("tab", { name: /쉬는 중/ }));
     const suspendedRowElement = screen.getByText("정").closest("tr") as HTMLElement;
     const suspendedRow = within(suspendedRowElement);
     expect(suspendedRowElement.querySelector(".rm-avatar-chip")).toHaveAttribute("data-avatar-size-role", "member");
@@ -452,7 +399,7 @@ describe("HostMembersPage", () => {
     expect(pendingArticle.querySelector(".rm-avatar-chip")).toHaveAttribute("data-avatar-size-role", "member");
     expect(screen.getByText("승인과 거절은 결과 안내를 포함해요.")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("tab", { name: "탈퇴/비활성" }));
+    await user.click(screen.getByRole("tab", { name: /전체/ }));
     const inactiveRowElement = screen.getByText("탈").closest("tr") as HTMLElement;
     const inactiveRow = within(inactiveRowElement);
     expect(inactiveRowElement.querySelector(".rm-avatar-chip img")).toHaveAttribute(
@@ -619,7 +566,7 @@ describe("HostMembersPage", () => {
     await user.type(dialog.getByLabelText("이름"), "새이름");
     await user.dblClick(dialog.getByRole("button", { name: "이름 저장" }));
 
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(dialog.getByRole("button", { name: "이름 저장" })).toBeDisabled();
     expect(dialog.getByRole("button", { name: "이름 저장" })).toHaveTextContent("저장 중");
 
@@ -632,7 +579,7 @@ describe("HostMembersPage", () => {
   it("keeps the member tab header and body on shared spacing classes", async () => {
     renderHostMembersPage();
 
-    expect(await screen.findByRole("tab", { name: "활성 멤버" })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: /전체/ })).toBeInTheDocument();
 
     const page = document.querySelector("main.rm-host-members-page");
     const contentContainer = document.querySelector("main > section.container") as HTMLElement | null;
@@ -657,9 +604,10 @@ describe("HostMembersPage", () => {
   it("labels viewer members as browsing members instead of approval pending", async () => {
     renderHostMembersPage();
 
-    const summary = await screen.findByLabelText("멤버 운영 요약");
-    expect(summary).toHaveTextContent("활동 2명 · 둘러보기 1명 · 쉬는 중 1명");
-    expect(summary).not.toHaveTextContent("승인 대기");
+    expect(await screen.findByRole("tab", { name: /전체/ })).toBeVisible();
+    expect(screen.getByRole("tab", { name: /활동/ })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByRole("tab", { name: /둘러보기/ })).toBeVisible();
+    expect(screen.getByRole("tab", { name: /쉬는 중/ })).toBeVisible();
 
     const viewer = within((await findPendingZone()).getByText("둘").closest("article") as HTMLElement);
     expect(viewer.getByText("둘러보기 멤버 · 요청일 2026.04.20")).toBeInTheDocument();
@@ -668,32 +616,29 @@ describe("HostMembersPage", () => {
     expect(screen.getByText("승인과 거절은 결과 안내를 포함해요.")).toBeInTheDocument();
   });
 
-  it("supports keyboard selection in the member management tablist", async () => {
+  it("filters the people ledger from the status chips", async () => {
     const user = userEvent.setup();
     renderHostMembersPage();
 
-    const activeTab = await screen.findByRole("tab", { name: "활성 멤버" });
-    const suspendedTab = screen.getByRole("tab", { name: "쉬는 중" });
-    const inactiveTab = screen.getByRole("tab", { name: "탈퇴/비활성" });
+    const allTab = await screen.findByRole("tab", { name: /전체/ });
+    const statusTabs = screen.getByRole("tablist", { name: "멤버 상태" });
+    const activeTab = within(statusTabs).getByRole("tab", { name: /활동/ });
+    const suspendedTab = within(statusTabs).getByRole("tab", { name: /쉬는 중/ });
 
-    activeTab.focus();
-    await user.keyboard("{ArrowRight}");
-    await waitFor(() => expect(suspendedTab).toHaveFocus());
+    expect(allTab).toHaveAttribute("aria-selected", "true");
+    expect(membersTabPanel("전체").getByText("멤버1")).toBeInTheDocument();
+    expect(membersTabPanel("전체").getByText("탈")).toBeInTheDocument();
+
+    await user.click(suspendedTab);
     expect(suspendedTab).toHaveAttribute("aria-selected", "true");
     expect(membersTabPanel("쉬는 중").getByText("정")).toBeInTheDocument();
+    expect(screen.queryByText("멤버1")).not.toBeInTheDocument();
 
-    await user.keyboard("{End}");
-    await waitFor(() => expect(inactiveTab).toHaveFocus());
-    expect(inactiveTab).toHaveAttribute("aria-selected", "true");
-    expect(membersTabPanel("탈퇴/비활성").getByText("탈")).toBeInTheDocument();
-
-    await user.keyboard("{Home}");
-    await waitFor(() => expect(activeTab).toHaveFocus());
+    await user.click(activeTab);
     expect(activeTab).toHaveAttribute("aria-selected", "true");
-
-    await user.keyboard("{ArrowLeft}");
-    await waitFor(() => expect(inactiveTab).toHaveFocus());
-    expect(inactiveTab).toHaveAttribute("aria-selected", "true");
+    expect(membersTabPanel("활동").getByText("멤버1")).toBeInTheDocument();
+    expect(screen.queryByText("정")).not.toBeInTheDocument();
+    expect(screen.queryByText("탈")).not.toBeInTheDocument();
   });
 
   it("renders viewer registration dates with app date formatting", async () => {
@@ -847,10 +792,10 @@ describe("HostMembersPage", () => {
     expect(secondRow.getByRole("button", { name: "거절" })).toBeDisabled();
     expect(secondRow.getByRole("button", { name: "거절" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
     expect(secondRow.getAllByText("멤버 상태 업데이트를 처리하는 중입니다.")).toHaveLength(2);
-    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
 
     await user.click(firstRow.getByRole("button", { name: "거절" }));
-    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
 
     firstApproval.resolve(new Response(JSON.stringify({ status: "ACTIVE" }), { status: 200, headers: { "Content-Type": "application/json" } }));
     secondApproval.resolve(new Response(JSON.stringify({ status: "ACTIVE" }), { status: 200, headers: { "Content-Type": "application/json" } }));
@@ -880,7 +825,7 @@ describe("HostMembersPage", () => {
     expect(deactivateButton).toHaveAccessibleDescription("이 멤버는 현재 정책상 둘러보기 해제할 수 없습니다.");
     expect(viewerRow.getByText("이 멤버는 현재 정책상 둘러보기 해제할 수 없습니다.")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("tab", { name: "쉬는 중" }));
+    await user.click(screen.getByRole("tab", { name: /쉬는 중/ }));
     const suspendedRow = within(screen.getByText("정").closest("tr") as HTMLElement);
     const restoreButton = suspendedRow.getByRole("button", { name: "복구" });
 
@@ -912,17 +857,17 @@ describe("HostMembersPage", () => {
     expect(await screen.findByText("정식 멤버로 전환했습니다.")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "가입 승인 대기" })).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenNthCalledWith(
-      4,
+      3,
       "/api/bff/api/host/members/membership-pending/activate?clubSlug=reading-sai",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      5,
+      4,
       "/api/bff/api/host/members?limit=50&clubSlug=reading-sai",
       expect.objectContaining({ cache: "no-store" }),
     );
 
-    await user.click(screen.getByRole("tab", { name: "활성 멤버" }));
+    await user.click(screen.getByRole("tab", { name: /활동/ }));
     expect(screen.getByText("둘")).toBeInTheDocument();
   });
 
@@ -953,12 +898,12 @@ describe("HostMembersPage", () => {
     const firstPending = within((await findPendingZone()).getByText("둘").closest("article") as HTMLElement);
     await revealPendingRowActions(user, firstPending);
     await user.click(firstPending.getByRole("button", { name: "승인" }));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
 
     const secondPendingRow = within((await findPendingZone()).getByText("두번째 둘러보기").closest("article") as HTMLElement);
     await revealPendingRowActions(user, secondPendingRow);
     await user.click(secondPendingRow.getByRole("button", { name: "승인" }));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(7));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6));
 
     expect(screen.queryByRole("region", { name: "가입 승인 대기" })).not.toBeInTheDocument();
 
@@ -997,17 +942,17 @@ describe("HostMembersPage", () => {
     expect(await screen.findByText("둘러보기 멤버를 해제했습니다.")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "가입 승인 대기" })).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenNthCalledWith(
-      4,
+      3,
       "/api/bff/api/host/members/membership-pending/deactivate-viewer?clubSlug=reading-sai",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      5,
+      4,
       "/api/bff/api/host/members?limit=50&clubSlug=reading-sai",
       expect.objectContaining({ cache: "no-store" }),
     );
 
-    await user.click(screen.getByRole("tab", { name: "탈퇴/비활성" }));
+    await user.click(screen.getByRole("tab", { name: /전체/ }));
     expect(screen.getByText("둘")).toBeInTheDocument();
     const inactiveViewerRow = within(screen.getByText("둘").closest("tr") as HTMLElement);
     expect(inactiveViewerRow.getByText("기록 보존")).toBeInTheDocument();
@@ -1029,7 +974,7 @@ describe("HostMembersPage", () => {
     expect(screen.queryByRole("region", { name: "가입 승인 대기" })).not.toBeInTheDocument();
     expect(screen.queryByText("정식 멤버 전환에 실패했습니다.")).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenNthCalledWith(
-      5,
+      4,
       "/api/bff/api/host/members?limit=50&clubSlug=reading-sai",
       expect.objectContaining({ cache: "no-store" }),
     );
@@ -1146,7 +1091,7 @@ describe("HostMembersPage", () => {
     const restore = deferred<Response>();
     const fetchMock = renderHostMembersPage([restore.promise]);
 
-    await user.click(await screen.findByRole("tab", { name: "쉬는 중" }));
+    await user.click(await screen.findByRole("tab", { name: /쉬는 중/ }));
     const suspendedRow = within(screen.getByText("정").closest("tr") as HTMLElement);
     await user.click(suspendedRow.getByRole("button", { name: "복구" }));
 
@@ -1178,12 +1123,12 @@ describe("HostMembersPage", () => {
     await user.click(within(row as HTMLElement).getByRole("button", { name: "이번 모임 추가" }));
 
     expect(fetchMock).toHaveBeenNthCalledWith(
-      4,
+      3,
       "/api/bff/api/host/members/membership-active/current-session/remove?clubSlug=reading-sai",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      5,
+      4,
       "/api/bff/api/host/members/membership-not-session/current-session/add?clubSlug=reading-sai",
       expect.objectContaining({ method: "POST" }),
     );
@@ -1215,7 +1160,7 @@ describe("HostMembersPage", () => {
     expect(activeRow.getAllByText("멤버 상태 업데이트를 처리하는 중입니다.")).toHaveLength(3);
 
     await user.click(activeRow.getByRole("button", { name: "멤버 관리 메뉴" }));
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
 
     await act(async () => {
@@ -1277,93 +1222,13 @@ describe("HostMembersPage", () => {
     );
   });
 
-  it("shows the refreshed invitation row after create instead of keeping an empty ledger", async () => {
-    const user = userEvent.setup();
-    const created: HostInvitationListItem = {
-      invitationId: "invite-new",
-      email: "new@example.com",
-      name: "새멤버",
-      role: "MEMBER",
-      status: "PENDING",
-      effectiveStatus: "PENDING",
-      expiresAt: "2026-05-20T12:00:00Z",
-      acceptedAt: null,
-      createdAt: "2026-04-20T12:00:00Z",
-      canRevoke: true,
-      canReissue: true,
-      applyToCurrentSession: true,
-    };
-    const invitationActions = {
-      ...noopHostInvitationsActions,
-      createInvitation: vi.fn(async () => new Response(JSON.stringify(created), { status: 201 })),
-      refreshInvitations: vi.fn(async () => ({ items: [created], nextCursor: null })),
-    };
-
+  it("sends invitation work to 초대와 설정 instead of hosting a people extras ledger", () => {
     render(
-      <HostMembersForTest
-        initialMembers={[members[0]]}
-        initialInvitations={[]}
-        invitationActions={invitationActions}
-      />,
+      <HostMembersForTest initialMembers={[members[0]]} />,
     );
 
-    const createInvitations = screen.getByRole("region", { name: "초대" });
-    await user.type(within(createInvitations).getByLabelText("이름"), "새멤버");
-    await user.type(within(createInvitations).getByLabelText("초대 이메일"), "new@example.com");
-    await user.click(screen.getByRole("button", { name: "초대 보내기" }));
-
-    const invitations = screen.getByRole("region", { name: "초대" });
-    expect(await within(invitations).findByText("새멤버")).toBeInTheDocument();
-    expect(invitationActions.refreshInvitations).toHaveBeenCalledWith({ limit: 50 });
-  });
-
-  it("publishes no invitation row or success copy when the registered host-members owner becomes obsolete", async () => {
-    const user = userEvent.setup();
-    const created: HostInvitationListItem = {
-      invitationId: "invite-obsolete",
-      email: "obsolete@example.com",
-      name: "사라진 소유자",
-      role: "MEMBER",
-      status: "PENDING",
-      effectiveStatus: "PENDING",
-      expiresAt: "2026-09-20T12:00:00Z",
-      acceptedAt: null,
-      createdAt: "2026-08-31T00:00:00Z",
-      canRevoke: true,
-      canReissue: true,
-      applyToCurrentSession: true,
-    };
-    const publishUi = vi.fn(() => "rejected" as const);
-    const createInvitation = vi.fn(async () => ({
-      created,
-      refreshed: { items: [created], nextCursor: null },
-      publishUi,
-    }));
-    const registeredActions: RegisteredHostInvitationsActions = {
-      listInvitations: noopHostInvitationsActions.listInvitations,
-      parseInvitationList: noopHostInvitationsActions.parseInvitationList,
-      createInvitation,
-      revokeInvitation: vi.fn(),
-    };
-
-    render(
-      <HostMembers
-        initialMembers={[members[0]]}
-        initialInvitations={[]}
-        actions={noopHostMembersActions}
-        invitationActions={registeredActions}
-      />,
-    );
-
-    const obsoleteInvitations = screen.getByRole("region", { name: "초대" });
-    await user.type(within(obsoleteInvitations).getByLabelText("이름"), "사라진 소유자");
-    await user.type(within(obsoleteInvitations).getByLabelText("초대 이메일"), "obsolete@example.com");
-    await user.click(screen.getByRole("button", { name: "초대 보내기" }));
-
-    const invitationRegion = screen.getByRole("region", { name: "초대" });
-    expect(createInvitation).toHaveBeenCalledTimes(1);
-    expect(publishUi).toHaveBeenCalledTimes(1);
-    expect(within(invitationRegion).queryByText("사라진 소유자")).not.toBeInTheDocument();
-    expect(within(invitationRegion).queryByText("초대를 보냈습니다.")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "초대와 설정 열기 ›" })).toHaveAttribute("href", "/app/host/settings");
+    expect(screen.queryByRole("region", { name: "초대" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "초대 보내기" })).not.toBeInTheDocument();
   });
 });

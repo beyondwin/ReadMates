@@ -393,6 +393,25 @@
   text-underline-offset: 3px;
 }
 
+.rm-host-people__settings-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.rm-host-people__settings-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.rm-host-people__settings-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
 .rm-host-pending {
   padding: 18px 22px;
   margin-bottom: var(--space-lg);

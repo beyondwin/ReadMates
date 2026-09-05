@@ -284,6 +284,102 @@ describe("HostWorkbox", () => {
     expect(props.onLoadMore).toHaveBeenCalledWith("opaque-next-page");
   });
 
+  it("does not render a footer when footerNote is null", () => {
+    renderWorkbox({ footerNote: null });
+    expect(document.querySelector(".rm-host-workbox__footer")).toBeNull();
+  });
+
+  it("does not render a footer when footerNote text is empty", () => {
+    renderWorkbox({ footerNote: { text: "", historyHref: "/app/host/sessions/session-1?section=history" } });
+    expect(document.querySelector(".rm-host-workbox__footer")).toBeNull();
+  });
+
+  it("keeps compact people rows destination-only and offers 작업함 모두 보기 so defer can open", async () => {
+    const item: HostWorkboxItemView = {
+      ...page.items[0],
+      key: "MEMBER_APPROVAL:opaque/server:key:r7",
+      type: "MEMBER_APPROVAL",
+      title: "가입 승인 요청",
+      destinationCategory: "people",
+      destinationHref: "/app/host/people",
+      dueAt: null,
+    };
+    const onShowAll = vi.fn();
+    const onDefer = vi.fn();
+    renderWorkbox({
+      view: { ...page, items: [item], partialWarnings: [], nextCursor: null },
+      disclosure: { visibleItems: [item], hiddenCount: 0, hasMore: false, expanded: false },
+      onShowAll,
+      onDefer,
+    });
+
+    const row = screen.getByRole("listitem", { name: /가입 승인 요청/ });
+    expect(within(row).queryByRole("button", { name: /보류/ })).not.toBeInTheDocument();
+    expect(row.textContent).not.toContain("세부 조작");
+    await userEvent.click(screen.getByRole("button", { name: "작업함 모두 보기" }));
+    expect(onShowAll).toHaveBeenCalledOnce();
+  });
+
+  it("exposes deferral on expanded 작업함 모두 보기 rows that destinations do not own", async () => {
+    const onDefer = vi.fn();
+    const item: HostWorkboxItemView = {
+      ...page.items[0],
+      key: "MEMBER_APPROVAL:opaque/server:key:r7",
+      type: "MEMBER_APPROVAL",
+      title: "가입 승인 요청",
+      destinationCategory: "people",
+      destinationHref: "/app/host/people",
+      dueAt: null,
+    };
+    renderWorkbox({
+      view: { ...page, items: [item], partialWarnings: [], nextCursor: null },
+      disclosure: { visibleItems: [item], hiddenCount: 0, hasMore: false, expanded: true },
+      onDefer,
+    });
+
+    const row = screen.getByRole("listitem", { name: /가입 승인 요청/ });
+    expect(row.textContent).not.toContain("세부 조작");
+    expect(screen.queryByRole("button", { name: "작업함 모두 보기" })).not.toBeInTheDocument();
+    await userEvent.click(within(row).getByRole("button", { name: "가입 승인 요청 보류" }));
+    expect(onDefer).toHaveBeenCalledWith("MEMBER_APPROVAL:opaque/server:key:r7", "TOMORROW");
+  });
+
+  it("does not expose defer on expanded schedule-review rows that the destination already owns", () => {
+    renderWorkbox({
+      view: { ...page, partialWarnings: [], nextCursor: null },
+      disclosure: { visibleItems: page.items, hiddenCount: 0, hasMore: false, expanded: true },
+      onDefer: vi.fn(),
+    });
+
+    const row = screen.getByRole("listitem", { name: /일정 확인이 필요한 멤버/ });
+    expect(within(row).queryByRole("button", { name: /보류/ })).not.toBeInTheDocument();
+  });
+
+  it("exposes undo on expanded deferred rows and wires pendingKey", () => {
+    const onUndoDeferral = vi.fn();
+    const item: HostWorkboxItemView = {
+      ...page.items[0],
+      key: "MEMBER_APPROVAL:opaque/server:key:r7",
+      type: "MEMBER_APPROVAL",
+      state: "DEFERRED",
+      title: "가입 승인 요청",
+      destinationCategory: "people",
+      destinationHref: "/app/host/people",
+      deferredUntil: "2026-09-02T09:00:00Z",
+      dueAt: null,
+    };
+    renderWorkbox({
+      state: "DEFERRED",
+      view: { ...page, state: "DEFERRED", items: [item], partialWarnings: [], nextCursor: null },
+      disclosure: { visibleItems: [item], hiddenCount: 0, hasMore: false, expanded: true },
+      pendingKey: item.key,
+      onUndoDeferral,
+    });
+
+    const button = screen.getByRole("button", { name: "가입 승인 요청 보류 해제" });
+    expect(button).toBeDisabled();
+  });
+
   it("keeps completed rows destination-only without in-row receipt disclosure", () => {
     renderWorkbox({
       state: "COMPLETED",

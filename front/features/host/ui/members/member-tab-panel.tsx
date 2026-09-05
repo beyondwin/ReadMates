@@ -14,10 +14,18 @@ import {
   MemberOverflowMenu,
 } from "./member-list";
 import { preservedRecordBadge } from "./member-list-helpers";
-import type { HostMemberLifecyclePath, HostMembersLinkComponent, LifecycleDialog, MemberTab } from "./types";
+import type { HostPeopleStatusFilter } from "./host-people-page";
+import type { HostMemberLifecyclePath, HostMembersLinkComponent, LifecycleDialog } from "./types";
+
+const PANEL_LABEL: Record<HostPeopleStatusFilter, string> = {
+  all: "전체",
+  active: "활동",
+  viewer: "둘러보기",
+  suspended: "쉬는 중",
+};
 
 export function MemberTabPanel({
-  activeTab,
+  statusFilter,
   activeMembers,
   suspendedMembers,
   inactiveMembers,
@@ -31,7 +39,7 @@ export function MemberTabPanel({
   personHref,
   LinkComponent,
 }: {
-  activeTab: MemberTab;
+  statusFilter: HostPeopleStatusFilter;
   activeMembers: HostMemberListItem[];
   suspendedMembers: HostMemberListItem[];
   inactiveMembers: HostMemberListItem[];
@@ -45,13 +53,17 @@ export function MemberTabPanel({
   personHref: (membershipId: string) => string;
   LinkComponent?: HostMembersLinkComponent;
 }) {
+  const showActive = statusFilter === "all" || statusFilter === "active";
+  const showSuspended = statusFilter === "all" || statusFilter === "suspended";
+  const showInactive = statusFilter === "all";
+
   return (
     <section
-      id={`host-members-panel-${activeTab}`}
+      id={`host-members-panel-${statusFilter}`}
       role="tabpanel"
-      aria-labelledby={`host-members-tab-${activeTab}`}
+      aria-label={PANEL_LABEL[statusFilter]}
     >
-      {activeTab === "active" ? (
+      {showActive ? (
         <MemberList
           members={activeMembers}
           emptyText="활성 멤버가 없습니다."
@@ -91,7 +103,7 @@ export function MemberTabPanel({
         />
       ) : null}
 
-      {activeTab === "suspended" ? (
+      {showSuspended ? (
         <MemberList
           members={suspendedMembers}
           emptyText="쉬는 멤버가 없습니다."
@@ -137,7 +149,7 @@ export function MemberTabPanel({
         />
       ) : null}
 
-      {activeTab === "inactive" ? (
+      {showInactive ? (
         <MemberList
           members={inactiveMembers}
           emptyText="탈퇴 또는 비활성 멤버가 없습니다."

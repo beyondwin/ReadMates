@@ -1,8 +1,6 @@
 import { type CSSProperties, useMemo, useRef, useState } from "react";
 import type {
   CurrentSessionPolicy,
-  HostInvitationListItem,
-  HostInvitationListPage,
   HostMemberListPage,
   HostMemberListItem,
   MemberLifecycleRequest,
@@ -11,7 +9,6 @@ import {
   HostMemberProfileActionError,
   type HostMembersActions,
 } from "@/features/host/model/host-member-actions";
-import type { RegisteredHostInvitationsActions } from "@/features/host/model/host-invitation-actions";
 import { isTransitionOwnerObsoleteError } from "@/shared/ui/use-transition-safety-owner";
 import { LifecyclePolicyDialog } from "./members/member-approval-actions";
 import { actionKey, disabledProfileReason, isMembershipPending } from "./members/member-action-rules";
@@ -26,17 +23,18 @@ import type {
   HostMembersLinkComponent,
   HostViewerAction,
   LifecycleDialog,
-  MemberTab,
   ProfileDialog,
 } from "./members/types";
 export type { HostMembersLinkComponent } from "./members/types";
 
+const DefaultPeopleLink: HostMembersLinkComponent = ({ to, children, ...props }) => (
+  <a {...props} href={to}>{children}</a>
+);
+
 type HostMembersProps = {
   initialMembers: HostMemberListPage | HostMemberListItem[];
   actions: HostMembersActions;
-  initialInvitations: HostInvitationListPage | HostInvitationListItem[];
-  invitationActions: RegisteredHostInvitationsActions;
-  /** Kept for route API compatibility; Stage 5 absorbed invitations into this page (no outbound link). */
+  settingsHref?: string;
   LinkComponent?: HostMembersLinkComponent;
 };
 
@@ -50,7 +48,8 @@ type MemberRowsUpdate = HostMemberListItem[] | ((current: HostMemberListItem[]) 
 export default function HostMembers({
   initialMembers,
   actions,
-  LinkComponent,
+  settingsHref = "/app/host/settings",
+  LinkComponent = DefaultPeopleLink,
 }: HostMembersProps) {
   const initialPage = useMemo(() => normalizeMemberPage(initialMembers), [initialMembers]);
   const initialMembersItems = initialPage.items;
@@ -68,7 +67,6 @@ export default function HostMembers({
   const members = visibleRowsState.members;
   const visibleNextCursor = visibleRowsState.nextCursor;
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [activeTab, setActiveTab] = useState<MemberTab>("active");
   const [statusFilter, setStatusFilter] = useState<HostPeopleStatusFilter>("all");
   const [dialog, setDialog] = useState<LifecycleDialog>(null);
   const [profileDialog, setProfileDialog] = useState<ProfileDialog>(null);
@@ -289,13 +287,6 @@ export default function HostMembers({
 
   const handleStatusFilterChange = (nextFilter: HostPeopleStatusFilter) => {
     setStatusFilter(nextFilter);
-    if (nextFilter === "suspended") {
-      setActiveTab("suspended");
-      return;
-    }
-    if (nextFilter === "all" || nextFilter === "active") {
-      setActiveTab("active");
-    }
   };
 
   const personHref = (membershipId: string) => `/app/host/people/${encodeURIComponent(membershipId)}`;
@@ -344,7 +335,7 @@ export default function HostMembers({
         ) : null}
 
         <MemberTabPanel
-          activeTab={activeTab}
+          statusFilter={statusFilter}
           activeMembers={activeMembers}
           suspendedMembers={suspendedMembers}
           inactiveMembers={inactiveMembers}
@@ -358,6 +349,10 @@ export default function HostMembers({
           personHref={personHref}
           LinkComponent={LinkComponent}
         />
+
+        <LinkComponent to={settingsHref} className="rm-host-people__settings-link">
+          초대와 설정 열기 ›
+        </LinkComponent>
 
         {dialog ? (
           <LifecyclePolicyDialog
