@@ -7,6 +7,7 @@ import {
   expectLocatorGeometry,
   type ApprovedRegion,
 } from "@/tests/e2e/support/approved-mockup-contract";
+import { expectNoTextOverlap } from "@/tests/ct/support/expect-no-overlap";
 import {
   expectMinimumTargetSize,
   expectNoHorizontalOverflow,
@@ -302,6 +303,7 @@ test("space menu keeps platform and club choices inside the production shell", a
   const platform = menu.getByRole("menuitemradio", { name: "플랫폼 운영" });
   const clubs = menu.getByRole("menuitem", { name: "내 클럽" });
   await expect(platform).toHaveAttribute("aria-checked", "true");
+  await expectNoTextOverlap(component.locator(".admin-shell__header"));
   await expect(clubs).toBeVisible();
   await expect(menu).not.toContainText(/OWNER|OPERATOR|SUPPORT|ACTIVE|SUSPENDED/);
   await expect(menu.getByText("현재 범위", { exact: true }).first()).toBeVisible();

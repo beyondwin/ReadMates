@@ -9,6 +9,7 @@ import {
   isSemanticDocumentOrder,
   type ApprovedRegion,
 } from "@/tests/e2e/support/approved-mockup-contract";
+import { expectNoTextOverlap } from "@/tests/ct/support/expect-no-overlap";
 import {
   VISUAL_AUTHORITY_VIEWPORTS,
   expectMinimumTargetSize,
@@ -392,6 +393,7 @@ test("Clubs locks the approved desktop ledger", async ({ mount, page }) => {
   );
   const firstRow = component.getByRole("link", { name: "문장과 사람들" });
   await expect(component.getByRole("heading", { name: "클럽 찾기" })).toBeVisible();
+  await expectNoTextOverlap(component.locator(".admin-clubs-ledger__list-header"));
   await expect(component.getByRole("region", { name: "클럽 관리 목록" })).toBeVisible();
   await expect(component.getByRole("region", { name: "선택한 클럽" })).toBeVisible();
   await expect(firstRow).toBeVisible();

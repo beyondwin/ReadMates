@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/experimental-ct-react";
 import type { HostWorkboxView } from "@/features/host/model/host-workbox-model";
+import { expectNoTextOverlap } from "@/tests/ct/support/expect-no-overlap";
 import { expectMinimumTargetSize, expectNoHorizontalOverflow, expectVisibleFocus } from "@/tests/e2e/support/visual-authority-contract";
 import { HostWorkbox } from "./host-workbox";
 import "../operating-room/operating-room.css";
@@ -88,6 +89,7 @@ for (const viewport of [
       await expectVisibleFocus(firstTab);
 
       const row = component.getByRole("listitem", { name: /일정 확인이 필요한 멤버/ });
+      await expectNoTextOverlap(row);
       await expect(row.getByRole("link", { name: "일정 확인이 필요한 멤버" })).toBeVisible();
       await expect(row.locator("details, summary")).toHaveCount(0);
       await expect(row.locator(".rm-icon-badge [data-icon='alert-circle']")).toBeVisible();

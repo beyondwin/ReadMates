@@ -109,3 +109,53 @@ Jammy 18 id (`DOCKER_CONTEXT=colima-readmates-va CI=true npx --yes corepack@0.35
 | geometry | `approved-host-ledgers.ct.tsx` person detail mobile | Host mobile geometry. Phase 4. |
 | 시맨틱 | `host-operating-room-responsive.ct.tsx` 320–1440 + partial warning | `details.rm-host-work-item__secondary` 없음(Task 12 행 누출 제거). Phase 2. |
 | geometry | 같은 파일 prep mobile / live attendance board | Task 18: CT main y 52·실측 height로 갱신. 통과. |
+
+## smoke (Task 29)
+
+Command: `READMATES_VISUAL_AUTHORITY_SMOKE_ONLY=true CI=true npx --yes corepack@0.35.0 pnpm --dir front test:e2e:visual-authority-browsers`
+
+21 tests (chromium both specs; firefox-host / webkit-mobile-host host-only; firefox-admin / webkit-mobile-admin admin-only). `CI=true` retries=2.
+
+**As-is first run (before audit heading/focus selector land):** **15 passed, 6 failed.**
+
+| fail | projects | cause |
+| --- | --- | --- |
+| Health is read-only evidence without commands | chromium, firefox-admin, webkit-mobile-admin | first `새로 확인` 36×48 (webkit 30×48) vs 44px. Heading/copy already matched (`서비스 건강` 없음, table `서비스 상태`, heading `AI 작업 대기열`). |
+| Audit URL owns the review docket | same 3 | `getByRole("heading", { name: "처리 기록", level: 2 })` — list heading is page **h1** while detail is closed. Copy is `처리 기록`, not `운영 처리 기록`. |
+
+Heading/copy selector fixes (did not loosen `approved-route-structure.ts`):
+
+- Clubs: dropped `level: 1` on `클럽 찾기` (ready list is `h2`; 시안 02 has no page h1).
+- Audit: dropped `level: 2`; after `목록으로`, focus is the row `button[data-audit-row]`, not the `listitem`.
+- Today `level: 1` / `확인함` already GREEN (Task 28). Did not rewrite to mockup `다시 보내기 검토`.
+
+**Second official run (committed smoke spec):** **16 passed, 3 failed, 2 flaky.**
+
+- Failed: Health 44px leftover on the same 3 admin projects. Did not restyle table-cell `새로 확인` (not a heading/copy fix; not Task 18 CSS).
+- Flaky (passed on retry): firefox-host workspace smoke; webkit-mobile-admin clubs `#admin-club-row-club-1` focus restore. Id still exists; did not start a fold fight.
+- Audit GREEN after heading + row-control focus selector.
+- Task 28 leftover `전체 처리 기록 보기` sticky-header intercept is `admin-today.spec.ts`, not this smoke suite.
+
+## overlap CT (Task 29)
+
+Helper: `front/tests/ct/support/expect-no-overlap.ts` (`expectNoTextOverlap`). Called from:
+
+1. Workbox row — `host-workbox.ct.tsx` composition, locator = the work `listitem`.
+2. Admin clubs header — `admin-editorial-ledger.ct.tsx` Clubs desktop, locator = `.admin-clubs-ledger__list-header`.
+3. Admin shell header with space switcher open — `admin-shell-layout.ct.tsx` space menu test, locator = `.admin-shell__header` (not account-control CSS rewrite).
+
+Command: `DOCKER_CONTEXT=colima-readmates-va CI=true npx --yes corepack@0.35.0 pnpm --dir front test:ct:docker`
+
+**168 passed, 10 failed.** Full CT GREEN is not a gate. Overlap asserts did **not** add a new fail. Space-menu test still dies later on switcher geometry `x=260 w=107` vs `x=188 w=160` (Task 27 leftover). Live-route punch-list 결함 `admin-space-switcher-desktop` 계정 라벨 vs 아바타: this CT has `accountNameVisible=false`, so the helper did not throw that pair. Did not rewrite Admin shell chrome.
+
+Same 10 leftover fails as Task 27 (selectors still match current DOM; raster/geometry only):
+
+- `diary-closed-768` 768×2427 vs 2430
+- 5 closing-board snapshots (~2–3px)
+- admin space menu geometry
+- Today mobile header 132.59 vs 70
+- Today case-detail back y 132.59 vs 0
+- Review-audit first-row height 46 vs 112
+
+Did not `--update` snapshots. Did not loosen structure contract.
+
