@@ -58,8 +58,13 @@ export function CurrentMeetingHeader({
   links,
   LinkComponent = DefaultLink,
 }: CurrentMeetingHeaderProps) {
-  const title = displayText(meeting.bookTitle, displayText(meeting.title, "모임 제목 미정"));
-  const kicker = [displayText(meeting.title, ""), displayText(meeting.bookAuthor, "")].filter(Boolean).join(" · ");
+  const bookTitle = displayText(meeting.bookTitle, "");
+  const meetingTitle = displayText(meeting.title, "");
+  const title = bookTitle || meetingTitle || "모임 제목 미정";
+  const kicker = [
+    bookTitle ? meetingTitle : "",
+    displayText(meeting.bookAuthor, ""),
+  ].filter(Boolean).join(" · ");
   const placeLabel = displayText(meeting.locationLabel, "장소 미정");
   const actions = [
     { label: "모임 정보", href: links.infoHref, icon: "info" as const },

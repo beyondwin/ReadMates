@@ -24,6 +24,9 @@ function safeCoverImageUrl(value: string | null | undefined): string | null {
   if (!trimmed.startsWith("/") || trimmed.startsWith("//") || trimmed.includes("\\")) {
     return null;
   }
+  if ([...trimmed].some((character) => character.charCodeAt(0) < 0x21)) {
+    return null;
+  }
 
   return trimmed;
 }

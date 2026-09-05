@@ -81,6 +81,21 @@ describe("CurrentMeetingHeader", () => {
     expect(within(screen.getByRole("navigation", { name: "현재 모임 작업" })).queryByRole("link", { name: "멤버 시야" })).not.toBeInTheDocument();
   });
 
+  it("omits the meeting title from the kicker when the h1 already fell back to it", () => {
+    render(
+      <CurrentMeetingHeader
+        meeting={{ ...meeting, bookTitle: "", bookImageUrl: null }}
+        badge={{ kind: "dday", label: "D-3" }}
+        links={links}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("스물여덟 번째 모임");
+    const kicker = document.querySelector(".rm-operating-room-header__kicker");
+    expect(kicker).toHaveTextContent("김초엽");
+    expect(kicker?.textContent).not.toContain("스물여덟 번째 모임");
+  });
+
   it("renders the established cover fallback and explicit labels for partial meeting fields", () => {
     render(
       <CurrentMeetingHeader
