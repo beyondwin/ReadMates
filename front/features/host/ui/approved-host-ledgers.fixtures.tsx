@@ -1,7 +1,5 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import {
-  approvedClubSettings,
-  approvedInvitationLinks,
   approvedMeetingSections,
   approvedPeopleLedgerFacts,
   approvedPeopleMembers,
@@ -26,12 +24,7 @@ import { formatMembershipTenure } from "./members/member-list-helpers";
 import { MemberPendingZone } from "./members/member-pending-zone";
 import { HostPersonDetail } from "./person/host-person-detail";
 import { HostScheduleReviewPage } from "./schedule-review/host-schedule-review-page";
-import { HostClubSettings } from "./settings/host-club-settings";
-import {
-  HostInvitationLinks,
-  type HostInvitationCreateDraft,
-} from "./settings/host-invitation-links";
-import { HostSettingsColumns, HostSettingsPage } from "./settings/host-settings-page";
+import { HostSettingsApprovedStory } from "./approved-host-settings.story";
 import "./host-editorial-ledger.css";
 import "./shell/host-shell.css";
 import "./workbox/host-workbox.css";
@@ -54,21 +47,11 @@ const peopleLedgerFacts = approvedPeopleLedgerFacts;
 const recordItems = approvedRecordItems;
 const recordFacts = approvedRecordFacts;
 const recordWorkbox = approvedRecordWorkbox;
-const invitationLinks = approvedInvitationLinks;
-const clubSettings = approvedClubSettings;
 const personNow = approvedPersonNow;
 const personJoinedAt = approvedPersonJoinedAt;
 const person = approvedPerson;
 const scheduleReviewMembers = approvedScheduleReviewMembers;
 const scheduleReviewPreview = approvedScheduleReviewPreview;
-
-
-const invitationCreateDraft: HostInvitationCreateDraft = {
-  name: "",
-  maxUses: "20",
-  expiresAt: "2026-09-30",
-};
-
 
 export function hostMeetingsApprovedView() {
   return hostApprovedShell(
@@ -145,68 +128,8 @@ export function hostRecordsApprovedView() {
   );
 }
 
-function HostSettingsApprovedComposition() {
-  const [createOpen, setCreateOpen] = useState(false);
-  return (
-    <HostSettingsPage
-      createCta={(
-        <button
-          className="btn btn-primary"
-          type="button"
-          aria-expanded={createOpen}
-          onClick={() => setCreateOpen((open) => !open)}
-        >
-          새 초대 링크
-        </button>
-      )}
-    >
-      <HostSettingsColumns
-        invitations={(
-          <HostInvitationLinks
-            links={invitationLinks}
-            loading={false}
-            error={null}
-            busy={false}
-            createDraft={invitationCreateDraft}
-            editDraft={null}
-            sharePath={null}
-            message={null}
-            alert={null}
-            onRetry={noop}
-            onRefresh={noop}
-            onCreateDraftChange={noop}
-            onEditDraftChange={noop}
-            onCreate={noop}
-            onUpdate={noop}
-            onToggle={noop}
-            onRetryCommand={noop}
-            onCopySharePath={noop}
-            now={new Date("2026-09-02T11:04:00+09:00")}
-            createOpen={createOpen}
-            onCreateOpenChange={setCreateOpen}
-            showCreateTrigger={false}
-          />
-        )}
-        clubSettings={(
-          <HostClubSettings
-            settings={clubSettings}
-            draft={clubSettings}
-            saving={false}
-            stale={false}
-            error={null}
-            hostCount="1명"
-            onDraftChange={noop}
-            onSave={noop}
-            onCloseReview={noop}
-          />
-        )}
-      />
-    </HostSettingsPage>
-  );
-}
-
 export function hostSettingsApprovedView() {
-  return hostApprovedShell("settings", <HostSettingsApprovedComposition />);
+  return <HostSettingsApprovedStory />;
 }
 
 export function hostScheduleReviewApprovedView() {
@@ -254,6 +177,20 @@ export function hostPersonApprovedView() {
         folioLabel: "FOLIO · 017",
         tenureLabel: formatMembershipTenure(personJoinedAt, personNow),
         joinedLabel: "2025년 10월 가입 · 초대 링크로 참여",
+        meetingTitle: "지구 끝의 온실",
+        scheduleSeenLabel: "변경 전 확인",
+        confirmedRevision: 3,
+        membershipSummary: "초대 링크 · 2025.10.03 · 활동 중 · 멤버",
+        attendanceTitles: {
+          27: "작별하지 않는다",
+          26: "밝은 밤",
+          25: "파친코",
+          24: "아무튼, 술",
+        },
+      }}
+      links={{
+        scheduleReviewHref: "/clubs/reading-sai/app/host/sessions/session-28/schedule-review",
+        historyHref: "/clubs/reading-sai/app/host/sessions/session-28",
       }}
     />,
   );

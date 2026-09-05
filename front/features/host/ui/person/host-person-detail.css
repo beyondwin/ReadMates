@@ -1,230 +1,254 @@
-.rm-host-person {
+.rm-person-detail {
   min-width: 0;
-  padding: var(--space-xl) max(var(--space-md), calc((100vw - 1120px) / 2)) var(--space-2xl);
-  color: var(--ink-900);
+  padding: 0 16px 24px;
+  color: var(--text);
 }
 
-.rm-host-person__header,
-.rm-host-person__body {
-  min-width: 0;
-}
-
-.rm-host-person__return {
+.rm-person-detail__back {
   display: inline-flex;
-  min-height: 44px;
   align-items: center;
-  color: var(--text-2);
-  text-underline-offset: 3px;
+  gap: 12px;
+  min-height: 48px;
+  color: var(--text);
+  font-size: 17px;
+  text-decoration: none;
 }
 
-.rm-host-person__identity {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-md) 0 var(--space-lg);
+.rm-person-detail__header {
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr) 44px;
+  column-gap: 20px;
+  align-items: start;
+  padding: 16px 0 24px;
   border-bottom: 1px solid var(--line);
 }
 
-.rm-host-person__identity h1,
-.rm-host-person h2,
-.rm-host-person p,
-.rm-host-person dl,
-.rm-host-person ol {
-  margin: 0;
+.rm-person-detail__header .rm-avatar-chip {
+  width: 108px;
+  height: 108px;
+  --avatar-size: 108px;
+  --avatar-mobile-size: 108px;
+}
+
+.rm-person-detail__folio,
+.rm-host-person__folio {
+  color: var(--text-3);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.rm-person-detail__header h1 {
+  margin: 4px 0;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.2;
   overflow-wrap: anywhere;
 }
 
-.rm-host-person__folio {
-  color: var(--text-3);
-  font-size: 0.75rem;
-  font-weight: 650;
-  letter-spacing: 0.06em;
-}
-
-.rm-host-person__identity h1 {
-  font-size: 28px !important;
-  font-weight: 600 !important;
-  line-height: 33.6px !important;
-  color: oklch(0.18 0.020 255);
-}
-
+.rm-person-detail__tenure,
 .rm-host-person__tenure {
-  margin-top: var(--space-xs);
-  color: oklch(0.18 0.020 255);
+  margin: 0;
+  color: var(--text);
   font-size: 14px;
   font-weight: 600;
   line-height: 19.6px;
 }
 
-.rm-host-person__joined {
-  margin-top: 2px;
+.rm-person-detail__tenure [data-tone="ok"] {
+  color: var(--ok);
+}
+
+.rm-person-detail__joined {
+  margin: 2px 0 0;
   color: var(--text-3);
-  font-size: 0.875rem;
+  font-size: 14px;
 }
 
-.rm-host-person [aria-label="참석 기록"] {
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 25.6px;
+.rm-person-detail__more-wrap {
+  position: relative;
+  justify-self: end;
 }
 
-.rm-host-person__body {
-  min-width: 0;
+.rm-person-detail__more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.rm-person-detail__menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 8;
   display: grid;
-  gap: 0;
-  padding-top: var(--space-md);
+  min-width: 160px;
+  padding: 8px 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  box-shadow: 0 8px 24px color-mix(in oklch, var(--text) 12%, transparent);
 }
 
-.rm-host-person__block {
-  display: grid;
-  gap: var(--space-sm);
-  min-width: 0;
-  padding: var(--space-md) 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.rm-host-person__block-title {
+.rm-person-detail__menu [role="menuitem"] {
   display: flex;
-  align-items: baseline;
-  gap: var(--space-sm);
-  margin: 0;
-  font-size: 1rem;
+  min-height: 44px;
+  align-items: center;
+  padding: 0 16px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.rm-person-detail__menu [role="menuitem"]:disabled {
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+
+.rm-person-detail__section {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  column-gap: 12px;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.rm-person-detail__section > span {
+  color: var(--text-3);
+  font-size: 14px;
+  padding-top: 4px;
+}
+
+.rm-person-detail__section h2 {
+  margin: 0 0 16px;
+  font-size: 20px;
   font-weight: 650;
 }
 
-.rm-host-person__index {
-  color: var(--text-3);
-  font-variant-numeric: tabular-nums;
-  font-weight: 650;
-}
-
-.rm-host-person__block dl {
-  display: grid;
-  gap: 0;
-  margin: 0;
-}
-
-.rm-host-person__block dl > div {
-  display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
-  gap: var(--space-sm);
-  padding: var(--space-sm) 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.rm-host-person__block dt {
-  color: var(--text-3);
-}
-
-.rm-host-person__block dd {
-  margin: 0;
+.rm-person-detail__section p {
+  margin: 0 0 8px;
   overflow-wrap: anywhere;
 }
 
-.rm-host-person__attendance ol {
+.rm-person-detail__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  margin: 0;
+}
+
+.rm-person-detail__row[data-tone="warn"] {
+  color: var(--warn);
+}
+
+.rm-person-detail__row[data-tone="ok"] {
+  color: var(--ok);
+}
+
+.rm-person-detail__row[data-tone="danger"] {
+  color: var(--danger);
+}
+
+.rm-person-detail__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  margin-top: 16px;
+}
+
+.rm-person-detail__links a,
+.rm-person-detail__links button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.rm-person-detail__links button:disabled {
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+
+.rm-person-detail__attendance {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.rm-host-person__attendance li {
+.rm-person-detail__attendance li {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-sm);
-  padding: var(--space-sm) 0;
-  border-bottom: 1px solid var(--line);
+  min-height: 56px;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--line-soft);
 }
 
-.rm-host-person__management p {
+.rm-person-detail__attendance [data-tone="ok"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ok);
+}
+
+.rm-person-detail__attendance [data-tone="danger"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--danger);
+}
+
+.rm-person-detail__attendance span:not([data-tone]) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--text-2);
 }
 
-.rm-host-person__text-link {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--accent, var(--text-2));
-  font: inherit;
-  font-weight: 650;
-  text-align: start;
+.rm-person-detail__section details {
+  margin: 0;
+}
+
+.rm-person-detail__section summary {
+  list-style: none;
   cursor: pointer;
 }
 
-.rm-host-person__text-link:disabled {
-  color: var(--text-3);
-  cursor: not-allowed;
+.rm-person-detail__section summary::-webkit-details-marker {
+  display: none;
 }
 
-.rm-host-person__aux {
-  min-width: 0;
+.rm-person-detail__section summary.rm-person-detail__row {
+  justify-content: space-between;
 }
 
-.rm-host-person__aux summary {
-  display: flex;
-  min-height: 44px;
-  align-items: center;
-  color: var(--text-3);
-  font-weight: 650;
-  cursor: pointer;
-}
-
-.rm-host-person :focus-visible {
+.rm-person-detail :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
   box-shadow: 0 0 0 4px var(--focus-ring-soft);
 }
 
-@media (max-width: 720px) {
-  .rm-host-person {
-    padding: 0 var(--space-md) 16px;
-  }
-
-  .rm-host-person__body {
-    padding-top: 0;
-  }
-
-  .rm-host-person__identity {
-    gap: 10px;
-    padding: 0 0 8px;
-  }
-
-  .rm-host-person__identity h1 {
-    font-size: 1.35rem;
-  }
-
-  .rm-host-person__block {
-    gap: 4px;
-    padding: 6px 0;
-  }
-
-  .rm-host-person__block-title {
-    font-size: 0.9375rem;
-  }
-
-  .rm-host-person__block dl > div {
-    grid-template-columns: 4.75rem minmax(0, 1fr);
-    gap: 8px;
-    padding: 1px 0;
-    border-bottom: 0;
-  }
-
-  .rm-host-person__attendance li {
-    padding: 3px 0;
-    border-bottom: 0;
-  }
-
-  .rm-host-person .small {
-    font-size: 0.75rem;
-    line-height: 1.35;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .rm-host-person,
-  .rm-host-person * {
+  .rm-person-detail,
+  .rm-person-detail * {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }

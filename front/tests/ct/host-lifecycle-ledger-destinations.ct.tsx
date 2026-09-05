@@ -115,9 +115,9 @@ test("surface 17 person detail at 390px", async ({ mount, page }) => {
   const component = await mount(<HostPersonDetail person={person} attendanceItems={person.attendanceHistory.items} nextCursor={null} loadingMore={false} loadMoreError={null} onLoadMore={noop} peopleHref="/app/host/people" now={new Date("2026-08-30T10:00:00+09:00")} />);
   await expect(component.getByRole("heading", { name: "정하늘" })).toBeVisible();
   await expect(component.getByText("페이지 열람 기록은 수집하지 않습니다.")).toBeVisible();
-  await expect(component.getByText(/일정 4판/)).toBeVisible();
+  await expect(component.getByText(/revision 4/)).toBeVisible();
   await expectNoHorizontalOverflow(page);
-  const returnLink = component.getByRole("link", { name: "사람 목록으로" });
+  const returnLink = component.getByRole("link", { name: "사람", exact: true });
   await expectMinimumTargetSize(returnLink);
   await returnLink.focus();
   await expectVisibleFocus(returnLink);

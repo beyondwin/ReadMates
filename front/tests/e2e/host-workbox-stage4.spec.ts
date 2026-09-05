@@ -677,7 +677,7 @@ select concat(
       && url.pathname.endsWith(`/api/host/people/${ACTIVE_MEMBERSHIP_ID}`)
       && url.searchParams.get("attendanceCursor") === firstCursor;
   });
-  await history.getByRole("button", { name: "참석 기록 더 보기" }).click();
+  await history.getByRole("button", { name: "전체 출석 보기" }).click();
   const continuationResponse = await continuationResponsePromise;
   expect(continuationResponse.status()).toBe(200);
   const continuationPage = await continuationResponse.json() as {
@@ -702,7 +702,7 @@ where id = ${sqlString("97200000-0000-4000-8003-000000000300")}
       && url.pathname.endsWith(`/api/host/people/${ACTIVE_MEMBERSHIP_ID}`)
       && url.searchParams.get("attendanceCursor") === continuationPage.attendanceHistory.nextCursor;
   });
-  await history.getByRole("button", { name: "참석 기록 더 보기" }).click();
+  await history.getByRole("button", { name: "전체 출석 보기" }).click();
   expect((await staleResponsePromise).status()).toBe(400);
   await expect(history.getByRole("alert")).toContainText("보이는 기록은 그대로 유지");
   await expect(history.getByRole("listitem")).toHaveCount(40);

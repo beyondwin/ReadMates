@@ -73,7 +73,7 @@ describe("space transition mutation-producer inventory", () => {
   // This repository-wide AST audit parses the mounted production graph repeatedly;
   // V8 coverage instrumentation adds enough overhead to exceed Vitest's 5s default.
   it("classifies every current mounted producer and exported out-of-domain write", () => {
-    expect(SPACE_TRANSITION_PRODUCER_INVENTORY).toHaveLength(105);
+    expect(SPACE_TRANSITION_PRODUCER_INVENTORY).toHaveLength(106);
     expect(SPACE_TRANSITION_PRODUCER_INVENTORY.reduce<Record<string, number>>(
       (counts, candidate) => ({
         ...counts,
@@ -81,7 +81,7 @@ describe("space transition mutation-producer inventory", () => {
       }),
       {},
     )).toEqual({
-      register: 30,
+      register: 31,
       modify: 40,
       "verified-no-change": 24,
       "out-of-domain": 11,

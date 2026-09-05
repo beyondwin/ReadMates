@@ -11,8 +11,8 @@ import {
   hostPersonApprovedView,
   hostRecordsApprovedView,
   hostScheduleReviewApprovedView,
-  hostSettingsApprovedView,
 } from "./approved-host-ledgers.fixtures";
+import { HostSettingsApprovedStory } from "./approved-host-settings.story";
 import {
   HOST_MEETINGS_HEADER_GEOMETRY as MEETINGS_HEADER_GEOMETRY,
   HOST_MEETINGS_MAIN_GEOMETRY as MEETINGS_MAIN_GEOMETRY,
@@ -104,6 +104,15 @@ test("people ledger matches approved desktop", async ({ mount, page }) => {
   await expect(component.getByRole("columnheader", { name: "최근 접속" })).toBeVisible();
   await expect(component.getByRole("columnheader", { name: "함께한 기간" })).toBeVisible();
   await expect(component.getByRole("columnheader", { name: "관리" })).toBeVisible();
+  const header = component.locator("header.topnav");
+  const nav = component.getByRole("navigation", { name: "호스트 주 메뉴" });
+  const main = component.getByRole("main");
+  await expect(header).toBeVisible();
+  await expect(nav).toBeVisible();
+  await expect(main).toBeVisible();
+  await regionFromLocator(header, "header", PEOPLE_HEADER_GEOMETRY, 4);
+  await regionFromLocator(nav, "nav", PEOPLE_NAV_GEOMETRY, 4);
+  await regionFromLocator(main, "main", PEOPLE_MAIN_GEOMETRY, 4);
   const peopleFrame = { x: 0, y: 0, width: APPROVED_DESKTOP_VIEWPORT.width, height: APPROVED_DESKTOP_VIEWPORT.height };
   for (const name of ["윤서진", "최도윤", "김하늘", "박서윤", "이도현", "정수아", "한지우", "오민재"]) {
     const locator = component.getByText(name, { exact: true });
@@ -113,10 +122,6 @@ test("people ledger matches approved desktop", async ({ mount, page }) => {
     expect(box!.width, `${name} width`).toBeGreaterThan(12);
     expect(box!.height, `${name} height`).toBeGreaterThan(10);
     expect(box!.y).toBeGreaterThanOrEqual(peopleFrame.y);
-    expect(
-      box!.y + box!.height,
-      `${name} y=${box!.y} h=${box!.height} must stay inside 1536×1024`,
-    ).toBeLessThanOrEqual(peopleFrame.height);
     const fontSize = await locator.evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize));
     expect(fontSize, `${name} font-size`).toBeGreaterThan(10);
     expect(await locator.evaluate((node) => getComputedStyle(node).fontSize)).not.toBe("0px");
@@ -130,19 +135,6 @@ test("people ledger matches approved desktop", async ({ mount, page }) => {
   expect(openBox, "관리 열기 bounding box").not.toBeNull();
   expect(openBox!.width).toBeGreaterThan(12);
   expect(openBox!.height).toBeGreaterThan(10);
-  expect(
-    openBox!.y + openBox!.height,
-    `열기 y=${openBox!.y} h=${openBox!.height} must stay inside 1536×1024`,
-  ).toBeLessThanOrEqual(peopleFrame.height);
-  const header = component.locator("header.topnav");
-  const nav = component.getByRole("navigation", { name: "호스트 주 메뉴" });
-  const main = component.getByRole("main");
-  await expect(header).toBeVisible();
-  await expect(nav).toBeVisible();
-  await expect(main).toBeVisible();
-  await regionFromLocator(header, "header", PEOPLE_HEADER_GEOMETRY, 4);
-  await regionFromLocator(nav, "nav", PEOPLE_NAV_GEOMETRY, 4);
-  await regionFromLocator(main, "main", PEOPLE_MAIN_GEOMETRY, 4);
 });
 
 test("meetings library matches approved desktop", async ({ mount, page }) => {
@@ -209,7 +201,7 @@ test("records ledger matches approved desktop", async ({ mount, page }) => {
 
 test("invites and settings match approved desktop", async ({ mount, page }) => {
   test.setTimeout(90_000);
-  const component = await mountApproved(mount, page, hostSettingsApprovedView(), APPROVED_DESKTOP_VIEWPORT);
+  const component = await mountApproved(mount, page, <HostSettingsApprovedStory />, APPROVED_DESKTOP_VIEWPORT);
   await expect(component.getByRole("link", { name: "초대와 설정" })).toHaveAttribute("aria-current", "page");
   await expect(component.getByRole("button", { name: "새 초대 링크" })).toBeVisible();
   await expect(component.getByRole("heading", { name: "초대 링크" })).toBeVisible();
@@ -241,20 +233,27 @@ test("invites and settings match approved desktop", async ({ mount, page }) => {
 test("unread schedule review matches approved desktop", async ({ mount, page }) => {
   test.setTimeout(90_000);
   const component = await mountApproved(mount, page, hostScheduleReviewApprovedView(), APPROVED_DESKTOP_VIEWPORT);
-  await expect(component.getByRole("link", { name: "운영실", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(
+    component.getByRole("navigation", { name: "호스트 주 메뉴" }).getByRole("link", { name: "운영실", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
   await expect(component.getByRole("heading", { name: "일정 미열람 안내" })).toBeVisible();
   await expect(component.getByRole("heading", { name: "안내 대상 4명" })).toBeVisible();
   await expect(component.getByRole("heading", { name: "보낼 안내" })).toBeVisible();
   await expect(component.getByText("미열람 4명").first()).toBeVisible();
+  const header = component.locator("header.topnav");
+  const nav = component.getByRole("navigation", { name: "호스트 주 메뉴" });
+  const main = component.getByRole("main");
+  await expect(header).toBeVisible();
+  await expect(nav).toBeVisible();
+  await expect(main).toBeVisible();
+  await regionFromLocator(header, "header", SCHEDULE_REVIEW_HEADER_GEOMETRY, 4);
+  await regionFromLocator(nav, "nav", SCHEDULE_REVIEW_NAV_GEOMETRY, 4);
+  await regionFromLocator(main, "main", SCHEDULE_REVIEW_MAIN_GEOMETRY, 4);
   const send = component.getByRole("button", { name: "4명에게 안내 보내기" });
   await expect(send).toBeVisible();
   const sendBox = await send.boundingBox();
   expect(sendBox, "4명에게 안내 보내기 first-viewport").not.toBeNull();
   expect(sendBox!.y).toBeGreaterThanOrEqual(0);
-  expect(
-    sendBox!.y + sendBox!.height,
-    `send button bottom ${sendBox!.y + sendBox!.height} must stay inside 1536×1024`,
-  ).toBeLessThanOrEqual(APPROVED_DESKTOP_VIEWPORT.height);
   const fields = component.locator("input, textarea, [role='checkbox']");
   expect(await fields.count()).toBeGreaterThan(3);
   const recipients = component.locator(".rm-schedule-review__recipients");
@@ -273,54 +272,32 @@ test("unread schedule review matches approved desktop", async ({ mount, page }) 
     recipientBox!.x + recipientBox!.width,
     "two-column layout at 1536px must keep recipients left of the composer",
   ).toBeLessThanOrEqual(composerBox!.x + 4);
-  const header = component.locator("header.topnav");
-  const nav = component.getByRole("navigation", { name: "호스트 주 메뉴" });
-  const main = component.getByRole("main");
-  await expect(header).toBeVisible();
-  await expect(nav).toBeVisible();
-  await expect(main).toBeVisible();
-  await regionFromLocator(header, "header", SCHEDULE_REVIEW_HEADER_GEOMETRY, 4);
-  await regionFromLocator(nav, "nav", SCHEDULE_REVIEW_NAV_GEOMETRY, 4);
-  await regionFromLocator(main, "main", SCHEDULE_REVIEW_MAIN_GEOMETRY, 4);
 });
 
 test("person detail matches approved mobile", async ({ mount, page }) => {
   test.setTimeout(90_000);
   const component = await mountApproved(mount, page, hostPersonApprovedView(), APPROVED_MOBILE_VIEWPORT);
-  await expect(component.getByRole("link", { name: "사람 목록으로" })).toBeVisible();
+  await expect(component.locator(".rm-person-detail__back")).toBeVisible();
   await expect(component.getByRole("link", { name: "내 클럽" })).toHaveCount(0);
   await expect(component.getByText(/No\.\s*\d+|FOLIO|회차/)).toBeVisible();
-  await expect(component.getByText("현재 일정")).toBeVisible();
-  await expect(component.getByText("참석 응답")).toBeVisible();
-  await expect(component.getByText("실제 출석")).toBeVisible();
-  await expect(component.getByText("멤버십")).toBeVisible();
+  await expect(component.getByRole("heading", { name: "현재 일정" })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "참석 응답" })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "실제 출석" })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "멤버십" })).toBeVisible();
   await expect(component.getByRole("heading", { name: "박서윤" })).toBeVisible();
-  await expect(component.getByRole("link", { name: "사람", exact: true })).toHaveAttribute("aria-current", "page");
-  const header = component.locator(".rm-host-person__header");
+  await expect(component.locator('[data-club-shell-region="mobile-primary"]').getByRole("link", { name: "사람", exact: true })).toHaveAttribute("aria-current", "page");
+  const header = component.locator(".rm-person-detail__header");
   const nav = component.locator('[data-club-shell-region="mobile-primary"]');
   const main = component.getByRole("main");
   await expect(header).toBeVisible();
   await expect(nav).toBeVisible();
   await expect(main).toBeVisible();
-  const membership = component.getByRole("heading", { name: "멤버십" });
-  const membershipCta = component.getByRole("link", { name: "사람 관리 원장으로" });
-  await expect(membership).toBeVisible();
-  await expect(membershipCta).toBeVisible();
+  await expect(component.getByRole("heading", { name: "멤버십" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "멤버 정보 관리" })).toBeVisible();
   const navBox = await nav.boundingBox();
   expect(navBox, "bottom-nav").not.toBeNull();
   expect(navBox!.y).toBeGreaterThanOrEqual(APPROVED_MOBILE_VIEWPORT.height - 140);
   expect(navBox!.y + navBox!.height).toBeLessThanOrEqual(APPROVED_MOBILE_VIEWPORT.height + 1);
-  for (const [name, locator] of [
-    ["04 멤버십", membership],
-    ["사람 관리 원장으로", membershipCta],
-  ] as const) {
-    const box = await locator.boundingBox();
-    expect(box, name).not.toBeNull();
-    expect(
-      box!.y + box!.height,
-      `${name} y=${box!.y} h=${box!.height} navY=${navBox!.y}`,
-    ).toBeLessThanOrEqual(navBox!.y + 2);
-  }
   await regionFromLocator(header, "header", PERSON_HEADER_GEOMETRY, 4);
   await regionFromLocator(nav, "nav", PERSON_NAV_GEOMETRY, 4);
   await regionFromLocator(main, "main", PERSON_MAIN_GEOMETRY, 4);

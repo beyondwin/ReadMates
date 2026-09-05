@@ -1514,7 +1514,7 @@ export const REQUIRED_VISUAL_AUTHORITY_COVERAGE: Record<ApprovedMockupId, Requir
       {
         name: "person-history-pagination",
         kind: "activate",
-        target: 'role=button[name="참석 기록 더 보기"]',
+        target: 'role=button[name="전체 출석 보기"]',
         via: "click",
         expectedVisible: '[aria-label="참석 기록"]',
         restoreCanonicalState: true,
@@ -1522,9 +1522,9 @@ export const REQUIRED_VISUAL_AUTHORITY_COVERAGE: Record<ApprovedMockupId, Requir
       {
         name: "person-status-keyboard-reachable",
         kind: "focus-control",
-        target: ".rm-host-person__management .rm-host-person__text-link",
+        target: ".rm-host-person__management a",
         expectedVisible: true,
-        expectedFocused: ".rm-host-person__management .rm-host-person__text-link",
+        expectedFocused: ".rm-host-person__management a",
         restoreCanonicalState: true,
       },
     ],
