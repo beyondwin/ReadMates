@@ -27,6 +27,7 @@ export type HostMeetingTocRow = {
   dateLabel?: string;
   dDayLabel?: string;
   actionLabel?: string;
+  current?: boolean;
 };
 
 export type HostMeetingTocSections = {
@@ -42,6 +43,16 @@ export function formatMeetingWeekday(date: string) {
   const value = new Date(`${match[1]}-${match[2]}-${match[3]}T00:00:00Z`);
   if (Number.isNaN(value.getTime())) return date;
   return `${Number(match[2])}월 ${Number(match[3])}일 ${WEEKDAYS[value.getUTCDay()]}`;
+}
+
+export function formatMeetingDDay(date: string, now: Date) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) return undefined;
+  const target = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((target - today) / 86_400_000);
+  if (days === 0) return "D-Day";
+  return days > 0 ? `D-${days}` : `D+${Math.abs(days)}`;
 }
 
 export function defaultMeetingActionLabel(lifecycleLabel: string) {
@@ -64,7 +75,16 @@ export type HostMeetingListState = {
 
 type TocSourceItem = Pick<
   HostSessionListItem,
-  "sessionId" | "sessionNumber" | "title" | "bookTitle" | "date" | "state" | "needsAttention"
+  | "sessionId"
+  | "sessionNumber"
+  | "title"
+  | "bookTitle"
+  | "date"
+  | "state"
+  | "needsAttention"
+  | "locationLabel"
+  | "hasDraft"
+  | "liveRevision"
 >;
 
 function lifecycleLabel(state: HostSessionListItem["state"]) {
@@ -111,6 +131,19 @@ function pastSummary(item: Pick<TocSourceItem, "date">): string {
   return dateMmDd(item.date);
 }
 
+export function meetingTocSummary(
+  item: Pick<TocSourceItem, "bookTitle" | "locationLabel" | "hasDraft" | "liveRevision" | "date">,
+  kind: "upcoming" | "past",
+): string {
+  if (kind === "upcoming") {
+    if (!item.locationLabel.trim()) return "장소 확인 필요";
+    if (!item.bookTitle.trim()) return "책만 정해짐";
+    return upcomingSummary(item);
+  }
+  if (item.hasDraft) return "기록 초안 있음";
+  return pastSummary(item);
+}
+
 function toTocRow(
   item: TocSourceItem,
   basePath: string,
@@ -123,7 +156,8 @@ function toTocRow(
     title: tocTitle(item),
     lifecycleLabel: hostMeetingLifecycleLabel(item.state),
     attentionLabel: tocAttentionLabel(item),
-    summary: kind === "upcoming" ? upcomingSummary(item) : pastSummary(item),
+    summary: meetingTocSummary(item, kind),
+    current: kind === "upcoming" && item.state === "OPEN",
     date: item.date,
     href: sessionDetailHref(basePath, item.sessionId),
     ...(detailLinkState === undefined ? {} : { state: detailLinkState }),
@@ -147,14 +181,17 @@ export function buildHostMeetingTocSections(input: {
       return true;
     });
   };
+  const upcomingRows = uniqueBySessionId(input.upcomingItems)
+    .map((item) => toTocRow(item, basePath, "upcoming", input.detailLinkState));
+  const upcomingIds = new Set(upcomingRows.map((row) => row.id));
   return {
     upcoming: {
-      rows: uniqueBySessionId(input.upcomingItems)
-        .map((item) => toTocRow(item, basePath, "upcoming", input.detailLinkState)),
+      rows: upcomingRows,
       nextCursor: input.upcomingCursor,
     },
     past: {
       rows: uniqueBySessionId(input.pastItems)
+        .filter((item) => !upcomingIds.has(item.sessionId))
         .map((item) => toTocRow(item, basePath, "past", input.detailLinkState)),
       nextCursor: input.pastCursor,
     },

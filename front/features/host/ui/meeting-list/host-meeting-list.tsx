@@ -5,6 +5,7 @@ import {
   type HostMeetingTocRow,
   type HostMeetingTocSections,
 } from "@/features/host/model/host-meeting-list-model";
+import { ReadmatesIcon } from "@/shared/ui/icon";
 import { MeetingLedgerRow, MeetingTocRow } from "./meeting-toc-row";
 import "./meeting-toc.css";
 
@@ -62,6 +63,8 @@ function TocSection({
   emptyCopy,
   errorMessage = null,
   onRetry,
+  currentSessionId,
+  now,
   LinkComponent,
 }: {
   title: string;
@@ -72,6 +75,8 @@ function TocSection({
   emptyCopy: string;
   errorMessage?: string | null;
   onRetry?: () => void;
+  currentSessionId?: string | null;
+  now: Date;
   LinkComponent: HostLinkComponent;
 }) {
   return (
@@ -103,7 +108,13 @@ function TocSection({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <MeetingLedgerRow key={row.id} row={row} LinkComponent={LinkComponent} />
+              <MeetingLedgerRow
+                key={row.id}
+                row={row}
+                current={row.current === true || row.id === currentSessionId}
+                now={now}
+                LinkComponent={LinkComponent}
+              />
             ))}
           </tbody>
         </table>
@@ -164,9 +175,9 @@ function ThisMonthRail({
       {rows.length === 0 ? (
         <p className="small rm-meeting-toc__section-empty">이번 달 모임이 없습니다.</p>
       ) : (
-        <ol className="rm-meeting-toc__rail-list" aria-label="이번 달 모임">
+        <ol className="rm-meeting-toc__timeline" aria-label="이번 달 모임">
           {rows.map((row, index) => (
-            <li key={row.id} className="rm-meeting-toc__rail-item">
+            <li key={row.id} data-next={index === 1 ? "true" : undefined}>
               <div className="rm-meeting-toc__rail-when">
                 <time dateTime={row.date}>{row.dateLabel ?? formatMeetingWeekday(row.date)}</time>
                 {THIS_MONTH_CHIPS[index] ? (
@@ -181,7 +192,9 @@ function ThisMonthRail({
         </ol>
       )}
       <button type="button" className="rm-meeting-toc__rail-calendar" onClick={onShowCalendar}>
+        <ReadmatesIcon name="calendar" size={16} />
         달력에서 보기
+        <ReadmatesIcon name="chevron-right" size={16} />
       </button>
     </aside>
   );
@@ -333,11 +346,14 @@ export function HostMeetingList({
     && !errorMessage
     && sections.upcoming.rows.length === 0
     && sections.past.rows.length === 0;
-  const showCreate = !loading && !isEmpty;
   const visibleSections = useMemo(
     () => filterMeetingSections(sections, statusFilter),
     [sections, statusFilter],
   );
+  const currentSessionId = sections.upcoming.rows.find((row) => row.current || row.lifecycleLabel === "준비 중")?.id
+    ?? sections.upcoming.rows[0]?.id
+    ?? null;
+  const totalMeetings = sections.upcoming.rows.length + sections.past.rows.length;
 
   useEffect(() => {
     if (focusHeadingRevision > previousFocusRevision.current) {
@@ -348,66 +364,57 @@ export function HostMeetingList({
 
   return (
     <main className="rm-meeting-toc">
-      <section className="page-header-compact">
-        <div className="container rm-meeting-toc__context">
-          <div className="rm-meeting-toc__toolbar">
-            <div>
-              <div className="eyebrow rm-meeting-toc__eyebrow">호스트 · 예정과 기록</div>
-              <h1
-                ref={headingRef}
-                tabIndex={-1}
-                className="h1 editorial rm-meeting-toc__heading"
-              >
-                일정과 모임
-              </h1>
-              <p className="small rm-meeting-toc__lede">
-                다가오는 일정과 지난 모임을 한 흐름에서 관리하세요.
-              </p>
-            </div>
-            <div className="rm-meeting-toc__view-tabs" role="tablist" aria-label="모임 보기 방식">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={view === "list"}
-                className="btn btn-quiet btn-sm"
-                onClick={() => setView("list")}
-              >
-                목록
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={view === "calendar"}
-                className="btn btn-quiet btn-sm"
-                onClick={() => setView("calendar")}
-              >
-                달력
-              </button>
-            </div>
-            <div className="rm-meeting-toc__filters" role="tablist" aria-label="모임 상태">
-              {STATUS_FILTERS.map((filter) => (
-                <button
-                  key={filter.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={statusFilter === filter.id}
-                  className="btn btn-quiet btn-sm"
-                  onClick={() => setStatusFilter(filter.id)}
-                >
-                  {filter.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          {showCreate ? (
-            <LinkComponent to={newMeetingHref} className="btn btn-primary rm-meeting-toc__action">
-              새 모임 만들기
-            </LinkComponent>
-          ) : null}
+      <header className="rm-meeting-toc__header">
+        <div>
+          <h1
+            ref={headingRef}
+            tabIndex={-1}
+            className="h1 editorial rm-meeting-toc__heading"
+          >
+            일정과 모임
+          </h1>
+          <p className="small rm-meeting-toc__lede">
+            다가오는 일정과 지난 모임을 한 흐름에서 관리하세요.
+          </p>
         </div>
-      </section>
+        <div className="rm-meeting-toc__view-toggle" role="tablist" aria-label="모임 보기 방식">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "list"}
+            aria-pressed={view === "list"}
+            onClick={() => setView("list")}
+          >
+            <ReadmatesIcon name="list" size={16} />
+            목록
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "calendar"}
+            aria-pressed={view === "calendar"}
+            onClick={() => setView("calendar")}
+          >
+            <ReadmatesIcon name="calendar" size={16} />
+            달력
+          </button>
+        </div>
+        <div className="rm-meeting-toc__filters" role="tablist" aria-label="모임 상태">
+          {STATUS_FILTERS.map((filter) => (
+            <button
+              key={filter.id}
+              type="button"
+              role="tab"
+              aria-selected={statusFilter === filter.id}
+              onClick={() => setStatusFilter(filter.id)}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+      </header>
 
-      <section className="container rm-meeting-toc__body">
+      <section className="rm-meeting-toc__body">
         <p className="sr-only" role="status" aria-live="polite">
           {announcement}
         </p>
@@ -448,6 +455,8 @@ export function HostMeetingList({
                   emptyCopy="다가오는 모임이 없습니다."
                   errorMessage={errorMessage}
                   onRetry={onRetry}
+                  currentSessionId={currentSessionId}
+                  now={now}
                   LinkComponent={LinkComponent}
                 />
                 <TocSection
@@ -459,13 +468,16 @@ export function HostMeetingList({
                   emptyCopy="지난 모임이 없습니다."
                   errorMessage={pastErrorMessage}
                   onRetry={onRetryPast}
+                  now={now}
                   LinkComponent={LinkComponent}
                 />
-                <div className="rm-meeting-toc__foot">
-                  <LinkComponent to={trashHref} className="btn btn-quiet btn-sm rm-meeting-toc__trash">
-                    휴지통
+                <footer className="rm-meeting-toc__footer">
+                  <span>총 {totalMeetings}개의 모임</span>
+                  <LinkComponent to={trashHref} className="rm-meeting-toc__trash">
+                    말소된 모임 보기
+                    <ReadmatesIcon name="chevron-right" size={16} />
                   </LinkComponent>
-                </div>
+                </footer>
               </div>
             )}
             <ThisMonthRail

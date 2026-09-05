@@ -90,10 +90,9 @@ describe("HostMeetingList", () => {
   it("keeps a quiet trash link at the bottom using trashHref", () => {
     renderList();
 
-    const trash = screen.getByRole("link", { name: "휴지통" });
+    const trash = screen.getByRole("link", { name: /말소된 모임 보기/ });
     expect(trash).toHaveAttribute("href", "/app/host/sessions?view=trash");
     expect(trash).toHaveClass("rm-meeting-toc__trash");
-    expect(trash.className).toMatch(/btn-quiet|quiet/);
   });
 
   it("shows the first-use empty copy among the four empty-state variants", () => {
@@ -105,7 +104,7 @@ describe("HostMeetingList", () => {
       "/app/host/sessions/new",
     );
     expect(screen.queryByText(/달성률|KPI|0%/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "휴지통" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /말소된 모임 보기/ })).not.toBeInTheDocument();
   });
 
   it("shows a retryable upcoming-section failure without hiding the past archive", async () => {
@@ -231,7 +230,19 @@ describe("HostMeetingList", () => {
     expect(screen.queryByText(/2026년/)).not.toBeInTheDocument();
   });
 
-  it("keeps list browse on one heading, one create action, and an accessible view toggle", () => {
+  it("renders view toggle icons, underline filters, dot statuses, timeline, and footer without a page create button", () => {
+    renderList({ now: new Date("2026-08-30T12:00:00+09:00") });
+
+    expect(document.querySelectorAll(".rm-meeting-toc__view-toggle [data-icon]")).toHaveLength(2);
+    expect(within(screen.getByRole("tablist", { name: "모임 상태" })).getAllByRole("tab")).toHaveLength(4);
+    expect(document.querySelectorAll(".rm-meeting-toc__status-dot").length).toBeGreaterThan(0);
+    expect(document.querySelector(".rm-meeting-toc__timeline")).toBeTruthy();
+    expect(screen.getByText(/총 \d+개의 모임/)).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "새 모임 만들기" })).toBeNull();
+    expect(screen.queryByText("호스트 · 예정과 기록")).not.toBeInTheDocument();
+  });
+
+  it("keeps list browse on one heading and an accessible view toggle", () => {
     renderList();
 
     const root = document.querySelector(".rm-meeting-toc") as HTMLElement | null;
@@ -242,23 +253,19 @@ describe("HostMeetingList", () => {
     expect(within(root!).getByRole("tab", { name: "목록" })).toHaveAttribute("aria-selected", "true");
     expect(root!.querySelectorAll("[style]")).toHaveLength(0);
     expect(findNestedLiveRegions(root!)).toEqual([]);
-    expect(within(root!).getAllByRole("link", { name: "새 모임 만들기" })).toHaveLength(1);
-    expect(within(root!).getByRole("link", { name: "새 모임 만들기" })).toHaveAttribute(
-      "href",
-      "/app/host/sessions/new",
-    );
+    expect(screen.queryByRole("link", { name: "새 모임 만들기" })).toBeNull();
   });
 
   it("keeps list/calendar and status chips in the first-viewport toolbar", () => {
     renderList();
 
-    const toolbar = document.querySelector(".rm-meeting-toc__toolbar") as HTMLElement | null;
-    expect(toolbar).not.toBeNull();
-    expect(within(toolbar!).getByRole("tab", { name: "목록" })).toHaveAttribute("aria-selected", "true");
-    expect(within(toolbar!).getByRole("tab", { name: "달력" })).toBeVisible();
-    expect(within(toolbar!).getByRole("tablist", { name: "모임 상태" })).toBeInTheDocument();
-    expect(within(toolbar!).getByRole("tab", { name: "전체" })).toHaveAttribute("aria-selected", "true");
-    expect(within(toolbar!).getByRole("tab", { name: "준비 중" })).toBeVisible();
+    const header = document.querySelector(".rm-meeting-toc__header") as HTMLElement | null;
+    expect(header).not.toBeNull();
+    expect(within(header!).getByRole("tab", { name: "목록" })).toHaveAttribute("aria-selected", "true");
+    expect(within(header!).getByRole("tab", { name: "달력" })).toBeVisible();
+    expect(within(header!).getByRole("tablist", { name: "모임 상태" })).toBeInTheDocument();
+    expect(within(header!).getByRole("tab", { name: "전체" })).toHaveAttribute("aria-selected", "true");
+    expect(within(header!).getByRole("tab", { name: "준비 중" })).toBeVisible();
   });
 
   it("filters rows by the selected status chip", async () => {

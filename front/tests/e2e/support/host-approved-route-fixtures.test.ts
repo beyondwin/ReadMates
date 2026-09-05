@@ -9,6 +9,7 @@ import {
   HOST_APPROVED_SESSION_ID,
   buildHostApprovedAuth,
   buildHostApprovedMeetingList,
+  buildHostApprovedMeetingPastPage,
   buildHostApprovedMembersPage,
   buildHostApprovedPersonDetail,
   buildHostApprovedRecordLedger,
@@ -99,6 +100,12 @@ describe("host approved route fixtures", () => {
     });
     expect(parseHostSessionListPage(buildHostApprovedRecordLedger(), "record").items[0].state).toBe("CLOSED");
     expect(parseHostSessionListPage(buildHostApprovedMeetingList(), "meeting").items[0].state).toBe("OPEN");
+  });
+
+  it("keeps No.28 out of the meetings past ledger", () => {
+    const past = buildHostApprovedMeetingPastPage().items;
+    expect(past.map((row) => row.sessionNumber)).not.toContain(28);
+    expect(past.map((row) => row.sessionId)).not.toContain(HOST_APPROVED_SESSION_ID);
   });
 
   it("returns membership-sky and fail-closes unknown people ids", () => {

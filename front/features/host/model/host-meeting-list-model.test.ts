@@ -109,6 +109,37 @@ describe("buildHostMeetingTocSections", () => {
     expect(sections.past.rows[0]?.summary).not.toMatch(/기록 정리 중/);
   });
 
+  it("uses location and book copy instead of invented response ratios", () => {
+    const sections = buildHostMeetingTocSections({
+      basePath,
+      upcomingItems: [
+        openItem(29, { locationLabel: "", bookTitle: "작별하지 않는다" }),
+        openItem(30, { locationLabel: "서점", bookTitle: "" }),
+      ],
+      upcomingCursor: null,
+      pastItems: [closedItem(27, { hasDraft: true })],
+      pastCursor: null,
+    });
+    expect(sections.upcoming.rows.map((row) => row.summary)).toEqual(["장소 확인 필요", "책만 정해짐"]);
+    expect(sections.past.rows[0]?.summary).toBe("기록 초안 있음");
+    expect(sections.upcoming.rows.some((row) => /\d+\/\d+/.test(row.summary))).toBe(false);
+  });
+
+  it("drops past rows that reuse an upcoming session id", () => {
+    const sections = buildHostMeetingTocSections({
+      basePath,
+      upcomingItems: [openItem(28, { sessionId: "session-28" })],
+      upcomingCursor: null,
+      pastItems: [
+        closedItem(28, { sessionId: "session-28" }),
+        closedItem(27),
+      ],
+      pastCursor: null,
+    });
+    expect(sections.past.rows.map((row) => row.id)).toEqual(["closed-27"]);
+    expect(sections.upcoming.rows[0]?.current).toBe(true);
+  });
+
   it("carries attention as text, not color-only", () => {
     const itemWithAttention = { ...closedItem(24), needsAttention: true };
     const sections = buildHostMeetingTocSections({

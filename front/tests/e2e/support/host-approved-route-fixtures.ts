@@ -252,6 +252,14 @@ export function buildHostApprovedRecordLedger(): HostSessionRecordLedgerPage {
   };
 }
 
+export function buildHostApprovedMeetingPastPage(): HostSessionRecordLedgerPage {
+  const ledger = buildHostApprovedRecordLedger();
+  return {
+    ...ledger,
+    items: ledger.items.filter((item) => item.sessionId !== HOST_APPROVED_SESSION_ID),
+  };
+}
+
 export function buildHostApprovedMeetingList(): HostSessionListPage & { summary: HostSessionLedgerSummary } {
   const venue = approvedRecordItems[0];
   return {
@@ -1084,8 +1092,9 @@ export async function installHostApprovedRoutes(
       return;
     }
     if (pathname === "/api/bff/api/host/sessions") {
-      const firstPage = url.searchParams.get("mode") === "record" || url.searchParams.has("needsAttention")
-        ? buildHostApprovedRecordLedger()
+      const isRecord = url.searchParams.get("mode") === "record" || url.searchParams.has("needsAttention");
+      const firstPage = isRecord
+        ? (fixtureKey === "host-meetings" ? buildHostApprovedMeetingPastPage() : buildHostApprovedRecordLedger())
         : buildHostApprovedMeetingList();
       await fulfillCursorPage(route, firstPage);
       return;

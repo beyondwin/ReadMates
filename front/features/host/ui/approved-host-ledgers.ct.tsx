@@ -151,7 +151,7 @@ test("meetings library matches approved desktop", async ({ mount, page }) => {
   await expect(component.getByRole("link", { name: "일정과 모임" })).toHaveAttribute("aria-current", "page");
   await expect(component.getByRole("tab", { name: "목록" })).toBeVisible();
   await expect(component.getByRole("tab", { name: "달력" })).toBeVisible();
-  await expect(component.getByRole("link", { name: "새 모임 만들기" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "새 모임 만들기" })).toHaveCount(0);
   await expect(component.getByRole("link", { name: "지구 끝의 온실", exact: true })).toBeVisible();
   await expect(component.getByText("맡겨진 소녀")).toBeVisible();
   await expect(component.getByRole("tab", { name: "전체" })).toBeVisible();

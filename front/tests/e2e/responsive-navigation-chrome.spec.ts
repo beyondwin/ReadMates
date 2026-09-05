@@ -424,9 +424,7 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await expect(page.getByRole("heading", { name: "모임", level: 1 })).toBeVisible();
   await expect(page.getByRole("heading", { name: "다가오는 모임", level: 2 })).toBeVisible();
   await expect(page.getByRole("heading", { name: "지난 모임", level: 2 })).toBeVisible();
-  const newMeetingAction = page.getByRole("link", { name: "새 모임 만들기" });
-  await expect(newMeetingAction).toHaveAttribute("href", `${baselineClubHostPath}/sessions/new`);
-  await expectPracticalTapTarget(newMeetingAction);
+  await expect(page.getByRole("link", { name: "새 모임 만들기" })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.goto(`${baselineClubHostPath}/sessions/${seededHostSessionId}`);
   await expect(page).toHaveURL(/\/app\/host\/sessions\/[^/]+\/?$/);
