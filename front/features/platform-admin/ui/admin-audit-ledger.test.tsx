@@ -86,16 +86,20 @@ const page: AdminAuditLedgerPage = {
 };
 
 describe("AdminAuditLedger", () => {
-  it("renders search with icon, period filter, status-iconed rows, and five detail sections", () => {
+  it("renders search with icon, period filter, status-iconed rows, and five detail sections", async () => {
+    const user = userEvent.setup();
     render(<AdminAuditLedger {...ledgerProps({ filters: { range: "24h" } })} />);
     expect(screen.getByRole("searchbox", { name: "기록 찾기" }).closest(".admin-audit__search")?.querySelector('[data-icon="search"]')).toBeTruthy();
-    expect(screen.getByRole("button", { name: /오늘/ })).toHaveClass("admin-audit__period");
+    const periodButton = screen.getByRole("button", { name: /오늘/ });
+    expect(periodButton).toHaveClass("admin-audit__period");
+    expect(periodButton).toHaveAttribute("aria-haspopup", "listbox");
+    await user.click(periodButton);
     expect(screen.getByRole("option", { name: "오늘" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "이번 주" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "이번 달" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "기간 지정" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 2, name: "처리 기록" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { level: 1, name: "처리 기록" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "처리 기록" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 2, name: "처리 기록" })).not.toBeInTheDocument();
     expect(screen.getByText("선택한 기록")).toBeInTheDocument();
     expect(document.querySelector(".admin-audit__detail h1 [data-icon='check-circle-filled']")).toBeTruthy();
     expect([...document.querySelectorAll(".admin-audit__detail-section h3")].map((heading) => heading.textContent)).toEqual([
@@ -321,7 +325,7 @@ describe("AdminAuditLedger", () => {
         onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()} />,
     );
     const first = screen.getByRole("listitem", { name: /알림 재처리를 확정했습니다/ });
-    first.focus();
+    within(first).getByRole("button").focus();
     await user.keyboard("{ArrowDown}");
     expect(onSelect).toHaveBeenCalledWith(page.items[1]);
     rerender(
@@ -330,7 +334,7 @@ describe("AdminAuditLedger", () => {
         selectedId={page.items[1].id} detailOpen={true} onSelect={onSelect} onCloseDetail={onCloseDetail}
         onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()} />,
     );
-    expect(screen.getByRole("listitem", { name: /지원 접근 권한을 부여했습니다/ })).toHaveFocus();
+    expect(within(screen.getByRole("listitem", { name: /지원 접근 권한을 부여했습니다/ })).getByRole("button")).toHaveFocus();
     const supportDetail = screen.getByRole("region", { name: "감사 이벤트 상세" });
     expect(supportDetail.querySelector(".admin-audit__identity")).toHaveTextContent("지원 접근 권한을 부여했습니다");
     expect(supportDetail.querySelector(".admin-audit__identity")).not.toHaveTextContent("support grant");
@@ -343,7 +347,7 @@ describe("AdminAuditLedger", () => {
         selectedId={page.items[1].id} detailOpen={false} onSelect={onSelect} onCloseDetail={onCloseDetail}
         onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()} />,
     );
-    expect(screen.getByRole("listitem", { name: /지원 접근 권한을 부여했습니다/ })).toHaveFocus();
+    expect(within(screen.getByRole("listitem", { name: /지원 접근 권한을 부여했습니다/ })).getByRole("button")).toHaveFocus();
   });
 
   it("exposes every share-safe filter without exposing cursor controls", () => {
@@ -556,5 +560,55 @@ describe("AdminAuditLedger", () => {
     );
     expect(PROCESSING_RECORDS_CSS).toMatch(/\.admin-audit__row\[data-selected="true"\]/);
     expect(PROCESSING_RECORDS_CSS).not.toMatch(/\.admin-audit__row\[aria-selected/);
+  });
+
+  it("keeps sensitive search and the collapsed filter opener unclipped", () => {
+    expect(PROCESSING_RECORDS_CSS).not.toMatch(/\.admin-audit__sensitive\s*,/);
+    expect(PROCESSING_RECORDS_CSS).not.toMatch(/\.admin-audit__sensitive\s*\{[^}]*clip:\s*rect\(0 0 0 0\)/);
+    expect(PROCESSING_RECORDS_CSS).toMatch(
+      /\.admin-audit__disclosure:not\(\[open\]\)\s*>\s*summary[\s\S]*position:\s*absolute/,
+    );
+    expect(PROCESSING_RECORDS_CSS).not.toMatch(
+      /\.admin-audit__disclosure:not\(\[open\]\)\s*>\s*summary\s*\{[^}]*clip:\s*rect\(0 0 0 0\)/,
+    );
+    render(<AdminAuditLedger {...ledgerProps()} />);
+    expect(screen.getByRole("searchbox", { name: "민감 대상 검색" })).toBeVisible();
+    expect(screen.getByText("필터")).toBeVisible();
+  });
+
+  it("activates a row through a nested pressed button without aria-selected on the listitem", async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(<AdminAuditLedger {...ledgerProps({ onSelect })} />);
+    const row = screen.getByRole("listitem", { name: /알림 재처리를 확정했습니다/ });
+    const control = within(row).getByRole("button", { pressed: true });
+    expect(row).toHaveAttribute("data-selected", "true");
+    expect(row).not.toHaveAttribute("aria-selected");
+    await user.click(control);
+    expect(onSelect).toHaveBeenCalledWith(page.items[0]);
+  });
+
+  it("keeps a list h1 when detail is closed or the ledger is empty", () => {
+    const { rerender } = render(<AdminAuditLedger {...ledgerProps({ detailOpen: false })} />);
+    expect(screen.getByRole("heading", { level: 1, name: "처리 기록" })).toBeInTheDocument();
+    expect(document.querySelector(".admin-page-frame__header")).toBeNull();
+    rerender(<AdminAuditLedger {...ledgerProps({ page: { ...page, items: [], nextCursor: null }, selectedId: null })} />);
+    expect(screen.getByRole("heading", { level: 1, name: "처리 기록" })).toBeInTheDocument();
+    rerender(<AdminAuditLedger {...ledgerProps({ page: null, loading: true, selectedId: null })} />);
+    expect(screen.getByRole("heading", { level: 1, name: "처리 기록" })).toBeInTheDocument();
+    rerender(<AdminAuditLedger {...ledgerProps({ selectedId: page.items[0].id, detailOpen: true })} />);
+    expect(screen.getByRole("heading", { level: 2, name: "처리 기록" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "알림 다시 보내기 완료" })).toBeInTheDocument();
+  });
+
+  it("changes the period from the visible control and reaches custom date inputs", async () => {
+    const user = userEvent.setup();
+    const onFilterChange = vi.fn();
+    render(<AdminAuditLedger {...ledgerProps({ filters: { range: "7d" }, onFilterChange })} />);
+    await user.click(screen.getByRole("button", { name: /이번 주/ }));
+    await user.click(screen.getByRole("option", { name: "기간 지정" }));
+    expect(onFilterChange).toHaveBeenCalledWith(expect.objectContaining({ range: undefined }));
+    expect(screen.getByLabelText("시작 시각")).toBeVisible();
+    expect(screen.getByLabelText("종료 시각")).toBeVisible();
   });
 });

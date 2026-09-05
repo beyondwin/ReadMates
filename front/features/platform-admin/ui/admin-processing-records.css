@@ -13,12 +13,14 @@
 }
 
 .admin-audit__list {
+  position: relative;
   border-right: 1px solid var(--line);
   padding: 32px 0 0;
   min-width: 0;
   min-height: 0;
 }
 
+.admin-audit__list h1,
 .admin-audit__list h2 {
   margin: 0 32px 20px;
   font-size: 20px;
@@ -53,11 +55,17 @@
   min-height: 44px;
 }
 
+.admin-audit__period-wrap {
+  position: relative;
+  display: inline-block;
+  margin: 0 32px 20px;
+}
+
 .admin-audit__period {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin: 0 32px 20px;
+  margin: 0;
   border: 0;
   background: transparent;
   color: var(--accent);
@@ -66,9 +74,65 @@
   cursor: pointer;
 }
 
-.admin-audit__period-select,
-.admin-audit__sensitive,
-.admin-audit__disclosure:not([open]) > summary,
+.admin-audit__period-menu {
+  position: absolute;
+  z-index: 2;
+  inset-inline-start: 0;
+  top: 100%;
+  margin: 0;
+  padding: 8px 0;
+  list-style: none;
+  min-width: 140px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.admin-audit__period-menu [role="option"] {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  background: transparent;
+  text-align: start;
+  cursor: pointer;
+}
+
+.admin-audit__sensitive {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+  margin: 0 32px 16px;
+}
+
+.admin-audit__disclosure:not([open]) > summary {
+  position: absolute;
+  top: 32px;
+  inset-inline-end: 32px;
+  z-index: 1;
+  width: max-content;
+  max-width: calc(100% - 116px);
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  overflow: visible;
+  clip: auto;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+
+.admin-audit__disclosure:not([open]) > summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-audit__disclosure:not([open]) .admin-work-view-bar {
+  display: none;
+}
+
 .admin-audit__identity,
 .admin-audit__operation,
 .admin-audit__metadata,
@@ -91,16 +155,29 @@
 
 .admin-audit__row,
 .admin-processing-records__row {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
-  column-gap: 16px;
-  align-items: center;
-  min-height: 112px;
-  padding: 0 32px;
+  display: block;
+  margin: 0;
+  padding: 0;
   border: 0;
   border-bottom: 1px solid var(--line-soft);
   border-radius: 0;
   background: transparent;
+}
+
+.admin-audit__row-control {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  column-gap: 16px;
+  align-items: center;
+  width: 100%;
+  min-height: 112px;
+  padding: 0 32px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
   cursor: pointer;
 }
 
@@ -123,7 +200,7 @@
   grid-row: 1;
 }
 
-.admin-audit__row > .rm-icon {
+.admin-audit__row-control > .rm-icon {
   grid-column: 1;
   grid-row: 1 / span 2;
   color: var(--text-3);

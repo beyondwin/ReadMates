@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -175,7 +175,7 @@ describe("AdminAuditRoute", () => {
 
     expect(screen.getByLabelText("location")).toHaveTextContent("event=event-1");
     expect(screen.getByLabelText("location")).not.toHaveTextContent("mode=detail");
-    expect(screen.getByRole("listitem", { name: /AI 작업 반영을 다시 시도했습니다/ })).toHaveFocus();
+    expect(within(screen.getByRole("listitem", { name: /AI 작업 반영을 다시 시도했습니다/ })).getByRole("button")).toHaveFocus();
     expect(document.querySelector(".admin-audit__body")).toHaveAttribute("data-detail-open", "false");
   });
 

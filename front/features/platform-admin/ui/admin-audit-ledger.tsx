@@ -28,7 +28,6 @@ import {
   type AdminAuditLedgerItem,
   type AdminAuditLedgerPage,
   type AdminAuditOutcome,
-  type AdminAuditPeriodId,
   type AdminAuditSourceSlice,
 } from "@/features/platform-admin/model/platform-admin-audit-model";
 import { AdminEvidenceLedger } from "./admin-evidence-ledger";
@@ -86,13 +85,17 @@ export function AdminAuditLedger({
   onRetryLoadMore,
 }: AdminAuditLedgerProps) {
   const rowsRef = useRef<HTMLUListElement>(null);
-  const periodSelectRef = useRef<HTMLSelectElement>(null);
+  const periodWrapRef = useRef<HTMLDivElement>(null);
   const wasDetailOpen = useRef(detailOpen);
   const previousSelectedId = useRef(selectedId);
   const [findDraft, setFindDraft] = useState("");
+  const [periodOpen, setPeriodOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const selected = page?.items.find((item) => item.id === selectedId)
     ?? (selectedId ? null : page?.items[0] ?? null);
   const period = adminAuditPeriodFromFilters(filters);
+  const listHeadingIsPage = !selected || !detailOpen;
+  const ListHeading = listHeadingIsPage ? "h1" : "h2";
 
   useEffect(() => {
     if (wasDetailOpen.current && !detailOpen && selectedId) {
@@ -109,16 +112,26 @@ export function AdminAuditLedger({
     if (!previousId || selectedId) return;
     const row = [...(rowsRef.current?.querySelectorAll<HTMLElement>("[data-audit-row]") ?? [])]
       .find((element) => element.dataset.auditRow === previousId)
-      ?? rowsRef.current?.querySelector<HTMLElement>(".admin-audit__row");
+      ?? rowsRef.current?.querySelector<HTMLElement>("[data-audit-row]");
     row?.focus();
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!periodOpen) return;
+    function handlePointerDown(event: PointerEvent) {
+      if (periodWrapRef.current?.contains(event.target as Node)) return;
+      setPeriodOpen(false);
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [periodOpen]);
   const hasFilters = sensitiveSearch.active || Object.entries(filters).some(([key, value]) => {
     if (key === "range") return value !== "7d";
     return Boolean(value);
   });
   const ledgerState = auditLedgerState({ page, loading, error });
 
-  function handleRowKeyDown(event: KeyboardEvent<HTMLLIElement>, item: AdminAuditLedgerItem) {
+  function handleRowKeyDown(event: KeyboardEvent<HTMLButtonElement>, item: AdminAuditLedgerItem) {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       onSelect(item);
@@ -153,7 +166,7 @@ export function AdminAuditLedger({
 
       <div className="admin-audit__body" data-detail-open={detailOpen ? "true" : "false"}>
         <div className="admin-audit__list">
-          <h2>처리 기록</h2>
+          <ListHeading>처리 기록</ListHeading>
           <label className="admin-audit__search">
             <ReadmatesIcon name="search" size={16} />
             <span className="label">기록 찾기</span>
@@ -175,30 +188,39 @@ export function AdminAuditLedger({
               }}
             />
           </label>
-          <button
-            type="button"
-            className="admin-audit__period"
-            onClick={() => {
-              const select = periodSelectRef.current;
-              if (!select) return;
-              select.focus();
-              select.showPicker?.();
-            }}
-          >
-            {period.label}
-            <ReadmatesIcon name="chevron-down" size={16} />
-          </button>
-          <select
-            ref={periodSelectRef}
-            className="admin-audit__period-select"
-            aria-label="기간"
-            value={period.id}
-            onChange={(event) => onFilterChange(adminAuditFiltersFromPeriod(event.currentTarget.value as AdminAuditPeriodId, filters))}
-          >
-            {ADMIN_AUDIT_PERIODS.map((item) => (
-              <option key={item.id} value={item.id}>{item.label}</option>
-            ))}
-          </select>
+          <div className="admin-audit__period-wrap" ref={periodWrapRef}>
+            <button
+              type="button"
+              className="admin-audit__period"
+              aria-expanded={periodOpen}
+              aria-haspopup="listbox"
+              aria-controls="admin-audit-period-options"
+              onClick={() => setPeriodOpen((open) => !open)}
+            >
+              {period.label}
+              <ReadmatesIcon name="chevron-down" size={16} />
+            </button>
+            {periodOpen ? (
+              <ul id="admin-audit-period-options" className="admin-audit__period-menu" role="listbox" aria-label="기간">
+                {ADMIN_AUDIT_PERIODS.map((item) => (
+                  <li key={item.id} role="none">
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={item.id === period.id}
+                      onClick={() => {
+                        onFilterChange(adminAuditFiltersFromPeriod(item.id, filters));
+                        setPeriodOpen(false);
+                        if (item.id === "custom") setFiltersOpen(true);
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
           {sensitiveSearch.canSearch ? (
             <form className="admin-audit__sensitive" onSubmit={(event) => { event.preventDefault(); sensitiveSearch.onSubmit(); }}>
               <label htmlFor="admin-audit-sensitive-search">민감 대상 검색</label>
@@ -207,7 +229,11 @@ export function AdminAuditLedger({
               {sensitiveSearch.active ? <button type="button" className="btn btn-quiet btn-sm" onClick={sensitiveSearch.onClear}>민감 검색 지우기</button> : null}
             </form>
           ) : null}
-          <details className="admin-audit__disclosure">
+          <details
+            className="admin-audit__disclosure"
+            open={filtersOpen}
+            onToggle={(event) => setFiltersOpen(event.currentTarget.open)}
+          >
             <summary>필터</summary>
             <AdminWorkViewBar
               filters={
@@ -296,41 +322,51 @@ function AuditRow({
   item: AdminAuditLedgerItem;
   selected: boolean;
   onSelect: () => void;
-  onKeyDown: (event: KeyboardEvent<HTMLLIElement>) => void;
+  onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
 }) {
   const row = buildAdminAuditLedgerRow(item);
   const title = adminAuditRowTitle(item);
   return (
     <li
-      data-audit-row={item.id}
       data-selected={selected ? "true" : "false"}
       className="admin-audit__row admin-processing-records__row"
-      tabIndex={0}
       aria-label={`${title} ${formatAdminAuditLedgerSentenceBody(item)}`}
       onClick={onSelect}
-      onKeyDown={onKeyDown}
     >
-      <ReadmatesIcon name="check-circle" size={16} />
-      <span className="admin-audit__row-title">{title}</span>
-      <span className="admin-audit__row-main">
-        <time
-          className="admin-audit__row-time"
-          dateTime={item.occurredAt}
-          data-audit-row-field="time"
-        >
-          {row.occurredAt}
-        </time>
-        <span className="admin-audit__row-time-short">{formatAdminAuditRowClock(item.occurredAt)}</span>
-        <span> · </span>
-        <span data-audit-row-field="actor">{row.actor}</span>
-        <span className="admin-audit__row-extra">
+      <button
+        type="button"
+        data-audit-row={item.id}
+        className="admin-audit__row-control"
+        aria-pressed={selected}
+        aria-label={`${title} ${formatAdminAuditLedgerSentenceBody(item)}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelect();
+        }}
+        onKeyDown={onKeyDown}
+      >
+        <ReadmatesIcon name="check-circle" size={16} />
+        <span className="admin-audit__row-title">{title}</span>
+        <span className="admin-audit__row-main">
+          <time
+            className="admin-audit__row-time"
+            dateTime={item.occurredAt}
+            data-audit-row-field="time"
+          >
+            {row.occurredAt}
+          </time>
+          <span className="admin-audit__row-time-short">{formatAdminAuditRowClock(item.occurredAt)}</span>
           <span> · </span>
-          <span data-audit-row-field="action">{row.action}</span>
-          <span> · </span>
-          <span data-audit-row-field="outcome">{row.result}</span>
+          <span data-audit-row-field="actor">{row.actor}</span>
+          <span className="admin-audit__row-extra">
+            <span> · </span>
+            <span data-audit-row-field="action">{row.action}</span>
+            <span> · </span>
+            <span data-audit-row-field="outcome">{row.result}</span>
+          </span>
         </span>
-      </span>
-      <span className="admin-audit__row-status">{adminAuditRowStatusLabel(item)}</span>
+        <span className="admin-audit__row-status">{adminAuditRowStatusLabel(item)}</span>
+      </button>
     </li>
   );
 }
