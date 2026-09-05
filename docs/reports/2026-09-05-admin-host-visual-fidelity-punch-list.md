@@ -74,8 +74,8 @@ Jammy admin 7 id (`READMATES_VISUAL_AUTHORITY_IDS=admin-today-desktop,admin-club
 
 - Pixel mismatch: admin 7/7 fail (모두 `pct` > 0.02). 기록 그대로 fail.
 - Structure: 02·03·04 화면 rule 전부 `passed:true`. `structurePass` true: today-desktop, clubs, service, records. false: space-switcher, today-mobile, work-detail (Phase 1 잔여).
-- Geometry: clubs/service/records `geometryPass: true` after remasure `ADMIN_LEDGER_*` / `ADMIN_SERVICE_TABLE_GEOMETRY` / heading boxes. today-desktop true. space-switcher·mobile 06–07 false.
-- CT verify: **163 passed, 15 failed**. Admin screenshot tests still GREEN — `--update` not run (would rewrite host snapshots). Clubs/service/audit first-row CT boxes remasured from Docker actuals. Remaining fails: host ledgers/closing snapshots, space menu, today mobile header (Phase 1/4).
+- Geometry: `ADMIN_LEDGER_*` list/docket and `ADMIN_SERVICE_TABLE_GEOMETRY` matched Jammy actuals ±2px (`260,86,537,855` / `797,86,875,855` / `378,110,1176,808`). Recapture `records-heading` failed (`817,139,835,37` vs actual `836.55,150.80,795.45,37.19`); remasured to `{ x: 837, y: 151, width: 795, height: 37 }`. clubs/service heading+table/evidence already within ±4px. today-desktop true. space-switcher·mobile 06–07 false. Did not re-run Jammy after heading remasure.
+- CT verify: **163 passed, 15 failed**. Clubs / Service / Review audit desktop CT GREEN. Admin screenshot tests GREEN — `--update` not run (would rewrite host snapshots). Remaining fails: host ledgers/closing snapshots, space menu, today mobile header (Phase 1/4 / Task 29).
 
 ## CT 대기
 
