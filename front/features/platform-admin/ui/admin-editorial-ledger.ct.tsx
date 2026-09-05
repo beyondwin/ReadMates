@@ -403,9 +403,9 @@ test("Clubs locks the approved desktop ledger", async ({ mount, page }) => {
   await expect(create).toBeVisible();
   await regionFromLocator(component.locator(".admin-shell__header"), "header", HEADER_DESKTOP_GEOMETRY, 4);
   await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4);
-  await regionFromLocator(component.locator(".admin-club-management__finder"), "finder", LEDGER_LIST_GEOMETRY, 2);
+  await regionFromLocator(component.locator(".admin-clubs-ledger__list"), "finder", LEDGER_LIST_GEOMETRY, 2);
   await regionFromLocator(component.locator(".admin-club-management__docket"), "docket", LEDGER_DOCKET_GEOMETRY, 2);
-  await regionFromLocator(firstRow, "first-row", { x: 284, y: 289, width: 94, height: 44 }, 2);
+  await regionFromLocator(firstRow, "first-row", { x: 332, y: 256, width: 342, height: 44 }, 2);
   await expectMinimumTargetSize(create);
   await create.focus();
   await expectVisibleFocus(create);
@@ -426,18 +426,18 @@ test("Service health locks the approved desktop ledger", async ({ mount, page })
     }),
   );
   const firstRow = component.getByText("알림", { exact: true }).first();
-  await expect(component.getByText("대체로 정상이며, 알림 전달을 확인해야 합니다.")).toBeVisible();
+  await expect(component.getByText("알림 전달을 확인해야 합니다")).toBeVisible();
   await expect(component.getByRole("columnheader", { name: "서비스" })).toBeVisible();
   await expect(firstRow).toBeVisible();
   await expect(component.getByRole("link", { name: "실패한 안내만 다시 보내기" })).toBeVisible();
   await expect(component.locator(".admin-case-docket")).toHaveCount(0);
   await expect(component.locator(".admin-action-dock")).toHaveCount(0);
   await expect(component.locator(".admin-receipt-timeline")).toHaveCount(0);
-  const refresh = component.getByRole("button", { name: "새로고침" });
+  const refresh = component.getByRole("button", { name: "새로 확인" }).first();
   await regionFromLocator(component.locator(".admin-shell__header"), "header", HEADER_DESKTOP_GEOMETRY, 4);
   await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4);
-  await regionFromLocator(component.locator(".admin-service-status__table"), "table", SERVICE_TABLE_GEOMETRY, 2);
-  await regionFromLocator(component.locator(".admin-service-status__attention").first(), "attention-row", { x: 292, y: 315, width: 527, height: 53 }, 2);
+  await regionFromLocator(component.locator("section.admin-service-status table"), "table", SERVICE_TABLE_GEOMETRY, 2);
+  await regionFromLocator(component.locator(".admin-service-status__attention").first(), "attention-row", { x: 380, y: 258, width: 1174, height: 105 }, 2);
   await expectMinimumTargetSize(refresh);
   await refresh.focus();
   await expectVisibleFocus(refresh);
@@ -458,7 +458,7 @@ test("Review audit locks the approved desktop ledger", async ({ mount, page }) =
       attentionCount: 0,
     }),
   );
-  const firstRow = component.getByRole("button", { name: /알림 다시 보내기 완료|알림 재처리를 확정했습니다/ });
+  const firstRow = component.getByRole("listitem", { name: /알림 다시 보내기 완료|알림 재처리를 확정했습니다/ });
   await expect(component.getByRole("heading", { name: "처리 기록", exact: true })).toBeVisible();
   await expect(component.getByRole("searchbox", { name: "기록 찾기" })).toBeVisible();
   await expect(component.locator("details.admin-audit__disclosure")).not.toHaveAttribute("open");
@@ -470,7 +470,7 @@ test("Review audit locks the approved desktop ledger", async ({ mount, page }) =
   await regionFromLocator(component.locator(".admin-shell__nav"), "nav", NAV_DESKTOP_GEOMETRY, 4);
   await regionFromLocator(component.locator(".admin-audit__list"), "list", LEDGER_LIST_GEOMETRY, 2);
   await regionFromLocator(component.locator(".admin-audit__detail"), "docket", LEDGER_DOCKET_GEOMETRY, 2);
-  await regionFromLocator(firstRow, "first-row", { x: 284, y: 325, width: 510, height: 58 }, 2);
+  await regionFromLocator(firstRow, "first-row", { x: 260, y: 297, width: 536, height: 112 }, 2);
   await expectMinimumTargetSize(firstRow);
   await firstRow.focus();
   await expectVisibleFocus(firstRow);

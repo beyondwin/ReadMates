@@ -9,6 +9,9 @@ import {
   formatAdminAuditLedgerSentence,
   adminAuditReasonLabel,
   adminAuditActorPrimaryLabel,
+  adminAuditPeriodFromFilters,
+  buildAdminAuditDetailSections,
+  formatAdminAuditRowClock,
   mergeAdminAuditLedgerPages,
   labelAdminAuditOutcome,
   labelAdminAuditActorRole,
@@ -422,5 +425,46 @@ describe("mergeAdminAuditLedgerPages", () => {
       items: [first.items[0], first.items[1], second.items[1]],
       nextCursor: null,
     });
+  });
+
+  it("maps existing range filters onto period labels and formats clocks from timestamps", () => {
+    expect(adminAuditPeriodFromFilters({ range: "24h" }).label).toBe("오늘");
+    expect(adminAuditPeriodFromFilters({ range: "7d" }).label).toBe("이번 주");
+    expect(adminAuditPeriodFromFilters({ range: "30d" }).label).toBe("이번 달");
+    expect(adminAuditPeriodFromFilters({ from: "2026-08-01T00:00:00.000Z" }).label).toBe("기간 지정");
+    expect(formatAdminAuditRowClock("2026-08-26T05:52:00Z")).toBe("14:52");
+  });
+
+  it("builds five docket sections from share-safe metadata without inventing missing before/after values", () => {
+    const labeled = buildAdminAuditDetailSections(auditItem({
+      safeMetadata: [
+        { label: "처리한 이유", value: "전달 지연을 확인했습니다.", kind: "text" },
+        { label: "영향 범위", value: "클럽 2곳", kind: "text" },
+        { label: "beforeStatus", value: "FAILED", kind: "code" },
+        { label: "afterStatus", value: "SUCCEEDED", kind: "code" },
+        { label: "처리 결과", value: "정상 반영 확인", kind: "text" },
+      ],
+    }));
+    expect(labeled.map((section) => section.heading)).toEqual([
+      "처리한 이유",
+      "영향 범위",
+      "변경 전",
+      "변경 후",
+      "처리 결과",
+    ]);
+    expect(labeled.map((section) => section.body)).toEqual([
+      "전달 지연을 확인했습니다.",
+      "클럽 2곳",
+      "FAILED",
+      "SUCCEEDED",
+      "정상 반영 확인",
+    ]);
+    expect(buildAdminAuditDetailSections(auditItem()).map((section) => section.body)).toEqual([
+      "기록된 사유 정보가 없습니다.",
+      "AI 작업",
+      "—",
+      "—",
+      "정상",
+    ]);
   });
 });

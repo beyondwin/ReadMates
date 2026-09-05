@@ -176,12 +176,16 @@ describe("actual-route visual authority scenarios", () => {
 
     const records = visualAuthorityScenario("admin-records-desktop");
     expect(records.regions.some((region) => region.selector === ".admin-audit__list")).toBe(true);
+    expect(records.regions.find((region) => region.name === "records-heading")?.selector)
+      .toBe(".admin-audit__detail h1");
 
     const service = visualAuthorityScenario("admin-service-desktop");
     expect(service.regions.some((region) => region.selector === ".admin-health-grid__strip")).toBe(true);
-    const noCommand = service.firstViewport.find((entry) => entry.name === "no-command-control");
-    expect(noCommand?.visibility).toBe("absent");
-    expect(noCommand?.selector).toMatch(/새로 확인|admin-health-grid__refresh/);
+    expect(service.regions.some((region) => region.selector === "section.admin-service-status table")).toBe(true);
+    const rowRecheck = service.firstViewport.find((entry) => entry.name === "row-recheck");
+    expect(rowRecheck?.visibility).toBe("fully-visible");
+    expect(rowRecheck?.selector).toMatch(/새로 확인/);
+    expect(service.firstViewport.some((entry) => entry.name === "no-command-control")).toBe(false);
 
     for (const id of [
       "host-prep-desktop",

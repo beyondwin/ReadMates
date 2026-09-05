@@ -207,6 +207,108 @@ export function buildAdminAuditLedgerRow(item: AdminAuditLedgerItem): AdminAudit
   };
 }
 
+export const ADMIN_AUDIT_PERIODS = [
+  { id: "today", range: "24h" as const, label: "오늘" },
+  { id: "this-week", range: "7d" as const, label: "이번 주" },
+  { id: "this-month", range: "30d" as const, label: "이번 달" },
+  { id: "custom", range: undefined, label: "기간 지정" },
+] as const;
+
+export type AdminAuditPeriodId = (typeof ADMIN_AUDIT_PERIODS)[number]["id"];
+
+export const ADMIN_AUDIT_DETAIL_HEADINGS = [
+  "처리한 이유",
+  "영향 범위",
+  "변경 전",
+  "변경 후",
+  "처리 결과",
+] as const;
+
+export type AdminAuditDetailHeading = (typeof ADMIN_AUDIT_DETAIL_HEADINGS)[number];
+
+export function adminAuditPeriodFromFilters(filters: AdminAuditFilters) {
+  if (filters.from || filters.to || filters.range === "90d" || !filters.range) {
+    return ADMIN_AUDIT_PERIODS[3];
+  }
+  return ADMIN_AUDIT_PERIODS.find((period) => period.range === filters.range) ?? ADMIN_AUDIT_PERIODS[1];
+}
+
+export function adminAuditFiltersFromPeriod(
+  periodId: AdminAuditPeriodId,
+  filters: AdminAuditFilters,
+): AdminAuditFilters {
+  if (periodId === "custom") {
+    return { ...filters, range: undefined };
+  }
+  const period = ADMIN_AUDIT_PERIODS.find((item) => item.id === periodId);
+  return { ...filters, range: period?.range, from: null, to: null };
+}
+
+export function formatAdminAuditRowClock(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Seoul",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const hour = parts.find((part) => part.type === "hour")?.value;
+  const minute = parts.find((part) => part.type === "minute")?.value;
+  return hour && minute ? `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}` : "";
+}
+
+export function adminAuditRowTitle(item: AdminAuditLedgerItem): string {
+  if (item.actionType === "ADMIN_NOTIFICATION_REPLAY_CONFIRMED") return "알림 다시 보내기 완료";
+  if (item.actionType === "FEEDBACK_DOCUMENT_PUBLISHED") return "공개 기록 확인 완료";
+  if (item.actionType === "ADMIN_CLUB_METADATA_UPDATED") return "클럽 운영 상태 변경";
+  return adminAuditActionPrimaryLabel(item) ?? item.summary;
+}
+
+export function adminAuditRowStatusLabel(item: AdminAuditLedgerItem): string {
+  const result = buildAdminAuditLedgerRow(item).result;
+  return result === "완료" ? "정상" : result;
+}
+
+export function adminAuditVisibleSummary(item: AdminAuditLedgerItem): string {
+  const summary = item.summary.trim();
+  if (summary && shouldShowAdminAuditDetailValue("summary", summary) && !/[A-Za-z]{6,}/.test(summary)) {
+    return summary;
+  }
+  return adminAuditRowTitle(item);
+}
+
+export function buildAdminAuditDetailSections(
+  item: AdminAuditLedgerItem,
+): Array<{ heading: AdminAuditDetailHeading; body: string }> {
+  const fallback: Record<AdminAuditDetailHeading, string> = {
+    "처리한 이유": adminAuditReasonLabel(item),
+    "영향 범위": adminAuditTargetPrimaryLabel(item),
+    "변경 전": "—",
+    "변경 후": "—",
+    "처리 결과": adminAuditRowStatusLabel(item),
+  };
+  const aliases: Record<AdminAuditDetailHeading, readonly string[]> = {
+    "처리한 이유": ["처리한 이유", "reason", "reasontext", "note"],
+    "영향 범위": ["영향 범위"],
+    "변경 전": ["변경 전", "beforestatus"],
+    "변경 후": ["변경 후", "afterstatus"],
+    "처리 결과": ["처리 결과"],
+  };
+  return ADMIN_AUDIT_DETAIL_HEADINGS.map((heading) => ({
+    heading,
+    body: metadataBodyForHeading(item, aliases[heading]) ?? fallback[heading],
+  }));
+}
+
+function metadataBodyForHeading(item: AdminAuditLedgerItem, aliases: readonly string[]) {
+  const wanted = new Set(aliases.map((alias) => alias.toLowerCase()));
+  return item.safeMetadata.find((entry) => (
+    wanted.has(entry.label.toLowerCase())
+    && shouldShowAdminAuditDetailValue(entry.label, entry.value)
+  ))?.value.trim() || undefined;
+}
+
 export function adminAuditTargetPrimaryLabel(item: AdminAuditLedgerItem): string {
   if (item.actionType.startsWith("SUPPORT_ACCESS_GRANT_")) return "지원 접근 대상";
   if (item.actionType.startsWith("ADMIN_NOTIFICATION_REPLAY_")) return "알림 재처리 대상";

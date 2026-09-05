@@ -1,7 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchAdminAuditLedger } from "@/features/platform-admin/api/platform-admin-audit-api";
-import { adminAuditLoaderFactory } from "./admin-audit-data";
+import { adminAuditLoaderFactory, buildAdminAuditProcessingView } from "./admin-audit-data";
 
 vi.mock("@/shared/auth/platform-admin-loader", () => ({
   requirePlatformAdminLoaderAuth: vi.fn(async () => ({
@@ -76,5 +76,49 @@ describe("adminAuditLoaderFactory", () => {
       expect((error as Response).headers.get("Location")).toBe("/admin/audit?range=7d&sourceSlice=S4");
       expect((error as Response).headers.get("X-Remix-Replace")).toBe("true");
     }
+  });
+
+  it("maps ledger page, filters, and selection onto the processing-records view", () => {
+    const page = {
+      generatedAt: "2026-08-25T00:00:00Z",
+      filters: {},
+      summary: { visibleCount: 1, sourceUnavailableCount: 0, metadataUnavailableCount: 0, unavailableSources: [] },
+      nextCursor: null,
+      items: [{
+        id: "platform_audit_events:event-1",
+        occurredAt: "2026-05-27T00:01:00Z",
+        sourceSlice: "S5" as const,
+        sourceTable: "platform_audit_events",
+        actionCategory: "NOTIFICATION" as const,
+        actionType: "ADMIN_NOTIFICATION_REPLAY_CONFIRMED",
+        outcome: "SUCCESS" as const,
+        actor: { userId: "admin-1", role: "OPERATOR" as const, displayLabel: "OPERATOR" },
+        target: { clubId: "club-1", userId: null, jobId: null, eventId: "preview-1", label: "Replay preview" },
+        summary: "알림 재처리가 확정되었습니다.",
+        safeMetadata: [
+          { label: "처리한 이유", value: "전달 지연을 확인했습니다.", kind: "text" },
+          { label: "영향 범위", value: "클럽 2곳", kind: "text" },
+        ],
+        metadataState: "AVAILABLE" as const,
+      }],
+    };
+    const view = buildAdminAuditProcessingView(page, { range: "24h" }, page.items[0].id);
+    expect(view.periodId).toBe("today");
+    expect(view.periodLabel).toBe("오늘");
+    expect(view.rows[0]).toMatchObject({
+      id: page.items[0].id,
+      title: "알림 다시 보내기 완료",
+      actor: "운영자",
+      status: "정상",
+    });
+    expect(view.rows[0]?.clock).toMatch(/^\d{2}:\d{2}$/);
+    expect(view.selected?.sections.map((section) => section.heading)).toEqual([
+      "처리한 이유",
+      "영향 범위",
+      "변경 전",
+      "변경 후",
+      "처리 결과",
+    ]);
+    expect(view.selected?.sections[0]?.body).toBe("전달 지연을 확인했습니다.");
   });
 });

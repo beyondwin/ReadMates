@@ -138,23 +138,24 @@ async function assertAdminLedgerAuthoritySurface(
   id: "admin-clubs-desktop" | "admin-service-desktop" | "admin-records-desktop",
 ): Promise<void> {
   const scenario = visualAuthorityScenario(id);
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.locator(".admin-shell__nav")).toBeVisible();
   await expect(page.locator(scenario.regions[2].selector)).toBeVisible();
 
   if (id === "admin-clubs-desktop") {
-    await expect(page.locator(".admin-club-management__finder")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.locator(".admin-clubs-ledger__list")).toBeVisible();
     await expect(page.locator(".admin-club-management__docket")).toBeVisible();
     return;
   }
 
   if (id === "admin-service-desktop") {
-    await expect(page.locator(".admin-service-status__table")).toBeVisible();
+    await expect(page.locator("section.admin-service-status table")).toBeVisible();
     await expect(page.locator(".admin-health-grid__strip")).toBeVisible();
-    await expect(page.getByRole("button", { name: "새로 확인" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "새로 확인" })).not.toHaveCount(0);
     return;
   }
 
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.locator(".admin-audit__list")).toBeVisible();
   await expect(page.locator(".admin-audit__detail")).toBeVisible();
 }

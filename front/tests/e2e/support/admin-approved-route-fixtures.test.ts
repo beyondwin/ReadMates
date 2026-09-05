@@ -58,6 +58,12 @@ describe("admin approved Clubs, Health, and Audit fixtures", () => {
   it("freezes the audit row that the selected-event URL names", () => {
     const page = buildAdminApprovedAuditEvents();
     expect(page.items[0]?.id).toBe("audit-visual-1");
+    expect(page.items).toHaveLength(3);
+    expect(page.filters).toEqual({
+      range: "7d",
+      from: "2026-08-19T10:00:00.000Z",
+      to: GENERATED_AT,
+    });
     expect(page.nextCursor).toEqual("audit-visual-next");
   });
 });

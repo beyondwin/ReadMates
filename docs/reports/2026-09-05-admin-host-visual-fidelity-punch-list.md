@@ -2,7 +2,7 @@
 
 비율은 측정값 그대로. 0.02 초과는 fail.
 
-Phase 0 기준선. 관측은 `docs/superpowers/specs/2026-09-05-admin-host-visual-fidelity-next-slice-design.md` §4.2를 E/A/B/C/D·결함 열로 나눈 것이다. `0단계 ratio`는 Task 3 Jammy 재캡처 `summary.json`(`pct`)을 그대로 둔다. `1단계 ratio`와 `structure`는 Task 12b Jammy 재캡처 `summary.json`(`pct`, `structurePass`)을 그대로 옮겼다. `2단계`는 Task 18 host 5 id Jammy 재캡처 실측이다. 나머지 id와 3–4단계는 해당 Phase 재캡처 전까지 `—`.
+Phase 0 기준선. 관측은 `docs/superpowers/specs/2026-09-05-admin-host-visual-fidelity-next-slice-design.md` §4.2를 E/A/B/C/D·결함 열로 나눈 것이다. `0단계 ratio`는 Task 3 Jammy 재캡처 `summary.json`(`pct`)을 그대로 둔다. `1단계 ratio`와 `structure`는 Task 12b Jammy 재캡처 `summary.json`(`pct`, `structurePass`)을 그대로 옮겼다. `2단계`는 Task 18 host 5 id Jammy 재캡처 실측이다. `3단계`는 Task 21 admin 7 id Jammy 재캡처 `pct` / `structurePass`이다. 4단계는 해당 Phase 재캡처 전까지 `—`.
 
 | 칸 | 정의 | 조치 |
 | --- | --- | --- |
@@ -20,13 +20,13 @@ ADR impact: none (관측·비율 기록만). ADR-0045 update / ADR-0053 Proposed
 
 | id | 시안 | E(구성) | A(토큰) | B | C | D | 결함 | 0단계 ratio | 1단계 ratio | 2단계 | 3단계 | 4단계 | structure |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `admin-today-desktop` | 01 | — | 활성 내비 파란 체크 아이콘, 페이지 제목 28→20 위계, 상태 띠 위치 | 공간 전환 크롬, `전체 10건 보기` | 배지 `3` vs `10` | — | — | 4.05 · fail | 4.1 · fail | — | — | — | true · pass |
-| `admin-clubs-desktop` | 02 | `클럽 찾기` 탭(전체·확인 필요·운영 중 + 카운트), 행 상태 문구, 운영 상태 facts 4개(아이콘·값), `확인할 내용` 섹션, 헤더 상태 문장, 내비 아이콘 | — | — | 클럽 수 | — | `새 클럽` 버튼이 제목 위에 겹침 | 4.88 · fail | 4.91 · fail | — | — | — | false · fail |
-| `admin-service-desktop` | 03 | 제목 `서비스 건강`/`새로고침`/`최근에 바뀐 것` 패널 대신 시안의 전폭 상태 표(서비스·상태·마지막 확인·영향·조치·펼침), 펼친 행의 3열 요약(영향 범위·최근 정상 전달·복구 조치), 헤더 상태 문장 + `마지막 전체 확인`, `기술 정보 펼치기` 푸터 | — | — | — | — | — | 3.98 · fail | 4.1 · fail | — | — | — | false · fail |
-| `admin-records-desktop` | 04 | 검색 아이콘, `오늘 ⌄` 기간 필터(날짜 범위 텍스트 대신), 행 상태 아이콘, 상세의 구조화 섹션(처리한 이유·영향 범위·변경 전·변경 후·처리 결과·기술 정보), 내비 아이콘 | — | — | 행 수 | — | — | 3.2 · fail | 3.2 · fail | — | — | — | false · fail |
-| `admin-space-switcher-desktop` | 05 | — | 메뉴 위치·폭, 아이콘(체크·사람), 계정 크롬(이름 + `계정` + 아바타) | — | — | — | 계정 라벨이 아바타 원과 겹침 | 5.08 · fail | 5.07 · fail | — | — | — | false · fail |
-| `admin-today-mobile` | 06 | — | 헤더 간격(브랜드·switcher·계정), 상태 배너 tinted 띠, 페이지 제목 36→28px, 행 아이콘 수직 정렬, 탭 바 아이콘 크기·무게 | `전체 10건 보기` | — | — | — | 5.65 · fail | 6.08 · fail | — | — | — | false · fail |
-| `admin-work-detail-mobile` | 07 | — | 뒤로 chevron 무게, 제목 간격, 하단 `기술 정보 펼치기` 정렬. 가장 근접한 화면 | — | — | — | — | 6.47 · fail | 13.23 · fail | — | — | — | false · fail |
+| `admin-today-desktop` | 01 | — | 활성 내비 파란 체크 아이콘, 페이지 제목 28→20 위계, 상태 띠 위치 | 공간 전환 크롬, `전체 10건 보기` | 배지 `3` vs `10` | — | — | 4.05 · fail | 4.1 · fail | — | 4.1 · fail / structure true | — | true · pass |
+| `admin-clubs-desktop` | 02 | Task 19 탭·facts·review 반영. 잔여: docket `h1`가 오른쪽 패인에 있어 document-order fail | clubs docket h1 32 vs typo 24; wordmark 20/700 vs 12/650; body-copy selector 없음 | — | 라이브 멤버/기록 사실은 `—`일 수 있음(Task 19). 클럽 수 | — | — | 4.88 · fail | 4.91 · fail | — | 5.43 · fail / structure true | — | true · pass |
+| `admin-service-desktop` | 03 | Task 20 전폭 상태 표·행 요약·`기술 정보 펼치기` 반영. 화면 rule `passed:true` | wordmark 20/700 vs 12/650; body-copy selector 없음 | — | — | — | — | 3.98 · fail | 4.1 · fail | — | 3.77 · fail / structure true | — | true · pass |
+| `admin-records-desktop` | 04 | Task 21 검색+기간+상태 아이콘 행+5 섹션+`기술 정보 펼치기`. 잔여: detail `h1`가 오른쪽 패인에 있어 document-order fail | wordmark 20/700 vs 12/650; page-title line-height 37.2 vs 31.2; body-copy selector 없음 | 기간 기본 `이번 주`(7d). 시안 `오늘`에 `?range=24h`를 붙이지 않음 | 시계/행위자는 실측 `14:52 · 운영자`(픽스처 occurredAt/역할). 기간 라벨은 제품 기본값 | — | — | 3.2 · fail | 3.2 · fail | — | 3.41 · fail / structure true | — | true · pass |
+| `admin-space-switcher-desktop` | 05 | — | 메뉴 위치·폭, 아이콘(체크·사람), 계정 크롬(이름 + `계정` + 아바타) | — | — | — | 계정 라벨이 아바타 원과 겹침 | 5.08 · fail | 5.07 · fail | — | 5.07 · fail / structure false | — | false · fail |
+| `admin-today-mobile` | 06 | — | 헤더 간격(브랜드·switcher·계정), 상태 배너 tinted 띠, 페이지 제목 36→28px, 행 아이콘 수직 정렬, 탭 바 아이콘 크기·무게 | `전체 10건 보기` | — | — | — | 5.65 · fail | 6.08 · fail | — | 6.08 · fail / structure false | — | false · fail |
+| `admin-work-detail-mobile` | 07 | — | 뒤로 chevron 무게, 제목 간격, 하단 `기술 정보 펼치기` 정렬. 가장 근접한 화면 | — | — | — | — | 6.47 · fail | 13.23 · fail | — | 13.23 · fail / structure false | — | false · fail |
 | `host-prep-desktop` | 07 | 크롬(§4.1). 워크박스 행(색 원형 아이콘 + 수량·기한 + 화살표, `세부 조작` 없음), rail 하단 이벤트 줄(`어제 19:30 자동 리마인드 전달됨 · 변경 이력`), 단계 탭 compact + 구분선, 준비 현황 열(항목·현황·세부 내용·관리)과 구체 액션 라벨(`멤버 보기` 등), 다음에 할 일 `내일 09:00까지 보류` secondary + 상태 줄. 결정 필요였던 H1 필드(§5.3: 책 제목) | — | — | D-3 vs D+3. 탭 `지금 N`은 제품 전체 건수(시안 07 `지금 4`는 fixture 4건) | — | 워크박스 행 텍스트 겹침(`1 기한 지남세부 조작`) | 6.47 · fail | 6.33 · fail | 6.53 · fail | — | — | true · pass |
 | `host-live-desktop` | 08 | prep과 같음 + 배지 `오늘`, 현장 현황 4행(실제 출석·참석 응답·진행 순서·현장 메모)과 액션. 사각지대: candidate의 다음에 할 일이 prep 내용(`일정 미확인 멤버 검토`) — `resolveNextAction` phase 반영 확인, live에서는 출석 확인 | — | — | — | — | 다음에 할 일이 prep 내용(사각지대) | 6.51 · fail | 6.38 · fail | 6.69 · fail | — | — | true · pass |
 | `host-closing-desktop` | 09 | 크롬(§4.1). 워크박스 행·rail 하단 | 단계 번호 원형, 상태 색, `기록 미리보기` 헤더 액션, 다음에 할 일 note 아이콘, `내일 18:00까지 보류` secondary | — | — | — | — | 6.67 · fail | 6.54 · fail | 6.91 · fail | — | — | true · pass |
@@ -67,6 +67,15 @@ Jammy host 5 id (`READMATES_VISUAL_AUTHORITY_IDS=host-prep-desktop,host-live-des
 - `geometryPass`/`typographyPass`: 5/5 false. phase-label·wordmark·page-title carry 유지.
 
 CT this fix round: not re-run (Jammy host 5 only). Prior Task 18 full CT was 166/12.
+
+## 3단계 요약 (Task 21)
+
+Jammy admin 7 id (`READMATES_VISUAL_AUTHORITY_IDS=admin-today-desktop,admin-clubs-desktop,admin-service-desktop,admin-records-desktop,admin-space-switcher-desktop,admin-today-mobile,admin-work-detail-mobile`). `DOCKER_CONTEXT=colima-readmates-va CI=true npx --yes corepack@0.35.0 pnpm --dir front test:e2e:approved-routes:docker`. `summary.json` `pct`/`structurePass`/`geometryPass`를 `3단계`/`structure`에 그대로 옮김.
+
+- Pixel mismatch: admin 7/7 fail (모두 `pct` > 0.02). 기록 그대로 fail.
+- Structure: 02·03·04 화면 rule 전부 `passed:true`. `structurePass` true: today-desktop, clubs, service, records. false: space-switcher, today-mobile, work-detail (Phase 1 잔여).
+- Geometry: clubs/service/records `geometryPass: true` after remasure `ADMIN_LEDGER_*` / `ADMIN_SERVICE_TABLE_GEOMETRY` / heading boxes. today-desktop true. space-switcher·mobile 06–07 false.
+- CT verify: **163 passed, 15 failed**. Admin screenshot tests still GREEN — `--update` not run (would rewrite host snapshots). Clubs/service/audit first-row CT boxes remasured from Docker actuals. Remaining fails: host ledgers/closing snapshots, space menu, today mobile header (Phase 1/4).
 
 ## CT 대기
 

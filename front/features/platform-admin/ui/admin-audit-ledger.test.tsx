@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import type { ComponentProps } from "react";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -24,6 +25,28 @@ const defaultSearch = {
   onSubmit: vi.fn(),
   onClear: vi.fn(),
 };
+
+function ledgerProps(
+  overrides: Partial<ComponentProps<typeof AdminAuditLedger>> = {},
+): ComponentProps<typeof AdminAuditLedger> {
+  return {
+    page,
+    filters: { range: "7d" },
+    loading: false,
+    error: null,
+    nextPageError: false,
+    loadingMore: false,
+    sensitiveSearch: defaultSearch,
+    selectedId: null,
+    detailOpen: false,
+    onSelect: vi.fn(),
+    onCloseDetail: vi.fn(),
+    onFilterChange: vi.fn(),
+    onLoadMore: vi.fn(),
+    onRetryLoadMore: vi.fn(),
+    ...overrides,
+  };
+}
 
 const page: AdminAuditLedgerPage = {
   generatedAt: "2026-05-27T00:00:00Z",
@@ -63,6 +86,31 @@ const page: AdminAuditLedgerPage = {
 };
 
 describe("AdminAuditLedger", () => {
+  it("renders search with icon, period filter, status-iconed rows, and five detail sections", () => {
+    render(<AdminAuditLedger {...ledgerProps({ filters: { range: "24h" } })} />);
+    expect(screen.getByRole("searchbox", { name: "기록 찾기" }).closest(".admin-audit__search")?.querySelector('[data-icon="search"]')).toBeTruthy();
+    expect(screen.getByRole("button", { name: /오늘/ })).toHaveClass("admin-audit__period");
+    expect(screen.getByRole("option", { name: "오늘" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "이번 주" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "이번 달" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "기간 지정" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "처리 기록" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: "처리 기록" })).not.toBeInTheDocument();
+    expect(screen.getByText("선택한 기록")).toBeInTheDocument();
+    expect(document.querySelector(".admin-audit__detail h1 [data-icon='check-circle-filled']")).toBeTruthy();
+    expect([...document.querySelectorAll(".admin-audit__detail-section h3")].map((heading) => heading.textContent)).toEqual([
+      "처리한 이유",
+      "영향 범위",
+      "변경 전",
+      "변경 후",
+      "처리 결과",
+    ]);
+    expect(document.querySelectorAll('.admin-audit__row [data-icon="check-circle"]').length).toBeGreaterThan(0);
+    expect(document.querySelector(".admin-audit__row[data-selected='true']")).not.toHaveAttribute("aria-selected");
+    expect(screen.getByText("09:01")).toBeInTheDocument();
+    expect(screen.queryByText("14:52 · 운영자")).not.toBeInTheDocument();
+  });
+
   it.each(["OWNER", "OPERATOR", "SUPPORT"] as const)("never renders raw %s as primary row actor copy", (role) => {
     render(
       <AdminAuditLedger
@@ -72,7 +120,7 @@ describe("AdminAuditLedger", () => {
         onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()}
       />,
     );
-    const row = screen.getByRole("button", { name: /알림 재처리를 확정했습니다/ });
+    const row = screen.getByRole("listitem", { name: /알림 재처리를 확정했습니다/ });
     expect(row).toHaveTextContent(role === "OWNER" ? "소유자" : role === "OPERATOR" ? "운영자" : "지원 담당");
     expect(row).not.toHaveTextContent(role);
   });
@@ -99,7 +147,7 @@ describe("AdminAuditLedger", () => {
     );
 
     expect(screen.getByRole("heading", { name: "처리 기록" })).toBeInTheDocument();
-    const notificationRow = screen.getByRole("button", { name: /알림 재처리를 확정했습니다/ });
+    const notificationRow = screen.getByRole("listitem", { name: /알림 재처리를 확정했습니다/ });
     expect(notificationRow).toBeInTheDocument();
     await user.click(notificationRow);
 
@@ -181,7 +229,7 @@ describe("AdminAuditLedger", () => {
       </MemoryRouter>,
     );
 
-    await user.click(screen.getByRole("button", { name: /AI 작업 반영을 다시 시도했습니다/ }));
+    await user.click(screen.getByRole("listitem", { name: /AI 작업 반영을 다시 시도했습니다/ }));
 
     const detail = screen.getByRole("region", { name: "감사 이벤트 상세" });
     expect(within(detail).getByText("후속 화면 있음")).toBeInTheDocument();
@@ -251,7 +299,7 @@ describe("AdminAuditLedger", () => {
         />
       </MemoryRouter>,
     );
-    await user.click(screen.getByRole("button", { name: /알림 재처리를 확정했습니다/ }));
+    await user.click(screen.getByRole("listitem", { name: /알림 재처리를 확정했습니다/ }));
     const detail = screen.getByRole("region", { name: "감사 이벤트 상세" });
     expect(detail).toHaveTextContent("notification-worker");
     expect(detail).toHaveTextContent("알림 재처리");
@@ -272,7 +320,7 @@ describe("AdminAuditLedger", () => {
         selectedId={page.items[0].id} detailOpen={true} onSelect={onSelect} onCloseDetail={onCloseDetail}
         onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()} />,
     );
-    const first = screen.getByRole("button", { name: /알림 재처리를 확정했습니다/ });
+    const first = screen.getByRole("listitem", { name: /알림 재처리를 확정했습니다/ });
     first.focus();
     await user.keyboard("{ArrowDown}");
     expect(onSelect).toHaveBeenCalledWith(page.items[1]);
@@ -282,7 +330,7 @@ describe("AdminAuditLedger", () => {
         selectedId={page.items[1].id} detailOpen={true} onSelect={onSelect} onCloseDetail={onCloseDetail}
         onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()} />,
     );
-    expect(screen.getByRole("button", { name: /지원 접근 권한을 부여했습니다/ })).toHaveFocus();
+    expect(screen.getByRole("listitem", { name: /지원 접근 권한을 부여했습니다/ })).toHaveFocus();
     const supportDetail = screen.getByRole("region", { name: "감사 이벤트 상세" });
     expect(supportDetail.querySelector(".admin-audit__identity")).toHaveTextContent("지원 접근 권한을 부여했습니다");
     expect(supportDetail.querySelector(".admin-audit__identity")).not.toHaveTextContent("support grant");
@@ -295,7 +343,7 @@ describe("AdminAuditLedger", () => {
         selectedId={page.items[1].id} detailOpen={false} onSelect={onSelect} onCloseDetail={onCloseDetail}
         onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()} />,
     );
-    expect(screen.getByRole("button", { name: /지원 접근 권한을 부여했습니다/ })).toHaveFocus();
+    expect(screen.getByRole("listitem", { name: /지원 접근 권한을 부여했습니다/ })).toHaveFocus();
   });
 
   it("exposes every share-safe filter without exposing cursor controls", () => {
@@ -346,7 +394,7 @@ describe("AdminAuditLedger", () => {
     );
 
     expect(screen.getByRole("heading", { name: "처리 기록" })).toBeInTheDocument();
-    const row = screen.getByRole("button", { name: /소유자 · 알림 재처리 대상에 알림 재처리를 확정했습니다/ });
+    const row = screen.getByRole("listitem", { name: /소유자 · 알림 재처리 대상에 알림 재처리를 확정했습니다/ });
     const fields = [...row.querySelectorAll<HTMLElement>("[data-audit-row-field]")];
     expect(fields.map((field) => field.dataset.auditRowField)).toEqual(["time", "actor", "action", "outcome"]);
     expect(fields.map((field) => field.textContent)).toEqual([
@@ -385,7 +433,7 @@ describe("AdminAuditLedger", () => {
       />,
     );
 
-    const row = screen.getByRole("button", { name: /소유자 · 알림 재처리 대상에/ });
+    const row = screen.getByRole("listitem", { name: /소유자 · 알림 재처리 대상에/ });
     expect(row).toHaveTextContent("차단됨");
     expect(row).not.toHaveTextContent("거부");
   });
@@ -411,7 +459,7 @@ describe("AdminAuditLedger", () => {
       />,
     );
 
-    const row = screen.getByRole("button", { name: /소유자 · 알림 재처리 대상에 알림 재처리를 확정했습니다/ });
+    const row = screen.getByRole("listitem", { name: /소유자 · 알림 재처리 대상에 알림 재처리를 확정했습니다/ });
     expect(row).not.toHaveTextContent("preview-1");
     await user.click(row);
 
@@ -447,7 +495,7 @@ describe("AdminAuditLedger", () => {
       />,
     );
 
-    const row = screen.getByRole("button", { name: /알림 재처리 대상에 알림 재처리를 확정했습니다/ });
+    const row = screen.getByRole("listitem", { name: /알림 재처리 대상에 알림 재처리를 확정했습니다/ });
     expect(row).not.toHaveTextContent("platform_audit_events");
     expect(row).not.toHaveTextContent("ADMIN_NOTIFICATION_REPLAY_CONFIRMED");
     expect(row).not.toHaveTextContent("receipt-1");
@@ -455,7 +503,7 @@ describe("AdminAuditLedger", () => {
     await user.click(row);
 
     const detail = screen.getByRole("region", { name: "감사 이벤트 상세" });
-    expect(within(detail).getByText("기록된 사유 정보가 없습니다.")).toBeInTheDocument();
+    expect(within(detail).getAllByText("기록된 사유 정보가 없습니다.").length).toBeGreaterThan(0);
     const disclosure = detail.querySelector("[data-admin-technical-disclosure]");
     expect(disclosure).toHaveTextContent("platform_audit_events");
     expect(disclosure).toHaveTextContent("ADMIN_NOTIFICATION_REPLAY_CONFIRMED");
@@ -473,7 +521,7 @@ describe("AdminAuditLedger", () => {
       />,
     );
 
-    const row = screen.getByRole("button", { name: /지원 접근 대상에 지원 접근 권한을 부여했습니다/ });
+    const row = screen.getByRole("listitem", { name: /지원 접근 대상에 지원 접근 권한을 부여했습니다/ });
     expect(row).not.toHaveTextContent("support grant");
     expect(row).not.toHaveTextContent("METADATA_READ");
     await user.click(row);
@@ -502,9 +550,11 @@ describe("AdminAuditLedger", () => {
     expect(shellCss).toContain("pointer-events: none");
   });
 
-  it("fills the approved page-heading band with the audit h1", () => {
+  it("uses a split ledger grid and selected-row data attribute, not aria-selected on rows", () => {
     expect(PROCESSING_RECORDS_CSS).toMatch(
-      /\.admin-audit \.admin-page-frame > \.admin-page-frame__header h1[\s\S]*width:\s*100%[\s\S]*height:\s*68px/,
+      /\.admin-audit(?:\.admin-audit)? \{[\s\S]*grid-template-columns:\s*38fr 62fr/,
     );
+    expect(PROCESSING_RECORDS_CSS).toMatch(/\.admin-audit__row\[data-selected="true"\]/);
+    expect(PROCESSING_RECORDS_CSS).not.toMatch(/\.admin-audit__row\[aria-selected/);
   });
 });

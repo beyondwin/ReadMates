@@ -98,11 +98,11 @@ describe("AdminAuditRoute", () => {
     const user = userEvent.setup();
     const { container } = renderRoute();
 
-    await user.click(await screen.findByRole("button", { name: /클럽을 활성화했습니다/ }));
+    await user.click(await screen.findByRole("listitem", { name: /클럽을 활성화했습니다/ }));
     await user.click(screen.getByRole("button", { name: "더 보기" }));
 
-    await screen.findByRole("button", { name: /지원 접근 권한을 회수했습니다/ });
-    expect(screen.getAllByRole("button", { name: /클럽을 활성화했습니다/ })).toHaveLength(1);
+    await screen.findByRole("listitem", { name: /지원 접근 권한을 회수했습니다/ });
+    expect(screen.getAllByRole("listitem", { name: /클럽을 활성화했습니다/ })).toHaveLength(1);
     expect(screen.getByRole("region", { name: "감사 이벤트 상세" })).toHaveTextContent("클럽을 활성화했습니다");
     expect(screen.getByLabelText("location")).toHaveTextContent("event=boundary");
     expect(screen.getByLabelText("location")).not.toHaveTextContent("mode=detail");
@@ -125,7 +125,7 @@ describe("AdminAuditRoute", () => {
     await user.type(input, "private.member@example.com");
     await user.click(screen.getByRole("button", { name: "대상 검색" }));
 
-    await screen.findByRole("button", { name: /알림 재처리를 확정했습니다/ });
+    await screen.findByRole("listitem", { name: /알림 재처리를 확정했습니다/ });
     expect(searchAdminAuditLedger).toHaveBeenCalledWith(
       { range: "7d", sourceSlice: "S6" },
       "private.member@example.com",
@@ -142,7 +142,7 @@ describe("AdminAuditRoute", () => {
     const { queryClient } = renderRoute();
     await user.type(await screen.findByRole("searchbox", { name: "민감 대상 검색" }), "private@example.com");
     await user.click(screen.getByRole("button", { name: "대상 검색" }));
-    await screen.findByRole("button", { name: /알림 재처리를 확정했습니다/ });
+    await screen.findByRole("listitem", { name: /알림 재처리를 확정했습니다/ });
 
     act(() => {
       queryClient.setQueryData(platformAdminKeys.capabilities(), {
@@ -155,7 +155,7 @@ describe("AdminAuditRoute", () => {
     });
 
     await waitFor(() => expect(screen.queryByRole("searchbox", { name: "민감 대상 검색" })).not.toBeInTheDocument());
-    expect(screen.queryByRole("button", { name: /알림 재처리를 확정했습니다/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("listitem", { name: /알림 재처리를 확정했습니다/ })).not.toBeInTheDocument();
     const sensitiveCache = queryClient.getQueriesData({ queryKey: [...platformAdminAuditKeys.all, "sensitive"] });
     expect(JSON.stringify(sensitiveCache)).not.toContain("private@example.com");
     expect(sensitiveCache.every(([key]) => (key as readonly unknown[]).at(-1) === 0)).toBe(true);
@@ -166,7 +166,7 @@ describe("AdminAuditRoute", () => {
     const user = userEvent.setup();
     renderRoute("/admin/audit?sourceSlice=S6&event=event-1&mode=detail");
 
-    expect(await screen.findByRole("button", { name: /AI 작업 반영을 다시 시도했습니다/ })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("listitem", { name: /AI 작업 반영을 다시 시도했습니다/ })).toHaveAttribute("data-selected", "true");
     const detail = screen.getByRole("region", { name: "감사 이벤트 상세" });
     expect(detail).toHaveTextContent("AI 작업 반영을 다시 시도했습니다");
     expect(document.querySelector(".admin-audit__body")).toHaveAttribute("data-detail-open", "true");
@@ -175,14 +175,14 @@ describe("AdminAuditRoute", () => {
 
     expect(screen.getByLabelText("location")).toHaveTextContent("event=event-1");
     expect(screen.getByLabelText("location")).not.toHaveTextContent("mode=detail");
-    expect(screen.getByRole("button", { name: /AI 작업 반영을 다시 시도했습니다/ })).toHaveFocus();
+    expect(screen.getByRole("listitem", { name: /AI 작업 반영을 다시 시도했습니다/ })).toHaveFocus();
     expect(document.querySelector(".admin-audit__body")).toHaveAttribute("data-detail-open", "false");
   });
 
   it("selects an event without encoding the default range or detail mode into the URL", async () => {
     const user = userEvent.setup();
     renderRoute("/admin/audit");
-    await user.click(await screen.findByRole("button", { name: /AI 작업 반영을 다시 시도했습니다/ }));
+    await user.click(await screen.findByRole("listitem", { name: /AI 작업 반영을 다시 시도했습니다/ }));
 
     expect(screen.getByLabelText("location")).toHaveTextContent("/admin/audit?event=event-1");
     expect(screen.getByLabelText("location")).not.toHaveTextContent("range=");
@@ -192,7 +192,7 @@ describe("AdminAuditRoute", () => {
   it("keeps an operator-chosen from/to window when selecting an event", async () => {
     const user = userEvent.setup();
     renderRoute("/admin/audit?from=2026-08-01T00:00:00.000Z&to=2026-08-20T00:00:00.000Z");
-    await user.click(await screen.findByRole("button", { name: /AI 작업 반영을 다시 시도했습니다/ }));
+    await user.click(await screen.findByRole("listitem", { name: /AI 작업 반영을 다시 시도했습니다/ }));
 
     const location = decodeURIComponent(screen.getByLabelText("location").textContent ?? "");
     expect(location).toContain("event=event-1");
@@ -207,7 +207,7 @@ describe("AdminAuditRoute", () => {
     const { queryClient } = renderRoute();
     await user.type(await screen.findByRole("searchbox", { name: "민감 대상 검색" }), "private.member@example.com");
     await user.click(screen.getByRole("button", { name: "대상 검색" }));
-    await user.click(await screen.findByRole("button", { name: /알림 재처리를 확정했습니다/ }));
+    await user.click(await screen.findByRole("listitem", { name: /알림 재처리를 확정했습니다/ }));
 
     expect(screen.getByLabelText("location")).toHaveTextContent("event=private-hit");
     expect(screen.getByLabelText("location")).not.toHaveTextContent("private.member@example.com");
@@ -233,13 +233,13 @@ describe("AdminAuditRoute", () => {
       .mockResolvedValueOnce(page([item("event-2", "CLUB_RESTORED")], null));
     const user = userEvent.setup();
     renderRoute();
-    await screen.findByRole("button", { name: /클럽을 일시 중지했습니다/ });
+    await screen.findByRole("listitem", { name: /클럽을 일시 중지했습니다/ });
     await user.click(screen.getByRole("button", { name: "더 보기" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("기존 기록은 유지되었습니다");
-    expect(screen.getByRole("button", { name: /클럽을 일시 중지했습니다/ })).toBeInTheDocument();
+    expect(screen.getByRole("listitem", { name: /클럽을 일시 중지했습니다/ })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "이어 불러오기 재시도" }));
-    expect(await screen.findByRole("button", { name: /클럽을 복구했습니다/ })).toBeInTheDocument();
+    expect(await screen.findByRole("listitem", { name: /클럽을 복구했습니다/ })).toBeInTheDocument();
   });
 
   it("describes an unavailable ledger in operator language while preserving the source filter", async () => {
@@ -254,7 +254,7 @@ describe("AdminAuditRoute", () => {
   it("publishes a fixed header status sentence once records are loaded", async () => {
     renderRoute();
 
-    expect(await screen.findByRole("button", { name: /AI 작업 반영을 다시 시도했습니다/ })).toBeInTheDocument();
+    expect(await screen.findByRole("listitem", { name: /AI 작업 반영을 다시 시도했습니다/ })).toBeInTheDocument();
     expect(useAdminShellStatus).toHaveBeenLastCalledWith({
       tone: "neutral",
       text: "누가 무엇을 왜 처리했는지 확인합니다.",

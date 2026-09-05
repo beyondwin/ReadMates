@@ -2,15 +2,19 @@ export const ADMIN_HEADER_DESKTOP_GEOMETRY = { x: 0, y: 0, width: 1672, height: 
 export const ADMIN_RAIL_DESKTOP_GEOMETRY = { x: 0, y: 86, width: 260, height: 855 } as const;
 export const ADMIN_QUEUE_DESKTOP_GEOMETRY = { x: 260, y: 86, width: 559, height: 855 } as const;
 export const ADMIN_DOCKET_DESKTOP_GEOMETRY = { x: 819, y: 86, width: 853, height: 855 } as const;
-export const ADMIN_LEDGER_LIST_GEOMETRY = { x: 260, y: 154, width: 559, height: 787 } as const;
-export const ADMIN_LEDGER_DOCKET_GEOMETRY = { x: 819, y: 154, width: 853, height: 787 } as const;
-export const ADMIN_SERVICE_TABLE_GEOMETRY = { x: 292, y: 154, width: 1348, height: 763 } as const;
+export const ADMIN_LEDGER_LIST_GEOMETRY = { x: 260, y: 86, width: 537, height: 855 } as const;
+export const ADMIN_LEDGER_DOCKET_GEOMETRY = { x: 797, y: 86, width: 875, height: 855 } as const;
+export const ADMIN_SERVICE_TABLE_GEOMETRY = { x: 378, y: 110, width: 1176, height: 808 } as const;
+export const ADMIN_SERVICE_EVIDENCE_GEOMETRY = { x: 378, y: 932, width: 1176, height: 45 } as const;
 export const ADMIN_HEADER_MOBILE_GEOMETRY = { x: 0, y: 0, width: 390, height: 70 } as const;
 export const ADMIN_NAV_MOBILE_GEOMETRY = { x: 0, y: 734, width: 390, height: 110 } as const;
 export const ADMIN_FIRST_ROW_MOBILE_GEOMETRY = { x: 20, y: 220, width: 350, height: 94 } as const;
 export const ADMIN_BACK_MOBILE_GEOMETRY = { x: 0, y: 0, width: 390, height: 67 } as const;
 export const ADMIN_DETAIL_DOCKET_MOBILE_GEOMETRY = { x: 20, y: 67, width: 350, height: 706 } as const;
 export const ADMIN_PAGE_HEADING_DESKTOP_GEOMETRY = { x: 260, y: 86, width: 1412, height: 68 } as const;
+export const ADMIN_CLUBS_HEADING_DESKTOP_GEOMETRY = { x: 837, y: 148, width: 795, height: 50 } as const;
+export const ADMIN_SERVICE_HEADING_DESKTOP_GEOMETRY = { x: 346, y: 86, width: 1240, height: 116 } as const;
+export const ADMIN_RECORDS_HEADING_DESKTOP_GEOMETRY = { x: 817, y: 139, width: 835, height: 37 } as const;
 export const HOST_BODY_DESKTOP_GEOMETRY = { x: 36, y: 353, width: 1464, height: 665 } as const;
 export const HOST_WORKBOX_DESKTOP_GEOMETRY = { x: 944, y: 353, width: 556, height: 665 } as const;
 export const HOST_OR_WORKBOX_DESKTOP_GEOMETRY = { x: 944, y: 353, width: 556, height: 665 } as const;
@@ -58,7 +62,7 @@ export const HOST_SCHEDULE_REVIEW_COMPOSER_GEOMETRY = { x: 804, y: 303, width: 6
 
 export const ADMIN_FIRST_ROW_DESKTOP_GEOMETRY = {
   x: ADMIN_QUEUE_DESKTOP_GEOMETRY.x,
-  y: ADMIN_LEDGER_LIST_GEOMETRY.y,
+  y: ADMIN_PAGE_HEADING_DESKTOP_GEOMETRY.y + ADMIN_PAGE_HEADING_DESKTOP_GEOMETRY.height,
   width: ADMIN_QUEUE_DESKTOP_GEOMETRY.width,
   height: 122,
 } as const;

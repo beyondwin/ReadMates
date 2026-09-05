@@ -1,11 +1,76 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { replace, type LoaderFunctionArgs } from "react-router";
-import { adminAuditFiltersFromSearchParams, adminAuditSearchFromFilters, adminAuditShareSafeIdentifier } from "@/features/platform-admin/model/platform-admin-audit-model";
+import {
+  adminAuditFiltersFromSearchParams,
+  adminAuditPeriodFromFilters,
+  adminAuditRowStatusLabel,
+  adminAuditRowTitle,
+  adminAuditSearchFromFilters,
+  adminAuditShareSafeIdentifier,
+  adminAuditVisibleSummary,
+  buildAdminAuditDetailSections,
+  buildAdminAuditLedgerRow,
+  formatAdminAuditRowClock,
+  type AdminAuditFilters,
+  type AdminAuditLedgerPage,
+  type AdminAuditPeriodId,
+} from "@/features/platform-admin/model/platform-admin-audit-model";
 import { platformAdminAuditLedgerInfiniteQuery } from "@/features/platform-admin/queries/platform-admin-audit-queries";
 import { requirePlatformAdminLoaderAuth } from "@/shared/auth/platform-admin-loader";
 
 const SAFE_AUDIT_PARAMS = new Set(["range", "from", "to", "clubId", "actorRole", "sourceSlice", "actionCategory", "outcome", "event", "mode", "target"]);
 const SAFE_EVENT_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+
+export type AdminAuditProcessingRowView = {
+  id: string;
+  title: string;
+  clock: string;
+  actor: string;
+  status: string;
+};
+
+export type AdminAuditProcessingView = {
+  periodId: AdminAuditPeriodId;
+  periodLabel: string;
+  rows: AdminAuditProcessingRowView[];
+  selected: {
+    title: string;
+    summary: string;
+    sections: ReturnType<typeof buildAdminAuditDetailSections>;
+  } | null;
+};
+
+export function buildAdminAuditProcessingView(
+  page: AdminAuditLedgerPage | null,
+  filters: AdminAuditFilters,
+  selectedId: string | null,
+): AdminAuditProcessingView {
+  const period = adminAuditPeriodFromFilters(filters);
+  const items = page?.items ?? [];
+  const selectedItem = items.find((item) => item.id === selectedId)
+    ?? (selectedId ? null : items[0] ?? null);
+  return {
+    periodId: period.id,
+    periodLabel: period.label,
+    rows: items.map((item) => {
+      const row = buildAdminAuditLedgerRow(item);
+      return {
+        id: item.id,
+        title: adminAuditRowTitle(item),
+        clock: formatAdminAuditRowClock(item.occurredAt),
+        actor: row.actor,
+        status: adminAuditRowStatusLabel(item),
+      };
+    }),
+    selected: selectedItem
+      ? {
+          title: adminAuditRowTitle(selectedItem),
+          summary: adminAuditVisibleSummary(selectedItem),
+          sections: buildAdminAuditDetailSections(selectedItem),
+        }
+      : null,
+  };
+}
 
 export function adminAuditEventFromSearchParams(params: URLSearchParams): string | null {
   const raw = params.get("event");
