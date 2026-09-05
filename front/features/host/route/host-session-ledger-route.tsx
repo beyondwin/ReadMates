@@ -8,6 +8,7 @@ import {
   hostRecordsNextClosingAction,
   hostSessionTrashDeletedAtLabel,
   hostSessionTrashRemainingCopy,
+  isRecordLedgerWorkboxType,
   normalizeHostSessionLedgerFilters,
   toHostSessionLedgerSearch,
   type HostSessionLedgerFilters,
@@ -20,6 +21,9 @@ import {
   useRestoreHostSessionMutation,
 } from "@/features/host/queries/host-session-queries";
 import { hostSessionRecordLedgerQuery } from "@/features/host/queries/host-session-record-queries";
+import { hostWorkboxPageQuery } from "@/features/host/queries/host-workbox-queries";
+import { buildHostWorkboxView } from "@/features/host/model/host-workbox-model";
+import type { HostWorkboxState } from "@/features/host/api/host-workbox-contracts";
 import { isReadmatesApiError } from "@/shared/api/errors";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
@@ -84,6 +88,12 @@ export function HostSessionLedgerRoute({
   });
   const restoreMutation = useRestoreHostSessionMutation(context);
   const transitionOwner = useTransitionSafetyOwner("host-session-ledger");
+  const [workboxState, setWorkboxState] = useState<HostWorkboxState>("NOW");
+  const workboxQuery = useQuery({
+    ...hostWorkboxPageQuery({ state: workboxState, limit: 20 }, context),
+    enabled: !trashView,
+    retry: false,
+  });
   const loaderPage = !trashView && sameFilters(filters, loaderData.filters) ? loaderData.page : null;
   const loaderTrashPage = trashView && sameFilters(filters, loaderData.filters) ? loaderData.trashPage : null;
   const basePage = query.data ?? loaderPage;
@@ -277,6 +287,15 @@ export function HostSessionLedgerRoute({
     remainingCopy: hostSessionTrashRemainingCopy(item.purgeAfter),
     ...restoreState[item.sessionId],
   }));
+  const workboxView = useMemo(() => {
+    if (!workboxQuery.data || workboxQuery.data.state !== workboxState) return null;
+    const view = buildHostWorkboxView(workboxQuery.data);
+    return {
+      ...view,
+      items: view.items.filter((item) => isRecordLedgerWorkboxType(item.type)),
+      partialWarnings: view.partialWarnings.filter((warning) => isRecordLedgerWorkboxType(warning.type)),
+    };
+  }, [workboxQuery.data, workboxState]);
 
   return (
     <>
@@ -317,6 +336,14 @@ export function HostSessionLedgerRoute({
             )
             : undefined
         }
+        workbox={workboxView}
+        workboxState={workboxState}
+        workboxLoading={workboxQuery.isPending || workboxQuery.isFetching}
+        workboxError={workboxQuery.isError ? "작업함을 불러오지 못했습니다." : null}
+        onWorkboxStateChange={setWorkboxState}
+        onWorkboxRetry={() => {
+          void workboxQuery.refetch();
+        }}
         LinkComponent={LinkComponent}
       />
     </>

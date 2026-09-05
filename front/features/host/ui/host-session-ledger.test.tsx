@@ -7,6 +7,7 @@ import {
   HostSessionAttentionSummary,
   HostSessionLedger,
 } from "./host-session-ledger";
+import type { HostWorkboxView } from "@/features/host/model/host-workbox-model";
 import {
   hostRecordsNextClosingAction,
   type HostSessionLedgerItem,
@@ -43,7 +44,76 @@ const filters = {
   needsAttention: null,
 } as const;
 
+const publishedItem: HostSessionLedgerItem = {
+  ...items[0],
+  sessionId: "session-26",
+  sessionNumber: 26,
+  bookTitle: "단 한 사람",
+  date: "2026-07-28",
+  state: "PUBLISHED",
+  recordStatus: "COMPLETE",
+  needsAttention: false,
+  hasDraft: false,
+  draftRevision: null,
+  lastModifiedAt: "2026-07-30T10:00:00+09:00",
+};
+
+const workboxView: HostWorkboxView = {
+  state: "NOW",
+  evaluatedAt: "2026-08-30T09:00:00Z",
+  items: [
+    {
+      key: "RECORD_CLOSING:session-28",
+      type: "RECORD_CLOSING",
+      state: "NOW",
+      title: "지난 모임 기록 마감",
+      description: "1건 · 오늘",
+      count: 1,
+      dueAt: null,
+      deferredUntil: null,
+      resolvedAt: null,
+      destinationHref: "/app/host?phase=closing",
+      receiptSummary: null,
+      operationalLabel: "지난 모임 기록 마감",
+      destinationCategory: "records",
+      countLabel: "1",
+    },
+  ],
+  partialWarnings: [],
+  nextCursor: null,
+};
+
 describe("HostSessionLedger", () => {
+  it("renders underline tabs with toned counts, export icon, next-closing banner, work rows in rail, and publish footer", () => {
+    render(
+      <HostSessionLedger
+        items={[items[0], publishedItem]}
+        filters={filters}
+        nextCursor={null}
+        loadingMore={false}
+        onFiltersChange={vi.fn()}
+        onLoadMore={vi.fn()}
+        nextAction={hostRecordsNextClosingAction(items[0])}
+        workbox={workboxView}
+        LinkComponent={({ to, children, ...props }) => <a {...props} href={to}>{children}</a>}
+      />,
+    );
+
+    const statusTabs = within(screen.getByRole("tablist", { name: "기록 상태" })).getAllByRole("tab");
+    expect(statusTabs).toHaveLength(4);
+    expect(statusTabs[1]?.querySelector('.rm-record-ledger__count[data-tone="danger"]')).toHaveTextContent("1");
+    expect(statusTabs[2]?.querySelector('.rm-record-ledger__count[data-tone="warn"]')).toHaveTextContent("1");
+    expect(statusTabs[3]?.querySelector('.rm-record-ledger__count[data-tone="ok"]')).toHaveTextContent("1");
+    expect(screen.getByRole("link", { name: "내보내기" }).querySelector('[data-icon="export"]')).toBeTruthy();
+    expect(document.querySelector(".rm-record-ledger__next .rm-icon-badge")).toBeTruthy();
+    expect(document.querySelectorAll(".rm-record-ledger__rail .rm-host-work-item").length).toBeGreaterThan(0);
+    expect(document.querySelector(".rm-record-ledger__footer")).toBeTruthy();
+    expect(screen.getByText("7월 30일 · No. 26 기록 게시됨")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "마감 작업" })).toBeVisible();
+    expect(screen.queryByRole("region", { name: "기록 장부 요약" })).not.toBeInTheDocument();
+    expect(screen.queryByText("세부 조작")).not.toBeInTheDocument();
+  });
+
   it("submits normalized search and exposes filter state changes", async () => {
     const user = userEvent.setup();
     const onFiltersChange = vi.fn();
@@ -66,16 +136,12 @@ describe("HostSessionLedger", () => {
     expect(onFiltersChange).toHaveBeenCalledWith({ ...filters, search: "모비 딕" });
 
     expect(screen.queryByRole("combobox", { name: "모임 상태" })).not.toBeInTheDocument();
-    const summary = screen.getByRole("region", { name: "기록 장부 요약" });
-    expect(summary).toHaveTextContent("확인 필요 3건");
-    expect(summary).toHaveTextContent("게시 기록 미완료 1건");
-    expect(summary).toHaveTextContent("초안 2건");
-    expect(summary.querySelector(".card-grid")).toBeNull();
+    expect(screen.queryByRole("region", { name: "기록 장부 요약" })).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole("combobox", { name: "기록 상태" }), { target: { value: "INCOMPLETE" } });
     expect(onFiltersChange).toHaveBeenCalledWith({ ...filters, recordStatus: "INCOMPLETE" });
   });
 
-  it("keeps a truthful zero summary as editorial context", () => {
+  it("keeps an honest empty ledger without fake summary counts", () => {
     render(
       <HostSessionLedger
         items={[]}
@@ -89,9 +155,8 @@ describe("HostSessionLedger", () => {
     );
 
     expect(screen.getByText("조건에 맞는 모임 기록이 없습니다.")).toBeVisible();
-    expect(screen.getByRole("region", { name: "기록 장부 요약" })).toHaveTextContent(
-      "확인 필요한 기록 없음",
-    );
+    expect(screen.queryByRole("region", { name: "기록 장부 요약" })).not.toBeInTheDocument();
+    expect(screen.queryByText("7월 30일 · No. 26 기록 게시됨")).not.toBeInTheDocument();
   });
 
   it("renders semantic desktop rows and equivalent mobile cards", () => {
@@ -115,7 +180,7 @@ describe("HostSessionLedger", () => {
     expect(within(table).getByRole("row", { name: /모비 딕/ })).toBeInTheDocument();
     const mobileCard = container.querySelector("article[data-session-id='session-28']");
     expect(mobileCard).toHaveTextContent("모비 딕");
-    expect(mobileCard).toHaveStyle({ minWidth: "0", overflowWrap: "anywhere" });
+    expect(mobileCard).toHaveClass("rm-record-ledger__card");
     expect(screen.getAllByRole("link", { name: "No.28 마감실 열기" })).toHaveLength(2);
     expect(screen.getByRole("link", { name: "마감실 열기" })).toBeVisible();
     expect(screen.queryByRole("link", { name: "새 모임 만들기" })).not.toBeInTheDocument();

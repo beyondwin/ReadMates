@@ -13,7 +13,7 @@ import {
   approvedRecordFacts,
   approvedRecordItems,
   approvedRecordLedgerSummary,
-  approvedRecordWorkItems,
+  approvedRecordWorkbox,
   approvedScheduleReviewMembers,
   approvedScheduleReviewPreview,
 } from "./approved-host-ledgers.data";
@@ -53,7 +53,7 @@ const peoplePendingMembers = approvedPeoplePendingMembers;
 const peopleLedgerFacts = approvedPeopleLedgerFacts;
 const recordItems = approvedRecordItems;
 const recordFacts = approvedRecordFacts;
-const recordWorkItems = approvedRecordWorkItems;
+const recordWorkbox = approvedRecordWorkbox;
 const invitationLinks = approvedInvitationLinks;
 const clubSettings = approvedClubSettings;
 const personNow = approvedPersonNow;
@@ -139,9 +139,8 @@ export function hostRecordsApprovedView() {
         href: "/clubs/reading-sai/app/host/sessions/session-28",
         ctaLabel: "마감실 열기",
       }}
-      workItems={recordWorkItems}
+      workbox={recordWorkbox}
       statusCounts={{ closing: 2, drafting: 1, published: 18 }}
-      workTabCounts={{ now: 2, deferred: 1 }}
     />,
   );
 }

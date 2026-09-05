@@ -3,7 +3,9 @@ import {
   attentionItems,
   hostSessionLedgerActionLabel,
   hostSessionLedgerBadges,
+  hostSessionLedgerLastPublishLine,
   hostSessionLedgerModifiedAtLabel,
+  isRecordLedgerWorkboxType,
   dedupeHostSessionLedgerItems,
   hostSessionTrashDeletedAtLabel,
   hostSessionTrashRemainingCopy,
@@ -120,6 +122,31 @@ describe("host session ledger model", () => {
       "CLOSED",
     ]);
     expect(page.summary.needsAttentionCount).toBe(9);
+  });
+
+  it("builds the publish footer from the latest published lastModifiedAt and omits invented copy", () => {
+    expect(hostSessionLedgerLastPublishLine([
+      ledgerItem("closed", "CLOSED", true),
+    ])).toBeNull();
+    expect(hostSessionLedgerLastPublishLine([
+      {
+        ...ledgerItem("session-25", "PUBLISHED", false),
+        sessionNumber: 25,
+        lastModifiedAt: "2026-07-09T10:00:00+09:00",
+      },
+      {
+        ...ledgerItem("session-26", "PUBLISHED", false),
+        sessionNumber: 26,
+        lastModifiedAt: "2026-07-30T10:00:00+09:00",
+      },
+    ])).toBe("7월 30일 · No. 26 기록 게시됨");
+  });
+
+  it("keeps only record-closing and notification-failure workbox kinds on the records rail", () => {
+    expect(isRecordLedgerWorkboxType("RECORD_CLOSING")).toBe(true);
+    expect(isRecordLedgerWorkboxType("NOTIFICATION_FAILURE")).toBe(true);
+    expect(isRecordLedgerWorkboxType("SCHEDULE_UNSEEN")).toBe(false);
+    expect(isRecordLedgerWorkboxType("MEMBER_APPROVAL")).toBe(false);
   });
 
   it("deduplicates exact session ids across opaque continuation pages while preserving first order", () => {

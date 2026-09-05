@@ -310,11 +310,62 @@ export const approvedRecordFacts = {
   },
 } as const;
 
-export const approvedRecordWorkItems = [
-  { title: "피드백 문서 확인", meta: "1개 · 오늘", href: "/clubs/reading-sai/app/host/sessions/session-28" },
-  { title: "지난 기록 게시 검토", meta: "1건 · 이번 주", href: "/clubs/reading-sai/app/host/sessions/session-27" },
-  { title: "소감 수집 보류", meta: "4명 · 내일", href: "/clubs/reading-sai/app/host/sessions/session-24" },
-];
+export const approvedRecordWorkbox = {
+  state: "NOW" as const,
+  evaluatedAt: "2026-09-02T10:00:00+09:00",
+  items: [
+    {
+      key: "NOTIFICATION_FAILURE:session-28",
+      type: "NOTIFICATION_FAILURE" as const,
+      state: "NOW" as const,
+      title: "피드백 문서 확인",
+      description: "1개 · 오늘",
+      count: 1,
+      dueAt: null,
+      deferredUntil: null,
+      resolvedAt: null,
+      destinationHref: "/clubs/reading-sai/app/host/sessions/session-28",
+      receiptSummary: null,
+      operationalLabel: "알림 실패 확인",
+      destinationCategory: "notifications" as const,
+      countLabel: "1",
+    },
+    {
+      key: "RECORD_CLOSING:session-27",
+      type: "RECORD_CLOSING" as const,
+      state: "NOW" as const,
+      title: "지난 기록 게시 검토",
+      description: "1건 · 이번 주",
+      count: 1,
+      dueAt: null,
+      deferredUntil: null,
+      resolvedAt: null,
+      destinationHref: "/clubs/reading-sai/app/host/sessions/session-27",
+      receiptSummary: null,
+      operationalLabel: "지난 모임 기록 마감",
+      destinationCategory: "records" as const,
+      countLabel: "1",
+    },
+    {
+      key: "RECORD_CLOSING:session-24",
+      type: "RECORD_CLOSING" as const,
+      state: "NOW" as const,
+      title: "소감 수집 보류",
+      description: "4명 · 내일",
+      count: 4,
+      dueAt: null,
+      deferredUntil: null,
+      resolvedAt: null,
+      destinationHref: "/clubs/reading-sai/app/host/sessions/session-24",
+      receiptSummary: null,
+      operationalLabel: "지난 모임 기록 마감",
+      destinationCategory: "records" as const,
+      countLabel: "4",
+    },
+  ],
+  partialWarnings: [],
+  nextCursor: null,
+};
 
 export const approvedInvitationLinks: HostInvitationLinkView[] = [
   {

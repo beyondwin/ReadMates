@@ -174,6 +174,7 @@ const HOST_PEOPLE_DEPENDENCIES = [
 
 const HOST_RECORDS_DEPENDENCIES = [
   "front/features/host/ui/host-session-ledger.tsx",
+  "front/features/host/ui/host-session-ledger.css",
   "front/features/host/route/host-session-ledger-route.tsx",
 ] as const;
 

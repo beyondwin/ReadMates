@@ -3,6 +3,8 @@ import {
   hostSessionLedgerActionLabel,
   hostSessionLedgerDraftLabel,
   hostSessionLedgerFeedbackLabel,
+  hostSessionLedgerLastPublishedItem,
+  hostSessionLedgerLastPublishLine,
   hostSessionLedgerPublicationLabel,
   hostSessionLedgerBadges,
   type HostSessionAttentionData,
@@ -15,9 +17,13 @@ import {
   type HostSessionLedgerWorkItem,
 } from "@/features/host/model/host-session-ledger-model";
 import { hostMeetingHref } from "@/features/host/model/host-meeting-ledger-model";
+import type { HostWorkboxView } from "@/features/host/model/host-workbox-model";
 import { formatMeetingOrdinal, hostMeetingLifecycleLabel } from "@/shared/model/meeting-language";
 import { readmatesReturnState } from "@/shared/routing/readmates-route-state";
+import { ReadmatesIcon, ReadmatesIconBadge } from "@/shared/ui/icon";
+import { HostWorkbox } from "./workbox/host-workbox";
 import "./host-editorial-ledger.css";
+import "./host-session-ledger.css";
 
 type LedgerLinkProps = {
   to: string;
@@ -68,11 +74,20 @@ export type HostSessionLedgerProps = {
   workItems?: HostSessionLedgerWorkItem[];
   statusCounts?: HostSessionLedgerStatusCounts;
   workTabCounts?: { now: number; deferred: number };
+  workbox?: HostWorkboxView | null;
+  workboxState?: HostWorkboxView["state"];
+  workboxLoading?: boolean;
+  workboxError?: string | null;
+  onWorkboxStateChange?: (state: HostWorkboxView["state"]) => void;
+  onWorkboxRetry?: () => void;
+  onWorkboxLoadMore?: (cursor: string) => void;
+  exportHref?: string;
 };
 
 const HOST_RECORDS_FOCUS_KEY = "readmates.host-records.focus-restore";
 
 type RecordsStatusFilter = "all" | "closing" | "drafting" | "published";
+type LedgerTone = "warn" | "ok" | "danger" | "accent";
 
 function DefaultLink({ to, children, state: _state, ...props }: LedgerLinkProps) {
   void _state;
@@ -119,6 +134,14 @@ function rowMatchesFilter(item: HostSessionLedgerItem, facts: HostSessionLedgerR
   return item.state === "PUBLISHED" || facts.publicationLabel === "게시됨";
 }
 
+function ledgerFactTone(label: string | undefined): LedgerTone | undefined {
+  if (label === "작성 중" || label === "확인 필요") return "warn";
+  if (label === "완료") return "ok";
+  if (label === "초안 없음" || label === "미등록" || label === "마감 필요") return "danger";
+  if (label === "게시 준비") return "accent";
+  return undefined;
+}
+
 function LedgerFilters({
   filters,
   onFiltersChange,
@@ -131,33 +154,21 @@ function LedgerFilters({
   };
 
   return (
-    <form
-      role="search"
-      onSubmit={submit}
-      className="rm-document-panel"
-      style={{
-        padding: 16,
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))",
-        gap: 10,
-        alignItems: "end",
-      }}
-    >
-      <label className="stack" style={{ "--stack": "6px", minWidth: 0 } as React.CSSProperties}>
+    <form role="search" onSubmit={submit} className="rm-document-panel rm-record-ledger__filters">
+      <label className="rm-record-ledger__filter-field">
         <span className="tiny">모임 기록 검색</span>
-        <span className="row" style={{ gap: 8, minWidth: 0 }}>
+        <span className="rm-record-ledger__search-row">
           <input
             className="input"
             type="search"
             aria-label="모임 기록 검색"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            style={{ minWidth: 0 }}
           />
           <button className="btn btn-primary btn-sm" type="submit">검색</button>
         </span>
       </label>
-      <label className="stack" style={{ "--stack": "6px" } as React.CSSProperties}>
+      <label className="rm-record-ledger__filter-field">
         <span className="tiny">기록 상태</span>
         <select
           className="input"
@@ -174,7 +185,7 @@ function LedgerFilters({
           <option value="COMPLETE">완료</option>
         </select>
       </label>
-      <label className="stack" style={{ "--stack": "6px" } as React.CSSProperties}>
+      <label className="rm-record-ledger__filter-field">
         <span className="tiny">확인 필요</span>
         <select
           className="input"
@@ -222,16 +233,16 @@ function DesktopLedger({
                   <strong>No. {item.sessionNumber} · {item.bookTitle}</strong>
                   <div className="tiny">{facts.dateLabel}</div>
                 </td>
-                <td>{facts.attendanceLabel}</td>
-                <td>{facts.reflectionLabel}</td>
-                <td>{facts.draftLabel}</td>
-                <td>{facts.feedbackLabel}</td>
-                <td>{facts.publicationLabel}</td>
+                <td data-tone={ledgerFactTone(facts.attendanceLabel)}>{facts.attendanceLabel}</td>
+                <td data-tone={ledgerFactTone(facts.reflectionLabel)}>{facts.reflectionLabel}</td>
+                <td data-tone={ledgerFactTone(facts.draftLabel)}>{facts.draftLabel}</td>
+                <td data-tone={ledgerFactTone(facts.feedbackLabel)}>{facts.feedbackLabel}</td>
+                <td data-tone={ledgerFactTone(facts.publicationLabel)}>{facts.publicationLabel}</td>
                 <td>
                   <LinkComponent
                     to={sessionRecordHref(item.sessionId)}
                     state={readmatesReturnState({ href: recordReturnHref, label: "기록으로" })}
-                    className="btn btn-ghost btn-sm"
+                    className="btn btn-outline btn-sm"
                     aria-label={`${formatMeetingOrdinal(item.sessionNumber, "folio")} ${action}`}
                   >
                     {action}
@@ -256,20 +267,19 @@ function MobileLedger({
   recordReturnHref: string;
 }) {
   return (
-    <div className="mobile-only stack" style={{ "--stack": "10px", minWidth: 0 } as React.CSSProperties}>
+    <div className="mobile-only rm-record-ledger__cards">
       {items.map(({ item, facts }) => {
         const action = facts.actionLabel ?? hostSessionLedgerActionLabel(item);
         return (
           <article
             key={item.sessionId}
             data-session-id={item.sessionId}
-            className="m-card"
-            style={{ minWidth: 0, overflowWrap: "anywhere" }}
+            className="m-card rm-record-ledger__card"
           >
             <div className="eyebrow">No.{item.sessionNumber} · {stateLabel(item.state)}</div>
-            <h2 className="h4 editorial" style={{ margin: "5px 0 2px", overflowWrap: "anywhere" }}>{item.bookTitle}</h2>
-            <div className="tiny" style={{ marginTop: 10 }}>{facts.dateLabel}</div>
-            <div className="tiny" style={{ marginTop: 4 }}>
+            <h2 className="h4 editorial rm-record-ledger__card-title">{item.bookTitle}</h2>
+            <div className="tiny rm-record-ledger__card-meta">{facts.dateLabel}</div>
+            <div className="tiny rm-record-ledger__card-facts">
               {facts.attendanceLabel} · {facts.reflectionLabel} · {facts.draftLabel}
             </div>
             <LinkComponent
@@ -299,35 +309,34 @@ function TrashLedger({
   LinkComponent: HostSessionLedgerLinkComponent;
 }) {
   return (
-    <div className="stack" style={{ "--stack": "10px", minWidth: 0 } as React.CSSProperties}>
+    <div className="rm-record-ledger__cards">
       {items.map((item) => (
         <article
           key={item.sessionId}
           data-session-id={item.sessionId}
-          className="m-card"
-          style={{ minWidth: 0, overflowWrap: "anywhere" }}
+          className="m-card rm-record-ledger__card"
         >
           <div className="eyebrow">No.{item.sessionNumber} · {stateLabel(item.state)}</div>
-          <h2 className="h4 editorial" style={{ margin: "5px 0 2px", overflowWrap: "anywhere" }}>
+          <h2 className="h4 editorial rm-record-ledger__card-title">
             {item.title}
           </h2>
-          <div className="tiny" style={{ marginTop: 8 }}>{item.deletedAtLabel}</div>
-          <div className="tiny" style={{ marginTop: 4 }}>{item.remainingCopy}</div>
+          <div className="tiny rm-record-ledger__card-meta">{item.deletedAtLabel}</div>
+          <div className="tiny rm-record-ledger__card-facts">{item.remainingCopy}</div>
           {item.restoreDisabledReason ? (
-            <p className="small" role="alert" style={{ margin: "10px 0 0" }}>{item.restoreDisabledReason}</p>
+            <p className="small rm-record-ledger__restore-alert" role="alert">{item.restoreDisabledReason}</p>
           ) : null}
           {item.restoreError ? (
-            <p className="small" role="alert" style={{ margin: "10px 0 0" }}>{item.restoreError}</p>
+            <p className="small rm-record-ledger__restore-alert" role="alert">{item.restoreError}</p>
           ) : null}
           {item.restoreConflict ? (
-            <p className="small" style={{ margin: "10px 0 0" }}>
+            <p className="small rm-record-ledger__restore-alert">
               {item.restoreConflict.message}{" "}
               <LinkComponent to={item.restoreConflict.openSessionHref}>
                 진행 중인 모임 열기
               </LinkComponent>
             </p>
           ) : null}
-          <div className="row" style={{ gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+          <div className="rm-record-ledger__restore-actions">
             <button
               className="btn btn-primary btn-sm"
               type="button"
@@ -369,7 +378,7 @@ function RecordsNextActionCard({
   const label = nextAction?.label ?? `${item.bookTitle} 기록 초안을 검토해 주세요`;
   return (
     <section
-      className="rm-host-records-next"
+      className="rm-record-ledger__next rm-host-records-next"
       aria-labelledby="rm-host-records-next-title"
       onClick={(event) => {
         if ((event.target as HTMLElement).closest("a")) {
@@ -377,31 +386,29 @@ function RecordsNextActionCard({
         }
       }}
     >
-      <p className="rm-host-records-next__eyebrow">다음에 마감할 기록</p>
-      <div className="rm-host-records-next__body">
-        <div className="rm-host-records-next__copy">
-          <span className="rm-host-records-next__mark" aria-hidden="true">!</span>
-          <div>
-            <h2 id="rm-host-records-next-title">{label}</h2>
-            {nextAction?.meta ? <p>{nextAction.meta}</p> : null}
-          </div>
-        </div>
-        <LinkComponent
-          to={href}
-          state={readmatesReturnState({ href: recordReturnHref, label: "기록으로" })}
-          className="btn btn-primary"
-          aria-label={cta}
-        >
-          {cta}
-        </LinkComponent>
+      <ReadmatesIconBadge name="alert-circle" tone="warn" size={40} />
+      <div className="rm-record-ledger__next-copy">
+        <p className="rm-record-ledger__eyebrow">다음에 마감할 기록</p>
+        <h2 id="rm-host-records-next-title">{label}</h2>
+        {nextAction?.meta ? <p>{nextAction.meta}</p> : null}
       </div>
+      <LinkComponent
+        to={href}
+        state={readmatesReturnState({ href: recordReturnHref, label: "기록으로" })}
+        className="btn btn-primary"
+        aria-label={cta}
+      >
+        {cta}
+      </LinkComponent>
     </section>
   );
 }
 
+const noopWorkboxHandler = () => undefined;
+
 export function HostSessionLedger({
   items,
-  summary,
+  summary: _summary,
   filters,
   nextCursor,
   loadingMore,
@@ -421,16 +428,27 @@ export function HostSessionLedger({
   headingRef,
   factsBySessionId,
   nextAction,
-  workItems,
+  workItems: _workItems,
   statusCounts,
-  workTabCounts,
+  workTabCounts: _workTabCounts,
+  workbox = null,
+  workboxState,
+  workboxLoading = false,
+  workboxError = null,
+  onWorkboxStateChange,
+  onWorkboxRetry,
+  onWorkboxLoadMore,
+  exportHref = "#",
 }: HostSessionLedgerProps) {
+  void _summary;
+  void _workItems;
+  void _workTabCounts;
   const trashView = filters.view === "trash";
   const [statusFilter, setStatusFilter] = useState<RecordsStatusFilter>("all");
   const itemIds = items.map((item) => item.sessionId).join("\0");
   useEffect(() => {
     if (sessionStorage.getItem(HOST_RECORDS_FOCUS_KEY) !== "closing") return;
-    const target = document.querySelector<HTMLElement>(".rm-host-records-next a");
+    const target = document.querySelector<HTMLElement>(".rm-host-records-next a, .rm-record-ledger__next a");
     if (!target) return;
     let inner = 0;
     const outer = window.requestAnimationFrame(() => {
@@ -458,15 +476,13 @@ export function HostSessionLedger({
     drafting: factRows.filter(({ item, facts }) => rowMatchesFilter(item, facts, "drafting")).length,
     published: factRows.filter(({ item, facts }) => rowMatchesFilter(item, facts, "published")).length,
   };
-  const railItems = workItems ?? [
-    { title: "확인 필요", meta: `${summary?.needsAttentionCount ?? 0}건` },
-    { title: "초안", meta: `${summary?.draftCount ?? 0}건` },
-    { title: "게시 미완료", meta: `${summary?.incompletePublishedCount ?? 0}건` },
-  ];
+  const lastPublished = hostSessionLedgerLastPublishedItem(items);
+  const publishLine = hostSessionLedgerLastPublishLine(items);
+  const publishHistoryHref = lastPublished ? sessionRecordHref(lastPublished.sessionId) : recordReturnHref;
 
   return (
     <main className="rm-host-editorial-ledger rm-host-editorial-ledger--context">
-      <section className="page-header-compact">
+      <header className="page-header-compact">
         <div className="container rm-host-editorial-ledger__context">
           <h1
             ref={headingRef}
@@ -481,11 +497,11 @@ export function HostSessionLedger({
               : "모임이 끝난 뒤 남겨야 할 기록과 게시 이력을 관리하세요."}
           </p>
         </div>
-      </section>
-      <section className="container rm-host-editorial-ledger__body">
+      </header>
+      <section className={trashView ? "container rm-record-ledger--trash" : "container rm-record-ledger"}>
         {trashView ? (
-          <div className="row-between" style={{ gap: 10, flexWrap: "wrap", minWidth: 0 }}>
-            <span className="small" style={{ color: "var(--text-2)" }}>
+          <div className="rm-record-ledger__trash-toolbar">
+            <span className="small">
               삭제된 모임을 남은 기간 동안 복원할 수 있습니다.
             </span>
             <LinkComponent to={activeHref} className="btn btn-quiet btn-sm">
@@ -493,16 +509,16 @@ export function HostSessionLedger({
             </LinkComponent>
           </div>
         ) : (
-          <div className="rm-host-records-toolbar">
-            <div className="rm-host-editorial-ledger__filters" role="tablist" aria-label="기록 상태">
+          <div className="rm-record-ledger__toolbar">
+            <div className="rm-record-ledger__tabs" role="tablist" aria-label="기록 상태">
               {([
                 { id: "all", label: "전체" },
-                { id: "closing", label: "마감 필요", count: derivedCounts.closing },
-                { id: "drafting", label: "작성 중", count: derivedCounts.drafting },
-                { id: "published", label: "게시됨", count: derivedCounts.published },
+                { id: "closing", label: "마감 필요", count: derivedCounts.closing, tone: "danger" as const },
+                { id: "drafting", label: "작성 중", count: derivedCounts.drafting, tone: "warn" as const },
+                { id: "published", label: "게시됨", count: derivedCounts.published, tone: "ok" as const },
               ] as const).map((chip) => {
                 const selected = statusFilter === chip.id;
-                const name = "count" in chip && chip.count != null ? `${chip.label} ${chip.count}` : chip.label;
+                const name = "count" in chip ? `${chip.label} ${chip.count}` : chip.label;
                 return (
                   <button
                     key={chip.id}
@@ -510,16 +526,20 @@ export function HostSessionLedger({
                     role="tab"
                     aria-label={name}
                     aria-selected={selected}
-                    className={`rm-host-editorial-ledger__filter${selected ? " is-selected" : ""}`}
                     onClick={() => setStatusFilter(chip.id)}
                   >
                     {chip.label}
-                    {"count" in chip && chip.count != null ? ` ${chip.count}` : ""}
+                    {"count" in chip ? (
+                      <span className="rm-record-ledger__count" data-tone={chip.tone}>{chip.count}</span>
+                    ) : null}
                   </button>
                 );
               })}
             </div>
-            <button type="button" className="btn btn-quiet btn-sm">내보내기</button>
+            <a className="rm-record-ledger__export" href={exportHref}>
+              <ReadmatesIcon name="export" size={16} />
+              내보내기
+            </a>
           </div>
         )}
         {!trashView && attentionRow ? (
@@ -530,110 +550,89 @@ export function HostSessionLedger({
             recordReturnHref={recordReturnHref}
           />
         ) : null}
-        <div className="rm-host-editorial-ledger--split">
-          <div>
-            {trashView ? null : <h2 className="rm-host-records-ledger__title">기록 원장</h2>}
-            {errorMessage ? (
-              <div className="surface-quiet" role="alert" style={{ padding: 18 }}>
-                <p className="small" style={{ margin: 0 }}>{errorMessage}</p>
-                {onRetry ? <button className="btn btn-ghost btn-sm" type="button" onClick={onRetry}>다시 시도</button> : null}
-              </div>
-            ) : loading ? (
-              <div className="surface-quiet small" role="status" style={{ padding: 18 }}>
-                {trashView ? "휴지통을 불러오는 중입니다." : "모임 기록을 불러오는 중입니다."}
-              </div>
-            ) : visibleItems.length === 0 ? (
-              <div className="surface-quiet small" style={{ padding: 18 }}>
-                {trashView ? "휴지통이 비어 있습니다." : "조건에 맞는 모임 기록이 없습니다."}
-              </div>
-            ) : trashView ? (
-              <TrashLedger
-                items={trashItems}
-                onRestore={onRestore}
-                onRetryRestore={onRetryRestore}
+        <section className="rm-record-ledger__board">
+          {trashView ? null : <h2 className="rm-host-records-ledger__title">기록 원장</h2>}
+          {errorMessage ? (
+            <div className="surface-quiet rm-record-ledger__state" role="alert">
+              <p className="small">{errorMessage}</p>
+              {onRetry ? <button className="btn btn-ghost btn-sm" type="button" onClick={onRetry}>다시 시도</button> : null}
+            </div>
+          ) : loading ? (
+            <div className="surface-quiet small rm-record-ledger__state" role="status">
+              {trashView ? "휴지통을 불러오는 중입니다." : "모임 기록을 불러오는 중입니다."}
+            </div>
+          ) : visibleItems.length === 0 ? (
+            <div className="surface-quiet small rm-record-ledger__state">
+              {trashView ? "휴지통이 비어 있습니다." : "조건에 맞는 모임 기록이 없습니다."}
+            </div>
+          ) : trashView ? (
+            <TrashLedger
+              items={trashItems}
+              onRestore={onRestore}
+              onRetryRestore={onRetryRestore}
+              LinkComponent={LinkComponent}
+            />
+          ) : visibleFactRows.length === 0 ? (
+            <div className="surface-quiet small rm-record-ledger__state">
+              조건에 맞는 모임 기록이 없습니다.
+            </div>
+          ) : (
+            <>
+              <DesktopLedger
+                items={visibleFactRows}
                 LinkComponent={LinkComponent}
+                recordReturnHref={recordReturnHref}
               />
-            ) : visibleFactRows.length === 0 ? (
-              <div className="surface-quiet small" style={{ padding: 18 }}>
-                조건에 맞는 모임 기록이 없습니다.
-              </div>
-            ) : (
-              <>
-                <DesktopLedger
-                  items={visibleFactRows}
-                  LinkComponent={LinkComponent}
-                  recordReturnHref={recordReturnHref}
-                />
-                <MobileLedger
-                  items={visibleFactRows}
-                  LinkComponent={LinkComponent}
-                  recordReturnHref={recordReturnHref}
-                />
-              </>
-            )}
-            {nextCursor ? (
-              <button className="btn btn-ghost" type="button" disabled={loadingMore} onClick={onLoadMore}>
-                {loadingMore ? "불러오는 중" : "더 보기"}
-              </button>
-            ) : null}
-            {loadMoreError ? <p className="small" role="alert">{loadMoreError}</p> : null}
-            {trashView ? null : (
-              <div className="rm-host-editorial-ledger__panel">
-                {!summary ? null : (
-                  <section className="rm-document-panel" aria-label="기록 장부 요약" style={{ padding: 18 }}>
-                    <h2 className="h4 editorial" style={{ margin: 0 }}>기록 장부 요약</h2>
-                    <p className="small" style={{ margin: "8px 0 0", color: "var(--text-2)" }}>
-                      {summary.needsAttentionCount === 0
-                        ? "확인 필요한 기록 없음"
-                        : `확인 필요 ${summary.needsAttentionCount}건`}
-                      {` · 게시 기록 미완료 ${summary.incompletePublishedCount}건 · 초안 ${summary.draftCount}건`}
-                    </p>
-                  </section>
-                )}
-                <details className="rm-host-editorial-ledger__panel">
-                  <summary className="btn btn-quiet btn-sm">기록 필터</summary>
-                  <LedgerFilters key={filters.search} filters={filters} onFiltersChange={onFiltersChange} />
-                </details>
-                <LinkComponent to={trashHref} className="btn btn-quiet btn-sm">
-                  휴지통
-                </LinkComponent>
-              </div>
-            )}
-          </div>
-          {trashView ? null : (
-            <aside className="rm-host-editorial-ledger__rail" aria-labelledby="closing-work-title">
-              <h2 id="closing-work-title">마감 작업</h2>
-              <div className="rm-host-editorial-ledger__filters" role="tablist" aria-label="마감 작업 상태">
-                <button type="button" role="tab" aria-selected="true" className="rm-host-editorial-ledger__filter is-selected">
-                  지금 {workTabCounts?.now ?? summary?.needsAttentionCount ?? railItems.length}
-                </button>
-                <button type="button" role="tab" aria-selected="false" className="rm-host-editorial-ledger__filter">
-                  보류 {workTabCounts?.deferred ?? 0}
-                </button>
-                <button type="button" role="tab" aria-selected="false" className="rm-host-editorial-ledger__filter">
-                  완료
-                </button>
-              </div>
-              <ul className="rm-host-editorial-ledger__list">
-                {railItems.map((work) => (
-                  <li key={work.title} className="rm-host-editorial-ledger__row">
-                    {work.href ? (
-                      <LinkComponent to={work.href} className="rm-host-records-work">
-                        <span>{work.title}</span>
-                        <span>{work.meta}</span>
-                      </LinkComponent>
-                    ) : (
-                      <>
-                        <span>{work.title}</span>
-                        <span>{work.meta}</span>
-                      </>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </aside>
+              <MobileLedger
+                items={visibleFactRows}
+                LinkComponent={LinkComponent}
+                recordReturnHref={recordReturnHref}
+              />
+            </>
           )}
-        </div>
+          {nextCursor ? (
+            <button className="btn btn-ghost" type="button" disabled={loadingMore} onClick={onLoadMore}>
+              {loadingMore ? "불러오는 중" : "더 보기"}
+            </button>
+          ) : null}
+          {loadMoreError ? <p className="small" role="alert">{loadMoreError}</p> : null}
+          {trashView ? null : (
+            <div className="rm-record-ledger__panel">
+              <details>
+                <summary className="btn btn-quiet btn-sm">기록 필터</summary>
+                <LedgerFilters key={filters.search} filters={filters} onFiltersChange={onFiltersChange} />
+              </details>
+              <LinkComponent to={trashHref} className="btn btn-quiet btn-sm">
+                휴지통
+              </LinkComponent>
+            </div>
+          )}
+        </section>
+        {trashView ? null : (
+          <aside className="rm-record-ledger__rail">
+            <HostWorkbox
+              title="마감 작업"
+              state={workboxState ?? workbox?.state ?? "NOW"}
+              view={workbox}
+              loading={workboxLoading}
+              error={workboxError}
+              onStateChange={onWorkboxStateChange ?? noopWorkboxHandler}
+              onRetry={onWorkboxRetry ?? noopWorkboxHandler}
+              onLoadMore={onWorkboxLoadMore ?? noopWorkboxHandler}
+              LinkComponent={LinkComponent}
+            />
+          </aside>
+        )}
+        {trashView ? null : (
+          <footer className="rm-record-ledger__footer">
+            <ReadmatesIcon name="check-circle" size={16} />
+            <span>{publishLine ?? "—"}</span>
+            <LinkComponent to={publishHistoryHref}>
+              게시 이력
+              <ReadmatesIcon name="chevron-right" size={16} />
+            </LinkComponent>
+          </footer>
+        )}
       </section>
     </main>
   );

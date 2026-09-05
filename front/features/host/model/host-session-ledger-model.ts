@@ -265,6 +265,47 @@ export function hostSessionLedgerFeedbackLabel(
   return "없음";
 }
 
+export function isRecordLedgerWorkboxType(type: string): boolean {
+  return type === "RECORD_CLOSING" || type === "NOTIFICATION_FAILURE";
+}
+
+export function hostSessionLedgerLastPublishedItem(
+  items: readonly HostSessionLedgerItem[],
+): HostSessionLedgerItem | null {
+  const published = items.filter((item) => item.state === "PUBLISHED");
+  if (published.length === 0) {
+    return null;
+  }
+  return published.reduce((current, item) => {
+    const currentTime = Date.parse(current.lastModifiedAt ?? current.date);
+    const itemTime = Date.parse(item.lastModifiedAt ?? item.date);
+    return itemTime >= currentTime ? item : current;
+  });
+}
+
+export function hostSessionLedgerLastPublishLine(items: readonly HostSessionLedgerItem[]): string | null {
+  const latest = hostSessionLedgerLastPublishedItem(items);
+  if (!latest) {
+    return null;
+  }
+  const stamp = latest.lastModifiedAt ?? latest.date;
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(stamp) ? `${stamp}T00:00:00+09:00` : stamp);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(date);
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  if (!month || !day) {
+    return null;
+  }
+  return `${Number(month)}월 ${Number(day)}일 · No. ${latest.sessionNumber} 기록 게시됨`;
+}
+
 export function hostSessionLedgerModifiedAtLabel(value: string | null) {
   if (!value) {
     return "수정 기록 없음";

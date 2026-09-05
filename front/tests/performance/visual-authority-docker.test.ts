@@ -110,6 +110,7 @@ const TASK_PATH_TABLE = [
   ["front/features/host/ui/members/member-list.test.tsx", 11],
   ["front/features/host/ui/members/member-ledger.css", 2],
   ["front/features/host/ui/host-session-ledger.tsx", 1],
+  ["front/features/host/ui/host-session-ledger.css", 1],
   ["front/features/host/ui/host-session-ledger.test.tsx", 11],
   ["front/features/host/ui/settings/host-settings-page.tsx", 11],
   ["front/features/host/ui/settings/host-invitation-links.tsx", 1],
