@@ -132,12 +132,12 @@ function pastSummary(item: Pick<TocSourceItem, "date">): string {
 }
 
 export function meetingTocSummary(
-  item: Pick<TocSourceItem, "bookTitle" | "locationLabel" | "hasDraft" | "liveRevision" | "date">,
+  item: Pick<TocSourceItem, "bookTitle" | "locationLabel" | "hasDraft" | "liveRevision" | "date" | "state">,
   kind: "upcoming" | "past",
 ): string {
   if (kind === "upcoming") {
     if (!item.locationLabel.trim()) return "장소 확인 필요";
-    if (!item.bookTitle.trim()) return "책만 정해짐";
+    if (item.bookTitle.trim() && item.state === "DRAFT") return "책만 정해짐";
     return upcomingSummary(item);
   }
   if (item.hasDraft) return "기록 초안 있음";

@@ -382,7 +382,6 @@ export function HostMeetingList({
             type="button"
             role="tab"
             aria-selected={view === "list"}
-            aria-pressed={view === "list"}
             onClick={() => setView("list")}
           >
             <ReadmatesIcon name="list" size={16} />
@@ -392,7 +391,6 @@ export function HostMeetingList({
             type="button"
             role="tab"
             aria-selected={view === "calendar"}
-            aria-pressed={view === "calendar"}
             onClick={() => setView("calendar")}
           >
             <ReadmatesIcon name="calendar" size={16} />

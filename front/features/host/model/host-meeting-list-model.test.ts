@@ -115,12 +115,22 @@ describe("buildHostMeetingTocSections", () => {
       upcomingItems: [
         openItem(29, { locationLabel: "", bookTitle: "작별하지 않는다" }),
         openItem(30, { locationLabel: "서점", bookTitle: "" }),
+        item("draft-31", "DRAFT", {
+          sessionNumber: 31,
+          bookTitle: "여름은 오래 그곳에 남아",
+          locationLabel: "서점",
+          date: "2026-10-13",
+        }),
       ],
       upcomingCursor: null,
       pastItems: [closedItem(27, { hasDraft: true })],
       pastCursor: null,
     });
-    expect(sections.upcoming.rows.map((row) => row.summary)).toEqual(["장소 확인 필요", "책만 정해짐"]);
+    expect(sections.upcoming.rows.map((row) => row.summary)).toEqual([
+      "장소 확인 필요",
+      "09-05 예정일",
+      "책만 정해짐",
+    ]);
     expect(sections.past.rows[0]?.summary).toBe("기록 초안 있음");
     expect(sections.upcoming.rows.some((row) => /\d+\/\d+/.test(row.summary))).toBe(false);
   });

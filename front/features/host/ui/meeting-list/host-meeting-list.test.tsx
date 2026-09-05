@@ -251,6 +251,8 @@ describe("HostMeetingList", () => {
     expect(within(root!).getByRole("heading", { level: 1, name: "일정과 모임" })).toBeInTheDocument();
     expect(within(root!).getByRole("tablist", { name: "모임 보기 방식" })).toBeInTheDocument();
     expect(within(root!).getByRole("tab", { name: "목록" })).toHaveAttribute("aria-selected", "true");
+    expect(within(root!).getByRole("tab", { name: "목록" })).not.toHaveAttribute("aria-pressed");
+    expect(within(root!).getByRole("tab", { name: "달력" })).not.toHaveAttribute("aria-pressed");
     expect(root!.querySelectorAll("[style]")).toHaveLength(0);
     expect(findNestedLiveRegions(root!)).toEqual([]);
     expect(screen.queryByRole("link", { name: "새 모임 만들기" })).toBeNull();
