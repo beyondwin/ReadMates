@@ -290,7 +290,7 @@ for (const viewport of viewports) {
       expect(workboxBox!.y).toBeGreaterThanOrEqual(primaryBox!.y + primaryBox!.height - 1);
     } else {
       expect(workboxBox!.x).toBeGreaterThan(primaryBox!.x);
-      expect(Math.abs(primaryBox!.width / (primaryBox!.width + workboxBox!.width) - 0.68)).toBeLessThan(0.04);
+      expect(Math.abs(primaryBox!.width / (primaryBox!.width + workboxBox!.width) - 0.62)).toBeLessThan(0.04);
     }
 
     await expect(nextAction.getByRole("link")).toHaveCount(1);

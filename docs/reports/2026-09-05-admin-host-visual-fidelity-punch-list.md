@@ -55,6 +55,8 @@ Task 12b Jammy 재캡처 (`DOCKER_CONTEXT=colima-readmates-va CI=true npx --yes 
 
 Phase 2 carry (Task 14, Task 18에서 재실측): live-mobile `phaseNav` (`HOST_LIVE_MOBILE_PHASE_NAV_GEOMETRY` height 41, 제거된 40px min-height)와 `typo("phase-label", 14px/600)`는 단계 탭 compact 이후 stale이다. 비율 열은 그대로 두고 Task 18 Jammy 재캡처 실측으로만 갱신한다.
 
+Task 17 C/A residue for Task 18: 운영실 body grid는 `62fr / 38fr`이다. 1464px body에서 ≈ 908 / 556이며, 시안 07 ~950 / 500과 `HOST_WORKBOX_DESKTOP_GEOMETRY` width 513(~35%)과 다르다. Task 18은 이 값을 구 유물로 무시하지 말고 재실측한다. 513px 열을 되돌리지 않는다.
+
 ## CT 대기
 
 검토자: Task 12b session / 2026-09-05. 실제 route `.tmp/visual-authority-compare/<id>/` reference·candidate와 나란히 본 뒤 Docker update mode로 갱신. Controller ratified `admin-shell-mobile-390.png` and `admin-shell-long-copy-320.png` on 2026-09-05 (visual inspection of Phase 1 shell chrome).
