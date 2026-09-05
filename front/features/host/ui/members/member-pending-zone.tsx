@@ -51,40 +51,33 @@ export function MemberPendingZone({
       className="rm-member-ledger__pending"
       aria-label="가입 승인 대기"
     >
-      <header className="rm-host-pending__header rm-member-ledger__pending-head">
-        <div className="stack" style={{ "--stack": "6px" } as CSSProperties}>
-          <h2 className="h4 editorial" style={{ margin: 0 }}>
-            가입 승인 대기 {visibleViewers.length}명
-          </h2>
-          <p className="small" style={{ margin: 0, color: "var(--text-2)" }}>
-            승인과 거절은 결과 안내를 포함해요.
-          </p>
-        </div>
-        <button
-          className="btn btn-primary"
-          type="button"
-          onClick={() => startReview(visibleViewers[0].membershipId)}
-        >
-          가입 승인 검토
-        </button>
-      </header>
+      <div className="rm-member-ledger__pending-main">
+        <header className="rm-host-pending__header rm-member-ledger__pending-head">
+          <div className="stack" style={{ "--stack": "6px" } as CSSProperties}>
+            <h2 className="h4 editorial" style={{ margin: 0 }}>
+              가입 승인 대기 {visibleViewers.length}명
+            </h2>
+            <p className="small" style={{ margin: 0, color: "var(--text-2)" }}>
+              승인과 거절은 결과 안내를 포함해요.
+            </p>
+          </div>
+        </header>
 
-      <ul className="rm-member-ledger__pending-list">
-        {visibleViewers.map((member) => {
-          const rowPending = isRowPending(member.membershipId);
-          const activateReason = disabledViewerActivationReason(rowPending);
-          const releaseReason = disabledViewerDeactivateReason(member, rowPending);
-          const activateDisabled = rowPending;
-          const releaseDisabled = !member.canDeactivate || rowPending;
-          const requestTime = formatPendingRequestTime(member.createdAt, now);
-          const reviewing = reviewingIds.has(member.membershipId);
-          const personTo = personHref?.(member.membershipId)
-            ?? `/app/host/people/${encodeURIComponent(member.membershipId)}`;
+        <ul className="rm-member-ledger__pending-list">
+          {visibleViewers.map((member) => {
+            const rowPending = isRowPending(member.membershipId);
+            const activateReason = disabledViewerActivationReason(rowPending);
+            const releaseReason = disabledViewerDeactivateReason(member, rowPending);
+            const activateDisabled = rowPending;
+            const releaseDisabled = !member.canDeactivate || rowPending;
+            const requestTime = formatPendingRequestTime(member.createdAt, now) || "—";
+            const reviewing = reviewingIds.has(member.membershipId);
+            const personTo = personHref?.(member.membershipId)
+              ?? `/app/host/people/${encodeURIComponent(member.membershipId)}`;
 
-          return (
-            <li key={member.membershipId} className="rm-member-ledger__pending-row">
-              <AvatarChip avatarKey={member.avatarKey} name={member.displayName} label="" size={44} />
-              <div className="rm-host-pending__identity">
+            return (
+              <li key={member.membershipId} className="rm-member-ledger__pending-row">
+                <AvatarChip avatarKey={member.avatarKey} name={member.displayName} label="" size={44} />
                 <span className="rm-host-pending__name">
                   <PersonLink
                     to={personTo}
@@ -92,49 +85,54 @@ export function MemberPendingZone({
                   >
                     {member.displayName}
                   </PersonLink>
+                  <span className="rm-sr-only">{requestMeta(member)}</span>
                 </span>
                 <span className="rm-member-ledger__pending-path">—</span>
-                {requestTime ? (
-                  <span className="small rm-host-pending__time">{requestTime}</span>
-                ) : null}
-                <span className="rm-sr-only">{requestMeta(member)}</span>
-              </div>
-              <div className="rm-member-ledger__pending-actions">
-                {reviewing ? (
-                  <>
-                    <PendingActionButton
-                      action="approve"
-                      membershipId={member.membershipId}
-                      label="승인"
-                      tone="primary"
-                      disabled={activateDisabled}
-                      reason={activateReason}
-                      onClick={() => onActivate(member.membershipId)}
-                    />
-                    <PendingActionButton
-                      action="reject"
-                      membershipId={member.membershipId}
-                      label="거절"
-                      tone="ghost"
-                      disabled={releaseDisabled}
-                      reason={releaseReason}
-                      onClick={() => onRelease(member.membershipId)}
-                    />
-                  </>
-                ) : (
-                  <button
-                    className="rm-member-ledger__review"
-                    type="button"
-                    onClick={() => startReview(member.membershipId)}
-                  >
-                    검토
-                  </button>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+                <span className="small rm-host-pending__time">{requestTime}</span>
+                <div className="rm-member-ledger__pending-actions">
+                  {reviewing ? (
+                    <>
+                      <PendingActionButton
+                        action="approve"
+                        membershipId={member.membershipId}
+                        label="승인"
+                        tone="primary"
+                        disabled={activateDisabled}
+                        reason={activateReason}
+                        onClick={() => onActivate(member.membershipId)}
+                      />
+                      <PendingActionButton
+                        action="reject"
+                        membershipId={member.membershipId}
+                        label="거절"
+                        tone="ghost"
+                        disabled={releaseDisabled}
+                        reason={releaseReason}
+                        onClick={() => onRelease(member.membershipId)}
+                      />
+                    </>
+                  ) : (
+                    <button
+                      className="rm-member-ledger__review"
+                      type="button"
+                      onClick={() => startReview(member.membershipId)}
+                    >
+                      검토
+                    </button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      <button
+        className="btn btn-primary"
+        type="button"
+        onClick={() => startReview(visibleViewers[0].membershipId)}
+      >
+        가입 승인 검토
+      </button>
     </section>
   );
 }

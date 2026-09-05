@@ -87,6 +87,8 @@ describe("HostMembers people ledger composition", () => {
     expect(screen.queryByRole("button", { name: /이름 변경/ })).toBeNull();
     expect(screen.queryByText("이번 모임 참여")).toBeNull();
     expect(screen.queryByText("오늘 14:20")).toBeNull();
+    expect(source).not.toMatch(/LifecyclePolicyDialog|HostMemberProfileDialog/);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("keeps the people ledger populated when the 둘러보기 chip is selected", async () => {

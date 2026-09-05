@@ -543,9 +543,7 @@ test("an empty reading shelf omits recent-session navigation", async ({ page }) 
   })).toHaveCount(0);
 });
 
-test("host edits a same-club member display name and sees the row update", async ({ page }) => {
-  const updatedDisplayName = uniqueDisplayName("Host");
-
+test("host people ledger opens person detail without inline rename", async ({ page }) => {
   await mockMyReadingShelfJourney(page);
   await loginWithGoogleFixture(page, hostEmail);
   await page.goto("/app/me/settings");
@@ -559,30 +557,17 @@ test("host edits a same-club member display name and sees the row update", async
   await page.goto("/app/host/members");
 
   await expect(page.getByRole("heading", { name: "사람", level: 1 })).toBeVisible();
-  await page.getByRole("tab", { name: "활성 멤버" }).click();
-
   const memberRow = page.getByRole("row").filter({ has: page.getByRole("heading", { name: "멤버4" }) });
   await expect(memberRow).toContainText("멤버4");
   await expect(memberRow).not.toContainText("@멤버4");
+  await expect(memberRow.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
+  const openHref = await memberRow.getByRole("link", { name: /열기/ }).getAttribute("href");
+  expect(openHref).toMatch(/\/app\/host\/people\//);
 
-  await memberRow.getByRole("button", { name: "이름 변경" }).click();
-  const dialog = page.getByRole("dialog", { name: /이름 수정/ });
-  await dialog.getByRole("textbox", { name: "이름" }).fill(updatedDisplayName);
-
-  const profileResponse = page.waitForResponse(
-    (response) =>
-      response.request().method() === "PATCH" &&
-      response.url().includes("/api/bff/api/host/members/") &&
-      response.url().includes("/profile") &&
-      response.status() === 200,
-  );
-  await dialog.getByRole("button", { name: "이름 저장" }).click();
-  await profileResponse;
-
-  await expect(page.getByRole("status")).toContainText("이름을 저장했습니다.");
-  const updatedRow = page.getByRole("row").filter({ has: page.getByRole("heading", { name: updatedDisplayName }) });
-  await expect(updatedRow).toBeVisible();
-  await expect(updatedRow).not.toContainText(`@${updatedDisplayName}`);
+  await page.goto(openHref ?? "/app/host/people");
+  await expect(page.getByRole("heading", { name: "멤버4", level: 1 })).toBeVisible();
+  await expect(page.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "정지" })).toHaveCount(0);
 });
 
 test("viewer can read member routes but cannot use current-session write actions or host routes", async ({

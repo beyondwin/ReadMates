@@ -1,19 +1,12 @@
 import { type CSSProperties, useMemo, useRef, useState } from "react";
 import type {
-  CurrentSessionPolicy,
   HostMemberListPage,
   HostMemberListItem,
   MemberLifecycleRequest,
 } from "@/features/host/model/host-view-types";
-import {
-  HostMemberProfileActionError,
-  type HostMembersActions,
-} from "@/features/host/model/host-member-actions";
+import { type HostMembersActions } from "@/features/host/model/host-member-actions";
 import { isTransitionOwnerObsoleteError } from "@/shared/ui/use-transition-safety-owner";
-import { LifecyclePolicyDialog } from "./members/member-approval-actions";
 import { actionKey, isMembershipPending } from "./members/member-action-rules";
-import { HostMemberProfileDialog } from "./members/member-profile-editor";
-import { hostProfileErrorMessage, profileFailureMessage } from "./members/member-profile-errors";
 import { HostPeoplePage, type HostPeopleScheduleSeenCounts, type HostPeopleStatusFilter } from "./members/host-people-page";
 import { MemberPendingZone } from "./members/member-pending-zone";
 import { MemberTabPanel } from "./members/member-tab-panel";
@@ -23,8 +16,6 @@ import type {
   HostMemberLifecyclePath,
   HostMembersLinkComponent,
   HostViewerAction,
-  LifecycleDialog,
-  ProfileDialog,
 } from "./members/types";
 export type { HostMembersLinkComponent } from "./members/types";
 
@@ -75,14 +66,10 @@ export default function HostMembers({
   const visibleNextCursor = visibleRowsState.nextCursor;
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [statusFilter, setStatusFilter] = useState<HostPeopleStatusFilter>("all");
-  const [dialog, setDialog] = useState<LifecycleDialog>(null);
-  const [profileDialog, setProfileDialog] = useState<ProfileDialog>(null);
-  const [dialogPolicy, setDialogPolicy] = useState<CurrentSessionPolicy>("APPLY_NOW");
   const [pendingActions, setPendingActions] = useState<Set<string>>(() => new Set());
   const [message, setMessage] = useState<null | { kind: "alert" | "status"; text: string }>(null);
   const pendingActionsRef = useRef<Set<string>>(new Set());
   const completedViewerMembershipIdsRef = useRef<Set<string>>(new Set());
-  const dialogTriggerRef = useRef<HTMLElement | null>(null);
 
   const setMembers = (update: MemberRowsUpdate) => {
     setMemberRowsState((current) => {
@@ -122,18 +109,6 @@ export default function HostMembers({
 
     pendingActionsRef.current = nextPendingActions;
     setPendingActions(nextPendingActions);
-  };
-
-  const closeDialog = () => {
-    setDialog(null);
-    dialogTriggerRef.current?.focus();
-    dialogTriggerRef.current = null;
-  };
-
-  const closeProfileDialog = () => {
-    setProfileDialog(null);
-    dialogTriggerRef.current?.focus();
-    dialogTriggerRef.current = null;
   };
 
   const refreshMembers = () => actions.refreshMembers();
@@ -223,42 +198,6 @@ export default function HostMembers({
     }
   };
 
-  const submitProfile = async (member: HostMemberListItem, displayName: string) => {
-    if (isMembershipPending(member.membershipId, pendingActionsRef.current)) {
-      return;
-    }
-
-    const key = actionKey(member, "profile");
-    setActionPending(key, true);
-    setMessage(null);
-
-    try {
-      const updatedMember = await actions.submitProfile(member.membershipId, displayName);
-      setMembers((current) =>
-        current.map((item) => (item.membershipId === updatedMember.membershipId ? updatedMember : item)),
-      );
-      setMessage({ kind: "status", text: "이름을 저장했습니다." });
-    } catch (error) {
-      if (isTransitionOwnerObsoleteError(error)) return;
-      const failure = error instanceof HostMemberProfileActionError
-        ? new Error(hostProfileErrorMessage(error.status, error.code), { cause: error })
-        : error;
-      throw new Error(profileFailureMessage(failure), { cause: error });
-    } finally {
-      setActionPending(key, false);
-    }
-  };
-
-  const confirmDialog = async () => {
-    if (!dialog) {
-      return;
-    }
-
-    const path = dialog.action === "suspend" ? "/suspend" : "/deactivate";
-    await submitLifecycle(dialog.member, path, { currentSessionPolicy: dialogPolicy });
-    closeDialog();
-  };
-
   const handleStatusFilterChange = (nextFilter: HostPeopleStatusFilter) => {
     setStatusFilter(nextFilter);
   };
@@ -330,26 +269,6 @@ export default function HostMembers({
         <LinkComponent to={settingsHref} className="rm-host-people__settings-link">
           초대와 설정 열기 ›
         </LinkComponent>
-
-        {dialog ? (
-          <LifecyclePolicyDialog
-            dialog={dialog}
-            policy={dialogPolicy}
-            submitting={pendingActions.has(actionKey(dialog.member, dialog.action === "suspend" ? "/suspend" : "/deactivate"))}
-            onPolicyChange={setDialogPolicy}
-            onClose={closeDialog}
-            onConfirm={() => void confirmDialog()}
-          />
-        ) : null}
-
-        {profileDialog ? (
-          <HostMemberProfileDialog
-            member={profileDialog.member}
-            submitting={pendingActions.has(actionKey(profileDialog.member, "profile"))}
-            onClose={closeProfileDialog}
-            onSubmit={(displayName) => submitProfile(profileDialog.member, displayName)}
-          />
-        ) : null}
       </div>
     </HostPeoplePage>
   );

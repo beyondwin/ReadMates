@@ -66,7 +66,20 @@ describe("MemberPendingZone", () => {
 
     const zone = screen.getByRole("region", { name: "가입 승인 대기" });
     expect(zone).toHaveClass("rm-member-ledger__pending");
+    const primaryReview = within(zone).getByRole("button", { name: "가입 승인 검토" });
+    expect(primaryReview.parentElement).toBe(zone);
+    expect(zone.querySelector(".rm-member-ledger__pending-list")?.contains(primaryReview)).toBe(false);
     expect(document.querySelectorAll(".rm-member-ledger__pending-row")).toHaveLength(2);
+    const firstRow = within(zone).getByText("둘").closest("li") as HTMLElement;
+    expect(firstRow.querySelector(".rm-host-pending__identity")).toBeNull();
+    expect([...firstRow.children].map((node) => node.className)).toEqual([
+      expect.stringContaining("rm-avatar-chip"),
+      "rm-host-pending__name",
+      "rm-member-ledger__pending-path",
+      expect.stringContaining("rm-host-pending__time"),
+      "rm-member-ledger__pending-actions",
+    ]);
+    expect(firstRow.querySelector(".rm-member-ledger__pending-path")).toHaveTextContent("—");
     expect(within(zone).getByText("승인과 거절은 결과 안내를 포함해요.")).toBeInTheDocument();
     expect(within(zone).getByRole("button", { name: "가입 승인 검토" })).toBeEnabled();
     expect(within(zone).getAllByRole("button", { name: "검토" })).toHaveLength(2);
@@ -76,7 +89,6 @@ describe("MemberPendingZone", () => {
     await user.click(within(zone).getByRole("button", { name: "가입 승인 검토" }));
     expect(onReview).toHaveBeenCalledWith("membership-viewer");
 
-    const firstRow = within(zone).getByText("둘").closest("li") as HTMLElement;
     const secondRow = within(zone).getByText("두번째 둘러보기").closest("li") as HTMLElement;
     expect(within(firstRow).getByRole("button", { name: "승인" })).toBeEnabled();
     expect(within(firstRow).getByRole("button", { name: "거절" })).toBeEnabled();

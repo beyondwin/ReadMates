@@ -467,14 +467,16 @@
 @media (max-width: 640px) {
   .rm-host-people__header,
   .rm-host-people__tools,
-  .rm-host-pending__header {
+  .rm-host-pending__header,
+  .rm-member-ledger__pending {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
   }
 
   .rm-host-people__search input,
   .rm-host-people__filters,
-  .rm-host-pending__header .btn {
+  .rm-host-pending__header .btn,
+  .rm-member-ledger__pending > .btn {
     width: 100%;
   }
 }
@@ -528,12 +530,15 @@
   border-bottom: 1px solid var(--line);
 }
 
+.rm-member-ledger__pending-main {
+  min-width: 0;
+}
+
 .rm-member-ledger__pending-head {
-  display: contents;
+  margin-bottom: 8px;
 }
 
 .rm-member-ledger__pending-list {
-  grid-column: 1 / -1;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -541,7 +546,7 @@
 
 .rm-member-ledger__pending-row {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
+  grid-template-columns: 44px minmax(0, 1fr) auto auto auto;
   column-gap: 16px;
   align-items: center;
   min-height: 56px;
@@ -551,6 +556,13 @@
 .rm-member-ledger__pending-path {
   color: var(--text-3);
   font-size: 14px;
+}
+
+.rm-member-ledger__pending-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: end;
 }
 
 .rm-member-ledger__review {
