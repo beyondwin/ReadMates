@@ -847,7 +847,7 @@ describe("HostDashboardRoute", () => {
     }));
 
     expect(await screen.findByRole("group", { name: "현재 모임" })).toBeVisible();
-    expect(screen.getByRole("region", { name: "작업함" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "호스트 작업함" })).toBeVisible();
     await userEvent.click(screen.getByRole("button", { name: "알림 상태 다시 불러오기" }));
 
     await waitFor(() => expect(routeMocks.retryNotificationHealth).toHaveBeenCalledTimes(1));
@@ -998,7 +998,8 @@ describe("HostDashboardRoute", () => {
     const user = userEvent.setup();
     const { router } = renderRoute("/clubs/reading-sai/app/host?phase=prep");
 
-    const workbox = await screen.findByRole("region", { name: "작업함" });
+    const workbox = await screen.findByRole("region", { name: "호스트 작업함" });
+    expect(within(workbox).getByRole("tab", { name: /지금 12/ })).toBeVisible();
     expect(within(workbox).getAllByRole("listitem")).toHaveLength(4);
     await user.click(within(workbox).getByRole("button", { name: "작업함 모두 보기" }));
     await waitFor(() => expect(router.state.location.search).toBe("?phase=prep&workbox=all"));
@@ -1020,7 +1021,7 @@ describe("HostDashboardRoute", () => {
     routeMocks.workboxPages.set("NOW:root", workboxPageWithItems(12));
     renderRoute("/clubs/reading-sai/app/host?phase=prep");
 
-    const workbox = await screen.findByRole("region", { name: "작업함" });
+    const workbox = await screen.findByRole("region", { name: "호스트 작업함" });
     expect(within(workbox).getAllByRole("listitem")).toHaveLength(3);
     expect(within(workbox).getByRole("button", { name: "작업함 모두 보기" })).toBeVisible();
   });
@@ -1030,7 +1031,7 @@ describe("HostDashboardRoute", () => {
     const user = userEvent.setup();
     const { router } = renderRoute("/clubs/reading-sai/app/host?phase=live");
 
-    const workbox = await screen.findByRole("region", { name: "작업함" });
+    const workbox = await screen.findByRole("region", { name: "호스트 작업함" });
     await user.click(within(workbox).getByRole("button", { name: "작업함 모두 보기" }));
     await waitFor(() => expect(router.state.location.search).toBe("?phase=live&workbox=all"));
   });
@@ -1051,7 +1052,7 @@ describe("HostDashboardRoute", () => {
     const summary = await screen.findByRole("region", { name: "일부 운영 정보 불러오기 실패" });
     expect(summary).toHaveTextContent("지난 모임 기록 마감 정보를 불러오지 못했어요.");
     expect(within(summary).getByRole("button", { name: "지난 모임 기록 마감 다시 불러오기" })).toBeVisible();
-    const workbox = screen.getByRole("region", { name: "작업함" });
+    const workbox = screen.getByRole("region", { name: "호스트 작업함" });
     expect(within(workbox).queryByRole("alert")).not.toBeInTheDocument();
   });
 });

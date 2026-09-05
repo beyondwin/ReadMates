@@ -153,7 +153,7 @@ test("approved host route requests carry clubSlug=visual-authority", async ({ pa
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(HOST_DASHBOARD_PATH, { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("region", { name: "작업함" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "호스트 작업함" })).toBeVisible();
   expect(hostRequests.length).toBeGreaterThan(0);
   for (const url of hostRequests) {
     expect(url.searchParams.get("clubSlug"), url.pathname).toBe(HOST_APPROVED_CLUB.clubSlug);
@@ -292,6 +292,6 @@ test("host data is not requested before authorization completes", async ({ page 
   await authStarted;
   expect(hostBeforeAuth).toEqual([]);
   releaseAuth();
-  await expect(page.getByRole("region", { name: "작업함" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "호스트 작업함" })).toBeVisible();
   requestAudit.assertNoUnmatchedOrEffecting();
 });

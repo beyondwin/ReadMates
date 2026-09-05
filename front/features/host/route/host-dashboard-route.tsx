@@ -728,6 +728,7 @@ export function HostDashboardRoute({
       pendingKey={workboxPendingKey}
       rowError={workboxRowError}
       showPartialWarnings={false}
+      title="호스트 작업함"
       footerNote={workboxFooterText
         ? { text: workboxFooterText, historyHref: headerLinks?.historyHref ?? paths.hostBasePath }
         : null}

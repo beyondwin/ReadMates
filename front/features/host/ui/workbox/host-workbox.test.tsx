@@ -205,6 +205,33 @@ describe("HostWorkbox", () => {
     expect(history.querySelector('[data-icon="chevron-right"]')).toBeTruthy();
   });
 
+  it("renders rail title, underline tabs with full counts, capped rows, and a footer note", () => {
+    const items = Array.from({ length: 12 }, (_, index): HostWorkboxItemView => ({
+      ...page.items[0],
+      key: `SCHEDULE_UNSEEN:resource-${index}:g1`,
+      title: `작업 ${index + 1}`,
+      count: index + 1,
+      countLabel: String(index + 1),
+      destinationHref: `/app/host/destination/${index}`,
+    }));
+    const view: HostWorkboxView = { ...page, items, partialWarnings: [], nextCursor: null };
+    renderWorkbox({
+      view,
+      disclosure: {
+        visibleItems: items.slice(0, 4),
+        hiddenCount: 8,
+        hasMore: true,
+        expanded: false,
+      },
+      footerNote: { text: "어제 19:30 자동 리마인드 전달됨", historyHref: "/h" },
+    });
+    expect(screen.getByRole("heading", { name: "호스트 작업함" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /지금 12/ })).toBeTruthy();
+    expect(screen.getAllByRole("listitem")).toHaveLength(4);
+    expect(screen.getByRole("link", { name: "변경 이력" })).toBeTruthy();
+    expect(screen.getByText("어제 19:30 자동 리마인드 전달됨").parentElement?.querySelector('[data-icon="clock"]')).toBeTruthy();
+  });
+
   it("renders only disclosure.visibleItems and exposes 작업함 모두 보기 until expanded", async () => {
     const items = Array.from({ length: 12 }, (_, index): HostWorkboxItemView => ({
       ...page.items[0],

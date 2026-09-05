@@ -8,10 +8,11 @@
 
 .rm-host-operating-room__body {
   display: grid;
-  grid-template-columns: minmax(0, 68fr) minmax(300px, 32fr);
-  width: min(100%, 1180px);
+  grid-template-columns: minmax(0, 62fr) minmax(360px, 38fr);
+  width: 100%;
+  max-width: none;
   margin-inline: auto;
-  border-inline: 1px solid var(--line-soft);
+  border-inline: 0;
 }
 
 .rm-host-operating-room__primary,
@@ -21,7 +22,7 @@
 
 .rm-host-operating-room__workbox-rail {
   border-inline-start: 1px solid var(--line);
-  background: var(--bg-sub);
+  background: transparent;
 }
 
 .rm-host-operating-room__body--empty .rm-host-operating-room__empty {
@@ -37,8 +38,8 @@
   align-items: end;
   justify-content: space-between;
   gap: var(--space-sm);
-  padding: var(--space-lg) var(--space-lg) var(--space-md);
-  border-bottom: 1px solid var(--line-soft);
+  padding: 28px 24px 0;
+  border: 0;
 }
 
 .rm-host-workbox__header h2,
@@ -50,7 +51,7 @@
 }
 
 .rm-host-workbox__header h2 {
-  font-size: var(--type-size-body-emphasis);
+  font-size: 20px;
   font-weight: 700;
 }
 
@@ -61,41 +62,30 @@
 }
 
 .rm-host-workbox__tabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  gap: 8px;
+  padding: 16px 24px 0;
   border-bottom: 1px solid var(--line);
 }
 
-.rm-host-workbox__tabs button {
+.rm-host-workbox__tabs [role="tab"] {
   position: relative;
   min-width: 0;
-  min-height: 46px;
-  padding: var(--space-xs);
+  min-height: 44px;
+  padding: 8px 20px 14px;
   border: 0;
   background: transparent;
-  color: var(--text-3);
+  color: var(--text-2);
   font: inherit;
-  font-size: var(--type-size-control);
+  font-size: 17px;
+  font-weight: 500;
   cursor: pointer;
 }
 
-.rm-host-workbox__tabs button + button {
-  border-inline-start: 1px solid var(--line-soft);
-}
-
-.rm-host-workbox__tabs button[aria-selected="true"] {
-  background: var(--bg);
+.rm-host-workbox__tabs [role="tab"][aria-selected="true"] {
   color: var(--accent);
   font-weight: 700;
-}
-
-.rm-host-workbox__tabs button[aria-selected="true"]::after {
-  position: absolute;
-  inset-inline: var(--space-sm);
-  inset-block-end: -1px;
-  height: 2px;
-  background: var(--accent);
-  content: "";
+  box-shadow: inset 0 -3px 0 var(--accent);
 }
 
 .rm-host-workbox__tabs button:focus-visible,
@@ -139,8 +129,7 @@
 
 .rm-host-workbox__partial button,
 .rm-host-workbox__error button,
-.rm-host-workbox__load-more,
-.rm-host-workbox__show-all {
+.rm-host-workbox__load-more {
   min-height: 44px;
   border: 1px solid var(--accent-line);
   border-radius: var(--r-2);
@@ -164,8 +153,16 @@
 }
 
 .rm-host-workbox__show-all {
-  justify-self: start;
-  padding-inline: var(--space-sm);
+  display: block;
+  margin: 16px auto 0;
+  min-height: 44px;
+  padding: 0;
+  color: var(--accent);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .rm-host-workbox__items {

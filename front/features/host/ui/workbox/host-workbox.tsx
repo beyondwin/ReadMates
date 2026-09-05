@@ -37,6 +37,7 @@ export type HostWorkboxProps = {
   rowError?: { key: string; message: string } | null;
   showPartialWarnings?: boolean;
   footerNote?: HostWorkboxFooterNote | null;
+  title?: string;
   onStateChange: (state: HostWorkboxState) => void;
   onRetry: () => void;
   onLoadMore: (cursor: string) => void;
@@ -56,6 +57,7 @@ export function HostWorkbox({
   rowError = null,
   showPartialWarnings = true,
   footerNote = null,
+  title = "호스트 작업함",
   onStateChange,
   onRetry,
   onLoadMore,
@@ -95,7 +97,7 @@ export function HostWorkbox({
     <section className="rm-host-workbox" aria-labelledby="host-workbox-title">
       <header className="rm-host-workbox__header">
         <div>
-          <h2 id="host-workbox-title">작업함</h2>
+          <h2 id="host-workbox-title">{title}</h2>
           <p>모임 밖에서도 이어지는 운영 작업</p>
         </div>
       </header>

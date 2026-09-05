@@ -868,7 +868,7 @@ test("prep locks the approved desktop operating room", async ({ mount, page }) =
   await expect(headerActions.locator("svg[data-icon='history']")).toBeVisible();
   await expect(headerActions.locator("svg[data-icon='eye']")).toHaveCount(0);
   await expect(headerActions).not.toContainText("멤버 시야");
-  const workboxTitle = workbox.getByRole("heading", { name: "작업함" });
+  const workboxTitle = workbox.getByRole("heading", { name: "호스트 작업함" });
   await expect(workboxTitle).toBeVisible();
   expect(await workboxTitle.evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize))).toBeGreaterThan(10);
   expect(await workboxTitle.evaluate((node) => getComputedStyle(node, "::after").content)).toBe("none");
