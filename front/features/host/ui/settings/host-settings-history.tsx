@@ -74,7 +74,7 @@ export function HostSettingsHistory({
             <li key={item.historyId} className="surface stack">
               <div className="cluster">
                 <strong>{actionLabels[item.action]}</strong>
-                <span className="small muted">revision {item.revision} · {new Date(item.occurredAt).toLocaleString("ko-KR")}</span>
+                <span className="small muted">{new Date(item.occurredAt).toLocaleString("ko-KR")}</span>
               </div>
               {[...allowedEntries(item.beforeSettings), ...allowedEntries(item.afterSettings)].length > 0 ? (
                 <dl>

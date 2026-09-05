@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import type { HostInvitationLinkView } from "@/features/host/model/host-settings-model";
+import { ReadmatesIcon } from "@/shared/ui/icon";
 
 export type HostInvitationCreateDraft = {
   name: string;
@@ -37,9 +38,15 @@ type Props = {
   onRetryCommand: () => void;
   onCopySharePath: () => void;
   now?: Date;
+  createOpen?: boolean;
+  onCreateOpenChange?: (open: boolean) => void;
+  showCreateTrigger?: boolean;
+  createTriggerRef?: RefObject<HTMLButtonElement | null>;
+  lastEventLabel?: string | null;
 };
 
 type InvitationPresentationStatus = "활성" | "만료 예정" | "중지" | "소진" | "만료";
+type InvitationTab = "활성" | "만료 예정" | "중지";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -76,6 +83,11 @@ function managementActions(status: InvitationPresentationStatus): ReadonlyArray<
   return ["이력"];
 }
 
+function matchesTab(status: InvitationPresentationStatus, tab: InvitationTab) {
+  if (tab === "중지") return status === "중지" || status === "만료" || status === "소진";
+  return status === tab;
+}
+
 export function HostInvitationLinks({
   links,
   loading,
@@ -96,10 +108,18 @@ export function HostInvitationLinks({
   onRetryCommand,
   onCopySharePath,
   now = new Date(),
+  createOpen: createOpenProp,
+  onCreateOpenChange,
+  showCreateTrigger = true,
+  createTriggerRef,
+  lastEventLabel = null,
 }: Props) {
-  const [createOpen, setCreateOpen] = useState(Boolean(createDraft.name.trim()));
-  const [statusFilter, setStatusFilter] = useState<InvitationPresentationStatus>("활성");
-  const createTriggerRef = useRef<HTMLButtonElement>(null);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(Boolean(createDraft.name.trim()));
+  const [statusFilter, setStatusFilter] = useState<InvitationTab>("활성");
+  const internalTriggerRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = createTriggerRef ?? internalTriggerRef;
+  const createOpen = createOpenProp ?? uncontrolledOpen;
+  const setCreateOpen = onCreateOpenChange ?? setUncontrolledOpen;
   const presented = links.map((item) => {
     const status = invitationPresentationStatus(item, now);
     return { item, status, expiry: expiryLabel(item, now, status) };
@@ -109,7 +129,7 @@ export function HostInvitationLinks({
     "만료 예정": presented.filter((row) => row.status === "만료 예정").length,
     중지: presented.filter((row) => row.status === "중지").length,
   } as const;
-  const visibleRows = presented;
+  const visibleRows = presented.filter((row) => matchesTab(row.status, statusFilter));
 
   function submitCreate(event: FormEvent) {
     event.preventDefault();
@@ -122,27 +142,29 @@ export function HostInvitationLinks({
       if (event.key !== "Escape") return;
       event.preventDefault();
       setCreateOpen(false);
-      createTriggerRef.current?.focus();
+      triggerRef.current?.focus();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [createOpen]);
+  }, [createOpen, setCreateOpen, triggerRef]);
 
   return (
-    <section className="stack rm-host-editorial-ledger__panel" aria-labelledby="named-links-title">
+    <section className="rm-host-invitations" aria-labelledby="named-links-title">
       <div>
         <h2 id="named-links-title">초대 링크</h2>
         <p className="small muted">링크 이름은 호스트만 볼 수 있어요.</p>
       </div>
-      <button
-        ref={createTriggerRef}
-        className="btn btn-primary"
-        type="button"
-        aria-expanded={createOpen}
-        onClick={() => setCreateOpen((open) => !open)}
-      >
-        새 초대 링크
-      </button>
+      {showCreateTrigger ? (
+        <button
+          ref={triggerRef}
+          className="btn btn-primary"
+          type="button"
+          aria-expanded={createOpen}
+          onClick={() => setCreateOpen(!createOpen)}
+        >
+          새 초대 링크
+        </button>
+      ) : null}
       {createOpen ? (
         <form className="cluster" onSubmit={submitCreate}>
           <label>링크 이름<input value={createDraft.name} maxLength={120} required onChange={(event) => onCreateDraftChange({ ...createDraft, name: event.target.value })} /></label>
@@ -159,7 +181,7 @@ export function HostInvitationLinks({
       {!loading && !error && links.length === 0 ? <p className="muted">아직 만든 링크가 없습니다.</p> : null}
       {!loading && !error && links.length > 0 ? (
         <>
-          <div className="rm-host-editorial-ledger__filters" role="tablist" aria-label="초대 링크 상태">
+          <div className="rm-host-invitations__tabs" role="tablist" aria-label="초대 링크 상태">
             {([
               { id: "활성", label: "활성", count: counts.활성 },
               { id: "만료 예정", label: "만료 예정", count: counts["만료 예정"] },
@@ -173,7 +195,6 @@ export function HostInvitationLinks({
                   role="tab"
                   aria-selected={selected}
                   aria-label={`${chip.label} ${chip.count}`}
-                  className={`rm-host-editorial-ledger__filter${selected ? " is-selected" : ""}`}
                   onClick={() => setStatusFilter(chip.id)}
                 >
                   {chip.label} {chip.count}
@@ -204,14 +225,13 @@ export function HostInvitationLinks({
                   <td>{item.usedCount} / {item.maxUses}</td>
                   <td>{expiry}</td>
                   <td>
-                    <div className="cluster">
+                    <div className="rm-host-invitations__manage">
                       {managementActions(status).map((action) => {
                         if (action === "보기" || action === "연장" || action === "이력") {
                           return (
                             <button
                               key={action}
                               type="button"
-                              className="btn-quiet"
                               onClick={() => onEditDraftChange({
                                 linkId: item.linkId,
                                 name: item.name,
@@ -225,14 +245,13 @@ export function HostInvitationLinks({
                         }
                         if (action === "복사") {
                           return sharePath ? (
-                            <button key={action} type="button" className="btn-quiet" onClick={onCopySharePath}>복사</button>
+                            <button key={action} type="button" onClick={onCopySharePath}>복사</button>
                           ) : null;
                         }
                         return (
                           <button
                             key={action}
                             type="button"
-                            className="btn-quiet"
                             onClick={() => onToggle(item)}
                           >
                             {item.status === "ACTIVE" ? "중지" : "다시 시작"}
@@ -254,9 +273,20 @@ export function HostInvitationLinks({
               ))}
             </tbody>
           </table>
-          <button type="button" className="btn-quiet" onClick={() => setStatusFilter("중지")}>
+          <a
+            className="rm-host-invitations__archived"
+            href="#archived-links"
+            onClick={(event) => {
+              event.preventDefault();
+              setStatusFilter("중지");
+            }}
+          >
             만료·중지된 링크 보기
-          </button>
+          </a>
+          <p className="rm-host-invitations__event">
+            <ReadmatesIcon name="clock" size={16} />
+            {lastEventLabel ?? "—"}
+          </p>
         </>
       ) : null}
     </section>

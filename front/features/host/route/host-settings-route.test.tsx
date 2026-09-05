@@ -238,7 +238,7 @@ describe("HostSettingsRoute transition ownership", () => {
 
     await userEvent.clear(clubName);
     await userEvent.type(clubName, updated.name);
-    await userEvent.click(screen.getByRole("button", { name: "설정 저장" }));
+    await userEvent.click(screen.getByRole("button", { name: "적용" }));
 
     await waitFor(() => expect(updateHostClubSettings).toHaveBeenCalledTimes(1));
     expect(updateHostClubSettings).toHaveBeenCalledWith(expect.objectContaining({
@@ -246,7 +246,7 @@ describe("HostSettingsRoute transition ownership", () => {
       expectedRevision: 3,
       idempotencyKey: expect.any(String),
     }), { clubSlug: "reading-sai" });
-    expect(await screen.findByText("revision 4")).toBeVisible();
+    expect(document.querySelector("[data-revision='4']")).toBeTruthy();
     expect(screen.getByLabelText("클럽 이름")).toHaveValue(updated.name);
   });
 
@@ -260,10 +260,10 @@ describe("HostSettingsRoute transition ownership", () => {
 
     await userEvent.clear(clubName);
     await userEvent.type(clubName, "충돌한 로컬 이름");
-    await userEvent.click(screen.getByRole("button", { name: "설정 저장" }));
+    await userEvent.click(screen.getByRole("button", { name: "적용" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("다른 운영자가 먼저 변경했습니다");
-    expect(screen.getByText("revision 4")).toBeVisible();
+    expect(await screen.findByText("다른 운영자가 저장한 이름")).toBeVisible();
     expect(screen.getByLabelText("클럽 이름")).toHaveValue(latest.name);
     expect(updateHostClubSettings).toHaveBeenCalledTimes(1);
   });
@@ -292,6 +292,7 @@ describe("HostSettingsRoute transition ownership", () => {
   it("publishes a structured co-host rejection without retaining a retry identity", async () => {
     vi.mocked(changeHostCoHost).mockRejectedValue(apiError("LAST_ACTIVE_HOST_REQUIRED", 409));
     renderRoute(createGlobalSpaceTransitionCoordinator());
+    await userEvent.click(await screen.findByRole("button", { name: "관리" }));
     const action = await screen.findByRole("button", { name: "은하 공동 호스트 지정" });
 
     await userEvent.click(action);
@@ -308,9 +309,9 @@ describe("HostSettingsRoute transition ownership", () => {
       .mockRejectedValueOnce(apiError("HOST_SETTINGS_STALE", 409))
       .mockResolvedValueOnce({ receiptId: "close-r-2", status: "ARCHIVED", revision: 5, replayed: false });
     renderRoute(createGlobalSpaceTransitionCoordinator());
-    await screen.findByRole("heading", { name: "클럽 운영 종료" });
+    await screen.findByRole("button", { name: "클럽 운영 종료" });
 
-    await userEvent.click(screen.getByRole("button", { name: "종료 검토" }));
+    await userEvent.click(screen.getByRole("button", { name: "클럽 운영 종료" }));
     await userEvent.click(screen.getByRole("button", { name: "종료 영향 미리보기" }));
     await userEvent.click(await screen.findByRole("button", { name: "클럽 운영 종료 확인" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("미리보기가 더 이상 유효하지 않습니다");
@@ -329,9 +330,9 @@ describe("HostSettingsRoute transition ownership", () => {
   it("keeps close-preview failure route-owned and retries without bypassing the dialog", async () => {
     vi.mocked(previewHostClubClose).mockRejectedValueOnce(new Error("preview unavailable")).mockResolvedValueOnce(previewOne);
     renderRoute(createGlobalSpaceTransitionCoordinator());
-    await screen.findByRole("heading", { name: "클럽 운영 종료" });
+    await screen.findByRole("button", { name: "클럽 운영 종료" });
 
-    await userEvent.click(screen.getByRole("button", { name: "종료 검토" }));
+    await userEvent.click(screen.getByRole("button", { name: "클럽 운영 종료" }));
     await userEvent.click(screen.getByRole("button", { name: "종료 영향 미리보기" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("종료 영향을 불러오지 못했습니다");
     await userEvent.click(screen.getByRole("button", { name: "미리보기 다시 시도" }));
@@ -409,7 +410,7 @@ describe("HostSettingsRoute transition ownership", () => {
     await userEvent.click(screen.getByRole("button", { name: "링크 편집 취소" }));
     await waitFor(() => expect(coordinator.getSnapshot()).toEqual({ kind: "clean" }));
 
-    await userEvent.click(screen.getByRole("button", { name: "종료 검토" }));
+    await userEvent.click(screen.getByRole("button", { name: "클럽 운영 종료" }));
     expect(coordinator.getSnapshot()).toMatchObject({ kind: "dirty" });
     await userEvent.click(screen.getByRole("button", { name: "취소" }));
     await waitFor(() => expect(coordinator.getSnapshot()).toEqual({ kind: "clean" }));

@@ -1,0 +1,249 @@
+.rm-host-settings-page {
+  padding: 32px 32px 40px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 560px;
+  column-gap: 48px;
+}
+
+.rm-host-settings__header {
+  grid-column: 1 / -1;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rm-host-settings-page h1.rm-host-editorial-ledger__heading,
+.rm-host-settings-page .rm-host-editorial-ledger__heading {
+  margin: 4px 0;
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 41.4px;
+}
+
+.rm-host-settings__header .rm-host-editorial-ledger__lede {
+  margin: 8px 0 0;
+  color: var(--text-2);
+}
+
+.rm-host-settings__header .btn-primary {
+  margin-top: 20px;
+  min-height: 52px;
+  padding: 0 24px;
+}
+
+.rm-host-settings-layout {
+  display: contents;
+}
+
+.rm-host-settings-layout > * {
+  min-width: 0;
+}
+
+.rm-host-invitations h2,
+.rm-host-settings h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 26px;
+}
+
+.rm-host-invitations > p,
+.rm-host-settings > p {
+  margin: 8px 0 0;
+  color: var(--text-2);
+}
+
+.rm-host-invitations__tabs {
+  display: flex;
+  gap: 40px;
+  border-bottom: 1px solid var(--line);
+  margin-top: 20px;
+}
+
+.rm-host-invitations__tabs [role="tab"] {
+  display: inline-flex;
+  gap: 10px;
+  padding: 0 4px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 17px;
+  cursor: pointer;
+}
+
+.rm-host-invitations__tabs [role="tab"][aria-selected="true"] {
+  color: var(--accent);
+  font-weight: 700;
+  box-shadow: inset 0 -3px 0 var(--accent);
+}
+
+.rm-host-invitations table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.rm-host-invitations table th {
+  padding: 8px 12px 8px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-4);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+}
+
+.rm-host-invitations table td {
+  padding: 20px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: middle;
+  font-size: 14px;
+}
+
+.rm-host-invitations table td:first-child,
+.rm-host-invitations table th:first-child {
+  padding-left: 0;
+}
+
+.rm-host-invite-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rm-host-invite-status__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.rm-host-invite-status[data-status="활성"] {
+  color: var(--ok, #27764d);
+}
+
+.rm-host-invite-status[data-status="만료 예정"] {
+  color: var(--warn, var(--warning, #b45309));
+}
+
+.rm-host-invite-status[data-status="중지"],
+.rm-host-invite-status[data-status="만료"],
+.rm-host-invite-status[data-status="소진"] {
+  color: var(--danger, #b42318);
+}
+
+.rm-host-invitations__manage {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.rm-host-invitations__manage a,
+.rm-host-invitations__manage button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rm-host-invitations__manage a + a::before,
+.rm-host-invitations__manage button + button::before {
+  content: "|";
+  margin: 0 12px;
+  color: var(--line);
+}
+
+.rm-host-invitations__archived {
+  display: inline-block;
+  margin-top: 16px;
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.rm-host-invitations__event {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 0;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.rm-host-settings h3 {
+  margin: 28px 0 0;
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.rm-host-settings dl {
+  margin: 8px 0 0;
+}
+
+.rm-host-settings dl div {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 56px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.rm-host-settings dt {
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.rm-host-settings dd {
+  margin: 0;
+}
+
+.rm-host-settings dl a,
+.rm-host-settings dl button.rm-host-settings__edit {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rm-host-settings__editor {
+  grid-template-columns: minmax(0, 1fr) !important;
+  padding: 8px 0 16px;
+}
+
+.rm-host-settings__end {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px;
+  align-items: center;
+  width: 100%;
+  margin-top: 8px;
+  padding: 24px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: var(--danger);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.rm-host-settings__end p {
+  margin: 4px 0 0;
+  color: var(--text-2);
+  font-weight: 400;
+  font-size: 14px;
+}
+
+@media (max-width: 960px) {
+  .rm-host-settings-page {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 24px 20px 32px;
+  }
+}

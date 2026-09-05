@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type {
   HostClosePreviewView as HostClubClosePreview,
@@ -11,9 +11,13 @@ import { HostClubCloseDialog } from "./host-club-close-dialog";
 import { HostClubSettings } from "./host-club-settings";
 import { HostCoHostManagement } from "./host-co-host-management";
 import { HostInvitationLinks, type HostInvitationCreateDraft } from "./host-invitation-links";
+import { HostSettingsColumns, HostSettingsPage } from "./host-settings-page";
 import { HostSettingsHistory } from "./host-settings-history";
 
+const now = new Date("2026-09-02T11:04:00+09:00");
 const link: HostInvitationLink = { linkId: "link-1", name: "가을 신규 멤버", status: "ACTIVE", maxUses: 4, usedCount: 1, expiresAt: "2026-09-30T00:00:00Z", revision: 2, createdAt: "2026-08-30T00:00:00Z", updatedAt: "2026-08-30T00:00:00Z" };
+const expiringLink: HostInvitationLink = { ...link, linkId: "link-expiring", name: "여름 모임", expiresAt: "2026-09-04T23:59:59Z" };
+const pausedLink: HostInvitationLink = { ...link, linkId: "link-paused", name: "테스트 링크", status: "PAUSED" };
 const settings: Settings = { clubId: "club-1", clubSlug: "reading-sai", name: "읽는사이", approvalPolicy: "INVITE_ONLY", defaultTimezone: "Asia/Seoul", scheduleReminderEnabled: true, recordPublicationDefault: "MEMBER", revision: 3, status: "ACTIVE" };
 const preview: HostClubClosePreview = { previewId: "preview-1", clubId: "club-1", actorMembershipId: "member-1", clubRevision: 3, effectHash: "a".repeat(64), effects: { clubStatus: "ARCHIVED", memberAccess: "ENDED", publicRecords: "UNCHANGED" }, expiresAt: "2026-08-30T01:00:00Z" };
 
@@ -41,7 +45,77 @@ function InvitationHarness({ onCreate = vi.fn(), onCopy = vi.fn() }: { onCreate?
   />;
 }
 
+function invitationProps(overrides: Partial<ComponentProps<typeof HostInvitationLinks>> = {}) {
+  return {
+    links: [link],
+    loading: false,
+    error: null,
+    busy: false,
+    createDraft: { name: "", maxUses: "20", expiresAt: "2026-09-30" } satisfies HostInvitationCreateDraft,
+    editDraft: null,
+    sharePath: null,
+    message: null,
+    alert: null,
+    onRetry: vi.fn(),
+    onRefresh: vi.fn(),
+    onCreateDraftChange: vi.fn(),
+    onEditDraftChange: vi.fn(),
+    onCreate: vi.fn(),
+    onUpdate: vi.fn(),
+    onToggle: vi.fn(),
+    onRetryCommand: vi.fn(),
+    onCopySharePath: vi.fn(),
+    now,
+    ...overrides,
+  };
+}
+
 describe("host settings presentation controls", () => {
+  it("puts the create CTA in the page header, underline link tabs, and a club-end row", () => {
+    render(
+      <HostSettingsPage createCta={<button className="btn btn-primary" type="button">새 초대 링크</button>}>
+        <HostSettingsColumns
+          invitations={<HostInvitationLinks {...invitationProps({ links: [link, expiringLink, pausedLink], showCreateTrigger: false })} />}
+          clubSettings={(
+            <HostClubSettings
+              settings={settings}
+              draft={settings}
+              saving={false}
+              stale={false}
+              error={null}
+              onDraftChange={vi.fn()}
+              onSave={vi.fn()}
+              onCloseReview={vi.fn()}
+            />
+          )}
+        />
+      </HostSettingsPage>,
+    );
+
+    expect(document.querySelector(".rm-host-settings__header .btn-primary")).toHaveTextContent("새 초대 링크");
+    expect(screen.getAllByRole("button", { name: "새 초대 링크" })).toHaveLength(1);
+    expect(screen.getAllByRole("tab")).toHaveLength(3);
+    expect(document.querySelector(".rm-host-invitations__tabs")).toBeTruthy();
+    expect(document.querySelector(".rm-host-settings__end")).toHaveTextContent("클럽 운영 종료");
+    expect(screen.queryByText(/revision/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: "설정 저장" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "종료 검토" })).toBeNull();
+    expect(screen.queryByText("세부 조작")).toBeNull();
+    expect(screen.queryByText(/오늘 11:04/)).toBeNull();
+    expect(screen.getByRole("tab", { name: "활성 1" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "만료 예정 1" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "중지 1" })).toBeInTheDocument();
+  });
+
+  it("filters invitation rows to the selected tab instead of showing every link", async () => {
+    render(<HostInvitationLinks {...invitationProps({ links: [link, expiringLink, pausedLink] })} />);
+    expect(screen.getByText("가을 신규 멤버")).toBeInTheDocument();
+    expect(screen.queryByText("테스트 링크")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "중지 1" }));
+    expect(screen.getByText("테스트 링크")).toBeInTheDocument();
+    expect(screen.queryByText("가을 신규 멤버")).not.toBeInTheDocument();
+  });
+
   it("renders route-owned invitation outcome and emits create/copy callbacks", async () => {
     const onCreate = vi.fn();
     const onCopy = vi.fn();
@@ -82,7 +156,7 @@ describe("host settings presentation controls", () => {
     render(<HostClubSettings settings={settings} draft={settings} saving={false} stale={false} error={null} onDraftChange={onDraftChange} onSave={onSave} />);
     await userEvent.click(screen.getByRole("button", { name: "수정" }));
     fireEvent.change(screen.getByLabelText("클럽 이름"), { target: { value: "읽는사이 새 이름" } });
-    await userEvent.click(screen.getByRole("button", { name: "설정 저장" }));
+    await userEvent.click(screen.getByRole("button", { name: "적용" }));
     expect(onDraftChange).toHaveBeenCalledWith(expect.objectContaining({ name: "읽는사이 새 이름" }));
     expect(onSave).toHaveBeenCalledTimes(1);
   });

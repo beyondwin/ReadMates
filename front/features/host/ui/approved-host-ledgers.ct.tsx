@@ -215,9 +215,9 @@ test("invites and settings match approved desktop", async ({ mount, page }) => {
   await expect(component.getByRole("heading", { name: "초대 링크" })).toBeVisible();
   await expect(component.getByText(/활성|만료 예정|중지/).first()).toBeVisible();
   await expect(component.getByLabel("링크 이름")).toHaveCount(0);
-  const closeHeading = component.getByRole("heading", { name: "클럽 운영 종료" });
-  await expect(closeHeading).toBeVisible();
-  const closeBox = await closeHeading.boundingBox();
+  const closeRow = component.locator(".rm-host-settings__end");
+  await expect(closeRow).toBeVisible();
+  const closeBox = await closeRow.boundingBox();
   expect(closeBox, "클럽 운영 종료 first-viewport").not.toBeNull();
   expect(closeBox!.y).toBeGreaterThanOrEqual(0);
   expect(closeBox!.y + closeBox!.height).toBeLessThanOrEqual(APPROVED_DESKTOP_VIEWPORT.height);

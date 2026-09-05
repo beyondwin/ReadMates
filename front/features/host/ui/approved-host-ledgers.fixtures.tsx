@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   approvedClubSettings,
   approvedInvitationLinks,
@@ -145,10 +145,21 @@ export function hostRecordsApprovedView() {
   );
 }
 
-export function hostSettingsApprovedView() {
-  return hostApprovedShell(
-    "settings",
-    <HostSettingsPage>
+function HostSettingsApprovedComposition() {
+  const [createOpen, setCreateOpen] = useState(false);
+  return (
+    <HostSettingsPage
+      createCta={(
+        <button
+          className="btn btn-primary"
+          type="button"
+          aria-expanded={createOpen}
+          onClick={() => setCreateOpen((open) => !open)}
+        >
+          새 초대 링크
+        </button>
+      )}
+    >
       <HostSettingsColumns
         invitations={(
           <HostInvitationLinks
@@ -171,6 +182,9 @@ export function hostSettingsApprovedView() {
             onRetryCommand={noop}
             onCopySharePath={noop}
             now={new Date("2026-09-02T11:04:00+09:00")}
+            createOpen={createOpen}
+            onCreateOpenChange={setCreateOpen}
+            showCreateTrigger={false}
           />
         )}
         clubSettings={(
@@ -187,8 +201,12 @@ export function hostSettingsApprovedView() {
           />
         )}
       />
-    </HostSettingsPage>,
+    </HostSettingsPage>
   );
+}
+
+export function hostSettingsApprovedView() {
+  return hostApprovedShell("settings", <HostSettingsApprovedComposition />);
 }
 
 export function hostScheduleReviewApprovedView() {

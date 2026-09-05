@@ -21,10 +21,9 @@ export function HostCoHostManagement({
   onRetryCommand: () => void;
 }) {
   return (
-    <section className="surface-quiet stack rm-host-editorial-ledger__panel" aria-labelledby="co-host-title">
+    <section className="surface-quiet stack rm-host-editorial-ledger__panel" aria-labelledby="co-host-title" data-settings-revision={settingsRevision}>
       <div className="cluster">
         <h2 id="co-host-title">공동 호스트 관리</h2>
-        <span className="small muted">settings revision {settingsRevision}</span>
       </div>
       <p className="small muted">현재 멤버 원장의 공개 가능한 신원과 역할만 표시합니다.</p>
       {alert ? (

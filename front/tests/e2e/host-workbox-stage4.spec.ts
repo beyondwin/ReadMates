@@ -722,7 +722,7 @@ test("named links and revisioned settings expose one-time authority while cursor
   const initialHistoryResponse = await initialHistoryResponsePromise;
   const initialHistory = await initialHistoryResponse.json() as { nextCursor: string };
   expect(initialHistory.nextCursor).toBeTruthy();
-  await expect(page.getByText("revision 41", { exact: true }).first()).toBeVisible();
+  await expect(page.locator("[data-revision='41']")).toBeVisible();
 
   await page.getByRole("button", { name: "새 초대 링크" }).click();
   await page.getByLabel("링크 이름").fill("브라우저 합성 공유 링크");
@@ -774,7 +774,7 @@ where id = ${sqlString(created.link.linkId)} and club_id = ${sqlString(CLUB_ID)}
       && url.pathname.endsWith("/api/host/club-settings/history")
       && !url.searchParams.has("cursor");
   });
-  await page.getByRole("button", { name: "설정 저장" }).click();
+  await page.getByRole("button", { name: "적용" }).click();
   const settingsResponse = await settingsResponsePromise;
   expect(settingsResponse.status()).toBe(200);
   expect(settingsResponse.request().postDataJSON()).toMatchObject({
@@ -787,6 +787,7 @@ where id = ${sqlString(created.link.linkId)} and club_id = ${sqlString(CLUB_ID)}
   const historyCursor = historyPage.nextCursor;
   expect(historyCursor).toBeTruthy();
 
+  await page.getByRole("button", { name: "열기" }).click();
   const historyRegion = page.getByRole("region", { name: "설정 변경 이력" });
   const continuationRequest = page.waitForRequest((request) => {
     const url = new URL(request.url());
@@ -814,7 +815,7 @@ where id = ${sqlString(created.link.linkId)} and club_id = ${sqlString(CLUB_ID)}
   await expect(historyRegion.getByRole("alert")).toContainText("보이는 이력은 유지");
   await expect(historyRegion.getByRole("listitem")).toHaveCount(40);
 
-  await page.getByRole("button", { name: "종료 검토" }).click();
+  await page.getByRole("button", { name: "클럽 운영 종료" }).click();
   const previewResponsePromise = page.waitForResponse((response) => (
     response.request().method() === "POST"
       && new URL(response.url()).pathname.endsWith("/api/host/club-settings/end/preview")

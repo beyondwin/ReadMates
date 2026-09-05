@@ -94,8 +94,9 @@ test("surface 13 settings destination at 1440px", async ({ mount, page }) => {
   await page.setViewportSize({ width: 1440, height: 1100 });
   const component = await mount(<HostSettingsDestinationStory />);
   await expect(component.getByRole("heading", { name: "초대 링크" })).toBeVisible();
-  await expect(component.getByRole("region", { name: "기존 이메일 초대 호환" })).toBeVisible();
-  await expect(component.getByText("settings revision 7", { exact: true })).toBeVisible();
+  await expect(component.getByRole("button", { name: "클럽 운영 종료" })).toBeVisible();
+  await expect(component.getByText("settings revision 7")).toHaveCount(0);
+  await expect(component.getByRole("heading", { name: "공동 호스트 관리" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await expectReducedMotion(page);
 });

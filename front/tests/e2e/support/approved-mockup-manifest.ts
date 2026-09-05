@@ -181,6 +181,8 @@ const HOST_RECORDS_DEPENDENCIES = [
 const HOST_SETTINGS_DEPENDENCIES = [
   "front/features/host/ui/settings/host-club-settings.tsx",
   "front/features/host/ui/settings/host-invitation-links.tsx",
+  "front/features/host/ui/settings/host-settings-page.tsx",
+  "front/features/host/ui/settings/host-settings.css",
   "front/features/host/ui/host-invitations.tsx",
   "front/features/host/route/host-settings-route.tsx",
   "front/features/host/route/host-invitations-route.tsx",
