@@ -429,9 +429,9 @@ h1.rm-operating-room-header__title {
 
   h1.rm-operating-room-header__title,
   .rm-host-operating-room h1 {
-    font-size: 22px;
+    font-size: 28px;
     font-weight: 600;
-    line-height: 1.25;
+    line-height: 33.6px;
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-phase-status-ledger {
@@ -557,8 +557,8 @@ h1.rm-operating-room-header__title {
 
   .rm-preparation-ledger-row,
   .rm-preparation-ledger__row {
-    min-height: 48px;
-    padding-block: 4px;
+    min-height: 0;
+    padding-block: 2px;
   }
 }
 
@@ -1328,9 +1328,17 @@ h1.rm-operating-room-header__title {
   .rm-preparation-ledger__row,
   .rm-phase-status-ledger-row {
     grid-template-columns: 36px 28px minmax(0,1fr) auto;
-    min-height: 48px;
-    padding-block: 4px;
+    min-height: 0;
+    padding-block: 2px;
     grid-template-areas: "index icon label link" "index icon value link" "index icon detail link";
+  }
+
+  .rm-preparation-ledger-row__value,
+  .rm-phase-status-ledger-row__value,
+  .rm-preparation-ledger-row__detail,
+  .rm-phase-status-ledger-row__detail {
+    font-size: 12px;
+    line-height: 1.25;
   }
 
   .rm-preparation-ledger-row__index {
@@ -1514,9 +1522,9 @@ h1.rm-operating-room-header__title {
   }
 
   .rm-host-operating-room[data-phase="prep"] .rm-operating-room-header__title {
-    font-size: 22px;
+    font-size: 28px;
     font-weight: 600;
-    line-height: 1.25;
+    line-height: 33.6px;
   }
 
   .rm-host-operating-room[data-phase="prep"] .rm-operating-room-next-action {
@@ -1551,24 +1559,6 @@ h1.rm-operating-room-header__title {
     align-items: start !important;
   }
 
-  html body .rm-preparation-ledger-row,
-  html body .rm-preparation-ledger__row {
-    min-height: 44px !important;
-    max-height: 52px;
-    overflow: hidden;
-    grid-template-columns: 28px 24px minmax(0, 1fr) minmax(0, auto) auto;
-    grid-template-areas: "index icon label value link";
-    align-items: center;
-  }
-
-  html body .rm-preparation-ledger-row__detail {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-  }
-
   html body .rm-host-operating-room .rm-host-workbox__header {
     padding: 4px 16px 0 !important;
   }
@@ -1580,7 +1570,7 @@ h1.rm-operating-room-header__title {
   }
 
   html body .rm-host-operating-room .rm-host-workbox__tabs button {
-    min-height: 36px;
+    min-height: 44px;
   }
 
   html body .rm-operating-room-next-action {
