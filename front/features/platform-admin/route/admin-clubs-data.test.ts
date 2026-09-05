@@ -61,17 +61,15 @@ describe("presentAdminClubForLedger", () => {
       { id: "operating", label: "운영 중", count: 1 },
     ]);
     expect(view.selected?.name).toBe("샘플 독서모임");
-    expect(view.selected?.facts.map((fact) => fact.icon)).toEqual([
-      "people",
-      "person",
-      "document",
-      "link",
-    ]);
+    expect(view.selected?.facts.map((fact) => fact.icon)).toEqual(["people", "link"]);
     expect(view.selected?.review.length).toBeGreaterThan(0);
-    expect(presented.operationsFacts?.hostsLabel).toMatch(/호스트/);
-    expect(presented.operationsFacts?.membersLabel).toMatch(/멤버/);
-    expect(presented.operationsFacts?.recordsLabel).toMatch(/공개 기록/);
-    expect(presented.operationsFacts?.domainLabel).toMatch(/도메인/);
+    expect(presented.operationsFacts.hostsLabel).toMatch(/호스트/);
+    expect(presented.operationsFacts.domainLabel).toMatch(/도메인/);
+    expect(presented.updatedAgo).toBe("");
+    expect(presented.operationsFacts.ageLabel).toBe("");
+    expect(presented.operationsFacts.membersLabel).toBe("");
+    expect(presented.operationsFacts.recordsLabel).toBe("");
+    expect(presented.facts.some((fact) => /\d/.test(fact.value) && fact.icon !== "people")).toBe(false);
   });
 });
 

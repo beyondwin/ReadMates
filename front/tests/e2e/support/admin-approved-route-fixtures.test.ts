@@ -47,7 +47,10 @@ describe("admin approved Clubs, Health, and Audit fixtures", () => {
     expect(page.items[0]?.clubId).toBe("club-sample");
     expect(page.items[0]?.name).toBe("샘플 독서모임");
     expect(page.items[0]?.domainCount).toBe(1);
+    expect(page.items[0]?.domainActionRequiredCount).toBe(0);
     expect(page.items[0]?.firstHostOnboardingState).toBe("ASSIGNED");
+    expect(page.items[1]?.clubId).toBe("club-sample-2");
+    expect(page.items[1]?.domainActionRequiredCount).toBe(1);
     expect(page.items.filter((club) => club.domainActionRequiredCount > 0)).toHaveLength(2);
     expect(page.nextCursor).toEqual("clubs-visual-next");
   });

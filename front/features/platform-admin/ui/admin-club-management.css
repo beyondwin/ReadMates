@@ -12,6 +12,7 @@
 }
 
 .admin-clubs-ledger__list {
+  position: relative;
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   min-width: 0;
@@ -28,6 +29,7 @@
   margin: 0 32px 20px;
 }
 
+.admin-clubs-ledger__list-header h1,
 .admin-clubs-ledger__list h2 {
   margin: 0;
   font-size: 20px;
@@ -106,7 +108,7 @@
   color: var(--ink-900);
 }
 
-.admin-clubs-ledger__row[aria-selected="true"] {
+.admin-clubs-ledger__row[data-selected="true"] {
   background: color-mix(in oklch, var(--warn) 8%, var(--bg));
   box-shadow: inset 4px 0 0 var(--warn);
 }
@@ -183,6 +185,20 @@
   min-height: 44px;
   padding: 12px 32px;
   cursor: pointer;
+}
+
+.admin-club-management__filters:not([open]) > summary {
+  position: absolute;
+  top: 32px;
+  inset-inline-end: 84px;
+  z-index: 1;
+  width: max-content;
+  max-width: calc(100% - 116px);
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  overflow: visible;
+  clip: auto;
 }
 
 .admin-club-management__filters:not([open]) .admin-work-view-bar {

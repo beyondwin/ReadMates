@@ -237,7 +237,7 @@ export function AdminClubsLedger({
     <section className="admin-clubs admin-clubs-ledger">
       <div className="admin-clubs-ledger__list">
         <div className="admin-clubs-ledger__list-header">
-          <h2>클럽 찾기</h2>
+          {pageState === "ready" ? <h2>클럽 찾기</h2> : <h1>클럽 찾기</h1>}
           {canCreateClub ? (
             <Link
               to={onboardingHref}
@@ -335,7 +335,6 @@ export function AdminClubsLedger({
                         data-club-id={club.clubId}
                         data-emphasis={club.emphasis}
                         data-selected={isSelected ? "true" : "false"}
-                        aria-selected={isSelected}
                         tabIndex={0}
                         onClick={() => {
                           setSelectedId(club.clubId);
@@ -494,8 +493,8 @@ function needsReview(club: AdminClubsLedgerClub) {
 }
 
 function factItems(club: AdminClubsLedgerClub): AdminClubLedgerFact[] {
-  if (club.facts && club.facts.length > 0) return [...club.facts];
   const ops = club.operationsFacts;
+  const provided = new Map((club.facts ?? []).map((fact) => [fact.icon, fact]));
   return [
     {
       icon: "people",
@@ -517,7 +516,7 @@ function factItems(club: AdminClubsLedgerClub): AdminClubLedgerFact[] {
       label: "도메인",
       value: factValue(ops?.domainLabel, "도메인", club.currentState),
     },
-  ];
+  ].map((fallback) => provided.get(fallback.icon) ?? fallback);
 }
 
 function factValue(raw: string | undefined, prefix: string, fallback: string) {

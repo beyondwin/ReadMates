@@ -59,9 +59,6 @@ export type AdminClubLedgerPresentation = ClubManagementRow & {
   };
 };
 
-const VIRTUAL_MEMBER_COUNT = "8명";
-const VIRTUAL_RECORD_COUNT = "1건";
-
 function clubFacts(club: PlatformAdminClub): AdminClubsLedgerFact[] {
   const hostValue = club.firstHostOnboardingState === "ASSIGNED" ? "1명" : "없음";
   const domainValue = club.domainActionRequiredCount > 0
@@ -71,8 +68,6 @@ function clubFacts(club: PlatformAdminClub): AdminClubsLedgerFact[] {
       : "없음";
   return [
     { icon: "people", label: "호스트", value: hostValue },
-    { icon: "person", label: "멤버", value: VIRTUAL_MEMBER_COUNT },
-    { icon: "document", label: "공개 기록", value: VIRTUAL_RECORD_COUNT },
     { icon: "link", label: "도메인", value: domainValue },
   ];
 }
@@ -94,11 +89,8 @@ export function presentAdminClubForLedger(
   const facts = clubFacts(club);
   const review = reviewItems(row);
   const needsReview = row.emphasis === "actionable";
-  const updatedAgo = needsReview ? "10분 전" : "1시간 전";
-  const host = facts[0]!;
-  const members = facts[1]!;
-  const records = facts[2]!;
-  const domain = facts[3]!;
+  const host = facts.find((fact) => fact.icon === "people");
+  const domain = facts.find((fact) => fact.icon === "link");
   return {
     ...row,
     clubId: club.clubId,
@@ -107,14 +99,14 @@ export function presentAdminClubForLedger(
     review,
     statusLabel: row.requiredAction ?? row.currentState,
     needsReview,
-    updatedAgo,
+    updatedAgo: "",
     operationsFacts: {
-      hostsLabel: `${host.label} ${host.value}`,
-      membersLabel: `${members.label} ${members.value}`,
-      recordsLabel: `${records.label} ${records.value}`,
-      domainLabel: `${domain.label} ${domain.value}`,
+      hostsLabel: host ? `${host.label} ${host.value}` : "호스트",
+      membersLabel: "",
+      recordsLabel: "",
+      domainLabel: domain ? `${domain.label} ${domain.value}` : "도메인",
       reviewLabel: review[0]?.text ?? row.currentState,
-      ageLabel: updatedAgo,
+      ageLabel: "",
     },
   };
 }

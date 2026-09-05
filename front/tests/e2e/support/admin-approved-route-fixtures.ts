@@ -250,21 +250,15 @@ const APPROVED_CLUB_SAMPLE = {
 export function buildAdminApprovedClubs() {
   const items = Array.from({ length: 24 }, (_, index) => {
     const n = index + 1;
-    const needsReview = n <= 2;
+    if (n === 1) return { ...APPROVED_CLUB_SAMPLE };
     return {
-      clubId: n === 1 ? APPROVED_CLUB_SAMPLE.clubId : `club-sample-${n}`,
-      slug: n === 1 ? APPROVED_CLUB_SAMPLE.slug : `sample-reading-${n}`,
-      name: n === 1 ? APPROVED_CLUB_SAMPLE.name : `샘플 독서모임 ${n}`,
-      tagline: "",
-      about: "",
-      status: "ACTIVE" as const,
-      publicVisibility: n === 1 ? ("PUBLIC" as const) : ("PRIVATE" as const),
-      domainCount: 1,
-      domainActionRequiredCount: needsReview ? 1 : 0,
-      notificationFailureCount: 0,
-      aiFailureCount: 0,
-      firstHostOnboardingState: "ASSIGNED" as const,
-      adminRevision: n === 1 ? 4 : n,
+      ...APPROVED_CLUB_SAMPLE,
+      clubId: `club-sample-${n}`,
+      slug: `sample-reading-${n}`,
+      name: `샘플 독서모임 ${n}`,
+      publicVisibility: "PRIVATE" as const,
+      domainActionRequiredCount: n === 2 || n === 3 ? 1 : 0,
+      adminRevision: n,
     };
   });
   return {

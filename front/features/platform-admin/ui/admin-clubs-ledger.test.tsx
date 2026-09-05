@@ -115,6 +115,11 @@ describe("AdminClubsLedger", () => {
     expect(screen.getByRole("list", { name: "운영 상태" }).querySelectorAll("[data-icon]")).toHaveLength(4);
     expect(screen.getByRole("heading", { name: "확인할 내용" })).toBeTruthy();
     expect(screen.queryByText("기술 정보", { selector: ".admin-clubs-ledger__row *" })).toBeNull();
+    const selectedRow = document.querySelector(
+      '.admin-clubs-ledger__row[data-selected="true"]',
+    ) as HTMLElement;
+    expect(selectedRow).toBeTruthy();
+    expect(selectedRow).not.toHaveAttribute("aria-selected");
   });
 
   it("composes page context, work-view filters, and an evidence ledger", () => {
@@ -176,6 +181,7 @@ describe("AdminClubsLedger", () => {
       </MemoryRouter>,
     );
     expect(screen.getByText("클럽을 불러오는 중입니다.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("클럽 찾기");
     expect(screen.queryByText("1건")).not.toBeInTheDocument();
 
     rerender(
@@ -202,6 +208,7 @@ describe("AdminClubsLedger", () => {
     expect(
       screen.getByText("클럽 목록을 불러오지 못했습니다."),
     ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("클럽 찾기");
     expect(screen.queryByText("1건")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Alpha" })).not.toBeInTheDocument();
   });
@@ -336,6 +343,9 @@ describe("AdminClubsLedger", () => {
     );
     expect(CLUB_MANAGEMENT_CSS).toContain(".admin-club-management");
     expect(CLUB_MANAGEMENT_CSS).toContain("prefers-reduced-motion");
+    expect(CLUB_MANAGEMENT_CSS).toMatch(
+      /\.admin-club-management__filters:not\(\[open\]\)\s*>\s*summary[\s\S]*position:\s*absolute/,
+    );
   });
 
   it("paints club rows at the approved 17/600/23.8 title metric", () => {
