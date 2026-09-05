@@ -181,23 +181,27 @@ h1.rm-operating-room-header__title {
 .rm-operating-room-phases {
   position: relative;
   min-height: 44px;
-  padding-inline: 0;
-  border-bottom: 1px solid var(--line);
+  padding: 0 32px;
+  border-bottom: 1px solid var(--line-soft);
   background: var(--bg);
 }
 
 .rm-operating-room-phases__list {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 160px));
-  width: min(100%, 540px);
-  min-width: 0;
+  display: flex;
+  gap: 0;
 }
 
 .rm-operating-room-phases__item {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  align-content: start;
-  min-width: 0;
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+
+.rm-operating-room-phases__item + .rm-operating-room-phases__item::before {
+  content: "";
+  width: 1px;
+  height: 20px;
+  background: var(--line);
 }
 
 .rm-operating-room-phases__tab {
@@ -207,9 +211,11 @@ h1.rm-operating-room-header__title {
   align-items: center;
   justify-content: center;
   gap: 4px var(--space-xs);
-  min-width: 0;
+  min-width: 108px;
   min-height: 44px;
-  padding: 0 var(--space-sm);
+  padding: 18px 24px;
+  font-size: 17px;
+  font-weight: 500;
   color: var(--text-2);
   text-align: center;
   text-decoration: none;
@@ -220,7 +226,7 @@ h1.rm-operating-room-header__title {
 
 .rm-operating-room-phases__tab::after {
   position: absolute;
-  inset-inline: var(--space-sm);
+  inset-inline: 24px;
   inset-block-end: -1px;
   height: 2px;
   background: transparent;
@@ -229,9 +235,11 @@ h1.rm-operating-room-header__title {
 
 .rm-operating-room-phases__tab[aria-current="page"] {
   color: var(--accent);
+  font-weight: 700;
 }
 
 .rm-operating-room-phases__tab[aria-current="page"]::after {
+  height: 3px;
   background: var(--accent);
 }
 
@@ -246,25 +254,10 @@ h1.rm-operating-room-header__title {
 }
 
 .rm-operating-room-phases__label {
-  color: oklch(0.18 0.020 255);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 19.6px;
-}
-
-.rm-operating-room-phases__tab[aria-current="page"] .rm-operating-room-phases__label,
-.rm-operating-room-phases__tab.is-blocked .rm-operating-room-phases__label {
-  color: oklch(0.18 0.020 255);
-}
-
-.rm-operating-room-phases__state {
-  color: var(--text-3);
-  font-size: var(--type-size-label);
-  font-weight: 600;
-}
-
-.rm-operating-room-phases__tab[aria-current="page"] .rm-operating-room-phases__state {
-  color: var(--accent);
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
 }
 
 .rm-operating-room-phases__reason {
@@ -449,6 +442,19 @@ h1.rm-operating-room-header__title {
 
   .rm-operating-room-phases {
     min-height: 44px;
+    padding: 0 16px;
+  }
+
+  .rm-operating-room-phases__item {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .rm-operating-room-phases__tab {
+    flex: 1;
+    min-width: 0;
+    padding: 14px 8px;
+    font-size: 18px;
   }
 
   .rm-operating-room-next-action {
@@ -1112,18 +1118,10 @@ h1.rm-operating-room-header__title {
 
   .rm-operating-room-phases {
     min-height: 0;
-    padding-inline: 0;
   }
 
   .rm-operating-room-phases__tab {
     align-content: center;
-    padding-inline: 6px;
-  }
-
-  .rm-operating-room-phases__label {
-    font-size: 14px;
-    font-weight: 600;
-    line-height: 19.6px;
   }
 
   .rm-operating-room-phases__reason {
@@ -1304,16 +1302,7 @@ h1.rm-operating-room-header__title {
     line-height: 33.6px;
   }
 
-  /* Live compact 390: 40px tabs/choices keep mockup-16 closer above the tab bar. Named leftover vs 44px. */
-  .rm-host-operating-room[data-phase="live"] .rm-operating-room-phases,
-  .rm-host-operating-room[data-phase="live"] .rm-operating-room-phases__tab {
-    min-height: 40px;
-  }
-
-  .rm-host-operating-room[data-phase="live"] .rm-operating-room-phases__tab {
-    padding: 2px 4px;
-  }
-
+  /* Live compact 390: 40px attendance choices keep mockup-16 closer above the tab bar. Named leftover vs 44px. */
   .rm-host-operating-room[data-phase="live"] .rm-meeting-response-ledger--attendance-board {
     gap: 2px;
   }

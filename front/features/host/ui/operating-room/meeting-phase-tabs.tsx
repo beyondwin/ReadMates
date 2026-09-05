@@ -67,7 +67,7 @@ export function MeetingPhaseTabs({
             <>
               <span className="rm-operating-room-phases__label">{phase.label}</span>
               {stateLabel ? (
-                <span className="rm-operating-room-phases__state">{stateLabel}</span>
+                <span className="rm-operating-room-phases__state rm-sr-only">{stateLabel}</span>
               ) : null}
             </>
           );

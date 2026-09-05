@@ -35,6 +35,18 @@ describe("MeetingPhaseTabs", () => {
     expect(complete).not.toHaveAttribute("aria-current");
   });
 
+  it("keeps 현재·완료·잠김 state labels screen-reader-only", () => {
+    render(<MeetingPhaseTabs phases={phases} currentPhase="live" />);
+
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs).toHaveLength(3);
+    expect(tabs.filter((tab) => tab.getAttribute("aria-current") === "page")).toHaveLength(1);
+
+    expect(screen.getByRole("tab", { name: /준비실/ }).querySelector(".rm-operating-room-phases__state")).toHaveClass("rm-sr-only");
+    expect(screen.getByRole("tab", { name: /현장/ }).querySelector(".rm-operating-room-phases__state")).toHaveClass("rm-sr-only");
+    expect(screen.getByRole("tab", { name: /마감실/ }).querySelector(".rm-operating-room-phases__state")).toHaveClass("rm-sr-only");
+  });
+
   it("shows a blocked reason and does not expose a false destination", () => {
     render(<MeetingPhaseTabs phases={phases} currentPhase="live" />);
 
