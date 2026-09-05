@@ -15,6 +15,12 @@ vi.mock("@/features/platform-admin/api/platform-admin-audit-api", () => ({
   searchAdminAuditLedger: vi.fn(),
 }));
 
+vi.mock("@/features/platform-admin/route/admin-shell-status-context", () => ({
+  useAdminShellStatus: vi.fn(),
+}));
+
+import { useAdminShellStatus } from "./admin-shell-status-context";
+
 function item(id: string, actionType = "AI_COMMAND_RETRY_COMMIT"): AdminAuditLedgerItem {
   const actionCategory = actionType.startsWith("CLUB_")
     ? "CLUB_LIFECYCLE"
@@ -242,5 +248,25 @@ describe("AdminAuditRoute", () => {
 
     expect(await screen.findByText("처리 기록을 불러오지 못했습니다. 다시 시도해 주세요.")).toBeInTheDocument();
     expect(fetchAdminAuditLedger).toHaveBeenCalledWith({ range: "7d", sourceSlice: "S5" }, undefined);
+    expect(useAdminShellStatus).toHaveBeenLastCalledWith(null);
+  });
+
+  it("publishes a fixed header status sentence once records are loaded", async () => {
+    renderRoute();
+
+    expect(await screen.findByRole("button", { name: /AI 작업 반영을 다시 시도했습니다/ })).toBeInTheDocument();
+    expect(useAdminShellStatus).toHaveBeenLastCalledWith({
+      tone: "neutral",
+      text: "누가 무엇을 왜 처리했는지 확인합니다.",
+      aside: null,
+    });
+  });
+
+  it("clears the header status sentence while records are loading", () => {
+    vi.mocked(fetchAdminAuditLedger).mockImplementation(() => new Promise(() => {}));
+    renderRoute();
+
+    expect(screen.getByText("처리 기록을 불러오는 중입니다.")).toBeInTheDocument();
+    expect(useAdminShellStatus).toHaveBeenLastCalledWith(null);
   });
 });

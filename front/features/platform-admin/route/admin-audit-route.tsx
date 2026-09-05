@@ -24,6 +24,7 @@ import {
   subscribePlatformAdminAuthorityLoss,
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { AdminAuditLedger } from "@/features/platform-admin/ui/admin-audit-ledger";
+import { useAdminShellStatus } from "./admin-shell-status-context";
 
 const GENERIC_ERROR = "처리 기록을 불러오지 못했습니다. 다시 시도해 주세요.";
 
@@ -113,6 +114,15 @@ export function AdminAuditRoute() {
   const sensitiveError = sensitiveRequest && sensitiveQuery.isError && !sensitiveQuery.isFetchNextPageError
     ? "민감 대상을 검색하지 못했습니다. 입력은 유지됩니다."
     : searchError;
+  useAdminShellStatus(
+    activeQuery.isPending || queryError
+      ? null
+      : {
+          tone: "neutral",
+          text: "누가 무엇을 왜 처리했는지 확인합니다.",
+          aside: null,
+        },
+  );
 
   return (
     <AdminAuditLedger

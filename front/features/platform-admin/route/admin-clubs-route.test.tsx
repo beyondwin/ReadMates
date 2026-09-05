@@ -31,7 +31,12 @@ vi.mock(
   }),
 );
 
+vi.mock("@/features/platform-admin/route/admin-shell-status-context", () => ({
+  useAdminShellStatus: vi.fn(),
+}));
+
 import { fetchPlatformAdminClubs } from "@/features/platform-admin/api/platform-admin-api";
+import { useAdminShellStatus } from "./admin-shell-status-context";
 
 const club: PlatformAdminClub = {
   clubId: "c-1",
@@ -137,6 +142,28 @@ function renderRoute(
       ) },
     ],
     { initialEntries },
+  );
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+}
+
+function renderFetchingClubsRoute() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, {
+    schemaVersion: 1,
+    role: "OWNER",
+    status: "ACTIVE",
+    capabilities: ["VIEW_CLUBS", "CREATE_CLUB"],
+    generatedAt: "2026-08-24T00:00:00Z",
+  });
+  const router = createMemoryRouter(
+    [{ path: "/admin/clubs", element: <AdminClubsRoute /> }],
+    { initialEntries: ["/admin/clubs"] },
   );
   return render(
     <QueryClientProvider client={queryClient}>
@@ -473,5 +500,55 @@ describe("AdminClubsRoute", () => {
       2,
       expect.objectContaining({ cursor: "cursor-2" }),
     );
+  });
+
+  it("publishes a quiet header status sentence from the loaded registry", () => {
+    renderRoute();
+    expect(useAdminShellStatus).toHaveBeenLastCalledWith({
+      tone: "ok",
+      text: "운영 중인 클럽 1곳 중 확인할 곳이 0곳 있습니다.",
+      aside: null,
+    });
+  });
+
+  it("warns in the header when loaded clubs still need review", () => {
+    renderRoute([
+      club,
+      {
+        ...club,
+        clubId: "c-2",
+        slug: "beta",
+        name: "Beta",
+        domainActionRequiredCount: 1,
+      },
+    ]);
+    expect(useAdminShellStatus).toHaveBeenLastCalledWith({
+      tone: "warn",
+      text: "운영 중인 클럽 2곳 중 확인할 곳이 1곳 있습니다.",
+      aside: null,
+    });
+  });
+
+  it("keeps the header status sentence when the registry is empty", () => {
+    renderRoute([], "/admin/clubs?search=missing");
+    expect(useAdminShellStatus).toHaveBeenLastCalledWith({
+      tone: "ok",
+      text: "운영 중인 클럽 0곳 중 확인할 곳이 0곳 있습니다.",
+      aside: null,
+    });
+  });
+
+  it("clears the header status sentence while clubs are loading", () => {
+    vi.mocked(fetchPlatformAdminClubs).mockImplementation(() => new Promise(() => {}));
+    renderFetchingClubsRoute();
+    expect(screen.getByText("클럽을 불러오는 중입니다.")).toBeInTheDocument();
+    expect(useAdminShellStatus).toHaveBeenLastCalledWith(null);
+  });
+
+  it("clears the header status sentence when the registry is unavailable", async () => {
+    vi.mocked(fetchPlatformAdminClubs).mockRejectedValue(new Error("unavailable"));
+    renderFetchingClubsRoute();
+    expect(await screen.findByText("클럽 목록을 불러오지 못했습니다.")).toBeInTheDocument();
+    expect(useAdminShellStatus).toHaveBeenLastCalledWith(null);
   });
 });

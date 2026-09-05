@@ -27,6 +27,7 @@ import { AdminClubsLedger } from "@/features/platform-admin/ui/admin-clubs-ledge
 import type { AdminPageState } from "@/features/platform-admin/ui/admin-state-panel";
 import { AdminOnboardingController } from "./admin-onboarding-controller";
 import type { AdminShellOutletContext } from "./admin-shell-layout";
+import { useAdminShellStatus } from "./admin-shell-status-context";
 
 type FilterKey =
   | "search"
@@ -159,6 +160,16 @@ export function AdminClubsRoute() {
     isPending: clubsQuery.isPending,
     isEmpty: clubs.length === 0,
   });
+  const needsReview = ledgerClubs.filter((club) => club.emphasis === "actionable").length;
+  useAdminShellStatus(
+    pageState === "loading" || pageState === "unavailable"
+      ? null
+      : {
+          tone: needsReview > 0 ? "warn" : "ok",
+          text: `운영 중인 클럽 ${ledgerClubs.length}곳 중 확인할 곳이 ${needsReview}곳 있습니다.`,
+          aside: null,
+        },
+  );
 
   return (
     <>

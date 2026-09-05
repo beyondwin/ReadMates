@@ -11,6 +11,12 @@ import {
   findUnnamedInteractiveElements,
 } from "@/shared/testing/accessibility-checks";
 
+vi.mock("@/features/platform-admin/route/admin-shell-status-context", () => ({
+  useAdminShellStatus: vi.fn(),
+}));
+
+import { useAdminShellStatus } from "./admin-shell-status-context";
+
 const HEALTH_SNAPSHOT: PlatformHealthSnapshotResponse = {
   schema: "platform.health_snapshot.v1",
   generatedAt: "2026-05-26T00:00:00Z",
@@ -214,5 +220,54 @@ describe("AdminHealthRoute", () => {
 
     expect(await screen.findByText("마지막 확인 자료가 2분 5초 전입니다.")).toBeInTheDocument();
     expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("publishes a degraded header status sentence from the loaded snapshot", async () => {
+    vi.spyOn(api, "fetchPlatformAdminHealthSnapshot").mockResolvedValueOnce(HEALTH_SNAPSHOT);
+    renderRoute();
+
+    expect(await screen.findByRole("heading", { name: "AI 작업 대기열" })).toBeInTheDocument();
+    expect(useAdminShellStatus).toHaveBeenLastCalledWith({
+      tone: "warn",
+      text: "대체로 정상이며, AI 작업 전달을 확인해야 합니다.",
+      aside: "마지막 전체 확인 09:00",
+    });
+  });
+
+  it("reports every service as healthy in the header when no card is degraded", async () => {
+    const healthySnapshot: PlatformHealthSnapshotResponse = {
+      ...HEALTH_SNAPSHOT,
+      cards: HEALTH_SNAPSHOT.cards.map((card) => ({
+        ...card,
+        status: "OK",
+        reason: null,
+        metric: card.metric ?? { value: 0, unit: "ok", label: "ok" },
+      })),
+    };
+    vi.spyOn(api, "fetchPlatformAdminHealthSnapshot").mockResolvedValueOnce(healthySnapshot);
+    renderRoute();
+
+    expect(await screen.findByText("모든 서비스가 정상 범위입니다. 현재 자료로 확인했습니다.")).toBeInTheDocument();
+    expect(useAdminShellStatus).toHaveBeenLastCalledWith({
+      tone: "ok",
+      text: "모든 서비스가 정상입니다.",
+      aside: "마지막 전체 확인 09:00",
+    });
+  });
+
+  it("clears the header status sentence while the snapshot is loading", () => {
+    vi.spyOn(api, "fetchPlatformAdminHealthSnapshot").mockImplementation(() => new Promise(() => {}));
+    renderRoute();
+
+    expect(screen.getByTestId("admin-health-skeleton")).toBeInTheDocument();
+    expect(useAdminShellStatus).toHaveBeenLastCalledWith(null);
+  });
+
+  it("clears the header status sentence when the snapshot is unavailable", async () => {
+    vi.spyOn(api, "fetchPlatformAdminHealthSnapshot").mockRejectedValueOnce(new Error("unavailable"));
+    renderRoute();
+
+    expect(await screen.findByText("스냅샷을 불러오지 못했습니다")).toBeInTheDocument();
+    expect(useAdminShellStatus).toHaveBeenLastCalledWith(null);
   });
 });

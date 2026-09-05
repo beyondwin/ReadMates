@@ -48,7 +48,12 @@ vi.mock("@/features/platform-admin/api/platform-admin-capabilities-api", () => (
   fetchPlatformAdminCapabilities: vi.fn(),
 }));
 
+vi.mock("@/features/platform-admin/route/admin-shell-status-context", () => ({
+  useAdminShellStatus: vi.fn(),
+}));
+
 import { fetchPlatformAdminCapabilities } from "@/features/platform-admin/api/platform-admin-capabilities-api";
+import { useAdminShellStatus } from "./admin-shell-status-context";
 
 const generatedAt = "2026-08-04T10:00:00Z";
 const memberQueryKey = ["current-session", "me"] as const;
@@ -243,6 +248,13 @@ beforeEach(() => {
 });
 
 describe("AdminTodayRoute", () => {
+  it("does not publish a route-owned header status sentence", async () => {
+    renderRoute(seededClient(), "/admin/today?case=case-notification");
+
+    expect(await screen.findByRole("heading", { level: 1, name: "오늘 할 일" })).toBeVisible();
+    expect(useAdminShellStatus).not.toHaveBeenCalled();
+  });
+
   it("restores a seeded case selection and renders the queue and inspector", async () => {
     const { container } = renderRoute(seededClient(), "/admin/today?case=case-notification");
 
