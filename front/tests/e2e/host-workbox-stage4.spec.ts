@@ -236,6 +236,24 @@ async function approveViewerThroughBff(page: Page): Promise<number> {
   }, { membershipId: VIEWER_MEMBERSHIP_ID, clubSlug: CLUB_SLUG });
 }
 
+async function deferWorkboxItemThroughBff(page: Page, key: string): Promise<{ status: number; deferredUntil: string }> {
+  return page.evaluate(async ({ workItemKey, clubSlug }) => {
+    const deferredUntil = new Date(Date.now() + 86_400_000).toISOString();
+    const response = await fetch(
+      `/api/bff/api/host/workbox/items/${encodeURIComponent(workItemKey)}/deferral?clubSlug=${encodeURIComponent(clubSlug)}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Readmates-Client-Contract": "v3",
+        },
+        body: JSON.stringify({ deferredUntil }),
+      },
+    );
+    return { status: response.status, deferredUntil };
+  }, { workItemKey: key, clubSlug: CLUB_SLUG });
+}
+
 test.beforeEach(() => {
   resetSeedGoogleLogins(["host@example.com", "member4@example.com", "member5@example.com"]);
   setupFixture();
@@ -258,20 +276,12 @@ test("authoritative workbox key survives defer, expiry and source-owned completi
 
   const row = page.getByRole("listitem", { name: "가입 승인 요청" });
   await expect(row).toBeVisible();
-  await expect(row.locator("details.rm-host-work-item__secondary")).not.toHaveAttribute("open");
+  await expect(row.locator("details")).toHaveCount(0);
   await expect(row.getByRole("button", { name: "가입 승인 요청 보류" })).toHaveCount(0);
-  await row.getByText("세부 조작").click();
-  await expect(row.locator("details.rm-host-work-item__secondary")).toHaveAttribute("open");
-  const defer = row.getByRole("button", { name: "가입 승인 요청 보류" });
-  await expect(defer).toBeVisible();
-  const deferralResponse = page.waitForResponse((response) => (
-    response.request().method() === "PUT"
-      && response.url().includes(`/api/host/workbox/items/${encodeURIComponent(authoritativeKey)}/deferral`)
-  ));
-  await defer.click();
-  const deferred = await deferralResponse;
-  expect(deferred.status()).toBe(200);
-  expect(deferred.request().postDataJSON()).toMatchObject({ deferredUntil: expect.any(String) });
+  await expect(row.getByRole("link", { name: "가입 승인 요청" })).toBeVisible();
+  const deferred = await deferWorkboxItemThroughBff(page, authoritativeKey);
+  expect(deferred.status).toBe(200);
+  expect(deferred.deferredUntil).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
   const deferredPagePromise = workboxResponse(page, "DEFERRED");
   await page.getByRole("tab", { name: /^보류/ }).click();
@@ -305,8 +315,9 @@ where club_id = ${sqlString(CLUB_ID)}
     }),
   ]));
   const completedRow = page.getByRole("listitem", { name: "가입 승인 요청" });
-  await completedRow.getByText("세부 조작").click();
-  await expect(page.getByText("서버가 기록한 완료 결과")).toBeVisible();
+  await expect(completedRow.locator("details")).toHaveCount(0);
+  await expect(completedRow.getByRole("link", { name: "가입 승인 요청" })).toBeVisible();
+  await expect(page.getByText("가입 승인 처리됨")).toBeVisible();
 
   await page.goto(`${HOST_PATH}/people/${VIEWER_MEMBERSHIP_ID}`);
   await expect(page.getByRole("heading", { level: 1, name: "승인 대기 합성 멤버" })).toBeVisible();
@@ -774,7 +785,6 @@ where id = ${sqlString(created.link.linkId)} and club_id = ${sqlString(CLUB_ID)}
   const historyCursor = historyPage.nextCursor;
   expect(historyCursor).toBeTruthy();
 
-  await page.locator("summary").filter({ hasText: "세부 조작" }).click();
   const historyRegion = page.getByRole("region", { name: "설정 변경 이력" });
   const continuationRequest = page.waitForRequest((request) => {
     const url = new URL(request.url());

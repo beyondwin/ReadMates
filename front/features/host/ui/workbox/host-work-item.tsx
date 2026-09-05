@@ -1,6 +1,7 @@
-import { useState, type ComponentType, type ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import type { HostWorkboxItemView } from "@/features/host/model/host-workbox-model";
-import { OperationReceipt, operationReceiptOutcome } from "./operation-receipt";
+import { ReadmatesIcon, ReadmatesIconBadge } from "@/shared/ui/icon";
+import { workItemIcon } from "./host-work-item-icon";
 
 export type HostWorkboxDeferralOption = "TOMORROW" | "THREE_DAYS" | "NEXT_WEEK";
 
@@ -16,108 +17,31 @@ const DefaultLink: ComponentType<WorkItemLinkProps> = ({ to, children, ...props 
 
 export type HostWorkItemProps = {
   item: HostWorkboxItemView;
-  pending: boolean;
   error?: string | null;
   now?: Date;
-  onDefer: (key: string, option: HostWorkboxDeferralOption) => void;
-  onUndoDeferral: (key: string) => void;
   LinkComponent?: ComponentType<WorkItemLinkProps>;
 };
 
 export function HostWorkItem({
   item,
-  pending,
   error = null,
   now = new Date(),
-  onDefer,
-  onUndoDeferral,
   LinkComponent = DefaultLink,
 }: HostWorkItemProps) {
-  const [deferralOption, setDeferralOption] = useState<HostWorkboxDeferralOption>("TOMORROW");
-  const [secondaryOpen, setSecondaryOpen] = useState(false);
   const due = dueLabel(item, now);
-
-  const facts = (
-    <dl className="rm-host-work-item__facts">
-      <div><dt>수량</dt><dd>{item.countLabel}</dd></div>
-      {item.deferredUntil ? <div><dt>보류 기한</dt><dd>{formatDateTime(item.deferredUntil)}</dd></div> : null}
-      {item.resolvedAt ? <div><dt>처리 시각</dt><dd>{formatDateTime(item.resolvedAt)}</dd></div> : null}
-    </dl>
-  );
-
-  const deferralControls = item.state === "NOW" ? (
-    <div className="rm-host-work-item__deferral">
-      <label>
-        <span className="sr-only">{item.title} 보류 기간</span>
-        <select
-          aria-label={`${item.title} 보류 기간`}
-          value={deferralOption}
-          disabled={pending}
-          onChange={(event) => setDeferralOption(event.currentTarget.value as HostWorkboxDeferralOption)}
-        >
-          <option value="TOMORROW">내일 오전 9시</option>
-          <option value="THREE_DAYS">3일 뒤 오전 9시</option>
-          <option value="NEXT_WEEK">7일 뒤 오전 9시</option>
-        </select>
-      </label>
-      <button
-        type="button"
-        disabled={pending}
-        onClick={() => onDefer(item.key, deferralOption)}
-        aria-label={`${item.title} 보류`}
-      >
-        {pending ? "보류 중" : "보류"}
-      </button>
-    </div>
-  ) : item.state === "DEFERRED" ? (
-    <button
-      type="button"
-      className="rm-host-work-item__undo"
-      disabled={pending}
-      onClick={() => onUndoDeferral(item.key)}
-      aria-label={`${item.title} 보류 해제`}
-    >
-      {pending ? "해제 중" : "지금 다시 보기"}
-    </button>
-  ) : null;
-
-  const receipt = item.state === "COMPLETED" && item.receiptSummary ? (
-    <OperationReceipt
-      outcome={operationReceiptOutcome(item.receiptSummary.outcome)}
-      title={receiptTitle(item.receiptSummary.operation)}
-      detail={item.receiptSummary.affectedCount === null
-        ? "서버가 기록한 완료 결과"
-        : `서버가 기록한 완료 결과 · 처리 ${item.receiptSummary.affectedCount}명`}
-      LinkComponent={LinkComponent}
-    />
-  ) : null;
+  const icon = workItemIcon(item.type);
 
   return (
     <li className="rm-host-work-item" aria-label={item.title} data-state={item.state}>
-      <div className="rm-host-work-item__row">
-        <LinkComponent to={item.destinationHref} className="rm-host-work-item__destination">
-          <span className="rm-host-work-item__label" aria-hidden="true">{item.operationalLabel}</span>
-          <strong className="rm-host-work-item__title">{item.title}</strong>
-          <span className="rm-host-work-item__meta" aria-hidden="true">
-            <span>{item.countLabel}</span>
-            {due ? <span data-overdue={due === "기한 지남" ? "true" : undefined}>{due}</span> : null}
-          </span>
-        </LinkComponent>
-        <details
-          className="rm-host-work-item__secondary"
-          onToggle={(event) => setSecondaryOpen(event.currentTarget.open)}
-        >
-          <summary aria-label={`${item.title} 세부 조작`}>
-            <span className="sr-only">세부 조작</span>
-          </summary>
-          <div className="rm-host-work-item__secondary-body" hidden={!secondaryOpen}>
-            <p>{item.description}</p>
-            {facts}
-            {deferralControls}
-            {receipt}
-          </div>
-        </details>
-      </div>
+      <LinkComponent to={item.destinationHref} className="rm-host-work-item__destination">
+        <ReadmatesIconBadge name={icon.name} tone={icon.tone} size={40} />
+        <strong className="rm-host-work-item__title">{item.title}</strong>
+        <span className="rm-host-work-item__meta" aria-hidden="true">
+          <span>{item.countLabel}</span>
+          {due ? <span data-overdue={due === "기한 지남" ? "true" : undefined}>{due}</span> : null}
+        </span>
+        <ReadmatesIcon name="chevron-right" size={16} />
+      </LinkComponent>
 
       {error ? <p className="rm-host-work-item__error" role="alert">{error}</p> : null}
     </li>
@@ -130,11 +54,6 @@ function dueLabel(item: HostWorkboxItemView, now: Date): string | null {
   }
   if (item.dueAt) return formatDateTime(item.dueAt);
   return null;
-}
-
-function receiptTitle(operation: string): string {
-  if (operation === "SCHEDULE_REMINDER") return "일정 알림";
-  return "작업 결과";
 }
 
 function formatDateTime(value: string): string {

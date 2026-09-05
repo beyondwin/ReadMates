@@ -6,6 +6,8 @@ import type {
   HostWorkSourceFailureCode,
 } from "../api/host-workbox-contracts";
 
+export type { HostWorkItemType };
+
 export type HostWorkboxDestinationCategory =
   | "schedule-review"
   | "people"
@@ -70,6 +72,46 @@ export function buildHostWorkboxDisclosure(
     hasMore: visibleItems.length < view.items.length || view.nextCursor !== null,
     expanded: options.expanded,
   };
+}
+
+export type HostWorkboxFooterNote = {
+  text: string;
+  historyHref: string;
+};
+
+export function buildWorkboxFooterNote(
+  items: readonly HostWorkboxItemView[],
+  now: Date = new Date(),
+): string | null {
+  const latest = items.reduce<HostWorkboxItemView | null>((current, item) => {
+    if (!item.resolvedAt || !item.receiptSummary) return current;
+    if (!current?.resolvedAt) return item;
+    return new Date(item.resolvedAt).getTime() > new Date(current.resolvedAt).getTime() ? item : current;
+  }, null);
+  if (!latest?.resolvedAt || !latest.receiptSummary) return null;
+  return `${formatReceiptWhen(latest.resolvedAt, now)} ${receiptOperationCopy(latest.receiptSummary.operation)}`;
+}
+
+function formatReceiptWhen(value: string, now: Date): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const time = new Intl.DateTimeFormat("ko-KR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(date);
+  const startOfNow = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const dayDiff = Math.round((startOfNow - startOfDate) / 86_400_000);
+  if (dayDiff === 0) return `오늘 ${time}`;
+  if (dayDiff === 1) return `어제 ${time}`;
+  return `${new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric" }).format(date)} ${time}`;
+}
+
+function receiptOperationCopy(operation: string): string {
+  if (operation === "SCHEDULE_REMINDER") return "자동 리마인드 전달됨";
+  if (operation === "APPROVED") return "가입 승인 처리됨";
+  return "작업 결과 기록됨";
 }
 
 export function buildHostWorkboxView(page: HostWorkboxPage): HostWorkboxView {

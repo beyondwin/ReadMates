@@ -44,8 +44,6 @@ function renderWorkbox(overrides: Partial<React.ComponentProps<typeof HostWorkbo
     onStateChange: vi.fn(),
     onRetry: vi.fn(),
     onLoadMore: vi.fn(),
-    onDefer: vi.fn(),
-    onUndoDeferral: vi.fn(),
     ...overrides,
   };
   render(<HostWorkbox {...props} />);
@@ -61,7 +59,7 @@ describe("HostWorkbox", () => {
     expect(within(tablist).getByRole("tab", { name: "보류" })).toBeVisible();
     expect(within(tablist).getByRole("tab", { name: "완료" })).toBeVisible();
     expect(within(tablist).queryByRole("tab", { name: "보류 0" })).not.toBeInTheDocument();
-    expect(screen.getByText("수량").closest("div")).toHaveTextContent("수량0");
+    expect(screen.getByText("0")).toBeVisible();
     expect(screen.getByText("현재 묶음 기준 · 다음 묶음 있음")).toBeVisible();
 
     await userEvent.click(within(tablist).getByRole("tab", { name: "보류" }));
@@ -103,8 +101,6 @@ describe("HostWorkbox", () => {
       onStateChange={vi.fn()}
       onRetry={vi.fn()}
       onLoadMore={vi.fn()}
-      onDefer={vi.fn()}
-      onUndoDeferral={vi.fn()}
     />);
     expect(screen.getByRole("status")).toHaveTextContent("작업함을 불러오는 중");
     expect(screen.getByRole("tab", { name: "지금" })).toBeVisible();
@@ -119,8 +115,6 @@ describe("HostWorkbox", () => {
       onStateChange={vi.fn()}
       onRetry={vi.fn()}
       onLoadMore={vi.fn()}
-      onDefer={vi.fn()}
-      onUndoDeferral={vi.fn()}
     />);
     expect(screen.getByRole("alert")).toHaveTextContent("작업함을 불러오지 못했습니다");
     expect(screen.getByRole("tab", { name: "지금" })).toBeVisible();
@@ -134,8 +128,6 @@ describe("HostWorkbox", () => {
       onStateChange={vi.fn()}
       onRetry={vi.fn()}
       onLoadMore={vi.fn()}
-      onDefer={vi.fn()}
-      onUndoDeferral={vi.fn()}
     />);
     expect(screen.getByText("지금 처리할 작업이 없습니다.")).toBeVisible();
     expect(screen.getByRole("tab", { name: "지금 0" })).toBeVisible();
@@ -157,36 +149,25 @@ describe("HostWorkbox", () => {
     );
   });
 
-  it("hides secondary workbox actions until disclosure, then defers with the authoritative key", async () => {
-    const props = renderWorkbox();
+  it("keeps workbox rows as destination links without detail-ops or defer controls", () => {
+    renderWorkbox();
     const row = screen.getByRole("listitem", { name: /일정 확인이 필요한 멤버/ });
 
     expect(screen.getByRole("link", { name: "일정 확인이 필요한 멤버" })).toBeVisible();
-    expect(screen.getByText("수량").closest("div")).toHaveTextContent("수량0");
-    expect(within(row).getByRole("combobox", { name: /보류 기간/, hidden: true })).not.toBeVisible();
-    expect(within(row).getByRole("button", { name: /보류$/, hidden: true })).not.toBeVisible();
-
-    await userEvent.click(within(row).getByText("세부 조작"));
-    await userEvent.selectOptions(within(row).getByRole("combobox", { name: /보류 기간/ }), "THREE_DAYS");
-    await userEvent.click(within(row).getByRole("button", { name: /보류$/ }));
-    expect(props.onDefer).toHaveBeenCalledWith("SCHEDULE_UNSEEN:opaque/server:key:r7", "THREE_DAYS");
+    expect(row.querySelector('.rm-icon-badge[data-tone="warn"] [data-icon="alert-circle"]')).toBeTruthy();
+    expect(row.querySelector('[data-icon="chevron-right"]')).toBeTruthy();
+    expect(row.textContent).not.toContain("세부 조작");
+    expect(within(row).queryByRole("combobox")).not.toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: /보류/ })).not.toBeInTheDocument();
   });
 
-  it("passes the exact authoritative key to defer and loads the next opaque cursor", async () => {
+  it("loads the next opaque cursor", async () => {
     const props = renderWorkbox();
-    const row = screen.getByRole("listitem", { name: /일정 확인이 필요한 멤버/ });
-
-    await userEvent.click(within(row).getByText("세부 조작"));
-    await userEvent.selectOptions(within(row).getByRole("combobox", { name: "일정 확인이 필요한 멤버 보류 기간" }), "THREE_DAYS");
-    await userEvent.click(within(row).getByRole("button", { name: "일정 확인이 필요한 멤버 보류" }));
-    expect(props.onDefer).toHaveBeenCalledWith("SCHEDULE_UNSEEN:opaque/server:key:r7", "THREE_DAYS");
-
     await userEvent.click(screen.getByRole("button", { name: "다음 묶음 불러오기" }));
     expect(props.onLoadMore).toHaveBeenCalledWith("opaque-next-page");
   });
 
-  it("undoes a deferral with the same authoritative key and keeps the row during pending/error", async () => {
-    const onUndoDeferral = vi.fn();
+  it("keeps a row visible while showing a row-level error", () => {
     renderWorkbox({
       state: "DEFERRED",
       view: {
@@ -204,31 +185,24 @@ describe("HostWorkbox", () => {
         key: "SCHEDULE_UNSEEN:opaque/server:key:r7",
         message: "보류를 해제하지 못했습니다.",
       },
-      onUndoDeferral,
     });
 
-    const pendingRow = screen.getByRole("listitem", { name: /일정 확인이 필요한 멤버/ });
-    expect(pendingRow).toBeVisible();
+    expect(screen.getByRole("listitem", { name: /일정 확인이 필요한 멤버/ })).toBeVisible();
     expect(screen.getByText("보류를 해제하지 못했습니다.")).toBeVisible();
-    await userEvent.click(within(pendingRow).getByText("세부 조작"));
-    const button = within(pendingRow).getByRole("button", { name: "일정 확인이 필요한 멤버 보류 해제" });
-    expect(button).toBeDisabled();
+    expect(screen.queryByText("세부 조작")).not.toBeInTheDocument();
+  });
 
+  it("renders a footer note with history chevron", () => {
     renderWorkbox({
-      state: "DEFERRED",
-      view: {
-        ...page,
-        state: "DEFERRED",
-        nextCursor: null,
-        items: [{ ...page.items[0], state: "DEFERRED", deferredUntil: "2026-09-02T09:00:00Z" }],
-      },
-      onUndoDeferral,
+      footerNote: { text: "어제 19:30 자동 리마인드 전달됨", historyHref: "/app/host/sessions/session-1?section=history" },
     });
-    const enabledRow = screen.getAllByRole("listitem", { name: /일정 확인이 필요한 멤버/ }).at(-1)!;
-    await userEvent.click(within(enabledRow).getByText("세부 조작"));
-    const enabled = within(enabledRow).getByRole("button", { name: "일정 확인이 필요한 멤버 보류 해제" });
-    await userEvent.click(enabled);
-    expect(onUndoDeferral).toHaveBeenCalledWith("SCHEDULE_UNSEEN:opaque/server:key:r7");
+
+    const footer = document.querySelector(".rm-host-workbox__footer");
+    expect(footer?.querySelector('[data-icon="clock"]')).toBeTruthy();
+    expect(screen.getByText("어제 19:30 자동 리마인드 전달됨")).toBeVisible();
+    const history = screen.getByRole("link", { name: "변경 이력" });
+    expect(history).toHaveAttribute("href", "/app/host/sessions/session-1?section=history");
+    expect(history.querySelector('[data-icon="chevron-right"]')).toBeTruthy();
   });
 
   it("renders only disclosure.visibleItems and exposes 작업함 모두 보기 until expanded", async () => {
@@ -310,7 +284,7 @@ describe("HostWorkbox", () => {
     expect(props.onLoadMore).toHaveBeenCalledWith("opaque-next-page");
   });
 
-  it("renders completed receipt summaries as read-only server evidence", async () => {
+  it("keeps completed rows destination-only without in-row receipt disclosure", () => {
     renderWorkbox({
       state: "COMPLETED",
       view: {
@@ -328,9 +302,8 @@ describe("HostWorkbox", () => {
     });
 
     const row = screen.getByRole("listitem", { name: /일정 확인이 필요한 멤버/ });
-    await userEvent.click(within(row).getByText("세부 조작"));
-    expect(within(row).getByRole("status", { name: /일정 알림 · 완료/ })).toBeVisible();
-    expect(within(row).getByText(/처리 0명/)).toBeVisible();
+    expect(row.textContent).not.toContain("세부 조작");
+    expect(within(row).queryByRole("status", { name: /일정 알림 · 완료/ })).not.toBeInTheDocument();
     expect(within(row).queryByRole("button", { name: /완료|보류/ })).not.toBeInTheDocument();
   });
 });

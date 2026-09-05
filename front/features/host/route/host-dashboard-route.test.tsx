@@ -484,8 +484,7 @@ describe("HostDashboardRoute", () => {
     }));
 
     const nextAction = await screen.findByRole("region", { name: "다음에 할 일" });
-    expect(within(nextAction).queryByRole("button", { name: "내일 09:00까지 보류" })).not.toBeInTheDocument();
-    await userEvent.click(within(nextAction).getByText("세부 조작"));
+    expect(within(nextAction).queryByText("세부 조작")).not.toBeInTheDocument();
     await userEvent.click(within(nextAction).getByRole("button", { name: "내일 09:00까지 보류" }));
     expect(routeMocks.deferWorkbox).toHaveBeenCalledWith(expect.objectContaining({
       key,
@@ -540,7 +539,6 @@ describe("HostDashboardRoute", () => {
     }));
 
     const nextAction = await screen.findByRole("region", { name: "다음에 할 일" });
-    await userEvent.click(within(nextAction).getByText("세부 조작"));
     const button = within(nextAction).getByRole("button", { name: "내일 09:00까지 보류" });
     await userEvent.click(button);
     expect(within(nextAction).getByRole("button", { name: "보류 중" })).toBeDisabled();

@@ -179,22 +179,19 @@ export function HostScheduleReviewPage({
                 onChange={(event) => onBodyChange?.(event.currentTarget.value)}
               />
             </label>
-            <details className="rm-schedule-review__channels">
-              <summary>세부 조작</summary>
-              <fieldset disabled={busy}>
-                <legend>발송 채널</legend>
-                {CHANNELS.map((channel) => (
-                  <label key={channel}>
-                    <input
-                      type="radio"
-                      name="schedule-review-channel"
-                      checked={requestedChannels === channel}
-                      onChange={() => onRequestedChannelsChange?.(channel)}
-                    /> {channelLabel(channel)}
-                  </label>
-                ))}
-              </fieldset>
-            </details>
+            <fieldset className="rm-schedule-review__channels" disabled={busy}>
+              <legend>발송 채널</legend>
+              {CHANNELS.map((channel) => (
+                <label key={channel}>
+                  <input
+                    type="radio"
+                    name="schedule-review-channel"
+                    checked={requestedChannels === channel}
+                    onChange={() => onRequestedChannelsChange?.(channel)}
+                  /> {channelLabel(channel)}
+                </label>
+              ))}
+            </fieldset>
 
             {error && !preview ? <p className="rm-schedule-review__error" role="alert">{error}</p> : null}
             {onPreview ? (

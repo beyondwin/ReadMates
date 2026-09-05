@@ -1,6 +1,7 @@
 import type { ComponentType, KeyboardEvent, ReactNode } from "react";
-import type { HostWorkboxDisclosure, HostWorkboxView } from "@/features/host/model/host-workbox-model";
-import { HostWorkItem, type HostWorkboxDeferralOption } from "./host-work-item";
+import type { HostWorkboxDisclosure, HostWorkboxFooterNote, HostWorkboxView } from "@/features/host/model/host-workbox-model";
+import { ReadmatesIcon } from "@/shared/ui/icon";
+import { HostWorkItem } from "./host-work-item";
 import "./host-workbox.css";
 
 type HostWorkboxState = HostWorkboxView["state"];
@@ -10,6 +11,10 @@ type WorkboxLinkProps = {
   className?: string;
   children: ReactNode;
 };
+
+const DefaultLink: ComponentType<WorkboxLinkProps> = ({ to, children, ...props }) => (
+  <a {...props} href={to}>{children}</a>
+);
 
 const tabs = [
   ["NOW", "지금"],
@@ -26,12 +31,11 @@ export type HostWorkboxProps = {
   pendingKey: string | null;
   rowError?: { key: string; message: string } | null;
   showPartialWarnings?: boolean;
+  footerNote?: HostWorkboxFooterNote | null;
   onStateChange: (state: HostWorkboxState) => void;
   onRetry: () => void;
   onLoadMore: (cursor: string) => void;
   onShowAll?: () => void;
-  onDefer: (key: string, option: HostWorkboxDeferralOption) => void;
-  onUndoDeferral: (key: string) => void;
   LinkComponent?: ComponentType<WorkboxLinkProps>;
 };
 
@@ -41,16 +45,14 @@ export function HostWorkbox({
   disclosure = null,
   loading,
   error,
-  pendingKey,
   rowError = null,
   showPartialWarnings = true,
+  footerNote = null,
   onStateChange,
   onRetry,
   onLoadMore,
   onShowAll,
-  onDefer,
-  onUndoDeferral,
-  LinkComponent,
+  LinkComponent = DefaultLink,
 }: HostWorkboxProps) {
   const loadedView = !loading && !error && view?.state === state ? view : null;
   const activeCount = loadedView?.items.length ?? null;
@@ -145,10 +147,7 @@ export function HostWorkbox({
                   <HostWorkItem
                     key={item.key}
                     item={item}
-                    pending={pendingKey === item.key}
                     error={rowError?.key === item.key ? rowError.message : null}
-                    onDefer={onDefer}
-                    onUndoDeferral={onUndoDeferral}
                     LinkComponent={LinkComponent}
                   />
                 ))}
@@ -178,6 +177,17 @@ export function HostWorkbox({
           </>
         ) : null}
       </div>
+
+      {footerNote ? (
+        <footer className="rm-host-workbox__footer">
+          <ReadmatesIcon name="clock" size={16} />
+          <span>{footerNote.text}</span>
+          <LinkComponent to={footerNote.historyHref}>
+            변경 이력
+            <ReadmatesIcon name="chevron-right" size={16} />
+          </LinkComponent>
+        </footer>
+      ) : null}
     </section>
   );
 }

@@ -194,10 +194,6 @@ export function HostPersonDetail({
           <BlockTitle id="person-management-title" index="04">멤버십</BlockTitle>
           <p>{statusLabels[person.status]} · {roleLabel}</p>
           <LinkComponent to={peopleHref} className="rm-host-person__text-link">사람 관리 원장으로</LinkComponent>
-          <details className="rm-host-person__aux">
-            <summary>세부 조작</summary>
-            <p>상태 변경은 서버가 허용한 현재 권한과 조건을 확인할 수 있는 사람 관리 원장에서 진행합니다.</p>
-          </details>
         </section>
       </div>
     </main>

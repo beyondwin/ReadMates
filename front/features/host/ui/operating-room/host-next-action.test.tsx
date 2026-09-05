@@ -4,12 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 import type { HostNextActionView } from "@/features/host/model/host-operating-room-model";
 import { HostNextAction } from "./host-next-action";
 
-async function discloseDefer(user: ReturnType<typeof userEvent.setup>) {
-  const region = screen.getByRole("region", { name: "다음에 할 일" });
-  await user.click(within(region).getByText("세부 조작"));
-  return region;
-}
-
 const actionable: HostNextActionView = {
   kind: "schedule-seen",
   state: "actionable",
@@ -32,27 +26,25 @@ describe("HostNextAction", () => {
     expect(region.querySelectorAll(".rm-operating-room-next-action__primary")).toHaveLength(1);
   });
 
-  it("folds defer behind 세부 조작 and keeps it available after disclose", async () => {
+  it("renders defer as a visible secondary button with a clock icon", async () => {
     const onDefer = vi.fn<(workItemKey: string) => void>();
     const user = userEvent.setup();
     render(<HostNextAction action={actionable} onDefer={onDefer} />);
 
     const region = screen.getByRole("region", { name: "다음에 할 일" });
-    expect(within(region).getByText("세부 조작")).toBeVisible();
-    expect(within(region).queryByRole("button", { name: "내일 09:00까지 보류" })).not.toBeInTheDocument();
-
-    await discloseDefer(user);
-    await user.click(within(region).getByRole("button", { name: "내일 09:00까지 보류" }));
+    expect(within(region).queryByText("세부 조작")).not.toBeInTheDocument();
+    const defer = within(region).getByRole("button", { name: "내일 09:00까지 보류" });
+    expect(defer.querySelector('[data-icon="clock"]')).toBeTruthy();
+    await user.click(defer);
 
     expect(onDefer).toHaveBeenCalledOnce();
     expect(onDefer).toHaveBeenCalledWith("server/opaque:key:with exact bytes");
   });
 
-  it("disables the exact defer action while its authoritative key is pending", async () => {
-    const user = userEvent.setup();
+  it("disables the exact defer action while its authoritative key is pending", () => {
     render(<HostNextAction action={actionable} onDefer={vi.fn()} pending />);
 
-    const region = await discloseDefer(user);
+    const region = screen.getByRole("region", { name: "다음에 할 일" });
     expect(within(region).getByRole("button", { name: "보류 중" })).toBeDisabled();
   });
 
@@ -104,6 +96,16 @@ describe("HostNextAction", () => {
     );
     expect(screen.getByText("최신 일정을 아직 보지 않은 4명이 있어요")).toBeVisible();
     expect(screen.getByRole("link", { name: "대상과 문구 검토" })).toBeVisible();
+  });
+
+  it("uses deferLabel from the next-action view", () => {
+    render(
+      <HostNextAction
+        action={{ ...actionable, deferLabel: "내일 18:00까지 보류" }}
+        onDefer={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "내일 18:00까지 보류" })).toBeVisible();
   });
 
   it("renders an optional secondary destination next to the primary control", () => {

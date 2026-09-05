@@ -32,7 +32,7 @@ import {
   type HostOperatingRoomSource,
   type HostOperatingRoomView,
 } from "@/features/host/model/host-operating-room-model";
-import { buildHostWorkboxDisclosure, buildHostWorkboxView } from "@/features/host/model/host-workbox-model";
+import { buildHostWorkboxDisclosure, buildHostWorkboxView, buildWorkboxFooterNote } from "@/features/host/model/host-workbox-model";
 import type { SessionClosingStatusInput } from "@/features/host/model/session-closing-model";
 import {
   hostSessionChangeUndoDescription,
@@ -54,7 +54,6 @@ import {
   hostWorkboxPageQuery,
   publishHostWorkboxComposition,
   useDeferHostWorkboxItemMutation,
-  useRemoveHostWorkboxDeferralMutation,
 } from "@/features/host/queries/host-workbox-queries";
 import { registerHostSensitiveState } from "@/features/host/storage/host-sensitive-storage";
 import type { HostLinkComponent } from "@/features/host/ui/host-link-types";
@@ -174,7 +173,6 @@ export function HostDashboardRoute({
     setWorkboxCursors([null]);
   }
   const deferWorkboxMutation = useDeferHostWorkboxItemMutation(context);
-  const removeWorkboxDeferralMutation = useRemoveHostWorkboxDeferralMutation(context);
 
   const detailQuery = useQuery({
     ...hostSessionDetailQuery(sessionId ?? "", context),
@@ -683,34 +681,6 @@ export function HostDashboardRoute({
     }
   }, [context, deferWorkboxMutation, queryClient, transitionOwner]);
 
-  const undoWorkItemDeferral = useCallback(async (workItemKey: string) => {
-    if (workboxMutationKeyRef.current !== null) return;
-    workboxMutationKeyRef.current = workItemKey;
-    setWorkboxPendingKey(workItemKey);
-    setWorkboxRowError(null);
-    const operationId = `host-workbox:remove-deferral:${workItemKey}`;
-    const handle = transitionOwner.begin(operationId, "L2", async () => ({ operationId, outcome: "still-unknown" }));
-    try {
-      await removeWorkboxDeferralMutation.mutateAsync(workItemKey);
-      if (await handle.settle("succeeded") !== "accepted") return;
-      await publishTransitionAction(handle, "cache", () => publishHostWorkboxComposition(queryClient, context));
-      await publishTransitionAction(handle, "ui", () => setWorkboxPendingKey((current) => current === workItemKey ? null : current));
-    } catch (error) {
-      if (error instanceof TransitionOwnerObsoleteError) return;
-      if (await handle.settle("failed") !== "accepted") return;
-      await publishTransitionAction(handle, "errorCopy", () => setWorkboxRowError({
-        key: workItemKey,
-        message: "보류를 해제하지 못했습니다. 항목을 유지한 채 다시 시도할 수 있습니다.",
-      }));
-      await publishTransitionAction(handle, "ui", () => setWorkboxPendingKey((current) => current === workItemKey ? null : current));
-    } finally {
-      if (workboxMutationKeyRef.current === workItemKey) {
-        workboxMutationKeyRef.current = null;
-      }
-      handle.completePublication();
-    }
-  }, [context, queryClient, removeWorkboxDeferralMutation, transitionOwner]);
-
   const workboxContent = (
     <HostWorkbox
       state={workboxState}
@@ -721,6 +691,10 @@ export function HostDashboardRoute({
       pendingKey={workboxPendingKey}
       rowError={workboxRowError}
       showPartialWarnings={false}
+      footerNote={{
+        text: buildWorkboxFooterNote(workboxView?.items ?? []) ?? "",
+        historyHref: headerLinks?.historyHref ?? paths.hostBasePath,
+      }}
       onStateChange={(nextState) => {
         setWorkboxState(nextState);
         setWorkboxCursors([null]);
@@ -732,8 +706,6 @@ export function HostDashboardRoute({
         setWorkboxRowError(null);
       }}
       onShowAll={showAllWorkbox}
-      onDefer={(key, option) => { void deferWorkItem(key, option); }}
-      onUndoDeferral={(key) => { void undoWorkItemDeferral(key); }}
       LinkComponent={LinkComponent}
     />
   );

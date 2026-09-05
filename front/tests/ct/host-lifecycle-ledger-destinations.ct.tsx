@@ -85,7 +85,6 @@ test("surface 11 people destination at 1440px", async ({ mount, page }) => {
 test("surface 12 records destination at 1440px", async ({ mount, page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const component = await mount(<main><h1>기록</h1><HostSessionLedger items={[record]} summary={{ needsAttentionCount: 1, incompletePublishedCount: 1, draftCount: 1 }} filters={{ view: "active", search: "", state: null, recordStatus: null, needsAttention: null }} nextCursor={null} loadingMore={false} onFiltersChange={noop} onLoadMore={noop} /></main>);
-  await component.getByText("세부 조작").click();
   await expect(component.getByRole("region", { name: "기록 장부 요약" })).toContainText("확인 필요 1건");
   await expect(component.getByRole("table", { name: "모임 기록 장부" })).toBeVisible();
   await expectNoHorizontalOverflow(page);

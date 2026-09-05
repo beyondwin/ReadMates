@@ -292,7 +292,6 @@ describe("HostSettingsRoute transition ownership", () => {
   it("publishes a structured co-host rejection without retaining a retry identity", async () => {
     vi.mocked(changeHostCoHost).mockRejectedValue(apiError("LAST_ACTIVE_HOST_REQUIRED", 409));
     renderRoute(createGlobalSpaceTransitionCoordinator());
-    await userEvent.click(await screen.findByText("세부 조작"));
     const action = await screen.findByRole("button", { name: "은하 공동 호스트 지정" });
 
     await userEvent.click(action);

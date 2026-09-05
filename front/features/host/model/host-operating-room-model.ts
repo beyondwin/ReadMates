@@ -71,6 +71,7 @@ export type HostNextActionView = {
   note?: string;
   reason: string;
   href: string | null;
+  deferLabel?: string | null;
 };
 
 export type PreparationLedgerRowView = {
@@ -500,13 +501,17 @@ function resolveNextAction(context: {
 
 function actionState(
   input: HostOperatingRoomInput,
-  action: Omit<HostNextActionView, "state" | "workItemKey">,
+  action: Omit<HostNextActionView, "state" | "workItemKey" | "deferLabel">,
 ): HostNextActionView {
   const authority = authoritativeWorkItem(input, action.kind);
+  const state = authority?.state ?? "actionable";
   return {
     ...action,
-    state: authority?.state ?? "actionable",
+    state,
     workItemKey: authority?.workItemKey ?? null,
+    deferLabel: state === "actionable"
+      ? (action.kind === "closing" ? "내일 18:00까지 보류" : "내일 09:00까지 보류")
+      : null,
   };
 }
 
@@ -541,6 +546,7 @@ function noNextAction(): HostNextActionView {
     label: "지금 필요한 조치 없음",
     reason: "현재 모임의 필수 준비가 확인되었습니다.",
     href: null,
+    deferLabel: null,
   };
 }
 

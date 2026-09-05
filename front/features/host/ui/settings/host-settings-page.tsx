@@ -33,12 +33,7 @@ export function HostSettingsColumns({
       <div>{invitations}</div>
       <div>
         {clubSettings}
-        {extra ? (
-          <details className="rm-host-editorial-ledger__panel">
-            <summary className="btn btn-quiet btn-sm">세부 조작</summary>
-            {extra}
-          </details>
-        ) : null}
+        {extra}
       </div>
     </div>
   );

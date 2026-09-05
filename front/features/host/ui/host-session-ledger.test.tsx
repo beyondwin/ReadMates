@@ -59,7 +59,6 @@ describe("HostSessionLedger", () => {
       />,
     );
 
-    await user.click(screen.getByText("세부 조작"));
     expect(screen.getByRole("link", { name: "휴지통" })).toHaveAttribute("href", "?view=trash");
     await user.click(screen.getByText("기록 필터"));
     await user.type(screen.getByRole("searchbox", { name: "모임 기록 검색" }), "  모비 딕  ");
@@ -76,8 +75,7 @@ describe("HostSessionLedger", () => {
     expect(onFiltersChange).toHaveBeenCalledWith({ ...filters, recordStatus: "INCOMPLETE" });
   });
 
-  it("keeps a truthful zero summary as editorial context", async () => {
-    const user = userEvent.setup();
+  it("keeps a truthful zero summary as editorial context", () => {
     render(
       <HostSessionLedger
         items={[]}
@@ -91,7 +89,6 @@ describe("HostSessionLedger", () => {
     );
 
     expect(screen.getByText("조건에 맞는 모임 기록이 없습니다.")).toBeVisible();
-    await user.click(screen.getByText("세부 조작"));
     expect(screen.getByRole("region", { name: "기록 장부 요약" })).toHaveTextContent(
       "확인 필요한 기록 없음",
     );

@@ -578,8 +578,7 @@ export function HostSessionLedger({
             ) : null}
             {loadMoreError ? <p className="small" role="alert">{loadMoreError}</p> : null}
             {trashView ? null : (
-              <details className="rm-host-editorial-ledger__panel">
-                <summary className="btn btn-quiet btn-sm">세부 조작</summary>
+              <div className="rm-host-editorial-ledger__panel">
                 {!summary ? null : (
                   <section className="rm-document-panel" aria-label="기록 장부 요약" style={{ padding: 18 }}>
                     <h2 className="h4 editorial" style={{ margin: 0 }}>기록 장부 요약</h2>
@@ -598,7 +597,7 @@ export function HostSessionLedger({
                 <LinkComponent to={trashHref} className="btn btn-quiet btn-sm">
                   휴지통
                 </LinkComponent>
-              </details>
+              </div>
             )}
           </div>
           {trashView ? null : (

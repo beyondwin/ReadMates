@@ -180,8 +180,6 @@ function hostWorkbox(overrides: {
       onStateChange={() => undefined}
       onRetry={() => undefined}
       onLoadMore={() => undefined}
-      onDefer={() => undefined}
-      onUndoDeferral={() => undefined}
     />
   );
 }
@@ -489,8 +487,6 @@ function approvedWorkbox(items: HostWorkboxView["items"]): ReactElement {
       onStateChange={() => undefined}
       onRetry={() => undefined}
       onLoadMore={() => undefined}
-      onDefer={() => undefined}
-      onUndoDeferral={() => undefined}
     />
   );
 }
