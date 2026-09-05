@@ -49,13 +49,13 @@ ADR impact: none (관측·비율 기록만). ADR-0045 update / ADR-0053 Proposed
 
 Task 12b Jammy 재캡처 (`DOCKER_CONTEXT=colima-readmates-va CI=true npx --yes corepack@0.35.0 pnpm --dir front test:e2e:approved-routes:docker`). Playwright **18 failed** (strict pixel, 모두 `pct` > 0.02). `summary.json` `pct`/`structurePass`를 `1단계 ratio`/`structure`에 그대로 옮김.
 
-- Pixel mismatch: **18/18 fail**.
+- Pixel mismatch: **18/18 fail**. 0단계 대비 비율 이동: **11/18 worse**, 6 improved, 1 flat. 큰 이동은 `admin-work-detail-mobile` 6.47 → 13.23 (상세에 셸 헤더·상태 띠가 남음).
 - Structure contract: **1/18 `structurePass: true`** (`admin-today-desktop`만). 화면별 rule RED는 Phase 2–4 정상.
 - 공유 크롬 rule(`nav-icons`, `header-status`, `utility-*`, `mobile-*`, `workbox-row-*`, `no-detail-ops-leak`): 해당 id 전부 `passed:true` (재캡처 후 구현 수정 없음). `workbox-footer`는 `workbox-row-*`가 아니며 운영실 화면별 잔여(Phase 2).
 
 ## CT 대기
 
-검토자: Task 12b session / 2026-09-05. 실제 route `.tmp/visual-authority-compare/<id>/` reference·candidate와 나란히 본 뒤 Docker update mode로 갱신.
+검토자: Task 12b session / 2026-09-05. 실제 route `.tmp/visual-authority-compare/<id>/` reference·candidate와 나란히 본 뒤 Docker update mode로 갱신. Controller ratified `admin-shell-mobile-390.png` and `admin-shell-long-copy-320.png` on 2026-09-05 (visual inspection of Phase 1 shell chrome).
 
 | 스냅샷 | 실제 route 대조 | 판정 |
 | --- | --- | --- |

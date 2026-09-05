@@ -35,6 +35,7 @@ function shellFixture(
   routePath = "today",
   currentNavigationOwner: "today" | "clubs" | "service" | "records" = "today",
   workspaceAccountLabel = "운영자",
+  accountNameVisible = false,
 ) {
   return (
     <MemoryRouter initialEntries={[`/admin/${routePath}`]}>
@@ -61,6 +62,7 @@ function shellFixture(
               accountError={null}
               onOtherAccountLogin={() => undefined}
               outletContext={{ authorityEpoch: 0 }}
+              accountNameVisible={accountNameVisible}
             />
           }
         >
@@ -283,6 +285,13 @@ async function mountApprovedShell(
   await expectNoHorizontalOverflow(page);
   return component;
 }
+
+test("account name renders beside the account button when the shell is asked to show it", async ({ mount, page }) => {
+  await page.setViewportSize(VISUAL_AUTHORITY_VIEWPORTS.desktopWide);
+  const component = await mount(shellFixture(todayShellContent, "today", "today", "김운영", true));
+  await expect(component.locator(".admin-shell__account-control").getByRole("button", { name: "계정" })).toBeVisible();
+  await expect(component.locator(".admin-shell__account-name")).toHaveText("김운영");
+});
 
 test("space menu keeps platform and club choices inside the production shell", async ({ mount, page }) => {
   test.setTimeout(90_000);
