@@ -1,4 +1,5 @@
 import { type ReactNode, useId, useState } from "react";
+import { ReadmatesIcon, type ReadmatesIconName } from "@/shared/ui/icon";
 import "@/features/host/ui/host-editorial-ledger.css";
 import { HostPeopleNameQueryContext } from "./host-people-name-query";
 import "./member-ledger.css";
@@ -24,6 +25,17 @@ const STATUS_CHIPS = [
   { id: "suspended", label: "쉬는 중", countKey: "suspended" },
 ] as const;
 
+const SCHEDULE_RAIL_ROWS: ReadonlyArray<{
+  key: keyof HostPeopleScheduleSeenCounts;
+  label: string;
+  icon: ReadmatesIconName;
+}> = [
+  { key: "current", label: "현재 일정 확인", icon: "calendar" },
+  { key: "stale", label: "변경 전 확인", icon: "calendar" },
+  { key: "unseen", label: "미열람", icon: "mail" },
+  { key: "notTarget", label: "대상 아님", icon: "minus-circle" },
+];
+
 export type HostPeopleStatusFilter = (typeof STATUS_CHIPS)[number]["id"];
 
 export function HostPeoplePage({
@@ -36,7 +48,7 @@ export function HostPeoplePage({
   onStatusFilterChange,
 }: {
   children: ReactNode;
-  scheduleSeen?: HostPeopleScheduleSeenCounts;
+  scheduleSeen?: HostPeopleScheduleSeenCounts | null;
   rosterCounts?: HostPeopleRosterCounts;
   unreadHref?: string;
   pendingZone?: ReactNode;
@@ -51,7 +63,7 @@ export function HostPeoplePage({
 
   return (
     <HostPeopleNameQueryContext.Provider value={query}>
-      <main className="rm-host-members-page rm-host-editorial-ledger rm-host-editorial-ledger--context">
+      <main className="rm-host-members-page rm-host-people rm-host-editorial-ledger rm-host-editorial-ledger--context">
         <section className="page-header-compact">
           <div className="container rm-host-people__header">
             <div className="rm-host-editorial-ledger__context">
@@ -62,7 +74,8 @@ export function HostPeoplePage({
             </div>
             <div className="rm-host-people__tools">
               <label className="rm-host-people__search" htmlFor={searchId}>
-                <span className="rm-sr-only">이름</span>
+                <ReadmatesIcon name="search" size={16} />
+                <span className="rm-sr-only">검색</span>
                 <input
                   id={searchId}
                   type="search"
@@ -72,7 +85,7 @@ export function HostPeoplePage({
                   onChange={(event) => setQuery(event.currentTarget.value)}
                 />
               </label>
-              <div className="rm-host-people__filters" role="tablist" aria-label="멤버 상태">
+              <div className="rm-host-people__filters rm-member-ledger__segments" role="tablist" aria-label="멤버 상태">
                 {STATUS_CHIPS.map((chip) => {
                   const selected = selectedFilter === chip.id;
                   const count = rosterCounts?.[chip.countKey];
@@ -102,22 +115,25 @@ export function HostPeoplePage({
             <div>{children}</div>
             <aside className="rm-host-editorial-ledger__rail" aria-labelledby="schedule-seen-title">
               <h2 id="schedule-seen-title">현재 일정 확인</h2>
-              {scheduleSeen ? (
-                <ul className="rm-host-editorial-ledger__list">
-                  <li className="rm-host-editorial-ledger__row"><span>현재 일정 확인</span><span>{scheduleSeen.current}</span></li>
-                  <li className="rm-host-editorial-ledger__row"><span>변경 전 확인</span><span>{scheduleSeen.stale}</span></li>
-                  <li className="rm-host-editorial-ledger__row"><span>미열람</span><span>{scheduleSeen.unseen}</span></li>
-                  {scheduleSeen.notTarget != null ? (
-                    <li className="rm-host-editorial-ledger__row"><span>대상 아님</span><span>{scheduleSeen.notTarget}</span></li>
-                  ) : null}
-                </ul>
-              ) : (
-                <p className="small">최근 접속은 클럽 공간 기준이며, 일정 확인은 사람 상세에서 따로 봅니다.</p>
-              )}
+              <ul className="rm-member-ledger__rail">
+                {SCHEDULE_RAIL_ROWS.map((row) => {
+                  const value = scheduleSeen?.[row.key];
+                  return (
+                    <li key={row.key} className="rm-member-ledger__rail-row">
+                      <ReadmatesIcon name={row.icon} size={24} />
+                      <span>{row.label}</span>
+                      <span>{value == null ? "—" : value}</span>
+                    </li>
+                  );
+                })}
+              </ul>
               {unreadHref ? (
-                <a className="rm-host-people__unread" href={unreadHref}>미열람 멤버 보기</a>
+                <a className="rm-host-people__unread" href={unreadHref}>미열람 멤버 보기 ›</a>
               ) : null}
-              <p className="small">최근 접속은 클럽 공간 기준이며 세부 활동은 표시하지 않아요.</p>
+              <p className="small rm-member-ledger__rail-info">
+                <ReadmatesIcon name="info" size={16} />
+                최근 접속은 클럽 공간 기준이며 세부 활동은 표시하지 않아요.
+              </p>
             </aside>
           </div>
         </section>

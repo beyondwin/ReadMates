@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { HostMemberListItem } from "@/features/host/model/host-view-types";
 import {
+  aggregateHostPeopleScheduleSeen,
   clubAccessMeta,
   formatMembershipTenure,
   formatPendingRequestTime,
   formatRecentClubAccess,
+  rsvpIconName,
+  scheduleSeenIconName,
 } from "./member-list-helpers";
 
 function member(lastClubAccessAt: string | null): HostMemberListItem {
@@ -58,5 +61,27 @@ describe("people ledger presentation labels", () => {
     expect(formatMembershipTenure("2025-01-02T00:00:00+09:00", now)).toBe("1년 8개월");
     expect(formatMembershipTenure("2025-10-02T00:00:00+09:00", now)).toBe("11개월");
     expect(formatMembershipTenure("2026-08-27T00:00:00+09:00", now)).toBe("6일");
+  });
+});
+
+describe("people ledger glyphs", () => {
+  it("maps schedule labels to calendar, mail, or minus-circle", () => {
+    expect(scheduleSeenIconName("현재 일정 확인")).toBe("calendar");
+    expect(scheduleSeenIconName("변경 전 확인")).toBe("calendar");
+    expect(scheduleSeenIconName("미열람")).toBe("mail");
+    expect(scheduleSeenIconName("일정 대상 아님")).toBe("minus-circle");
+  });
+
+  it("maps rsvp labels to check, question, or x icons and omits unknown values", () => {
+    expect(rsvpIconName("참석")).toBe("check-circle");
+    expect(rsvpIconName("미응답")).toBe("question-circle");
+    expect(rsvpIconName("불참")).toBe("x-circle");
+    expect(rsvpIconName("—")).toBeNull();
+  });
+});
+
+describe("aggregateHostPeopleScheduleSeen", () => {
+  it("does not invent rail counts when members have no scheduleSeen field", () => {
+    expect(aggregateHostPeopleScheduleSeen([member("2026-08-29T01:02:03Z")])).toBeNull();
   });
 });

@@ -11,13 +11,14 @@ import {
 } from "@/features/host/model/host-member-actions";
 import { isTransitionOwnerObsoleteError } from "@/shared/ui/use-transition-safety-owner";
 import { LifecyclePolicyDialog } from "./members/member-approval-actions";
-import { actionKey, disabledProfileReason, isMembershipPending } from "./members/member-action-rules";
-import { MemberActionButton } from "./members/member-list";
+import { actionKey, isMembershipPending } from "./members/member-action-rules";
 import { HostMemberProfileDialog } from "./members/member-profile-editor";
 import { hostProfileErrorMessage, profileFailureMessage } from "./members/member-profile-errors";
-import { HostPeoplePage, type HostPeopleStatusFilter } from "./members/host-people-page";
+import { HostPeoplePage, type HostPeopleScheduleSeenCounts, type HostPeopleStatusFilter } from "./members/host-people-page";
 import { MemberPendingZone } from "./members/member-pending-zone";
 import { MemberTabPanel } from "./members/member-tab-panel";
+import { aggregateHostPeopleScheduleSeen } from "./members/member-list-helpers";
+import type { MemberLedgerFacts } from "./members/member-list";
 import type {
   HostMemberLifecyclePath,
   HostMembersLinkComponent,
@@ -36,6 +37,9 @@ type HostMembersProps = {
   actions: HostMembersActions;
   settingsHref?: string;
   LinkComponent?: HostMembersLinkComponent;
+  factsByMembershipId?: Readonly<Record<string, MemberLedgerFacts>>;
+  scheduleSeen?: HostPeopleScheduleSeenCounts | null;
+  unreadHref?: string;
 };
 
 type MemberRowsState = {
@@ -50,6 +54,9 @@ export default function HostMembers({
   actions,
   settingsHref = "/app/host/settings",
   LinkComponent = DefaultPeopleLink,
+  factsByMembershipId,
+  scheduleSeen: scheduleSeenProp,
+  unreadHref,
 }: HostMembersProps) {
   const initialPage = useMemo(() => normalizeMemberPage(initialMembers), [initialMembers]);
   const initialMembersItems = initialPage.items;
@@ -105,23 +112,6 @@ export default function HostMembers({
     [members],
   );
   const viewerMembers = useMemo(() => members.filter((member) => member.status === "VIEWER"), [members]);
-  const openDialog = (nextDialog: Exclude<LifecycleDialog, null>, trigger: HTMLElement) => {
-    dialogTriggerRef.current = trigger;
-    setMessage(null);
-    setDialogPolicy("APPLY_NOW");
-    setDialog(nextDialog);
-  };
-
-  const openProfileDialog = (member: HostMemberListItem, trigger: HTMLElement) => {
-    if (isMembershipPending(member.membershipId, pendingActionsRef.current)) {
-      return;
-    }
-
-    dialogTriggerRef.current = trigger;
-    setMessage(null);
-    setProfileDialog({ member });
-  };
-
   const setActionPending = (key: string, isPending: boolean) => {
     const nextPendingActions = new Set(pendingActionsRef.current);
     if (isPending) {
@@ -269,27 +259,12 @@ export default function HostMembers({
     closeDialog();
   };
 
-  const renderProfileAction = (member: HostMemberListItem) => {
-    const rowPending = isMembershipPending(member.membershipId, pendingActions);
-    const profileReason = disabledProfileReason(rowPending);
-
-    return (
-      <MemberActionButton
-        action="profile"
-        member={member}
-        label="이름 변경"
-        disabled={rowPending}
-        reason={profileReason}
-        onClick={(event) => openProfileDialog(member, event.currentTarget)}
-      />
-    );
-  };
-
   const handleStatusFilterChange = (nextFilter: HostPeopleStatusFilter) => {
     setStatusFilter(nextFilter);
   };
 
   const personHref = (membershipId: string) => `/app/host/people/${encodeURIComponent(membershipId)}`;
+  const scheduleSeen = scheduleSeenProp ?? aggregateHostPeopleScheduleSeen(members, factsByMembershipId);
   const pendingZone = (
     <MemberPendingZone
       viewers={viewerMembers}
@@ -319,6 +294,8 @@ export default function HostMembers({
         viewer: viewerMembers.length,
         suspended: suspendedMembers.length,
       }}
+      scheduleSeen={scheduleSeen}
+      unreadHref={unreadHref}
       pendingZone={pendingZone}
       statusFilter={statusFilter}
       onStatusFilterChange={handleStatusFilterChange}
@@ -337,17 +314,17 @@ export default function HostMembers({
         <MemberTabPanel
           statusFilter={statusFilter}
           activeMembers={activeMembers}
+          viewerMembers={viewerMembers}
           suspendedMembers={suspendedMembers}
           inactiveMembers={inactiveMembers}
           pendingActions={pendingActions}
           nextCursor={visibleNextCursor}
           isLoadingMore={isLoadingMore}
-          renderProfileAction={renderProfileAction}
-          onOpenDialog={openDialog}
           onSubmitLifecycle={submitLifecycle}
           onLoadMore={loadMoreMembers}
           personHref={personHref}
           LinkComponent={LinkComponent}
+          factsByMembershipId={factsByMembershipId}
         />
 
         <LinkComponent to={settingsHref} className="rm-host-people__settings-link">

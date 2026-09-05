@@ -48,10 +48,10 @@ export function MemberPendingZone({
 
   return (
     <section
-      className="rm-document-panel rm-host-pending"
+      className="rm-member-ledger__pending"
       aria-label="가입 승인 대기"
     >
-      <header className="rm-host-pending__header">
+      <header className="rm-host-pending__header rm-member-ledger__pending-head">
         <div className="stack" style={{ "--stack": "6px" } as CSSProperties}>
           <h2 className="h4 editorial" style={{ margin: 0 }}>
             가입 승인 대기 {visibleViewers.length}명
@@ -69,7 +69,7 @@ export function MemberPendingZone({
         </button>
       </header>
 
-      <div className="stack" style={{ "--stack": "10px" } as CSSProperties}>
+      <ul className="rm-member-ledger__pending-list">
         {visibleViewers.map((member) => {
           const rowPending = isRowPending(member.membershipId);
           const activateReason = disabledViewerActivationReason(rowPending);
@@ -82,60 +82,59 @@ export function MemberPendingZone({
             ?? `/app/host/people/${encodeURIComponent(member.membershipId)}`;
 
           return (
-            <article key={member.membershipId} className="rm-host-pending__row">
-              <div className="row-between" style={{ alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-                <div className="rm-host-pending__identity">
-                  <AvatarChip avatarKey={member.avatarKey} name={member.displayName} label="" sizeRole="member" />
-                  <span className="rm-host-pending__name">
-                    <PersonLink
-                      to={personTo}
-                      className="rm-host-member-ledger__person-link"
-                    >
-                      {member.displayName}
-                    </PersonLink>
-                  </span>
-                  {requestTime ? (
-                    <span className="small rm-host-pending__time">{requestTime}</span>
-                  ) : null}
-                  <span className="rm-sr-only">{requestMeta(member)}</span>
-                </div>
-                <div className="row" style={{ gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                  {reviewing ? (
-                    <>
-                      <PendingActionButton
-                        action="approve"
-                        membershipId={member.membershipId}
-                        label="승인"
-                        tone="primary"
-                        disabled={activateDisabled}
-                        reason={activateReason}
-                        onClick={() => onActivate(member.membershipId)}
-                      />
-                      <PendingActionButton
-                        action="reject"
-                        membershipId={member.membershipId}
-                        label="거절"
-                        tone="ghost"
-                        disabled={releaseDisabled}
-                        reason={releaseReason}
-                        onClick={() => onRelease(member.membershipId)}
-                      />
-                    </>
-                  ) : (
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      type="button"
-                      onClick={() => startReview(member.membershipId)}
-                    >
-                      검토
-                    </button>
-                  )}
-                </div>
+            <li key={member.membershipId} className="rm-member-ledger__pending-row">
+              <AvatarChip avatarKey={member.avatarKey} name={member.displayName} label="" size={44} />
+              <div className="rm-host-pending__identity">
+                <span className="rm-host-pending__name">
+                  <PersonLink
+                    to={personTo}
+                    className="rm-host-member-ledger__person-link"
+                  >
+                    {member.displayName}
+                  </PersonLink>
+                </span>
+                <span className="rm-member-ledger__pending-path">—</span>
+                {requestTime ? (
+                  <span className="small rm-host-pending__time">{requestTime}</span>
+                ) : null}
+                <span className="rm-sr-only">{requestMeta(member)}</span>
               </div>
-            </article>
+              <div className="rm-member-ledger__pending-actions">
+                {reviewing ? (
+                  <>
+                    <PendingActionButton
+                      action="approve"
+                      membershipId={member.membershipId}
+                      label="승인"
+                      tone="primary"
+                      disabled={activateDisabled}
+                      reason={activateReason}
+                      onClick={() => onActivate(member.membershipId)}
+                    />
+                    <PendingActionButton
+                      action="reject"
+                      membershipId={member.membershipId}
+                      label="거절"
+                      tone="ghost"
+                      disabled={releaseDisabled}
+                      reason={releaseReason}
+                      onClick={() => onRelease(member.membershipId)}
+                    />
+                  </>
+                ) : (
+                  <button
+                    className="rm-member-ledger__review"
+                    type="button"
+                    onClick={() => startReview(member.membershipId)}
+                  >
+                    검토
+                  </button>
+                )}
+              </div>
+            </li>
           );
         })}
-      </div>
+      </ul>
     </section>
   );
 }

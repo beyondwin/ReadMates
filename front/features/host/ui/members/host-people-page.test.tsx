@@ -51,6 +51,26 @@ describe("matchesHostPeopleNameQuery", () => {
   });
 });
 
+describe("HostPeoplePage approved header and rail", () => {
+  it("renders a search icon, filled status segments, and a 4-row schedule rail without invented counts", () => {
+    render(
+      <HostPeoplePage>
+        <p>ledger</p>
+      </HostPeoplePage>,
+    );
+
+    const search = screen.getByRole("searchbox", { name: "이름으로 찾기" });
+    expect(search.closest("label")?.querySelector('[data-icon="search"]')).toBeTruthy();
+    expect(document.querySelector(".rm-member-ledger__segments")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /전체/ })).toHaveAttribute("aria-selected", "true");
+    expect(document.querySelectorAll(".rm-member-ledger__rail-row")).toHaveLength(4);
+    expect(screen.getByRole("heading", { name: "현재 일정 확인" })).toBeInTheDocument();
+    expect(screen.queryByText("일정 확인은 사람 상세에서 따로 봅니다.")).not.toBeInTheDocument();
+    expect(screen.getByText(/최근 접속은 클럽 공간 기준/)).toBeInTheDocument();
+    expect(document.querySelector(".rm-member-ledger__rail-row [data-icon]")).toBeTruthy();
+  });
+});
+
 describe("HostPeoplePage name search", () => {
   it("filters the mounted member list and pending rows by display name", async () => {
     const user = userEvent.setup();

@@ -65,6 +65,8 @@ describe("MemberPendingZone", () => {
     );
 
     const zone = screen.getByRole("region", { name: "가입 승인 대기" });
+    expect(zone).toHaveClass("rm-member-ledger__pending");
+    expect(document.querySelectorAll(".rm-member-ledger__pending-row")).toHaveLength(2);
     expect(within(zone).getByText("승인과 거절은 결과 안내를 포함해요.")).toBeInTheDocument();
     expect(within(zone).getByRole("button", { name: "가입 승인 검토" })).toBeEnabled();
     expect(within(zone).getAllByRole("button", { name: "검토" })).toHaveLength(2);
@@ -74,8 +76,8 @@ describe("MemberPendingZone", () => {
     await user.click(within(zone).getByRole("button", { name: "가입 승인 검토" }));
     expect(onReview).toHaveBeenCalledWith("membership-viewer");
 
-    const firstRow = within(zone).getByText("둘").closest("article") as HTMLElement;
-    const secondRow = within(zone).getByText("두번째 둘러보기").closest("article") as HTMLElement;
+    const firstRow = within(zone).getByText("둘").closest("li") as HTMLElement;
+    const secondRow = within(zone).getByText("두번째 둘러보기").closest("li") as HTMLElement;
     expect(within(firstRow).getByRole("button", { name: "승인" })).toBeEnabled();
     expect(within(firstRow).getByRole("button", { name: "거절" })).toBeEnabled();
     expect(within(secondRow).getByRole("button", { name: "검토" })).toBeEnabled();
@@ -100,7 +102,7 @@ describe("MemberPendingZone", () => {
       />,
     );
 
-    const row = screen.getByText("둘").closest("article") as HTMLElement;
+    const row = screen.getByText("둘").closest("li") as HTMLElement;
     await user.click(within(row).getByRole("button", { name: "검토" }));
     expect(within(row).getByRole("button", { name: "승인" })).toBeDisabled();
     expect(within(row).getByRole("button", { name: "거절" })).toBeDisabled();

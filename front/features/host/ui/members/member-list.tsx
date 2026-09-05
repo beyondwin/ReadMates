@@ -7,8 +7,9 @@ import {
   useRef,
   useState,
 } from "react";
-import type { HostMemberListItem, MembershipStatus } from "@/features/host/model/host-view-types";
+import type { HostMemberListItem } from "@/features/host/model/host-view-types";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
+import { ReadmatesIcon } from "@/shared/ui/icon";
 import { isMembershipPending, memberActionPendingReason } from "./member-action-rules";
 import {
   clubAccessMeta,
@@ -16,6 +17,9 @@ import {
   formatMembershipTenure,
   formatRecentClubAccess,
   rosterStatusLabels,
+  rsvpIconName,
+  scheduleSeenIconName,
+  statusPillTone,
 } from "./member-list-helpers";
 import { matchesHostPeopleNameQuery, useHostPeopleNameQuery } from "./host-people-name-query";
 import type { HostMemberLifecyclePath } from "./types";
@@ -27,34 +31,6 @@ const DefaultPersonLink: HostMembersLinkComponent = ({ to, children, ...props })
 );
 
 const HOST_PEOPLE_FOCUS_KEY = "readmates.host-people.focus-restore";
-
-function statusBadgeClass(status: MembershipStatus) {
-  if (status === "ACTIVE") {
-    return "badge badge-ok badge-dot";
-  }
-
-  if (status === "VIEWER" || status === "INVITED") {
-    return "badge badge-accent badge-dot";
-  }
-
-  if (status === "SUSPENDED") {
-    return "badge badge-warn badge-dot";
-  }
-
-  return "badge";
-}
-
-function currentSessionBadge(member: HostMemberListItem) {
-  if (member.currentSessionParticipationStatus === "ACTIVE") {
-    return { label: "이번 모임 참여", className: "badge badge-ok badge-dot" };
-  }
-
-  if (member.currentSessionParticipationStatus === "REMOVED") {
-    return { label: "이번 모임 제외", className: "badge badge-warn badge-dot" };
-  }
-
-  return { label: "이번 모임 미포함", className: "badge" };
-}
 
 export function MemberActionButton({
   action,
@@ -256,7 +232,6 @@ export function MemberList({
   renderProfileAction,
   renderActions,
   renderOverflow,
-  renderCurrentSessionBadge = currentSessionBadge,
   factsByMembershipId,
   personHref,
   LinkComponent,
@@ -266,10 +241,9 @@ export function MemberList({
   emptyText: string;
   sectionDescription: string;
   sectionMeta?: string;
-  renderProfileAction: (member: HostMemberListItem) => ReactNode;
+  renderProfileAction?: (member: HostMemberListItem) => ReactNode;
   renderActions: (member: HostMemberListItem) => ReactNode;
   renderOverflow?: (member: HostMemberListItem) => ReactNode;
-  renderCurrentSessionBadge?: (member: HostMemberListItem) => { label: string; className: string };
   factsByMembershipId?: Readonly<Record<string, MemberLedgerFacts>>;
   personHref?: (membershipId: string) => string;
   LinkComponent?: HostMembersLinkComponent;
@@ -313,9 +287,9 @@ export function MemberList({
   }
 
   return (
-    <div
-      className="stack"
-      style={{ "--stack": "12px" } as CSSProperties}
+    <section
+      className="rm-member-ledger"
+      aria-label={sectionDescription}
       onClick={(event) => {
         const heading = (event.target as HTMLElement).closest("[data-membership-id]");
         const membershipId = heading?.getAttribute("data-membership-id");
@@ -327,11 +301,16 @@ export function MemberList({
         }
       }}
     >
+      <header className="rm-member-ledger__heading">
+        <h2 className="rm-host-member-ledger__title">멤버 원장</h2>
+        {sectionMeta ? <p className="rm-host-member-ledger__caption-meta">{sectionMeta}</p> : null}
+      </header>
+      <div
+        className="stack"
+        style={{ "--stack": "12px" } as CSSProperties}
+      >
       <table className="rm-host-member-ledger">
-        <caption className="rm-host-member-ledger__caption">
-          <span className="rm-host-member-ledger__title">{sectionDescription}</span>
-          {sectionMeta ? <span className="rm-host-member-ledger__caption-meta">{sectionMeta}</span> : null}
-        </caption>
+        <caption className="rm-sr-only">{sectionDescription}</caption>
         <thead>
           <tr>
             <th scope="col">멤버</th>
@@ -347,13 +326,14 @@ export function MemberList({
         </thead>
         <tbody>
           {visibleMembers.map((member) => {
-            const sessionBadge = renderCurrentSessionBadge(member);
             const facts = factsByMembershipId?.[member.membershipId];
             const scheduleSeenLabel = facts?.scheduleSeenLabel ?? defaultScheduleSeenLabel(member);
-            const rsvpLabel = facts?.rsvpLabel ?? sessionBadge.label;
+            const rsvpLabel = facts?.rsvpLabel ?? "—";
             const lastAccessLabel = facts?.lastAccessLabel
               ?? formatRecentClubAccess(member.lastClubAccessAt, now);
-            const rsvpClassName = facts?.rsvpLabel ? undefined : sessionBadge.className;
+            const scheduleIcon = scheduleSeenIconName(scheduleSeenLabel);
+            const rsvpIcon = rsvpIconName(rsvpLabel);
+            const pillTone = statusPillTone(member.status);
             const personTo = personHref?.(member.membershipId)
               ?? `/app/host/people/${encodeURIComponent(member.membershipId)}`;
 
@@ -376,15 +356,23 @@ export function MemberList({
                         {member.displayName}
                       </PersonLink>
                     </h2>
-                    {member.role === "HOST" ? <span className="badge badge-accent badge-dot">호스트</span> : null}
+                    {member.role === "HOST" ? <span className="rm-member-ledger__host">호스트</span> : null}
                   </div>
                 </td>
                 <td className="rm-host-member-ledger__status">
-                  <span className={statusBadgeClass(member.status)}>{rosterStatusLabels[member.status]}</span>
+                  <span className="rm-member-ledger__pill" data-tone={pillTone}>{rosterStatusLabels[member.status]}</span>
                 </td>
-                <td className="rm-host-member-ledger__schedule">{scheduleSeenLabel}</td>
+                <td className="rm-host-member-ledger__schedule">
+                  <span className="rm-member-ledger__schedule">
+                    <ReadmatesIcon name={scheduleIcon} size={16} />
+                    {scheduleSeenLabel}
+                  </span>
+                </td>
                 <td className="rm-host-member-ledger__meta">
-                  {rsvpClassName ? <span className={rsvpClassName}>{rsvpLabel}</span> : rsvpLabel}
+                  <span className="rm-member-ledger__rsvp">
+                    {rsvpIcon ? <ReadmatesIcon name={rsvpIcon} size={16} /> : null}
+                    {rsvpLabel}
+                  </span>
                 </td>
                 <td className="rm-host-member-ledger__access">
                   <span>{lastAccessLabel}</span>
@@ -399,12 +387,13 @@ export function MemberList({
                   <div className="rm-host-member-ledger__actions">
                     <PersonLink
                       to={personTo}
-                      className="rm-host-member-ledger__open"
+                      className="rm-host-member-ledger__open rm-member-ledger__open"
                       onClick={() => sessionStorage.setItem(HOST_PEOPLE_FOCUS_KEY, member.membershipId)}
                     >
                       열기
+                      <ReadmatesIcon name="chevron-right" size={16} />
                     </PersonLink>
-                    {renderProfileAction(member)}
+                    {renderProfileAction?.(member)}
                     {renderActions(member)}
                     {renderOverflow?.(member)}
                   </div>
@@ -414,7 +403,8 @@ export function MemberList({
           })}
         </tbody>
       </table>
-    </div>
+      </div>
+    </section>
   );
 }
 

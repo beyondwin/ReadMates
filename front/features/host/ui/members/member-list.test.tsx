@@ -104,4 +104,28 @@ describe("MemberList person identity", () => {
     });
     expect(sessionStorage.getItem("readmates.host-people.focus-restore")).toBeNull();
   });
+
+  it("renders icon schedule/rsvp cells, a single open link, and no current-session badge", () => {
+    render(
+      <MemberList
+        members={[member]}
+        emptyText="비어 있음"
+        sectionDescription="멤버 원장"
+        factsByMembershipId={{
+          "membership-safe": { scheduleSeenLabel: "현재 일정 확인", rsvpLabel: "참석" },
+        }}
+        personHref={(membershipId) => `/app/host/people/${membershipId}`}
+        LinkComponent={({ to, children, ...props }) => <a {...props} href={to}>{children}</a>}
+        renderProfileAction={() => null}
+        renderActions={() => null}
+      />,
+    );
+
+    expect(document.querySelectorAll(".rm-member-ledger__schedule [data-icon]").length).toBeGreaterThan(0);
+    expect(document.querySelectorAll(".rm-member-ledger__rsvp [data-icon]").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "열기" })).toHaveLength(1);
+    expect(document.querySelector('.rm-member-ledger__open [data-icon="chevron-right"]')).toBeTruthy();
+    expect(screen.queryByText("이번 모임 참여")).toBeNull();
+    expect(screen.queryByRole("button", { name: /이름 변경/ })).toBeNull();
+  });
 });

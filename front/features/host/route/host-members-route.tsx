@@ -4,6 +4,7 @@ import { useLoaderData, useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import HostMembers, { type HostMembersLinkComponent } from "@/features/host/ui/host-members";
+import { aggregateHostPeopleScheduleSeen } from "@/features/host/ui/members/member-list-helpers";
 import { createHostMembersActions, type HostMembersRouteData } from "./host-members-data";
 import type { HostMembersActions } from "@/features/host/model/host-member-actions";
 import { scopedAppPath } from "@/shared/auth/member-app-loader";
@@ -64,6 +65,7 @@ export function HostMembersRoute({ LinkComponent }: { LinkComponent?: HostMember
       actions={registeredActions}
       settingsHref={`${scopedAppPath(clubSlug)}${HOST_ROUTE_HREFS.settings.replace(/^\/app/, "")}`}
       LinkComponent={LinkComponent}
+      scheduleSeen={aggregateHostPeopleScheduleSeen(members.items)}
     />
   );
 }

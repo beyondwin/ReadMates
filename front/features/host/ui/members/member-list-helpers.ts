@@ -1,4 +1,5 @@
 import type { HostMemberListItem, MembershipStatus } from "@/features/host/model/host-view-types";
+import type { ReadmatesIconName } from "@/shared/ui/icon";
 import { formatDateOnlyLabel, formatDateTimeLabel } from "@/shared/ui/readmates-display";
 
 const statusLabels: Record<MembershipStatus, string> = {
@@ -116,6 +117,68 @@ export function defaultScheduleSeenLabel(member: HostMemberListItem): string {
     return "일정 대상 아님";
   }
   return "—";
+}
+
+export function scheduleSeenIconName(label: string): ReadmatesIconName {
+  if (label === "미열람") {
+    return "mail";
+  }
+  if (label === "일정 대상 아님" || label === "—") {
+    return "minus-circle";
+  }
+  return "calendar";
+}
+
+export function rsvpIconName(label: string): ReadmatesIconName | null {
+  if (label === "참석") {
+    return "check-circle";
+  }
+  if (label === "미응답") {
+    return "question-circle";
+  }
+  if (label === "불참") {
+    return "x-circle";
+  }
+  return null;
+}
+
+export function statusPillTone(status: MembershipStatus): "info" | "neutral" | undefined {
+  if (status === "VIEWER" || status === "INVITED") {
+    return "info";
+  }
+  if (status === "ACTIVE") {
+    return undefined;
+  }
+  return "neutral";
+}
+
+export function aggregateHostPeopleScheduleSeen(
+  members: readonly HostMemberListItem[],
+  factsByMembershipId?: Readonly<Record<string, { scheduleSeenLabel?: string }>>,
+): { current: number; stale: number; unseen: number; notTarget: number } | null {
+  if (!factsByMembershipId) {
+    return null;
+  }
+
+  const counts = { current: 0, stale: 0, unseen: 0, notTarget: 0 };
+  let known = false;
+  for (const member of members) {
+    const label = factsByMembershipId[member.membershipId]?.scheduleSeenLabel;
+    if (!label) {
+      continue;
+    }
+    known = true;
+    if (label === "현재 일정 확인") {
+      counts.current += 1;
+    } else if (label === "변경 전 확인") {
+      counts.stale += 1;
+    } else if (label === "미열람") {
+      counts.unseen += 1;
+    } else if (label === "일정 대상 아님") {
+      counts.notTarget += 1;
+    }
+  }
+  return known ? counts : null;
 }
 
 export function preservedRecordBadge() {
