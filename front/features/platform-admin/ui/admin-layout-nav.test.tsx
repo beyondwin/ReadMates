@@ -241,4 +241,13 @@ describe("AdminLayoutNav", () => {
     expect(window.matchMedia).toHaveBeenCalledWith("(max-width: 768px)");
     expect(container.querySelector(".admin-layout-nav")).toBeNull();
   });
+
+  it("renders one icon per area and a filled check on the active area", () => {
+    renderNav({ currentOwner: "clubs", todayCount: 3, onLogout: () => {} });
+    const items = screen.getAllByRole("link");
+    expect(items.filter((el) => el.querySelector("[data-icon]"))).toHaveLength(4);
+    expect(screen.getByRole("link", { name: /클럽 관리/ }).querySelector('[data-icon="check-circle-filled"]')).toBeTruthy();
+    expect(screen.getByRole("link", { name: /오늘 할 일/ }).querySelector('[data-icon="check-circle"]')).toBeTruthy();
+    expect(screen.getByRole("button", { name: "다른 계정으로 로그인" }).querySelector('[data-icon="logout"]')).toBeTruthy();
+  });
 });

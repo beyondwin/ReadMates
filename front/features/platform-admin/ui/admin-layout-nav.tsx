@@ -6,6 +6,15 @@ import {
   type AdminRouteDescriptor,
 } from "@/features/platform-admin/model/admin-route-catalog";
 import type { PlatformAdminCapabilities } from "@/features/platform-admin/model/platform-admin-capabilities";
+import { ReadmatesIcon, type ReadmatesIconName } from "@/shared/ui/icon";
+
+export const ADMIN_NAV_ICONS: Record<AdminRouteOwner, ReadmatesIconName> = {
+  today: "check-circle",
+  clubs: "people",
+  service: "shield-check",
+  records: "document",
+  emergency: "alert-circle",
+};
 
 export type AdminNavigationLinkRenderProps = {
   href: string;
@@ -62,6 +71,10 @@ export function AdminLayoutNav({
                   ariaCurrent: areaActive ? "page" : undefined,
                   children: (
                     <>
+                      <ReadmatesIcon
+                        name={areaActive ? "check-circle-filled" : (ADMIN_NAV_ICONS[area.id] ?? "document")}
+                        size={20}
+                      />
                       <span className="admin-layout-nav__item-label">{area.label}</span>
                       {area.id === "today" && todayCount != null && todayCount > 0 ? (
                         <span className="admin-layout-nav__count ledger-number" aria-hidden="true">
@@ -93,10 +106,12 @@ export function AdminLayoutNav({
         <button
           type="button"
           className="admin-layout-nav__logout"
-          aria-label={accountBusy ? "로그아웃 중" : "다른 계정으로 로그인"}
           disabled={accountBusy}
           onClick={onLogout}
-        />
+        >
+          <ReadmatesIcon name="logout" size={24} />
+          <span className="rm-sr-only">{accountBusy ? "로그아웃 중" : "다른 계정으로 로그인"}</span>
+        </button>
       ) : (
         <span className="admin-layout-nav__logout" aria-hidden="true" />
       )}
