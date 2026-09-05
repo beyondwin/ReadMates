@@ -633,18 +633,18 @@ describe("AdminShellLayout", () => {
     expect(shellCss).toContain(".admin-shell__account-button");
     expect(shellCss).toMatch(/\.admin-shell__space-control[\s\S]*?overflow:\s*visible/);
     expect(shellCss).toMatch(/\.admin-shell__space-control[\s\S]*?z-index:\s*40/);
-    expect(todayCss).toMatch(/\.admin-shell__space-control[\s\S]*?opacity:\s*1/);
-    expect(todayCss).toMatch(/\.admin-shell__space-control[\s\S]*?overflow:\s*visible/);
-    expect(todayCss).not.toMatch(/\.admin-shell__space-control[\s\S]{0,240}opacity:\s*0/);
-    expect(todayCss).toMatch(
+    expect(shellCss).toMatch(/\.admin-shell__space-control[\s\S]*?opacity:\s*1/);
+    expect(shellCss).not.toMatch(/\.admin-shell__space-control[\s\S]{0,240}opacity:\s*0/);
+    expect(shellCss).toMatch(
       /\.admin-shell__space-control:not\(:has\(\.rm-global-space-switcher__trigger\[aria-expanded="true"\]\)\)[\s\S]*?pointer-events:\s*none/,
     );
-    expect(todayCss).toMatch(
+    expect(shellCss).toMatch(
       /\.admin-shell__space-control:not\(:has\(\.rm-global-space-switcher__trigger\[aria-expanded="true"\]\)\)[\s\S]*?\.rm-global-space-switcher__trigger[\s\S]*?pointer-events:\s*auto/,
     );
-    expect(todayCss).toMatch(
+    expect(shellCss).toMatch(
       /\.admin-shell__space-control:has\(\.rm-global-space-switcher__trigger\[aria-expanded="true"\]\)[\s\S]*?overflow:\s*visible/,
     );
+    expect(todayCss).not.toMatch(/\.admin-shell:has\(/);
     expect(shellCss).toMatch(/\.admin-shell__main\s*\{[^}]*width:\s*100%;[^}]*max-width:\s*none;/s);
     expect(pageCss).toContain(".admin-page-frame");
     expect(pageCss).toContain(".admin-state-panel");

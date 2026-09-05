@@ -11,6 +11,7 @@ import {
   type AdminNavigationLinkRenderProps,
 } from "@/features/platform-admin/ui/admin-layout-nav";
 import { AdminMobileNavigation } from "@/features/platform-admin/ui/admin-mobile-navigation";
+import { useAdminContentWidth } from "@/features/platform-admin/ui/use-admin-content-width";
 import { ReadmatesIcon } from "@/shared/ui/icon";
 import {
   AdminShellStatusProvider,
@@ -23,7 +24,10 @@ import "@/features/platform-admin/ui/admin-editorial-ledger.css";
 import "@/features/platform-admin/ui/admin-today.css";
 import "@/features/platform-admin/ui/admin-club-management.css";
 
-export type AdminShellOutletContext = { authorityEpoch: number };
+export type AdminShellOutletContext = {
+  authorityEpoch: number;
+  contentLayout?: "flow" | "split";
+};
 
 type AdminShellLayoutProps = {
   workspaceAccountLabel: string;
@@ -59,9 +63,11 @@ export function AdminShellLayout({
   outletContext,
   accountNameVisible = false,
 }: AdminShellLayoutProps) {
+  const { ref: mainRef, layout: measuredLayout } = useAdminContentWidth<HTMLElement>();
+  const contentLayout = outletContext.contentLayout ?? measuredLayout;
   return (
     <AdminShellStatusProvider>
-      <div className="admin-shell">
+      <div className="admin-shell" data-content-layout={contentLayout}>
         <a href="#admin-main" className="admin-shell__skip-link" onClick={focusAdminMain}>
           본문으로 건너뛰기
         </a>
@@ -102,10 +108,10 @@ export function AdminShellLayout({
               onLogout={onOtherAccountLogin}
             />
           </aside>
-          <main id="admin-main" className="admin-shell__main" tabIndex={-1}>
+          <main id="admin-main" ref={mainRef} className="admin-shell__main" tabIndex={-1}>
             <AdminBreadcrumb routePath={routePath} extra={breadcrumbExtra} />
             <AdminAlarmBar summary={alarm.summary} state={alarm.state} />
-            <Outlet context={outletContext} />
+            <Outlet context={{ ...outletContext, contentLayout }} />
           </main>
         </div>
         <AdminMobileNavigation

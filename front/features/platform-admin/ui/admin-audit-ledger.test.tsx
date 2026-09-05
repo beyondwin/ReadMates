@@ -487,19 +487,24 @@ describe("AdminAuditLedger", () => {
   });
 
   it("paints row titles at 17/600 and leaves pagination in the first viewport", () => {
+    const shellCss = readFileSync(
+      path.resolve("features/platform-admin/ui/admin-shell.css"),
+      "utf8",
+    );
     expect(PROCESSING_RECORDS_CSS).toMatch(
       /\.admin-audit__row-title[\s\S]*font-weight:\s*600/,
     );
     expect(PROCESSING_RECORDS_CSS).not.toMatch(
       /\.admin-audit__more \{[\s\S]*clip:\s*rect/,
     );
-    expect(PROCESSING_RECORDS_CSS).toContain("pointer-events: none");
+    expect(PROCESSING_RECORDS_CSS).not.toContain(".admin-shell:has(");
     expect(PROCESSING_RECORDS_CSS).toContain(".admin-audit");
+    expect(shellCss).toContain("pointer-events: none");
   });
 
   it("fills the approved page-heading band with the audit h1", () => {
     expect(PROCESSING_RECORDS_CSS).toMatch(
-      /\.admin-shell:has\(\.admin-audit\) \.admin-page-frame > \.admin-page-frame__header h1[\s\S]*width:\s*100%[\s\S]*height:\s*68px/,
+      /\.admin-audit \.admin-page-frame > \.admin-page-frame__header h1[\s\S]*width:\s*100%[\s\S]*height:\s*68px/,
     );
   });
 });

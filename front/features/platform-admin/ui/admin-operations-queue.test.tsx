@@ -90,7 +90,7 @@ describe("AdminOperationsQueue", () => {
 
   it("lets expanded Today rows escape the 100vh/664px overflow clip", () => {
     expect(QUEUE_CSS).toMatch(
-      /\.admin-shell:has\(\.admin-today-ledger\[data-queue-disclosure="all"\]\)\s*\{[^}]*overflow:\s*visible/,
+      /\.admin-shell\[data-content-layout="split"\]:has\(\[data-queue-disclosure="all"\]\)\s*\{[^}]*overflow:\s*visible/,
     );
     expect(QUEUE_CSS).toMatch(
       /\[data-queue-disclosure="all"\]\[data-content-layout="split"\][\s\S]{0,120}overflow:\s*visible/,
@@ -99,7 +99,7 @@ describe("AdminOperationsQueue", () => {
       /\[data-content-layout="flow"\]\[data-queue-disclosure="all"\][\s\S]{0,220}overflow:\s*visible/,
     );
     expect(QUEUE_CSS).not.toMatch(
-      /\.admin-shell:has\(\.admin-today-ledger\[data-queue-disclosure="all"\]\)\s*\{[^}]*overflow:\s*hidden/,
+      /\.admin-shell\[data-content-layout="split"\]:has\(\[data-queue-disclosure="all"\]\)\s*\{[^}]*overflow:\s*hidden/,
     );
     expect(QUEUE_CSS).not.toMatch(
       /\.admin-operations-queue__list[\s\S]{0,80}overflow-y:\s*auto/,

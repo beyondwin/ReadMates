@@ -7,13 +7,15 @@
 }
 
 .admin-breadcrumb {
-  min-width: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
   color: var(--text-3);
   font-size: var(--type-size-supporting);
   font-weight: 800;
   line-height: var(--type-leading-supporting);
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -181,11 +183,48 @@
   min-width: 0;
 }
 
+.admin-shell[data-content-layout="split"] {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.admin-shell[data-content-layout="split"] .admin-shell__body {
+  min-height: 0;
+  height: 100%;
+}
+
+.admin-shell[data-content-layout="split"] .admin-shell__main {
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
 .admin-shell__space-control {
   position: relative;
   z-index: 40;
   min-width: 160px;
   overflow: visible;
+}
+
+.admin-shell__space-control:not(:has(.rm-global-space-switcher__trigger[aria-expanded="true"])) {
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.admin-shell__space-control:not(:has(.rm-global-space-switcher__trigger[aria-expanded="true"])) .rm-global-space-switcher__trigger {
+  pointer-events: auto;
+}
+
+.admin-shell__space-control:has(.rm-global-space-switcher__trigger[aria-expanded="true"]) {
+  opacity: 1;
+  overflow: visible;
+  width: auto;
+  min-width: 160px;
+  height: auto;
 }
 
 .admin-shell__space-control .rm-global-space-switcher__trigger {
@@ -427,26 +466,26 @@
     flex-wrap: nowrap;
   }
 
-  .admin-shell__body {
-    grid-template-columns: 1fr;
-    width: min(100% - 32px, 720px);
-    gap: 16px;
-    padding: 18px 0 64px;
-  }
-
   .admin-shell {
+    display: grid;
+    grid-template-rows: auto 1fr;
     overflow-x: clip;
   }
 
+  .admin-shell__body {
+    grid-template-columns: 1fr;
+    width: 100%;
+    gap: 0;
+    padding: 0 0 110px;
+  }
+
+  .admin-shell__main {
+    overflow: auto;
+    padding: 0 20px;
+  }
+
   .admin-shell__nav {
-    position: static;
-    min-width: 0;
-    max-width: 100%;
-    min-height: auto;
-    overflow-x: auto;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-    padding: 0 0 14px;
+    display: none;
   }
 
   .admin-layout-nav__areas {

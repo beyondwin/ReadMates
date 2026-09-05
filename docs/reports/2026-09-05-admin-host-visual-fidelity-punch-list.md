@@ -44,3 +44,20 @@ ADR impact: none (관측·비율 기록만). ADR-0045 update / ADR-0053 Proposed
 - Pixel mismatch: **18/18 fail** (모두 `pct` > 0.02).
 - Structure contract: **18/18 `structurePass: false`**.
 - 이후 Phase 재캡처 시 해당 단계 비율·`structure` 열만 갱신한다. 이미지는 커밋하지 않는다.
+
+## CT 대기
+
+Task 9 (`DOCKER_CONTEXT=colima-readmates-va CI=true npx --yes corepack@0.35.0 pnpm --dir front test:ct:docker`). `run-ct-docker.ts`는 `-- features/platform-admin` 필터를 받지 않아 전체 CT 177건을 돌렸다. 스냅샷은 갱신하지 않는다. Task 12b 재캡처 뒤 2026-09-04 spec §3 순서로 맞춘다.
+
+통과: 171. 데스크톱 geometry(Today L1 / Clubs / Service / Review audit)는 브레드크럼을 셸 기본 시각 숨김으로 올린 뒤 통과. `editorial-ledger-emergency-takedown-390.png`는 이번 실행에서 통과.
+
+대기 실패 6:
+
+| 구분 | 테스트 | 메모 |
+| --- | --- | --- |
+| 스냅샷 | `admin-shell-layout.ct.tsx` `admin-shell-mobile-390.png` | 비율 0.04. 의도한 크롬 변화. |
+| 스냅샷 | `admin-shell-layout.ct.tsx` `admin-shell-long-copy-320.png` | 320×979 vs 320×898, 비율 0.11. |
+| 시맨틱(Task 7 CT 잔여) | `admin-shell-layout.ct.tsx` Today desktop production shell | `다른 계정으로 로그인` 헤더 버튼을 기다리다 timeout. 제품 버튼 이름은 `계정`. |
+| 시맨틱(Task 7 CT 잔여) | `admin-shell-layout.ct.tsx` space menu | `김운영` / `.admin-shell__account-action-short` 가시성. `accountNameVisible` 기본 false. |
+| geometry | `admin-editorial-ledger.ct.tsx` Today mobile list 390 | header 높이 132.59 vs 70. Task 7 상태 띠 2행. |
+| geometry | `admin-editorial-ledger.ct.tsx` Today case detail 390 | back y 132.59 vs 0. 모바일 상세에서 셸 헤더를 `:has()`로 숨기던 규칙을 삭제. |

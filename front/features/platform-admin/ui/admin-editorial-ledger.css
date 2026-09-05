@@ -1604,33 +1604,31 @@
     position: static;
   }
 
-  /* admin-processing-records.css pins the two-pane desktop audit layout to one viewport
-     height. These overrides carry the `.admin-shell:has()` prefix so they out-specify it
-     and let a compact shell scroll the document instead of clipping the record. */
-  .admin-shell:has(.admin-audit) .admin-shell__main,
-  .admin-shell:has(.admin-audit) .admin-audit,
-  .admin-shell:has(.admin-audit) .admin-page-context,
-  .admin-shell:has(.admin-audit) .admin-page-frame,
-  .admin-shell:has(.admin-audit) .admin-audit__body,
-  .admin-shell:has(.admin-audit) .admin-audit__rows,
-  .admin-shell:has(.admin-audit) .admin-audit__list,
-  .admin-shell:has(.admin-audit) .admin-audit__detail {
+  /* Compact audit must scroll the document instead of clipping the two-pane
+     desktop record that is height-locked on a wide shell. */
+  .admin-audit,
+  .admin-audit .admin-page-context,
+  .admin-audit .admin-page-frame,
+  .admin-audit__body,
+  .admin-audit__rows,
+  .admin-audit__list,
+  .admin-audit__detail {
     height: auto;
     max-height: none;
     min-height: 0;
     overflow: visible;
   }
 
-  .admin-shell:has(.admin-audit) .admin-page-frame {
+  .admin-audit .admin-page-frame {
     grid-template-rows: auto minmax(0, auto);
   }
 
-  .admin-shell:has(.admin-audit) .admin-audit__body {
+  .admin-audit__body {
     grid-template-columns: 1fr;
   }
 
-  .admin-shell:has(.admin-audit) .admin-audit__list,
-  .admin-shell:has(.admin-audit) .admin-audit__detail {
+  .admin-audit__list,
+  .admin-audit__detail {
     border-right: 0;
     border-left: 0;
   }
@@ -1642,7 +1640,7 @@
 
   /* The desktop audit pane has no back control, so it is visually hidden there. A
      compact shell shows one pane at a time and needs a real exit target. */
-  .admin-shell:has(.admin-audit) .admin-audit__back {
+  .admin-audit__back {
     position: static;
     display: inline-flex;
     width: auto;
@@ -2995,107 +2993,23 @@
   text-underline-offset: 3px;
 }
 
-/* Approved Today queue/docket composition. */
-
-.admin-shell:has(.rm-global-space-switcher__trigger[aria-expanded="true"]) .admin-shell__space-control {
-  opacity: 1;
-  overflow: visible;
-  width: auto;
-  min-width: 160px;
-  height: auto;
-}
-
-.admin-shell:has(.rm-global-space-switcher__trigger[aria-expanded="true"]) .admin-shell__account-control {
-  display: grid;
-  grid-template-columns: auto 32px;
-  grid-template-rows: auto auto;
-  column-gap: 10px;
-  row-gap: 0;
-  align-items: center;
-}
-
-.admin-shell:has(.rm-global-space-switcher__trigger[aria-expanded="true"]) .admin-shell__account-action-short {
-  position: static;
-  width: auto;
-  height: auto;
-  overflow: visible;
-  clip: auto;
-  color: var(--text-3);
-}
-
-.admin-shell:has(.rm-global-space-switcher__trigger[aria-expanded="true"]) .admin-shell__account-control .btn {
-  grid-column: 1 / -1;
-  grid-row: 1 / -1;
-  display: grid;
-  grid-template-columns: auto 32px;
-  grid-template-rows: auto auto;
-  justify-items: start;
-  align-items: center;
-  column-gap: 10px;
-  min-width: 0;
-  padding: 0;
-}
-
-.admin-shell:has(.rm-global-space-switcher__trigger[aria-expanded="true"]) .admin-shell__account-control .btn::before {
-  grid-column: 2;
-  grid-row: 1 / -1;
-  justify-self: end;
-}
-
-.admin-shell:has(.rm-global-space-switcher__trigger[aria-expanded="true"]) .admin-shell__account-action-short {
-  grid-column: 1;
-  grid-row: 2;
-}
-
 .admin-shell__account-action-short {
   color: var(--text-3);
   font: 600 var(--type-size-label)/var(--type-leading-label) var(--f-sans);
 }
 
-.admin-shell:has(.admin-clubs-ledger) .admin-breadcrumb,
-.admin-shell:has(.admin-service-status) .admin-breadcrumb,
-.admin-shell:has(.admin-audit) .admin-breadcrumb,
-.admin-shell:has(.admin-clubs-ledger) .admin-alarm-bar,
-.admin-shell:has(.admin-service-status) .admin-alarm-bar,
-.admin-shell:has(.admin-audit) .admin-alarm-bar,
-.admin-shell:has(.admin-clubs-ledger) .admin-shell__space-control,
-.admin-shell:has(.admin-service-status) .admin-shell__space-control,
-.admin-shell:has(.admin-audit) .admin-shell__space-control,
-.admin-shell:has(.admin-clubs-ledger) .admin-shell__header-actions,
-.admin-shell:has(.admin-service-status) .admin-shell__header-actions,
-.admin-shell:has(.admin-audit) .admin-shell__header-actions {
-  display: none;
-}
-
-.admin-shell:has(.admin-clubs-ledger) .admin-shell__wordmark,
-.admin-shell:has(.admin-service-status) .admin-shell__wordmark,
-.admin-shell:has(.admin-audit) .admin-shell__wordmark {
-  color: #0b1628;
-  font-size: 32px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.admin-shell:has(.admin-clubs-ledger) .admin-shell__main,
-.admin-shell:has(.admin-service-status) .admin-shell__main,
-.admin-shell:has(.admin-audit) .admin-shell__main {
-  min-height: 0;
-  overflow: hidden;
-  padding: 0;
-}
-
-.admin-shell:has(.admin-clubs-ledger) .admin-clubs-ledger,
-.admin-shell:has(.admin-clubs-ledger) .admin-page-context,
-.admin-shell:has(.admin-clubs-ledger) .admin-page-frame,
-.admin-shell:has(.admin-clubs-ledger) .admin-club-management,
-.admin-shell:has(.admin-clubs-ledger) .admin-club-management__split,
-.admin-shell:has(.admin-audit) .admin-audit,
-.admin-shell:has(.admin-audit) .admin-page-context,
-.admin-shell:has(.admin-audit) .admin-page-frame,
-.admin-shell:has(.admin-audit) .admin-audit__body,
-.admin-shell:has(.admin-service-status) .admin-health-grid,
-.admin-shell:has(.admin-service-status) .admin-page-context,
-.admin-shell:has(.admin-service-status) .admin-page-frame {
+.admin-clubs-ledger,
+.admin-clubs-ledger .admin-page-context,
+.admin-clubs-ledger .admin-page-frame,
+.admin-clubs-ledger .admin-club-management,
+.admin-clubs-ledger .admin-club-management__split,
+.admin-audit,
+.admin-audit .admin-page-context,
+.admin-audit .admin-page-frame,
+.admin-audit__body,
+.admin-service-status .admin-health-grid,
+.admin-service-status .admin-page-context,
+.admin-service-status .admin-page-frame {
   display: grid;
   gap: 0;
   height: 100%;
@@ -3103,14 +3017,14 @@
   max-width: none;
 }
 
-.admin-shell:has(.admin-clubs-ledger) .admin-page-frame,
-.admin-shell:has(.admin-audit) .admin-page-frame,
-.admin-shell:has(.admin-service-status) .admin-page-frame {
+.admin-clubs-ledger .admin-page-frame,
+.admin-audit .admin-page-frame,
+.admin-service-status .admin-page-frame {
   grid-template-rows: 68px minmax(0, 1fr);
 }
 
-.admin-shell:has(.admin-clubs-ledger) .admin-page-frame__header,
-.admin-shell:has(.admin-audit) .admin-page-frame__header {
+.admin-clubs-ledger .admin-page-frame__header,
+.admin-audit .admin-page-frame__header {
   display: flex;
   align-items: center;
   min-height: 68px;
@@ -3118,7 +3032,7 @@
   border-bottom: 1px solid var(--line);
 }
 
-.admin-shell:has(.admin-service-status) .admin-page-frame__header {
+.admin-service-status .admin-page-frame__header {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -3129,13 +3043,13 @@
   border: 0;
 }
 
-.admin-shell:has(.admin-clubs-ledger) .admin-page-frame__header h1,
-.admin-shell:has(.admin-audit) .admin-page-frame__header h1,
-.admin-shell:has(.admin-service-status) .admin-page-frame__header h1,
-.admin-shell:has(.admin-service-status) .admin-page-frame__description,
-.admin-shell:has(.admin-service-status) .admin-page-frame__action,
-.admin-shell:has(.admin-service-status) .admin-page-context__meta,
-.admin-shell:has(.admin-service-status) .admin-health-grid__stale {
+.admin-clubs-ledger .admin-page-frame__header h1,
+.admin-audit .admin-page-frame__header h1,
+.admin-service-status .admin-page-frame__header h1,
+.admin-service-status .admin-page-frame__description,
+.admin-service-status .admin-page-frame__action,
+.admin-service-status .admin-page-context__meta,
+.admin-service-status .admin-health-grid__stale {
   position: absolute;
   left: -10000px;
   width: 1px;
@@ -3144,49 +3058,49 @@
   clip: rect(0 0 0 0);
 }
 
-.admin-shell:has(.admin-clubs-ledger) .admin-page-frame__header,
-.admin-shell:has(.admin-audit) .admin-page-frame__header {
+.admin-clubs-ledger .admin-page-frame__header,
+.admin-audit .admin-page-frame__header {
   overflow: hidden;
 }
 
-.admin-shell:has(.admin-clubs-ledger) .admin-page-frame__description,
-.admin-shell:has(.admin-audit) .admin-page-frame__description,
-.admin-shell:has(.admin-service-status) .admin-service-status__banner {
+.admin-clubs-ledger .admin-page-frame__description,
+.admin-audit .admin-page-frame__description,
+.admin-service-status__banner {
   max-width: none;
   color: var(--text);
   font-size: 16px;
   font-weight: 650;
 }
 
-.admin-shell:has(.admin-clubs-ledger) .admin-clubs-ledger__scroller,
-.admin-shell:has(.admin-audit) .admin-audit__rows,
-.admin-shell:has(.admin-audit) .admin-audit__list,
-.admin-shell:has(.admin-audit) .admin-audit__detail,
-.admin-shell:has(.admin-clubs-ledger) .admin-club-management__finder,
-.admin-shell:has(.admin-clubs-ledger) .admin-club-management__docket {
+.admin-clubs-ledger__scroller,
+.admin-audit__rows,
+.admin-audit__list,
+.admin-audit__detail,
+.admin-clubs-ledger .admin-club-management__finder,
+.admin-clubs-ledger .admin-club-management__docket {
   max-height: none;
   height: 100%;
   min-height: 0;
   overflow: auto;
 }
 
-.admin-shell:has(.admin-audit) .admin-audit__body {
+.admin-audit__body {
   grid-row: 2;
   min-height: 0;
 }
 
-.admin-shell:has(.admin-clubs-ledger) .admin-club-management {
+.admin-clubs-ledger .admin-club-management {
   grid-row: 2;
   min-height: 0;
 }
 
-.admin-shell:has(.admin-service-status) .admin-service-status {
+.admin-service-status {
   max-width: none;
   padding: 0 32px 24px;
 }
 
 @media (max-width: 767px) {
-.admin-mobile-navigation {
+  .admin-mobile-navigation {
     min-height: 110px;
     padding-bottom: 0;
   }
@@ -3204,38 +3118,5 @@
 
   .admin-mobile-navigation__link--active {
     background: var(--surface);
-  }
-
-  .admin-mobile-navigation__link::before {
-    content: "";
-    width: 24px;
-    height: 24px;
-    background-color: currentColor;
-    -webkit-mask-repeat: no-repeat;
-    mask-repeat: no-repeat;
-    -webkit-mask-position: center;
-    mask-position: center;
-    -webkit-mask-size: contain;
-    mask-size: contain;
-  }
-
-  .admin-mobile-navigation__items > li:nth-child(1) .admin-mobile-navigation__link::before {
-    -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><rect x='4' y='5' width='16' height='15' rx='2'/><path d='M8 3.5v3M16 3.5v3M4 10h16'/></svg>");
-    mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><rect x='4' y='5' width='16' height='15' rx='2'/><path d='M8 3.5v3M16 3.5v3M4 10h16'/></svg>");
-  }
-
-  .admin-mobile-navigation__items > li:nth-child(2) .admin-mobile-navigation__link::before {
-    -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><circle cx='9' cy='8' r='3'/><circle cx='16' cy='9' r='2.5'/><path d='M4 18c.5-3 2.5-5 5-5s4.5 2 5 5'/><path d='M13 18c.3-2 1.5-3.5 3.5-3.5 1.7 0 3 1.2 3.5 3.5'/></svg>");
-    mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><circle cx='9' cy='8' r='3'/><circle cx='16' cy='9' r='2.5'/><path d='M4 18c.5-3 2.5-5 5-5s4.5 2 5 5'/><path d='M13 18c.3-2 1.5-3.5 3.5-3.5 1.7 0 3 1.2 3.5 3.5'/></svg>");
-  }
-
-  .admin-mobile-navigation__items > li:nth-child(3) .admin-mobile-navigation__link::before {
-    -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><path d='M12 3 19 6v6c0 5-3.2 8.2-7 9-3.8-.8-7-4-7-9V6z'/><path d='M8.5 12.2 11 14.7 16 9.5'/></svg>");
-    mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><path d='M12 3 19 6v6c0 5-3.2 8.2-7 9-3.8-.8-7-4-7-9V6z'/><path d='M8.5 12.2 11 14.7 16 9.5'/></svg>");
-  }
-
-  .admin-mobile-navigation__items > li:nth-child(4) .admin-mobile-navigation__link::before {
-    -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><path d='M7 3.5h7l4 4V20.5H7z'/><path d='M14 3.5V8h4.5'/><path d='M9.5 12h6M9.5 15.5h6'/></svg>");
-    mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'><path d='M7 3.5h7l4 4V20.5H7z'/><path d='M14 3.5V8h4.5'/><path d='M9.5 12h6M9.5 15.5h6'/></svg>");
   }
 }

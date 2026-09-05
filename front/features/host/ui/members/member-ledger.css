@@ -327,13 +327,10 @@
 .rm-host-people__search input {
   min-width: 220px;
   min-height: 44px;
-  padding: 0 14px 0 36px;
+  padding: 0 14px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background:
-    var(--bg)
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23666' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='7' cy='7' r='4.5'/%3E%3Cpath d='M10.5 10.5 14 14'/%3E%3C/svg%3E")
-    no-repeat 14px 50%;
+  background: var(--bg);
   color: var(--ink-900);
   font: inherit;
 }

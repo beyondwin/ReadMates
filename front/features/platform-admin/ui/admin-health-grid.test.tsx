@@ -271,19 +271,19 @@ describe("AdminHealthGrid", () => {
       /\.admin-service-status \.admin-health-grid__strip\s*\{[^}]*clip:\s*rect/,
     );
     expect(SERVICE_STATUS_CSS).toMatch(
-      /\.admin-shell:has\(\.admin-service-status\) \.admin-health-grid__strip\s*\{[^}]*clip:\s*auto/,
+      /\.admin-service-status \.admin-health-grid__strip\s*\{[^}]*clip:\s*auto/,
     );
   });
 
   it("keeps the service table in the list column so the evidence strip does not intercept row clicks", () => {
     expect(SERVICE_STATUS_CSS).toMatch(
-      /\.admin-shell:has\(\.admin-service-status\) \.admin-service-status__table\s*\{[^}]*width:\s*1348px[^}]*overflow:\s*hidden/,
+      /\.admin-service-status__table\s*\{[^}]*width:\s*1348px[^}]*overflow:\s*hidden/,
     );
     expect(SERVICE_STATUS_CSS).toMatch(
-      /\.admin-shell:has\(\.admin-service-status\) \.admin-service-status__row[\s\S]*width:\s*527px/,
+      /\.admin-service-status__row[\s\S]*width:\s*527px/,
     );
     expect(SERVICE_STATUS_CSS).toMatch(
-      /\.admin-shell:has\(\.admin-service-status\) \.admin-service-status\s*\{[^}]*padding:\s*0/,
+      /\.admin-service-status\s*\{[^}]*padding:\s*0/,
     );
   });
 
@@ -547,13 +547,17 @@ describe("AdminHealthGrid", () => {
 
   it("fills the approved page-heading band with the health h1", () => {
     expect(SERVICE_STATUS_CSS).toMatch(
-      /\.admin-shell:has\(\.admin-service-status\) \.admin-page-frame > \.admin-page-frame__header h1[\s\S]*width:\s*100%[\s\S]*height:\s*68px/,
+      /\.admin-service-status \.admin-page-frame > \.admin-page-frame__header h1[\s\S]*width:\s*100%[\s\S]*height:\s*68px/,
     );
   });
 
   it("does not let collapsed space-control intercept health rows", () => {
-    expect(SERVICE_STATUS_CSS).toContain(":has(.admin-service-status)");
-    expect(SERVICE_STATUS_CSS).toMatch(
+    const shellCss = readFileSync(
+      path.resolve("features/platform-admin/ui/admin-shell.css"),
+      "utf8",
+    );
+    expect(SERVICE_STATUS_CSS).not.toContain(".admin-shell:has(");
+    expect(shellCss).toMatch(
       /\.admin-shell__space-control:not\(:has\(\.rm-global-space-switcher__trigger\[aria-expanded="true"\]\)\)[\s\S]*pointer-events:\s*none/,
     );
   });

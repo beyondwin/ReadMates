@@ -287,7 +287,7 @@ describe("AdminClubsLedger", () => {
 
   it("fills the approved page-heading band with the clubs h1", () => {
     expect(CLUB_MANAGEMENT_CSS).toMatch(
-      /\.admin-shell:has\(\.admin-clubs-ledger\) \.admin-page-frame > \.admin-page-frame__header h1[\s\S]*width:\s*100%[\s\S]*height:\s*68px/,
+      /\.admin-clubs-ledger \.admin-page-frame > \.admin-page-frame__header h1[\s\S]*width:\s*100%[\s\S]*height:\s*68px/,
     );
   });
 
@@ -330,8 +330,12 @@ describe("AdminClubsLedger", () => {
   });
 
   it("does not let collapsed space-control intercept club rows", () => {
-    expect(CLUB_MANAGEMENT_CSS).toContain(":has(.admin-clubs-ledger)");
-    expect(CLUB_MANAGEMENT_CSS).toMatch(
+    const shellCss = readFileSync(
+      path.resolve("features/platform-admin/ui/admin-shell.css"),
+      "utf8",
+    );
+    expect(CLUB_MANAGEMENT_CSS).not.toContain(".admin-shell:has(");
+    expect(shellCss).toMatch(
       /\.admin-shell__space-control:not\(:has\(\.rm-global-space-switcher__trigger\[aria-expanded="true"\]\)\)[\s\S]*pointer-events:\s*none/,
     );
   });

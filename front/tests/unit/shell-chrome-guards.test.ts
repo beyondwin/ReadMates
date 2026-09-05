@@ -7,18 +7,8 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 const cssRoots = ["features", "shared", "src/styles"];
 
 // Baselines record the count at plan start. They may only go DOWN. Task 9 and Task 12 set them to 0.
-const DATA_URI_ICON_BASELINE: Record<string, number> = {
-  "features/platform-admin/ui/admin-today.css": 13,
-  "features/platform-admin/ui/admin-editorial-ledger.css": 8,
-  "features/host/ui/members/member-ledger.css": 1,
-};
-const SHELL_FORK_BASELINE: Record<string, number> = {
-  "features/platform-admin/ui/admin-today.css": 67,
-  "features/platform-admin/ui/admin-club-management.css": 14,
-  "features/platform-admin/ui/admin-processing-records.css": 15,
-  "features/platform-admin/ui/admin-editorial-ledger.css": 77,
-  "features/platform-admin/ui/admin-service-status.css": 23,
-};
+const DATA_URI_ICON_BASELINE: Record<string, number> = {};
+const SHELL_FORK_BASELINE: Record<string, number> = {};
 
 function cssFiles(dir: string): string[] {
   const out: string[] = [];
