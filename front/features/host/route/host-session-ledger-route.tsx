@@ -294,6 +294,7 @@ export function HostSessionLedgerRoute({
       ...view,
       items: view.items.filter((item) => isRecordLedgerWorkboxType(item.type)),
       partialWarnings: view.partialWarnings.filter((warning) => isRecordLedgerWorkboxType(warning.type)),
+      nextCursor: null,
     };
   }, [workboxQuery.data, workboxState]);
 

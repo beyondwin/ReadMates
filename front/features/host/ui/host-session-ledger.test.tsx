@@ -114,6 +114,43 @@ describe("HostSessionLedger", () => {
     expect(screen.queryByText("세부 조작")).not.toBeInTheDocument();
   });
 
+  it("caps the records rail at four work rows and drops a dead load-more", async () => {
+    const user = userEvent.setup();
+    const manyItems = Array.from({ length: 12 }, (_, index) => ({
+      ...workboxView.items[0],
+      key: `RECORD_CLOSING:session-${index}`,
+      title: `마감 작업 ${index + 1}`,
+      count: index + 1,
+      countLabel: String(index + 1),
+      destinationHref: `/app/host/records/${index}`,
+    }));
+    render(
+      <HostSessionLedger
+        items={items}
+        filters={filters}
+        nextCursor={null}
+        loadingMore={false}
+        onFiltersChange={vi.fn()}
+        onLoadMore={vi.fn()}
+        workbox={{ ...workboxView, items: manyItems, nextCursor: "opaque-unfiltered-page" }}
+        onWorkboxLoadMore={vi.fn()}
+        LinkComponent={({ to, children, ...props }) => <a {...props} href={to}>{children}</a>}
+      />,
+    );
+
+    const rail = document.querySelector(".rm-record-ledger__rail");
+    expect(rail).toBeTruthy();
+    expect(within(rail as HTMLElement).getAllByRole("listitem")).toHaveLength(4);
+    expect(screen.getByRole("button", { name: "작업함 모두 보기" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "다음 묶음 불러오기" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "지금 12" })).toBeVisible();
+    expect(screen.queryByRole("tab", { name: "지금 12+" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "작업함 모두 보기" }));
+    expect(within(rail as HTMLElement).getAllByRole("listitem")).toHaveLength(12);
+    expect(screen.queryByRole("button", { name: "다음 묶음 불러오기" })).not.toBeInTheDocument();
+  });
+
   it("submits normalized search and exposes filter state changes", async () => {
     const user = userEvent.setup();
     const onFiltersChange = vi.fn();

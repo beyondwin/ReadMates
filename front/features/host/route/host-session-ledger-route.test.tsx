@@ -14,5 +14,6 @@ describe("host session ledger transition owner", () => {
     expect(source).toContain("hostWorkboxPageQuery");
     expect(source).toContain("buildHostWorkboxView");
     expect(source).toContain("isRecordLedgerWorkboxType");
+    expect(source).toContain("nextCursor: null");
   });
 });

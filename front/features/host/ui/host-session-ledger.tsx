@@ -17,10 +17,11 @@ import {
   type HostSessionLedgerWorkItem,
 } from "@/features/host/model/host-session-ledger-model";
 import { hostMeetingHref } from "@/features/host/model/host-meeting-ledger-model";
-import type { HostWorkboxView } from "@/features/host/model/host-workbox-model";
+import { buildHostWorkboxDisclosure, type HostWorkboxView } from "@/features/host/model/host-workbox-model";
 import { formatMeetingOrdinal, hostMeetingLifecycleLabel } from "@/shared/model/meeting-language";
 import { readmatesReturnState } from "@/shared/routing/readmates-route-state";
 import { ReadmatesIcon, ReadmatesIconBadge } from "@/shared/ui/icon";
+import { useOperatingRoomCompactViewport } from "./operating-room/use-operating-room-compact-viewport";
 import { HostWorkbox } from "./workbox/host-workbox";
 import "./host-editorial-ledger.css";
 import "./host-session-ledger.css";
@@ -445,6 +446,15 @@ export function HostSessionLedger({
   void _workTabCounts;
   const trashView = filters.view === "trash";
   const [statusFilter, setStatusFilter] = useState<RecordsStatusFilter>("all");
+  const compactViewport = useOperatingRoomCompactViewport();
+  const [workboxExpanded, setWorkboxExpanded] = useState(false);
+  const railWorkbox = workbox ? { ...workbox, nextCursor: null } : null;
+  const workboxDisclosure = railWorkbox
+    ? buildHostWorkboxDisclosure(railWorkbox, {
+      limit: compactViewport ? 3 : 4,
+      expanded: workboxExpanded,
+    })
+    : null;
   const itemIds = items.map((item) => item.sessionId).join("\0");
   useEffect(() => {
     if (sessionStorage.getItem(HOST_RECORDS_FOCUS_KEY) !== "closing") return;
@@ -613,12 +623,17 @@ export function HostSessionLedger({
             <HostWorkbox
               title="마감 작업"
               state={workboxState ?? workbox?.state ?? "NOW"}
-              view={workbox}
+              view={railWorkbox}
+              disclosure={workboxDisclosure}
               loading={workboxLoading}
               error={workboxError}
-              onStateChange={onWorkboxStateChange ?? noopWorkboxHandler}
+              onStateChange={(nextState) => {
+                setWorkboxExpanded(false);
+                (onWorkboxStateChange ?? noopWorkboxHandler)(nextState);
+              }}
               onRetry={onWorkboxRetry ?? noopWorkboxHandler}
               onLoadMore={onWorkboxLoadMore ?? noopWorkboxHandler}
+              onShowAll={() => setWorkboxExpanded(true)}
               LinkComponent={LinkComponent}
             />
           </aside>
