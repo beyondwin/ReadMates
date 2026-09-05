@@ -78,7 +78,7 @@ const WORKBOX_COPY: Record<HostWorkItemType, { title: string; description: strin
   SCHEDULE_UNSEEN: {
     title: "일정 확인이 필요한 멤버",
     description: "변경 전 확인 1명 · 미열람 2명",
-    href: `/app/host/sessions/${HOST_APPROVED_SESSION_ID}`,
+    href: `/app/host/sessions/${HOST_APPROVED_SESSION_ID}/schedule-review`,
     resource: HOST_APPROVED_SESSION_ID,
   },
   MEMBER_APPROVAL: {
@@ -168,6 +168,27 @@ function workboxItem(
   };
 }
 
+function completedReminderItem(): HostWorkboxItem {
+  const base = WORKBOX_COPY.NOTIFICATION_FAILURE;
+  return {
+    key: `NOTIFICATION_FAILURE:${base.resource}:completed-reminder`,
+    type: "NOTIFICATION_FAILURE",
+    state: "COMPLETED",
+    title: base.title,
+    description: base.description,
+    count: 1,
+    dueAt: null,
+    deferredUntil: null,
+    resolvedAt: "2026-08-29T19:30:00Z",
+    destinationHref: base.href,
+    receiptSummary: {
+      operation: "SCHEDULE_REMINDER",
+      outcome: "DONE",
+      affectedCount: 8,
+    },
+  };
+}
+
 export function buildHostApprovedWorkboxPage(
   itemCount = DEFAULT_WORKBOX_ITEMS,
   state: HostWorkboxPage["state"] = "NOW",
@@ -176,7 +197,9 @@ export function buildHostApprovedWorkboxPage(
   const copy = options?.copy ?? "default";
   const items = state === "NOW"
     ? Array.from({ length: itemCount }, (_, index) => workboxItem(WORKBOX_TYPES[index % WORKBOX_TYPES.length], index, copy))
-    : [];
+    : state === "COMPLETED"
+      ? [completedReminderItem()]
+      : [];
   return {
     state,
     evaluatedAt: EVALUATED_AT,

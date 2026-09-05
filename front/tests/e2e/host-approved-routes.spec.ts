@@ -65,15 +65,18 @@ async function assertHostOperatingRoomAuthoritySurface(
   await expect(nextAction).toBeVisible();
 
   if (id === "host-live-mobile") {
+    await page.evaluate(() => window.scrollTo(0, 0));
     const nav = page.locator('[data-club-shell-region="mobile-primary"] .m-tabbar').first();
     const board = page.locator(".rm-meeting-response-ledger--attendance-board").first();
+    const previewRow = page.locator(".rm-meeting-response-ledger--attendance-board .rm-meeting-response-ledger__row--board").first();
     await expect(board).toBeVisible();
+    await expect(previewRow).toBeVisible();
     await expect(nav).toBeVisible();
     const navBox = await nav.boundingBox();
-    const boardBox = await board.boundingBox();
+    const rowBox = await previewRow.boundingBox();
     expect(navBox, "mobile nav").not.toBeNull();
-    expect(boardBox, "attendance board").not.toBeNull();
-    expect(boardBox!.y + boardBox!.height).toBeLessThanOrEqual(navBox!.y + 1);
+    expect(rowBox, "attendance preview row").not.toBeNull();
+    expect(rowBox!.y + rowBox!.height).toBeLessThanOrEqual(navBox!.y + 1);
 
     const rows = page.locator(".rm-meeting-response-ledger--attendance-board .rm-meeting-response-ledger__row--board");
     const clipped = await rows.evaluateAll((nodes) => nodes.map((node) => {

@@ -1,5 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
+import { ReadmatesIcon, type ReadmatesIconName } from "@/shared/ui/icon";
 import {
   beginHostMeetingFilterCommit,
   commitHostMeetingAttendanceRow,
@@ -69,6 +70,7 @@ export function MeetingResponseLedger({
   pendingUndo = null,
   agendaHref = null,
   attendanceCensus = null,
+  hideChrome = false,
 }: {
   rows: ReadonlyArray<MeetingResponseLedgerRow>;
   onAttendanceChange: (membershipId: string, attendance: MeetingAttendance) => void;
@@ -77,6 +79,7 @@ export function MeetingResponseLedger({
   pendingUndo?: WorkspacePendingUndo | null;
   agendaHref?: string | null;
   attendanceCensus?: AttendanceBoardCensus | null;
+  hideChrome?: boolean;
 }) {
   if (presentation === "attendanceBoard") {
     return (
@@ -87,6 +90,7 @@ export function MeetingResponseLedger({
         pendingUndo={pendingUndo}
         agendaHref={agendaHref}
         attendanceCensus={attendanceCensus}
+        hideChrome={hideChrome}
       />
     );
   }
@@ -112,10 +116,41 @@ export function MeetingResponseLedger({
 }
 
 const attendanceBoardChoices = [
-  { attendance: "ATTENDED" as const, label: "참석" },
-  { attendance: "ABSENT" as const, label: "불참" },
-  { attendance: "UNKNOWN" as const, label: "미확인" },
-] as const;
+  { attendance: "ATTENDED" as const, label: "참석", icon: "check-circle" as const },
+  { attendance: "ABSENT" as const, label: "불참", icon: "x-circle" as const },
+  { attendance: "UNKNOWN" as const, label: "미확인", icon: "question-circle" as const },
+] as const satisfies ReadonlyArray<{
+  attendance: MeetingAttendance;
+  label: string;
+  icon: ReadmatesIconName;
+}>;
+
+export function AttendanceBoardChrome({
+  agendaHref = null,
+  census,
+}: {
+  agendaHref?: string | null;
+  census: AttendanceBoardCensus;
+}) {
+  return (
+    <div className="rm-meeting-response-ledger__head">
+      <p className="rm-meeting-response-ledger__eyebrow">현장 운영</p>
+      <div className="rm-meeting-response-ledger__title-row">
+        <h2 id="meeting-day-attendance-title" className="h2 editorial">출석 확인</h2>
+        {agendaHref ? (
+          <a className="rm-meeting-response-ledger__agenda" href={agendaHref}>진행 순서 보기 ›</a>
+        ) : null}
+      </div>
+      <p className="rm-meeting-response-ledger__summary">
+        실제 출석 <span className="rm-meeting-response-ledger__attended">{census.attended}</span> / {census.all} · 확인 필요 {census.pending}
+      </p>
+      <p className="rm-meeting-response-ledger__note">
+        <ReadmatesIcon name="info" size={16} />
+        참석 응답과 실제 출석은 별개로 기록해요.
+      </p>
+    </div>
+  );
+}
 
 function rsvpFactLabel(response: Response): string {
   if (response === "GOING") return "참석 응답";
@@ -131,6 +166,7 @@ function AttendanceBoardLedger({
   pendingUndo,
   agendaHref,
   attendanceCensus,
+  hideChrome,
 }: {
   rows: ReadonlyArray<MeetingResponseLedgerRow>;
   onAttendanceChange: (membershipId: string, attendance: MeetingAttendance) => void;
@@ -138,6 +174,7 @@ function AttendanceBoardLedger({
   pendingUndo: WorkspacePendingUndo | null;
   agendaHref: string | null;
   attendanceCensus: AttendanceBoardCensus | null;
+  hideChrome: boolean;
 }) {
   const pendingIds = useMemo(
     () => rows.filter((row) => isPendingAttendance(row.attendance)).map((row) => row.membershipId),
@@ -161,24 +198,14 @@ function AttendanceBoardLedger({
     : null;
   const previewTruncated = attendanceCensus != null && rows.length < attendanceCensus.all;
 
+  const Root = hideChrome ? "div" : "section";
+
   return (
-    <section
+    <Root
       className="rm-meeting-response-ledger rm-meeting-response-ledger--attendance-board"
-      aria-labelledby="meeting-day-attendance-title"
+      {...(hideChrome ? {} : { "aria-labelledby": "meeting-day-attendance-title" })}
     >
-      <div className="rm-meeting-response-ledger__head">
-        <p className="rm-meeting-response-ledger__eyebrow">현장 운영</p>
-        <div className="rm-meeting-response-ledger__title-row">
-          <h2 id="meeting-day-attendance-title" className="h2 editorial">출석 확인</h2>
-          {agendaHref ? (
-            <a className="rm-meeting-response-ledger__agenda" href={agendaHref}>진행 순서 보기</a>
-          ) : null}
-        </div>
-        <p className="rm-meeting-response-ledger__summary">
-          실제 출석 {counts.attended} / {counts.all} · 확인 필요 {counts.pending}
-        </p>
-        <p className="rm-meeting-response-ledger__note">참석 응답과 실제 출석은 별개로 기록해요.</p>
-      </div>
+      {hideChrome ? null : <AttendanceBoardChrome agendaHref={agendaHref} census={counts} />}
 
       {rows.length === 0 ? (
         <p role="status" className="rm-meeting-panel-state">조건에 맞는 참여자가 없습니다.</p>
@@ -186,42 +213,47 @@ function AttendanceBoardLedger({
         <ul className="rm-meeting-response-ledger__rows">
           {rows.map((row) => (
             <li key={row.membershipId} className="rm-meeting-response-ledger__row rm-meeting-response-ledger__row--board">
-              <div className="rm-meeting-response-ledger__person">
-                {row.avatarKey ? (
-                  <AvatarChip
-                    avatarKey={row.avatarKey}
-                    name={row.displayName}
-                    label=""
-                    sizeRole="roster"
-                  />
-                ) : null}
-                <span className="rm-meeting-response-ledger__person-copy">
-                  <strong>{row.displayName}</strong>
-                  <span className="small muted">{rsvpFactLabel(row.response)}</span>
-                </span>
+              <AvatarChip
+                avatarKey={row.avatarKey}
+                name={row.displayName}
+                label=""
+                size={44}
+              />
+              <div className="rm-meeting-response-ledger__person-copy">
+                <strong>{row.displayName}</strong>
+                <span className="small muted">{rsvpFactLabel(row.response)}</span>
               </div>
               <div
-                className="rm-meeting-response-ledger__attendance-group"
+                className="rm-attendance-choice-group"
                 role="group"
                 aria-label={`${row.displayName} 실제 출석`}
               >
-                {attendanceBoardChoices.map((choice) => (
-                  <button
-                    key={choice.attendance}
-                    type="button"
-                    className="rm-meeting-response-ledger__attendance-choice"
-                    data-attendance={choice.attendance}
-                    aria-label={`${row.displayName} ${choice.label}`}
-                    aria-pressed={row.attendance === choice.attendance}
-                    disabled={row.writeState === "saving"}
-                    onClick={() => {
-                      if (row.attendance === choice.attendance) return;
-                      onAttendanceChange(row.membershipId, choice.attendance);
-                    }}
-                  >
-                    {choice.label}
-                  </button>
-                ))}
+                {attendanceBoardChoices.map((choice) => {
+                  const selected = row.attendance === choice.attendance;
+                  return (
+                    <button
+                      key={choice.attendance}
+                      type="button"
+                      className="rm-meeting-response-ledger__attendance-choice rm-attendance-choice"
+                      data-attendance={choice.attendance}
+                      aria-label={`${row.displayName} ${choice.label}`}
+                      aria-pressed={selected}
+                      disabled={row.writeState === "saving"}
+                      onClick={() => {
+                        if (selected) return;
+                        onAttendanceChange(row.membershipId, choice.attendance);
+                      }}
+                    >
+                      {selected ? (
+                        <span className="rm-attendance-choice">
+                          <ReadmatesIcon name={choice.icon} size={20} />
+                        </span>
+                      ) : (
+                        choice.label
+                      )}
+                    </button>
+                  );
+                })}
               </div>
               {row.writeState === "saving" ? <span role="status" className="small">저장 중</span> : null}
               {row.writeState === "error" ? <span role="alert" className="small">저장하지 못했습니다. 다시 선택해 주세요.</span> : null}
@@ -230,6 +262,8 @@ function AttendanceBoardLedger({
           ))}
         </ul>
       )}
+
+      <WorkspaceUndoBar pendingUndo={boardUndo} />
 
       {counts.pending > 0 && !previewTruncated ? (
         <div className="rm-meeting-response-ledger__bulk rm-meeting-response-ledger__bulk--meeting-day">
@@ -244,8 +278,7 @@ function AttendanceBoardLedger({
       ) : null}
 
       <p className="rm-meeting-response-ledger__save-hint">선택하면 바로 저장돼요.</p>
-      <WorkspaceUndoBar pendingUndo={boardUndo} />
-    </section>
+    </Root>
   );
 }
 

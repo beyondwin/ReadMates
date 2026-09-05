@@ -238,6 +238,8 @@
   margin-left: auto;
   display: inline-flex;
   align-items: center;
+  min-width: 44px;
+  min-height: 44px;
   gap: 4px;
   color: var(--accent);
   font-weight: 600;

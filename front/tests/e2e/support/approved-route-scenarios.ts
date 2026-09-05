@@ -22,13 +22,16 @@ import {
   ADMIN_SERVICE_TABLE_GEOMETRY,
   ADMIN_SPACE_TRIGGER_GEOMETRY,
   ADMIN_TODAY_HEADING_MOBILE_GEOMETRY,
+  HOST_CLOSING_NEXT_ACTION_DESKTOP_GEOMETRY,
   HOST_CLOSING_PHASE_PANEL_DESKTOP_GEOMETRY,
+  HOST_CLOSING_PHASE_STATUS_DESKTOP_GEOMETRY,
   HOST_CURRENT_MEETING_DESKTOP_GEOMETRY,
   HOST_LIVE_MOBILE_NEXT_ACTION_GEOMETRY,
   HOST_LIVE_MOBILE_PHASE_NAV_GEOMETRY,
   HOST_LIVE_MOBILE_PHASE_PANEL_GEOMETRY,
   HOST_LIVE_MOBILE_PHASE_STATUS_GEOMETRY,
   HOST_LIVE_MOBILE_WORKBOX_GEOMETRY,
+  HOST_LEDGER_NAV_GEOMETRY,
   HOST_LIVE_PHASE_PANEL_DESKTOP_GEOMETRY,
   HOST_MEETINGS_HEADER_GEOMETRY,
   HOST_MEETINGS_HEADING_GEOMETRY,
@@ -296,7 +299,7 @@ const HOST_HEADER = {
 const HOST_NAV = {
   name: "host-nav",
   selector: 'nav[aria-label="호스트 주 메뉴"]',
-  expected: HOST_OR_DESKTOP_NAV_GEOMETRY,
+  expected: HOST_LEDGER_NAV_GEOMETRY,
   toleranceCssPx: 4 as const,
 };
 const HOST_MOBILE_NAV = {
@@ -490,6 +493,8 @@ const CLOSING_DESTINATION: VisualAuthorityInteraction = {
 function hostOperatingRoomRegions(
   body: Geometry = HOST_PREP_PHASE_PANEL_DESKTOP_GEOMETRY,
   workbox: Geometry = HOST_OR_WORKBOX_DESKTOP_GEOMETRY,
+  nextAction: Geometry = HOST_NEXT_ACTION_DESKTOP_GEOMETRY,
+  phaseStatus: Geometry = HOST_PHASE_STATUS_DESKTOP_GEOMETRY,
 ) {
   return [
     HOST_HEADER,
@@ -514,13 +519,13 @@ function hostOperatingRoomRegions(
     {
       name: "primary-next-action",
       selector: ".rm-operating-room-next-action",
-      expected: HOST_NEXT_ACTION_DESKTOP_GEOMETRY,
+      expected: nextAction,
       toleranceCssPx: 4 as const,
     },
     {
       name: "phase-status",
       selector: ".rm-host-operating-room__phase-notice",
-      expected: HOST_PHASE_STATUS_DESKTOP_GEOMETRY,
+      expected: phaseStatus,
       toleranceCssPx: 4 as const,
     },
     {
@@ -1108,7 +1113,12 @@ export const REQUIRED_VISUAL_AUTHORITY_COVERAGE: Record<ApprovedMockupId, Requir
     actor: HOST_ACTOR,
     fixtureKey: "host-operating-room",
     preparationKey: "none",
-    regions: hostOperatingRoomRegions(HOST_CLOSING_PHASE_PANEL_DESKTOP_GEOMETRY),
+    regions: hostOperatingRoomRegions(
+      HOST_CLOSING_PHASE_PANEL_DESKTOP_GEOMETRY,
+      HOST_OR_WORKBOX_DESKTOP_GEOMETRY,
+      HOST_CLOSING_NEXT_ACTION_DESKTOP_GEOMETRY,
+      HOST_CLOSING_PHASE_STATUS_DESKTOP_GEOMETRY,
+    ),
     typography: HOST_OPERATING_TYPOGRAPHY,
     firstViewport: HOST_OPERATING_FIRST_VIEWPORT,
     defaultVisibleItems: { selector: WORKBOX_ITEMS, count: 4 },

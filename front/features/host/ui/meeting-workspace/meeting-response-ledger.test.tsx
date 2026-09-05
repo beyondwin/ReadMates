@@ -158,8 +158,8 @@ describe("MeetingResponseLedger", () => {
 
     expect(screen.getByRole("heading", { name: "출석 확인" })).toBeVisible();
     expect(screen.getByText("참석 응답과 실제 출석은 별개로 기록해요.")).toBeVisible();
-    expect(screen.getByText("실제 출석 1 / 4 · 확인 필요 2")).toBeVisible();
-    expect(screen.getByRole("link", { name: "진행 순서 보기" })).toHaveAttribute(
+    expect(document.querySelector(".rm-meeting-response-ledger__summary")).toHaveTextContent("실제 출석 1 / 4 · 확인 필요 2");
+    expect(screen.getByRole("link", { name: "진행 순서 보기 ›" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=agenda",
     );
@@ -213,8 +213,42 @@ describe("MeetingResponseLedger", () => {
       />,
     );
 
-    expect(screen.getByText("실제 출석 8 / 12 · 확인 필요 3")).toBeVisible();
+    expect(document.querySelector(".rm-meeting-response-ledger__summary")).toHaveTextContent("실제 출석 8 / 12 · 확인 필요 3");
     expect(screen.queryByRole("button", { name: /나머지 .*명 모두 참석/ })).not.toBeInTheDocument();
     expect(screen.getAllByRole("listitem")).toHaveLength(meetingDayRows.length);
+  });
+
+  it("attendanceBoard shows icons only on the selected choice and keeps a truncated one-row preview", () => {
+    render(
+      <MeetingResponseLedger
+        presentation="attendanceBoard"
+        rows={[meetingDayRows[3]!]}
+        onAttendanceChange={vi.fn()}
+        onBulkAttendanceChange={vi.fn()}
+        attendanceCensus={{ attended: 3, all: 6, pending: 2 }}
+      />,
+    );
+
+    const attended = screen.getByRole("button", { name: "서연 참석" });
+    expect(attended.querySelector(".rm-attendance-choice [data-icon='check-circle']")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "서연 불참" }).querySelector("[data-icon]")).toBeNull();
+    expect(screen.getByRole("button", { name: "서연 미확인" }).querySelector("[data-icon]")).toBeNull();
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    expect(screen.queryByText(/나머지 \d+명/)).toBeNull();
+  });
+
+  it("attendanceBoard maps absent and unknown choices to circle icons", () => {
+    render(
+      <MeetingResponseLedger
+        presentation="attendanceBoard"
+        rows={[meetingDayRows[2]!, meetingDayRows[0]!]}
+        onAttendanceChange={vi.fn()}
+        onBulkAttendanceChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "하준 불참" }).querySelector(".rm-attendance-choice [data-icon='x-circle']")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "지후 미확인" }).querySelector(".rm-attendance-choice [data-icon='question-circle']")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "하준 참석" }).querySelector("[data-icon]")).toBeNull();
   });
 });

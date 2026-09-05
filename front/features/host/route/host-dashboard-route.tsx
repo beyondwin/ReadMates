@@ -59,6 +59,7 @@ import {
 import { registerHostSensitiveState } from "@/features/host/storage/host-sensitive-storage";
 import type { HostLinkComponent } from "@/features/host/ui/host-link-types";
 import {
+  AttendanceBoardChrome,
   MeetingResponseLedger,
   type MeetingAttendance,
 } from "@/features/host/ui/meeting-workspace/meeting-response-ledger";
@@ -156,6 +157,10 @@ export function HostDashboardRoute({
 
   const nowWorkboxQuery = useQuery({
     ...hostWorkboxPageQuery({ state: "NOW", limit: 20 }, context),
+    retry: false,
+  });
+  const completedWorkboxQuery = useQuery({
+    ...hostWorkboxPageQuery({ state: "COMPLETED", limit: 20 }, context),
     retry: false,
   });
   const workboxQueries = useQueries({
@@ -548,11 +553,18 @@ export function HostDashboardRoute({
     all: compactAttendanceRows.length,
     pending: compactAttendanceRows.filter((row) => row.attendance === "UNKNOWN").length,
   };
+  const compactLiveAgendaHref = selectedDetail
+    ? liveAgendaHref ?? hostSessionHref(paths.hostBasePath, selectedDetail.sessionId, "?section=agenda")
+    : null;
   const compactLiveContent = selectedDetail ? (
-    <>
+    <section className="rm-host-operating-room__compact-live" aria-labelledby="meeting-day-attendance-title">
+      <AttendanceBoardChrome
+        agendaHref={compactLiveAgendaHref}
+        census={compactAttendanceCensus}
+      />
       <MeetingResponseLedger
         presentation="attendanceBoard"
-        agendaHref={hostSessionHref(paths.hostBasePath, selectedDetail.sessionId, "?section=agenda")}
+        hideChrome
         rows={compactAttendancePreview}
         attendanceCensus={compactAttendanceCensus}
         onAttendanceChange={(membershipId, attendance) => {
@@ -571,7 +583,7 @@ export function HostDashboardRoute({
           {`출석 ${compactAttendanceCensus.all}명 모두 보기`}
         </LinkComponent>
       ) : null}
-    </>
+    </section>
   ) : null;
 
   const closingContent = view.closing ? (
@@ -717,7 +729,15 @@ export function HostDashboardRoute({
     }
   }, [context, queryClient, removeWorkboxDeferralMutation, transitionOwner]);
 
-  const workboxFooterText = buildWorkboxFooterNote(workboxView?.items ?? []);
+  const completedWorkboxView = completedWorkboxQuery.data?.state === "COMPLETED"
+    ? buildHostWorkboxView(completedWorkboxQuery.data)
+    : null;
+  const workboxFooterText = buildWorkboxFooterNote(
+    completedWorkboxView?.items ?? [],
+    completedWorkboxQuery.data?.evaluatedAt
+      ? new Date(completedWorkboxQuery.data.evaluatedAt)
+      : new Date(),
+  );
   const workboxContent = (
     <HostWorkbox
       state={workboxState}

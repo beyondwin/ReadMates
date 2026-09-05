@@ -4,7 +4,7 @@ import type {
   HostWorkboxPage,
   HostWorkboxState,
 } from "../api/host-workbox-contracts";
-import { buildHostWorkboxDisclosure, buildHostWorkboxView, workboxOwnsDeferral } from "./host-workbox-model";
+import { buildHostWorkboxDisclosure, buildHostWorkboxView, buildWorkboxFooterNote, workboxOwnsDeferral } from "./host-workbox-model";
 
 const TYPE_EXPECTATIONS = [
   ["SCHEDULE_UNSEEN", "일정 미열람 확인", "schedule-review"],
@@ -105,6 +105,21 @@ describe("buildHostWorkboxView", () => {
       );
     },
   );
+
+  it("formats the latest completed reminder relative to the supplied now", () => {
+    const now = new Date(2026, 7, 30, 9, 0, 0);
+    const items = [{
+      ...buildHostWorkboxView(page("COMPLETED")).items[0]!,
+      resolvedAt: new Date(2026, 7, 29, 19, 30, 0).toISOString(),
+      receiptSummary: { operation: "SCHEDULE_REMINDER", outcome: "DONE", affectedCount: 8 },
+    }];
+
+    expect(buildWorkboxFooterNote(items, now)).toBe("어제 19:30 자동 리마인드 전달됨");
+  });
+
+  it("returns null when no completed receipt exists", () => {
+    expect(buildWorkboxFooterNote(buildHostWorkboxView(page("NOW")).items)).toBeNull();
+  });
 });
 
 function viewWithTwelveItems() {

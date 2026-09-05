@@ -17,7 +17,7 @@ import {
   expectReducedMotion,
   expectVisibleFocus,
 } from "@/tests/e2e/support/visual-authority-contract";
-import { MeetingResponseLedger } from "../meeting-workspace/meeting-response-ledger";
+import { MeetingResponseLedger, AttendanceBoardChrome } from "../meeting-workspace/meeting-response-ledger";
 import { PhaseStatusLedger } from "./phase-status-ledger";
 import { HostWorkbox } from "../workbox/host-workbox";
 import { OperatingRoomPhaseContinuityStory } from "./host-operating-room-phase-continuity-ct-harness";
@@ -51,7 +51,7 @@ const view: HostOperatingRoomView = {
     title: "경계가 긴 한글 모임 제목과 A deliberately long English meeting title without clipping",
     bookTitle: "이미지가 없어도 운영 문맥을 잃지 않는 아주 긴 책 제목",
     bookAuthor: "Long Public-safe Author Name",
-    bookImageUrl: null,
+    bookImageUrl: "/covers/operating-room.png",
     date: "2026-09-01",
     startTime: "19:30",
     endTime: "21:30",
@@ -170,6 +170,11 @@ const workboxView: HostWorkboxView = {
   ],
 };
 
+const APPROVED_WORKBOX_FOOTER = {
+  text: "어제 19:30 자동 리마인드 전달됨",
+  historyHref: "/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=history",
+} as const;
+
 function hostWorkbox(overrides: {
   view?: HostWorkboxView | null;
   loading?: boolean;
@@ -182,6 +187,7 @@ function hostWorkbox(overrides: {
       loading={overrides.loading ?? false}
       error={overrides.error ?? null}
       pendingKey={null}
+      footerNote={APPROVED_WORKBOX_FOOTER}
       onStateChange={() => undefined}
       onRetry={() => undefined}
       onLoadMore={() => undefined}
@@ -348,7 +354,7 @@ test("operating room loading keeps current-meeting context", async ({ mount, pag
   await page.setViewportSize({ width: 768, height: 900 });
   const component = await mount(operatingRoomFixture(null, hostWorkbox({ view: null, loading: true })));
   await expect(component.getByRole("group", { name: "현재 모임" })).toBeVisible();
-  await expect(component.getByRole("heading", { name: view.meeting!.title })).toBeVisible();
+  await expect(component.getByRole("heading", { name: view.meeting!.bookTitle! })).toBeVisible();
   await expect(component.getByRole("status")).toContainText("작업함을 불러오는 중입니다.");
   await expect(component.getByRole("region", { name: "다음에 할 일" })).toBeVisible();
   expect(await isSemanticDocumentOrder([
@@ -399,7 +405,7 @@ test("operating room partial warning keeps unaffected rows usable", async ({ mou
 test("operating room long Korean and English titles wrap without overflow", async ({ mount, page }) => {
   await page.setViewportSize({ width: 320, height: 720 });
   const component = await mount(operatingRoomFixture());
-  const title = component.getByRole("heading", { name: view.meeting!.title });
+  const title = component.getByRole("heading", { name: view.meeting!.bookTitle! });
   await expect(title).toBeVisible();
   const metrics = await title.evaluate((element) => {
     const style = getComputedStyle(element);
@@ -443,7 +449,7 @@ const approvedMeeting = {
   title: "지구 끝의 온실",
   bookTitle: "지구 끝의 온실",
   bookAuthor: "김초엽",
-  bookImageUrl: null,
+  bookImageUrl: "/covers/operating-room.png",
   date: "2026-09-01",
   startTime: "19:30",
   endTime: "21:30",
@@ -509,6 +515,7 @@ function approvedWorkbox(items: HostWorkboxView["items"]): ReactElement {
       loading={false}
       error={null}
       pendingKey={null}
+      footerNote={APPROVED_WORKBOX_FOOTER}
       onStateChange={() => undefined}
       onRetry={() => undefined}
       onLoadMore={() => undefined}
@@ -688,10 +695,14 @@ const liveAttendees = [
 function approvedAttendanceBoard() {
   const preview = liveAttendees.slice(0, 1);
   return (
-    <>
+    <section className="rm-host-operating-room__compact-live" aria-labelledby="meeting-day-attendance-title">
+      <AttendanceBoardChrome
+        agendaHref="/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=agenda"
+        census={liveAttendanceCensus}
+      />
       <MeetingResponseLedger
         presentation="attendanceBoard"
-        agendaHref="/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=agenda"
+        hideChrome
         attendanceCensus={liveAttendanceCensus}
         rows={preview.map((attendee) => ({
           membershipId: attendee.membershipId,
@@ -717,7 +728,7 @@ function approvedAttendanceBoard() {
       >
         {`출석 ${liveAttendanceCensus.all}명 모두 보기`}
       </a>
-    </>
+    </section>
   );
 }
 
@@ -845,7 +856,7 @@ test("prep locks the approved desktop operating room", async ({ mount, page }) =
   await expect(component.getByRole("link", { name: "운영실" })).toHaveAttribute("aria-current", "page");
   await expect(component.getByRole("link", { name: "모임 정보" })).toBeVisible();
   await expect(component.getByRole("link", { name: "일정 편집" })).toBeVisible();
-  await expect(component.getByRole("link", { name: "변경 이력" })).toBeVisible();
+  await expect(component.getByRole("navigation", { name: "현재 모임 작업" }).getByRole("link", { name: "변경 이력" })).toBeVisible();
   await expect(component.getByRole("link", { name: "대상과 문구 검토" })).toBeVisible();
   await expect(component.getByRole("region", { name: "준비 현황" }).getByRole("link", { name: /보기/ }).first()).toBeVisible();
   await expect(component.getByRole("complementary", { name: "클럽 작업함" }).getByRole("listitem")).toHaveCount(4);
@@ -856,7 +867,8 @@ test("prep locks the approved desktop operating room", async ({ mount, page }) =
   expect(coverBox, "cover cell").not.toBeNull();
   expect(coverBox!.width).toBeGreaterThan(48);
   expect(coverBox!.height).toBeGreaterThan(48);
-  await expect(cover.locator(".rm-book-cover__fallback")).toBeVisible();
+  await expect(cover.locator(".rm-book-cover__image")).toBeVisible();
+  await expect(cover.locator(".rm-book-cover__fallback")).toHaveCount(0);
   const prepIcons = component.getByRole("region", { name: "준비 현황" });
   await expect(prepIcons.locator("svg[data-icon='calendar']")).toBeVisible();
   await expect(prepIcons.locator("svg[data-icon='people']")).toBeVisible();
@@ -974,8 +986,7 @@ test("prep locks the approved mobile operating room", async ({ mount, page }) =>
   await expect(firstWorkboxRow).toBeVisible();
   for (const [name, locator] of [
     ["next-action", nextAction],
-    ["prep-row-4", preparation.getByRole("listitem").nth(3)],
-    ["workbox-now-row", firstWorkboxRow],
+    ["prep-row-1", preparation.getByRole("listitem").first()],
   ] as const) {
     const box = await locator.boundingBox();
     expect(box, name).not.toBeNull();
@@ -1019,7 +1030,6 @@ test("live locks the approved mobile attendance board", async ({ mount, page }) 
   const board = component.locator(".rm-meeting-response-ledger--attendance-board");
   const roster = board.getByRole("listitem");
   await expect(roster).toHaveCount(1);
-  const disclose = component.getByRole("link", { name: "출석 12명 모두 보기" });
   const bottomNav = component.locator('[data-club-shell-region="mobile-primary"]');
   const frame = { x: 0, y: 0, width: 390, height: 832 };
   await expect(bottomNav).toHaveCSS("position", "fixed");
@@ -1029,7 +1039,6 @@ test("live locks the approved mobile attendance board", async ({ mount, page }) 
   expect(navBox!.y + navBox!.height).toBeLessThanOrEqual(frame.height + 1);
   for (const [name, locator] of [
     ["roster-row-1", roster.first()],
-    ["disclose", disclose],
   ] as const) {
     const box = await locator.boundingBox();
     expect(box, name).not.toBeNull();

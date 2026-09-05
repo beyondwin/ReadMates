@@ -797,15 +797,42 @@ describe("HostDashboardRoute", () => {
     renderRoute("/clubs/reading-sai/app/host?phase=live");
 
     expect(await screen.findByRole("region", { name: "출석 확인" })).toBeVisible();
-    expect(screen.getByText("실제 출석 1 / 2 · 확인 필요 1")).toBeVisible();
+    expect(document.querySelector(".rm-meeting-response-ledger__summary")).toHaveTextContent("실제 출석 1 / 2 · 확인 필요 1");
+    expect(screen.getByText("현장 운영")).toBeVisible();
+    expect(screen.getByRole("link", { name: "진행 순서 보기 ›" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-7?section=agenda",
+    );
     expect(screen.getByText("진행 중").closest("[data-badge]")).toHaveAttribute("data-badge", "live");
     expect(screen.getByRole("link", { name: "출석 2명 모두 보기" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7?section=attendance",
     );
+    expect(screen.getByRole("button", { name: "지후 미확인" }).querySelector(".rm-attendance-choice [data-icon='question-circle']")).toBeTruthy();
+    expect(screen.getAllByRole("listitem").filter((item) => item.classList.contains("rm-meeting-response-ledger__row"))).toHaveLength(1);
     expect(screen.getByText("지후")).toBeVisible();
     expect(screen.queryByText("서연")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /나머지 .*명 모두 참석/ })).not.toBeInTheDocument();
+  });
+
+  it("shows a workbox footer note from the completed receipt while the NOW tab is open", async () => {
+    routeMocks.workboxPages.set("NOW:root", workboxPageWithItems(4));
+    routeMocks.workboxPages.set("COMPLETED:root", {
+      ...workboxPageWithItems(1),
+      state: "COMPLETED",
+      items: [{
+        ...workboxPageWithItems(1).items[0]!,
+        state: "COMPLETED",
+        deferredUntil: null,
+        resolvedAt: new Date(2026, 7, 29, 19, 30, 0).toISOString(),
+        receiptSummary: { operation: "SCHEDULE_REMINDER", outcome: "DONE", affectedCount: 8 },
+      }],
+    });
+    renderRoute("/clubs/reading-sai/app/host?phase=prep");
+
+    expect(await screen.findByText(/자동 리마인드 전달됨/)).toBeVisible();
+    expect(document.querySelector(".rm-host-workbox__footer")?.querySelector('[data-icon="clock"]')).toBeTruthy();
+    expect(document.querySelector(".rm-host-workbox__footer a")).toHaveTextContent("변경 이력");
   });
 
   it("keeps successful meeting content when optional sources fail and exposes scoped retry", async () => {

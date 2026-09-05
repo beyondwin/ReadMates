@@ -44,6 +44,10 @@ function fixture() {
             loading={false}
             error={null}
             pendingKey={null}
+            footerNote={{
+              text: "어제 19:30 자동 리마인드 전달됨",
+              historyHref: "/app/host/sessions/session-1?section=history",
+            }}
             onStateChange={() => undefined}
             onRetry={() => undefined}
             onLoadMore={() => undefined}
