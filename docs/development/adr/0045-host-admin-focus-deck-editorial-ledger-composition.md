@@ -91,6 +91,7 @@ paper/ink primitive에 **아이콘 primitive**를 추가한다. Host와 platform
 - queue selection, filter, pagination, polling order freeze, pending-new, Back/Forward, scroll/focus restoration을 검증한다.
 - L1 state/history, L2 preview/confirm/receipt, L3 convergence/resume를 해당 command에서만 E2E 검증한다.
 - 320/390/768/900/1024/1440px, 200% zoom, keyboard/focus, reduced motion, 긴 한국어를 검증한다.
+- 2026-09-06 구현 완료 사실: `ReadmatesIcon`/`ReadmatesIconBadge`가 Admin·Host 셸·원장·작업함 아이콘의 단일 primitive다. `shell-chrome-guards.test.ts`는 CSS data-URI 아이콘과 `.admin-shell:has(` 셸 override baseline을 0으로 감시한다. 18장 실제 route pixel은 18/18 `not_passed_0.02`로 남고 ADR-0053은 `Proposed`다. `front/DESIGN.md`가 유틸 5개·운영실 헤더 액션 3개·H1 책 제목과 아이콘 primitive를 기록한다.
 
 ## 후속 작업
 

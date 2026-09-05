@@ -6,10 +6,14 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
+### Changed
+
+- Admin·Host 셸 크롬을 승인 시안 기본값으로 통합, 아이콘 primitive 도입, route-scoped 셸 override 제거.
+
 ### Highlights
 
 - **첫 화면 우선순위 정리:** 관리자 `오늘 할 일`은 우선 업무 **3건**만 먼저 보여 주고, 나머지는 `전체 보기`로 펼칩니다. 호스트 작업함은 데스크톱 **4건**·모바일 **3건**을 먼저 보여 주고, 나머지는 `작업함 모두 보기`로 펼칩니다. 두 경로 모두 주소로 공유·복원할 수 있어 펼친 상태가 새로고침이나 뒤로 가기에서 유지됩니다.
-- Admin 승인 시안 01–07과 Host 승인 시안 07–17의 첫 화면 구성을 실제 로그인 화면으로 맞췄습니다. 구성·간격·타이포·첫 화면 노출·조작은 18/18 통과했고, 승인 시안 대비 픽셀 비율 0.02는 18/18 미달(`not_passed_0.02`)입니다. 로컬 lint·unit·build와 Docker CT 177건, 호스트 생애주기 E2E는 통과했습니다. 사람 30초 이해도 검증과 보조기술 검증, 원격 CI는 아직 남아 있습니다. 이 상태로는 `origin/main` push가 시각 권위 job을 실패시킵니다.
+- Admin 승인 시안 01–07과 Host 승인 시안 07–17의 첫 화면 구성을 실제 로그인 화면으로 맞췄습니다. 2026-09-06 Jammy 재측정에서 승인 시안 대비 픽셀 비율 0.02는 18/18 미달(`not_passed_0.02`)이고 structurePass는 12 true / 6 false입니다. 이 상태로는 `origin/main` push가 시각 권위 job을 실패시킵니다. 사람 30초 이해도 검증과 보조기술 검증, 원격 CI는 `not measured`입니다.
 - **호스트 생애주기 운영실:** 호스트의 canonical 업무 영역을 운영실(`/app/host`)·일정과 모임(`/app/host/sessions`)·사람(`/app/host/people`)·기록(`/app/host/records`) 네 곳으로 고정했습니다. 운영실은 서버가 고른 현재 모임을 준비실·현장·마감실로 나누고, 계산된 다음 행동 하나·준비 현황·호스트 작업함을 같은 문맥에 둡니다. 기존 `/members`와 `/operations`는 query·허용된 incoming fragment·검증된 safe state를 보존해 각각 `/people`과 운영실로 replace 이동합니다. `/invitations`는 query와 검증된 safe state를 보존하되 incoming fragment를 canonical `#invitations`로 교체해 `/settings#invitations`로 replace 이동합니다. `/records`는 독립 canonical 기록 원장으로 유지합니다. 기존 모임 `/edit`·`/closing` deep link는 같은 모임 상세/기록 문맥으로 호환합니다.
 - **호스트 운영 사실·복구 계약:** 일정 확인은 current schedule을 실제로 렌더링한 ACTIVE participant만 exact `scheduleRevision`으로 기록하며 최근 접속·참석 응답·실제 출석·알림 전달과 분리합니다. 작업함은 일정 미열람·가입 승인·기록 마감·초대 만료·알림 실패를 15분 immutable snapshot으로 페이지하고, 보류 만료는 `NOW`로 복귀하며 완료는 별도 mutable flag가 아니라 source/allowlist receipt에서 파생합니다. 일정 미열람 수동 알림은 대상·문구·revision snapshot을 preview에 묶고 idempotent confirm과 receipt/history reconciliation으로 응답 손실 때 같은 발송을 다시 보내지 않습니다. 사람 상세는 접속·일정 확인·응답·출석을 분리하며, 초대와 설정은 OAuth invitation flow에서만 소비되는 named link, revisioned club settings/co-host history, local-safe 운영 종료 preview/confirm을 제공합니다. 외부 OAuth/provider, 실제 이메일 발송과 실제 클럽 운영 종료는 이 저장소 변경에서 실행하지 않았습니다.
 - **플랫폼 어드민 운영 제품 개편:** `/admin/**`를 ADR-0050의 `오늘 할 일`·`클럽 관리`·`서비스 상태`·`처리 기록` 네 축으로 정리하고, 긴급 공개 회수는 하단 비상 레인으로 유지합니다. Today는 observed content width 960px 이상에서 38:62 queue/docket, 그 아래에서 URL-addressable 목록/상세 완료 흐름을 사용합니다. 서버 `allowedActions`에 있는 확인함·잠시 미룸·처리함만 제공하며 서버 의미가 없는 무시·병합·사유 입력을 만들지 않습니다.
@@ -29,6 +33,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Fixed
 
+- **host meetings 원장의 현재 모임 중복 표시:** 다가오는 모임과 지난 모임에 같은 현재 회차가 동시에 보이던 fixture 필터를 고쳐, 현재 모임이 한쪽에만 나타나게 했습니다.
 - **현장 출석 미리보기 일괄 저장:** 좁은 화면 운영실 출석 보드는 1행만 보여 주고 `출석 N명 모두 보기`로 전체 명단에 들어갑니다. 미리보기가 전체 인원보다 짧으면 `나머지 N명` 일괄 출석을 숨겨, 화면에 없는 사람을 잘못 저장하지 않습니다.
 - **좁은 화면 처리 기록 열람:** `/admin/audit`는 좁은 화면에서 기록을 눌러 상세로 들어가고 `목록으로`로 되돌아올 수 있습니다. 한 화면 높이에 고정하던 두 단 배치를 데스크톱 폭에서만 적용해, 좁은 화면에서 목록이 잘리거나 하단 메뉴가 기록 클릭을 가로채지 않습니다. 데스크톱 선택 주소(`?event=...`)는 그대로입니다.
 - **운영실 상태 안내 접근성:** 모임 운영실의 상태 안내 문단은 안내할 내용이 있을 때만 live region으로 알립니다. 빈 문단이 계속 상태 영역으로 노출되어 보조기술이 빈 알림을 읽거나 다른 상태 영역과 뒤섞이던 문제를 고쳤습니다.
@@ -72,7 +77,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Verification
 
-- Admin·Host 실제 route 시각 권위 closeout: `CI=true npx --yes corepack@0.35.0 pnpm --dir front lint`(error 0, warning 5), `test`(480 files / 4754), `build`, `DOCKER_CONTEXT=colima-readmates-va pnpm --dir front test:ct:docker`(177 passed), host lifecycle E2E 1건 통과. 승인 PNG는 수정하지 않았고 `test:e2e:approved-routes:docker`는 재실행하지 않아 직전 18/18 `not_passed_0.02`를 유지합니다. 사람 30초 gate와 VoiceOver/Safari·NVDA/Chrome은 `not measured`, 원격 CI는 `pending_remote_ci`입니다. ADR-0053은 `Proposed`입니다.
+- Admin·Host visual fidelity closeout (2026-09-06): `CI=true npx --yes corepack@0.35.0 pnpm --dir front lint` exit 0 (0 errors, 5 warnings); `test` exit 1 (5 failed / 4868 passed); `build` exit 0; boundary+chrome-guard vitest exit 0 (17 passed); `DOCKER_CONTEXT=colima-readmates-va … test:ct:docker` exit 1 (168 passed, 10 failed); `… test:e2e:approved-routes:docker` exit 1 (Playwright 18 failed, pixel 18/18 `not_passed_0.02`, structurePass 12/6); focused E2E trio exit 1 (4 passed, 3 failed, 5 did not run). 승인 PNG·sha256·`maxDiffPixelRatio` 0.02는 수정하지 않았다. 사람 30초 gate와 VoiceOver/Safari·NVDA/Chrome·원격 CI는 `not measured`. ADR-0045 update 유지, ADR-0053은 `Proposed`. `origin/main` 미푸시.
 - 이번 whole-branch 보정은 actual controller/owner host·platform authority-loss 35건, mutation inventory 37건, primary-language/admin status 59건, owner/coordinator/host-ledger/admin route 47건을 focused GREEN으로 확인했습니다. Frontend lint는 error 0건(기존 Fast Refresh warning 2건), full Vitest는 449 files·4,193 tests, production build는 807 modules로 통과했고 public release candidate와 repository fallback public-safety check도 통과했습니다. 이 보정에서 server, MySQL/Testcontainers, Docker component, E2E는 다시 실행하지 않았으므로 새 최종 증거로 주장하지 않습니다. 5명 초보 운영자 30초 이해 연구와 VoiceOver/Safari·NVDA/Chrome 수동 screen-reader 순서는 계속 `not measured`입니다. 로컬 gitleaks는 사용할 수 없어 fallback path/content check만 실행했으며 완전한 secret scan으로 주장하지 않습니다. Provider 호출, 실제 이메일 발송, production mutation, deploy는 수행하지 않았습니다.
 
 ## v2.4.1 - 2026-08-17

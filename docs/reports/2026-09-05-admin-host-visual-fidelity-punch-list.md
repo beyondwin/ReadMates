@@ -159,3 +159,25 @@ Same 10 leftover fails as Task 27 (selectors still match current DOM; raster/geo
 
 Did not `--update` snapshots. Did not loosen structure contract.
 
+## 최종 게이트 (Task 30)
+
+Commands are `CI=true npx --yes corepack@0.35.0 pnpm --dir front …` unless noted. Pixel 0.02 초과는 `not_passed_0.02`. `origin/main` 미푸시. 사람 30초 gate·VoiceOver/Safari·NVDA/Chrome·원격 CI는 `not measured`.
+
+| 명령 | exit | 숫자 |
+| --- | --- | --- |
+| `pnpm --dir front lint` | 0 | 0 errors, 5 warnings |
+| `pnpm --dir front test` | 1 | 5 failed / 4868 passed (4873). Leftover: producer-inventory timeout, schedule-review heading geometry unit vs recapture `{40,163,1456,38}`, host-session-editor 2, workbox=all still 4 items |
+| `pnpm --dir front build` | 0 | production build |
+| `vitest run tests/unit/frontend-boundaries.test.ts tests/unit/shell-chrome-guards.test.ts` | 0 | 2 files / 17 passed |
+| `DOCKER_CONTEXT=colima-readmates-va … test:ct:docker` | 1 | **168 passed, 10 failed** (same HEAD as Task 29). Leftover raster/geometry only |
+| `DOCKER_CONTEXT=colima-readmates-va … test:e2e:approved-routes:docker` | 1 | Playwright **18 failed**. Pixel **18/18 `not_passed_0.02`**. structurePass **12 true / 6 false** |
+| focused E2E trio chromium `--retries=0` | 1 | **4 passed, 3 failed, 5 did not run**. Fails: Today `전체 처리 기록 보기` sticky header intercept; lifecycle + workbox-stage4 H1 still assert meeting title (product H1 is book title) |
+
+Jammy `summary.json` `pct` (records 두 id는 같은 실행 `report.json` `mismatchPixelRatio`×100): today-desktop 4.1, clubs 5.43, service 3.77, records 3.41, space-switcher 5.07, today-mobile 6.08, work-detail 13.23, prep-d 6.53, live-d 6.69, closing-d 6.91, meetings 4.47, people 5.51, host-records 5.30, settings 4.09, schedule-review 6.6, prep-m 13.25, live-m 13.84, person-m 7.29. All `not_passed_0.02`.
+
+structurePass true: admin today/clubs/service/records desktop, host OR 5 id, settings, schedule-review, person-mobile. false: space-switcher, today-mobile, work-detail, meetings (`status-dot`/`footer-total`), people (`rsvp-icon`), host-records (live missing CT class names).
+
+E 잔여: clubs/records docket h1 document-order; host live next-action prep 내용; meetings No.28 leftover if still dual. A 잔여: wordmark 20/700 vs 12/650, phase-label color/size, space-switcher 계정 라벨 vs 아바타, today-mobile header 132 vs 70. B: 출석 1행, workbox 4/3, Today 3건, 공간 전환 크롬. C: live clocks/facts `—`, fixture counts. D: raster, 기록만. Pixel 18/18 fail은 merge blocker가 아님(spec).
+
+갱신한 CT snapshot: Task 12b `admin-shell-mobile-390.png`, `admin-shell-long-copy-320.png` (controller ratified 2026-09-05). Task 30은 `--update` 하지 않음.
+

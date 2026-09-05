@@ -6,7 +6,8 @@ code-native UI는 편집·runtime source다. tracked CT snapshot은 보조 회�
 token, shared CSS/component, fixture 변경은 영향 reference 증거를 무효화한다.
 **실제 authenticated route가 18개 reference 전부의 최종 시각 권위다.** Component fixture와 tracked CT snapshot은 보조 회귀 근거일 뿐 최종 승인 receipt를 만들지 않는다. 전체 capture에 적용하던 broad font-raster 예외(0.10/0.15)는 제거했고 gate는 18/18 `maxDiffPixelRatio` 0.02 fail-closed다. mask는 없다.
 
-현재 시각 권위 기록은 `docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md`다. 그 기록에서 composition·geometry·typography·first viewport·interaction·request audit는 18/18 통과했고, strict pixel은 18/18 `not_passed_0.02`다. 로컬 lint·unit·build와 Docker CT 177건, host lifecycle E2E는 이후 closeout에서 통과했다. 사람 30초 gate는 `pending_external_human_evidence`, Chrome 200%·VoiceOver/Safari·NVDA/Chrome은 `not_measured`, 원격 CI는 `pending_remote_ci`다. ADR-0053은 `Proposed`이며 픽셀 수락 완료가 아니다. Public, guest, member composition은 이 문서로 바꾸지 않는다.
+현재 시각 권위 기록은 `docs/reports/2026-09-05-admin-host-visual-fidelity-punch-list.md`다. 승인 PNG는 수정하지 않았다. 2026-09-06 Jammy 재측정에서 strict pixel은 18/18 `not_passed_0.02`다. structurePass true 12 / false 6. 사람 30초 gate·VoiceOver/Safari·NVDA/Chrome·원격 CI는 `not measured`다. ADR-0053은 `Proposed`이며 픽셀 수락 완료가 아니다. Public, guest, member composition은 이 문서로 바꾸지 않는다.
+
 
 구성 수렴 다음의 시각 충실도(빠진 아이콘·여백, geometry PASS를 시안 일치로 읽지 말 것, 출석 1행 유지, `origin/main` 미푸시)는 `docs/superpowers/specs/2026-09-05-admin-host-visual-fidelity-next-slice-design.md`가 다음 슬라이스 핸드오프다. 그 문서는 구현 계획이 아니다.
 
@@ -26,8 +27,16 @@ token, shared CSS/component, fixture 변경은 영향 reference 증거를 무효
 ## Host primary chrome
 
 호스트 1차 내비게이션은 네 영역이다: **운영실** · **일정과 모임** · **사람** · **기록**.
-데스크톱 top nav와 모바일 tab bar는 같은 canonical 목적지(`HOST_ROUTE_HREFS.operatingRoom` / `.meetings` / `.people` / `.records`)와 순서를 쓴다. `초대와 설정`, `멤버 시야`, 알림, 계정, `새 모임`은 utility/action이며 1차 영역을 늘리지 않는다.
+데스크톱 top nav와 모바일 tab bar는 같은 canonical 목적지(`HOST_ROUTE_HREFS.operatingRoom` / `.meetings` / `.people` / `.records`)와 순서를 쓴다.
+데스크톱 헤더 유틸은 다섯 개다: `초대와 설정` · `멤버 시야` · 알림(종) · 아바타 · `새 모임`. 1차 영역을 늘리지 않는다.
+운영실 헤더 액션은 `모임 정보` · `일정 편집`(마감실에서는 `기록 미리보기`) · `변경 이력` 세 개이며, `멤버 시야`를 운영실 액션으로 중복 노출하지 않는다.
+현재 모임 **H1은 책 제목**이고, 모임 제목·회차는 kicker다.
 `/members`와 `/operations`는 query·허용된 incoming fragment·검증된 same-club return state를 보존해 각각 `/people`과 운영실로 replace한다. `/invitations`는 query와 검증된 same-club return state를 보존하되 incoming fragment를 canonical `#invitations`로 교체해 `/settings#invitations`로 replace한다. `/records`는 canonical 기록 원장이고 `/sessions/:sessionId/edit`·`/closing`은 기존 deep link 문맥을 보존한다.
+
+## Icon primitive
+
+Host와 platform admin의 제품 셸·원장·작업함 아이콘은 `front/shared/ui/icon.tsx`의 `ReadmatesIcon`(24 viewBox, stroke 1.75, size 16/20/24, `data-icon`, `aria-hidden` 기본)과 채움 variant `ReadmatesIconBadge` 하나에서 나온다. ADR-0045 2026-09-05 update가 이 제약을 고정한다. CSS `mask-image`/`background-image`의 `data:image/svg+xml`로 아이콘을 그리지 않고, `.admin-shell:has(` route-scoped 셸 override로 크롬을 fork하지 않는다. `front/tests/unit/shell-chrome-guards.test.ts`가 두 규칙을 baseline 0으로 감시한다.
+
 
 ## Shared tokens
 
@@ -72,7 +81,8 @@ Lifecycle·audience·public placement를 한 stepper로 합치지 않는다. 다
 
 390·767·768·1024·1199·1200·1440px와 320×350 200% zoom proxy에서 가로 overflow, 44px target(live compact 출석 choice 40px / undo 36px leftover), 순서, keyboard roving, visible focus와 reduced motion은 이 문서가 규정하는 계약이다. 보조 CT는 `host-shell.ct.tsx`와 `host-operating-room-responsive.ct.tsx`가 현재 composition geometry를 잠근다. Phase와 workbox tab은 방향키와 Home/End를 지원하고, focus/return state는 route/panel을 닫거나 Back/Forward할 때 원래 control로 돌아간다.
 
-> **시각 권위와 보조 CT.** 승인 PNG는 수정하지 않는다. 보조 CT snapshot 3장(`admin-shell-mobile-390.png`, `admin-shell-long-copy-320.png`, `editorial-ledger-emergency-takedown-390.png`)은 현재 composition 회귀 기준이며 승인 PNG PASS가 아니다. 실제 route pixel gate는 18/18 `not_passed_0.02`이며 ADR-0053은 `Proposed`다. Cross-browser smoke와 `admin-today.spec.ts`는 이 closeout에서 다시 돌리지 않았으므로 통과 근거로 인용하지 않는다. 전체 목록은 `docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md` §잔여 위험과 릴리스 경계를 따른다.
+> **시각 권위와 보조 CT.** 승인 PNG는 수정하지 않는다. 보조 CT snapshot 중 Task 12b에서 갱신한 2장(`admin-shell-mobile-390.png`, `admin-shell-long-copy-320.png`)은 Phase 1 셸 크롬 회귀 기준이며 승인 PNG PASS가 아니다. 검토자: Task 12b session / controller ratified 2026-09-05. 실제 route pixel gate는 18/18 `not_passed_0.02`이며 ADR-0053은 `Proposed`다. Task 30 focused E2E trio와 browser smoke는 잔여 fail이 있어 통과 근거로 인용하지 않는다. 전체 목록은 `docs/reports/2026-09-05-admin-host-visual-fidelity-punch-list.md` 최종 게이트를 따른다.
+
 
 `front/tests/e2e/support/visual-authority-contract.ts`의 검사는 visible main, bounded interactive accessible-name source, nested interactive, ARIA target, navigation/complementary landmark 이름만 확인하는 저장소 custom DOM/ARIA audit다. axe/axe-core 또는 전체 접근성 적합성으로 부르지 않는다. 현재 Chromium 자동화에서 helper-classified serious/critical finding은 없지만 VoiceOver/NVDA, Firefox/WebKit과 실제 기기 screen reader는 `not measured`다.
 
@@ -147,20 +157,24 @@ Live region은 의미 있는 전이에만 쓰고 polling마다 반복하지 않�
 
 Contract widths: 320, 390, 768, 900, 1024, 1440px. keyboard, visible focus, 44px target(live compact 출석 choice 40px / undo 36px leftover), reduced motion, long Korean/English wrapping은 automated helper로 검증한다. Chrome 실제 toolbar 200% zoom은 이번 actual-route 수렴에서 **`not_measured`**다. 자동화의 320×350 200% proxy는 실제 toolbar 확대 측정이 아니므로 DPR·CSS viewport·scroll/client width 확인으로 확대 해석하지 않는다. Manual screen-reader announcement order도 `not_measured`이며 어느 쪽도 검증 완료로 주장하지 않는다. 근거는 `docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md` §Step 4다.
 
-Host lifecycle의 code-native source는 `front/features/host/ui/operating-room/host-operating-room-responsive.ct.tsx`, `front/features/host/ui/meeting-workspace/host-lifecycle-responsive.ct.tsx`, `front/features/host/ui/shell/host-shell.ct.tsx`이고, real-route continuity와 recovery widths는 `front/tests/e2e/host-lifecycle-route-continuity.spec.ts`, `front/tests/e2e/host-authority-loss.spec.ts`, `front/tests/e2e/host-workbox-stage4.spec.ts`가 맡는다. 다만 **이 목록 전체가 현재 계약을 잠근다고 읽지 않는다.** 2026-09-04 실행 기준 상태는 다음과 같다.
+Host lifecycle의 code-native source는 `front/features/host/ui/operating-room/host-operating-room-responsive.ct.tsx`, `front/features/host/ui/meeting-workspace/host-lifecycle-responsive.ct.tsx`, `front/features/host/ui/shell/host-shell.ct.tsx`이고, real-route continuity와 recovery widths는 `front/tests/e2e/host-lifecycle-route-continuity.spec.ts`, `front/tests/e2e/host-authority-loss.spec.ts`, `front/tests/e2e/host-workbox-stage4.spec.ts`가 맡는다. 다만 **이 목록 전체가 현재 계약을 잠근다고 읽지 않는다.** 2026-09-06 Task 30 게이트 상태는 다음과 같다.
 
-| suite | 2026-09-04 상태 |
+| suite | 2026-09-06 상태 |
 | --- | --- |
-| `host-lifecycle-responsive.ct.tsx` | 통과 — 잠근다 |
-| `host-shell.ct.tsx` | 통과 — 잠근다 |
-| `host-lifecycle-route-continuity.spec.ts` | 통과 — 잠근다 |
-| `host-operating-room-responsive.ct.tsx` | **실패 (5건)** — 잠그지 않는다 |
-| `host-workbox-stage4.spec.ts` | **실패 (1건)** — 잠그지 않는다 |
-| `host-authority-loss.spec.ts` | **미실행** — 이번 수렴에서 돌리지 않았다. 통과로 읽지 않는다. |
+| `CI=true npx --yes corepack@0.35.0 pnpm --dir front lint` | exit 0 — 0 errors, 5 warnings |
+| `… pnpm --dir front test` | exit 1 — 5 failed / 4868 passed (4873) |
+| `… pnpm --dir front build` | exit 0 |
+| `… vitest run tests/unit/frontend-boundaries.test.ts tests/unit/shell-chrome-guards.test.ts` | exit 0 — 2 files / 17 passed |
+| `DOCKER_CONTEXT=colima-readmates-va CI=true … test:ct:docker` | exit 1 — 168 passed, 10 failed (Task 29 same HEAD) |
+| `DOCKER_CONTEXT=colima-readmates-va CI=true … test:e2e:approved-routes:docker` | exit 1 — Playwright 18 failed, pixel 18/18 `not_passed_0.02` |
+| focused E2E trio (`admin-today` · `host-lifecycle-operating-room` · `host-workbox-stage4`, chromium, retries 0) | exit 1 — 4 passed, 3 failed, 5 did not run |
+| `host-authority-loss.spec.ts` | **미실행** — 통과로 읽지 않는다 |
 
-따라서 semantic/geometry/DOM 계약을 현재 잠그는 것은 위 표의 통과 3개뿐이다. 실패·미실행 suite는 갱신 또는 실행 전까지 통과 근거로 인용하지 않는다. 자세한 내용은 `docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md` §잔여 위험과 릴리스 경계에 있다. 승인 PNG를 runtime 배경으로 쓰지 않으며 tracked snapshot은 보조 회귀 cache다.
+따라서 semantic/geometry/DOM 계약을 현재 잠그는 것은 CT leftover 10 밖의 통과 파일뿐이다. 실패·미실행 suite는 통과 근거로 인용하지 않는다. 자세한 숫자는 `docs/reports/2026-09-05-admin-host-visual-fidelity-punch-list.md` 최종 게이트에 있다. 승인 PNG를 runtime 배경으로 쓰지 않으며 tracked snapshot은 보조 회귀 cache다.
 
-Admin·Host 승인 PNG 비교는 `front/tests/e2e/support/approved-mockup-manifest.ts`와 실제 authenticated route를 candidate로 쓰는 `pnpm --dir front test:e2e:approved-routes:docker`가 담당한다. `pnpm --dir front test:ct:docker`는 보조 component 회귀 suite이며 승인 receipt를 만들지 않는다. token, shared CSS/component, fixture 변경은 `pnpm --dir front visual-authority:affected`가 계산한 영향 id의 기존 승인을 무효화하고 approved reference·candidate·overlay·diff·measurement report와 독립 검토가 다시 필요하다. 현재 결과는 `docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md`를 따른다: composition·geometry·typography·first viewport·interaction·request audit 18/18 통과, strict pixel 18/18 `not_passed_0.02`. 2026-09-02 두 보고서는 component fixture 기반 역사적 기록이다. ADR-0053은 `Proposed`다.
+
+Admin·Host 승인 PNG 비교는 `front/tests/e2e/support/approved-mockup-manifest.ts`와 실제 authenticated route를 candidate로 쓰는 `pnpm --dir front test:e2e:approved-routes:docker`가 담당한다. `pnpm --dir front test:ct:docker`는 보조 component 회귀 suite이며 승인 receipt를 만들지 않는다. token, shared CSS/component, fixture 변경은 `pnpm --dir front visual-authority:affected`가 계산한 영향 id의 기존 승인을 무효화하고 approved reference·candidate·overlay·diff·measurement report와 독립 검토가 다시 필요하다. 현재 결과는 `docs/reports/2026-09-05-admin-host-visual-fidelity-punch-list.md`를 따른다: strict pixel 18/18 `not_passed_0.02`, structurePass 12 true / 6 false. 2026-09-02·2026-09-04 보고서는 역사적 기록이다. ADR-0053은 `Proposed`다.
+
 
 Admin tracked screenshots는 대표 상태의 보조 cache다. 1024px는 viewport contract와 browser smoke에 있고, Admin 시각 권위 PNG는 `design/mockups/2026-08-30-admin-operations-redesign/` `01`–`07`이다.
 
