@@ -75,6 +75,7 @@ const preparation: readonly PreparationLedgerRowView[] = [
     denominator: 12,
     href: "/clubs/reading-sai/app/host/sessions/session-27?section=responses&scheduleSeen=unseen",
     workItemKey: "server/opaque:item:27",
+    actionLabel: "멤버 보기",
   },
   {
     id: "rsvp",
@@ -86,6 +87,7 @@ const preparation: readonly PreparationLedgerRowView[] = [
     denominator: 12,
     href: "/clubs/reading-sai/app/host/sessions/session-27?section=responses",
     workItemKey: null,
+    actionLabel: "응답 보기",
   },
   {
     id: "questions",
@@ -97,6 +99,7 @@ const preparation: readonly PreparationLedgerRowView[] = [
     denominator: null,
     href: "/clubs/reading-sai/app/host/sessions/session-27?section=responses&focus=questions",
     workItemKey: null,
+    actionLabel: "질문 보기",
   },
   {
     id: "place",
@@ -108,6 +111,7 @@ const preparation: readonly PreparationLedgerRowView[] = [
     denominator: null,
     href: "/clubs/reading-sai/app/host/sessions/session-27?section=basic&edit=1",
     workItemKey: null,
+    actionLabel: "정보 보기",
   },
 ];
 

@@ -1,5 +1,6 @@
 import type { AnchorHTMLAttributes, ComponentType, ReactNode } from "react";
 import type { SessionClosingBoardView, SessionClosingTone } from "@/features/host/model/session-closing-model";
+import { ReadmatesIcon } from "@/shared/ui/icon";
 import "./session-closing-board.css";
 
 export type SessionClosingLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {
@@ -57,21 +58,23 @@ export function SessionClosingBoard({
             >
               <div className="row-between rm-host-closing-board__checklist-row">
                 <div className="rm-host-closing-board__checklist-copy">
-                  <span className="tiny muted rm-host-closing-board__step-no" aria-hidden="true">
-                    {String(index + 1).padStart(2, "0")}
+                  <span className="rm-session-closing-board__step-index" aria-hidden="true">
+                    {index + 1}
                   </span>
                   <strong>{item.label}</strong>
                 </div>
-                {item.state === "DONE" && item.completedStamp ? (
+                <span className="rm-session-closing-board__status" data-status={item.stateLabel}>
+                  {item.stateLabel}
+                </span>
+                {item.completedStamp ? (
                   <span className="tiny rm-host-closing-board__stamp">{item.completedStamp}</span>
-                ) : (
-                  <span className={badgeClass(item.tone)}>{item.stateLabel}</span>
-                )}
+                ) : null}
               </div>
               <p className="small muted">{item.detail}</p>
               {item.href ? (
                 <LinkComponent className="small rm-host-closing-board__item-action" to={item.href}>
-                  {item.actionLabel}
+                  <span>{item.actionLabel}</span>
+                  <ReadmatesIcon name="chevron-right" size={16} />
                 </LinkComponent>
               ) : (
                 <span className="small muted rm-host-closing-board__item-action">{item.actionLabel}</span>

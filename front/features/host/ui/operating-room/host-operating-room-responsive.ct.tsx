@@ -81,6 +81,7 @@ const view: HostOperatingRoomView = {
       denominator: 12_345,
       href: "/clubs/public-safe/app/host/sessions/public-safe-session-27/schedule-review",
       workItemKey: "public-safe-work-item-27",
+      actionLabel: "멤버 보기",
     },
     {
       id: "rsvp",
@@ -92,6 +93,7 @@ const view: HostOperatingRoomView = {
       denominator: 12_345,
       href: "/clubs/public-safe/app/host/sessions/public-safe-session-27?section=responses",
       workItemKey: null,
+      actionLabel: "응답 보기",
     },
     {
       id: "questions",
@@ -103,6 +105,7 @@ const view: HostOperatingRoomView = {
       denominator: null,
       href: null,
       workItemKey: null,
+      actionLabel: "질문 보기",
     },
     {
       id: "place",
@@ -114,6 +117,7 @@ const view: HostOperatingRoomView = {
       denominator: null,
       href: "/clubs/public-safe/app/host/sessions/public-safe-session-27?section=basic",
       workItemKey: null,
+      actionLabel: "정보 보기",
     },
   ],
   partialFailures: [],
@@ -555,6 +559,7 @@ function approvedOperatingRoom(input: {
         denominator: 12,
         href: "/clubs/reading-sai/app/host/sessions/public-safe-session-27/schedule-review",
         workItemKey: "public-safe-work-item-27",
+        actionLabel: "멤버 보기",
       },
       {
         id: "rsvp",
@@ -566,6 +571,7 @@ function approvedOperatingRoom(input: {
         denominator: 12,
         href: "/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=responses",
         workItemKey: null,
+        actionLabel: "응답 보기",
       },
       {
         id: "questions",
@@ -577,6 +583,7 @@ function approvedOperatingRoom(input: {
         denominator: null,
         href: "/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=responses&focus=questions",
         workItemKey: null,
+        actionLabel: "질문 보기",
       },
       {
         id: "place",
@@ -588,6 +595,7 @@ function approvedOperatingRoom(input: {
         denominator: null,
         href: "/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=basic",
         workItemKey: null,
+        actionLabel: "정보 보기",
       },
     ],
     partialFailures: [],

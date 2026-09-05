@@ -716,9 +716,9 @@ h1.rm-operating-room-header__title {
 }
 
 .rm-preparation-ledger h2 {
-  margin: 0;
-  font-size: var(--type-size-body-emphasis);
-  font-weight: 650;
+  margin: 0 0 16px;
+  font-size: 17px;
+  font-weight: 700;
 }
 
 .rm-operating-room-next-action__state,
@@ -868,37 +868,51 @@ h1.rm-operating-room-header__title {
 
 .rm-preparation-ledger {
   position: relative;
-  padding: 22px 36px 0 0;
+  padding: 24px 32px;
   background: var(--bg);
 }
 
 .rm-preparation-ledger h2 {
-  margin-bottom: var(--space-md);
+  margin: 0 0 16px;
+  font-size: 17px;
+  font-weight: 700;
 }
 
-.rm-preparation-ledger__list {
+.rm-preparation-ledger__list,
+.rm-phase-status-ledger__list {
   position: relative;
   margin: 0;
   padding: 0;
-  border-top: 1px solid var(--line);
   list-style: none;
 }
 
+.rm-preparation-ledger__head,
+.rm-phase-status-ledger__head,
 .rm-preparation-ledger-row,
-.rm-preparation-ledger__row {
-  position: relative;
+.rm-preparation-ledger__row,
+.rm-phase-status-ledger-row {
   display: grid;
-  grid-template-columns:
-    minmax(148px, 0.8fr)
-    minmax(88px, 0.55fr)
-    minmax(0, 1.4fr)
-    minmax(108px, auto);
-  gap: 12px;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(100px, .8fr) minmax(0, 2fr) auto;
+  column-gap: 24px;
   align-items: center;
-  min-width: 0;
-  min-height: 62px;
-  padding-block: 8px;
+}
+
+.rm-preparation-ledger__head,
+.rm-phase-status-ledger__head {
+  padding: 0 0 10px;
+  color: var(--text-3);
+  font-size: 14px;
   border-bottom: 1px solid var(--line);
+}
+
+.rm-preparation-ledger-row,
+.rm-preparation-ledger__row,
+.rm-phase-status-ledger-row {
+  position: relative;
+  min-width: 0;
+  min-height: 60px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 16px;
 }
 
 .rm-preparation-ledger-row__label,
@@ -909,10 +923,11 @@ h1.rm-operating-room-header__title {
   min-width: 0;
 }
 
-.rm-preparation-ledger-row__label {
+.rm-preparation-ledger-row__label,
+.rm-phase-status-ledger-row__label {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   font-weight: 650;
 }
 
@@ -926,40 +941,52 @@ h1.rm-operating-room-header__title {
   font-variant-numeric: tabular-nums;
 }
 
-.rm-phase-status-ledger-row__index {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
+.rm-session-closing-board__step-index {
+  width: 24px;
+  height: 24px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
   color: var(--text-3);
-  font-size: var(--type-size-label);
+  font-size: 12px;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
 }
 
-.rm-preparation-ledger-row__value {
+.rm-preparation-ledger-row__value,
+.rm-phase-status-ledger-row__value {
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  font-weight: 650;
 }
 
-.rm-preparation-ledger-row[data-state="warning"] .rm-preparation-ledger-row__value {
-  color: var(--warn);
-}
-
-.rm-preparation-ledger-row[data-state="complete"] .rm-preparation-ledger-row__value {
+.rm-preparation-ledger-row[data-state="complete"] .rm-preparation-ledger-row__value,
+.rm-preparation-ledger-row[data-state="normal"] .rm-preparation-ledger-row__value,
+.rm-phase-status-ledger-row[data-state="complete"] .rm-phase-status-ledger-row__value,
+.rm-phase-status-ledger-row[data-state="normal"] .rm-phase-status-ledger-row__value {
   color: var(--ok);
 }
 
-.rm-preparation-ledger-row__detail {
-  color: var(--text-3);
-  font-size: var(--type-size-supporting);
-  line-height: var(--type-leading-body);
+.rm-preparation-ledger-row[data-state="warning"] .rm-preparation-ledger-row__value,
+.rm-phase-status-ledger-row[data-state="warning"] .rm-phase-status-ledger-row__value {
+  color: var(--warn);
 }
 
-.rm-preparation-ledger-row__actions {
+.rm-phase-status-ledger-row[data-state="in-progress"] .rm-phase-status-ledger-row__value {
+  color: var(--accent);
+}
+
+.rm-phase-status-ledger-row[data-state="pending"] .rm-phase-status-ledger-row__value {
+  color: var(--text-3);
+}
+
+.rm-preparation-ledger-row__detail,
+.rm-phase-status-ledger-row__detail {
+  color: var(--text-2);
+}
+
+.rm-preparation-ledger-row__actions,
+.rm-phase-status-ledger-row__actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -967,12 +994,22 @@ h1.rm-operating-room-header__title {
 }
 
 .rm-preparation-ledger-row__link,
+.rm-phase-status-ledger-row__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
 .rm-preparation-ledger-row__retry {
   padding-inline: var(--space-xs);
   border: 0;
   background: transparent;
   color: var(--accent);
   font-size: var(--type-size-control);
+  font-weight: 600;
   text-decoration: none;
 }
 
@@ -1205,40 +1242,6 @@ h1.rm-operating-room-header__title {
     flex-wrap: wrap;
     gap: 8px;
   }
-
-  .rm-preparation-ledger {
-    padding: 12px 0 0;
-  }
-
-  .rm-preparation-ledger-row,
-  .rm-preparation-ledger__row {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    grid-template-areas:
-      "label value action"
-      "detail detail action";
-    gap: 2px 8px;
-    min-height: 44px;
-    padding-block: 6px;
-  }
-
-  .rm-preparation-ledger-row__label {
-    grid-area: label;
-  }
-
-  .rm-preparation-ledger-row__value {
-    grid-area: value;
-    justify-self: end;
-  }
-
-  .rm-preparation-ledger-row__detail {
-    grid-area: detail;
-    display: block;
-  }
-
-  .rm-preparation-ledger-row__actions {
-    grid-area: action;
-    align-self: center;
-  }
 }
 
 @media (max-width: 767px) {
@@ -1287,9 +1290,73 @@ h1.rm-operating-room-header__title {
     text-decoration: none;
   }
 
+  .rm-preparation-ledger,
+  .rm-phase-status-ledger {
+    padding: 20px 16px;
+  }
+
+  .rm-preparation-ledger__head,
+  .rm-phase-status-ledger__head {
+    display: none;
+  }
+
+  .rm-preparation-ledger-row,
+  .rm-preparation-ledger__row,
+  .rm-phase-status-ledger-row {
+    grid-template-columns: 36px 28px minmax(0,1fr) auto;
+    min-height: 96px;
+    grid-template-areas: "index icon label link" "index icon value link" "index icon detail link";
+  }
+
   .rm-preparation-ledger-row__index {
     display: inline-flex;
-    align-items: baseline;
+    grid-area: index;
+    align-items: center;
+  }
+
+  .rm-session-closing-board__step-index {
+    grid-area: index;
+  }
+
+  .rm-preparation-ledger-row__label,
+  .rm-phase-status-ledger-row__label {
+    display: contents;
+  }
+
+  .rm-preparation-ledger-row__label .rm-icon,
+  .rm-phase-status-ledger-row__label .rm-icon {
+    grid-area: icon;
+    align-self: center;
+  }
+
+  .rm-preparation-ledger-row__label-text {
+    grid-area: label;
+    align-self: center;
+  }
+
+  .rm-preparation-ledger-row__value,
+  .rm-phase-status-ledger-row__value {
+    grid-area: value;
+  }
+
+  .rm-preparation-ledger-row__detail,
+  .rm-phase-status-ledger-row__detail {
+    grid-area: detail;
+  }
+
+  .rm-preparation-ledger-row__actions,
+  .rm-phase-status-ledger-row__actions {
+    grid-area: link;
+    align-self: center;
+  }
+
+  .rm-preparation-ledger-row__link span,
+  .rm-phase-status-ledger-row__link span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
   }
 
   .rm-host-operating-room .rm-host-workbox__header {
@@ -1317,16 +1384,6 @@ h1.rm-operating-room-header__title {
 
   .rm-operating-room-next-action__reason {
     font-size: var(--type-size-supporting);
-  }
-
-  .rm-preparation-ledger-row,
-  .rm-preparation-ledger__row {
-    min-height: 44px;
-    padding-block: 4px;
-  }
-
-  .rm-preparation-ledger-row__detail {
-    font-size: 0.75rem;
   }
 
   .rm-host-operating-room[data-phase="live"] .rm-operating-room-header {
@@ -1436,31 +1493,8 @@ h1.rm-operating-room-header__title {
     line-height: 1.25;
   }
 
-  .rm-host-operating-room[data-phase="prep"] .rm-preparation-ledger-row__detail {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-  }
-
   .rm-host-operating-room[data-phase="prep"] .rm-operating-room-next-action__label {
     font-size: 24px;
-  }
-
-  .rm-host-operating-room[data-phase="prep"] .rm-preparation-ledger {
-    padding-top: 6px;
-  }
-
-  .rm-host-operating-room[data-phase="prep"] .rm-preparation-ledger h2 {
-    margin-bottom: 4px;
-  }
-
-  .rm-host-operating-room[data-phase="prep"] .rm-preparation-ledger-row,
-  .rm-host-operating-room[data-phase="prep"] .rm-preparation-ledger__row {
-    min-height: 44px;
-    padding-block: 2px;
   }
 
   .rm-host-operating-room[data-phase="prep"] .rm-host-operating-room__body {

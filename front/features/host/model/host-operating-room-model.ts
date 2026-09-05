@@ -84,6 +84,7 @@ export type PreparationLedgerRowView = {
   denominator: number | null;
   href: string | null;
   workItemKey: string | null;
+  actionLabel: string;
 };
 
 export type PhaseStatusLedgerRowView = {
@@ -282,14 +283,14 @@ function scheduleSeenRow(
   const href = hostSessionPath(basePath, meeting.sessionId, "/schedule-review");
   if (summary.availability === "UNAVAILABLE") {
     if (meeting.state === "DRAFT") {
-      return unavailableRow("schedule-seen", "일정 확인", "아직 멤버에게 공개되지 않음", "멤버 공개 뒤 집계가 시작됩니다.", null);
+      return unavailableRow("schedule-seen", "현재 일정 확인", "아직 멤버에게 공개되지 않음", "멤버 공개 뒤 집계가 시작됩니다.", null);
     }
     failures.push({ source: "schedule-seen", message: "일정 확인 집계를 불러오지 못했습니다.", retryable: true });
-    return unavailableRow("schedule-seen", "일정 확인", "집계 준비 중", "최신 일정 확인 상태를 다시 불러오세요.", null);
+    return unavailableRow("schedule-seen", "현재 일정 확인", "집계 준비 중", "최신 일정 확인 상태를 다시 불러오세요.", null);
   }
   if (!hasScheduleCounts(summary)) {
     failures.push({ source: "schedule-seen", message: "일정 확인 집계 계약이 완전하지 않습니다.", retryable: true });
-    return unavailableRow("schedule-seen", "일정 확인", "집계 준비 중", "분모를 확인한 뒤 다시 표시합니다.", null);
+    return unavailableRow("schedule-seen", "현재 일정 확인", "집계 준비 중", "분모를 확인한 뒤 다시 표시합니다.", null);
   }
 
   const unseenCount = countFor(summary, "UNSEEN");
@@ -297,7 +298,7 @@ function scheduleSeenRow(
   const pendingCount = unseenCount + staleCount;
   return {
     id: "schedule-seen",
-    label: "일정 확인",
+    label: "현재 일정 확인",
     state: pendingCount > 0 ? "warning" : "complete",
     value: `현재 일정 확인 ${countFor(summary, "CURRENT")}/${summary.eligibleCount}`,
     detail: pendingCount > 0 ? `미열람 ${unseenCount} · 변경 전 확인 ${staleCount}` : "모두 최신 일정을 확인했습니다.",
@@ -305,6 +306,7 @@ function scheduleSeenRow(
     denominator: summary.eligibleCount,
     href,
     workItemKey: pendingCount > 0 ? authoritativeWorkItemKey : null,
+    actionLabel: preparationActionLabel("schedule-seen"),
   };
 }
 
@@ -334,6 +336,7 @@ function rsvpRow(
     denominator: participants.length,
     href: hostSessionPath(basePath, meeting.sessionId, "?section=responses"),
     workItemKey: missing > 0 ? authoritativeWorkItemKey : null,
+    actionLabel: preparationActionLabel("rsvp"),
   };
 }
 
@@ -363,6 +366,7 @@ function questionRow(
     denominator: eligibleMemberCount,
     href,
     workItemKey: questionCount === 0 ? authoritativeWorkItemKey : null,
+    actionLabel: preparationActionLabel("questions"),
   };
 }
 
@@ -383,6 +387,7 @@ function placeRow(
     denominator: null,
     href: hostSessionPath(basePath, meeting.sessionId, "?section=basic&edit=1"),
     workItemKey: prepared ? null : authoritativeWorkItemKey,
+    actionLabel: preparationActionLabel("place"),
   };
 }
 
@@ -393,7 +398,18 @@ function unavailableRow(
   detail: string,
   href: string | null,
 ): PreparationLedgerRowView {
-  return { id, label, state: "unavailable", value, detail, numerator: null, denominator: null, href, workItemKey: null };
+  return {
+    id,
+    label,
+    state: "unavailable",
+    value,
+    detail,
+    numerator: null,
+    denominator: null,
+    href,
+    workItemKey: null,
+    actionLabel: preparationActionLabel(id),
+  };
 }
 
 function closingView(
@@ -640,7 +656,16 @@ function closingLedgerAction(label: string): string {
   if (label === "기록 초안") return "초안 열기";
   if (label === "피드백 문서 확인" || label === "피드백 문서") return "문서 확인";
   if (label === "멤버 게시") return "게시 조건";
-  return "자세히 보기";
+  return "열기";
+}
+
+function preparationActionLabel(id: PreparationRowId): string {
+  switch (id) {
+    case "schedule-seen": return "멤버 보기";
+    case "rsvp": return "응답 보기";
+    case "questions": return "질문 보기";
+    case "place": return "정보 보기";
+  }
 }
 
 function activeParticipants(meeting: HostSessionDetailResponse) {

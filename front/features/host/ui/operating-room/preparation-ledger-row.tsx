@@ -2,6 +2,7 @@ import type { ComponentType, ReactNode } from "react";
 import type { PreparationLedgerRowView, PreparationRowId } from "@/features/host/model/host-operating-room-model";
 import type { ReadmatesIconName } from "@/shared/ui/icon";
 import { ReadmatesIcon } from "@/shared/ui/icon";
+import { useOperatingRoomCompactViewport } from "./use-operating-room-compact-viewport";
 
 export type PreparationLedgerLinkProps = {
   to: string;
@@ -41,32 +42,36 @@ export function PreparationLedgerRow({
   onRetry,
   LinkComponent = DefaultLink,
 }: PreparationLedgerRowProps) {
+  const compact = useOperatingRoomCompactViewport();
+  const actionName = compact ? row.actionLabel : `${row.label} ${row.actionLabel}`;
+
   return (
     <li
       className="rm-preparation-ledger-row"
       aria-label={row.label}
       data-state={row.state}
     >
+      {index != null ? (
+        <span className="rm-preparation-ledger-row__index" data-prep-index aria-hidden="true">
+          {String(index + 1).padStart(2, "0")}
+        </span>
+      ) : null}
       <span className="rm-preparation-ledger-row__label">
-        {index != null ? (
-          <span className="rm-preparation-ledger-row__index" data-prep-index aria-hidden="true">
-            {String(index + 1).padStart(2, "0")}
-          </span>
-        ) : null}
-        <ReadmatesIcon name={rowGlyphs[row.id]} size={16} />
-        {row.label}
+        <ReadmatesIcon name={rowGlyphs[row.id]} size={compact ? 24 : 16} />
+        <span className="rm-preparation-ledger-row__label-text">{row.label}</span>
       </span>
       <span className="rm-preparation-ledger-row__value">{row.value}</span>
       <span className="rm-preparation-ledger-row__detail">{row.detail}</span>
-      <span className="rm-preparation-ledger-row__state">{rowStateLabels[row.state]}</span>
+      <span className="rm-preparation-ledger-row__state rm-sr-only">{rowStateLabels[row.state]}</span>
       <span className="rm-preparation-ledger-row__actions">
         {row.href ? (
           <LinkComponent
             to={row.href}
             className="rm-preparation-ledger-row__link"
-            aria-label={`${row.label} 자세히 보기`}
+            aria-label={actionName}
           >
-            자세히 보기
+            <span>{row.actionLabel}</span>
+            <ReadmatesIcon name="chevron-right" size={16} />
           </LinkComponent>
         ) : null}
         {row.state === "unavailable" && onRetry ? (

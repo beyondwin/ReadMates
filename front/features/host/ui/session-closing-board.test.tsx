@@ -146,4 +146,14 @@ describe("SessionClosingBoard", () => {
     expect(screen.queryByText("ADMIN_ROUTE")).toBeNull();
     expect(screen.queryByText("{\"")).toBeNull();
   });
+
+  it("paints circular step indices on closing checklist rows", () => {
+    render(<SessionClosingBoard view={view} embedded />);
+
+    const indices = [...document.querySelectorAll(".rm-session-closing-board__step-index")].map(
+      (node) => node.textContent,
+    );
+    expect(indices).toEqual(["1", "2"]);
+    expect(screen.getByRole("link", { name: "수동 발송" }).querySelector("svg[data-icon='chevron-right']")).not.toBeNull();
+  });
 });

@@ -7,7 +7,7 @@ import { PreparationLedger } from "./preparation-ledger";
 const rows: readonly PreparationLedgerRowView[] = [
   {
     id: "schedule-seen",
-    label: "일정 확인",
+    label: "현재 일정 확인",
     state: "warning",
     value: "현재 일정 확인 0/12",
     detail: "미열람 12 · 변경 전 확인 0",
@@ -15,6 +15,7 @@ const rows: readonly PreparationLedgerRowView[] = [
     denominator: 12,
     href: "/session-27?section=responses&scheduleSeen=unseen",
     workItemKey: "opaque/schedule",
+    actionLabel: "멤버 보기",
   },
   {
     id: "rsvp",
@@ -26,6 +27,7 @@ const rows: readonly PreparationLedgerRowView[] = [
     denominator: 12,
     href: "/session-27?section=responses",
     workItemKey: null,
+    actionLabel: "응답 보기",
   },
   {
     id: "questions",
@@ -37,6 +39,7 @@ const rows: readonly PreparationLedgerRowView[] = [
     denominator: null,
     href: "/session-27?section=responses&focus=questions",
     workItemKey: null,
+    actionLabel: "질문 보기",
   },
   {
     id: "place",
@@ -48,6 +51,7 @@ const rows: readonly PreparationLedgerRowView[] = [
     denominator: null,
     href: "/session-27?section=basic&edit=1",
     workItemKey: null,
+    actionLabel: "정보 보기",
   },
 ];
 
@@ -63,7 +67,7 @@ describe("PreparationLedger", () => {
       const item = within(region).getByRole("listitem", { name: row.label });
       expect(within(item).getByText(row.value)).toBeVisible();
       expect(within(item).getByText(row.detail)).toBeVisible();
-      expect(within(item).getByRole("link", { name: `${row.label} 자세히 보기` })).toHaveAttribute(
+      expect(within(item).getByRole("link", { name: `${row.label} ${row.actionLabel}` })).toHaveAttribute(
         "href",
         row.href,
       );
@@ -84,12 +88,12 @@ describe("PreparationLedger", () => {
   it("preserves zero as data and names row state without relying on color", () => {
     render(<PreparationLedger rows={rows} />);
 
-    const schedule = screen.getByRole("listitem", { name: "일정 확인" });
+    const schedule = screen.getByRole("listitem", { name: "현재 일정 확인" });
     expect(within(schedule).getByText("현재 일정 확인 0/12")).toBeVisible();
-    expect(within(schedule).getByText("확인 필요")).toBeVisible();
+    expect(within(schedule).getByText("확인 필요")).toHaveClass("rm-sr-only");
 
     const questions = screen.getByRole("listitem", { name: "발제 질문" });
-    expect(within(questions).getByText("불러오지 못함")).toBeVisible();
+    expect(within(questions).getByText("불러오지 못함")).toHaveClass("rm-sr-only");
   });
 
   it("preserves the distinct draft unavailable copy without replacing it with counts", () => {
@@ -129,5 +133,13 @@ describe("PreparationLedger", () => {
 
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("renders column head, specific action labels, and hides generic state words", () => {
+    render(<PreparationLedger rows={rows} />);
+    expect(screen.getByText("세부 내용")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "현재 일정 확인 멤버 보기" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /자세히 보기/ })).toBeNull();
+    expect(screen.getByText("확인 필요")).toHaveClass("rm-sr-only");
   });
 });

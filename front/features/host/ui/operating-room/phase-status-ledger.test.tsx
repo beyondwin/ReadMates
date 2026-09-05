@@ -30,11 +30,11 @@ describe("PhaseStatusLedger", () => {
     expect(within(region).getByRole("heading", { name: "현장 현황" })).toBeVisible();
     expect(within(region).getByText("실제 출석")).toBeVisible();
     expect(within(region).getByText("참석 8 · 알린 불참 1 · 확인 필요 3")).toBeVisible();
-    expect(within(region).getByRole("link", { name: "실제 출석 자세히 보기" })).toHaveAttribute(
+    expect(within(region).getByRole("link", { name: "실제 출석 출석 보기" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/sessions/public-safe-session-27?section=attendance",
     );
-    expect(within(region).getByRole("link", { name: "실제 출석 자세히 보기" })).toHaveTextContent("출석 보기");
+    expect(within(region).getByRole("link", { name: "실제 출석 출석 보기" })).toHaveTextContent("출석 보기");
     expect(region.querySelector("svg[data-icon='person']")).not.toBeNull();
     expect(region.querySelector("svg[data-icon='people']")).not.toBeNull();
   });
@@ -58,6 +58,10 @@ describe("PhaseStatusLedger", () => {
     expect(items).toHaveLength(5);
     items.forEach((item, index) => {
       expect(item.querySelector("[data-index]")?.textContent).toBe(String(index + 1));
+      expect(item.querySelector(".rm-session-closing-board__step-index")?.textContent).toBe(String(index + 1));
     });
+    expect(screen.getByText("세부 내용")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /자세히 보기/ })).toBeNull();
+    expect(region.querySelector("svg[data-icon='chevron-right']")).not.toBeNull();
   });
 });

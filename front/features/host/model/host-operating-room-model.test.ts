@@ -206,11 +206,12 @@ describe("buildHostOperatingRoomView", () => {
       numerator: row.numerator,
       denominator: row.denominator,
       value: row.value,
+      actionLabel: row.actionLabel,
     }))).toEqual([
-      { id: "schedule-seen", numerator: 2, denominator: 4, value: "현재 일정 확인 2/4" },
-      { id: "rsvp", numerator: 2, denominator: 4, value: "응답 2/4" },
-      { id: "questions", numerator: 3, denominator: 4, value: "질문 작성 3/4 · 5개" },
-      { id: "place", numerator: null, denominator: null, value: "작은 서재" },
+      { id: "schedule-seen", numerator: 2, denominator: 4, value: "현재 일정 확인 2/4", actionLabel: "멤버 보기" },
+      { id: "rsvp", numerator: 2, denominator: 4, value: "응답 2/4", actionLabel: "응답 보기" },
+      { id: "questions", numerator: 3, denominator: 4, value: "질문 작성 3/4 · 5개", actionLabel: "질문 보기" },
+      { id: "place", numerator: null, denominator: null, value: "작은 서재", actionLabel: "정보 보기" },
     ]);
   });
 

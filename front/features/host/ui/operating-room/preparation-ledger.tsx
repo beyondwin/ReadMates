@@ -19,6 +19,12 @@ export function PreparationLedger({ rows, onRetry, LinkComponent }: PreparationL
       aria-labelledby="rm-preparation-ledger-title"
     >
       <h2 id="rm-preparation-ledger-title">준비 현황</h2>
+      <div className="rm-preparation-ledger__head">
+        <span>항목</span>
+        <span>현황</span>
+        <span>세부 내용</span>
+        <span>관리</span>
+      </div>
       <ol className="rm-preparation-ledger__list">
         {rows.map((row, index) => (
           <PreparationLedgerRow

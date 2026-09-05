@@ -569,7 +569,7 @@ describe("HostDashboardRoute", () => {
     expect(router.state.historyAction).toBe("REPLACE");
     expect(screen.getByRole("tab", { name: /준비실/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("아직 멤버에게 공개되지 않음")).toBeVisible();
-    expect(screen.queryByRole("link", { name: "일정 확인 자세히 보기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "현재 일정 확인 멤버 보기" })).not.toBeInTheDocument();
   });
 
   it("keeps a qualifying future draft schedule review actionable from exact detail counts", async () => {
@@ -669,7 +669,7 @@ describe("HostDashboardRoute", () => {
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7/schedule-review",
     );
-    expect(within(ledger).getByRole("link", { name: "일정 확인 자세히 보기" })).toHaveAttribute(
+    expect(within(ledger).getByRole("link", { name: "현재 일정 확인 멤버 보기" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7/schedule-review",
     );
@@ -758,7 +758,7 @@ describe("HostDashboardRoute", () => {
       "href",
       "/clubs/reading-sai/app/host/records",
     );
-    expect(within(checklist).getByRole("link", { name: "기록 초안 자세히 보기" })).toHaveAttribute(
+    expect(within(checklist).getByRole("link", { name: "기록 초안 초안 열기" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7?section=records",
     );
