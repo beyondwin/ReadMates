@@ -212,7 +212,11 @@ describe("HostScheduleReviewRoute", () => {
     renderRoute();
 
     expect(await screen.findByRole("checkbox", { name: /현재 확인/ })).toBeDisabled();
-    expect(screen.getByRole("heading", { name: "일정 미열람 검토" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "일정 미열람 안내" })).toBeVisible();
+    expect(document.querySelector(".rm-schedule-review__changes")).toHaveTextContent("오후 7:30");
+    expect(document.querySelector(".rm-schedule-review__changes")).toHaveTextContent("책방 안쪽");
+    expect(document.querySelector(".rm-schedule-review__changes")).toHaveTextContent("변경 없음");
+    expect(screen.queryByText("어제 19:30")).toBeNull();
     expect(screen.getByRole("checkbox", { name: /현재 확인/ })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: /변경 전 확인/ })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: /미열람/ })).toBeChecked();
@@ -227,7 +231,7 @@ describe("HostScheduleReviewRoute", () => {
 
   it("previews the exact snapshot-bound Task 2 selection and invalidates it after edits", async () => {
     renderRoute();
-    await screen.findByRole("heading", { name: "일정 미열람 검토" });
+    await screen.findByRole("heading", { name: "일정 미열람 안내" });
 
     await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
     await waitFor(() => expect(previewManualNotification).toHaveBeenCalledWith({
@@ -254,7 +258,7 @@ describe("HostScheduleReviewRoute", () => {
   it("confirms only the current preview, preserves a durable partial receipt, and invalidates scoped caches", async () => {
     const client = renderRoute();
     const invalidate = vi.spyOn(client, "invalidateQueries");
-    await screen.findByRole("heading", { name: "일정 미열람 검토" });
+    await screen.findByRole("heading", { name: "일정 미열람 안내" });
 
     await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
     await userEvent.click(await screen.findByRole("button", { name: "2명에게 안내 보내기" }));
@@ -306,7 +310,7 @@ describe("HostScheduleReviewRoute", () => {
   it("recovers stale authority by refreshing exact evidence while retaining the draft and never resending", async () => {
     vi.mocked(confirmManualNotification).mockRejectedValueOnce({ code: "MANUAL_NOTIFICATION_PREVIEW_STALE", status: 409 });
     renderRoute();
-    await screen.findByRole("heading", { name: "일정 미열람 검토" });
+    await screen.findByRole("heading", { name: "일정 미열람 안내" });
     await userEvent.clear(screen.getByRole("textbox", { name: "알림 제목" }));
     await userEvent.type(screen.getByRole("textbox", { name: "알림 제목" }), "보존할 제목");
     await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
@@ -329,7 +333,7 @@ describe("HostScheduleReviewRoute", () => {
   ])("clears the non-current preview after %s", async (code) => {
     vi.mocked(confirmManualNotification).mockRejectedValueOnce({ code, status: 409 });
     renderRoute();
-    await screen.findByRole("heading", { name: "일정 미열람 검토" });
+    await screen.findByRole("heading", { name: "일정 미열람 안내" });
     await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
     await userEvent.click(await screen.findByRole("button", { name: "2명에게 안내 보내기" }));
 
@@ -349,7 +353,7 @@ describe("HostScheduleReviewRoute", () => {
   ])("refreshes exact authority before re-enabling after %s", async (code) => {
     vi.mocked(confirmManualNotification).mockRejectedValueOnce({ code, status: 409 });
     renderRoute();
-    await screen.findByRole("heading", { name: "일정 미열람 검토" });
+    await screen.findByRole("heading", { name: "일정 미열람 안내" });
     await userEvent.clear(screen.getByRole("textbox", { name: "알림 제목" }));
     await userEvent.type(screen.getByRole("textbox", { name: "알림 제목" }), "보존할 제목");
     await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
@@ -367,7 +371,7 @@ describe("HostScheduleReviewRoute", () => {
       status: 409,
     });
     renderRoute();
-    await screen.findByRole("heading", { name: "일정 미열람 검토" });
+    await screen.findByRole("heading", { name: "일정 미열람 안내" });
     await userEvent.clear(screen.getByRole("textbox", { name: "알림 제목" }));
     await userEvent.type(screen.getByRole("textbox", { name: "알림 제목" }), "보존할 제목");
     await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
@@ -385,7 +389,7 @@ describe("HostScheduleReviewRoute", () => {
     vi.mocked(confirmManualNotification).mockRejectedValueOnce(new ReadmatesTransportError());
     const client = renderRoute();
     const invalidate = vi.spyOn(client, "invalidateQueries");
-    await screen.findByRole("heading", { name: "일정 미열람 검토" });
+    await screen.findByRole("heading", { name: "일정 미열람 안내" });
     await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
     await userEvent.click(await screen.findByRole("button", { name: "2명에게 안내 보내기" }));
 
@@ -446,7 +450,7 @@ describe("HostScheduleReviewRoute", () => {
     const client = renderRoute(transitionPort);
     const invalidate = vi.spyOn(client, "invalidateQueries");
     const storageWrite = vi.spyOn(Storage.prototype, "setItem");
-    await screen.findByRole("heading", { name: "일정 미열람 검토" });
+    await screen.findByRole("heading", { name: "일정 미열람 안내" });
     await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
     await userEvent.click(await screen.findByRole("button", { name: "2명에게 안내 보내기" }));
 
@@ -505,7 +509,7 @@ describe("HostScheduleReviewRoute", () => {
     const client = renderRoute(transitionPort);
     const invalidate = vi.spyOn(client, "invalidateQueries");
     const storageWrite = vi.spyOn(Storage.prototype, "setItem");
-    await screen.findByRole("heading", { name: "일정 미열람 검토" });
+    await screen.findByRole("heading", { name: "일정 미열람 안내" });
     await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
     expect(await screen.findByRole("region", { name: "발송 전 확인" })).toBeVisible();
 
@@ -526,7 +530,7 @@ describe("HostScheduleReviewRoute", () => {
     expect(screen.getByRole("region", { name: "발송 전 확인" })).toBeVisible();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.queryByRole("status", { name: /일정 알림/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "일정 미열람 검토" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "일정 미열람 안내" })).toBeVisible();
     expect(storageWrite).not.toHaveBeenCalled();
     await expect(capturedHandle?.reconcile()).resolves.toEqual(expect.objectContaining({ outcome: "authority-lost" }));
     storageWrite.mockRestore();

@@ -219,6 +219,8 @@ export function hostScheduleReviewApprovedView() {
       scheduleRevision={4}
       unreadMemberCount={4}
       excludedCurrentCount={8}
+      startTime="19:30"
+      locationLabel="을지로 북살롱"
       recipients={scheduleReviewMembers}
       selectedMembershipIds={scheduleReviewMembers.map((member) => member.membershipId)}
       subject={scheduleReviewPreview.template.subject}
@@ -229,7 +231,9 @@ export function hostScheduleReviewApprovedView() {
       onSubjectChange={noop}
       onBodyChange={noop}
       onRequestedChannelsChange={noop}
+      onPreview={noop}
       onConfirm={async () => undefined}
+      onDefer={noop}
     />,
   );
 }

@@ -104,8 +104,8 @@ test("surface 13 settings destination at 1440px", async ({ mount, page }) => {
 test("surface 14 schedule-review route continuity at 1024px", async ({ mount, page }) => {
   await page.setViewportSize({ width: 1024, height: 900 });
   const component = await mount(<main className="rm-schedule-review"><HostScheduleReviewHeader returnHref="/clubs/reading-sai/app/host" sessionNumber={7} bookTitle="파도와 바람의 기록" scheduleRevision={7} /><section aria-label="대상 확인"><h2>대상 확인</h2><label><input type="checkbox" checked readOnly />변경 전 확인 · 일정 6판 확인</label></section></main>);
-  await expect(component.getByRole("heading", { name: "일정 미열람 검토" })).toBeVisible();
-  await expect(component.getByRole("link", { name: "운영실로 돌아가기" })).toHaveAttribute("href", "/clubs/reading-sai/app/host");
+  await expect(component.getByRole("heading", { name: "일정 미열람 안내" })).toBeVisible();
+  await expect(component.getByRole("link", { name: "운영실" })).toHaveAttribute("href", "/clubs/reading-sai/app/host");
   await expect(component.getByRole("checkbox", { name: /변경 전 확인/ })).toBeChecked();
   await expectNoHorizontalOverflow(page);
 });

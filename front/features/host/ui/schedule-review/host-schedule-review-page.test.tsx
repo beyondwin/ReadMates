@@ -1,7 +1,8 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { ManualNotificationPreviewResponse } from "@/features/host/model/host-view-types";
-import { HostScheduleReviewPage } from "./host-schedule-review-page";
+import { HostScheduleReviewPage, type HostScheduleReviewPageProps } from "./host-schedule-review-page";
 
 const preview: ManualNotificationPreviewResponse = {
   previewId: "preview-schedule-28",
@@ -33,34 +34,110 @@ const preview: ManualNotificationPreviewResponse = {
   warnings: [],
 };
 
-describe("HostScheduleReviewPage", () => {
-  it("renders the mockup first-viewport two-column review with send confirmation", () => {
-    render(
-      <HostScheduleReviewPage
-        returnHref="/clubs/reading-sai/app/host"
-        sessionNumber={28}
-        bookTitle="지구 끝의 온실"
-        scheduleRevision={4}
-        unreadMemberCount={4}
-        excludedCurrentCount={8}
-        recipients={[
-          { membershipId: "membership-park", displayName: "박서윤", avatarKey: "peach-green-book", scheduleSeenState: "STALE" },
-          { membershipId: "membership-lee", displayName: "이도현", avatarKey: "banana-green-book", scheduleSeenState: "UNSEEN" },
-          { membershipId: "membership-kang", displayName: "강유진", avatarKey: "tulip-notebook", scheduleSeenState: "UNSEEN" },
-          { membershipId: "membership-moon", displayName: "문재희", avatarKey: "candle-green-book", scheduleSeenState: "UNSEEN" },
-        ]}
-        selectedMembershipIds={["membership-park", "membership-lee", "membership-kang", "membership-moon"]}
-        subject={preview.template.subject}
-        body={preview.template.bodyPreview}
-        requestedChannels="BOTH"
-        preview={preview}
-        onPreview={vi.fn()}
-        onConfirm={vi.fn()}
-      />,
-    );
+const recipients: HostScheduleReviewPageProps["recipients"] = [
+  { membershipId: "membership-park", displayName: "박서윤", avatarKey: "peach-green-book", scheduleSeenState: "STALE" },
+  { membershipId: "membership-lee", displayName: "이도현", avatarKey: "banana-green-book", scheduleSeenState: "UNSEEN" },
+  { membershipId: "membership-kang", displayName: "강유진", avatarKey: "tulip-notebook", scheduleSeenState: "UNSEEN" },
+  { membershipId: "membership-moon", displayName: "문재희", avatarKey: "candle-green-book", scheduleSeenState: "UNSEEN" },
+];
 
-    expect(screen.getByRole("heading", { name: "일정 미열람 검토" })).toBeVisible();
-    expect(screen.getByText("미열람 4명").textContent).toContain("미열람 4명");
+function renderPage(overrides: Partial<HostScheduleReviewPageProps> = {}) {
+  return render(
+    <HostScheduleReviewPage
+      returnHref="/clubs/reading-sai/app/host"
+      sessionNumber={28}
+      bookTitle="지구 끝의 온실"
+      scheduleRevision={4}
+      unreadMemberCount={4}
+      excludedCurrentCount={8}
+      recipients={recipients}
+      selectedMembershipIds={recipients.map((member) => member.membershipId)}
+      subject={preview.template.subject}
+      body={preview.template.bodyPreview}
+      requestedChannels="BOTH"
+      preview={preview}
+      onPreview={vi.fn()}
+      onConfirm={vi.fn()}
+      {...overrides}
+    />,
+  );
+}
+
+describe("HostScheduleReviewPage", () => {
+  it("renders breadcrumb, change table, target table header, select-all, counter, defer, and cancel", () => {
+    renderPage({
+      startTime: "19:30",
+      locationLabel: "책방 안쪽",
+      onDefer: vi.fn(),
+    });
+
+    expect(document.querySelector(".rm-schedule-review__breadcrumb")).toHaveTextContent("운영실");
+    expect(document.querySelector(".rm-schedule-review__breadcrumb")).toHaveTextContent("일정 미열람 확인");
+    expect(screen.getByRole("heading", { name: "일정 미열람 안내" })).toBeVisible();
+    expect(document.querySelector(".rm-schedule-review__revision")?.querySelector('[data-icon="clock"]')).toBeTruthy();
+    expect(document.querySelector(".rm-schedule-review__revision")).toHaveTextContent("현재 일정 revision 4");
+    expect(document.querySelector(".rm-schedule-review__changes")).toBeTruthy();
+    expect(document.querySelector(".rm-schedule-review__targets thead")).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: "전체 선택" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /제외된 8명 보기/ })).toHaveClass("rm-schedule-review__excluded");
+    expect(screen.getByText(/\/ 4000/)).toHaveClass("rm-schedule-review__counter");
+    expect(screen.getByRole("button", { name: "내일 09:00까지 보류" })).toHaveClass("rm-schedule-review__defer");
+    expect(screen.getByRole("link", { name: "취소하고 운영실로" })).toHaveClass("rm-schedule-review__cancel");
+    expect(screen.getByRole("button", { name: "알림 미리보기" })).toHaveClass("rm-schedule-review__preview");
+    expect(screen.queryByText("세부 조작")).toBeNull();
+  });
+
+  it("shows current schedule values as unchanged when previous revision fields are absent", () => {
+    renderPage({ startTime: "19:30", locationLabel: "책방 안쪽" });
+
+    const changes = document.querySelector(".rm-schedule-review__changes");
+    expect(changes).toHaveTextContent("오후 7:30");
+    expect(changes).toHaveTextContent("책방 안쪽");
+    expect(changes?.querySelectorAll("tr")).toHaveLength(3);
+    expect(changes).toHaveTextContent("변경 없음");
+    expect(changes?.querySelector('[data-icon="arrow-right"]')).toBeNull();
+    expect(screen.queryByText("어제 19:30")).toBeNull();
+    expect(screen.queryByText(/을지로/)).toBeNull();
+  });
+
+  it("renders previous-to-current diffs with an arrow when previous values are supplied", () => {
+    renderPage({
+      startTime: "19:30",
+      previousStartTime: "19:00",
+      locationLabel: "책방 안쪽",
+      previousLocationLabel: "책방 안쪽",
+      changeReason: "시작 시간을 늦췄어요",
+    });
+
+    const startRow = screen.getByText("시작 시간").closest("tr");
+    expect(startRow?.querySelector('[data-icon="arrow-right"]')).toBeTruthy();
+    expect(startRow).toHaveTextContent("오후 7:00");
+    expect(startRow?.querySelector("[data-new]")).toHaveTextContent("오후 7:30");
+    expect(screen.getByText("장소").closest("tr")).toHaveTextContent("변경 없음");
+    expect(screen.getByText("변경 사유").closest("tr")).toHaveTextContent("시작 시간을 늦췄어요");
+  });
+
+  it("counts the live body against the real composer max and keeps preview then send", async () => {
+    const onConfirm = vi.fn();
+    renderPage({
+      body: "확인해주세요.",
+      preview,
+      onConfirm,
+    });
+
+    expect(screen.getByText("7 / 4000")).toHaveClass("rm-schedule-review__counter");
+    expect(screen.queryByText("72 / 140")).toBeNull();
+    expect(screen.getByRole("checkbox", { name: "변경 내용 포함" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "4명에게 안내 보내기" }));
+    expect(onConfirm).toHaveBeenCalledWith(false);
+    expect(screen.getByRole("button", { name: "알림 미리보기" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "발송 전 확인" })).toBeVisible();
+  });
+
+  it("renders the mockup first-viewport two-column review with send confirmation", () => {
+    renderPage();
+
+    expect(screen.getByRole("heading", { name: "일정 미열람 안내" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "안내 대상 4명" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "보낼 안내" })).toBeVisible();
     expect(screen.getByRole("button", { name: "4명에게 안내 보내기" })).toBeVisible();

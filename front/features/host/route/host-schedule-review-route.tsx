@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import type {
   HostSessionDetailResponse,
   ManualNotificationConfirmResponse,
@@ -20,7 +20,8 @@ import {
   hostSessionDetailQuery,
   hostSessionKeys,
 } from "@/features/host/queries/host-session-queries";
-import { hostWorkboxKeys } from "@/features/host/queries/host-workbox-queries";
+import { hostWorkboxKeys, hostWorkboxPageQuery, useDeferHostWorkboxItemMutation } from "@/features/host/queries/host-workbox-queries";
+import { formatDateTimeLabel } from "@/shared/ui/readmates-display";
 import { HostScheduleReviewPage } from "@/features/host/ui/schedule-review/host-schedule-review-page";
 import {
   OperationReceipt,
@@ -109,6 +110,7 @@ function HostScheduleReviewSession({
 }) {
   const context = useMemo(() => requireHostClubContext(clubSlug), [clubSlug]);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const detailQuery = useQuery({
     ...hostSessionDetailQuery(sessionId, context),
     enabled: Boolean(sessionId),
@@ -121,9 +123,15 @@ function HostScheduleReviewSession({
     enabled: Boolean(sessionId) && scheduleAvailable,
     retry: false,
   });
+  const workboxQuery = useQuery({
+    ...hostWorkboxPageQuery({ state: "NOW", limit: 20 }, context),
+    enabled: Boolean(sessionId) && scheduleAvailable,
+    retry: false,
+  });
   const template = optionsQuery.data?.templates.find((item) => item.eventType === "SESSION_REMINDER_DUE") ?? null;
   const previewMutation = usePreviewManualNotificationMutation(context);
   const confirmMutation = useConfirmManualNotificationMutation(context);
+  const deferMutation = useDeferHostWorkboxItemMutation(context);
   const [draftOverride, setDraftOverride] = useState<ScheduleReviewDraft | null>(null);
   const [previewSnapshot, setPreviewSnapshot] = useState<PreviewSnapshot | null>(null);
   const [receipt, setReceipt] = useState<DurableReceipt | null>(null);
@@ -424,8 +432,33 @@ function HostScheduleReviewSession({
     );
   }
 
-  const busy = previewMutation.isPending || confirmMutation.isPending;
+  const busy = previewMutation.isPending || confirmMutation.isPending || deferMutation.isPending;
   const excludedCurrentCount = detail.attendees.filter((attendee) => attendee.scheduleSeenState === "CURRENT").length;
+  const workItemKey = workboxQuery.data?.items.find((item) => (
+    item.type === "SCHEDULE_UNSEEN"
+    && item.state === "NOW"
+    && destinationTargetsScheduleReview(item.destinationHref, sessionId)
+  ))?.key ?? null;
+  const previousDispatch = optionsQuery.data?.recentDispatches.find((item) => (
+    item.eventType === "SESSION_REMINDER_DUE" && item.sessionId === sessionId
+  ));
+  const historyHref = `/clubs/${encodeURIComponent(context.clubSlug)}/app/host/sessions/${encodeURIComponent(sessionId)}?section=history`;
+
+  const deferReview = async () => {
+    if (!workItemKey || deferMutation.isPending) return;
+    setError(null);
+    try {
+      await deferMutation.mutateAsync({
+        key: workItemKey,
+        deferredUntil: tomorrowMorningIso(),
+      });
+      await queryClient.invalidateQueries({ queryKey: hostWorkboxKeys.scope(context) });
+      await queryClient.invalidateQueries({ queryKey: hostSessionKeys.operatingRoomCurrent(context) });
+      navigate(returnHref);
+    } catch {
+      setError("작업을 보류하지 못했습니다. 다시 시도해 주세요.");
+    }
+  };
 
   return (
     <HostScheduleReviewPage
@@ -435,6 +468,12 @@ function HostScheduleReviewSession({
       scheduleRevision={detail.scheduleRevision}
       unreadMemberCount={eligibleIds.length}
       excludedCurrentCount={excludedCurrentCount}
+      startTime={detail.startTime}
+      locationLabel={detail.locationLabel}
+      historyHref={historyHref}
+      previousNotice={previousDispatch
+        ? formatDateTimeLabel(previousDispatch.createdAt, "이전 안내")
+        : "이전 안내 없음"}
       recipients={detail.attendees.map((attendee) => ({
         membershipId: attendee.membershipId,
         displayName: attendee.displayName,
@@ -451,6 +490,7 @@ function HostScheduleReviewSession({
       previewPending={previewMutation.isPending}
       confirmBusy={confirmMutation.isPending}
       LinkComponent={LinkComponent}
+      onDefer={workItemKey ? () => void deferReview() : undefined}
       receipt={receipt ? (
         <OperationReceipt
           outcome={receipt.outcome}
@@ -485,7 +525,7 @@ function ScheduleReviewUnavailable({
   return (
     <main className="rm-schedule-review rm-schedule-review--unavailable">
       <section role="alert">
-        <h1>일정 미열람 검토</h1>
+        <h1>일정 미열람 안내</h1>
         <p>{message}</p>
         <div>
           {onRetry ? <button type="button" onClick={onRetry}>다시 확인</button> : null}
@@ -494,6 +534,23 @@ function ScheduleReviewUnavailable({
       </section>
     </main>
   );
+}
+
+function destinationTargetsScheduleReview(destinationHref: string, sessionId: string): boolean {
+  try {
+    const pathname = new URL(destinationHref, "https://readmates.local").pathname;
+    return pathname.endsWith(`/sessions/${encodeURIComponent(sessionId)}/schedule-review`);
+  } catch {
+    return false;
+  }
+}
+
+function tomorrowMorningIso(now = new Date()): string {
+  const result = new Date(now);
+  result.setDate(result.getDate() + 1);
+  result.setHours(9, 0, 0, 0);
+  if (result.getTime() <= now.getTime()) result.setDate(result.getDate() + 1);
+  return result.toISOString();
 }
 
 function manualNotificationErrorDisposition(error: unknown): "authority" | "preview" | "unknown" {

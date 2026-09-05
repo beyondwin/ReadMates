@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
+import { ReadmatesIcon } from "@/shared/ui/icon";
 import "./host-schedule-review.css";
 
 export type HostScheduleReviewLinkProps = {
@@ -28,10 +29,20 @@ export function HostScheduleReviewHeader({
 }) {
   return (
     <header className="rm-schedule-review__header">
-      <LinkComponent to={returnHref} className="rm-schedule-review__return">운영실로 돌아가기</LinkComponent>
-      <h1>일정 미열람 검토</h1>
-      <p>{sessionNumber}회 · {bookTitle} · 일정 {scheduleRevision}판</p>
-      {unreadMemberCount != null ? <p>미열람 {unreadMemberCount}명 · 미리보기 뒤에만 직접 보냅니다. 자동 발송하지 않아요.</p> : null}
+      <nav className="rm-schedule-review__breadcrumb" aria-label="경로">
+        <LinkComponent to={returnHref}>운영실</LinkComponent>
+        <span aria-hidden="true"> / </span>
+        <span>일정 미열람 확인</span>
+      </nav>
+      <h1>일정 미열람 안내</h1>
+      <p>
+        {sessionNumber}회 · {bookTitle} · 일정 {scheduleRevision}판
+        {unreadMemberCount != null ? ` · 미열람 ${unreadMemberCount}명` : ""}
+      </p>
+      <p className="rm-schedule-review__revision">
+        <ReadmatesIcon name="clock" size={16} />
+        현재 일정 revision {scheduleRevision}
+      </p>
     </header>
   );
 }

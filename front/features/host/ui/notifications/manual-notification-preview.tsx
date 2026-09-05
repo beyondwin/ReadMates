@@ -7,6 +7,9 @@ export type ManualNotificationPreviewConfirmationProps = {
   presentation?: "centered" | "side-sheet";
   diagnostics?: "inline" | "folded";
   error?: string | null;
+  hideConfirm?: boolean;
+  resendConfirmed?: boolean;
+  onResendConfirmedChange?: (value: boolean) => void;
   onRefreshPreview?: () => Promise<unknown> | void;
   onConfirm: (resendConfirmed: boolean) => Promise<unknown> | void;
 };
@@ -21,6 +24,7 @@ export function ManualNotificationPreviewPanel({
   presentation,
   diagnostics = "inline",
   error,
+  hideConfirm = false,
   onRefreshPreview,
   onResendConfirmedChange,
   onConfirm,
@@ -34,6 +38,7 @@ export function ManualNotificationPreviewPanel({
   presentation: "centered" | "side-sheet";
   diagnostics?: "inline" | "folded";
   error?: string | null;
+  hideConfirm?: boolean;
   onRefreshPreview?: () => Promise<unknown> | void;
   onResendConfirmedChange: (value: boolean) => void;
   onConfirm: () => void;
@@ -108,15 +113,17 @@ export function ManualNotificationPreviewPanel({
             </label>
           </div>
         ) : null}
-        <button
-          type="button"
-          className="btn btn-primary btn-sm"
-          disabled={disabled || busy}
-          style={{ marginTop: 14 }}
-          onClick={onConfirm}
-        >
-          {busy ? "발송 요청 중" : confirmLabel}
-        </button>
+        {hideConfirm ? null : (
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            disabled={disabled || busy}
+            style={{ marginTop: 14 }}
+            onClick={onConfirm}
+          >
+            {busy ? "발송 요청 중" : confirmLabel}
+          </button>
+        )}
       </section>
     );
   }
@@ -149,7 +156,7 @@ export function ManualNotificationPreviewPanel({
       {warning.message}
     </p>
   ));
-  const confirmButton = (
+  const confirmButton = hideConfirm ? null : (
     <button
       type="button"
       className="btn btn-primary btn-sm rm-notification-preview__confirm"
@@ -249,10 +256,15 @@ function ManualNotificationPreviewConfirmationState({
   presentation = "centered",
   diagnostics = "inline",
   error,
+  hideConfirm = false,
+  resendConfirmed: resendConfirmedProp,
+  onResendConfirmedChange,
   onRefreshPreview,
   onConfirm,
 }: ManualNotificationPreviewConfirmationProps): ReactElement {
-  const [resendConfirmed, setResendConfirmed] = useState(false);
+  const [resendConfirmedLocal, setResendConfirmedLocal] = useState(false);
+  const resendConfirmed = resendConfirmedProp ?? resendConfirmedLocal;
+  const setResendConfirmed = onResendConfirmedChange ?? setResendConfirmedLocal;
   const requiresResend = preview.duplicates.requiresResendConfirmation;
   const isSideSheet = presentation === "side-sheet";
 
@@ -269,6 +281,7 @@ function ManualNotificationPreviewConfirmationState({
       presentation={presentation}
       diagnostics={diagnostics}
       error={error}
+      hideConfirm={hideConfirm}
       onRefreshPreview={onRefreshPreview}
       onResendConfirmedChange={setResendConfirmed}
       onConfirm={() => void onConfirm(resendConfirmed)}

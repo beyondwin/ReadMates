@@ -387,8 +387,8 @@ test("schedule review fails closed for drafts, requires preview, and keeps an un
   });
 
   await page.goto(`${HOST_PATH}/sessions/${OPEN_SESSION_ID}/schedule-review`);
-  await expect(page.getByRole("heading", { level: 1, name: "일정 미열람 검토" })).toBeVisible();
-  const recipientRows = page.locator(".rm-schedule-review__recipients li");
+  await expect(page.getByRole("heading", { level: 1, name: "일정 미열람 안내" })).toBeVisible();
+  const recipientRows = page.locator(".rm-schedule-review__targets tbody tr");
   const currentMember = recipientRows.filter({ hasText: "합성 호스트" });
   const staleMember = recipientRows.filter({ hasText: "일정 미열람 합성 멤버" });
   await expect(currentMember.getByRole("checkbox")).toBeDisabled();

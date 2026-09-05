@@ -242,7 +242,7 @@ test("unread schedule review matches approved desktop", async ({ mount, page }) 
   test.setTimeout(90_000);
   const component = await mountApproved(mount, page, hostScheduleReviewApprovedView(), APPROVED_DESKTOP_VIEWPORT);
   await expect(component.getByRole("link", { name: "운영실", exact: true })).toHaveAttribute("aria-current", "page");
-  await expect(component.getByRole("heading", { name: "일정 미열람 검토" })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "일정 미열람 안내" })).toBeVisible();
   await expect(component.getByRole("heading", { name: "안내 대상 4명" })).toBeVisible();
   await expect(component.getByRole("heading", { name: "보낼 안내" })).toBeVisible();
   await expect(component.getByText("미열람 4명").first()).toBeVisible();
