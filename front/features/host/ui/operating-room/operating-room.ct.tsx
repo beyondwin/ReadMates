@@ -229,6 +229,24 @@ for (const viewport of [
     await primary.focus();
     await expectVisibleFocus(primary);
 
+    if (viewport.width === 390) {
+      const questions = component.getByRole("listitem", { name: "발제 질문" });
+      const labelBox = await questions.locator(".rm-preparation-ledger-row__label-text").boundingBox();
+      const valueBox = await questions.locator(".rm-preparation-ledger-row__value").boundingBox();
+      const detailBox = await questions.locator(".rm-preparation-ledger-row__detail").boundingBox();
+      const questionsBox = await questions.boundingBox();
+      expect(labelBox, "questions label").not.toBeNull();
+      expect(valueBox, "questions value").not.toBeNull();
+      expect(detailBox, "questions detail").not.toBeNull();
+      expect(questionsBox, "questions row").not.toBeNull();
+      expect(labelBox!.x + labelBox!.width, "label left of value").toBeLessThanOrEqual(valueBox!.x + 2);
+      expect(Math.abs(valueBox!.x - detailBox!.x), "value+detail stacked").toBeLessThanOrEqual(4);
+      expect(valueBox!.width, "unavailable value width").toBeGreaterThanOrEqual(80);
+      expect(valueBox!.height, "unavailable value single line").toBeLessThanOrEqual(22);
+      expect(questionsBox!.height, "unavailable row stays compact").toBeLessThanOrEqual(100);
+      expect(firstBox!.height, "short-copy row ~48px").toBeLessThanOrEqual(56);
+    }
+
     if (viewport.width === 1440) {
       const thirdRow = await component.getByRole("listitem", { name: "발제 질문" }).boundingBox();
       expect(thirdRow).not.toBeNull();

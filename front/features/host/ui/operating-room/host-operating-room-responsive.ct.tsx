@@ -984,9 +984,22 @@ test("prep locks the approved mobile operating room", async ({ mount, page }) =>
   expect(navBox!.y).toBeLessThan(frame.height);
   const firstWorkboxRow = workbox.getByRole("listitem").first();
   await expect(firstWorkboxRow).toBeVisible();
+  const firstPrepRow = preparation.getByRole("listitem").first();
+  const firstLabel = await firstPrepRow.locator(".rm-preparation-ledger-row__label-text").boundingBox();
+  const firstValue = await firstPrepRow.locator(".rm-preparation-ledger-row__value").boundingBox();
+  const firstDetail = await firstPrepRow.locator(".rm-preparation-ledger-row__detail").boundingBox();
+  expect(firstLabel, "prep label").not.toBeNull();
+  expect(firstValue, "prep value").not.toBeNull();
+  expect(firstDetail, "prep detail").not.toBeNull();
+  expect(firstLabel!.x + firstLabel!.width, "label left of value").toBeLessThanOrEqual(firstValue!.x + 2);
+  expect(Math.abs(firstValue!.x - firstDetail!.x), "value+detail stacked").toBeLessThanOrEqual(4);
+  const firstPrepBox = await firstPrepRow.boundingBox();
+  expect(firstPrepBox, "prep-row-1 height").not.toBeNull();
+  expect(firstPrepBox!.height, "prep-row-1 ~48px").toBeLessThanOrEqual(56);
+
   for (const [name, locator] of [
     ["next-action", nextAction],
-    ["prep-row-1", preparation.getByRole("listitem").first()],
+    ["prep-row-1", firstPrepRow],
     ["prep-row-4", preparation.getByRole("listitem").nth(3)],
   ] as const) {
     const box = await locator.boundingBox();

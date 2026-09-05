@@ -527,7 +527,7 @@ h1.rm-operating-room-header__title {
   }
 
   .rm-preparation-ledger {
-    padding-top: 12px;
+    padding-top: 0;
   }
 
   .rm-host-operating-room .rm-host-workbox__header {
@@ -1311,11 +1311,11 @@ h1.rm-operating-room-header__title {
 
   .rm-preparation-ledger,
   .rm-phase-status-ledger {
-    padding: 4px 16px 8px;
+    padding: 0 16px;
   }
 
   .rm-preparation-ledger h2 {
-    margin: 0 0 4px;
+    margin: 0;
     font-size: 14px;
   }
 
@@ -1327,10 +1327,22 @@ h1.rm-operating-room-header__title {
   .rm-preparation-ledger-row,
   .rm-preparation-ledger__row,
   .rm-phase-status-ledger-row {
-    grid-template-columns: 36px 28px minmax(0,1fr) auto;
-    min-height: 0;
+    grid-template-columns: 22px 22px max-content minmax(0, 1fr) 44px;
+    column-gap: 8px;
+    row-gap: 0;
+    min-height: 48px;
     padding-block: 2px;
-    grid-template-areas: "index icon label link" "index icon value link" "index icon detail link";
+    align-items: center;
+    grid-template-areas:
+      "index icon label value link"
+      "index icon label detail link";
+  }
+
+  .rm-preparation-ledger-row[data-state="unavailable"] {
+    grid-template-areas:
+      "index icon label value link"
+      "index icon label detail link"
+      ". . . retry retry";
   }
 
   .rm-preparation-ledger-row__value,
@@ -1365,22 +1377,42 @@ h1.rm-operating-room-header__title {
   .rm-preparation-ledger-row__label-text {
     grid-area: label;
     align-self: center;
+    white-space: nowrap;
   }
 
   .rm-preparation-ledger-row__value,
   .rm-phase-status-ledger-row__value {
     grid-area: value;
+    min-width: 0;
   }
 
   .rm-preparation-ledger-row__detail,
   .rm-phase-status-ledger-row__detail {
     grid-area: detail;
+    min-width: 0;
   }
 
   .rm-preparation-ledger-row__actions,
   .rm-phase-status-ledger-row__actions {
+    display: contents;
+  }
+
+  .rm-preparation-ledger-row__link,
+  .rm-phase-status-ledger-row__link {
     grid-area: link;
     align-self: center;
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: flex-end;
+  }
+
+  .rm-preparation-ledger-row__retry {
+    grid-area: retry;
+    justify-self: start;
+    min-width: 44px;
+    min-height: 44px;
+    padding-inline: 0;
+    font-size: 12px;
   }
 
   .rm-preparation-ledger-row__link span,
