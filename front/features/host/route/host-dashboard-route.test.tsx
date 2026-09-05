@@ -589,7 +589,7 @@ describe("HostDashboardRoute", () => {
 
     const ledger = await screen.findByRole("region", { name: "준비 현황" });
     expect(within(ledger).getByText("현재 일정 확인 1/2")).toBeVisible();
-    expect(screen.getByRole("region", { name: "다음에 할 일" })).toHaveTextContent("일정 미확인 멤버 검토");
+    expect(screen.getByRole("region", { name: "다음에 할 일" })).toHaveTextContent("최신 일정을 아직 보지 않은 1명이 있어요");
     expect(screen.getByRole("link", { name: "대상과 문구 검토" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7/schedule-review",
@@ -646,7 +646,7 @@ describe("HostDashboardRoute", () => {
 
     expect(await screen.findByRole("group", { name: "현재 모임" })).toHaveTextContent("일곱 번째 독서모임");
     expect(screen.getByRole("tab", { name: /준비실/ })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("region", { name: "다음에 할 일" })).toHaveTextContent("실제 출석 확인");
+    expect(screen.getByRole("region", { name: "다음에 할 일" })).toHaveTextContent("최신 일정을 아직 보지 않은 1명이 있어요");
     const ledger = screen.getByRole("region", { name: "준비 현황" });
     expect(within(ledger).getAllByRole("listitem")).toHaveLength(4);
     expect(within(ledger).getByText("현재 일정 확인 1/2")).toBeVisible();
@@ -665,9 +665,9 @@ describe("HostDashboardRoute", () => {
       "/clubs/reading-sai/app/sessions/session-7",
     );
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("파도와 바람의 기록");
-    expect(screen.getByRole("link", { name: "출석 확인 시작" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "대상과 문구 검토" })).toHaveAttribute(
       "href",
-      "/clubs/reading-sai/app/host/sessions/session-7?section=attendance",
+      "/clubs/reading-sai/app/host/sessions/session-7/schedule-review",
     );
     expect(within(ledger).getByRole("link", { name: "일정 확인 자세히 보기" })).toHaveAttribute(
       "href",
@@ -749,7 +749,7 @@ describe("HostDashboardRoute", () => {
     const checklist = screen.getByRole("region", { name: "마감 현황" });
     expect(checklist).toHaveTextContent("출석 확정");
     expect(checklist).toHaveTextContent("기록 초안");
-    expect(screen.getByRole("region", { name: "다음에 할 일" })).toHaveTextContent("기록 패키지 검토");
+    expect(screen.getByRole("region", { name: "다음에 할 일" })).toHaveTextContent("기록 초안을 검토하면 멤버에게 게시할 수 있어요");
     expect(screen.getByRole("link", { name: "기록 미리보기" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7?section=records",

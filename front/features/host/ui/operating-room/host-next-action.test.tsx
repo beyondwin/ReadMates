@@ -18,12 +18,13 @@ describe("HostNextAction", () => {
     render(<HostNextAction action={actionable} />);
 
     const region = screen.getByRole("region", { name: "다음에 할 일" });
-    expect(screen.getByText("지금 처리")).toBeVisible();
+    expect(screen.getByText("지금 처리")).toHaveClass("rm-sr-only");
     expect(screen.getByText("미열람 3 · 변경 전 확인 1")).toBeVisible();
     const primary = screen.getByRole("link", { name: "일정 미확인 멤버 검토" });
     expect(primary).toHaveAttribute("href", actionable.href);
     expect(primary).toHaveClass("btn", "btn-primary");
     expect(region.querySelectorAll(".rm-operating-room-next-action__primary")).toHaveLength(1);
+    expect(region).toHaveAttribute("data-kind", "schedule-seen");
   });
 
   it("renders defer as a visible secondary button with a clock icon", async () => {
@@ -66,7 +67,7 @@ describe("HostNextAction", () => {
   ] as const)("keeps a %s action visible and recoverable", (state, stateLabel) => {
     render(<HostNextAction action={{ ...actionable, state, workItemKey: null }} />);
 
-    expect(screen.getByText(stateLabel)).toBeVisible();
+    expect(screen.getByText(stateLabel)).toHaveClass("rm-sr-only");
     expect(screen.getByRole("link", { name: actionable.label })).toHaveAttribute("href", actionable.href);
     expect(screen.getByText(actionable.reason)).toBeVisible();
   });
@@ -74,7 +75,7 @@ describe("HostNextAction", () => {
   it("shows a deferred action as one resumable primary without another defer control", () => {
     render(<HostNextAction action={{ ...actionable, state: "deferred" }} onDefer={vi.fn()} />);
 
-    expect(screen.getByText("보류됨 · 이어서 처리 가능")).toBeVisible();
+    expect(screen.getByText("보류됨 · 이어서 처리 가능")).toHaveClass("rm-sr-only");
     expect(screen.getByRole("link", { name: `이어서 ${actionable.label}` })).toHaveAttribute(
       "href",
       actionable.href,
@@ -82,6 +83,13 @@ describe("HostNextAction", () => {
     expect(screen.getAllByRole("link")).toHaveLength(1);
     expect(screen.queryByText("세부 조작")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /보류/ })).not.toBeInTheDocument();
+  });
+
+  it("renders label, reason, primary, defer secondary, and note", () => {
+    render(<HostNextAction action={{ ...actionable, label: "최신 일정을 아직 보지 않은 4명이 있어요", reason: "대상과 문구를 확인한 뒤 직접 보내세요.", deferLabel: "내일 09:00까지 보류", note: "일정이 어제 19:30에 변경되었어요" }} onDefer={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "내일 09:00까지 보류" }).querySelector('[data-icon="clock"]')).toBeTruthy();
+    expect(screen.getByText("일정이 어제 19:30에 변경되었어요").closest(".rm-operating-room-next-action__note")?.querySelector("[data-icon]")).toBeTruthy();
+    expect(screen.getByText("지금 처리")).toHaveClass("rm-sr-only");
   });
 
   it("uses ctaLabel for the primary control and keeps label as the status sentence", () => {
@@ -158,7 +166,7 @@ describe("HostNextAction", () => {
       />,
     );
 
-    expect(screen.getByText("준비 확인 완료")).toBeVisible();
+    expect(screen.getByText("준비 확인 완료")).toHaveClass("rm-sr-only");
     expect(screen.getByText("현재 모임의 필수 준비가 확인되었습니다.")).toBeVisible();
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
 

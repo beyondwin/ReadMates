@@ -311,9 +311,15 @@ function sessionAttendees(
     }));
   const attendees = [...fromPeople, ...extra];
   if (!attendanceMix) return attendees;
+  const unknownTarget = 3;
+  const unknownStart = Math.max(0, attendees.length - unknownTarget);
   return attendees.map((attendee, index) => ({
     ...attendee,
-    attendanceStatus: index < 8 ? "ATTENDED" : index === 8 ? "ABSENT" : "UNKNOWN",
+    attendanceStatus: index >= unknownStart
+      ? "UNKNOWN" as const
+      : index === unknownStart - 1
+        ? "ABSENT" as const
+        : "ATTENDED" as const,
   }));
 }
 

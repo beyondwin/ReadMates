@@ -174,7 +174,7 @@ export function buildHostOperatingRoomView(input: HostOperatingRoomInput): HostO
     input,
     meeting,
     preparation,
-    phases,
+    phase,
     closing,
   });
 
@@ -215,6 +215,7 @@ function emptyOperatingRoom(basePath: string): HostOperatingRoomView {
       label: "첫 모임 만들기",
       reason: "운영실에서 준비할 첫 모임을 만드세요.",
       href: hostPath(basePath, "/sessions/new"),
+      deferLabel: null,
     },
     preparation: [],
     partialFailures: [],
@@ -430,10 +431,12 @@ function resolveNextAction(context: {
   input: HostOperatingRoomInput;
   meeting: HostSessionDetailResponse;
   preparation: readonly PreparationLedgerRowView[];
-  phases: readonly MeetingPhaseTabView[];
+  phase: HostMeetingPhase;
   closing: SessionClosingBoardView | null;
 }): HostNextActionView {
-  if (context.input.pendingOutcome) return context.input.pendingOutcome;
+  if (context.input.pendingOutcome) {
+    return { ...context.input.pendingOutcome, deferLabel: null };
+  }
 
   const { meeting } = context;
   if (meeting.state === "PUBLISHED") return noNextAction();
@@ -446,6 +449,7 @@ function resolveNextAction(context: {
         label: "마감 상태 다시 확인",
         reason: "마감 상태를 확인할 수 없어 안전하게 다시 읽어야 합니다.",
         href: hostSessionPath(context.input.basePath, meeting.sessionId, "?section=records"),
+        deferLabel: null,
       };
     }
     if (context.closing.primaryAction.label === "추가 조치 없음") return noNextAction();
@@ -453,7 +457,7 @@ function resolveNextAction(context: {
       && context.input.closing.data.overall.primaryAction === "IMPORT_RECORDS";
     return actionState(context.input, {
       kind: "closing",
-      label: context.closing.primaryAction.label,
+      label: "기록 초안을 검토하면 멤버에게 게시할 수 있어요",
       ctaLabel: "기록 초안 검토",
       reason: context.closing.primaryAction.reason,
       href: importRecords
@@ -462,14 +466,14 @@ function resolveNextAction(context: {
     });
   }
 
-  const liveAvailable = context.phases.some(({ id, availability }) => id === "live" && availability === "available");
-  const unknownAttendanceCount = activeParticipants(meeting).filter(({ attendanceStatus }) => attendanceStatus === "UNKNOWN").length;
-  if (liveAvailable && unknownAttendanceCount > 0) {
+  const unknownAttendanceCount = activeParticipants(meeting)
+    .filter(({ attendanceStatus }) => attendanceStatus === "UNKNOWN").length;
+  if (context.phase === "live" && unknownAttendanceCount > 0) {
     return actionState(context.input, {
       kind: "attendance",
-      label: "실제 출석 확인",
+      label: `아직 출석을 확인하지 않은 ${unknownAttendanceCount}명이 있어요`,
       ctaLabel: "출석 확인 시작",
-      reason: `출석이 확인되지 않은 멤버가 ${unknownAttendanceCount}명입니다.`,
+      reason: "참석 응답과 실제 출석은 별개로 기록해요.",
       href: hostSessionPath(context.input.basePath, meeting.sessionId, "?section=attendance"),
     });
   }
@@ -477,11 +481,16 @@ function resolveNextAction(context: {
   for (const kind of ["schedule-seen", "rsvp", "questions", "place"] as const) {
     const row = context.preparation.find(({ id }) => id === kind);
     if (row?.state === "warning") {
+      const pendingCount = (row.denominator ?? 0) - (row.numerator ?? 0);
       return actionState(context.input, {
         kind,
-        label: nextActionLabel(kind),
+        label: kind === "schedule-seen"
+          ? `최신 일정을 아직 보지 않은 ${pendingCount}명이 있어요`
+          : nextActionLabel(kind),
         ctaLabel: kind === "schedule-seen" ? "대상과 문구 검토" : undefined,
-        reason: row.detail,
+        reason: kind === "schedule-seen"
+          ? "대상과 문구를 확인한 뒤 직접 보내세요. 자동 발송하지 않아요."
+          : row.detail,
         href: row.href,
       });
     }
@@ -493,6 +502,7 @@ function resolveNextAction(context: {
         label: "발제 질문 집계 다시 확인",
         reason: row.detail,
         href: row.href,
+        deferLabel: null,
       };
     }
   }

@@ -60,6 +60,21 @@ function session(
   };
 }
 
+function withUnknownAttendance(
+  meeting: HostSessionDetailResponse,
+  unknownCount: number,
+): HostSessionDetailResponse {
+  const attendees = meeting.attendees.map((row, index) => ({
+    ...row,
+    attendanceStatus: (index < unknownCount ? "UNKNOWN" : "ATTENDED") as
+      HostSessionDetailResponse["attendees"][number]["attendanceStatus"],
+  }));
+  while (attendees.length < unknownCount) {
+    attendees.push(attendee(`member-u-${attendees.length + 1}`, "NO_RESPONSE", "UNKNOWN", "UNSEEN"));
+  }
+  return { ...meeting, attendees };
+}
+
 function attendee(
   membershipId: string,
   rsvpStatus: "NO_RESPONSE" | "GOING" | "MAYBE" | "DECLINED",
@@ -261,11 +276,36 @@ describe("buildHostOperatingRoomView", () => {
     });
   });
 
+  it("prefers attendance in live phase and yields sentence labels with a defer label", () => {
+    const view = buildHostOperatingRoomView(input({
+      requestedPhase: "live",
+      currentMeeting: withUnknownAttendance(session(), 3),
+    }));
+    expect(view.nextAction.kind).toBe("attendance");
+    expect(view.nextAction.label).toBe("아직 출석을 확인하지 않은 3명이 있어요");
+    expect(view.nextAction.deferLabel).toBe("내일 09:00까지 보류");
+  });
+
+  it("keeps preparation next-action when live is available but the requested phase is prep", () => {
+    const view = buildHostOperatingRoomView(input({
+      requestedPhase: "prep",
+      currentMeeting: withUnknownAttendance(session(), 3),
+    }));
+    expect(view.phase).toBe("prep");
+    expect(view.nextAction.kind).toBe("schedule-seen");
+    expect(view.nextAction.label).toBe("최신 일정을 아직 보지 않은 2명이 있어요");
+    expect(view.nextAction.reason).toBe("대상과 문구를 확인한 뒤 직접 보내세요. 자동 발송하지 않아요.");
+    expect(view.nextAction.deferLabel).toBe("내일 09:00까지 보류");
+  });
+
   it("chooses exactly one next action in the fixed attendance, schedule, RSVP, questions, place, closing order", () => {
     const base = input();
     expect(buildHostOperatingRoomView(base).nextAction).toMatchObject({
       kind: "attendance",
+      label: "아직 출석을 확인하지 않은 2명이 있어요",
       ctaLabel: "출석 확인 시작",
+      reason: "참석 응답과 실제 출석은 별개로 기록해요.",
+      deferLabel: "내일 09:00까지 보류",
     });
 
     const attendanceDone = session({
@@ -273,7 +313,10 @@ describe("buildHostOperatingRoomView", () => {
     });
     expect(buildHostOperatingRoomView(input({ currentMeeting: attendanceDone })).nextAction).toMatchObject({
       kind: "schedule-seen",
+      label: "최신 일정을 아직 보지 않은 2명이 있어요",
       ctaLabel: "대상과 문구 검토",
+      reason: "대상과 문구를 확인한 뒤 직접 보내세요. 자동 발송하지 않아요.",
+      deferLabel: "내일 09:00까지 보류",
     });
 
     const scheduleDone = session({
@@ -307,8 +350,9 @@ describe("buildHostOperatingRoomView", () => {
       closing: ready(closing("BLOCKED", "IMPORT_RECORDS")),
     })).nextAction).toMatchObject({
       kind: "closing",
-      label: "기록 패키지 검토",
+      label: "기록 초안을 검토하면 멤버에게 게시할 수 있어요",
       ctaLabel: "기록 초안 검토",
+      deferLabel: "내일 18:00까지 보류",
       href: "/clubs/book-club/app/host/records",
     });
   });

@@ -286,6 +286,7 @@ export function HostDashboardRoute({
           label: "출석 변경 비교",
           reason: "최신 출석과 보존한 내 선택을 확인한 뒤 다시 저장하세요.",
           href: null,
+          deferLabel: null,
         },
       };
     }
@@ -305,6 +306,7 @@ export function HostDashboardRoute({
           label: "출석 변경 결과 확인",
           reason: "같은 요청을 다시 보내기 전에 최신 출석과 변경 내역을 확인해야 합니다.",
           href: sessionId ? hostSessionHref(paths.hostBasePath, sessionId, "?section=history") : null,
+          deferLabel: null,
         },
       };
     }

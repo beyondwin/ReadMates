@@ -87,7 +87,7 @@ export function HostOperatingRoomPage({
   const compactViewport = useOperatingRoomCompactViewport();
   // The notice keeps its place in the layout even when empty, but an empty live region
   // would announce nothing and collide with the page's real status regions.
-  const phaseNotice = phaseNormalizationReason ?? view.nextAction.note ?? "";
+  const phaseNotice = phaseNormalizationReason ?? "";
   if (!view.meeting || !headerLinks) {
     return (
       <main className="rm-host-operating-room rm-host-operating-room--empty">

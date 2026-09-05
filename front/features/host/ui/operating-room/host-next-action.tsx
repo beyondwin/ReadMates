@@ -57,10 +57,11 @@ export function HostNextAction({
       className="rm-operating-room-next-action"
       aria-labelledby="rm-operating-room-next-action-title"
       data-state={action.state}
+      data-kind={action.kind}
     >
       <div className="rm-operating-room-next-action__heading-row">
         <h2 id="rm-operating-room-next-action-title">다음에 할 일</h2>
-        <span className="rm-operating-room-next-action__state">{stateLabels[action.state]}</span>
+        <span className="rm-operating-room-next-action__state rm-sr-only">{stateLabels[action.state]}</span>
       </div>
 
       <p className="rm-operating-room-next-action__label">{action.label}</p>
@@ -99,7 +100,10 @@ export function HostNextAction({
       ) : null}
 
       {action.note ? (
-        <p className="rm-operating-room-next-action__note">{action.note}</p>
+        <p className="rm-operating-room-next-action__note">
+          <ReadmatesIcon name={action.state === "deferred" ? "clock" : "info"} size={16} />
+          {action.note}
+        </p>
       ) : null}
     </section>
   );

@@ -47,6 +47,7 @@ describe("host approved route fixtures", () => {
     expect(closed).toMatchObject({ sessionId: HOST_APPROVED_SESSION_ID, state: "CLOSED" });
     expect(open?.state).toBe("OPEN");
     expect(open?.attendees.filter((attendee) => attendee.attendanceStatus === "ATTENDED").length).toBeGreaterThan(0);
+    expect(open?.attendees.filter((attendee) => attendee.attendanceStatus === "UNKNOWN")).toHaveLength(3);
     const status = buildHostApprovedClosingStatus(HOST_APPROVED_SESSION_ID, { lifecycle: "CLOSED" });
     expect(status?.overall.primaryAction).toBe("IMPORT_RECORDS");
     expect(status?.checklist.map((item) => item.id)).toEqual([
