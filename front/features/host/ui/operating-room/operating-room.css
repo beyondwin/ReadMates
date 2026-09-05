@@ -1319,6 +1319,10 @@ h1.rm-operating-room-header__title {
     font-size: 14px;
   }
 
+  .rm-preparation-ledger:not(.rm-phase-status-ledger) h2 {
+    line-height: 1.25;
+  }
+
   .rm-preparation-ledger__head,
   .rm-phase-status-ledger__head {
     display: none;
@@ -1338,11 +1342,23 @@ h1.rm-operating-room-header__title {
       "index icon label detail link";
   }
 
+  /* One shared label track for the whole ledger so every row starts value/detail at the same x. */
+  .rm-preparation-ledger__list:not(.rm-phase-status-ledger__list) {
+    display: grid;
+    grid-template-columns: 22px 22px max-content minmax(0, 1fr) 44px;
+    column-gap: 8px;
+  }
+
+  .rm-preparation-ledger-row:not(.rm-phase-status-ledger-row) {
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+  }
+
+  /* Recovery control shares the label track under its label instead of owning a third 44px row. */
   .rm-preparation-ledger-row[data-state="unavailable"] {
     grid-template-areas:
       "index icon label value link"
-      "index icon label detail link"
-      ". . . retry retry";
+      "index icon retry detail link";
   }
 
   .rm-preparation-ledger-row__value,
@@ -1377,6 +1393,7 @@ h1.rm-operating-room-header__title {
   .rm-preparation-ledger-row__label-text {
     grid-area: label;
     align-self: center;
+    line-height: 1.25;
     white-space: nowrap;
   }
 
@@ -1409,10 +1426,12 @@ h1.rm-operating-room-header__title {
   .rm-preparation-ledger-row__retry {
     grid-area: retry;
     justify-self: start;
+    align-self: center;
     min-width: 44px;
     min-height: 44px;
     padding-inline: 0;
     font-size: 12px;
+    white-space: nowrap;
   }
 
   .rm-preparation-ledger-row__link span,

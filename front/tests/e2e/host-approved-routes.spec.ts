@@ -64,6 +64,22 @@ async function assertHostOperatingRoomAuthoritySurface(
   expect(partialBeforeNextAction, "giant partial panel must not precede next action").toBe(false);
   await expect(nextAction).toBeVisible();
 
+  if (id === "host-prep-mobile" || id === "host-live-mobile") {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const navAboveWorkbox = page.locator('[data-club-shell-region="mobile-primary"] .m-tabbar').first();
+    const firstWorkItemTitle = page.locator(".rm-host-work-item__title").first();
+    await expect(navAboveWorkbox).toBeVisible();
+    await expect(firstWorkItemTitle).toBeVisible();
+    const navTopBox = await navAboveWorkbox.boundingBox();
+    const titleBox = await firstWorkItemTitle.boundingBox();
+    expect(navTopBox, "mobile nav").not.toBeNull();
+    expect(titleBox, "first work item title").not.toBeNull();
+    expect(
+      titleBox!.y,
+      `first work-item title top ${titleBox!.y} must sit above the mobile nav top ${navTopBox!.y}`,
+    ).toBeLessThan(navTopBox!.y);
+  }
+
   if (id === "host-live-mobile") {
     await page.evaluate(() => window.scrollTo(0, 0));
     const nav = page.locator('[data-club-shell-region="mobile-primary"] .m-tabbar').first();

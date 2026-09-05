@@ -243,8 +243,32 @@ for (const viewport of [
       expect(Math.abs(valueBox!.x - detailBox!.x), "value+detail stacked").toBeLessThanOrEqual(4);
       expect(valueBox!.width, "unavailable value width").toBeGreaterThanOrEqual(80);
       expect(valueBox!.height, "unavailable value single line").toBeLessThanOrEqual(22);
-      expect(questionsBox!.height, "unavailable row stays compact").toBeLessThanOrEqual(100);
+      expect(questionsBox!.height, "unavailable row stays compact").toBeLessThanOrEqual(76);
       expect(firstBox!.height, "short-copy row ~48px").toBeLessThanOrEqual(56);
+
+      const columnStarts = await component.locator(".rm-preparation-ledger__list > li").evaluateAll(
+        (rows) => rows.map((row) => {
+          const box = (selector: string) => {
+            const node = row.querySelector(selector);
+            return node ? node.getBoundingClientRect().x : null;
+          };
+          return { value: box(".rm-preparation-ledger-row__value"), detail: box(".rm-preparation-ledger-row__detail") };
+        }),
+      );
+      expect(columnStarts.length, "prep rows measured").toBe(4);
+      const valueStarts = columnStarts.map((entry) => entry.value);
+      const detailStarts = columnStarts.map((entry) => entry.detail);
+      for (const [index, start] of valueStarts.entries()) {
+        expect(start, `row ${index + 1} value x`).not.toBeNull();
+        expect(
+          Math.abs(start! - valueStarts[0]!),
+          `row ${index + 1} value shares the first row value column`,
+        ).toBeLessThanOrEqual(1);
+        expect(
+          Math.abs(detailStarts[index]! - valueStarts[0]!),
+          `row ${index + 1} detail shares the first row value column`,
+        ).toBeLessThanOrEqual(1);
+      }
     }
 
     if (viewport.width === 1440) {
