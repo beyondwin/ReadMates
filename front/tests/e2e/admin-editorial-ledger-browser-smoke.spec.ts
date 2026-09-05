@@ -92,7 +92,8 @@ test("Health is read-only evidence without commands", async ({ page }) => {
   await page.goto("/admin/health");
   await expectReducedMotion(page);
 
-  await expect(page.getByRole("heading", { name: "서비스 건강" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "서비스 건강" })).toHaveCount(0);
+  await expect(page.getByRole("table", { name: "서비스 상태" })).toBeVisible();
   await expect(page.getByRole("region", { name: "서비스 신호" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "AI 작업 대기열" })).toBeVisible();
   await expect(page.locator(".admin-case-docket")).toHaveCount(0);
@@ -100,7 +101,7 @@ test("Health is read-only evidence without commands", async ({ page }) => {
   await expect(page.locator(".admin-receipt-timeline")).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 
-  const refresh = page.getByRole("button", { name: "새로고침" });
+  const refresh = page.getByRole("button", { name: "새로 확인" }).first();
   await refresh.focus();
   await expectVisibleFocus(refresh);
   await expectMinimumTargetSize(refresh);

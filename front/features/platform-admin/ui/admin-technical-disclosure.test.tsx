@@ -27,4 +27,15 @@ describe("AdminTechnicalDisclosure", () => {
     );
     expect(container).toBeEmptyDOMElement();
   });
+
+  it("keeps children inside the disclosure when items are empty", () => {
+    const { container } = render(
+      <AdminTechnicalDisclosure items={[]}>
+        <p className="admin-health-deploy-strip">배포 이력</p>
+      </AdminTechnicalDisclosure>,
+    );
+    const disclosure = container.querySelector("[data-admin-technical-disclosure]");
+    expect(disclosure).toBeTruthy();
+    expect(disclosure?.querySelector(".admin-health-deploy-strip")).toBeTruthy();
+  });
 });

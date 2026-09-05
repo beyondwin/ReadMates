@@ -162,6 +162,10 @@ type GridProps = ComponentProps<typeof AdminHealthGrid> & {
   onRetryCard?: (cardId: string) => void;
 };
 
+async function expandServiceRow(user: ReturnType<typeof userEvent.setup>, title: string) {
+  await user.click(screen.getByRole("button", { name: `${title} 상세 펼치기` }));
+}
+
 function renderGrid(props: Partial<GridProps> = {}) {
   const defaultProps: GridProps = {
     snapshot: HEALTH_SNAPSHOT,
@@ -218,8 +222,40 @@ describe("AdminHealthGrid", () => {
     ]);
     expect(within(screen.getByRole("row", { name: /앱과 API/ })).queryByRole("img")).toBeNull();
     expect(screen.getByRole("button", { name: "알림 상세 접기" })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("영향 범위").closest(".admin-service-status__facts")).toBeTruthy();
+    expect(screen.getByText("영향 범위").closest("dl.admin-service-status__facts")).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "최근에 바뀐 것" })).toBeNull();
+  });
+
+  it("keeps 실패한 안내만 다시 보내기 on the notifications expansion only", async () => {
+    const user = userEvent.setup();
+    renderGrid({ snapshot: notificationAttentionSnapshot() });
+    expect(screen.getByRole("link", { name: "실패한 안내만 다시 보내기" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "앱과 API 상세 펼치기" }));
+    expect(screen.queryByText("실패한 안내만 다시 보내기")).not.toBeInTheDocument();
+  });
+
+  it("shows 영향 없음 in a quiet row expansion instead of source-guidance impact", async () => {
+    const user = userEvent.setup();
+    renderGrid({ snapshot: notificationAttentionSnapshot() });
+    await user.click(screen.getByRole("button", { name: "앱과 API 상세 펼치기" }));
+    const facts = screen.getByText("영향 범위").closest(".admin-service-status__facts");
+    expect(facts).toBeTruthy();
+    expect(within(facts as HTMLElement).getByText("영향 없음")).toBeInTheDocument();
+    expect(within(facts as HTMLElement).queryByText("서비스 요청 처리가 대기할 수 있습니다.")).toBeNull();
+  });
+
+  it("does not keep collapsed health-card retries in the tab order", () => {
+    renderGrid();
+    expect(screen.getByRole("button", { name: "도메인 상세 펼치기" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "Redis 다시 확인" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Redis" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the deploy strip inside 기술 정보 펼치기", () => {
+    renderGrid();
+    const disclosure = screen.getByText("기술 정보 펼치기").closest("details");
+    expect(disclosure?.querySelector(".admin-health-deploy-strip, .admin-health-deploy-strip__empty")).toBeTruthy();
   });
 
   it("composes page context and an evidence ledger without case lifecycle chrome", () => {
@@ -248,11 +284,13 @@ describe("AdminHealthGrid", () => {
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });
 
-  it("shows only actual abnormal sources and keeps all normal known sources in one quiet list", () => {
+  it("shows only actual abnormal sources and keeps all normal known sources in one quiet list", async () => {
+    const user = userEvent.setup();
     renderGrid();
 
     expect(screen.getByTestId("admin-health-grid")).toHaveAttribute("data-page-state", "partial");
     expect(screen.getByRole("heading", { name: "AI 작업 대기열" })).toBeInTheDocument();
+    await expandServiceRow(user, "도메인");
     expect(screen.getByRole("heading", { name: "Redis" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "알림 대기열" })).not.toBeInTheDocument();
     const normalSources = screen.getByRole("region", { name: "정상 범위 서비스" });
@@ -348,11 +386,13 @@ describe("AdminHealthGrid", () => {
     expect(screen.getAllByRole("button", { name: "요청 중" })[0]).toBeDisabled();
   });
 
-  it("keeps successful cards when a partial source is unavailable", () => {
+  it("keeps successful cards when a partial source is unavailable", async () => {
+    const user = userEvent.setup();
     renderGrid();
 
     expect(screen.getByText("일부만 확인됨")).toBeInTheDocument();
     expect(screen.getByTestId("admin-health-grid")).toHaveAttribute("data-page-state", "partial");
+    await expandServiceRow(user, "도메인");
     const redis = screen.getByRole("article", { name: "Redis" });
     expect(within(redis).getByText("확인 불가")).toBeInTheDocument();
     expect(within(redis).queryByText("정상")).not.toBeInTheDocument();
@@ -361,7 +401,8 @@ describe("AdminHealthGrid", () => {
     expect(screen.queryByRole("heading", { name: "최근에 바뀐 것" })).not.toBeInTheDocument();
   });
 
-  it("keeps card evidence when every source is unavailable", () => {
+  it("keeps card evidence when every source is unavailable", async () => {
+    const user = userEvent.setup();
     renderGrid({
       snapshot: snapshotWith(HEALTH_SNAPSHOT.cards.map((item) => unavailableCard({
         id: item.id,
@@ -373,7 +414,9 @@ describe("AdminHealthGrid", () => {
     });
 
     expect(screen.getByTestId("admin-health-grid")).toHaveAttribute("data-page-state", "unavailable");
+    await expandServiceRow(user, "알림");
     expect(screen.getByRole("heading", { name: "알림 대기열" })).toBeInTheDocument();
+    await expandServiceRow(user, "도메인");
     expect(screen.getByRole("heading", { name: "Redis" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "최근에 바뀐 것" })).not.toBeInTheDocument();
     expect(screen.getAllByText("확인 불가").length).toBeGreaterThan(1);
@@ -381,7 +424,8 @@ describe("AdminHealthGrid", () => {
     expect(screen.queryByText("42 rows")).not.toBeInTheDocument();
   });
 
-  it("treats disabled Redis, Kafka, and provider as absence, not page failure", () => {
+  it("treats disabled Redis, Kafka, and provider as absence, not page failure", async () => {
+    const user = userEvent.setup();
     renderGrid({
       snapshot: snapshotWith([
         ...HEALTH_SNAPSHOT.cards.filter((item) => (
@@ -413,11 +457,13 @@ describe("AdminHealthGrid", () => {
     expect(screen.getByTestId("admin-health-grid")).toHaveAttribute("data-page-state", "ready");
     expect(screen.queryByText("일부만 확인됨")).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    await expandServiceRow(user, "도메인");
     expect(within(screen.getByRole("article", { name: "Redis" })).getAllByText("사용 안 함")).toHaveLength(2);
-    expect(within(screen.getByRole("article", { name: "AI 작업 대기열" })).getAllByText("사용 안 함")).toHaveLength(2);
-    expect(within(screen.getByRole("article", { name: "AI 제공자" })).getAllByText("사용 안 함")).toHaveLength(2);
     expect(within(screen.getByRole("article", { name: "Redis" })).queryByText("확인 불가")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Redis 다시 확인" })).not.toBeInTheDocument();
+    await expandServiceRow(user, "요약 작업");
+    expect(within(screen.getByRole("article", { name: "AI 작업 대기열" })).getAllByText("사용 안 함")).toHaveLength(2);
+    expect(within(screen.getByRole("article", { name: "AI 제공자" })).getAllByText("사용 안 함")).toHaveLength(2);
     const narrative = document.querySelector(".admin-health-grid__narrative");
     expect(narrative).toHaveTextContent(
       "사용하지 않는 서비스가 3곳 있습니다. 현재 자료로 확인했습니다.",
@@ -477,7 +523,8 @@ describe("AdminHealthGrid", () => {
     expect(document.querySelector(".admin-health-grid__narrative")).toHaveTextContent(expected);
   });
 
-  it("aggregates an all-disabled snapshot without a green ready claim", () => {
+  it("aggregates an all-disabled snapshot without a green ready claim", async () => {
+    const user = userEvent.setup();
     renderGrid({
       snapshot: snapshotWith(HEALTH_SNAPSHOT.cards.map((item) => unavailableCard({
         id: item.id,
@@ -492,6 +539,7 @@ describe("AdminHealthGrid", () => {
     expect(screen.getByRole("heading", { name: "사용 안 함" })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(document.querySelector(".admin-health-card__pill--ok")).toBeNull();
+    await expandServiceRow(user, "알림");
     expect(screen.getByRole("heading", { name: "알림 대기열" })).toBeInTheDocument();
   });
 
@@ -540,6 +588,7 @@ describe("AdminHealthGrid", () => {
     const onRetryCard = vi.fn();
     renderGrid({ onRetryCard });
 
+    await expandServiceRow(user, "도메인");
     await user.click(screen.getByRole("button", { name: "Redis 다시 확인" }));
     expect(onRetryCard).toHaveBeenCalledTimes(1);
     expect(onRetryCard).toHaveBeenCalledWith("redis");
@@ -684,6 +733,9 @@ describe("AdminHealthGrid", () => {
     expect(source).not.toContain("platform-admin-queries");
     expect(source).not.toContain("platform-admin-health-api");
     expect(source).not.toContain("admin-health-route");
+    expect(source).not.toContain("admin-health-data");
+    expect(source).not.toContain("SERVICE_STATUS_GROUPS");
+    expect(source).toContain("buildAdminServiceStatusView");
     expect(/fetch\s*\(/.test(source)).toBe(false);
   });
 

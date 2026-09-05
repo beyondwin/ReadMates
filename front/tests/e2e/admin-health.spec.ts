@@ -221,18 +221,20 @@ test("operator views /admin/health grid", async ({ page }) => {
 
   await page.goto("/admin/health");
 
-  await expect(page.getByRole("heading", { name: "서비스 건강" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "서비스 건강" })).toHaveCount(0);
+  await expect(page.getByRole("table", { name: "서비스 상태" })).toBeVisible();
   await expect(page.getByRole("region", { name: "서비스 신호" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
-  await expectMinimumTargetSize(page.getByRole("button", { name: "새로고침" }));
+  await expectMinimumTargetSize(page.getByRole("button", { name: "새로 확인" }).first());
   await expect(page.locator(".admin-case-docket")).toHaveCount(0);
   await expect(page.locator(".admin-action-dock")).toHaveCount(0);
   await expect(page.locator(".admin-receipt-timeline")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "AI 작업 대기열" })).toBeVisible();
+  await page.getByRole("button", { name: "도메인 상세 펼치기" }).click();
   await expect(page.getByRole("heading", { name: "Redis" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "알림 대기열" })).toHaveCount(0);
   await expect(page.getByText("정상 범위 서비스").first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "최근에 바뀐 것" })).toBeVisible();
+  await expect(page.getByText("기술 정보 펼치기")).toBeVisible();
   await expect(page.getByText("readmates-api:dev-20260526")).not.toBeVisible();
   await expect(
     page.locator("article", { hasText: "Redis" }).getByText("redis_metrics_unavailable"),
@@ -247,8 +249,8 @@ test("operator views /admin/health grid", async ({ page }) => {
   await expect(page).toHaveURL(/\/admin\/notifications\?focus=outbox_backlog/);
   await expect(page.getByText(/서비스 상태의 발송 대기 신호/)).toBeVisible();
   await page.goto("/admin/health");
-  await expect(page.getByRole("button", { name: "새로고침" })).toBeVisible();
-  await page.getByRole("button", { name: "새로고침" }).click();
+  await expect(page.getByRole("button", { name: "새로 확인" }).first()).toBeVisible();
+  await page.getByRole("button", { name: "새로 확인" }).first().click();
   await page.getByText("정상 범위 서비스").first().click();
   await expect(page.getByRole("link", { name: "AI 제공자" })).toHaveAttribute(
     "href",
@@ -292,6 +294,6 @@ for (const fixture of HEALTH_REFRESH_FIXTURES) {
 
     await expect(page.getByText(fixture.expected, { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "AI 작업 대기열" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "최근에 바뀐 것" })).toBeVisible();
+    await expect(page.getByText("기술 정보 펼치기")).toBeVisible();
   });
 }

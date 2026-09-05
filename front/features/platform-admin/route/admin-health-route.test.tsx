@@ -164,6 +164,8 @@ describe("AdminHealthRoute", () => {
     expect(findNestedLiveRegions(container)).toEqual([]);
     expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "도메인 상세 펼치기" }));
     expect(screen.getByRole("heading", { name: "Redis" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "알림 대기열" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "데이터베이스 연결" })).not.toBeInTheDocument();
@@ -194,7 +196,9 @@ describe("AdminHealthRoute", () => {
       .mockResolvedValue(HEALTH_SNAPSHOT);
     renderRoute();
 
-    expect(await screen.findByRole("heading", { name: "Redis" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "AI 작업 대기열" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "도메인 상세 펼치기" }));
+    expect(screen.getByRole("heading", { name: "Redis" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Redis 다시 확인" }));
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });

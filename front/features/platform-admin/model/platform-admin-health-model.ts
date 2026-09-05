@@ -458,6 +458,105 @@ function formatResolvedIncident(lastIncident?: HealthLastIncident | null): strin
   return `${when} · ${lastIncident.title}`;
 }
 
+export type AdminServiceStatusRowId =
+  | "app-api"
+  | "notifications"
+  | "summaries"
+  | "public-record"
+  | "domain";
+
+export type AdminServiceStatusRow = {
+  id: AdminServiceStatusRowId;
+  title: string;
+  attention: boolean;
+  statusLabel: string;
+  lastChecked: string;
+  impactLabel: string;
+  summary: string;
+  impactScope: string;
+  lastOkDelivery: string;
+  recoveryLabel: string | null;
+  recoveryHref: string | null;
+  cardIds: readonly string[];
+};
+
+export type AdminServiceStatusView = {
+  rows: AdminServiceStatusRow[];
+  defaultExpandedId: AdminServiceStatusRowId | null;
+};
+
+const SERVICE_STATUS_GROUPS: readonly {
+  id: AdminServiceStatusRowId;
+  title: string;
+  cardIds: readonly string[];
+}[] = [
+  { id: "app-api", title: "앱과 API", cardIds: ["db_pool"] },
+  { id: "notifications", title: "알림", cardIds: ["outbox_backlog", "notification_dispatch_success"] },
+  { id: "summaries", title: "요약 작업", cardIds: ["kafka_consumer_lag", "ai_provider_availability"] },
+  { id: "public-record", title: "공개 기록", cardIds: [DEPLOY_ATTEMPTS_CARD_ID] },
+  { id: "domain", title: "도메인", cardIds: ["redis", "outbound-resilience"] },
+];
+
+const NOTIFICATION_RECOVERY_LABEL = "실패한 안내만 다시 보내기";
+
+const EVIDENCE_RANK: Record<HealthEvidenceState, number> = {
+  crit: 5,
+  warn: 4,
+  unavailable: 3,
+  empty: 2,
+  disabled: 1,
+  ok: 0,
+};
+
+export function buildAdminServiceStatusView(
+  snapshot: PlatformHealthSnapshot,
+): AdminServiceStatusView {
+  const cards = healthCardsForPage(snapshot);
+  const rows = SERVICE_STATUS_GROUPS.map((group) => presentServiceStatusRow(group, cards));
+  const defaultExpandedId = rows.find((row) => row.attention)?.id ?? null;
+  return { rows, defaultExpandedId };
+}
+
+function presentServiceStatusRow(
+  group: (typeof SERVICE_STATUS_GROUPS)[number],
+  cards: readonly HealthCard[],
+): AdminServiceStatusRow {
+  const matched = cards.filter((card) => group.cardIds.includes(card.id));
+  const worst = pickWorstHealthCard(matched);
+  const evidence = worst ? healthCardEvidenceState(worst) : "ok";
+  const attention = evidence !== "ok" && evidence !== "disabled";
+  const operator = worst ? healthCardOperatorView(worst) : null;
+  const notificationsRecovery = group.id === "notifications" && attention;
+  return {
+    id: group.id,
+    title: group.title,
+    attention,
+    statusLabel: statusLabelForEvidence(evidence),
+    lastChecked: worst ? formatLastEvidenceLabel(worst.lastCheckedAt) : "확인 시각 없음",
+    impactLabel: attention ? (operator?.impact ?? "확인 필요") : "영향 없음",
+    summary: operator?.stateSentence ?? "",
+    impactScope: attention ? (operator?.impact ?? "확인 필요") : "영향 없음",
+    lastOkDelivery: "—",
+    recoveryLabel: notificationsRecovery ? NOTIFICATION_RECOVERY_LABEL : null,
+    recoveryHref: notificationsRecovery ? (worst?.drill?.target ?? null) : null,
+    cardIds: group.cardIds,
+  };
+}
+
+function pickWorstHealthCard(cards: readonly HealthCard[]): HealthCard | undefined {
+  return [...cards].sort(
+    (left, right) =>
+      EVIDENCE_RANK[healthCardEvidenceState(right)] - EVIDENCE_RANK[healthCardEvidenceState(left)],
+  )[0];
+}
+
+function statusLabelForEvidence(evidence: HealthEvidenceState): string {
+  if (evidence === "ok") return "정상";
+  if (evidence === "disabled") return "사용 안 함";
+  if (evidence === "unavailable" || evidence === "empty") return "확인 지연";
+  return "확인 필요";
+}
+
 export function healthFailedSources(cards: readonly HealthCard[]): HealthFailedSource[] {
   return cards
     .filter((card) => healthCardEvidenceState(card) === "unavailable")

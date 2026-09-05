@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { HealthCard } from "./platform-admin-health-model";
 import {
   HEALTH_CARD_IDS,
+  buildAdminServiceStatusView,
   formatHealthNarrative,
   formatRefreshStateLabel,
   healthCardEvidenceState,
@@ -266,6 +267,39 @@ describe("health card operator view", () => {
     expect(disabled.stateSentence).toBe("현재 운영 설정에서 사용하지 않습니다.");
     expect(noData.evidence).toBe("empty");
     expect(noData.stateSentence).toBe("아직 판단할 자료가 없습니다.");
+  });
+});
+
+describe("buildAdminServiceStatusView", () => {
+  it("gates recovery copy to 알림 and keeps quiet-row impact as 영향 없음", () => {
+    const view = buildAdminServiceStatusView({
+      schema: "platform.health_snapshot.v1",
+      generatedAt: "2026-05-26T00:00:00Z",
+      lastSuccessfulAt: "2026-05-26T00:00:00Z",
+      refreshState: "FRESH",
+      staleAgeSeconds: 0,
+      cards: [
+        card({
+          id: "outbox_backlog",
+          title: "Outbox backlog",
+          status: "WARN",
+          drill: { kind: "ADMIN_ROUTE", target: "/admin/notifications?focus=outbox_backlog" },
+        }),
+        card({ id: "db_pool", title: "DB pool" }),
+        WARN_KAFKA,
+      ],
+    });
+
+    const notifications = view.rows.find((row) => row.id === "notifications");
+    const appApi = view.rows.find((row) => row.id === "app-api");
+    const summaries = view.rows.find((row) => row.id === "summaries");
+    expect(notifications?.recoveryLabel).toBe("실패한 안내만 다시 보내기");
+    expect(notifications?.recoveryHref).toBe("/admin/notifications?focus=outbox_backlog");
+    expect(summaries?.recoveryLabel).toBeNull();
+    expect(summaries?.recoveryHref).toBeNull();
+    expect(appApi?.attention).toBe(false);
+    expect(appApi?.impactScope).toBe("영향 없음");
+    expect(appApi?.impactLabel).toBe("영향 없음");
   });
 });
 
