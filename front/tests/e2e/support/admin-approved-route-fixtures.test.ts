@@ -43,8 +43,12 @@ describe("admin approved Today fixtures", () => {
 describe("admin approved Clubs, Health, and Audit fixtures", () => {
   it("freezes the clubs row that the selected-club URL names", () => {
     const page = buildAdminApprovedClubs();
+    expect(page.items).toHaveLength(24);
     expect(page.items[0]?.clubId).toBe("club-sample");
     expect(page.items[0]?.name).toBe("샘플 독서모임");
+    expect(page.items[0]?.domainCount).toBe(1);
+    expect(page.items[0]?.firstHostOnboardingState).toBe("ASSIGNED");
+    expect(page.items.filter((club) => club.domainActionRequiredCount > 0)).toHaveLength(2);
     expect(page.nextCursor).toEqual("clubs-visual-next");
   });
 

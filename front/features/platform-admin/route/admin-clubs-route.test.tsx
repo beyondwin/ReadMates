@@ -200,7 +200,8 @@ describe("AdminClubsRoute", () => {
     ).toBeInTheDocument();
     const list = screen.getByRole("region", { name: "클럽 관리 목록" });
     expect(within(list).getByText("활성 · 비공개")).toBeInTheDocument();
-    expect(within(list).getByText("alpha")).toBeInTheDocument();
+    const detail = screen.getByRole("region", { name: "선택한 클럽" });
+    expect(within(detail).getByText("alpha")).toBeInTheDocument();
     const href = screen.getByRole("link", { name: "Alpha" }).getAttribute("href");
     expect(href).toContain("/admin/clubs/c-1");
     expect(href).toContain("returnTo=%2Fadmin%2Fclubs");

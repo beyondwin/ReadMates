@@ -374,10 +374,10 @@ test.describe("admin clubs registry", () => {
     });
     const rows = judgementList.getByRole("listitem");
 
-    // The decision sequence starts with the club name, then action/signal.
+    // The decision sequence starts with the club name, then the status phrase.
     const criticalRow = rows.first();
     const primarySequence = await criticalRow
-      .locator(":scope > :not(details) :is(a, dt, dd)")
+      .locator(":scope > :not(details) :is(a, p)")
       .evaluateAll((elements) =>
         elements.map((element) => ({
           role: element instanceof HTMLAnchorElement ? "link" : element.tagName.toLowerCase(),
@@ -386,22 +386,18 @@ test.describe("admin clubs registry", () => {
       );
     expect(primarySequence).toEqual([
       { role: "link", text: "Broken Club" },
-      { role: "dt", text: "필요한 조치" },
-      { role: "dd", text: "실패 신호 확인" },
-      { role: "dt", text: "최근 신호" },
-      { role: "dd", text: "알림 실패 2건 · 도메인 조치 필요" },
+      { role: "p", text: "실패 신호 확인" },
     ]);
     await expect(criticalRow.getByRole("link", { name: "Broken Club" })).toBeVisible();
-    await expect(criticalRow.getByText("필요한 조치")).toBeVisible();
     await expect(criticalRow.getByText("실패 신호 확인")).toBeVisible();
-    await expect(criticalRow.getByText("최근 신호")).toBeVisible();
-    await expect(criticalRow.getByText("알림 실패 2건")).toBeVisible();
+    await expect(criticalRow.getByText("필요한 조치")).toHaveCount(0);
+    await expect(criticalRow.getByText("최근 신호")).toHaveCount(0);
 
     const quietRow = rows.filter({
       has: page.getByRole("link", { name: "Healthy Club" }),
     });
     await expect(quietRow).toHaveCount(1);
-    await expect(quietRow.getByText("운영 상태")).toBeVisible();
+    await expect(quietRow.getByText("활성 · 비공개")).toBeVisible();
     await expect(quietRow.getByText("필요한 조치")).toHaveCount(0);
     await expect(quietRow.getByText("최근 신호")).toHaveCount(0);
 
@@ -415,7 +411,9 @@ test.describe("admin clubs registry", () => {
     for (const rawValue of ["crit-club", "broken", "ACTIVE", "PRIVATE", "1", "2"]) {
       await expect(primaryContent.getByText(rawValue, { exact: true })).toHaveCount(0);
     }
-    const technicalDisclosure = criticalRow.getByLabel("기술 정보");
+    const technicalDisclosure = page
+      .getByRole("region", { name: "선택한 클럽" })
+      .getByLabel("기술 정보");
     await expect(technicalDisclosure.locator("summary")).toBeVisible();
     await technicalDisclosure.locator("summary").click();
     await expect(technicalDisclosure).toContainText("클럽 ID");

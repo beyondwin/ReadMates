@@ -8,9 +8,6 @@ import {
   useSearchParams,
 } from "react-router";
 import {
-  buildClubManagementRow,
-} from "@/features/platform-admin/model/platform-admin-club-triage-model";
-import {
   platformAdminClubListFiltersFromSearch,
   platformAdminClubListHref,
 } from "@/features/platform-admin/model/platform-admin-club-list-filters";
@@ -25,6 +22,11 @@ import {
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { AdminClubsLedger } from "@/features/platform-admin/ui/admin-clubs-ledger";
 import type { AdminPageState } from "@/features/platform-admin/ui/admin-state-panel";
+import {
+  adminClubsTabCountsFromView,
+  buildAdminClubsLedgerView,
+  presentAdminClubForLedger,
+} from "./admin-clubs-data";
 import { AdminOnboardingController } from "./admin-onboarding-controller";
 import type { AdminShellOutletContext } from "./admin-shell-layout";
 import { useAdminShellStatus } from "./admin-shell-status-context";
@@ -114,16 +116,21 @@ export function AdminClubsRoute() {
   }, [clubsQuery.data]);
   const ledgerClubs = useMemo(
     () =>
-      clubs.map((club) => ({
-        ...buildClubManagementRow(club),
-        clubId: club.clubId,
-        href: buildAdminDetailHref(`/admin/clubs/${club.clubId}`, {
-          returnTo,
-          focusId: club.clubId,
-          scrollTop,
-        }),
-      })),
+      clubs.map((club) =>
+        presentAdminClubForLedger(
+          club,
+          buildAdminDetailHref(`/admin/clubs/${club.clubId}`, {
+            returnTo,
+            focusId: club.clubId,
+            scrollTop,
+          }),
+        ),
+      ),
     [clubs, returnTo, scrollTop],
+  );
+  const ledgerView = useMemo(
+    () => buildAdminClubsLedgerView(ledgerClubs, restore.focusId),
+    [ledgerClubs, restore.focusId],
   );
 
   const updateFilter = useCallback(
@@ -160,7 +167,7 @@ export function AdminClubsRoute() {
     isPending: clubsQuery.isPending,
     isEmpty: clubs.length === 0,
   });
-  const needsReview = ledgerClubs.filter((club) => club.emphasis === "actionable").length;
+  const needsReview = ledgerView.tabs[1]?.count ?? 0;
   useAdminShellStatus(
     pageState === "loading" || pageState === "unavailable"
       ? null
@@ -193,6 +200,7 @@ export function AdminClubsRoute() {
         onLoadMore={() => void clubsQuery.fetchNextPage()}
         onScrollChange={setScrollTop}
         onActivateClub={openClub}
+        tabCounts={adminClubsTabCountsFromView(ledgerView)}
       />
       <AdminOnboardingController
         capabilities={capabilities}

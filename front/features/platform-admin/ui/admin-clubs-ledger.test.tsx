@@ -33,6 +33,46 @@ const club: AdminClubsLedgerClub = {
   ],
 };
 
+const sentencesClub: AdminClubsLedgerClub = {
+  clubId: "club-sentences",
+  name: "문장과 사람들",
+  href: "/admin/clubs/club-sentences",
+  currentState: "운영 중",
+  requiredAction: "설정 확인 필요",
+  recentSignal: "공개 범위 설정을 다시 확인해 주세요.",
+  emphasis: "actionable",
+  technicalDisclosure: [
+    { label: "클럽 ID", value: "club-sentences" },
+    { label: "Slug", value: "sentences" },
+    { label: "수명주기 값", value: "ACTIVE" },
+    { label: "공개 상태 값", value: "PRIVATE" },
+  ],
+  operationsFacts: {
+    hostsLabel: "호스트 2명",
+    membersLabel: "멤버 18명",
+    recordsLabel: "공개 기록 6건",
+    domainLabel: "도메인 정상",
+    reviewLabel: "공개 범위 설정을 다시 확인해 주세요.",
+    ageLabel: "10분 전",
+  },
+};
+
+const saturdayClub: AdminClubsLedgerClub = {
+  clubId: "club-saturday",
+  name: "토요일의 책",
+  href: "/admin/clubs/club-saturday",
+  currentState: "운영 중",
+  requiredAction: "설정 확인 필요",
+  recentSignal: "호스트 초대 대기",
+  emphasis: "actionable",
+  technicalDisclosure: [
+    { label: "클럽 ID", value: "club-saturday" },
+    { label: "Slug", value: "saturday-book" },
+    { label: "수명주기 값", value: "ACTIVE" },
+    { label: "공개 상태 값", value: "PUBLIC" },
+  ],
+};
+
 function renderLedger(
   overrides: Partial<Parameters<typeof AdminClubsLedger>[0]> = {},
 ) {
@@ -61,6 +101,22 @@ function renderLedger(
 }
 
 describe("AdminClubsLedger", () => {
+  it("renders three counted tabs, a warn-marked selected row, icon facts, and a review section", () => {
+    renderLedger({
+      clubs: [sentencesClub, saturdayClub],
+      filters: {},
+      searchDraft: "",
+      tabCounts: { all: 24, attention: 2, operating: 22 },
+      canCreateClub: true,
+    });
+    expect(screen.getAllByRole("tab")).toHaveLength(3);
+    expect(screen.getByRole("tab", { name: /확인 필요 2/ })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("문장과 사람들");
+    expect(screen.getByRole("list", { name: "운영 상태" }).querySelectorAll("[data-icon]")).toHaveLength(4);
+    expect(screen.getByRole("heading", { name: "확인할 내용" })).toBeTruthy();
+    expect(screen.queryByText("기술 정보", { selector: ".admin-clubs-ledger__row *" })).toBeNull();
+  });
+
   it("composes page context, work-view filters, and an evidence ledger", () => {
     const { container } = renderLedger();
 
@@ -87,10 +143,13 @@ describe("AdminClubsLedger", () => {
     expect(row).toHaveAttribute("data-emphasis", "quiet");
     expect(within(row).queryByText("필요한 조치")).toBeNull();
     expect(within(row).queryByText("마지막 확인")).toBeNull();
-    expect(within(row).getByRole("group", { name: "기술 정보" })).toBeInTheDocument();
-    expect(within(row).getByText("alpha")).toBeInTheDocument();
-    expect(within(row).getByText("ACTIVE")).toBeInTheDocument();
-    expect(within(row).getByText("PRIVATE")).toBeInTheDocument();
+    expect(within(row).queryByRole("group", { name: "기술 정보" })).toBeNull();
+    const detail = screen.getByRole("region", { name: "선택한 클럽" });
+    expect(within(detail).getByRole("group", { name: "기술 정보" })).toBeInTheDocument();
+    expect(within(detail).getByText("기술 정보 펼치기")).toBeInTheDocument();
+    expect(within(detail).getByText("alpha")).toBeInTheDocument();
+    expect(within(detail).getByText("ACTIVE")).toBeInTheDocument();
+    expect(within(detail).getByText("PRIVATE")).toBeInTheDocument();
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });
 
@@ -285,9 +344,9 @@ describe("AdminClubsLedger", () => {
     );
   });
 
-  it("fills the approved page-heading band with the clubs h1", () => {
+  it("fills the list heading at the approved 20/700 metric", () => {
     expect(CLUB_MANAGEMENT_CSS).toMatch(
-      /\.admin-clubs-ledger \.admin-page-frame > \.admin-page-frame__header h1[\s\S]*width:\s*100%[\s\S]*height:\s*68px/,
+      /\.admin-clubs-ledger__list h2[\s\S]*font-size:\s*20px[\s\S]*font-weight:\s*700/,
     );
   });
 
@@ -351,10 +410,10 @@ describe("AdminClubsLedger", () => {
     const row = container.querySelector('[data-club-id="c-1"]') as HTMLElement;
 
     expect(row).toHaveAttribute("data-emphasis", "actionable");
-    expect(within(row).getByText("필요한 조치")).toBeInTheDocument();
     expect(within(row).getByText("실패 신호 확인")).toBeInTheDocument();
-    expect(within(row).getByText("최근 신호")).toBeInTheDocument();
-    expect(within(row).getByText("알림 실패 2건")).toBeInTheDocument();
+    expect(row.querySelector('[data-icon="alert-circle"]')).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "확인할 내용" })).toBeInTheDocument();
+    expect(screen.getByText("알림 실패 2건")).toBeInTheDocument();
   });
 
   it("does not import route, query, or API modules", () => {

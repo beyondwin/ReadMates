@@ -6,9 +6,9 @@ import {
 import type { ClubManagementRow } from "@/features/platform-admin/model/platform-admin-club-triage-model";
 import type { AdminPageState } from "./admin-state-panel";
 import { AdminEvidenceLedger } from "./admin-evidence-ledger";
-import { AdminPageContext } from "./admin-page-context";
 import { AdminTechnicalDisclosure } from "./admin-technical-disclosure";
 import { AdminWorkViewBar } from "./admin-work-view-bar";
+import { ReadmatesIcon } from "@/shared/ui/icon";
 
 const FOCUS_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const MAX_SCROLL_TOP = 1_000_000;
@@ -28,10 +28,21 @@ export type AdminClubsTabCounts = {
   operating: number;
 };
 
+export type AdminClubLedgerFact = {
+  icon: "people" | "person" | "document" | "link";
+  label: string;
+  value: string;
+};
+
 export type AdminClubsLedgerClub = ClubManagementRow & {
   clubId: string;
   href: string;
   operationsFacts?: AdminClubOperationsFacts;
+  facts?: readonly AdminClubLedgerFact[];
+  review?: readonly { text: string }[];
+  statusLabel?: string;
+  needsReview?: boolean;
+  updatedAgo?: string;
 };
 
 export type AdminClubsLedgerFilters = {
@@ -66,6 +77,12 @@ type Props = {
   onActivateClub?: (clubId: string) => void;
   tabCounts?: AdminClubsTabCounts;
 };
+
+const TABS = [
+  ["all", "전체"],
+  ["attention", "확인 필요"],
+  ["operating", "운영 중"],
+] as const;
 
 export function AdminClubsLedger({
   clubs,
@@ -148,8 +165,8 @@ export function AdminClubsLedger({
     safeScrollTop,
   ]);
 
-  const attentionClubs = clubs.filter((club) => club.emphasis === "actionable");
-  const operatingClubs = clubs.filter((club) => club.emphasis !== "actionable");
+  const attentionClubs = clubs.filter((club) => needsReview(club));
+  const operatingClubs = clubs.filter((club) => !needsReview(club));
   const counts = tabCounts ?? {
     all: clubs.length,
     attention: attentionClubs.length,
@@ -217,102 +234,108 @@ export function AdminClubsLedger({
   );
 
   return (
-    <div className="admin-clubs admin-clubs-ledger">
-      <AdminPageContext
-        heading="클럽 찾기"
-        description={`운영 중인 클럽 ${counts.all}곳 중 확인할 곳이 ${counts.attention}곳 있습니다.`}
-        action={
-          canCreateClub ? (
-            <Link to={onboardingHref} className="btn btn-primary btn-sm">
-              새 클럽
+    <section className="admin-clubs admin-clubs-ledger">
+      <div className="admin-clubs-ledger__list">
+        <div className="admin-clubs-ledger__list-header">
+          <h2>클럽 찾기</h2>
+          {canCreateClub ? (
+            <Link
+              to={onboardingHref}
+              className="admin-clubs-ledger__create"
+              aria-label="새 클럽"
+            >
+              +
             </Link>
-          ) : null
-        }
-      >
-        <div className="admin-club-management">
-          <div className="admin-club-management__split">
-            <section className="admin-club-management__finder" aria-label="클럽 찾기">
-              <p className="admin-club-management__title" aria-hidden="true">클럽 찾기</p>
-              <details
-                className="admin-club-management__filters"
-                open={filtersOpen}
-                onToggle={(event) => setFiltersOpen(event.currentTarget.open)}
-              >
-                <summary>필터와 검색</summary>
-                <AdminWorkViewBar search={undefined} filters={filterFields} />
-              </details>
-              {pageState !== "ready" ? (
-                <AdminEvidenceLedger
-                  label={ADMIN_COPY.heading.clubsLedger}
-                  count={undefined}
-                  state={pageState}
-                  title={
-                    pageState === "empty"
-                      ? "조건에 맞는 클럽이 없습니다."
-                      : pageState === "unavailable"
-                        ? "클럽 목록을 불러오지 못했습니다."
-                        : "클럽을 불러오는 중입니다."
-                  }
-                  description=""
-                  action={
-                    pageState === "unavailable" ? (
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={onRetry}
-                      >
-                        다시 시도
-                      </button>
-                    ) : undefined
-                  }
-                />
-              ) : (
-                <>
-                <div className="admin-club-management__tabs" role="tablist" aria-label="클럽 찾기 구분">
-                  {(
-                    [
-                      ["all", "전체", counts.all],
-                      ["attention", "확인 필요", counts.attention],
-                      ["operating", "운영 중", counts.operating],
-                    ] as const
-                  ).map(([id, label, count]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      role="tab"
-                      aria-selected={tab === id}
-                      className="admin-club-management__tab"
-                      onClick={() => setTab(id)}
-                    >
-                      {label}
-                      <span>{count}</span>
-                    </button>
-                  ))}
-                </div>
-                <div
-                  ref={scrollerRef}
-                  className="admin-clubs-ledger__scroller"
-                  onScroll={(event) => {
-                    const next = event.currentTarget.scrollTop;
-                    onScrollChange(
-                      Number.isSafeInteger(next) &&
-                        next >= 0 &&
-                        next <= MAX_SCROLL_TOP
-                        ? next
-                        : 0,
-                    );
-                  }}
+          ) : null}
+        </div>
+        <details
+          className="admin-club-management__filters"
+          open={filtersOpen}
+          onToggle={(event) => setFiltersOpen(event.currentTarget.open)}
+        >
+          <summary>필터와 검색</summary>
+          <AdminWorkViewBar search={undefined} filters={filterFields} />
+        </details>
+        {pageState !== "ready" ? (
+          <AdminEvidenceLedger
+            label={ADMIN_COPY.heading.clubsLedger}
+            count={undefined}
+            state={pageState}
+            title={
+              pageState === "empty"
+                ? "조건에 맞는 클럽이 없습니다."
+                : pageState === "unavailable"
+                  ? "클럽 목록을 불러오지 못했습니다."
+                  : "클럽을 불러오는 중입니다."
+            }
+            description=""
+            action={
+              pageState === "unavailable" ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={onRetry}
                 >
-                  <section className="admin-club-management__list-wrap" aria-label="클럽 관리 목록">
-                  <ul className="admin-club-management__list">
-                    {visibleClubs.map((club) => (
+                  다시 시도
+                </button>
+              ) : undefined
+            }
+          />
+        ) : (
+          <>
+            <div
+              className="admin-club-management__tabs"
+              role="tablist"
+              aria-label="클럽 찾기 구분"
+            >
+              {TABS.map(([id, label]) => {
+                const count = counts[id];
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === id}
+                    className="admin-club-management__tab"
+                    onClick={() => setTab(id)}
+                  >
+                    <span>{label}</span>
+                    <span className="admin-clubs-ledger__count">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div
+              ref={scrollerRef}
+              className="admin-clubs-ledger__scroller"
+              onScroll={(event) => {
+                const next = event.currentTarget.scrollTop;
+                onScrollChange(
+                  Number.isSafeInteger(next) &&
+                    next >= 0 &&
+                    next <= MAX_SCROLL_TOP
+                    ? next
+                    : 0,
+                );
+              }}
+            >
+              <section
+                className="admin-club-management__list-wrap"
+                aria-label="클럽 관리 목록"
+              >
+                <ul className="admin-club-management__list">
+                  {visibleClubs.map((club) => {
+                    const isSelected = club.clubId === selected?.clubId;
+                    const reviewNeeded = needsReview(club);
+                    return (
                       <li
                         key={club.clubId}
                         id={`admin-club-row-${club.clubId}`}
-                        className="admin-club-management__row"
+                        className="admin-clubs-ledger__row admin-club-management__row"
                         data-club-id={club.clubId}
                         data-emphasis={club.emphasis}
-                        data-selected={club.clubId === selected?.clubId ? "true" : "false"}
+                        data-selected={isSelected ? "true" : "false"}
+                        aria-selected={isSelected}
                         tabIndex={0}
                         onClick={() => {
                           setSelectedId(club.clubId);
@@ -326,6 +349,11 @@ export function AdminClubsLedger({
                           onActivateClub?.(club.clubId);
                         }}
                       >
+                        {reviewNeeded ? (
+                          <ReadmatesIcon name="alert-circle" size={16} />
+                        ) : (
+                          <span className="admin-clubs-ledger__row-icon" aria-hidden="true" />
+                        )}
                         <div className="admin-club-management__identity">
                           <Link
                             to={club.href}
@@ -347,99 +375,101 @@ export function AdminClubsLedger({
                           >
                             {club.name}
                           </Link>
-                          <span className="admin-club-management__age">
-                            {club.operationsFacts?.ageLabel ?? ""}
-                          </span>
+                          <p
+                            className={
+                              reviewNeeded
+                                ? "admin-clubs-ledger__row-status admin-clubs-ledger__row-status--warn"
+                                : "admin-clubs-ledger__row-status"
+                            }
+                          >
+                            {club.statusLabel ?? club.requiredAction ?? club.currentState}
+                          </p>
                         </div>
-                        <dl className="admin-club-management__facts">
-                          {club.operationsFacts?.ageLabel ? (
-                            <div>
-                              <dt>현재 상태</dt>
-                              <dd>{club.operationsFacts.ageLabel}</dd>
-                            </div>
-                          ) : null}
-                          {club.requiredAction ? (
-                            <div className="admin-club-management__action">
-                              <dt>필요한 조치</dt>
-                              <dd>{club.requiredAction}</dd>
-                            </div>
-                          ) : (
-                            <div>
-                              <dt>운영 상태</dt>
-                              <dd>{club.currentState}</dd>
-                            </div>
-                          )}
-                          {club.recentSignal ? (
-                            <div className="admin-club-management__signal">
-                              <dt>최근 신호</dt>
-                              <dd>{club.recentSignal}</dd>
-                            </div>
-                          ) : null}
-                        </dl>
-                        <AdminTechnicalDisclosure items={club.technicalDisclosure} />
+                        <span className="admin-club-management__age">
+                          {club.updatedAgo ?? club.operationsFacts?.ageLabel ?? ""}
+                        </span>
+                        <ReadmatesIcon name="chevron-right" size={16} />
                       </li>
-                    ))}
-                  </ul>
-                  </section>
-                </div>
-                {hasNextPage ? (
-                  <div className="admin-clubs__load-more">
-                    {loadMoreError ? (
-                      <p className="danger" role="alert">
-                        다음 클럽을 불러오지 못했습니다. 현재 목록은 그대로 유지됩니다.
-                      </p>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      disabled={loadingMore}
-                      onClick={onLoadMore}
-                    >
-                      {loadingMore
-                        ? "불러오는 중"
-                        : loadMoreError
-                          ? "다시 불러오기"
-                          : "더 보기"}
-                    </button>
-                  </div>
+                    );
+                  })}
+                </ul>
+              </section>
+            </div>
+            {hasNextPage ? (
+              <div className="admin-clubs__load-more">
+                {loadMoreError ? (
+                  <p className="danger" role="alert">
+                    다음 클럽을 불러오지 못했습니다. 현재 목록은 그대로 유지됩니다.
+                  </p>
                 ) : null}
-                </>
-              )}
-            </section>
-            <ClubDocket club={pageState === "ready" ? selected : null} />
-          </div>
-        </div>
-      </AdminPageContext>
-    </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={loadingMore}
+                  onClick={onLoadMore}
+                >
+                  {loadingMore
+                    ? "불러오는 중"
+                    : loadMoreError
+                      ? "다시 불러오기"
+                      : "더 보기"}
+                </button>
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
+      <ClubDocket club={pageState === "ready" ? selected : null} />
+    </section>
   );
 }
 
 function ClubDocket({ club }: { club: AdminClubsLedgerClub | null }) {
   if (!club) {
     return (
-      <aside className="admin-club-management__docket" aria-label="선택한 클럽" role="region">
+      <section
+        className="admin-clubs-ledger__detail admin-club-management__docket"
+        aria-label="선택한 클럽"
+      >
         <p>클럽을 선택하세요.</p>
-      </aside>
+      </section>
     );
   }
-  const facts = club.operationsFacts;
+  const facts = factItems(club);
+  const review = reviewCopy(club);
   return (
-    <aside className="admin-club-management__docket" aria-label="선택한 클럽" role="region">
+    <section
+      className="admin-clubs-ledger__detail admin-club-management__docket"
+      aria-label="선택한 클럽"
+    >
       <p className="admin-club-management__docket-kicker">선택한 클럽</p>
-      <h2>{club.name}</h2>
+      <h1>{club.name}</h1>
       <section>
-        <h3>운영 상태</h3>
-        <ul className="admin-club-management__ops">
-          <li>{facts?.hostsLabel ?? "호스트"}</li>
-          <li>{facts?.membersLabel ?? "멤버"}</li>
-          <li>{facts?.recordsLabel ?? "공개 기록"}</li>
-          <li>{facts?.domainLabel ?? club.currentState}</li>
+        <h3 id="admin-clubs-ops-heading">운영 상태</h3>
+        <ul
+          className="admin-clubs-ledger__facts"
+          aria-labelledby="admin-clubs-ops-heading"
+        >
+          {facts.map((fact) => (
+            <li key={fact.icon}>
+              <ReadmatesIcon name={fact.icon} size={16} />
+              <span>{fact.label}</span>
+              <strong>{fact.value}</strong>
+            </li>
+          ))}
         </ul>
       </section>
-      {club.requiredAction || club.recentSignal ? (
-        <section>
+      {review.length > 0 ? (
+        <section className="admin-clubs-ledger__review">
           <h3>확인할 내용</h3>
-          <p>{facts?.reviewLabel ?? club.recentSignal ?? club.requiredAction}</p>
+          <ul>
+            {review.map((item) => (
+              <li key={item.text}>
+                <ReadmatesIcon name="alert-circle" size={16} />
+                {item.text}
+              </li>
+            ))}
+          </ul>
         </section>
       ) : null}
       <section>
@@ -451,9 +481,56 @@ function ClubDocket({ club }: { club: AdminClubsLedgerClub | null }) {
           <Link to={club.href} className="btn btn-quiet">예시 데이터</Link>
         </div>
       </section>
-      <AdminTechnicalDisclosure items={club.technicalDisclosure} />
-    </aside>
+      <AdminTechnicalDisclosure
+        summary="기술 정보 펼치기"
+        items={club.technicalDisclosure}
+      />
+    </section>
   );
+}
+
+function needsReview(club: AdminClubsLedgerClub) {
+  return club.needsReview ?? club.emphasis === "actionable";
+}
+
+function factItems(club: AdminClubsLedgerClub): AdminClubLedgerFact[] {
+  if (club.facts && club.facts.length > 0) return [...club.facts];
+  const ops = club.operationsFacts;
+  return [
+    {
+      icon: "people",
+      label: "호스트",
+      value: factValue(ops?.hostsLabel, "호스트", "호스트"),
+    },
+    {
+      icon: "person",
+      label: "멤버",
+      value: factValue(ops?.membersLabel, "멤버", "멤버"),
+    },
+    {
+      icon: "document",
+      label: "공개 기록",
+      value: factValue(ops?.recordsLabel, "공개 기록", "공개 기록"),
+    },
+    {
+      icon: "link",
+      label: "도메인",
+      value: factValue(ops?.domainLabel, "도메인", club.currentState),
+    },
+  ];
+}
+
+function factValue(raw: string | undefined, prefix: string, fallback: string) {
+  if (!raw) return fallback;
+  return raw.startsWith(prefix) ? raw.slice(prefix.length).trim() || fallback : raw;
+}
+
+function reviewCopy(club: AdminClubsLedgerClub): readonly { text: string }[] {
+  if (club.review && club.review.length > 0) return club.review;
+  const text = club.operationsFacts?.reviewLabel
+    ?? club.recentSignal
+    ?? club.requiredAction;
+  return text ? [{ text }] : [];
 }
 
 function isModifiedNavigationClick(event: MouseEvent) {
