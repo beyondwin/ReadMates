@@ -125,9 +125,9 @@ export function HostInvitationLinks({
     return { item, status, expiry: expiryLabel(item, now, status) };
   });
   const counts = {
-    활성: presented.filter((row) => row.status === "활성").length,
-    "만료 예정": presented.filter((row) => row.status === "만료 예정").length,
-    중지: presented.filter((row) => row.status === "중지").length,
+    활성: presented.filter((row) => matchesTab(row.status, "활성")).length,
+    "만료 예정": presented.filter((row) => matchesTab(row.status, "만료 예정")).length,
+    중지: presented.filter((row) => matchesTab(row.status, "중지")).length,
   } as const;
   const visibleRows = presented.filter((row) => matchesTab(row.status, statusFilter));
 

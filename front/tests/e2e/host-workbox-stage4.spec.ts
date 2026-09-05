@@ -762,7 +762,7 @@ where id = ${sqlString(created.link.linkId)} and club_id = ${sqlString(CLUB_ID)}
   await expect(page.getByRole("button", { name: "한 번만 복사" })).toHaveCount(0);
   await expect(page.getByRole("status")).toContainText("다시 표시하지 않습니다");
 
-  await page.locator(".rm-host-editorial-ledger__row").filter({ hasText: "클럽 이름" }).getByRole("button", { name: "수정" }).click();
+  await page.getByRole("button", { name: "수정" }).click();
   await page.getByLabel("클럽 이름").fill("작업함 합성 클럽 개정");
   const settingsResponsePromise = page.waitForResponse((response) => (
     response.request().method() === "PUT"

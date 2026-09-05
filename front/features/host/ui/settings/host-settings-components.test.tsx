@@ -18,6 +18,8 @@ const now = new Date("2026-09-02T11:04:00+09:00");
 const link: HostInvitationLink = { linkId: "link-1", name: "가을 신규 멤버", status: "ACTIVE", maxUses: 4, usedCount: 1, expiresAt: "2026-09-30T00:00:00Z", revision: 2, createdAt: "2026-08-30T00:00:00Z", updatedAt: "2026-08-30T00:00:00Z" };
 const expiringLink: HostInvitationLink = { ...link, linkId: "link-expiring", name: "여름 모임", expiresAt: "2026-09-04T23:59:59Z" };
 const pausedLink: HostInvitationLink = { ...link, linkId: "link-paused", name: "테스트 링크", status: "PAUSED" };
+const expiredLink: HostInvitationLink = { ...link, linkId: "link-expired", name: "지난 공개 초대", status: "EXPIRED" };
+const exhaustedLink: HostInvitationLink = { ...link, linkId: "link-exhausted", name: "소진된 링크", status: "EXHAUSTED" };
 const settings: Settings = { clubId: "club-1", clubSlug: "reading-sai", name: "읽는사이", approvalPolicy: "INVITE_ONLY", defaultTimezone: "Asia/Seoul", scheduleReminderEnabled: true, recordPublicationDefault: "MEMBER", revision: 3, status: "ACTIVE" };
 const preview: HostClubClosePreview = { previewId: "preview-1", clubId: "club-1", actorMembershipId: "member-1", clubRevision: 3, effectHash: "a".repeat(64), effects: { clubStatus: "ARCHIVED", memberAccess: "ENDED", publicRecords: "UNCHANGED" }, expiresAt: "2026-08-30T01:00:00Z" };
 
@@ -105,6 +107,16 @@ describe("host settings presentation controls", () => {
     expect(screen.getByRole("tab", { name: "활성 1" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "만료 예정 1" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "중지 1" })).toBeInTheDocument();
+  });
+
+  it("counts the 중지 tab with the same predicate as the archived filter", async () => {
+    render(<HostInvitationLinks {...invitationProps({ links: [link, pausedLink, expiredLink, exhaustedLink] })} />);
+    expect(screen.getByRole("tab", { name: "중지 3" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "중지 3" }));
+    expect(screen.getByText("테스트 링크")).toBeInTheDocument();
+    expect(screen.getByText("지난 공개 초대")).toBeInTheDocument();
+    expect(screen.getByText("소진된 링크")).toBeInTheDocument();
+    expect(screen.queryByText("가을 신규 멤버")).not.toBeInTheDocument();
   });
 
   it("filters invitation rows to the selected tab instead of showing every link", async () => {
