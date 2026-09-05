@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -90,6 +92,34 @@ describe("HostNextAction", () => {
     expect(screen.getByRole("button", { name: "내일 09:00까지 보류" }).querySelector('[data-icon="clock"]')).toBeTruthy();
     expect(screen.getByText("일정이 어제 19:30에 변경되었어요").closest(".rm-operating-room-next-action__note")?.querySelector("[data-icon]")).toBeTruthy();
     expect(screen.getByText("지금 처리")).toHaveClass("rm-sr-only");
+  });
+
+  it("renders a closing note from the next-action view", () => {
+    render(
+      <HostNextAction
+        action={{
+          ...actionable,
+          kind: "closing",
+          label: "기록 초안을 검토하면 멤버에게 게시할 수 있어요",
+          ctaLabel: "기록 초안 검토",
+          deferLabel: "내일 18:00까지 보류",
+          note: "게시 전에 피드백 문서를 확인해 주세요.",
+        }}
+      />,
+    );
+    const note = screen.getByText("게시 전에 피드백 문서를 확인해 주세요.");
+    expect(note.closest(".rm-operating-room-next-action__note")).toBeTruthy();
+    expect(note.closest(".rm-operating-room-next-action__note")?.querySelector("[data-icon]")).toBeTruthy();
+  });
+
+  it("sits the mobile primary underline on the label", () => {
+    const css = readFileSync(path.resolve("features/host/ui/operating-room/operating-room.css"), "utf8");
+    const textLinkRules = [...css.matchAll(/[^{}]*next-action__primary[^{]*\{[^}]*border-bottom:\s*2px solid var\(--accent\)[^}]*\}/g)]
+      .map((match) => match[0]);
+    expect(textLinkRules.length).toBeGreaterThan(0);
+    for (const rule of textLinkRules) {
+      expect(rule).toContain("align-items: flex-end");
+    }
   });
 
   it("uses ctaLabel for the primary control and keeps label as the status sentence", () => {

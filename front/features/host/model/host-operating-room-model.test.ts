@@ -357,6 +357,26 @@ describe("buildHostOperatingRoomView", () => {
     });
   });
 
+  it("carries a closing checklist note on an actionable next-action", () => {
+    const status = closing("BLOCKED", "IMPORT_RECORDS");
+    status.checklist = [{
+      id: "FEEDBACK_DOCUMENT_READY",
+      state: "ACTION_REQUIRED",
+      label: "피드백 문서",
+      detail: "게시 전에 피드백 문서를 확인해 주세요.",
+      href: "/app/host/sessions/session-12?section=records",
+    }];
+    const view = buildHostOperatingRoomView(input({
+      currentMeeting: session({ state: "CLOSED", date: "2026-08-29" }),
+      closing: ready(status),
+    }));
+    expect(view.nextAction).toMatchObject({
+      kind: "closing",
+      state: "actionable",
+      note: "게시 전에 피드백 문서를 확인해 주세요.",
+    });
+  });
+
   it("keeps unpublished schedule-seen copy on DRAFT only", () => {
     const draft = buildHostOperatingRoomView(input({
       currentMeeting: session({

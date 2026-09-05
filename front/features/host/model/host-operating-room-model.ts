@@ -460,6 +460,7 @@ function resolveNextAction(context: {
       label: "기록 초안을 검토하면 멤버에게 게시할 수 있어요",
       ctaLabel: "기록 초안 검토",
       reason: context.closing.primaryAction.reason,
+      note: closingNextActionNote(context.closing),
       href: importRecords
         ? `${context.input.basePath}/records`
         : context.closing.primaryAction.href,
@@ -507,6 +508,13 @@ function resolveNextAction(context: {
     }
   }
   return noNextAction();
+}
+
+function closingNextActionNote(closing: SessionClosingBoardView): string | undefined {
+  const feedback = closing.checklist.find((item) => item.id === "FEEDBACK_DOCUMENT_READY");
+  if (feedback?.state !== "ACTION_REQUIRED") return undefined;
+  const detail = feedback.detail.trim();
+  return detail || undefined;
 }
 
 function actionState(
