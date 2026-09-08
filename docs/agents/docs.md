@@ -49,6 +49,8 @@ git diff --check -- <changed-docs>
 
 For agent guidance, ADR, or spec/plan changes, run `python3 -B scripts/check-agent-guidance.py` before committing. Use the exact ADR declaration format in `docs/development/adr/README.md`; fix findings before handoff.
 
+For workflow changes, review the executable diff and follow `scripts/README.md` to update the affected workflow digest, then run `python3 -B scripts/check-host-client-rollout-contract.py`.
+
 For agent-routing or public-safety documentation, also run a targeted scan over the changed docs for private-looking values:
 
 ```bash
