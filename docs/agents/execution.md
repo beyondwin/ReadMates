@@ -36,12 +36,14 @@ Read this for rules that apply across frontend, BFF, server, scripts, deploy, an
 ## Authority Boundary
 
 - Read-only inspection and requested repository edits are in scope.
+- User instructions override skill guidelines, subject to higher-priority instructions. If guidance blocks work, cite the exact file and rule and explain why it applies.
 - Commit, push, PR, tag, deploy, secret rotation, and production data mutation require explicit request scope and the repository release contract.
 - Never present repository configuration as proof that production is currently running that configuration.
 
 ## Verification And Handoff
 
 - Run the smallest focused check first, then the canonical surface gate selected by `AGENTS.md` and `docs/development/acceptance-matrix.md`.
+- Repeat or broaden passing checks only for a new edit, failure, or unresolved risk.
 - Report exact commands, automated evidence, manual evidence, skipped validation with reasons, and residual risk.
 - State whether evidence is repository-only, local-runtime, or live production evidence.
 - Confirm that ADR status and indexes match the delivered state; do not leave an implemented decision `Proposed` or an unimplemented decision `Accepted`.

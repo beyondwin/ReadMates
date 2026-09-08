@@ -4,6 +4,8 @@ ReadMates is an invite-only reading-club app: React/Vite frontend, Cloudflare Pa
 
 Successful work keeps the touched feature inside the existing architecture, protects public-repo safety, and verifies the smallest surface that could have regressed.
 
+Complete authorized work using repository evidence and session context for routine decisions. Do not request approval again for the same scope.
+
 Before editing, check `git status --short --branch`, identify the touched surface, and choose the primary guide for the task. If a task crosses surfaces, read each matching guide before changing that surface:
 
 - Frontend route, state, API client, or tests: `docs/agents/front.md`
@@ -31,7 +33,7 @@ Before spec, implementation-plan, or direct implementation work, read the accept
 
 Public repo safety matters: do not add real member data, secrets, deployment state, local absolute paths, private domains, OCIDs, or token-shaped examples. You may inspect local env or generated files when needed, but do not quote or persist their private values in docs, tests, commits, or final responses.
 
-Ask before editing when the request needs private data, conflicts with the architecture source of truth, requires destructive git or deployment operations, or is too underspecified to choose a safe surface. If a relevant check cannot run, do not claim it passed; report the skipped command and reason.
+Ask before the affected action when private-data access, destructive git, or deployment authority is missing, the request conflicts with the architecture source of truth, or missing information prevents choosing a safe surface. Complete independent authorized preparation first. If a relevant check cannot run, do not claim it passed; report the skipped command and reason.
 
 Residual risk and release readiness reviews: when asked to check remaining risk, release readiness, or whether a branch is safe after merge, do not limit the review to the latest implementation plan unless the user explicitly says so. Review the current branch against its base, usually `origin/main..HEAD`, and use `docs/development/release-readiness-review.md` to check CHANGELOG/Unreleased, CI/deploy scripts, operator-facing behavior changes, security-code hygiene, architecture-test baselines/exceptions, and public-release safety. Passing tests is evidence, not proof that no operational or release risk remains.
 
@@ -48,4 +50,4 @@ Run the smallest relevant checks before finishing:
 
 The pinned package manager is the root `package.json` `packageManager` value (`pnpm@11.13.1` in the current tree). If local `pnpm` behavior differs, a lockfile/install/build check is involved, or CI parity matters, activate the repo-defined package manager through Corepack and run the frontend command through the resolved Corepack launcher, such as `corepack pnpm --dir front ...` or `npx --yes corepack@0.35.0 pnpm --dir front ...` when `corepack` is not on PATH. Report the exact command. Use `npx --yes pnpm@11.13.1 ...` only as an explicit fallback when Corepack itself is unavailable and call that out.
 
-Final responses should name the changed surface, list the checks actually run, and call out any remaining risk or skipped validation.
+Keep final responses concise: name the changed surface, list the checks actually run, and call out any remaining risk or skipped validation.
