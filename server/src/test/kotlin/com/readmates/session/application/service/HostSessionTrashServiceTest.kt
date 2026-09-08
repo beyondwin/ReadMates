@@ -51,6 +51,7 @@ import com.readmates.shared.security.CurrentMember
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.parallel.Isolated
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import java.time.Duration
@@ -58,6 +59,7 @@ import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.UUID
 
+@Isolated("Captures JVM-global Logback events during parallel unit tests")
 class HostSessionTrashServiceTest {
     @Test
     fun `delete moves a session to trash for seven server days without removing children`() {

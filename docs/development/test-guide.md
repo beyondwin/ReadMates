@@ -308,6 +308,8 @@ For release-risk review that touches SQL plans, API contracts, or query budgets,
   --tests com.readmates.performance.MySqlQueryPlanTest
 ```
 
+Logback context·appender나 `System.out`처럼 JVM 공유 상태를 변경·수집하는 테스트는 `@Isolated`로 다른 클래스와 격리합니다. 단독 통과만으로 병렬 전체 실행의 안정성을 판단하지 않습니다.
+
 `:unitTest`는 JUnit5 클래스 단위 병렬 + Gradle `maxParallelForks=availableProcessors()/2`(기본)로 실행합니다. CI에서는 `READMATES_TEST_FORKS` env로 fork 수를 명시할 수 있고, sweep harness(`scripts/bench/sweep-forks.sh`)로 머신별 최적값을 측정할 수 있습니다. Backend `Test` JVM heap은 기본 `1536m`이며, 로컬/CI 메모리 상황에 따라 `-PtestMaxHeap=2g` 또는 `READMATES_TEST_MAX_HEAP=2g`로 조정할 수 있습니다.
 
 PR-level quality gate는 단일 `check` task로 통합되어 있습니다.
