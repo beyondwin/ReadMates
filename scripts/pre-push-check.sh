@@ -204,7 +204,8 @@ should_run_public_release_check() {
     never) return 1 ;;
   esac
 
-  changed_paths | sort -u | grep -Eq '^(\.github/|deploy/|docs/|scripts/|AGENTS\.md|README\.md|\.env\.example|\.gitleaks\.toml)'
+  # Consume all paths: grep -q can SIGPIPE sort and look like no match under pipefail.
+  changed_paths | sort -u | grep -E '^(\.github/|deploy/|docs/|scripts/|AGENTS\.md|README\.md|\.env\.example|\.gitleaks\.toml)' >/dev/null
 }
 
 if [[ "$release_mode" == "always" && "$changelog_check" != "never" ]]; then
@@ -222,6 +223,7 @@ if [[ -f "AGENTS.md" || -f "scripts/check-agent-guidance.py" ]]; then
 else
   printf '\n==> Agent guidance contract skipped (public candidate excludes private guidance)\n'
 fi
+run_step "Pre-push release routing" python3 -B scripts/test-pre-push-check.py
 run_step "Deploy workflow contract" python3 -B scripts/check-deploy-workflow-contract.py
 run_step "Activate repo package manager" activate_repo_pnpm
 run_step "Git whitespace check" check_whitespace

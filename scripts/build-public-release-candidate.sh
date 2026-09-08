@@ -500,6 +500,7 @@ copy_manifest() {
   copy_optional_file "scripts/lint-grafana-dashboards.sh"
   copy_optional_file "scripts/observability-local-smoke.sh"
   copy_optional_file "scripts/pre-push-check.sh"
+  copy_required_file "scripts/test-pre-push-check.py"
   copy_optional_file "scripts/public-release-check.sh"
   copy_optional_file "scripts/server-ci-check.sh"
   copy_optional_file "scripts/smoke-production-integrations.sh"

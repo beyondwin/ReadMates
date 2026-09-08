@@ -16,7 +16,7 @@ CI에서 자주 실패하는 게이트를 로컬에서 먼저 묶어 확인할 �
 ./scripts/pre-push-check.sh
 ```
 
-기본 모드는 full source checkout의 agent guidance 계약, deploy workflow 계약, `git diff --check`, frontend lint, coverage 포함 unit test, frontend build, Zod fixture freshness, backend `check`, production AI 설정과 fixture 검증을 실행합니다. `docs/`, `scripts/`, `deploy/`, `.github/`, `README.md`처럼 공개 후보에 영향을 주는 경로가 바뀌면 clean public release candidate를 만들고 scanner도 실행합니다.
+기본 모드는 full source checkout의 agent guidance 계약, 공개 검사 선택 회귀, deploy workflow 계약, `git diff --check`, frontend lint, coverage 포함 unit test, frontend build, Zod fixture freshness, backend `check`, production AI 설정과 fixture 검증을 실행합니다. `docs/`, `scripts/`, `deploy/`, `.github/`, `README.md`처럼 공개 후보에 영향을 주는 경로가 바뀌면 clean public release candidate를 만들고 scanner도 실행합니다.
 
 릴리즈 또는 태그 배포 직전에는 integration/E2E까지 포함합니다.
 

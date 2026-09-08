@@ -8,6 +8,8 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Changed
 
+- pre-push의 변경 경로 판정이 긴 목록에서도 공개 후보 검사를 선택하도록 수정했습니다. 실제 Git fixture 회귀 검사를 pre-push와 공개 후보 CI에 추가했습니다.
+
 - 문서의 ADR 선언·인덱스와 pre-push/CI 검증 안내를 맞췄습니다. 승인된 Quiet Desk 방향은 ADR-0054 `Proposed`로 등록했으며 현재 PNG 게이트는 유지합니다. 공용 아이콘·셸 계약은 기존 ADR 본문을 보존해 ADR-0055로 분리했습니다.
 
 - Admin·Host 셸 크롬을 승인 시안 기본값으로 통합, 아이콘 primitive 도입, route-scoped 셸 override 제거.

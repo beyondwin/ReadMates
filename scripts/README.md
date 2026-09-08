@@ -192,6 +192,7 @@ Repository-local planning support, when available in a full source checkout, doe
 기본 실행 범위는 다음과 같습니다.
 
 - Full source checkout에 contributor-guidance checker가 있으면 해당 계약 검사
+- `python3 -B scripts/test-pre-push-check.py` (큰 변경 목록과 staged 문서의 공개 검사 선택 회귀)
 - `python3 -B scripts/check-deploy-workflow-contract.py`
 - `git diff --check`
 - `corepack pnpm --dir front lint`

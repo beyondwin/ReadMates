@@ -20,6 +20,8 @@ repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || fail "run this scrip
 cd "$repo_root"
 repo_abs="$(pwd -P)"
 
+python3 -B scripts/test-pre-push-check.py
+
 tmp_dir="$repo_abs/.tmp"
 fixture_root="$tmp_dir/public-release-fixtures"
 candidate_dir="$tmp_dir/public-release-candidate"
