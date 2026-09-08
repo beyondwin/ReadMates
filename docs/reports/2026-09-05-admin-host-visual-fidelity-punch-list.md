@@ -180,4 +180,3 @@ structurePass true: admin today/clubs/service/records desktop, host OR 5 id, set
 E 잔여: clubs/records docket h1 document-order; host live next-action prep 내용; meetings No.28 leftover if still dual. A 잔여: wordmark 20/700 vs 12/650, phase-label color/size, space-switcher 계정 라벨 vs 아바타, today-mobile header 132 vs 70. B: 출석 1행, workbox 4/3, Today 3건, 공간 전환 크롬. C: live clocks/facts `—`, fixture counts. D: raster, 기록만. Pixel 18/18 fail은 merge blocker가 아님(spec).
 
 갱신한 CT snapshot: Task 12b `admin-shell-mobile-390.png`, `admin-shell-long-copy-320.png` (controller ratified 2026-09-05). Task 30은 `--update` 하지 않음.
-

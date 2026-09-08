@@ -1,8 +1,7 @@
 # ADR-0045: 호스트·플랫폼 관리자 composition을 Focus Deck·Editorial Operations Ledger로 고정
 
-- 상태: Accepted
+- 상태: Superseded by ADR-0055
 - 결정일: 2026-08-26
-- 갱신일: 2026-09-05
 - 작성자: 제품·디자인·플랫폼 운영·프런트엔드
 - 관련: ADR-0003, ADR-0020, ADR-0039, ADR-0040, ADR-0043, ADR-0044, ADR-0046, ADR-0047,
   `docs/superpowers/specs/2026-08-26-readmates-host-admin-visual-authority-and-integration-design.md`
@@ -70,18 +69,6 @@ capability projection은 유지한다. Today case lifecycle action은 서버가 
 - shared component와 route-owned state 경계를 엄격히 review해야 한다.
 - 역할·viewport별 visual baseline 유지 비용이 생긴다.
 
-## 공유 아이콘 primitive와 셸 fork 금지 (2026-09-05 update)
-
-paper/ink primitive에 **아이콘 primitive**를 추가한다. Host와 platform admin의 제품 셸·원장·작업함 아이콘은 `front/shared/ui/icon.tsx`의 `ReadmatesIcon`(24 viewBox, stroke 1.75, size 16/20/24, `data-icon` 이름, `aria-hidden` 기본)과 채움 variant `ReadmatesIconBadge` 하나에서 나온다.
-
-다음을 durable 제약으로 둔다.
-
-- 제품 셸의 아이콘은 React 컴포넌트다. CSS `mask-image`/`background-image`의 `data:image/svg+xml`로 아이콘을 그리지 않는다. DOM에 없는 아이콘은 접근성·typography·구조 검사에 잡히지 않기 때문이다.
-- 셸 크롬은 route와 무관하게 같다. route가 셸을 바꾸려면 셸 컴포넌트에 명시적 prop/slot/context를 추가한다. `.admin-shell:has(<route class>)` 같은 route-scoped 후행 override로 셸을 fork하지 않는다.
-- 두 규칙은 `front/tests/unit/shell-chrome-guards.test.ts`가 감시한다.
-
-근거: 2026-09-05 18장 승인 PNG 대조에서 Today route만 시안 크롬을 갖고 나머지 route는 옛 셸을 그리는 원인이 `admin-today.css`의 route-scoped override 44개와 CSS data URI 아이콘이었다. 이 절은 ADR-0045의 결정을 바꾸지 않고 공유 primitive 범위를 넓힌다.
-
 ## 검증
 
 - host Focus Deck의 상태·responsive 검증은 ADR-0044의 matrix를 따른다.
@@ -91,7 +78,6 @@ paper/ink primitive에 **아이콘 primitive**를 추가한다. Host와 platform
 - queue selection, filter, pagination, polling order freeze, pending-new, Back/Forward, scroll/focus restoration을 검증한다.
 - L1 state/history, L2 preview/confirm/receipt, L3 convergence/resume를 해당 command에서만 E2E 검증한다.
 - 320/390/768/900/1024/1440px, 200% zoom, keyboard/focus, reduced motion, 긴 한국어를 검증한다.
-- 2026-09-06 구현 완료 사실: `ReadmatesIcon`/`ReadmatesIconBadge`가 Admin·Host 셸·원장·작업함 아이콘의 단일 primitive다. `shell-chrome-guards.test.ts`는 CSS data-URI 아이콘과 `.admin-shell:has(` 셸 override baseline을 0으로 감시한다. 18장 실제 route pixel은 18/18 `not_passed_0.02`로 남고 ADR-0053은 `Proposed`다. `front/DESIGN.md`가 유틸 5개·운영실 헤더 액션 3개·H1 책 제목과 아이콘 primitive를 기록한다.
 
 ## 후속 작업
 

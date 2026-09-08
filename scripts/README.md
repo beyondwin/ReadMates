@@ -192,6 +192,7 @@ Repository-local planning support, when available in a full source checkout, doe
 기본 실행 범위는 다음과 같습니다.
 
 - Full source checkout에 contributor-guidance checker가 있으면 해당 계약 검사
+- `python3 -B scripts/check-deploy-workflow-contract.py`
 - `git diff --check`
 - `corepack pnpm --dir front lint`
 - `npx --yes corepack@0.35.0 pnpm --dir front lint` (`corepack`이 PATH에 없을 때)
@@ -200,6 +201,8 @@ Repository-local planning support, when available in a full source checkout, doe
 - `corepack pnpm --dir front zod:export-fixtures`
 - `git diff --exit-code front/tests/unit/__fixtures__/zod-schemas/`
 - `./scripts/server-ci-check.sh`
+- `bash ./scripts/validate-production-ai-config.sh`
+- `bash ./scripts/verify-production-ai-config-fixtures.sh`
 
 `pre-push-check.sh`는 루트 `package.json`의 `packageManager`를 읽고 해당 pnpm을 Corepack으로 활성화한 뒤, 해석된 Corepack launcher로 frontend checks를 실행합니다. 로컬 Node 설치가 `corepack`을 PATH에 노출하지 않으면 스크립트는 `npx --yes corepack@0.35.0`을 사용합니다. 다른 major version의 globally installed pnpm으로 우회하지 않습니다.
 
@@ -217,6 +220,8 @@ Repository-local planning support, when available in a full source checkout, doe
 ```
 
 `--full`은 `./server/gradlew -p server integrationTest`, Corepack launcher를 통한 `pnpm --dir front test:e2e`, 그리고 관측 설정 검증(Prometheus rules/config, Tempo config, Grafana dashboard lint, Alertmanager config)을 추가로 실행합니다. Docker, MySQL client, Playwright browser 의존성이 준비되지 않은 환경에서는 기본 pre-push hook보다 수동 릴리즈 점검으로 실행합니다.
+
+기본 모드와 `--full` 모두 `test:ct:docker`와 `test:e2e:approved-routes:docker`를 직접 실행하지 않습니다. UI 변경의 CI parity를 확인하려면 두 Docker gate를 별도로 실행합니다. CI의 `frontend-visual-regression`은 CT 뒤에 변경 경로의 영향 ID를 계산해 실제 라우트와 승인 PNG를 비교합니다. 영향 ID 선택, browser smoke와 strict 비교의 차이는 [테스트 가이드](../docs/development/test-guide.md#실제-라우트-시각-권위-게이트)를 따릅니다.
 
 ### Release-mode CHANGELOG guard
 

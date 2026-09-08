@@ -22,6 +22,19 @@ ReadMates의 주요 기술 의사결정을 기록한다. 새 결정을 내릴 �
 
 Routine refactor, component-local layout, reversible implementation detail은 ADR 대상이 아니다. ADR 수를 늘리는 것보다 미래 판단에 실제 제약을 주는 결정을 빠뜨리지 않는 것이 목적이다.
 
+## Spec·plan 선언 형식
+
+2026-08-22 이후 dated spec·plan은 문서 상단에 장식 없는 독립 행으로 다음 중 하나를 쓴다. 목록·굵은 글씨를 붙이지 않으며 non-`none`은 같은 행에 실제 ADR 번호를 적는다. 여러 영향이 있으면 주 영향을 하나 선택하고 나머지는 뒤에 설명한다.
+
+```text
+ADR impact: none
+ADR impact: update — ADR-0053
+ADR impact: new — ADR-0054
+ADR impact: supersede — ADR-0046, ADR-0048
+```
+
+`new`는 문서 결정일의 ADR이 실제로 존재해야 하고, `supersede`는 기존 ADR의 상태 연결이 있어야 한다. 아직 전환하지 않은 결정은 `Proposed`로 등록하고 현재 계약을 유지한다. 커밋 전에 `python3 -B scripts/check-agent-guidance.py`로 선언·참조·상태·두 인덱스를 함께 검사한다.
+
 ## 인덱스
 
 | # | 제목 | 상태 | 결정일 | 영향 영역 |
@@ -69,7 +82,7 @@ Routine refactor, component-local layout, reversible implementation detail은 AD
 | [0042](0042-purpose-separated-platform-admin-audit-cursors.md) | 플랫폼 어드민 audit cursor를 V57 digest key로 서명 | Accepted | 2026-08-24 | platform ops, security, server |
 | [0043](0043-minimize-platform-admin-support-reason-evidence.md) | 플랫폼 어드민 support access 사유 evidence를 최소화 | Accepted | 2026-08-24 | platform ops, security, server, front |
 | [0044](0044-host-focus-deck-primary-action-composition.md) | 호스트 현재 모임을 Focus Deck 단일 주 행동으로 구성 | Superseded by ADR-0046 | 2026-08-26 | product, design, front |
-| [0045](0045-host-admin-focus-deck-editorial-ledger-composition.md) | 호스트·플랫폼 관리자 composition을 Focus Deck·Editorial Operations Ledger로 고정 | Accepted | 2026-08-26 (update 2026-09-05) | product, design, platform ops, front |
+| [0045](0045-host-admin-focus-deck-editorial-ledger-composition.md) | 호스트·플랫폼 관리자 composition을 Focus Deck·Editorial Operations Ledger로 고정 | Superseded by ADR-0055 | 2026-08-26 | product, design, platform ops, front |
 | [0046](0046-host-triage-home-meeting-diary-composition.md) | 호스트 워크스페이스를 오늘 트리아지 + 모임 다이어리로 재구성 | Superseded by ADR-0048 | 2026-08-27 | product, design, front |
 | [0047](0047-admin-case-desk-narrative-composition.md) | 플랫폼 어드민을 케이스 데스크 + 운영 서사로 재구성 | Superseded by ADR-0050 | 2026-08-27 | product, design, platform ops, front |
 | [0048](0048-host-lifecycle-operating-room-composition.md) | 호스트 워크스페이스를 모임 생애주기 운영실 + 작업함으로 구성 | Accepted | 2026-09-01 | product, design, front |
@@ -78,8 +91,12 @@ Routine refactor, component-local layout, reversible implementation detail은 AD
 | [0051](0051-global-platform-and-club-space-transition.md) | 전역 공간을 플랫폼 운영·내 클럽 두 축으로 고정 | Accepted | 2026-08-30 | product, front, server, security |
 | [0052](0052-oci-capacity-and-recovery-guardrails.md) | OCI 용량과 복구 guardrail | Proposed | 2026-08-30 | ops, security |
 | [0053](0053-approved-mockup-pixel-fidelity-gate.md) | 승인 시안을 Admin·Host 픽셀 근접 합격 기준으로 사용 | Proposed | 2026-09-02 | product, design, front |
+| [0054](0054-code-native-design-contract.md) | 코드 네이티브 시안 계약을 호스트·어드민 시각 권위로 사용 | Proposed | 2026-09-06 | design, front |
+| [0055](0055-shared-icon-and-shell-composition.md) | 공유 브랜드 primitive에 아이콘과 셸 일관성 계약을 포함 | Accepted | 2026-09-05 | design, front |
 
 ADR-0048/0049는 Stage 5 전체 gate와 최종 acceptance evidence가 각 결정의 named criteria를 충족해 `Accepted`다. 구현 근거와 배포·외부 서비스·수동 보조기술의 미측정 범위는 각 ADR의 `검증` 및 잔여 검증 절에서 관리한다.
+
+ADR-0054는 승인된 Quiet Desk 시각 계약의 미구현 방향이다. 전환 검증 전에는 ADR-0053과 현재 PNG 게이트를 유지한다.
 
 ## 상태 범례
 

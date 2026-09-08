@@ -9,10 +9,11 @@ token, shared CSS/component, fixture 변경은 영향 reference 증거를 무효
 현재 시각 권위 기록은 `docs/reports/2026-09-05-admin-host-visual-fidelity-punch-list.md`다. 승인 PNG는 수정하지 않았다. 2026-09-06 Jammy 재측정에서 strict pixel은 18/18 `not_passed_0.02`다. structurePass true 12 / false 6. 사람 30초 gate·VoiceOver/Safari·NVDA/Chrome·원격 CI는 `not measured`다. ADR-0053은 `Proposed`이며 픽셀 수락 완료가 아니다. Public, guest, member composition은 이 문서로 바꾸지 않는다.
 
 
-구성 수렴 다음의 시각 충실도(빠진 아이콘·여백, geometry PASS를 시안 일치로 읽지 말 것, 출석 1행 유지, `origin/main` 미푸시)는 `docs/superpowers/specs/2026-09-05-admin-host-visual-fidelity-next-slice-design.md`가 다음 슬라이스 핸드오프다. 그 문서는 구현 계획이 아니다.
+다음 구현 방향은 [ADR-0054](../docs/development/adr/0054-code-native-design-contract.md)의 Quiet Desk 코드 네이티브 시안 계약(`Proposed`)이다. 2026-09-06 설계·계획이 이전 시각 충실도 핸드오프를 대체하지만 CSS 공유·계약 추출·새 게이트는 아직 미구현이다. 현재 PNG 권위와 검증 명령은 전환 검증까지 유지한다.
 
 - ADR-0044: Superseded by ADR-0046 (단일 주 행동 계산 규칙은 운영실에 계승)
-- ADR-0045: Accepted — host/admin 공유 paper/ink primitive
+- ADR-0045: Superseded by ADR-0055
+- ADR-0055: Accepted — host/admin 공유 paper/ink primitive와 공용 아이콘·셸 크롬 규칙
 - ADR-0046: Superseded by ADR-0048
 - ADR-0047: Superseded by ADR-0050
 - ADR-0048: Accepted — lifecycle operating room과 host 4축 내비게이션의 현재 권위
@@ -35,7 +36,7 @@ token, shared CSS/component, fixture 변경은 영향 reference 증거를 무효
 
 ## Icon primitive
 
-Host와 platform admin의 제품 셸·원장·작업함 아이콘은 `front/shared/ui/icon.tsx`의 `ReadmatesIcon`(24 viewBox, stroke 1.75, size 16/20/24, `data-icon`, `aria-hidden` 기본)과 채움 variant `ReadmatesIconBadge` 하나에서 나온다. ADR-0045 2026-09-05 update가 이 제약을 고정한다. CSS `mask-image`/`background-image`의 `data:image/svg+xml`로 아이콘을 그리지 않고, `.admin-shell:has(` route-scoped 셸 override로 크롬을 fork하지 않는다. `front/tests/unit/shell-chrome-guards.test.ts`가 두 규칙을 baseline 0으로 감시한다.
+Host와 platform admin의 제품 셸·원장·작업함 아이콘은 `front/shared/ui/icon.tsx`의 `ReadmatesIcon`(24 viewBox, stroke 1.75, size 16/20/24, `data-icon`, `aria-hidden` 기본)과 채움 variant `ReadmatesIconBadge` 하나에서 나온다. ADR-0055가 이 제약을 고정한다. CSS `mask-image`/`background-image`의 `data:image/svg+xml`로 아이콘을 그리지 않고, `.admin-shell:has(` route-scoped 셸 override로 크롬을 fork하지 않는다. `front/tests/unit/shell-chrome-guards.test.ts`가 두 규칙을 baseline 0으로 감시한다.
 
 
 ## Shared tokens

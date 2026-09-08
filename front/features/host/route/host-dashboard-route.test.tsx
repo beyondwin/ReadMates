@@ -1032,7 +1032,7 @@ describe("HostDashboardRoute", () => {
     expect(within(workbox).getAllByRole("listitem")).toHaveLength(4);
     await user.click(within(workbox).getByRole("button", { name: "작업함 모두 보기" }));
     await waitFor(() => expect(router.state.location.search).toBe("?phase=prep&workbox=all"));
-    expect(within(workbox).getAllByRole("listitem")).toHaveLength(12);
+    await waitFor(() => expect(within(workbox).getAllByRole("listitem")).toHaveLength(12));
 
     await user.click(within(workbox).getByRole("tab", { name: "보류" }));
     await waitFor(() => expect(router.state.location.search).toBe("?phase=prep&workbox=all"));

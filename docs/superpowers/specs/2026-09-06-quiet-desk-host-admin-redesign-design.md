@@ -3,9 +3,10 @@
 - 상태: Approved design (2026-09-06 브레인스토밍에서 사용자 승인), implementation not started
 - 범위: 호스트 앱(`/app/host/**`, `/clubs/:slug/app/host/**`)과 플랫폼 어드민(`/admin/**`)의 전 화면 재구성, 멤버·호스트·어드민 공유 셸과 공간 전환 UX, 시안 → 구현 → 검증을 잇는 새 시각 권위 파이프라인, 기존 PNG 권위·픽셀 게이트 레거시 정리
 - 비범위: 서버 API·BFF 프로토콜·DB 스키마 변경, 멤버·공개·게스트 화면 composition 변경(공유 셸 헤더만 예외), 새 서버 기능(시안에 `제안` 배지가 붙은 항목 중 서버 의미가 필요한 것은 클라이언트 표현만 바꾸고 서버 계약은 유지)
-- ADR impact: **new** ADR-0054(코드 네이티브 시안 계약, ADR-0053 supersede), **update** ADR-0048(호스트 라벨·오늘 구성·할 일 통합), ADR-0050(어드민 라벨·하위 탭·조치 링크·빈 상태), ADR-0051(공간 전환 표현: 어드민 분리, 세그먼트 토글), ADR-0045(공용 문법 primitive 확장)
 - 시안 소스: `design/mockups/2026-09-06-quiet-desk/` (생성기 `gen/*.py`, 아트보드 `*.dc.html` 71장, `canvas.json`). 리뷰 캔버스: https://claude.ai/code/artifact/b76a5cd3-073c-4bd7-b346-287dc910a9e4 (참고용, 권위는 커밋된 소스)
 - 관련: `docs/superpowers/specs/2026-09-05-admin-host-visual-fidelity-next-slice-design.md`(이 문서가 대체), `docs/reports/2026-09-05-admin-host-visual-fidelity-punch-list.md`, `front/DESIGN.md`, `docs/agents/design.md`, `design/system/src/styles/tokens.css`
+
+ADR impact: new — ADR-0054 (`Proposed`). ADR-0053은 전환 검증까지 유지한다. Accepted ADR-0048/0050/0051/0055의 결정 변경은 별도 focused ADR로 supersede하며 기존 본문을 수정하지 않는다.
 
 ## 0. 왜 다시 하는가
 
@@ -99,7 +100,7 @@ Playwright(저장소 pinned Jammy 이미지)로 각 아트보드 파일을 `page
 | 픽셀 | 시안 렌더 vs 라우트, `maxDiffPixelRatio` 0.01 | **보고만** (`docs/reports`), 게이트 아님 |
 | 스트레스 | `design-contract-stress.spec.ts`: 320px, 200% 확대 proxy(320×350), 장문 클럽·책 이름 픽스처 변형, 빈 목록, 오류 상태에서 가로 오버플로·겹침·44px 타깃 | 게이트 실패(기존 `approved-route-stress.spec.ts` 대체, 슬라이스 0에서 만든 뒤 슬라이스 8에서 옛 것 삭제) |
 
-- 실행: `pnpm --dir front test:e2e:design-contract:docker`. CI의 시각 권위 잡은 이 명령으로 교체한다. 기존 `test:e2e:approved-routes:docker`는 레거시 정리 슬라이스에서 삭제한다.
+- 실행: `pnpm --dir front test:e2e:design-contract:docker`. 슬라이스 0에서는 기존 PNG 잡과 병행하고, 슬라이스 8의 전체 전환 검증 뒤 CI 시각 권위 잡을 교체한다. 기존 `test:e2e:approved-routes:docker`는 레거시 정리 슬라이스에서 삭제한다.
 - 픽스처는 `gen/fixtures.json`을 import해 BFF 응답으로 변환한다. 시안 숫자와 픽스처 숫자가 어긋나면 게이트가 아니라 빌드가 실패한다(fixture 변환 단위 테스트).
 - 무효화: `quiet-desk.css`, `tokens.css`, 공유 컴포넌트, `fixtures.json`, 아트보드가 바뀌면 계약을 다시 생성해야 한다. 게이트는 시나리오 시작 전에 현재 아트보드 파일의 SHA-256과 계약의 `artboardSha256`을 비교하고 다르면 실패한다(`stale contract`).
 - 키보드: `shell.perspective-toggle`과 `.qd-tabs`는 방향키로 이동, 메뉴·시트는 Escape로 닫히고 포커스가 트리거로 돌아온다. 게이트가 화면마다 이 동작을 실행한다.
@@ -339,7 +340,7 @@ ReadMates  을지로 북살롱[▾]   오늘  모임  멤버  기록      [+ 새
 
 | # | 슬라이스 | 포함 | 종료 기준 |
 | --- | --- | --- | --- |
-| 0 | 기반 | **ADR-0054 Proposed를 첫 커밋으로**(ADR-0045/0048/0050/0051 README 비고에 'ADR-0054 §영향에 따라 update 예정'), `quiet-desk.css` 이관(`qd-` 개명), 생성기 토큰·CSS 읽기, `fixtures.json`, `data-spec` 보강, 계약 추출기, 게이트·스트레스 spec 뼈대, CI 잡 교체(옛 잡은 비활성), 공용 컴포넌트 §5.1 전부, 용어 사전 | 컴포넌트 CT가 71장 계약의 `dom`과 일치. 게이트는 셸 화면(`D21`)만 통과 |
+| 0 | 기반 | **ADR-0054 Proposed 확인**(관련 Accepted ADR 변경은 해당 슬라이스 전에 별도 focused ADR로 supersede 준비), `quiet-desk.css` 이관(`qd-` 개명), 생성기 토큰·CSS 읽기, `fixtures.json`, `data-spec` 보강, 계약 추출기, 게이트·스트레스 spec 뼈대, 새 CI 잡 추가(기존 PNG 잡 유지), 공용 컴포넌트 §5.1 전부, 용어 사전 | 컴포넌트 CT가 71장 계약의 `dom`과 일치. 게이트는 셸 화면(`D21`)만 통과 |
 | 1 | 공유 셸 | 클럽 헤더·세그먼트·클럽 메뉴·계정 메뉴·모바일 헤더·탭바·시트, 어드민을 클럽 크롬에서 제거, 어드민 셸(사이드바·상단바·계정 메뉴), 전환 안전 E2E `space-transition.spec.ts` 신설(기존 `admin-approved-routes.spec.ts`의 전환기 메뉴 열기·Escape·포커스 시나리오를 새 세그먼트로 포팅하고, dirty/pending/unknown-outcome 시나리오는 `front/src/app/global-space-transition-controller.test.tsx`의 단위 케이스를 행동 기준으로 새로 쓴다) | `D21`, `M22`, `A13`, `AM8` 통과. `space-transition.spec.ts` 통과 |
 | 2 | 호스트 오늘 | 상태 결정, 상태 문장, 3섹션, 할 일 통합, 시작 전, 당일 출석 컨트롤 | `D01 D05 D09 D10`, `M11 M01 M02 M03` 통과. host-lifecycle E2E 통과 |
 | 3 | 호스트 모임 | 모임 목록·휴지통·새 모임·수정·지난 모임 상세 | `D04 D06 D14 D15 D24`, `M04 M05 M12 M15` |
@@ -359,11 +360,13 @@ ReadMates  을지로 북살롱[▾]   오늘  모임  멤버  기록      [+ 새
 
 ## 10. ADR
 
+ADR-0054는 등록됐다. 아래 Accepted ADR의 후속 결정은 각 해당 슬라이스 전에 별도 focused `Proposed` ADR로 기록하고, 전환 검증 후 원본을 status-only supersede한다. 기존 본문에 update 절을 추가하지 않는다.
+
 - **ADR-0054 (new, Proposed → 슬라이스 8에서 Accepted)**: "코드 네이티브 시안 계약을 호스트·어드민 시각 권위로 사용". 결정: 시안은 런타임 CSS·토큰·픽스처를 공유하는 `.dc.html` 생성물이며, `data-spec` 계약(존재·순서·DOM 서명·geometry·typography)이 합격 기준이다. 픽셀 비교는 보고용. 대안 기각: PNG 권위 유지(측정 불가), 스냅샷만(drift 고착), 픽셀 게이트(폰트·데이터 불일치로 실패). ADR-0053을 supersede.
-- **ADR-0048 update**: 4축 라벨 `오늘 · 모임 · 멤버 · 기록`, 운영실 → 오늘(상태 문장 + 3섹션), 다음 행동 + 작업함 → 할 일. 다음 행동 계산 규칙·작업함 source·출석 cap·전환 안전은 유지.
-- **ADR-0050 update**: 내비 라벨 `오늘 · 클럽 · 서비스 · 기록`, 축 내부 하위 탭, 케이스 첫 버튼 = 조치 라우트, 빈 상태 구성.
-- **ADR-0051 update**: 2축 모델과 서버 projection 유지. 표현은 클럽 헤더에서 platform 항목 제거, perspective는 세그먼트, club은 클럽명 메뉴, platform 진입·출구는 계정 메뉴.
-- **ADR-0045 update**: 공용 primitive에 §5.1 컴포넌트와 `quiet-desk.css` 단일 파일 원칙 추가. 아이콘 primitive 규칙 유지(`gear` `swap` `check` `undo` `copy` `grid` `sparkle` `download` `chart` 추가).
+- **ADR-0048 후속 결정**: 4축 라벨 `오늘 · 모임 · 멤버 · 기록`, 운영실 → 오늘(상태 문장 + 3섹션), 다음 행동 + 작업함 → 할 일. 다음 행동 계산 규칙·작업함 source·출석 cap·전환 안전은 유지.
+- **ADR-0050 후속 결정**: 내비 라벨 `오늘 · 클럽 · 서비스 · 기록`, 축 내부 하위 탭, 케이스 첫 버튼 = 조치 라우트, 빈 상태 구성.
+- **ADR-0051 후속 결정**: 2축 모델과 서버 projection 유지. 표현은 클럽 헤더에서 platform 항목 제거, perspective는 세그먼트, club은 클럽명 메뉴, platform 진입·출구는 계정 메뉴.
+- **ADR-0055 후속 결정**: 공용 primitive에 §5.1 컴포넌트와 `quiet-desk.css` 단일 파일 원칙 추가. 아이콘 primitive 규칙 유지(`gear` `swap` `check` `undo` `copy` `grid` `sparkle` `download` `chart` 추가).
 
 ## 11. 위험과 미해결
 
@@ -372,4 +375,4 @@ ReadMates  을지로 북살롱[▾]   오늘  모임  멤버  기록      [+ 새
 - **데이터 형태 차이**: 시안은 최대 12명·5행 등 짧은 목록이다. 긴 목록·빈 목록·오류는 `StatePanel`과 `더 보기`로 처리하며 별도 stress E2E(기존 `approved-route-stress` 대체)가 320px·200% zoom·장문을 검사한다.
 - **모바일 조치 제한**: 어드민 모바일은 조치를 하지 않는다. 운영자가 원하면 후속 슬라이스.
 - **사람·보조기술 검증**은 자동화되지 않는다. 미측정이면 미측정으로 적는다.
-- **push 차단**: 슬라이스 0에서 CI 잡을 교체하면 옛 픽셀 잡은 사라지지만 새 게이트도 처음엔 셸 화면만 통과한다. 게이트는 "계약이 있는 화면만" 검사하므로 슬라이스마다 통과 범위가 늘어난다. push 여부는 릴리스 준비 검토(`docs/development/release-readiness-review.md`)로 따로 판단한다.
+- **push 차단**: 슬라이스 0은 기존 PNG 잡을 유지하면서 새 게이트를 추가한다. 새 게이트의 skipped 또는 일부 화면 통과는 전환 증거가 아니다. 71장 전체·stress·전환 안전 검증이 끝난 슬라이스 8에서만 기존 잡을 교체한다. push 여부는 릴리스 준비 검토(`docs/development/release-readiness-review.md`)로 따로 판단한다.

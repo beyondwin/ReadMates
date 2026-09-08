@@ -1,5 +1,7 @@
 # Admin·Host Visual Fidelity (Composition Residue) Implementation Plan
 
+> 이 문서는 당시 승인·작업 기록이다. 후속 방향은 2026-09-06 Quiet Desk 설계·계획과 ADR-0054 (`Proposed`)를 따른다. 기존 측정은 해당 날짜의 증거이며 현재 완료 상태가 아니다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Admin 승인 시안 7장과 Host 승인 시안 11장(총 18장)이 실제 authenticated route에서 시안과 같아 보이도록, 공유 크롬을 셸 기본값으로 올리고 아이콘을 하나의 primitive로 통합한 뒤 화면별 구성 잔여(E)와 시각 토큰(A)을 닫는다.
@@ -12,7 +14,7 @@
 
 **Plan base:** 로컬 `main` `a48f0eda5` (`docs: scope admin/host visual fidelity slice to composition residue`). `origin/main`이 아니다.
 
-ADR impact: **update (ADR-0045)** — 아이콘 primitive와 "CSS data URI 아이콘 금지·route-scoped 셸 override 금지"를 ADR-0045 본문에 한 절로 추가한다(Task 1). ADR-0053은 `Proposed` 유지. 이 계획은 ADR-0053을 `Accepted`로 올리지 않는다.
+ADR impact: supersede — ADR-0045, ADR-0055. 공용 아이콘·셸 제약은 ADR-0055로 분리했고 ADR-0045 본문은 보존한다. 아래 구현 과정의 update 표기는 당시 기록이다.
 
 ## Global Constraints
 

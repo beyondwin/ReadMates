@@ -47,7 +47,7 @@ ReadMates의 durable product·technical·design·operational decision은 [ADR �
 | [ADR-0042](adr/0042-purpose-separated-platform-admin-audit-cursors.md) | 플랫폼 어드민 audit cursor를 V57 digest key로 서명 | Accepted |
 | [ADR-0043](adr/0043-minimize-platform-admin-support-reason-evidence.md) | 플랫폼 어드민 support access 사유 evidence를 최소화 | Accepted |
 | [ADR-0044](adr/0044-host-focus-deck-primary-action-composition.md) | 호스트 현재 모임을 Focus Deck 단일 주 행동으로 구성 | Superseded by ADR-0046 |
-| [ADR-0045](adr/0045-host-admin-focus-deck-editorial-ledger-composition.md) | 호스트·플랫폼 관리자 composition을 Focus Deck·Editorial Operations Ledger로 고정 | Accepted |
+| [ADR-0045](adr/0045-host-admin-focus-deck-editorial-ledger-composition.md) | 호스트·플랫폼 관리자 composition을 Focus Deck·Editorial Operations Ledger로 고정 | Superseded by ADR-0055 |
 | [ADR-0046](adr/0046-host-triage-home-meeting-diary-composition.md) | 호스트 워크스페이스를 오늘 트리아지 + 모임 다이어리로 재구성 | Superseded by ADR-0048 |
 | [ADR-0047](adr/0047-admin-case-desk-narrative-composition.md) | 플랫폼 어드민을 케이스 데스크 + 운영 서사로 재구성 | Superseded by ADR-0050 |
 | [ADR-0048](adr/0048-host-lifecycle-operating-room-composition.md) | 호스트 워크스페이스를 모임 생애주기 운영실 + 작업함으로 구성 | Accepted |
@@ -56,5 +56,7 @@ ReadMates의 durable product·technical·design·operational decision은 [ADR �
 | [ADR-0051](adr/0051-global-platform-and-club-space-transition.md) | 전역 공간을 플랫폼 운영·내 클럽 두 축으로 고정 | Accepted |
 | [ADR-0052](adr/0052-oci-capacity-and-recovery-guardrails.md) | OCI 용량과 복구 guardrail | Proposed |
 | [ADR-0053](adr/0053-approved-mockup-pixel-fidelity-gate.md) | 승인 시안을 Admin·Host 픽셀 근접 합격 기준으로 사용 | Proposed |
+| [ADR-0054](adr/0054-code-native-design-contract.md) | 코드 네이티브 시안 계약을 호스트·어드민 시각 권위로 사용 | Proposed |
+| [ADR-0055](adr/0055-shared-icon-and-shell-composition.md) | 공유 브랜드 primitive에 아이콘과 셸 일관성 계약을 포함 | Accepted |
 
 Active architecture는 [architecture.md](architecture.md), 검증 경로는 [test-guide.md](test-guide.md)와 각 ADR의 `검증` 절을 따른다. Server의 canonical PR gate는 `./scripts/server-ci-check.sh`다. 외부 서비스의 가격·한도·API 동작처럼 변할 수 있는 사실은 운영 판단 직전에 공식 source로 다시 확인한다.

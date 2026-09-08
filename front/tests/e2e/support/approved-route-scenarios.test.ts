@@ -345,17 +345,17 @@ describe("actual-route visual authority scenarios", () => {
     expect(review.regions.find((region) => region.name === "host-nav")?.expected)
       .toEqual({ x: 676, y: 23, width: 290, height: 44 });
     expect(review.regions.find((region) => region.name === "review-heading")?.expected)
-      .toEqual({ x: 48, y: 171, width: 1440, height: 41 });
+      .toEqual({ x: 40, y: 163, width: 1456, height: 38 });
     expect(review.firstViewport.find((entry) => entry.name === "preview-confirmation")?.selector)
       .toBe('[aria-label="발송 전 확인"]');
 
     const person = visualAuthorityScenario("host-person-mobile");
     expect(person.regions.find((region) => region.name === "person-heading")?.expected)
-      .toEqual({ x: 91, y: 121, width: 72, height: 34 });
+      .toEqual({ x: 145, y: 154, width: 164, height: 34 });
     expect(person.regions.find((region) => region.name === "person-status")?.expected)
-      .toEqual({ x: 91, y: 155, width: 72, height: 20 });
+      .toEqual({ x: 145, y: 192, width: 164, height: 20 });
     expect(person.regions.find((region) => region.name === "person-history")?.expected)
-      .toEqual({ x: 17, y: 389, width: 356, height: 217 });
+      .toEqual({ x: 17, y: 660, width: 356, height: 380 });
   });
 
   it("does not restore a ratio bypass in the contract source", () => {

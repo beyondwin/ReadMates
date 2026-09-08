@@ -19,7 +19,7 @@ ReadMates를 로컬에서 실행하고, 테스트하고, 구조를 이해하기 
 | Spring AI provider, 비용·복구, trace/privacy | [spring-ai-2-provider-architecture.md](spring-ai-2-provider-architecture.md) |
 | 디자인 시스템과 pattern catalog | [../../design/README.md](../../design/README.md) |
 | 주요 기술적 의사결정 | [technical-decisions.md](technical-decisions.md) |
-| Architecture Decision Records | [adr/README.md](adr/README.md) |
+| Architecture Decision Records와 spec·plan 선언 형식 | [adr/README.md](adr/README.md) |
 | 버저닝 source of truth와 release tag 기준 | [versioning.md](versioning.md) |
 | 릴리즈 관리와 CHANGELOG | [release-management.md](release-management.md), [../../CHANGELOG.md](../../CHANGELOG.md) |
 | 배포 문서 허브 | [../deploy/README.md](../deploy/README.md) |

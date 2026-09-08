@@ -1,11 +1,13 @@
 # Admin·Host 승인 PNG 시각 충실도 슬라이스 (구성 잔여 포함)
 
+> 이 문서는 당시 승인·작업 기록이다. 후속 방향은 2026-09-06 Quiet Desk 설계·계획과 ADR-0054 (`Proposed`)를 따른다. 기존 측정은 해당 날짜의 증거이며 현재 완료 상태가 아니다.
+
 - 상태: Approved design, implementation not started. 2026-09-05 오전 초안은 "아이콘·여백만" 범위였고, 같은 날 18장 reference/candidate 전수 비교 뒤 **구성 잔여를 범위에 포함**하는 것으로 승인됨
 - 승인일: 2026-09-05
 - 범위: Admin 승인 시안 `01`–`07`과 Host 승인 시안 `07`–`17`(총 18장)을 실제 authenticated route에서 시안과 같아 보이게 맞추는 작업. 공유 크롬(셸·아이콘·워크박스 행), 화면별 **구성 잔여**, 시각 토큰(아이콘·여백·밀도), 그리고 테스트/카피 정직성 잔여
 - 비범위: Public·Member, 서버 API 의미, 배포, `origin/main` push, 승인 PNG 갱신, pixel gate 완화, 현장 출석 1행 cap 철회, ADR-0048·0050·0051 제품 구성 변경
 
-ADR impact: **update (ADR-0045)**. 이 슬라이스는 host/admin 공유 primitive에 **아이콘 primitive**를 추가하고, "CSS data URI 아이콘 금지·route-scoped 셸 override 금지"를 durable 제약으로 둔다. 이는 ADR-0045(paper/ink primitive)의 범위 확장이므로 ADR-0045 본문에 한 절을 `update`로 추가한다. 결정을 뒤집는 것이 아니므로 supersede가 아니다. ADR-0053은 `Proposed`로 두며 이 문서로 올리지 않는다. 0.02 완화, mask 도입, 승인 PNG 교체, 출석 미리보기 행 수 상향은 이 문서가 승인하지 않는다.
+ADR impact: supersede — ADR-0045, ADR-0055. 공용 아이콘·셸 제약은 ADR-0055로 분리했고 ADR-0045 본문은 보존한다. 아래 구현 과정의 update 표기는 당시 기록이다.
 
 관련: ADR-0045, ADR-0048, ADR-0050, ADR-0051, ADR-0053, `front/DESIGN.md`, `docs/superpowers/specs/2026-09-04-admin-host-actual-route-visual-authority-convergence-design.md`, `docs/superpowers/plans/2026-09-04-admin-host-actual-route-visual-authority-convergence.md`, `docs/reports/2026-09-04-admin-host-actual-route-visual-authority-acceptance.md`, `design/mockups/2026-08-30-admin-operations-redesign/README.md`, `docs/development/host-redesign-mockups/README.md`
 

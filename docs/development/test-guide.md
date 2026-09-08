@@ -16,7 +16,7 @@ CI에서 자주 실패하는 게이트를 로컬에서 먼저 묶어 확인할 �
 ./scripts/pre-push-check.sh
 ```
 
-기본 모드는 `git diff --check`, frontend lint, coverage 포함 unit test, frontend build, Zod fixture freshness, backend `check`를 실행합니다. `docs/`, `scripts/`, `deploy/`, `.github/`, `README.md`처럼 공개 후보에 영향을 주는 경로가 바뀌면 clean public release candidate를 만들고 scanner도 실행합니다.
+기본 모드는 full source checkout의 agent guidance 계약, deploy workflow 계약, `git diff --check`, frontend lint, coverage 포함 unit test, frontend build, Zod fixture freshness, backend `check`, production AI 설정과 fixture 검증을 실행합니다. `docs/`, `scripts/`, `deploy/`, `.github/`, `README.md`처럼 공개 후보에 영향을 주는 경로가 바뀌면 clean public release candidate를 만들고 scanner도 실행합니다.
 
 릴리즈 또는 태그 배포 직전에는 integration/E2E까지 포함합니다.
 
@@ -25,6 +25,8 @@ CI에서 자주 실패하는 게이트를 로컬에서 먼저 묶어 확인할 �
 ```
 
 명령 목록만 확인하려면 `--dry-run`을 사용합니다. Public release scanner를 수동으로 생략할 때는 `--no-release`를 쓰되, release-sensitive 경로 변경에서는 완료 보고에 생략 이유를 남깁니다.
+
+기본 모드와 `--full` 모두 Docker CT와 아래 [실제 라우트 시각 권위 게이트](#실제-라우트-시각-권위-게이트)를 직접 실행하지 않습니다. 관련 UI 변경은 두 검증을 별도로 실행합니다. 일반 E2E는 pinned renderer가 없으면 approved-route 비교 spec을 수집하지 않습니다.
 
 ## Frontend
 
@@ -243,7 +245,7 @@ docker volume rm readmates-ct-root-node-modules readmates-ct-front-node-modules 
 
 **flake 정책:** 애니메이션과 caret을 끄고, 고정 viewport `480x360`, `maxDiffPixelRatio: 0.02`로 픽셀 노이즈를 흡수합니다. baseline update는 package script가 Docker renderer로만 연결합니다.
 
-**CI gate:** `.github/workflows/ci.yml`의 `frontend-visual-regression` job은 pull request와 `main` push에서 `pnpm test:ct:docker`를 실행합니다. 이 job은 baseline을 갱신하지 않고 drift만 검증하며, 실패 시 `front/test-results`와 `front/playwright-report`를 artifact로 업로드합니다. 의도한 UI 변경이면 먼저 product diff를 리뷰한 뒤 Docker update command로 PNG baseline을 갱신하고, 의도하지 않은 diff면 UI/fixture를 고칩니다.
+**CI gate:** `.github/workflows/ci.yml`의 `frontend-visual-regression` job은 pull request와 `main` push에서 `pnpm test:ct:docker`를 실행한 뒤, 변경 경로가 영향을 주는 실제 라우트 시각 권위도 검증합니다. 실패 시 `front/test-results`와 `front/playwright-report`를 artifact로 업로드합니다. 의도한 UI 변경의 CT baseline은 product diff를 리뷰한 뒤 Docker update command로 갱신할 수 있지만, 승인 시안 PNG는 이 절차의 갱신 대상이 아닙니다.
 
 **Public release safety:** `front/__screenshots__`는 repo에 커밋되는 regression baseline이지만 clean public release candidate에는 포함하지 않습니다. CT baseline 경로, release candidate copy rule, public scanner rule을 바꾸면 아래 명령으로 screenshot exclusion이 유지되는지 확인합니다.
 
@@ -253,6 +255,26 @@ docker volume rm readmates-ct-root-node-modules readmates-ct-front-node-modules 
 ```
 
 **experimental API 주의:** `@playwright/experimental-ct-react`는 experimental이고 Vite 8 / React 19 조합은 bleeding-edge입니다. 부팅이 실패하면 임시 우회를 강제하지 말고 이슈로 기록한 뒤 진행합니다.
+
+## 실제 라우트 시각 권위 게이트
+
+Admin 7개·Host 11개 승인 PNG와 실제 인증 라우트의 비교는 `front/tests/e2e/support/approved-mockup-manifest.ts`와 `approved-mockup-contract.ts`가 관리합니다. 최종 비교는 pinned Jammy renderer에서 `maxDiffPixelRatio: 0.02`를 적용하며, CT snapshot 갱신이나 일반 browser smoke 통과로 대체하지 않습니다. 현재 계약은 [front/DESIGN.md](../../front/DESIGN.md), 날짜별 측정 결과는 그 문서가 연결하는 보고서를 따릅니다.
+
+저장소 루트에서 전체 18개 비교를 실행합니다. Corepack이 PATH에 없으면 `corepack` 대신 `npx --yes corepack@0.35.0`을 사용합니다.
+
+```bash
+corepack pnpm --dir front test:e2e:approved-routes:docker
+```
+
+CI는 PR base SHA 또는 push 이전 SHA와 `HEAD`의 변경 경로를 파일로 만든 뒤 `visual-authority:affected -- --changed-paths-file <path>`로 영향 ID를 구합니다. 매핑되지 않은 시각 민감 경로는 실패하며, ID가 있으면 `READMATES_VISUAL_AUTHORITY_IDS`로 선택해 위 Docker gate를 실행합니다. 실패 artifact에는 `approved-mockup`의 reference·candidate·overlay·diff·report가 포함됩니다.
+
+여러 브라우저의 동작·레이아웃 smoke는 별도 명령입니다.
+
+```bash
+corepack pnpm --dir front test:e2e:visual-authority-browsers
+```
+
+`test:e2e:approved-routes`는 Docker helper가 사용하는 내부 실행 명령입니다. 일반 host에서는 canonical renderer 조건 때문에 비교 spec이 수집 대상에서 제외되므로 픽셀 통과 근거로 쓰지 않습니다. `READMATES_VISUAL_AUTHORITY_SMOKE_ONLY=true`는 backend 없는 fixture 실행을 선택하는 설정이며 Docker의 strict pixel 검사를 완화하지 않습니다.
 
 ## Backend
 

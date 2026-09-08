@@ -24,7 +24,7 @@ function count(source: string, needle: string): number {
   return source.split(needle).length - 1;
 }
 
-describe("shell chrome guards (ADR-0045 update 2026-09-05)", () => {
+describe("shell chrome guards (ADR-0055)", () => {
   const files = cssRoots.flatMap((root) => cssFiles(path.join(projectRoot, root)));
 
   it("draws no icon from a CSS data URI outside the recorded baseline", () => {

@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+ADR impact: new — ADR-0054 (`Proposed`). 현재 PNG 게이트는 유지하며 관련 Accepted ADR의 변경은 별도 focused ADR로 supersede한다.
+
 **Goal:** 71장 코드 네이티브 시안을 실제 인증 라우트에서 그대로 재현하고, 시안·구현·검증이 같은 CSS·토큰·픽스처·`data-spec` 계약을 공유하는 파이프라인으로 기존 PNG 픽셀 게이트를 대체한다.
 
 **Architecture:** 시안 생성기(`design/mockups/2026-09-06-quiet-desk/gen`)가 런타임 CSS(`front/shared/styles/quiet-desk.css`)와 토큰을 읽어 아트보드를 만들고, Playwright 추출기가 아트보드에서 `data-spec` 계약 JSON을 뽑는다. 런타임은 프래그먼트와 1:1인 공용 컴포넌트(`front/shared/ui/quiet-desk/`)로 화면을 조립하고, `design-contract.spec.ts`가 실제 라우트를 계약과 비교한다. 슬라이스 0(기반)·1(공유 셸)을 먼저 끝내고, 2~7(화면 묶음)은 독립 실행, 8(레거시 정리)로 닫는다.
@@ -29,7 +31,7 @@
 - 픽셀 비교는 보고용(`docs/reports`)이고 게이트가 아니다. 게이트는 존재·순서·DOM 서명·geometry(±4/±2px)·typography·오버플로·ARIA다.
 - 공개 저장소 안전: 실제 멤버 데이터·비밀·사설 도메인·절대 경로 금지. 시안·픽스처 데이터는 `gen/fixtures.json`의 가상 값만.
 - 패키지 매니저는 Corepack: `npx --yes corepack@0.35.0 pnpm --dir front ...`. Docker 컨텍스트 `colima-readmates-va`(`DOCKER_CONTEXT=colima-readmates-va`), `docker context use` 금지.
-- 매 태스크 시작 전 `git status --short --branch --untracked-files=all`. 파일 단위로만 stage. 커밋 메시지 끝에 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
+- 매 태스크 시작 전 `git status --short --branch --untracked-files=all`. 파일 단위로만 stage. 커밋 작성자·공동 작성자는 실제 기여자만 기록한다.
 - 기존 401/403 purge, 409 보존, unknown-outcome 무재시도, receipt/history, 전환 안전(dirty/pending/unknown-outcome) 계약은 손대지 않는다.
 
 ---
@@ -82,16 +84,16 @@
 
 ## 슬라이스 0 — 기반
 
-### Task 0.0: ADR-0054 Proposed와 문서 연결 (첫 커밋)
+### Task 0.0: ADR-0054 Proposed와 문서 연결 확인
 
 **Files:**
-- Create: `docs/development/adr/0054-code-native-design-contract.md`
-- Modify: `docs/development/adr/README.md`(0054 행 추가 `Proposed`; 0053 비고 "ADR-0054로 supersede 예정"; 0045·0048·0050·0051 비고 "ADR-0054 §영향에 따라 update 예정(라벨·셸 표현)"), `front/DESIGN.md`(맨 위에 "다음 권위: quiet-desk 계약, 슬라이스 진행 중" 절), `docs/agents/design.md`(코드 네이티브 시안 절 3줄), `design/mockups/2026-09-06-quiet-desk/README.md`, `.gitignore`
+- Verify: `docs/development/adr/0054-code-native-design-contract.md` (`Proposed`, 2026-09-09 등록됨)
+- Modify: `docs/development/adr/README.md`(0054 `Proposed`와 파생 인덱스 정합성 확인; Accepted ADR 후속 결정은 별도 focused ADR로 기록), `front/DESIGN.md`(맨 위에 "다음 권위: quiet-desk 계약, 슬라이스 진행 중" 절), `docs/agents/design.md`(코드 네이티브 시안 절 3줄), `design/mockups/2026-09-06-quiet-desk/README.md`, `.gitignore`
 - Check: `git diff --check -- docs design front/DESIGN.md`, `python3 scripts/agent-preflight.py`
 
-- [ ] ADR 본문은 스펙 §10 첫 항목 그대로(컨텍스트·결정·근거·대안·결과·검증·후속). 상태 `Proposed`. 커밋 `docs(adr): ADR-0054 code-native design contract (proposed)`
+- [ ] 등록된 ADR-0054와 스펙 §10의 결정·검증 조건을 확인한다. 상태는 `Proposed`이며 등록만으로 구현 완료를 주장하지 않는다.
 
-루트 `AGENTS.md`는 durable decision의 `Proposed` ADR을 구현 **전**에 요구하므로 이 태스크가 슬라이스 0의 첫 커밋이다.
+루트 `AGENTS.md`는 durable decision의 `Proposed` ADR을 구현 **전**에 요구하므로 이 태스크의 정합성 확인을 구현보다 먼저 수행한다.
 
 ### Task 0.1: 시안 CSS를 런타임 파일로 이관하고 생성기가 읽게 한다
 
@@ -522,7 +524,7 @@ await browser.close();
 
 - [ ] **Step 5: 계약 71개 생성·커밋** — `design-contract:extract` 실행, `design-contract/*.json` 71개 확인. 커밋 `feat(design): extract data-spec contracts from artboards`
 
-### Task 0.5: 게이트 spec과 CI 잡 교체
+### Task 0.5: 게이트 spec과 병행 CI 잡 추가
 
 **Files:**
 - Create: `front/tests/e2e/design-contract.spec.ts`
@@ -599,7 +601,7 @@ for (const screen of registry.screens) {
 
 - [ ] **Step 2: 실행해서 전부 skip 확인** — `DOCKER_CONTEXT=colima-readmates-va npx --yes corepack@0.35.0 pnpm --dir front test:e2e:design-contract:docker` → 71 skipped.
 
-- [ ] **Step 3: CI 잡 교체** — `ci.yml`의 시각 권위 잡 명령을 `test:e2e:design-contract:docker`로, 신선도 검사 스텝 두 개 추가: `python3 design/mockups/2026-09-06-quiet-desk/gen/build.py --no-font --check`(fontTools 불필요), `pnpm --dir front design-contract:extract:check`. 옛 `approved-routes` 스텝은 `if: false`로 비활성(삭제는 슬라이스 8).
+- [ ] **Step 3: 병행 CI 잡 추가** — `ci.yml`에 `test:e2e:design-contract:docker`를 실행하는 새 잡과 신선도 검사 스텝 두 개 추가: `python3 design/mockups/2026-09-06-quiet-desk/gen/build.py --no-font --check`(fontTools 불필요), `pnpm --dir front design-contract:extract:check`. 기존 `approved-routes` 스텝은 활성 상태를 유지한다. 새 잡이 전부 skipped이거나 일부 화면만 통과하면 대체 증거로 인정하지 않는다. 교체·삭제는 슬라이스 8의 전체 전환 검증 뒤 수행한다.
 - [ ] **Step 3b: `expect-no-text-overlap.ts` 복사** — `front/tests/ct/support/expect-no-overlap.ts`의 `expectNoTextOverlap(container: Locator)`를 `front/tests/e2e/support/expect-no-text-overlap.ts`로 복사하되 `Locator` import를 `@playwright/experimental-ct-react`에서 `@playwright/test`로 바꾼다.
 
 - [ ] **Step 4: 커밋** — `test(front): design-contract gate replaces approved-routes pixel job`
@@ -739,7 +741,7 @@ export function ExpandableRow(p: { expanded: boolean; cells: ReactNode[]; summar
 
 - [ ] **Step 1**: spec 작성(위 매트릭스 루프) → 전부 skip 확인 → 커밋 `test(front): design-contract stress matrix (long copy, empty, error)`
 
-**슬라이스 0 종료 기준:** `pnpm --dir front lint/test/build` 초록, `test:ct:docker` 초록(새 컴포넌트 CT 포함), `design-contract`·stress 전부 skipped, CI 잡 교체(신선도 검사 두 개 초록), 아트보드·레지스트리·계약 `--check` diff 0, ADR-0054 Proposed 커밋이 슬라이스 첫 커밋.
+**슬라이스 0 종료 기준:** `pnpm --dir front lint/test/build` 초록, `test:ct:docker` 초록(새 컴포넌트 CT 포함), `design-contract`·stress 전부 skipped, 새 CI 잡 추가(신선도 검사 두 개 초록, 기존 PNG 잡 유지), 아트보드·레지스트리·계약 `--check` diff 0, ADR-0054 `Proposed` 확인 완료. 전부 skipped인 게이트는 기반 준비 상태일 뿐 전환 합격이 아니다.
 
 ---
 
@@ -881,10 +883,10 @@ export function AdminShellQuiet(p: { current: "today" | "clubs" | "service" | "r
 
 | Task | 내용 |
 | --- | --- |
-| 8.1 | 선행 조건: `space-transition.spec.ts`·`design-contract-stress.spec.ts`가 존재하고 초록. 그다음 스펙 §9 삭제 목록 실행(파일 단위 커밋 여러 개), `package.json` 스크립트 정리, CI 옛 스텝 삭제 |
+| 8.1 | 선행 조건: 전체 71장 계약 게이트·`space-transition.spec.ts`·`design-contract-stress.spec.ts`가 skipped 없이 초록이고 사람·보조기술 evidence가 ADR 승격 조건을 충족한다. 그다음 스펙 §9 삭제 목록 실행(파일 단위 커밋 여러 개), `package.json` 스크립트 정리, CI 옛 스텝 삭제 |
 | 8.2 | `GlobalSpaceSwitcher`·`workspace-selector`·`approved-host-shell` 삭제, 남은 import 정리 |
 | 8.3 | 화면별 CSS 삭제 후 `quiet-desk-css-parity`·게이트 71/71 재확인 |
-| 8.4 | ADR-0054 `Accepted`, ADR-0053 `Superseded by ADR-0054`, ADR-0045/0048/0050/0051 update 절 추가, `front/DESIGN.md` 전면 갱신, `docs/agents/design.md`, README, CHANGELOG |
+| 8.4 | ADR-0054 `Accepted`, ADR-0053 `Superseded by ADR-0054`, 관련 Accepted ADR은 해당 focused 후속 ADR로 status-only supersede, `front/DESIGN.md` 전면 갱신, `docs/agents/design.md`, README, CHANGELOG |
 | 8.5 | `docs/reports/2026-MM-DD-quiet-desk-acceptance.md`: 게이트 결과, 픽셀 비율 보고, 사람 30초·보조기술 측정/미측정 |
 | 8.6 | `docs/development/release-readiness-review.md`에 따라 `origin/main..HEAD` 검토 |
 
@@ -892,7 +894,7 @@ export function AdminShellQuiet(p: { current: "today" | "clubs" | "service" | "r
 
 ## Self-Review
 
-- **Spec coverage:** §2 파이프라인 → Task 0.1~0.5. §3 셸 → 1.1~1.5. §4 화면 71장 → 슬라이스 2~7 표(모든 아트보드 id가 한 번씩 등장). §5 문법 → 0.7~0.9. §6 동작 → 2.x·3.2·4.3·5.4·6.1·7.x. §7 검증 → 0.5와 각 종료 기준. §8 순서 → 슬라이스 구조. §9 → 8.1~8.3. §10 → 0.10, 8.4. §11 위험 중 "DOM 서명 엄격도"는 0.4의 `IGNORED_CLASSES`와 속성 무시로, "생성기 언어"는 0.5의 `--no-font --check`로 다뤘다.
+- **Spec coverage:** §2 파이프라인 → Task 0.1~0.5. §3 셸 → 1.1~1.5. §4 화면 71장 → 슬라이스 2~7 표(모든 아트보드 id가 한 번씩 등장). §5 문법 → 0.7~0.9. §6 동작 → 2.x·3.2·4.3·5.4·6.1·7.x. §7 검증 → 0.5와 각 종료 기준. §8 순서 → 슬라이스 구조. §9 → 8.1~8.3. §10 → 0.0, 8.4. §11 위험 중 "DOM 서명 엄격도"는 0.4의 `IGNORED_CLASSES`와 속성 무시로, "생성기 언어"는 0.5의 `--no-font --check`로 다뤘다.
 - **Placeholder scan:** 슬라이스 2~8은 의도적으로 골격이며 "각 슬라이스 시작 시 상세 계획 + pre-sdd-review"를 헤더에 명시했다. 슬라이스 0·1에는 TBD가 없다.
 - **Type consistency:** `TodayState`(0.9, 2.1), `PerspectiveToggleProps`(1.1→1.2·1.3), `ClubMenuProps`(1.1→1.2·1.3), `AccountMenuProps`(1.2→1.3), `CircTone`(0.7 `CircIcon`→0.8 `TodoRail`/`RecordCard`), `HostBffPayloads`/`AdminBffPayloads`·`installDesignContractFixtures`(0.2→0.5·0.11), `domSignature`/`domSignatureSource`(0.4→0.5·0.7), `IMPLEMENTED`/`INTERACTIONS`(0.3→0.5·1.4·1.5·2.9), `SpaceTransitionRequestResult`·`useGlobalSpaceTransitionController`(1.1·1.4) 이름을 통일했다.
 - **Pre-SDD review 최종 잔여 반영(READY 뒤):** PSDR-201 파일 구조 문구, PSDR-202 `loginAs` 잔존 삭제, PSDR-203 닫힌 메뉴 unmount 규칙, PSDR-204 `--check` 최종형 표기와 `render_screens_md` 인터페이스, PSDR-205 도커 러너를 Task 0.4에서 생성, PSDR-206 게이트의 `Region`·`collect` import 정리, PSDR-107 vitest 테스트 `import.meta.dirname`.
