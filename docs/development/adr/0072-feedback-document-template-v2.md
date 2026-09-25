@@ -1,6 +1,6 @@
 # ADR-0072: 피드백 문서 템플릿 v2 — 모임 단위 섹션과 회차 누적 흐름을 선택 섹션으로 추가
 
-- 상태: Proposed
+- 상태: Accepted
 - 결정일: 2026-09-25
 - 작성자: 호스트 운영 / 피드백 문서 담당
 - 관련: `server/src/main/kotlin/com/readmates/feedback/application/FeedbackDocumentParser.kt` (`FeedbackDocumentParser.parse`), `front/features/feedback/ui/feedback-document-page.tsx` (`FeedbackDocumentPage`), `server/src/main/kotlin/com/readmates/club/adapter/out/persistence/JdbcAdminClubOperationsAdapter.kt` (`FEEDBACK_DOCUMENT_MARKER`), `docs/development/session-import-generator.md`

@@ -8,11 +8,31 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Highlights
 
-- **피드백 문서 템플릿 v2:** `readmates-feedback:v2` 마커로 한눈에 보기, 오늘의 하이라이트, 모임 피드백(잘된 점·아쉬운 점·발언 분량·다음 모임 제안), 모임의 흐름(회차별 참석·단계·반복 과제), 이어갈 질문과 참여자별 배지·변화 흐름·지난 과제에서 해낸 것·첫 기록 기준점·이번 모임의 발언을 선택 섹션으로 추가했습니다(ADR-0072, Proposed). v1 문서와 AI 생성·외부 JSON import 경로는 그대로 동작하며, 피드백 API 응답은 기존 필드를 유지한 채 `templateVersion`과 선택 섹션 필드를 추가합니다. 멤버 피드백 화면은 v2 섹션이 있을 때만 새 영역과 문서 안 바로 가기를 그리고, 관리자 마감 위험 판정은 v2 마커도 유효한 문서로 봅니다. DB schema는 바뀌지 않습니다.
+- 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+
+## v2.5.0 - 2026-09-25
+
+### Highlights
+
+- **피드백 문서 템플릿 v2:** `readmates-feedback:v2` 마커로 한눈에 보기, 오늘의 하이라이트, 모임 피드백(잘된 점·아쉬운 점·발언 분량·다음 모임 제안), 모임의 흐름(회차별 참석·단계·반복 과제), 이어갈 질문과 참여자별 배지·변화 흐름·지난 과제에서 해낸 것·첫 기록 기준점·이번 모임의 발언을 선택 섹션으로 추가했습니다(ADR-0072). v1 문서와 AI 생성·외부 JSON import 경로는 그대로 동작하며, 피드백 API 응답은 기존 필드를 유지한 채 `templateVersion`과 선택 섹션 필드를 추가합니다. 멤버 피드백 화면은 v2 섹션이 있을 때만 새 영역과 문서 안 바로 가기를 그리고, 관리자 마감 위험 판정은 v2 마커도 유효한 문서로 봅니다. DB schema는 바뀌지 않습니다.
 
 ### Changed
 
 - **Detekt 기준 완화:** `MaxLineLength` 160, `TooManyFunctions` 25, `LongMethod` 100·`LargeClass` 1000(테스트 제외), `CyclomaticComplexMethod` 25, `LongParameterList` 8/10, `NestedBlockDepth` 5, `ReturnCount`·`ThrowsCount` 4, `ComplexCondition` 6으로 조정했습니다. 기존 baseline 파일은 바꾸지 않았습니다.
+
+### Deployment Notes
+
+- 배포 기준은 운영 중인 `v2.4.1`에 이번 변경만 더한 커밋입니다. DB migration, 새 환경 변수, runtime rendering 변경이 없으므로 `sync-config`는 필요하지 않습니다.
+- Annotated `v2.5.0` tag에서 `Deploy Server Image`가 scan한 digest를 같은 tag로 promote한 뒤 OCI backend를 먼저 배포합니다. `/internal/health`와 BFF auth가 정상이면 같은 tag로 Cloudflare Pages frontend를 배포합니다.
+- 새 서버는 v1과 v2 피드백 문서를 모두 읽고, 새 프론트는 v2 선택 섹션이 없는 응답(구 서버·v1 문서)도 기존 화면으로 그립니다. 운영에 v2 문서를 반영하는 작업은 backend 배포가 끝난 뒤에만 합니다.
+- Final smoke는 public app/auth, OAuth redirect와 피드백 문서 화면을 read-only로 확인합니다. 알림 발송과 실제 OAuth 완료는 수행하지 않습니다.
+
+### Verification
+
+- Frontend: `npx --yes corepack@0.35.0 pnpm --dir front lint`, `test`(280 files / 2,187 tests), `build`가 통과했습니다. Chromium E2E `test:e2e`는 150/150이 통과했습니다.
+- Server: `./scripts/server-ci-check.sh`(ktlint, detekt, unit, architecture, JaCoCo)가 통과했습니다. MySQL/Testcontainers 전체 `./server/gradlew -p server integrationTest` 1,006 tests가 통과했습니다.
+- 기존 운영 v1 피드백 문서 16개(1~11차 버전 포함)와 v2 전환본 11개가 새 parser에서 모두 파싱되는 것을 로컬에서 확인했습니다(실제 데이터는 저장소에 포함하지 않음).
+- Public release: `./scripts/build-public-release-candidate.sh`와 `./scripts/public-release-check.sh .tmp/public-release-candidate`가 통과했습니다. 로컬에 gitleaks가 없어 fallback path/content 검사로 실행했습니다.
 
 ## v2.4.1 - 2026-08-17
 
