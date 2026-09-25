@@ -28,6 +28,7 @@ ReadMates의 주요 기술 의사결정을 기록한다. 새 결정을 내릴 �
 | [0014](0014-bff-secret-rotation-lifecycle.md) | BFF secret rotation lifecycle — 4단계 절차 + preflight 진단 엔드포인트 | Accepted | 2026-05-12 | front, security |
 | [0015](0015-notification-outbox-dedupe-policy.md) | Notification Outbox dedupeKey 정책 | Accepted | 2026-05-12 | server |
 | [0016](0016-deploy-ledger-event-schema.md) | Deploy ledger NDJSON 스키마 | Accepted | 2026-05-12 | ops |
+| [0072](0072-feedback-document-template-v2.md) | 피드백 문서 템플릿 v2 — 모임 단위 섹션과 회차 누적 흐름 선택 섹션 | Proposed | 2026-09-25 | server, front |
 
 ## 상태 범례
 
