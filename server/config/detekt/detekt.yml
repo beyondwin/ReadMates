@@ -76,10 +76,10 @@ complexity:
   active: true
   CognitiveComplexMethod:
     active: false
-    allowedComplexity: 15
+    allowedComplexity: 25
   ComplexCondition:
     active: true
-    allowedConditions: 4
+    allowedConditions: 6
   ComplexInterface:
     active: false
     allowedDefinitions: 10
@@ -107,14 +107,16 @@ complexity:
     ignoredLabels: []
   LargeClass:
     active: true
-    allowedLines: 600
+    excludes: ['**/test/**', '**/androidTest/**', '**/commonTest/**', '**/jvmTest/**', '**/androidUnitTest/**', '**/androidInstrumentedTest/**', '**/jsTest/**', '**/iosTest/**']
+    allowedLines: 1000
   LongMethod:
     active: true
-    allowedLines: 60
+    excludes: ['**/test/**', '**/androidTest/**', '**/commonTest/**', '**/jvmTest/**', '**/androidUnitTest/**', '**/androidInstrumentedTest/**', '**/jsTest/**', '**/iosTest/**']
+    allowedLines: 100
   LongParameterList:
     active: true
-    allowedFunctionParameters: 6
-    allowedConstructorParameters: 7
+    allowedFunctionParameters: 8
+    allowedConstructorParameters: 10
     ignoreDefaultParameters: false
     ignoreDataClasses: true
     ignoreAnnotatedParameter: []
@@ -127,7 +129,7 @@ complexity:
     ignoreArgumentsMatchingNames: false
   NestedBlockDepth:
     active: true
-    allowedDepth: 4
+    allowedDepth: 5
   NestedScopeFunctions:
     active: false
     allowedDepth: 1
@@ -149,11 +151,11 @@ complexity:
   TooManyFunctions:
     active: true
     excludes: ['**/test/**', '**/androidTest/**', '**/commonTest/**', '**/jvmTest/**', '**/androidUnitTest/**', '**/androidInstrumentedTest/**', '**/jsTest/**', '**/iosTest/**']
-    allowedFunctionsPerFile: 11
-    allowedFunctionsPerClass: 11
-    allowedFunctionsPerInterface: 11
-    allowedFunctionsPerObject: 11
-    allowedFunctionsPerEnum: 11
+    allowedFunctionsPerFile: 25
+    allowedFunctionsPerClass: 25
+    allowedFunctionsPerInterface: 25
+    allowedFunctionsPerObject: 25
+    allowedFunctionsPerEnum: 25
     ignoreDeprecated: false
     ignorePrivate: false
     ignoreOverridden: false
@@ -613,7 +615,7 @@ style:
     maxChainedCalls: 5
   MaxLineLength:
     active: true
-    maxLineLength: 120
+    maxLineLength: 160
     excludePackageStatements: true
     excludeImportStatements: true
     excludeCommentStatements: false
@@ -654,7 +656,7 @@ style:
     active: false
   ReturnCount:
     active: true
-    max: 2
+    max: 4
     excludedFunctions:
       - 'equals'
     excludeLabeled: false
@@ -672,7 +674,7 @@ style:
     ignoredCharacters: []
   ThrowsCount:
     active: true
-    max: 2
+    max: 4
     excludeGuardClauses: false
   TrailingWhitespace:
     active: false

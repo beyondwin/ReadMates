@@ -26,6 +26,12 @@ data class FeedbackDocumentResult(
     val metadata: List<FeedbackMetadataItemResult>,
     val observerNotes: List<String>,
     val participants: List<FeedbackParticipantResult>,
+    val templateVersion: Int = 1,
+    val overview: List<FeedbackMetadataItemResult> = emptyList(),
+    val highlights: List<FeedbackHighlightResult> = emptyList(),
+    val groupFeedback: FeedbackGroupFeedbackResult? = null,
+    val trend: FeedbackTrendResult? = null,
+    val followUpQuestions: List<String> = emptyList(),
 )
 
 data class FeedbackMetadataItemResult(
@@ -42,6 +48,75 @@ data class FeedbackParticipantResult(
     val problems: List<FeedbackProblemResult>,
     val actionItems: List<String>,
     val revealingQuote: FeedbackRevealingQuoteResult,
+    val badges: List<String> = emptyList(),
+    val journey: List<FeedbackJourneyStepResult> = emptyList(),
+    val achievements: List<String> = emptyList(),
+    val baseline: List<String> = emptyList(),
+    val sessionQuotes: List<FeedbackSessionQuoteResult> = emptyList(),
+)
+
+data class FeedbackHighlightResult(
+    val title: String,
+    val lines: List<FeedbackHighlightLineResult>,
+    val why: String,
+)
+
+data class FeedbackHighlightLineResult(
+    val speaker: String,
+    val time: String?,
+    val text: String,
+)
+
+data class FeedbackGroupFeedbackResult(
+    val strengths: List<FeedbackGroupPointResult>,
+    val improvements: List<FeedbackGroupPointResult>,
+    val speakingShares: List<FeedbackSpeakingShareResult>,
+    val speakingNote: String?,
+    val nextSteps: List<String>,
+)
+
+data class FeedbackGroupPointResult(
+    val title: String,
+    val evidence: String,
+    val interpretation: String,
+)
+
+data class FeedbackSpeakingShareResult(
+    val name: String,
+    val percent: Int,
+)
+
+data class FeedbackTrendResult(
+    val attendance: List<FeedbackAttendancePointResult>,
+    val phases: List<FeedbackTrendPhaseResult>,
+    val repeatedTasks: List<FeedbackRepeatedTaskResult>,
+)
+
+data class FeedbackAttendancePointResult(
+    val label: String,
+    val count: Int,
+)
+
+data class FeedbackTrendPhaseResult(
+    val label: String,
+    val text: String,
+)
+
+data class FeedbackRepeatedTaskResult(
+    val task: String,
+    val detail: String,
+    val status: String,
+)
+
+data class FeedbackJourneyStepResult(
+    val label: String,
+    val text: String,
+)
+
+data class FeedbackSessionQuoteResult(
+    val time: String?,
+    val quote: String,
+    val note: String,
 )
 
 data class FeedbackProblemResult(

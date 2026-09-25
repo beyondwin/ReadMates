@@ -377,6 +377,36 @@ class FeedbackDocumentControllerTest(
                 jsonPath("$.participants[0].revealingQuote.quote") { exists() }
                 jsonPath("$.participants[0].revealingQuote.context") { exists() }
                 jsonPath("$.participants[0].revealingQuote.note") { exists() }
+                jsonPath("$.templateVersion") { value(1) }
+                jsonPath("$.highlights.length()") { value(0) }
+                jsonPath("$.groupFeedback") { value(null as Any?) }
+                jsonPath("$.participants[0].sessionQuotes.length()") { value(0) }
+            }
+    }
+
+    @Test
+    fun `host reads v2 feedback document sections`() {
+        insertLatestDocument(98, "feedback-6-v2.md", validV2FeedbackMarkdown())
+
+        mockMvc
+            .get("/api/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.templateVersion") { value(2) }
+                jsonPath("$.overview[0].label") { value("무엇을") }
+                jsonPath("$.highlights[0].title") { value("기준이 다듬어졌다") }
+                jsonPath("$.highlights[0].lines[0].speaker") { value("이멤버5") }
+                jsonPath("$.highlights[0].lines[0].time") { value("10:00") }
+                jsonPath("$.highlights[0].why") { value("설명이 쌓였다.") }
+                jsonPath("$.groupFeedback.strengths[0].title") { value("말뜻부터 맞췄다") }
+                jsonPath("$.groupFeedback.speakingShares[0].percent") { value(100) }
+                jsonPath("$.trend.attendance[0].count") { value(3) }
+                jsonPath("$.trend.repeatedTasks[0].status") { value("진행 중") }
+                jsonPath("$.followUpQuestions[0]") { value("기준은 누가 정하는가?") }
+                jsonPath("$.participants[0].badges[0]") { value("첫 기록") }
+                jsonPath("$.participants[0].baseline[0]") { value("결론으로 시작하는지") }
+                jsonPath("$.participants[0].sessionQuotes[0].quote") { value("피하는 게 맞다고 봤어요.") }
             }
     }
 
@@ -603,6 +633,129 @@ class FeedbackDocumentControllerTest(
             """.trimIndent(),
         )
     }
+
+    private fun insertLatestDocument(
+        version: Int,
+        fileName: String,
+        sourceText: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into session_feedback_documents (
+              id, club_id, session_id, version, source_text, file_name, content_type, file_size
+            )
+            values (
+              '00000000-0000-0000-0000-000000000995',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000000306',
+              ?, ?, ?, 'text/markdown', ?
+            )
+            """.trimIndent(),
+            version,
+            sourceText,
+            fileName,
+            sourceText.toByteArray(StandardCharsets.UTF_8).size,
+        )
+    }
+
+    private fun validV2FeedbackMarkdown(): String =
+        """
+        <!-- readmates-feedback:v2 -->
+
+        # 독서모임 6차 피드백
+
+        투자의 원칙 · 2026.04.15
+
+        ## 메타
+
+        - 일시: 2026.04.15 (수) · 19:40
+
+        ## 한눈에 보기
+
+        - 무엇을: 판단 기준을 사례로 확인했다.
+
+        ## 관찰자 노트
+
+        이번 회차는 판단 기준을 명확히 세우는 연습에 집중했다.
+
+        ## 오늘의 하이라이트
+
+        ### 1. 기준이 다듬어졌다
+
+        - 이멤버5 [10:00]: 피하는 게 맞다고 봤어요.
+
+        왜 좋았나: 설명이 쌓였다.
+
+        ## 모임 피드백
+
+        ### 잘된 점
+
+        #### 1. 말뜻부터 맞췄다
+
+        - 근거: 기준(10분)
+        - 해석: 애매한 말을 확인했다.
+
+        ### 발언 분량
+
+        - 이멤버5: 100
+
+        ## 모임의 흐름
+
+        ### 회차별 참석
+
+        - 6차: 3
+
+        ### 반복 과제
+
+        - 결론부터 말하기 | 이멤버5 6차 | 진행 중
+
+        ## 이어갈 질문
+
+        1. 기준은 누가 정하는가?
+
+        ## 참여자별 피드백
+
+        ### 01. 이멤버5
+
+        역할: 구체적인 사례를 통해 판단 기준을 확인하는 참여자
+        배지: 첫 기록
+
+        #### 첫 기록 기준점
+
+        - 결론으로 시작하는지
+
+        #### 참여 스타일
+
+        이멤버5은 질문의 전제를 먼저 확인했다.
+
+        #### 실질 기여
+
+        - 의사결정 기준을 설명했다. [10:00]
+
+        #### 이번 모임의 발언
+
+        - [10:00] 피하는 게 맞다고 봤어요. | 기준을 행동으로 옮긴 발언이다.
+
+        #### 문제점과 자기모순
+
+        ##### 1. 적용 범위가 좁았다
+
+        - 핵심: 다른 상황으로 확장하지 않았다.
+        - 근거: "피하는 게 맞다고 봤어요." [12:00]
+        - 해석: 적용 조건을 함께 말하면 선명해진다.
+
+        #### 실천 과제
+
+        1. 적용 조건을 함께 말한다.
+
+        #### 드러난 한 문장
+
+        > 피하는 게 맞다고 봤어요.
+
+        맥락: 의사결정을 설명하던 장면 · [12:00]
+
+        주석: 기준이 행동으로 이어지는 순간이다.
+        """.trimIndent()
 
     private fun validFeedbackMarkdown(): String =
         """

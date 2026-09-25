@@ -3,10 +3,13 @@ package com.readmates.feedback.adapter.`in`.web
 import com.readmates.feedback.application.model.FeedbackDocumentListItemResult
 import com.readmates.feedback.application.model.FeedbackDocumentResult
 import com.readmates.feedback.application.model.FeedbackDocumentStatusResult
+import com.readmates.feedback.application.model.FeedbackGroupFeedbackResult
+import com.readmates.feedback.application.model.FeedbackGroupPointResult
 import com.readmates.feedback.application.model.FeedbackMetadataItemResult
 import com.readmates.feedback.application.model.FeedbackParticipantResult
 import com.readmates.feedback.application.model.FeedbackProblemResult
 import com.readmates.feedback.application.model.FeedbackRevealingQuoteResult
+import com.readmates.feedback.application.model.FeedbackTrendResult
 import com.readmates.shared.paging.CursorPage
 
 fun CursorPage<FeedbackDocumentListItemResult>.toWebDto(): FeedbackDocumentListPage =
@@ -39,6 +42,19 @@ fun FeedbackDocumentResult.toWebDto(): FeedbackDocumentResponse =
         metadata = metadata.map { it.toWebDto() },
         observerNotes = observerNotes,
         participants = participants.map { it.toWebDto() },
+        templateVersion = templateVersion,
+        overview = overview.map { it.toWebDto() },
+        highlights =
+            highlights.map { highlight ->
+                FeedbackHighlight(
+                    title = highlight.title,
+                    lines = highlight.lines.map { FeedbackHighlightLine(speaker = it.speaker, time = it.time, text = it.text) },
+                    why = highlight.why,
+                )
+            },
+        groupFeedback = groupFeedback?.toWebDto(),
+        trend = trend?.toWebDto(),
+        followUpQuestions = followUpQuestions,
     )
 
 fun FeedbackDocumentStatusResult.toWebDto(): FeedbackDocumentStatus =
@@ -64,6 +80,30 @@ private fun FeedbackParticipantResult.toWebDto(): FeedbackParticipant =
         problems = problems.map { it.toWebDto() },
         actionItems = actionItems,
         revealingQuote = revealingQuote.toWebDto(),
+        badges = badges,
+        journey = journey.map { FeedbackJourneyStep(label = it.label, text = it.text) },
+        achievements = achievements,
+        baseline = baseline,
+        sessionQuotes = sessionQuotes.map { FeedbackSessionQuote(time = it.time, quote = it.quote, note = it.note) },
+    )
+
+private fun FeedbackGroupFeedbackResult.toWebDto(): FeedbackGroupFeedback =
+    FeedbackGroupFeedback(
+        strengths = strengths.map { it.toWebDto() },
+        improvements = improvements.map { it.toWebDto() },
+        speakingShares = speakingShares.map { FeedbackSpeakingShare(name = it.name, percent = it.percent) },
+        speakingNote = speakingNote,
+        nextSteps = nextSteps,
+    )
+
+private fun FeedbackGroupPointResult.toWebDto(): FeedbackGroupPoint =
+    FeedbackGroupPoint(title = title, evidence = evidence, interpretation = interpretation)
+
+private fun FeedbackTrendResult.toWebDto(): FeedbackTrend =
+    FeedbackTrend(
+        attendance = attendance.map { FeedbackAttendancePoint(label = it.label, count = it.count) },
+        phases = phases.map { FeedbackTrendPhase(label = it.label, text = it.text) },
+        repeatedTasks = repeatedTasks.map { FeedbackRepeatedTask(task = it.task, detail = it.detail, status = it.status) },
     )
 
 private fun FeedbackProblemResult.toWebDto(): FeedbackProblem =

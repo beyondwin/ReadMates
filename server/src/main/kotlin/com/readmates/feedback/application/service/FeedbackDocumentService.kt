@@ -9,9 +9,6 @@ import com.readmates.feedback.application.model.FeedbackDocumentResult
 import com.readmates.feedback.application.model.FeedbackDocumentSessionResult
 import com.readmates.feedback.application.model.FeedbackDocumentStatusResult
 import com.readmates.feedback.application.model.FeedbackMetadataItemResult
-import com.readmates.feedback.application.model.FeedbackParticipantResult
-import com.readmates.feedback.application.model.FeedbackProblemResult
-import com.readmates.feedback.application.model.FeedbackRevealingQuoteResult
 import com.readmates.feedback.application.model.StoredFeedbackDocumentListResult
 import com.readmates.feedback.application.model.StoredFeedbackDocumentResult
 import com.readmates.feedback.application.port.`in`.GetHostFeedbackDocumentPreviewUseCase
@@ -163,32 +160,13 @@ class FeedbackDocumentService(
             uploadedAt = uploadedAt.toString(),
             metadata = parsedDocument.metadata.map { FeedbackMetadataItemResult(it.label, it.value) },
             observerNotes = parsedDocument.observerNotes,
-            participants =
-                parsedDocument.participants.map { participant ->
-                    FeedbackParticipantResult(
-                        number = participant.number,
-                        name = participant.name,
-                        role = participant.role,
-                        style = participant.styleParagraphs,
-                        contributions = participant.contributionBullets,
-                        problems =
-                            participant.problems.map { problem ->
-                                FeedbackProblemResult(
-                                    title = problem.title,
-                                    core = problem.core,
-                                    evidence = problem.evidence,
-                                    interpretation = problem.interpretation,
-                                )
-                            },
-                        actionItems = participant.actionItems,
-                        revealingQuote =
-                            FeedbackRevealingQuoteResult(
-                                quote = participant.revealingQuote.quote,
-                                context = participant.revealingQuote.context,
-                                note = participant.revealingQuote.note,
-                            ),
-                    )
-                },
+            participants = parsedDocument.participants.map { it.toResult() },
+            templateVersion = parsedDocument.templateVersion,
+            overview = parsedDocument.overview.map { FeedbackMetadataItemResult(it.label, it.value) },
+            highlights = parsedDocument.highlights.map { it.toResult() },
+            groupFeedback = parsedDocument.groupFeedback?.toResult(),
+            trend = parsedDocument.trend?.toResult(),
+            followUpQuestions = parsedDocument.followUpQuestions,
         )
 
     private companion object {

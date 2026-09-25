@@ -419,7 +419,7 @@ private fun ResultSet.toClosingRiskFacts(): ClosingRiskFacts {
                 getInt("highlight_count") > 0 ||
                 getInt("one_liner_count") > 0,
         feedbackMissing = feedbackSourceText == null,
-        feedbackInvalid = feedbackSourceText != null && !feedbackSourceText.contains(FEEDBACK_DOCUMENT_MARKER),
+        feedbackInvalid = feedbackSourceText != null && FEEDBACK_DOCUMENT_MARKERS.none { feedbackSourceText.contains(it) },
         notificationSent = getString("latest_notification_status") in setOf("PUBLISHED", "SENT"),
         publicVisible =
             getBoolean("is_public") &&
@@ -463,7 +463,7 @@ private const val COST_SCALE = 4
 private const val CLOSING_RISK_ITEM_LIMIT = 5
 private const val CLOSING_RISK_SCAN_LIMIT = 50
 private const val TODAY_CLOSING_RISK_SCAN_LIMIT = 200
-private const val FEEDBACK_DOCUMENT_MARKER = "<!-- readmates-feedback:v1 -->"
+private val FEEDBACK_DOCUMENT_MARKERS = listOf("<!-- readmates-feedback:v1 -->", "<!-- readmates-feedback:v2 -->")
 private const val TODAY_CLOSING_RISK_SQL = """
 select
   clubs.id as club_id,

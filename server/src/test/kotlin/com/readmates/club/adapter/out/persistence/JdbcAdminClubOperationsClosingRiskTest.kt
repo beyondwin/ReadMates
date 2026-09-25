@@ -121,7 +121,7 @@ class JdbcAdminClubOperationsClosingRiskTest(
         insertFeedbackDocument(
             "00000000-0000-0000-0000-0000000ce302",
             READY_SESSION_ID,
-            "<!-- readmates-feedback:v1 -->\n# Ready feedback",
+            "<!-- readmates-feedback:v2 -->\n# Ready feedback",
         )
     }
 
