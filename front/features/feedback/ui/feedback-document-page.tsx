@@ -8,7 +8,25 @@ import {
   readmatesReturnState,
   type ReadmatesReturnTarget,
 } from "@/features/feedback/model/feedback-document-model";
+import {
+  feedbackParticipantAnchor,
+  feedbackSectionIds,
+  hasFeedbackGroupSections,
+  splitTrailingTimestamp,
+} from "@/features/feedback/model/feedback-document-model";
 import { Link } from "@/features/feedback/ui/feedback-link";
+import {
+  FeedbackGroupLabel,
+  FeedbackGroupSection,
+  FeedbackHighlightsSection,
+  FeedbackJumpNav,
+  FeedbackOverviewFields,
+  FeedbackTrendSection,
+  ParticipantBadges,
+  ParticipantJourney,
+  ParticipantSessionQuotes,
+  feedbackDocumentV2Styles,
+} from "@/features/feedback/ui/feedback-document-v2-sections";
 import { feedbackDocumentPdfDownloadsEnabled } from "@/shared/config/readmates-feature-flags";
 
 const singlePagePrintStyleId = "rm-feedback-document-single-page-print-style";
@@ -39,6 +57,7 @@ export default function FeedbackDocumentPage({
   const feedbackHref = appFeedbackHref(document.sessionId);
   const returnState = readmatesReturnState(returnTarget);
   const showHeaderActions = printMode && feedbackDocumentPdfDownloadsEnabled;
+  const hasGroupSections = hasFeedbackGroupSections(document);
 
   return (
     <main className={`rm-feedback-document-page${printMode ? " rm-feedback-document-page--print" : ""}`}>
@@ -105,9 +124,21 @@ export default function FeedbackDocumentPage({
       <section style={{ padding: "32px 0 84px" }}>
         <div className="container">
           <div className="stack" style={{ "--stack": "40px", maxWidth: 920, margin: "0 auto" } as CSSProperties}>
-            <DocumentMeta document={document} />
-            <ObserverNotes notes={document.observerNotes} />
-            <ParticipantSections participants={document.participants} />
+            {hasGroupSections ? (
+              <div className="stack" style={{ "--stack": "16px" } as CSSProperties}>
+                <DocumentMeta document={document} />
+                <FeedbackJumpNav document={document} />
+              </div>
+            ) : (
+              <DocumentMeta document={document} />
+            )}
+            {hasGroupSections ? <FeedbackGroupLabel>모임 전체</FeedbackGroupLabel> : null}
+            <ObserverNotes notes={document.observerNotes} overview={document.overview ?? []} />
+            <FeedbackHighlightsSection highlights={document.highlights ?? []} />
+            <FeedbackGroupSection group={document.groupFeedback ?? null} />
+            <FeedbackTrendSection trend={document.trend ?? null} followUpQuestions={document.followUpQuestions ?? []} />
+            {hasGroupSections ? <FeedbackGroupLabel>멤버별 피드백</FeedbackGroupLabel> : null}
+            <ParticipantSections participants={document.participants} showTimestamps={document.templateVersion === 2} />
           </div>
         </div>
       </section>
@@ -347,16 +378,17 @@ function DocumentMeta({ document }: { document: FeedbackDocumentView }) {
   );
 }
 
-function ObserverNotes({ notes }: { notes: string[] }) {
+function ObserverNotes({ notes, overview }: { notes: string[]; overview: NonNullable<FeedbackDocumentView["overview"]> }) {
   if (notes.length === 0) {
     return null;
   }
 
   return (
-    <section className="surface-quiet rm-feedback-observer-notes" style={{ padding: 26 }}>
+    <section id={feedbackSectionIds.summary} className="surface-quiet rm-feedback-observer-notes" style={{ padding: 26 }}>
       <div className="eyebrow" style={{ marginBottom: 14 }}>
         관찰 메모
       </div>
+      <FeedbackOverviewFields items={overview} />
       <div className="stack" style={{ "--stack": "12px" } as CSSProperties}>
         {notes.map((note) => (
           <p key={note} className="body editorial" style={{ fontSize: 16, lineHeight: 1.65, margin: 0 }}>
@@ -368,12 +400,19 @@ function ObserverNotes({ notes }: { notes: string[] }) {
   );
 }
 
-function ParticipantSections({ participants }: { participants: FeedbackDocumentView["participants"] }) {
+function ParticipantSections({
+  participants,
+  showTimestamps,
+}: {
+  participants: FeedbackDocumentView["participants"];
+  showTimestamps: boolean;
+}) {
   return (
     <div className="stack" style={{ "--stack": "32px" } as CSSProperties}>
       {participants.map((participant) => (
         <section
           key={`${participant.number}-${participant.name}`}
+          id={feedbackParticipantAnchor(participant)}
           className="surface rm-feedback-participant-document"
           style={{ padding: 30 }}
         >
@@ -389,12 +428,21 @@ function ParticipantSections({ participants }: { participants: FeedbackDocumentV
                 {participant.role}
               </p>
             </div>
+            <ParticipantBadges badges={participant.badges ?? []} />
           </div>
 
-          <div className="grid-2" style={{ gap: 18, marginTop: 24 }}>
+          <ParticipantJourney participant={participant} />
+
+          <div className="grid-2 rm-feedback-grid" style={{ gap: 18, marginTop: (participant.journey?.length ?? 0) > 0 || (participant.baseline?.length ?? 0) > 0 ? 18 : 24 }}>
             <BulletSection title="발화 스타일" items={participant.style} />
-            <BulletSection title="기여" items={participant.contributions} />
+            {showTimestamps ? (
+              <ContributionSection items={participant.contributions} />
+            ) : (
+              <BulletSection title="기여" items={participant.contributions} />
+            )}
           </div>
+
+          <ParticipantSessionQuotes quotes={participant.sessionQuotes ?? []} />
 
           <ProblemBlocks problems={participant.problems} />
           <ActionItems items={participant.actionItems} />
@@ -419,6 +467,33 @@ function BulletSection({ title, items }: { title: string; items: string[] }) {
         {items.map((item) => (
           <li key={item} className="small" style={{ color: "var(--text-2)", marginTop: 6 }}>
             {item}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function ContributionSection({ items }: { items: string[] }) {
+  if (items.length === 0) {
+    return null;
+  }
+
+  const entries = items.map((item) => splitTrailingTimestamp(item));
+  if (entries.every((entry) => entry.time === null)) {
+    return <BulletSection title="기여" items={items} />;
+  }
+
+  return (
+    <section className="surface-quiet" style={{ padding: 18 }}>
+      <div className="eyebrow" style={{ marginBottom: 4 }}>
+        기여
+      </div>
+      <ul className="rm-feedback-contributions">
+        {entries.map((entry) => (
+          <li key={`${entry.time ?? ""}-${entry.text}`} className={`small${entry.time ? "" : " no-time"}`}>
+            {entry.time ? <span className="tiny mono rm-feedback-time">{entry.time}</span> : null}
+            <span>{entry.text}</span>
           </li>
         ))}
       </ul>
@@ -517,6 +592,8 @@ function QuoteBlock({ quote }: { quote: FeedbackDocumentView["participants"][num
 function FeedbackDocumentStyles() {
   return (
     <style>{`
+      ${feedbackDocumentV2Styles}
+
       .rm-feedback-problem-fields {
         display: grid;
         grid-template-columns: minmax(34px, max-content) minmax(0, 1fr);

@@ -1,4 +1,9 @@
-export type FeedbackDocumentView = {
+import type {
+  FeedbackDocumentV2Fields,
+  FeedbackParticipantV2Fields,
+} from "@/features/feedback/api/feedback-contracts";
+
+export type FeedbackDocumentView = FeedbackDocumentV2Fields & {
   sessionId: string;
   sessionNumber: number;
   title: string;
@@ -12,7 +17,7 @@ export type FeedbackDocumentView = {
     value: string;
   }>;
   observerNotes: string[];
-  participants: Array<{
+  participants: Array<FeedbackParticipantV2Fields & {
     number: number;
     name: string;
     role: string;
@@ -81,4 +86,36 @@ export function feedbackUnavailableCopy(reason: FeedbackUnavailableReason) {
         title: "아직 열람 가능한 피드백 문서가 없습니다.",
         body: "호스트가 피드백 문서를 등록하면 이 화면에서 확인할 수 있습니다.",
       };
+}
+
+const trailingTimestampPattern = /\s*\[(\d{1,2}(?::\d{2}){1,2})\]\s*$/;
+
+export function splitTrailingTimestamp(text: string): { text: string; time: string | null } {
+  const match = trailingTimestampPattern.exec(text);
+  if (!match) {
+    return { text, time: null };
+  }
+
+  return { text: text.slice(0, match.index).trimEnd(), time: match[1] ?? null };
+}
+
+export function hasFeedbackGroupSections(document: FeedbackDocumentV2Fields) {
+  return Boolean(
+    (document.overview?.length ?? 0) > 0 ||
+      (document.highlights?.length ?? 0) > 0 ||
+      document.groupFeedback ||
+      document.trend ||
+      (document.followUpQuestions?.length ?? 0) > 0,
+  );
+}
+
+export const feedbackSectionIds = {
+  summary: "feedback-summary",
+  highlights: "feedback-highlights",
+  group: "feedback-group",
+  trend: "feedback-trend",
+};
+
+export function feedbackParticipantAnchor(participant: { number: number }) {
+  return `feedback-participant-${participant.number}`;
 }
