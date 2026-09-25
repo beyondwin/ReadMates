@@ -8,7 +8,11 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Highlights
 
-- 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+- **피드백 문서 템플릿 v2:** `readmates-feedback:v2` 마커로 한눈에 보기, 오늘의 하이라이트, 모임 피드백(잘된 점·아쉬운 점·발언 분량·다음 모임 제안), 모임의 흐름(회차별 참석·단계·반복 과제), 이어갈 질문과 참여자별 배지·변화 흐름·지난 과제에서 해낸 것·첫 기록 기준점·이번 모임의 발언을 선택 섹션으로 추가했습니다(ADR-0072, Proposed). v1 문서와 AI 생성·외부 JSON import 경로는 그대로 동작하며, 피드백 API 응답은 기존 필드를 유지한 채 `templateVersion`과 선택 섹션 필드를 추가합니다. 멤버 피드백 화면은 v2 섹션이 있을 때만 새 영역과 문서 안 바로 가기를 그리고, 관리자 마감 위험 판정은 v2 마커도 유효한 문서로 봅니다. DB schema는 바뀌지 않습니다.
+
+### Changed
+
+- **Detekt 기준 완화:** `MaxLineLength` 160, `TooManyFunctions` 25, `LongMethod` 100·`LargeClass` 1000(테스트 제외), `CyclomaticComplexMethod` 25, `LongParameterList` 8/10, `NestedBlockDepth` 5, `ReturnCount`·`ThrowsCount` 4, `ComplexCondition` 6으로 조정했습니다. 기존 baseline 파일은 바꾸지 않았습니다.
 
 ## v2.4.1 - 2026-08-17
 
