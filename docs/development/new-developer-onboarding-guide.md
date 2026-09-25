@@ -1,14 +1,14 @@
 # ReadMates 신규 합류 개발자 온보딩 가이드
 
-이 문서는 ReadMates에 새로 합류했거나 처음 프로젝트를 맡는 개발자가 제품 목적, 저장소 구조, 요청 흐름, 프론트엔드, BFF, 백엔드, 데이터 계층, Redis, Kafka, 인증, 검증 절차를 한 번에 잡을 수 있게 돕는 입문 문서입니다.
+새로 합류한 개발자가 제품 목적, 저장소 구조, 요청 흐름, frontend, BFF, backend, 데이터 계층, Redis, Kafka, 인증, 검증 절차를 한 번에 잡기 위한 입문 문서입니다.
 
-현재 동작의 source of truth는 코드, 테스트, migration, scripts, [아키텍처 문서](architecture.md), [ADR](adr/README.md)입니다. 이 가이드는 그 문서들을 대체하지 않고, 처음 읽는 순서와 실무 연결점을 제공합니다.
+현재 동작의 기준은 코드, 테스트, migration, scripts, [아키텍처 문서](architecture.md), [ADR](adr/README.md)입니다. 이 가이드는 읽는 순서와 연결점만 알려 줍니다.
 
 ## 먼저 보는 전체 그림
 
-ReadMates는 여러 정기 독서모임의 공개 소개, 멤버 세션 준비, 호스트 운영, 공개 기록, 참석자 전용 피드백 문서를 하나의 클럽별 권한 흐름으로 묶는 invite-only reading-club app입니다.
+ReadMates는 초대 기반 독서모임 앱입니다. 여러 클럽의 공개 소개, 멤버 세션 준비, 호스트 운영, 공개 기록, 멤버 전용 피드백 문서를 클럽별 권한 흐름으로 묶습니다.
 
-가장 중요한 실행 흐름은 아래와 같습니다.
+핵심 실행 흐름:
 
 ```text
 Browser
@@ -20,7 +20,7 @@ Browser
   -> optional Kafka/Redpanda workers
 ```
 
-MySQL과 Flyway가 durable source of truth입니다. Redis는 기본 off인 보조 계층이고, Kafka/Redpanda는 알림과 AI 생성 같은 비동기 workflow를 운영하기 위한 파이프라인입니다. Redis나 Kafka가 멈춰도 핵심 회원, 세션, 공개 기록 데이터가 Redis/Kafka에만 남아 있으면 안 됩니다.
+MySQL/Flyway가 영속 데이터의 source of truth입니다. Redis는 기본 off인 보조 계층이고, Kafka/Redpanda는 알림과 AI 생성 같은 비동기 workflow용 파이프라인입니다. 회원, 세션, 공개 기록 데이터가 Redis나 Kafka에만 있으면 안 됩니다.
 
 ## 처음 읽는 순서
 
@@ -40,14 +40,14 @@ MySQL과 Flyway가 durable source of truth입니다. Redis는 기본 off인 보�
 | `docs/development/` | 개발자가 따라야 할 현재 구조, 실행, 테스트 문서 | `architecture.md`, `local-setup.md`, `test-guide.md`, `adr/README.md` |
 | `docs/deploy/` | Cloudflare, OCI, Compose, public release 관련 runbook | 실제 운영값 대신 placeholder만 사용합니다. |
 | `docs/operations/` | 관측, runbook, postmortem, 운영 반복 절차 | 장애 분석이나 배포 후 확인에 사용합니다. |
-| `design/` | 디자인 시스템 workspace와 catalog | UI를 바꿀 때 design guide와 함께 봅니다. |
+| `design/` | 디자인 시스템 package와 catalog | UI를 바꿀 때 design guide와 함께 봅니다. |
 | `scripts/` | public release, smoke, safety helper | 릴리즈 안전성이나 문서 public-safety 확인에 사용합니다. |
 
 ## 프론트엔드
 
-ReadMates 프론트엔드는 Next.js가 아니라 `React 19 + TypeScript + Vite + React Router 8` SPA입니다. 서버 렌더링이나 React Server Component 구조가 아니므로 `"use client"` 같은 Next/React Server Component 지시어를 추가하지 않습니다.
+Frontend는 Next.js가 아니라 `React 19 + TypeScript + Vite + React Router 8` SPA입니다. 서버 렌더링이나 React Server Component가 없으므로 `"use client"` 같은 지시어를 넣지 않습니다.
 
-핵심 책임은 route-first 구조입니다.
+구조는 route-first입니다.
 
 ```text
 front/src/app
@@ -67,9 +67,9 @@ front/src/app
 | `front/features/<name>/ui` | props와 callback만 받는 presentation |
 | `front/shared` | feature에 묶이지 않는 primitive, auth helper, routing helper, 공통 UI |
 
-서버 상태는 TanStack Query v5로 점진 이관 중입니다. 새 server state는 feature의 `queries`에 query key와 invalidation 정책을 두고, route module이 loader/action과 UI props 조립을 책임지는 방식으로 유지합니다.
+서버 상태는 TanStack Query v5로 관리합니다. 주요 화면의 이관은 끝났습니다([server-state-migration.md](server-state-migration.md)). 새 server state는 feature의 `queries`에 query key와 invalidation을 두고, route module이 loader/action과 UI props 조립을 맡습니다.
 
-Zod는 API response shape를 개발 모드에서 검증하고, fixture export를 통해 서버 contract test와 연결합니다. production bundle에서는 schema가 제거되도록 설계되어 있으므로 runtime validation을 무조건 production 비용으로 이해하면 안 됩니다.
+Zod는 개발 모드에서 API 응답 모양을 검증하고, fixture export로 서버 contract test와 이어집니다. production bundle에서는 schema가 빠지도록(`import.meta.env.DEV` 분기) 만들어 runtime 비용이 없습니다.
 
 주의할 점:
 
@@ -81,7 +81,7 @@ Zod는 API response shape를 개발 모드에서 검증하고, fixture export를
 
 ## BFF와 OAuth Proxy
 
-운영에서 browser-facing origin은 Cloudflare Pages입니다. 브라우저는 Spring API origin을 직접 신뢰 경계로 사용하지 않고, 같은 origin의 `/api/bff/**`를 호출합니다.
+운영에서 브라우저가 보는 origin은 Cloudflare Pages입니다. 브라우저는 Spring API origin을 직접 쓰지 않고 같은 origin의 `/api/bff/**`를 호출합니다.
 
 ```text
 Browser
@@ -90,7 +90,7 @@ Browser
   -> Spring /api/**
 ```
 
-BFF는 upstream Spring 요청에 `X-Readmates-Bff-Secret`, trusted club context header, forwarded cookie, client IP 관련 header를 조립합니다. 브라우저가 보낸 내부 `x-readmates-*` header는 권한이나 club context의 근거로 신뢰하지 않습니다. Shared helper는 upstream response에서도 내부 header와 secret이 브라우저로 새지 않게 정리합니다.
+BFF는 Spring으로 보내는 요청에 `X-Readmates-Bff-Secret`, trusted club context header, forwarded cookie, client IP header를 붙입니다. 브라우저가 보낸 내부 `x-readmates-*` header는 믿지 않습니다. 응답에서도 내부 header와 secret이 브라우저로 새지 않게 정리합니다.
 
 OAuth도 같은 boundary를 따릅니다.
 
@@ -115,7 +115,7 @@ Browser
 
 ## 백엔드
 
-백엔드는 단일 `Kotlin/Spring Boot` 모듈입니다. 기능 코드는 가능한 범위에서 feature-local clean architecture를 따릅니다.
+Backend는 단일 `Kotlin/Spring Boot 4` 모듈입니다. 기능 코드는 feature-local clean architecture를 따릅니다.
 
 ```text
 adapter.in.web
@@ -133,25 +133,26 @@ adapter.in.web
 | `application.port.out` | persistence, Redis, Kafka, mail, provider 호출 contract | JDBC/Redis/Kafka SDK detail |
 | `adapter.out.*` | JDBC SQL, Redis operation, Kafka publish, SMTP, 외부 HTTP/provider 구현 | controller 역할이나 UI contract 조립 |
 
-서버 slice는 write-side, read-side, ops read-side, workflow-side로 나뉩니다. 새 기능이나 전환된 기능은 이 구분을 보고 domain package, read DTO, transaction, outbound port 책임을 결정합니다. `ServerArchitectureBoundaryTest`가 application layer의 Spring Web/JDBC/Redis/Kafka 구현 detail 의존 같은 주요 회귀를 막습니다.
+서버 slice는 write-side, read-side, ops read-side, workflow-side로 나뉩니다([architecture.md](architecture.md#cqrs-read-vs-write-package-split)). 새 기능은 이 구분으로 domain package, read DTO, transaction, outbound port 책임을 정합니다. `ServerArchitectureBoundaryTest`(ArchUnit)가 application layer의 Spring Web/JDBC/Redis/Kafka 의존 같은 회귀를 막고, detekt가 코드 품질 기준(`server/config/detekt/detekt.yml`)을 검사합니다.
 
 ## MySQL과 Flyway
 
-MySQL compatible database가 ReadMates의 durable source of truth입니다. 세션, 멤버십, 공개 기록, 알림 outbox, 감사 ledger 같은 핵심 데이터는 Redis나 Kafka가 아니라 MySQL row로 남아야 합니다.
+MySQL compatible database가 영속 데이터의 source of truth입니다. 세션, 멤버십, 공개 기록, 알림 outbox, 감사 ledger는 MySQL row로 남아야 합니다.
 
-Flyway migration은 운영 schema 변경의 기준입니다.
+Flyway migration이 운영 schema 변경의 기준입니다.
 
 - 운영 migration: `server/src/main/resources/db/mysql/migration`
-- dev/test seed: 운영 migration과 분리된 dev/test 경로
+- dev seed: 운영 migration과 분리된 `server/src/main/resources/db/mysql/dev`
+- 적용된 migration은 수정하지 않습니다(`scripts/check-flyway-migration-immutability.py`).
 - persistence code: feature별 `adapter.out.persistence`에서 JDBC SQL과 row mapping 관리
 
-JPA/Hibernate를 쓰지 않고 JDBC 중심으로 SQL을 명시하는 이유는 schema와 query를 직접 통제하고, Flyway migration과 application SQL 사이의 drift를 테스트로 드러내기 위해서입니다.
+JPA/Hibernate 대신 JDBC로 SQL을 직접 씁니다. schema와 query를 직접 통제하고, migration과 application SQL 사이의 drift를 테스트로 드러내기 위해서입니다.
 
-Schema를 바꾸는 작업은 migration, persistence adapter SQL, server test, frontend contract, active docs를 함께 확인해야 합니다.
+Schema를 바꾸면 migration, persistence SQL, server test, frontend contract, active docs를 함께 확인합니다.
 
 ## Redis
 
-Redis는 기본 off인 optional 보조 계층입니다. `READMATES_REDIS_ENABLED=true`와 기능별 flag를 켠 환경에서만 Redis-backed 기능이 동작합니다.
+Redis는 기본 off입니다. `READMATES_REDIS_ENABLED=true`와 기능별 flag를 켠 환경에서만 동작합니다.
 
 | 사용 범위 | 저장/처리하는 것 | 장애 시 기대 |
 | --- | --- | --- |
@@ -161,11 +162,11 @@ Redis는 기본 off인 optional 보조 계층입니다. `READMATES_REDIS_ENABLED
 | Cache invalidation | mutation commit 뒤 best-effort key 삭제 | invalidation 실패가 domain mutation rollback 이유가 되면 안 됨 |
 | AI generation job state | job hash, transcript/turn/result/evidence TTL, cost counters | Commit 전 AI job은 실패/만료될 수 있고, commit한 검토 완료 snapshot은 MySQL staged draft에 남음 |
 
-Redis key와 metric label에는 raw session token, 초대 token, BFF secret, OAuth code, private feedback document body, 이메일, 표시 이름을 넣지 않습니다. AI transcript 본문과 evidence는 짧은 TTL의 job handoff 값에만 둘 수 있고 Kafka, MySQL audit, metric tag, operator log로 복사하지 않습니다. 검토 완료 generated snapshot만 공통 MySQL staged draft에 저장됩니다.
+Redis key와 metric label에는 raw session token, 초대 token, BFF secret, OAuth code, 피드백 문서 본문, 이메일, 표시 이름을 넣지 않습니다. AI 대본과 근거는 짧은 TTL의 job handoff 값에만 두고 Kafka, MySQL audit, metric tag, 운영 로그로 복사하지 않습니다. 검토 완료 snapshot만 MySQL staged draft에 저장됩니다.
 
 ## Kafka와 Redpanda
 
-ReadMates는 Kafka-compatible Redpanda를 비동기 pipeline에 사용합니다. 핵심은 domain mutation과 외부 side effect를 분리하는 것입니다.
+Kafka 호환 Redpanda를 비동기 pipeline에 씁니다. 목적은 domain mutation과 외부 side effect를 분리하는 것입니다.
 
 알림 pipeline:
 
@@ -185,11 +186,11 @@ domain mutation
 - relay/consumer/delivery worker가 재시도와 DEAD 상태를 명시적으로 다룹니다.
 - 호스트 수동 알림도 별도 즉시 SMTP 경로가 아니라 같은 outbox pipeline을 사용합니다.
 
-AI generation에서는 Kafka에 transcript 본문을 넣지 않습니다. Kafka message는 `readmates.aigen.jobs.v1` 같은 AI generation metadata queue의 job routing metadata 중심이고, worker가 Redis TTL key에서 transcript를 읽어 provider adapter를 호출한 뒤 검증된 결과만 commit path로 넘깁니다.
+AI 생성은 Kafka에 대본을 넣지 않습니다. `readmates.aigen.jobs.v1` topic에는 job routing metadata만 싣고, worker가 Redis TTL key에서 대본을 읽어 provider를 호출한 뒤 검증된 결과만 commit 경로로 넘깁니다.
 
 ## 인증과 권한
 
-운영 로그인은 Google OAuth입니다. 성공하면 Spring이 server-side session을 만들고 `readmates_session` HttpOnly cookie를 발급합니다. Raw session token은 DB에 그대로 저장하지 않고 `auth_sessions.session_token_hash` 같은 hash column에 저장합니다.
+운영 로그인은 Google OAuth입니다. 성공하면 Spring이 서버 측 session을 만들고 `readmates_session` HttpOnly cookie를 발급합니다. raw token은 저장하지 않고 `auth_sessions.session_token_hash`에 hash만 둡니다.
 
 권한은 두 축으로 나뉩니다.
 
@@ -198,7 +199,7 @@ AI generation에서는 Kafka에 transcript 본문을 넣지 않습니다. Kafka 
 | Club membership | 클럽별 `HOST`, `MEMBER`, 둘러보기/정식 멤버 상태를 기준으로 member/host route와 API 접근을 판단합니다. |
 | Platform admin | `OWNER`, `OPERATOR`, `SUPPORT` 같은 플랫폼 운영 권한입니다. Club host 권한과 별개이며 `platform_admins`가 별도 source입니다. |
 
-Spring은 BFF secret을 통과한 요청에서만 trusted club slug/host header를 신뢰합니다. 브라우저가 같은 header 이름을 직접 보냈다고 해서 club context나 권한으로 인정하지 않습니다.
+Spring은 BFF secret을 통과한 요청의 club slug/host header만 믿습니다. 브라우저가 같은 이름의 header를 보내도 club context나 권한으로 인정하지 않습니다.
 
 ## 주요 로직 Walkthrough
 
@@ -256,6 +257,18 @@ domain event row
 
 확인 파일: `server/src/main/kotlin/com/readmates/notification`.
 
+### 피드백 문서
+
+```text
+session record final apply
+  -> session_feedback_documents live row
+  -> FeedbackDocumentParser (v1/v2 marker)
+  -> GET /api/sessions/{sessionId}/feedback-document
+  -> feedback document page (v2 선택 섹션은 있을 때만 표시)
+```
+
+확인 파일: `server/src/main/kotlin/com/readmates/feedback`, `front/features/feedback`, [ADR-0072](adr/0072-feedback-document-template-v2.md), [템플릿 형식](session-import-generator.md).
+
 ### AI 생성
 
 ```text
@@ -283,7 +296,7 @@ host transcript upload
 | Optional Redis | cache, rate limit, AI job state 같은 재생성 가능하거나 짧은 TTL 상태를 빠르게 처리합니다. | source of truth가 아니므로 fallback, TTL, invalidation 정책을 함께 유지해야 합니다. |
 | Kafka/Redpanda + outbox | mutation과 이메일/in-app/AI worker side effect를 분리하고 재시도와 replay를 가능하게 합니다. | local/dev 운영 복잡도와 backlog 모니터링 책임이 생깁니다. |
 | Zod contract fixture | frontend가 기대하는 response shape를 fixture로 내보내 서버 contract test와 연결합니다. | schema 변경 시 fixture 갱신과 서버 test를 같이 봐야 합니다. |
-| Playwright/Testcontainers/ArchUnit | browser flow, 실제 infra 근접 integration, architecture boundary를 각각 검증합니다. | 전체 검증은 느릴 수 있어 변경 표면별 최소 검증을 고르는 판단이 필요합니다. |
+| Playwright/Testcontainers/ArchUnit/detekt | browser flow, 실제 infra에 가까운 integration, architecture boundary, 코드 품질을 각각 검증합니다. | 전체 검증은 느릴 수 있어 변경 표면별 최소 검증을 고르는 판단이 필요합니다. |
 
 ## 기능을 추가할 때 보는 순서
 
@@ -309,11 +322,13 @@ host transcript upload
 | Server full Testcontainers | `./server/gradlew -p server integrationTest` |
 | API/auth/BFF/user-flow | `pnpm --dir front test:e2e` |
 | Public release candidate | `./scripts/build-public-release-candidate.sh`, `./scripts/public-release-check.sh .tmp/public-release-candidate` |
-| Docs-only | `git diff --check -- <changed-docs>` |
+| Docs-only | `git diff --check -- <changed-docs>` + targeted safety scan |
 
-테스트가 통과했다는 사실은 release risk가 없다는 증명이 아닙니다. release readiness를 물어보는 작업에서는 [release-readiness-review.md](release-readiness-review.md)를 별도로 따라야 합니다.
+테스트 통과는 release risk가 없다는 증명이 아닙니다. release readiness 점검은 [release-readiness-review.md](release-readiness-review.md)를 따릅니다.
 
-Backend의 기본 Gradle `test` task는 중복 선택을 피하기 위해 비활성화되어 있습니다. 따라서 `./server/gradlew -p server clean test`만 실행하는 것은 의미 있는 검증 근거가 아니며, 위 표의 PR-level wrapper와 필요한 explicit integration lane을 사용합니다.
+pnpm은 Corepack으로 루트 `packageManager` 버전을 씁니다. `corepack`이 없으면 `npx --yes corepack@0.35.0 pnpm --dir front ...`로 실행합니다.
+
+서버의 기본 Gradle `test` task는 꺼져 있습니다(`enabled = false`). `./scripts/server-ci-check.sh`가 `check`(detekt, `unitTest`, `architectureTest`)를 돌리고, 단위 테스트만 볼 때는 `./server/gradlew -p server unitTest`, Testcontainers는 `integrationTest`를 씁니다.
 
 ## 절대 문서에 넣지 않는 값
 

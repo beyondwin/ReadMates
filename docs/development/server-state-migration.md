@@ -1,50 +1,44 @@
 # Server State Migration Status
 
-본 문서는 TanStack Query 마이그레이션 진행 상황을 추적합니다.
+TanStack Query 이관 현황과 따라야 할 패턴입니다.
 
-## 이번 분기 진행 범위
+## 현재 상태
 
-Engineering proof portfolio 분기에서는 아래 순서로 server state migration을 진행했고, 현재 `public` read path와 platform admin operating console surface까지 완료했습니다.
-
-1. `host/members` — 멤버 목록과 lifecycle/profile/viewer mutation을 Query invalidation 패턴으로 정리합니다.
-2. `host/notifications` — 수동 알림 options/preview/confirm/dispatch ledger를 route-owned state와 Query cache로 분리합니다.
-3. `host/sessions` — dashboard/session list, editor detail/manual dispatch read, session mutation을 Query cache로 옮깁니다.
-4. `current-session` — 멤버 현재 세션 read/mutation path를 Query loader seeding과 invalidation으로 정리하고 custom route refresh event를 제거합니다.
-5. `platform-admin` — summary, club directory/detail, support grants, onboarding/domain/club mutation cache ownership을 platform admin query module로 모읍니다.
-6. `archive` / `feedback` / `public` — 공개/멤버 read path를 Query loader seeding으로 이전하고 AI commit 후 scoped invalidation으로 갱신합니다.
-7. `platform-admin/ai-ops` — AI job 운영 요약과 ledger/action을 platform admin query module로 분리합니다.
-8. `platform-admin/notifications` — 알림 운영 snapshot, event/delivery ledgers, replay preview/confirm mutation을 platform admin query module로 분리합니다.
-9. `platform-admin/club-operations` — 클럽 상세 운영 snapshot을 loader-seeded Query read model로 분리합니다.
-10. `platform-admin/support` — support search, grant ledger, grant create/revoke mutation cache ownership을 support route module로 분리합니다.
-11. `platform-admin/audit` — 통합 감사 ledger를 loader-seeded Query read model로 분리합니다. Filter URL state는 S8 analytics가 재사용할 date range, club scope, source slice, action category, actor role, outcome vocabulary를 따릅니다.
-12. `host/session-records` — 전체 회차 장부, record editor, cursor history, draft save/apply/restore와 호스트 작업 알림 preview/decision을 club-scoped Query cache와 route-owned mutation으로 분리합니다.
-
-각 migration은 UI 컴포넌트가 API를 직접 호출하지 않는다는 route-first 경계를 유지해야 합니다.
+주요 화면의 이관은 끝났습니다. 새 server state도 같은 패턴을 따릅니다. 어떤 경우에도 UI 컴포넌트는 API를 직접 부르지 않는다는 route-first 경계를 지킵니다.
 
 ## 완료
-- `host/invitations` — list query + create/revoke mutation + loader hand-off; UI no longer imports host query keys or invalidation helpers.
-- `host/members` — list query + lifecycle/profile/viewer mutation refresh + loader hand-off; host member action contracts now live outside `route` so query modules do not import route-owned types.
-- `host/notifications` — summary, event/delivery/audit ledgers, manual options, preview/confirm, and manual dispatch ledger query ownership + loader hand-off
-- `host/sessions` — dashboard current/session list, editor detail/manual dispatch reads, session mutations, loader seeding, and notification session-selector sharing
-- `current-session` — member current-session read path, RSVP/checkin/questions/review mutations, loader seeding, and query invalidation replacing the custom route refresh event
-- `platform-admin` — summary, clubs, selected-club support grants, domain check, onboarding commit, club update, and support grant mutation cache ownership
-- `archive` — list/detail reads, cursor pages, and session-record invalidation are Query-owned
-- `feedback` — feedback document reads and AI commit invalidation are Query-owned
-- `public` — club/session public reads use Query loader seeding with scoped invalidation
-- `platform-admin/ai-ops` — AI Ops summary/job ledger reads and force-cancel invalidation are Query-owned
-- `platform-admin/notifications` — admin notification snapshot, event/delivery cursor ledgers, replay preview, and replay confirm are Query-owned
-- `platform-admin/club-operations` — selected club operations snapshot is loader-seeded and Query-owned
-- `platform-admin/support` — support search, active grant ledger, grant create, and revoke invalidation are Query-owned
-- `platform-admin/audit` — platform/club/notification replay/AI audit source를 Query-owned cursor ledger로 조회하고, route loader seeding과 safe metadata detail rendering을 적용합니다.
-- `host/session-records` — `/app/host/sessions` 장부, editor live/draft projection, cursor history, draft save/apply/restore, host-action preview/confirm이 Query-owned이며 성공 mutation은 장부·editor·history·member/public record surface를 범위에 맞게 invalidate합니다. JSON/AI commit receipt의 draft revision도 editor cache와 동기화합니다.
+
+| 영역 | Query 모듈 | Query가 소유하는 것 |
+| --- | --- | --- |
+| host invitations | `host/queries/host-invitation-queries.ts` | 목록, 생성/회수 mutation, loader hand-off |
+| host members | `host/queries/host-members-queries.ts` | 목록, lifecycle/profile/viewer mutation. action contract는 `route` 밖에 둡니다. |
+| host notifications | `host/queries/host-notification-queries.ts` | 요약, event/delivery/audit ledger, 수동 발송 options/preview/confirm, dispatch ledger |
+| host sessions | `host/queries/host-session-queries.ts` | dashboard, 세션 목록, editor detail, 세션 mutation, 알림 세션 선택 공유 |
+| host session records | `host/queries/host-session-record-queries.ts` | 회차 장부, editor live/draft projection, cursor history, draft save/apply/restore, 호스트 작업 알림 preview/confirm. JSON/AI commit receipt의 draft revision도 editor cache와 맞춥니다. |
+| host club operations | `host/queries/host-club-operations-queries.ts` | 클럽 운영 read model |
+| current session | `current-session/queries/current-session-queries.ts` | 현재 세션 read, RSVP/체크인/질문/서평 mutation. 예전 custom refresh event를 대체합니다. |
+| archive | `archive/queries/archive-queries.ts`, `profile-queries.ts` | 목록/상세, cursor page, 세션 기록 invalidation |
+| feedback | `feedback/queries/feedback-queries.ts` | 피드백 문서 read, AI commit 뒤 invalidation |
+| public | `public/queries/public-queries.ts` | 클럽/세션 공개 read, loader seeding, scoped invalidation |
+| guest browse | `guest-browse/queries/guest-browse-queries.ts` | 익명 게스트 앱 read |
+| platform admin | `platform-admin/queries/platform-admin-queries.ts` | 요약, 클럽 목록/상세, support grant, domain check, onboarding commit, 클럽 수정 |
+| admin AI Ops | `platform-admin-ai-ops-queries.ts` | AI Ops 요약, job ledger, force-cancel invalidation |
+| admin notifications | `platform-admin-notifications-queries.ts` | 알림 snapshot, event/delivery cursor ledger, replay preview/confirm |
+| admin club operations | `platform-admin-club-operations-queries.ts` | 선택한 클럽의 운영 snapshot(loader seeding) |
+| admin support | `platform-admin-support-queries.ts` | support 검색, grant ledger, grant 생성/회수 |
+| admin audit | `platform-admin-audit-queries.ts` | platform/club/알림 replay/AI 감사 cursor ledger, safe metadata detail |
+| admin health, analytics, operations | `platform-admin-health-queries.ts`, `platform-admin-analytics-queries.ts`, `platform-admin-operations-queries.ts` | 운영 헬스, 분석, `/admin/today` 운영 case queue와 acknowledge/snooze/resolve mutation |
+
+경로는 `front/features/` 기준입니다.
 
 ## 패턴
-- query: `features/<feature>/queries/<area>-queries.ts` 에 `queryOptions` + `useXxxMutation` export
-- query key: `[feature, area, op, params]` 형태 const tuple. Club-scoped host routes include `clubSlug` in the key scope.
-- mutation: `onSuccess` 에서 affected list/detail/current/dashboard roots를 invalidate하고, 삭제처럼 canonical entity가 사라지는 경우 detail cache를 remove
-- 컴포넌트는 actions props 인터페이스를 유지 — 테스트는 wrapper + mock actions 로 동일하게 작성
-- cursor pagination helper: `front/shared/query/cursor-pagination.ts`의 `normalizePageRequest`, `pageFromNormalizedPageRequest`, `appendCursor`, `pageRequests`, `combineCursorPages`를 사용해 query key page normalization과 appended page 조립을 공유합니다. Feature-specific nested page shape는 feature-local wrapper에서 조립합니다.
+
+- **query**: `features/<feature>/queries/<area>-queries.ts`에서 `queryOptions`와 `useXxxMutation`을 export합니다.
+- **query key**: `[feature, area, op, params]` 형태의 const tuple입니다. club-scoped host route는 key에 `clubSlug`를 넣습니다.
+- **mutation**: `onSuccess`에서 영향받는 list/detail/current/dashboard root를 invalidate합니다. 삭제처럼 entity가 사라지면 detail cache를 remove합니다.
+- **컴포넌트**: actions props 인터페이스를 유지합니다. 테스트는 wrapper와 mock actions로 씁니다.
+- **cursor pagination**: `front/shared/query/cursor-pagination.ts`의 `normalizePageRequest`, `pageFromNormalizedPageRequest`, `appendCursor`, `pageRequests`, `combineCursorPages`로 page 정규화와 이어 붙이기를 공유합니다. feature별 nested page 모양은 feature 안의 wrapper에서 조립합니다.
 
 ## 후속 후보 (우선순위)
-1. Design-system visual regression infrastructure
-2. Further server read-model query budget work
+
+현재 진행 중인 이관 작업은 없습니다. 이전 후보였던 route-critical 시각 회귀(`pnpm --dir front test:ct:docker`)와 서버 read model query budget/EXPLAIN 검사(`ServerQueryBudgetTest`, `MySqlQueryPlanTest`)는 이미 들어가 있습니다.

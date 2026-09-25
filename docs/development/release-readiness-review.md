@@ -1,6 +1,6 @@
 # ReadMates Release Readiness Review
 
-이 문서는 현재 branch의 ReadMates-specific release risk를 검토하는 active checklist입니다. 2026-07-11 이전의 dated evidence는 [`docs/reports/2026-07-11-release-readiness-history.md`](../reports/2026-07-11-release-readiness-history.md)에 보존되어 있으며 현재 절차의 source of truth가 아닙니다.
+현재 branch의 release risk를 검토하는 checklist입니다. 2026-07-11 이전 기록은 [`docs/reports/2026-07-11-release-readiness-history.md`](../reports/2026-07-11-release-readiness-history.md)에 있으며 현재 절차의 기준이 아닙니다.
 
 ## 기본 범위
 
@@ -13,7 +13,7 @@ git diff --stat origin/main..HEAD
 git diff --name-only origin/main..HEAD
 ```
 
-feature branch에서 base가 `origin/main`이 아니면 실제 base branch 또는 merge-base를 먼저 확인합니다. 사용자가 명시적으로 특정 implementation plan 범위만 보라고 하지 않았다면, 최신 계획 문서나 마지막 커밋 묶음으로 범위를 좁히지 않습니다.
+base가 `origin/main`이 아니면 실제 base branch나 merge-base를 먼저 확인합니다. 사용자가 좁히지 않았다면 최신 계획이나 마지막 커밋 묶음으로 범위를 줄이지 않습니다.
 
 ## 필수 확인 항목
 
@@ -21,7 +21,7 @@ feature branch에서 base가 `origin/main`이 아니면 실제 base branch 또�
 - 운영자가 놀랄 수 있는 변경이 historical planning docs에만 남지 않고 CHANGELOG, deploy/runbook, operator-facing docs 중 적절한 곳에 기록되어 있는지 확인합니다.
 - CI/deploy script가 scan한 artifact와 publish/deploy한 artifact를 다르게 만들지 않는지, root cause를 오도하는 진단 메시지를 만들지 않는지, broad false positive로 운영 실패를 유발하지 않는지 확인합니다.
 - Security code에 피할 수 있는 dead code, inconsistent constant-time behavior, unsafe fallback mode, secret/token exposure, audit/metric silent-loss mode가 없는지 확인합니다.
-- Architecture test의 baseline이나 exception list가 새 부채를 영속화하지 않는지 확인합니다. 남겨야 한다면 후속 plan, issue, TODO가 아니라 실행 가능한 추적 문서에 명시되어야 합니다.
+- Architecture/품질 baseline(`server/config/architecture/`, `server/config/detekt/`, `server/config/ktlint/`)이나 exception list가 새 부채를 늘리지 않는지 확인합니다. Detekt rule threshold(`detekt.yml`) 변경은 CHANGELOG에 기록되어야 합니다.
 - Public release candidate 생성과 scanner가 새 generated artifact, private state, local path, token-shaped data를 허용하지 않는지 확인합니다.
 - 운영 분석 또는 observability 표면이 바뀌면 데이터 부족, 측정 실패, 위험 신호가 UI/API/docs에서 서로 구분되는지 확인합니다. Analytics 변경은 가능한 경우 query budget evidence와 public-safe visual evidence를 함께 남깁니다.
 - 테스트 통과는 중요한 증거지만, release note 누락, 운영 surprise, 보안 코드 위생, 배포 진단 리스크를 자동으로 닫지는 않습니다.
@@ -69,9 +69,9 @@ Server behavior, auth, BFF, persistence, architecture boundary 변경이 있으�
 ./scripts/server-ci-check.sh
 ```
 
-Persistence, migration, API contract, query budget, or Testcontainers behavior changes also require the relevant focused test or `./server/gradlew -p server integrationTest`.
+Persistence, migration, API contract, query budget, Testcontainers 동작이 바뀌면 관련 focused test나 `./server/gradlew -p server integrationTest`도 실행합니다.
 
-Frontend route, BFF proxy, user-flow 변경이 있으면 frontend guide의 checks와 E2E 필요성을 검토합니다.
+Frontend route, BFF proxy, user-flow 변경이 있으면 frontend check와 E2E를 검토합니다. 로컬 pnpm이 고정 버전과 다르면 `corepack pnpm --dir front ...`로 실행합니다.
 
 ```bash
 pnpm --dir front lint
@@ -101,4 +101,7 @@ findings를 우선순위별로 보고합니다.
 
 ## 릴리스 증거 보관
 
-버전별 검토와 실제 배포 결과는 `docs/reports`의 날짜가 있는 evidence 문서에 보관합니다. 이전 릴리스는 [2026-08-09 v2.3.0 release readiness evidence](../reports/2026-08-09-release-readiness-v2.3.0.md)에 있고, 현재 릴리스는 [2026-08-17 v2.4.1 release readiness evidence](../reports/2026-08-17-release-readiness-v2.4.1.md)에 기록합니다. 새 릴리스 증거를 이 체크리스트 본문에 누적하지 않습니다.
+버전별 검토와 배포 결과는 `docs/reports`의 날짜가 붙은 evidence 문서에 보관하고, 이 체크리스트 본문에는 쌓지 않습니다.
+
+- 최근 evidence 문서: [2026-08-17 v2.4.1](../reports/2026-08-17-release-readiness-v2.4.1.md), [2026-08-09 v2.3.0](../reports/2026-08-09-release-readiness-v2.3.0.md)
+- `v2.5.0`·`v2.5.1`은 별도 evidence 문서 없이 `CHANGELOG.md`의 각 버전 `Verification`/`Deployment Notes`에 기록되어 있습니다. `v2.5.0` 서버 이미지는 Trivy gate에서 막혀 배포되지 않았고, `v2.5.1`이 운영 배포입니다.

@@ -11,14 +11,22 @@
 
 ## 사전 준비
 
-- VPN, OCI Compose stack SSH (read-only 진단 키 우선; mutation은 deploy SSH 키), `kubectl`/`docker compose` 접근.
-- MySQL read replica access (운영 placeholder `mysql://<host>:3306/readmates`) 또는 OCI MySQL HeatWave 콘솔.
-- Redis CLI (`redis-cli -h <host> -a <password>`; production은 TLS 또는 stunnel).
-- Prometheus + Grafana + internal Tempo. 대시보드 정의는 `ops/grafana/dashboards/aigen.json`, alert rules는 `ops/prometheus/alerts/aigen-rules.yml`입니다. Tempo는 7일 retention이며 public port를 만들지 않습니다.
-- 환경별 secret 회전 채널 (`READMATES_AIGEN_ANTHROPIC_API_KEY`, `READMATES_AIGEN_OPENAI_API_KEY`, `READMATES_AIGEN_GEMINI_API_KEY`).
-- 운영 감사 채널: 모든 manual override(키 삭제, cap 해제, kill switch 토글)는 incident ticket과 운영 chat에 timestamp + operator id를 함께 기록합니다.
+- VM SSH: 전체 상태 수집은 읽기 전용 진단 키로 합니다([Read-only diagnostics](read-only-diagnostics.md)). 진단 키는 collector 출력만 주므로, 아래 Redis/DB 조회와 수정은 admin 키로 접속해 실행합니다.
+- MySQL: VM에서 HeatWave private endpoint로 접속하거나 OCI 콘솔을 씁니다.
+- Redis: compose 서비스 `redis`(비밀번호 없음, 외부 포트 없음). VM에서 아래처럼 씁니다.
 
-설정 source of truth: `server/src/main/resources/application.yml`의 `readmates.aigen.*` 블록. 변경 시 deploy 절차는 [release-management.md](../../development/release-management.md)와 [post-deploy-watch.md](post-deploy-watch.md)를 따릅니다.
+  ```bash
+  RCLI='sudo docker compose -f /opt/readmates/compose.yml exec -T redis redis-cli'
+  APP='sudo docker compose -f /opt/readmates/compose.yml'
+  ```
+
+- Prometheus + Grafana + internal Tempo. dashboard는 `ops/grafana/dashboards/aigen.json`(Grafana `AI Session Generation`), alert rule은 `ops/prometheus/alerts/aigen-rules.yml`입니다. Tempo는 7일 보존이고 공개 포트가 없습니다.
+- 감사 기록: 모든 수동 조작(키 교체, cap 해제, kill switch 토글)은 incident ticket과 운영 채팅에 시각과 operator를 남깁니다.
+
+설정 위치:
+
+- 기본값: `server/src/main/resources/application.yml`의 `readmates.aigen.*`.
+- production 값: GitHub Variables/Secrets → `sync-config`가 `/etc/readmates/readmates.env`로 렌더링합니다. env가 `application.yml` 기본값보다 우선합니다. 특히 `READMATES_AIGEN_ENABLED`, `READMATES_AIGEN_ENABLED_PROVIDERS`, provider API key, `READMATES_AIGEN_GOOGLE_PAID_TIER_RETENTION_CONFIRMED`는 [Secrets management](secrets-management.md)로 바꿉니다.
 
 ## Job 상태와 payload lifecycle
 
@@ -60,11 +68,10 @@ PENDING/RUNNING           -> FAILED
 운영자가 job 상태만 확인해야 할 때는 payload를 열지 말고 hash metadata와 key 존재 여부만 봅니다.
 
 ```bash
-redis-cli -h <host> -a <password> --no-auth-warning HGETALL "aigen:job:<jobId>"
-redis-cli -h <host> -a <password> --no-auth-warning EXISTS \
-  "aigen:job:<jobId>:transcript" "aigen:job:<jobId>:turns" \
+$RCLI HGETALL "aigen:job:<jobId>"
+$RCLI EXISTS "aigen:job:<jobId>:transcript" "aigen:job:<jobId>:turns" \
   "aigen:job:<jobId>:result" "aigen:job:<jobId>:evidence"
-redis-cli -h <host> -a <password> --no-auth-warning TTL "aigen:job:<jobId>:transcript"
+$RCLI TTL "aigen:job:<jobId>:transcript"
 ```
 
 `COMMITTED`/`CANCELLED`인데 payload key가 없는 것은 정상입니다. 운영자는 `GET`, `MGET`, 대본 search, payload download로 내용을 열지 않고 `EXISTS`/`TTL`과 hash metadata만 확인합니다.
@@ -74,7 +81,7 @@ redis-cli -h <host> -a <password> --no-auth-warning TTL "aigen:job:<jobId>:trans
 ### Rollout과 rollback
 
 - Legacy pipeline과 runtime mode selector는 없습니다. Rollout gate는 `READMATES_AIGEN_ENABLED`, `READMATES_AIGEN_ENABLED_PROVIDERS`, provider key/capability, Google paid-tier 확인, mock-wire 계약과 운영 검토입니다.
-- Rollback은 먼저 AI kill switch를 끄고 Kafka consumer를 정지한 뒤 6시간 AI payload/attempt TTL을 기다리고 이전 image를 복원합니다. 긴급 cleanup은 승인된 job namespace에만 적용하며 Redis 전체 flush는 금지합니다. V38은 additive라 DB를 destructive rollback하지 않고 forward-fix합니다.
+- Rollback은 먼저 AI kill switch를 끄고(§8, consumer도 함께 멈춤) 6시간 AI payload/attempt TTL을 기다리고 이전 image를 복원합니다. 긴급 cleanup은 승인된 job namespace에만 적용하며 Redis 전체 flush는 금지합니다. V38은 additive라 DB를 destructive rollback하지 않고 forward-fix합니다.
 - Schema/grounding/provider failure를 ungrounded 또는 직접 SDK 경로로 우회하지 않습니다.
 
 ### 입력, 회원, 수정 규칙
@@ -115,7 +122,6 @@ redis-cli -h <host> -a <password> --no-auth-warning TTL "aigen:job:<jobId>:trans
    ```yaml
    readmates:
      aigen:
-       enabled-providers: [CLAUDE, OPENAI, GEMINI]
        pricing:
          "[gpt-5.4-mini]":
            input-per-m-token-usd: 0.75
@@ -126,53 +132,53 @@ redis-cli -h <host> -a <password> --no-auth-warning TTL "aigen:job:<jobId>:trans
    - Provider 접두사 매칭은 `YamlModelCatalog.providerFromName` (`claude-*`, `gpt-*`/`o\d+`, `gemini-*`). OpenAI 모델 ID는 provider API가 받는 canonical alias (`gpt-5.4-mini`)를 그대로 사용합니다.
    - Grounded canonical ID: `claude-sonnet-4-6`, `gpt-5.4-mini`, `gemini-3-flash-preview`. Legacy pricing catalog의 다른 모델은 capability catalog에 없으면 grounded model-list에 나오지 않습니다.
    - `readmates.aigen.grounded.capabilities` 항목에 context window, max output, structured-output support를 공식 provider 문서와 실제 SDK/API surface로 재검증한 값만 추가합니다. 불명하면 모델을 노출하지 않고 503으로 fail closed합니다.
-2. 모델 제거는 같은 map에서 key를 삭제하고, `enabled-providers`에서 해당 provider 전체를 빼면 해당 provider 모델 전부가 한꺼번에 차단됩니다.
+2. 모델 제거는 같은 map에서 key를 삭제합니다. provider 전체를 막으려면 PR 없이 GitHub Variable `READMATES_AIGEN_ENABLED_PROVIDERS`에서 빼고 `sync-config`(`restart_api=true`)를 실행합니다(§7).
 3. Frontend는 `GET /api/host/sessions/{sessionId}/ai-generate/models`의 server capability catalog을 source of truth로 사용합니다. Browser에 provider model ID를 별도 hardcode하지 않습니다.
-4. PR merge 후 deploy (server → frontend 순). Deploy 절차는 [post-deploy-watch.md](post-deploy-watch.md).
+4. PR merge 후 배포합니다(server → frontend 순). 배포 뒤 [Post-deploy watch](post-deploy-watch.md)를 확인합니다.
 5. Smoke script는 공개 안전 합성 회원 `공개 회원 A`가 `ACTIVE`인 전용 smoke 클럽에서만 실행합니다. Script가 지원 TXT를 임시로 만들며 private transcript 경로를 받지 않습니다. Live provider call은 retention 확인과 별도 명시 승인 후에만 실행합니다. 일반 gate는 `bash -n` 문법 검사만 수행합니다.
 
-Rollback: `application.yml`의 직전 commit으로 되돌리고 재배포.
+Rollback: `application.yml`을 직전 commit으로 되돌리고 다시 배포합니다.
 
 ## 2. 클럽 cost cap 임시 상향 (Redis 키 수동 reset)
 
-`readmates.aigen.caps.club-monthly-cost-usd` (기본 $20) 초과로 호스트가 429/`CLUB_MONTHLY_CAP_EXCEEDED`를 받을 때 임시로 풀어야 하는 경우의 절차입니다.
+`readmates.aigen.caps.club-monthly-cost-usd`(기본 $20, env `READMATES_AIGEN_CLUB_MONTHLY_COST_USD`) 초과로 호스트가 429/`CLUB_MONTHLY_CAP_EXCEEDED`를 받을 때 임시로 풀어야 하는 경우의 절차입니다.
 
-1. **승인 게이트**: incident ticket을 먼저 만들고, 운영 책임자 1인의 명시 승인을 받습니다. Cap 정책은 spec §6 비용 보호의 핵심이라 무단 해제는 감사 위반입니다.
+1. **승인 게이트**: incident ticket을 먼저 만들고 운영 책임자 1인의 명시 승인을 받습니다. cap은 비용 보호의 핵심이라 무단 해제는 감사 위반입니다.
 2. 현재 누적 비용 확인:
    ```bash
-   redis-cli -h <host> -a <password> --no-auth-warning GET "aigen:club:<clubId>:monthly_cost_usd"
-   redis-cli -h <host> -a <password> --no-auth-warning TTL "aigen:club:<clubId>:provider_admission"
+   $RCLI GET "aigen:club:<clubId>:monthly_cost_usd"
+   $RCLI TTL "aigen:club:<clubId>:monthly_cost_usd"
    ```
    값은 USD scale=4 BigDecimal의 문자열 표현입니다.
 3. Audit-log로 합계와 교차검증:
    ```sql
    SELECT SUM(cost_estimate_usd) AS total
    FROM ai_generation_audit_log
-   WHERE club_id = <clubId>
+   WHERE club_id = '<clubId>'
      AND created_at >= DATE_FORMAT(NOW(), '%Y-%m-01');
    ```
 4. 임시 reset (감사 후 결정):
    ```bash
-   redis-cli -h <host> -a <password> --no-auth-warning SET "aigen:club:<clubId>:monthly_cost_usd" "0.0000" EX 2678400
+   $RCLI SET "aigen:club:<clubId>:monthly_cost_usd" "0.0000" EX 2678400
    ```
-   `EX 2678400` (≈31d)는 monthly counter TTL과 일치합니다. 부분 차감이 필요하면 `SET <newValue>`로 명시값을 적습니다.
+   `EX 2678400`(31일)은 서버가 쓰는 monthly counter TTL과 같습니다. 부분 차감이 필요하면 `SET <newValue>`로 명시값을 적습니다.
 5. 같은 incident ticket에 `operator`, `timestamp`, `clubId`, `previousValue`, `newValue`, `justification`을 남기고 다음 영업일에 cap 재산정 또는 정책 변경 여부를 회의 안건으로 올립니다.
 
 Backout: 원래 값을 다시 `SET`. Cap 자체를 영구 상향하려면 `application.yml`의 `caps.club-monthly-cost-usd`를 변경한 PR을 통합 검토합니다.
 
 ## 3. 호스트 일일 cap 임시 해제
 
-`readmates.aigen.caps.host-daily-calls` (기본 10회) 초과로 호스트가 `HOST_DAILY_CAP_EXCEEDED`를 받을 때의 절차입니다.
+`readmates.aigen.caps.host-daily-calls`(기본 10회, env `READMATES_AIGEN_HOST_DAILY_CALLS`) 초과로 호스트가 `HOST_DAILY_CAP_EXCEEDED`를 받을 때의 절차입니다.
 
 1. **승인 게이트**: incident ticket 발급 + 운영 책임자 승인. 호스트 단위 일일 cap은 PII/abuse 보호 목적이므로 routine 해제 대상이 아닙니다.
 2. 현재 카운트:
    ```bash
-   redis-cli -h <host> -a <password> --no-auth-warning GET "aigen:host:<userId>:daily"
-   redis-cli -h <host> -a <password> --no-auth-warning GET "aigen:host:<userId>:minute"
+   $RCLI GET "aigen:host:<userId>:daily"
+   $RCLI GET "aigen:host:<userId>:minute"
    ```
 3. Delete (counter TTL 24h):
    ```bash
-   redis-cli -h <host> -a <password> --no-auth-warning DEL "aigen:host:<userId>:daily" "aigen:host:<userId>:minute"
+   $RCLI DEL "aigen:host:<userId>:daily" "aigen:host:<userId>:minute"
    ```
    해제 후 카운트는 0부터 다시 누적됩니다.
 4. Incident ticket에 `operator`, `timestamp`, `userId`, `previousCount`, `justification`, `revertPlan`을 남깁니다. 명시적인 revert plan이 없으면 sliding TTL 만료로 자연 reset됩니다.
@@ -183,20 +189,18 @@ Backout: TTL 만료를 기다리거나 즉시 counter를 직전 값으로 `SET .
 
 Provider별 API key는 `READMATES_AIGEN_ANTHROPIC_API_KEY`, `READMATES_AIGEN_OPENAI_API_KEY`, `READMATES_AIGEN_GEMINI_API_KEY` 환경변수입니다. 명시적 Spring AI `ChatModel` bean이 부팅 시 환경값을 읽으므로 회전 후 재시작이 필요합니다.
 
-1. 새 key를 provider 콘솔에서 발급하고 secret manager (OCI Vault 또는 동등)에 등록합니다.
-2. Deploy stack의 env file (`/etc/readmates/readmates.env` 또는 compose secret)을 새 값으로 교체. raw 값은 Git에 남기지 않습니다.
-3. Spring API 인스턴스 재시작:
-   ```bash
-   ssh -i <deploy-ssh-key> ubuntu@<vm-public-ip> 'sudo systemctl restart readmates-server'
-   ```
+1. provider 콘솔에서 새 key를 발급합니다.
+2. GitHub Secret(`READMATES_AIGEN_*_API_KEY`) 값을 바꿉니다. raw 값은 Git이나 채팅에 남기지 않습니다.
+3. `sync-config`를 `restart_api=true`로 실행해 env를 갱신하고 `readmates-api`를 재생성합니다([Secrets management](secrets-management.md)).
+   - SSH로 직접 재시작해야 하면: `$APP up -d --force-recreate readmates-api`
 4. Smoke (provider별):
    - Claude: `scripts/aigen-smoke-claude.sh`
    - OpenAI: `scripts/aigen-smoke-openai.sh`
    - Gemini: `scripts/aigen-smoke-gemini.sh`
-   각 스크립트는 transcript size 검증 + multipart POST + polling을 수행합니다.
-5. 5분 후 Grafana 대시보드에서 해당 provider의 success rate와 latency가 정상 범주인지 확인.
+   smoke 스크립트는 live provider를 호출합니다. §1의 5번 조건(전용 smoke 클럽, 별도 승인)을 지킵니다.
+5. 5분 뒤 Grafana `AI Session Generation`에서 해당 provider의 `Provider call outcomes`와 `Provider call latency`가 정상인지 봅니다.
 
-Rollback: secret manager에서 이전 key로 되돌리고 재시작. Provider 콘솔에서 새 key를 revoke.
+Rollback: GitHub Secret을 이전 key로 되돌리고 `sync-config`(`restart_api=true`)를 다시 실행합니다. 새 key는 provider 콘솔에서 revoke합니다.
 
 ## 5. Schema 실패 spike 조사
 
@@ -221,7 +225,7 @@ Rollback: secret manager에서 이전 key로 되돌리고 재시작. Provider �
 3. 의심 가설:
    - 직전 deploy로 renderer, versioned schema 또는 provider options 변경 → `git log --since "2 hour ago" -- server/src/main/kotlin/com/readmates/aigen/`.
    - Provider 모델 마이너 버전 변경 (Gemini "auto-updated minor" 등) → provider release notes.
-   - 특정 transcript pattern → 같은 club 또는 같은 host의 반복 실패라면 transcript의 형식이 enum off-allowlist일 가능성. 본문은 audit log에 저장되지 않으므로 호스트에게 transcript 재요청해 retro로 확인.
+   - 특정 transcript 형식 → 같은 club/host에서 반복된다면 형식 문제일 수 있습니다. 본문은 audit log에 없고, 운영자는 transcript를 받지 않습니다. 호스트에게 형식 규칙(아래 "입력, 회원, 수정 규칙")을 안내하고 재업로드를 요청합니다.
 4. 단기 대응: 영향 provider/model을 1번 절차로 allowlist에서 일시 제거. 장기는 schema/prompt 패치.
 
 관련 alert anchor: [`#schema-failure-spike`](#schema-failure-spike), [`#provider-error-burst`](#provider-error-burst).
@@ -242,11 +246,10 @@ Rollback: secret manager에서 이전 key로 되돌리고 재시작. Provider �
    ```
 3. Redis에 같은 jobId hash가 살아 있으면 (`aigen:job:<jobId>` 6h TTL) 운영자가 status/stage/revision/cleanup metadata와 payload 존재 여부만 확인할 수 있습니다. `COMMITTED`/`CANCELLED` 이후에는 네 transient payload가 삭제되므로 없어도 정상입니다:
    ```bash
-   redis-cli -h <host> -a <password> --no-auth-warning HGETALL "aigen:job:<jobId>"
-   redis-cli -h <host> -a <password> --no-auth-warning EXISTS \
-     "aigen:job:<jobId>:transcript" "aigen:job:<jobId>:turns" \
+   $RCLI HGETALL "aigen:job:<jobId>"
+   $RCLI EXISTS "aigen:job:<jobId>:transcript" "aigen:job:<jobId>:turns" \
      "aigen:job:<jobId>:result" "aigen:job:<jobId>:evidence"
-   redis-cli -h <host> -a <password> --no-auth-warning TTL "aigen:job:<jobId>:transcript"
+   $RCLI TTL "aigen:job:<jobId>:transcript"
    ```
 4. 호스트가 동일 transcript로 재검증을 원하면 host editor에서 직접 재생성합니다. 재생성은 revision을 증가시키고 네 section review를 전부 초기화하므로 새 근거를 다시 확인해야 합니다.
 5. 의심 패턴이 반복되면 provider/model/call mode, safe grounding status/count를 aggregate하여 follow-up을 만듭니다. Private source를 live provider로 재전송하는 평가는 별도 승인 없이 실행하지 않습니다.
@@ -256,25 +259,24 @@ Rollback: secret manager에서 이전 key로 되돌리고 재시작. Provider �
 특정 provider가 5xx/timeout/rate-limit를 burst하거나 [`#provider-error-burst`](#provider-error-burst) alert가 발화했을 때.
 
 1. Provider status page (Anthropic / OpenAI / Google Cloud) 확인. 운영자가 transient 판단이면 5분 모니터링 후 자연 회복 확인.
-2. 회복되지 않으면 `application.yml`의 `readmates.aigen.enabled-providers`에서 해당 provider를 제거 (예: `[CLAUDE, GEMINI]`).
-3. PR merge + deploy (server 단일 변경, frontend 변경 없음).
+2. 회복되지 않으면 GitHub Variable `READMATES_AIGEN_ENABLED_PROVIDERS`에서 해당 provider를 뺍니다(예: `CLAUDE,GEMINI`). PR은 필요 없습니다.
+3. `sync-config`를 `restart_api=true`로 실행합니다.
 4. 효과:
-   - UI dropdown의 해당 provider 옵션은 catalog 결과에서 자동 제외됩니다 (`YamlModelCatalog`의 `enabled-providers` 필터).
-   - 클럽 default가 해당 provider를 가리키고 있어도 catalog 미포함이라 generation 시도는 503/`PROVIDER_DISABLED`.
-   - 호스트는 다른 provider로 수동 전환합니다.
-5. Provider 회복 후 같은 PR을 revert deploy.
+   - 해당 provider 모델은 server catalog(`YamlModelCatalog`의 enabled-providers 필터)에서 빠져 UI 선택지에서 사라집니다.
+   - 클럽 기본값이 그 provider를 가리켜도 생성 요청은 거절됩니다. 호스트는 다른 provider를 고릅니다.
+5. provider가 회복되면 Variable을 되돌리고 `sync-config`를 다시 실행합니다.
 
 ## 8. 전체 disable kill switch
 
 전체 AI generation 흐름을 비상 정지해야 할 때 (예: 보안 사건, 전사 비용 통제, [`#redis-down`](#redis-down) 등 backbone 장애).
 
-1. `application.yml`의 `readmates.aigen.enabled`를 `false`로 변경 후 PR + deploy. 또는 환경변수 `READMATES_AIGEN_ENABLED=false`로 override 가능.
+1. GitHub Variable `READMATES_AIGEN_ENABLED`를 `false`로 바꾸고 `sync-config`를 `restart_api=true`로 실행합니다. production에서는 env가 `application.yml`보다 우선하므로 PR은 필요 없습니다.
 2. 효과:
    - `AiGenerationKillSwitchFilter`가 `/api/host/sessions/*/ai-generate/**`와 `/api/host/clubs/*/ai-defaults` 요청을 가로채 503 + RFC 7807 `application/problem+json` (`code: AI_DISABLED`)을 반환합니다. Controller bean은 `@ConditionalOnProperty`로 등록되지 않지만, 운영자는 404가 아니라 명시적인 disable 응답을 봅니다.
    - Frontend AI 모드 토글은 여전히 보이지만 generation/default-model 요청은 `AI_DISABLED` 응답을 받아 사용자 안전 오류 상태로 전환됩니다. 토글 자체를 숨기려면 frontend feature flag 변경이 별도로 필요합니다.
-   - Kafka consumer (`AiGenerationJobConsumer`)도 같은 flag로 로드되지 않으므로 in-flight job은 다음 부팅에 재처리되지 않습니다. PR 메시지 본문은 transcript 없이 metadata만이라 손실 영향은 job 재시도/만료 처리 범위로 제한됩니다.
+   - Kafka consumer(`AiGenerationJobConsumer`)도 같은 flag로 로드되지 않습니다. 처리 중이던 job은 이어서 처리되지 않고, 6시간 TTL이나 recovery로 정리됩니다. Kafka 메시지에는 transcript가 없고 routing metadata만 있습니다.
 3. 운영 chat과 incident ticket에 kill switch on/off 시간을 남깁니다.
-4. 복원: flag를 `true`로 되돌리고 deploy. 부팅 후 첫 generation 요청을 smoke 스크립트로 1건 검증.
+4. 복원: Variable을 `true`로 되돌리고 `sync-config`(`restart_api=true`)를 실행합니다. 재시작 뒤 전용 smoke 클럽에서 생성 1건으로 확인합니다.
 
 ## 9. Gemini retention policy
 
@@ -283,13 +285,13 @@ Rollback: secret manager에서 이전 key로 되돌리고 재시작. Provider �
 ### 요구 조건
 
 - API key는 **유료(paid) Google AI Studio 프로젝트** (Gemini API billing enabled)에서 발급해야 합니다. Paid tier 프로젝트는 prompt/response 데이터를 product improvement 용도로 사용하지 않는다는 Google 측 contractual guarantee가 적용됩니다.
-- **무료(free) tier 프로젝트는 사용 금지**입니다. Free tier 트래픽은 Google이 product improvement 용도로 사용할 수 있으므로 spec §5.7 "retention 최소 옵션을 강제한다" 요구를 만족하지 못합니다.
+- **무료(free) tier 프로젝트는 사용 금지**입니다. Free tier 트래픽은 Google이 product improvement 용도로 쓸 수 있어 "retention 최소 옵션 강제" 요구를 만족하지 못합니다.
 
 ### 검증 절차
 
 1. Google AI Studio 콘솔(또는 GCP 콘솔)에서 키가 속한 프로젝트의 billing status를 확인합니다 (`Billing > Account management`).
 2. Billing이 disabled / 무료 quota 상태라면 그 키는 절대 운영/스테이징 환경에 주입하지 마십시오. 잘못 주입된 경우 §4 절차로 즉시 회전하고 incident ticket을 발급합니다.
-3. 키 발급/회전 PR을 머지하기 전 reviewer는 "paid-tier 프로젝트 확인됨"을 PR description에 명시적으로 남깁니다 (감사 trail).
+3. 키를 교체할 때는 "paid-tier 프로젝트 확인됨"을 incident/변경 기록에 남깁니다(감사 trail).
 
 ### 코드 gate와 best-effort 신호
 
@@ -300,7 +302,7 @@ Gemini provider가 enabled이면 `READMATES_AIGEN_GOOGLE_PAID_TIER_RETENTION_CON
 ### 관련 항목
 
 - [§4 Provider key 회전](#4-provider-key-회전) — 매 회전 시 본 절차로 tier 재검증.
-- spec §5.7 (`docs/superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md`) — retention 요구의 정책 근거.
+- [Spring AI 2 provider architecture](../../development/spring-ai-2-provider-architecture.md) — 현재 provider/retention 계약.
 - `server/src/main/kotlin/com/readmates/aigen/config/AiGenerationSpringAiConfig.kt` — paid-tier gate, header, retry/timeout의 구현 위치.
 
 ## Alert response
@@ -311,7 +313,7 @@ Gemini provider가 enabled이면 `READMATES_AIGEN_GOOGLE_PAID_TIER_RETENTION_CON
 
 - **조건**: 특정 `provider` 라벨에 대해 `FAILED` 상태 job 비율이 10m 동안 10%를 초과.
 - **즉시 triage**:
-  1. Grafana `Completion by status` panel을 provider 필터로 확인.
+  1. Grafana `AI Session Generation`의 `Jobs by status/provider (5m rate)`와 `Provider call outcomes`를 provider별로 봅니다.
   2. Audit log로 error_code 분포 확인:
      ```sql
      SELECT error_code, COUNT(*) FROM ai_generation_audit_log
@@ -327,13 +329,13 @@ Gemini provider가 enabled이면 `READMATES_AIGEN_GOOGLE_PAID_TIER_RETENTION_CON
 
 - **조건**: `SCHEMA_INVALID` validation failure 비율이 1h 동안 20% 초과.
 - **즉시 triage**: §5의 SQL 쿼리 2개로 provider × model break-down 확인. 직전 deploy diff 확인.
-- **에스컬레이션**: 단일 provider/model 집중이면 §1 절차로 임시 allowlist에서 제거. 전 provider면 spec §9 prompt builder 또는 schema regression 회귀.
+- **에스컬레이션**: 단일 provider/model 집중이면 §1 절차로 임시 allowlist에서 제거. 모든 provider에서 나면 renderer/schema 회귀를 의심하고 직전 배포 diff를 봅니다.
 - **연관 항목**: [§5 Schema 실패 spike 조사](#5-schema-실패-spike-조사), [§1 allowlist 관리](#1-새-모델-allowlist-추가제거).
 
 ### <a id="budget-exhaustion"></a> AiGenBudgetExhaustion (info)
 
 - **조건**: 30d 전사 aggregate cost > $1000 (alert는 aggregate. 클럽별 cap은 app 코드에서 강제).
-- **즉시 triage**: per-club drill-down은 metric label이 아니라 audit-log SQL로 수행 (spec §11.1 cardinality/PII 제약):
+- **즉시 triage**: 클럽별 분석은 metric label이 아니라 audit-log SQL로 합니다(cardinality/PII 제약):
    ```sql
    SELECT club_id, SUM(cost_estimate_usd) AS spend
    FROM ai_generation_audit_log
@@ -374,11 +376,12 @@ Gemini provider가 enabled이면 `READMATES_AIGEN_GOOGLE_PAID_TIER_RETENTION_CON
 ### <a id="redis-down"></a> AiGenRedisDown (critical)
 
 - **조건**: `redis_up == 0` AND HTTP 5xx rate > 1 req/s, 1m 지속.
+- **주의**: 현재 Prometheus는 Redis exporter를 scrape하지 않아 `redis_up`이 없습니다. 이 alert는 사실상 울리지 않으므로 Redis 문제는 [Redis instability](observability-bootstrap.md#redis-instability) 알림과 아래 확인으로 잡습니다.
 - **즉시 triage**:
-  1. Redis health 확인: `redis-cli -h <host> -a <password> --no-auth-warning PING` → `PONG` 미반환이면 redis 장애 확정.
-  2. Spring API health: `journalctl -u readmates-server --since "5 min ago" | jq 'select(.level=="ERROR")' | head`.
+  1. Redis 확인: `$RCLI PING` → `PONG`이 없으면 Redis 장애입니다. `$APP ps redis`, `$APP logs --tail=120 redis`도 봅니다.
+  2. API 에러 로그: `$APP logs --no-log-prefix --since 5m readmates-api | jq -cR 'fromjson? | select(.level=="ERROR")' | head`
   3. AI generation은 idempotency, cap counter, job state 전부 Redis 의존이므로 Redis가 down이면 generation은 503/`REDIS_UNAVAILABLE` 또는 silent failure.
-- **에스컬레이션**: Redis 복구 작업과 **동시에** §8 절차로 kill switch flip. 복원 후 다시 enable. Redis 복구는 [Read-only diagnostics](read-only-diagnostics.md)와 OCI 운영 매뉴얼 참고.
+- **에스컬레이션**: Redis 복구와 **동시에** §8로 kill switch를 끕니다. 복구 뒤 다시 켭니다. 상태 수집은 [Read-only diagnostics](read-only-diagnostics.md)를 씁니다.
 - **연관 항목**: [§8 kill switch](#8-전체-disable-kill-switch).
 
 ### <a id="provider-circuit-open"></a> AiGenProviderCircuitOpen (warn)
@@ -408,7 +411,7 @@ Gemini provider가 enabled이면 `READMATES_AIGEN_GOOGLE_PAID_TIER_RETENTION_CON
 ### <a id="tempo-down"></a> TempoTargetDown / <a id="tempo-not-ready"></a> TempoNotReady (critical)
 
 - **조건**: internal Tempo scrape target down 또는 active ingester 부재.
-- **즉시 triage**: `docker compose ps tempo`, Tempo health/config verify, `readmates_tempo_data` disk 사용량과 7일 compaction을 확인합니다. OCI에서는 host port가 없고 Compose network에서만 접근되는 것이 정상입니다.
+- **즉시 triage**: `sudo docker compose -p readmates -f /opt/readmates/deploy/oci/compose.infra.yml ps tempo`, Tempo health/config verify, `readmates_tempo_data` volume 디스크 사용량과 7일 compaction을 확인합니다. OCI에서는 host port가 없고 Compose network에서만 접근되는 것이 정상입니다.
 - **대응**: volume 여유와 config를 복구하고 `bash scripts/validate-tempo-config.sh`, `bash scripts/observability-local-smoke.sh`로 재현합니다. Tempo만의 장애로 AI product/consumer를 rollback하지 않습니다. Disk pressure가 지속되면 reviewed change로 sampling/retention을 조정합니다.
 
 ### Trace privacy 확인
@@ -425,7 +428,7 @@ CI는 모든 PR에서 `scripts/aigen-pii-check.sh`를 실행합니다. Fail 시 
    ```bash
    bash scripts/aigen-pii-check.sh
    ```
-2. 출력의 실패 메시지는 어느 invariant가 (1-15) 깨졌는지와 file:line을 가리킵니다.
+2. 실패 메시지가 깨진 check(`check1_*` … `check15_*`)와 file:line을 알려 줍니다.
 3. 다음 중 하나로 대응:
    - **신규 코드가 실제 PII 누출**: 해당 라인을 제거하거나 invariant를 만족하도록 리팩터.
    - **신규 코드가 정당** (예: invariant 자체를 설명하는 주석/문서): script 안에 명시적인 allowlist를 추가하고 왜 안전한지 주석으로 정당화합니다. 무근거 allowlist 추가는 review에서 reject.

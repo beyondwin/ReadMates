@@ -1,21 +1,21 @@
 # 아키텍처
 
-ReadMates는 여러 정기 독서모임의 공개 소개, 멤버 세션 준비, 호스트 운영, 공개 기록, 참석자 전용 피드백 문서를 하나의 플랫폼 세션과 클럽별 권한 흐름으로 묶습니다.
+ReadMates는 여러 독서모임의 공개 소개, 멤버 세션 준비, 호스트 운영, 공개 기록, 참석자 전용 피드백 문서를 하나의 로그인 세션과 클럽별 권한으로 묶습니다.
 
-이 문서는 현재 구조의 source of truth입니다. 기능 문서나 release note가 이 문서와 충돌하면 코드와 테스트를 확인한 뒤 이 문서 또는 해당 문서를 함께 갱신합니다.
-
-아키텍처 변경은 관련 frontend/server guide, 테스트 경계, 배포 문서까지 맞을 때 완료로 봅니다. 외부 provider 동작이나 운영값은 이 문서에 실제 값으로 남기지 않고 placeholder 또는 링크된 runbook 기준으로 설명합니다.
+- 이 문서는 현재 구조의 source of truth입니다. 다른 문서와 충돌하면 코드와 테스트를 확인한 뒤 함께 고칩니다.
+- 아키텍처 변경은 frontend/server guide, 경계 테스트, 배포 문서까지 맞아야 완료입니다.
+- 운영값과 외부 provider 설정은 실제 값 대신 placeholder나 runbook 링크로 적습니다.
 
 ## 제품 표면
 
 | 표면 | 주요 route | 사용자 | 역할 |
 | --- | --- | --- | --- |
-| 공개 사이트 | `/clubs/:slug`, `/clubs/:slug/about`, `/clubs/:slug/records`, `/clubs/:slug/sessions/:sessionId`, `/`, `/about`, `/records`, `/sessions/:sessionId`, `/login`, `/clubs/:slug/invite/:token`, `/invite/:token`, `/reset-password/:token` | 게스트, 로그인 사용자 | 클럽 소개와 `PUBLIC_RECORD`로 배치된 공개 기록, Google OAuth 시작, 클럽 context가 있는 초대 수락 진입, 종료된 비밀번호 경로 안내. Unscoped public route는 호환성을 위해 baseline club을 사용 |
+| 공개 사이트 | `/clubs/:slug`, `/clubs/:slug/about`, `/clubs/:slug/records`, `/clubs/:slug/sessions/:sessionId`, `/`, `/about`, `/records`, `/sessions/:sessionId`, `/login`, `/auth/error`, `/clubs/:slug/invite/:token`, `/invite/:token`, `/reset-password/:token`, `/living-archive-preview` | 게스트, 로그인 사용자 | 클럽 소개와 `PUBLIC_RECORD` 공개 기록, Google OAuth 시작과 오류 안내, 클럽 context가 있는 초대 수락, 종료된 비밀번호 경로 안내. Unscoped route는 호환성을 위해 baseline club을 씁니다. `/living-archive-preview`는 직접 URL로만 여는 `noindex` 디자인 프리뷰입니다. |
 | 클럽 게스트 앱 | `/clubs/:slug/app`, `/clubs/:slug/app/session/current`, `/clubs/:slug/app/notes`, `/clubs/:slug/app/archive`, `/clubs/:slug/app/sessions/:sessionId`, `/clubs/:slug/app/me`, `/clubs/:slug/app/me/records` | 로그인하지 않은 게스트 | `ACTIVE + PUBLIC` 클럽에서 `GUEST_READABLE` 현재·예정 세션과 기록을 읽습니다. 개인 화면은 preview, 설정·알림·피드백은 정식 멤버 안내, 호스트 route는 거절합니다. 공개 사이트의 `PUBLIC_RECORD` 배치와는 별도 표면입니다. |
 | 로그인 후 진입 | `/app`, `/clubs/:slug/app`, 등록된 club host의 `/app` | 로그인 사용자 | 가입 클럽이 하나면 해당 클럽 앱으로 이동하고, 여러 개면 클럽 선택 화면을 보여주며, 선택한 클럽 context로 앱에 진입 |
 | 멤버 앱 | `/clubs/:slug/app`, `/clubs/:slug/app/pending`, `/clubs/:slug/app/session/current`, `/clubs/:slug/app/notes`, `/clubs/:slug/app/archive`, `/clubs/:slug/app/sessions/:sessionId`, `/clubs/:slug/app/feedback/:sessionId`, `/clubs/:slug/app/feedback/:sessionId/print`, `/clubs/:slug/app/me`, `/clubs/:slug/app/me/records`, `/clubs/:slug/app/me/settings`, `/clubs/:slug/app/notifications`, `/clubs/:slug/app/notifications/settings`, 등록된 club host의 `/app/**` | 둘러보기 멤버(`VIEWER`), 정식 멤버, 호스트 | 현재 세션 확인, 게스트 공개 예정 세션 확인, 둘러보기 멤버 승인 안내, 정식 멤버의 RSVP·읽은 분량·질문·서평, 아카이브, 참석 회차 피드백 문서, 개인 기록과 계정·멤버십 정보, 알림 설정과 알림함을 제공합니다. |
-| 호스트 앱 | `/clubs/:slug/app/host`, `/clubs/:slug/app/host/notifications`, `/clubs/:slug/app/host/members`, `/clubs/:slug/app/host/invitations`, `/clubs/:slug/app/host/sessions`, `/clubs/:slug/app/host/sessions/new`, `/clubs/:slug/app/host/sessions/:sessionId/edit`, `/clubs/:slug/app/host/sessions/:sessionId/closing`, 등록된 club host의 `/app/host/**` | 현재 클럽의 호스트 | 전용 세션 기록 장부에서 과거/예정 회차 검색, 예정 세션 생성/수정, 공개 범위 설정, 현재 세션 시작, 참석 확정, 진행 세션 닫기, staged 기록 초안 검토·적용·revision 복원, AI 생성 또는 외부 JSON을 공통 초안으로 가져오기, 회차별 클로징 상태 확인, 초대 관리, 멤버 상태와 표시 이름 관리, 알림 발송 운영 |
-| 플랫폼 관리 | `/admin`, `/admin/today`, `/admin/health`, `/admin/notifications`, `/admin/clubs`, `/admin/clubs/:clubId`, `/admin/support`, `/admin/ai-ops`, `/admin/audit`, `/admin/analytics` | platform admin | `/admin/today`의 내구 운영 케이스 ledger에서 클럽 공개 readiness·domain·첫 호스트, 알림 실패, AI job 이상, 회차 마감 위험을 우선순위 queue와 inspector로 확인하고 acknowledge·snooze·엄격한 resolve 검증을 수행합니다. 그 밖에 클럽 생성, 클럽 목록 확인, 공개/비공개 상태 관리, 공개 소개 정보 관리, 등록형 domain alias 요청과 상태 확인, 첫 호스트 온보딩 상태 확인, 운영 health와 알림 outbox/delivery 상태 확인, 클럽 운영 readiness 집계, 제한된 support access grant 관리, AI job 운영 조회와 강제 취소, 통합 감사 ledger 조회를 수행합니다. `/admin/analytics`는 활성 멤버, 세션 완료율, RSVP 응답률, AI 비용/세션, 알림 도달률을 7/30/90일 window와 series/benchmark로 보여주는 aggregate-only 운영 분석 표면입니다. 세션/멤버/알림 발송 같은 클럽 내부 운영은 기본적으로 호스트 앱 책임이고, platform admin 표면은 aggregate/read-only 진단과 감사 가능한 복구 작업만 다룹니다. |
+| 호스트 앱 | `/clubs/:slug/app/host`, `/clubs/:slug/app/host/notifications`, `/clubs/:slug/app/host/members`, `/clubs/:slug/app/host/invitations`, `/clubs/:slug/app/host/sessions`, `/clubs/:slug/app/host/sessions/new`, `/clubs/:slug/app/host/sessions/:sessionId/edit`, `/clubs/:slug/app/host/sessions/:sessionId/closing`, `/clubs/:slug/app/host/sessions/:sessionId/feedback-document`, 등록된 club host의 `/app/host/**` | 현재 클럽의 호스트 | 전용 세션 기록 장부에서 과거/예정 회차 검색, 예정 세션 생성/수정, 공개 범위 설정, 현재 세션 시작, 참석 확정, 진행 세션 닫기, staged 기록 초안 검토·적용·revision 복원, AI 생성 또는 외부 JSON을 공통 초안으로 가져오기, live 피드백 문서 미리보기, 회차별 클로징 상태 확인, 초대 관리, 멤버 상태와 표시 이름 관리, 알림 발송 운영 |
+| 플랫폼 관리 | `/admin`(→ `/admin/today`), `/admin/today`, `/admin/health`, `/admin/notifications`, `/admin/clubs`, `/admin/clubs/:clubId`, `/admin/support`, `/admin/ai-ops`, `/admin/audit`, `/admin/analytics` | platform admin | `/admin/today`는 클럽 readiness·domain·첫 호스트, 알림 실패, AI job 이상, 회차 마감 위험을 운영 케이스 queue로 보여주고 acknowledge·snooze·resolve를 처리합니다. 그 밖에 클럽 생성·공개 상태·소개 정보, domain alias, 첫 호스트 온보딩, 운영 health, 알림 outbox/delivery, support access grant, AI job 조회·강제 취소, 통합 감사 ledger를 다룹니다. `/admin/analytics`는 활성 멤버, 세션 완료율, RSVP 응답률, AI 비용/세션, 알림 도달률을 7/30/90일 window로 보여주는 aggregate-only 표면입니다. 클럽 내부 운영(세션, 멤버, 알림 발송)은 호스트 앱 책임이고, platform admin은 aggregate 진단과 감사 가능한 복구만 다룹니다. |
 
 ## 프런트엔드 route-first 경계
 
@@ -66,7 +66,13 @@ MySQL
 
 Production에서 browser-facing origin은 Cloudflare Pages입니다. 브라우저는 직접 Spring API origin을 신뢰하지 않고, 같은 origin의 `/api/bff/**`로 요청합니다. Pages Functions는 upstream Spring `/api/**`로 전달하면서 `X-Readmates-Bff-Secret`을 붙이고 cookie를 전달합니다. 또한 path fallback의 `clubSlug` query와 요청 host에서 클럽 context를 계산해 Spring으로 신뢰 가능한 `X-Readmates-Club-Slug`, `X-Readmates-Club-Host` header를 전달합니다. Cloudflare Functions의 `front/functions/_shared/proxy.ts`는 upstream response header 복사, 내부 `x-readmates-*` response header 제거, host 정규화, client IP 계산, OAuth forwarded header 생성처럼 재사용되는 trusted header/cookie/host/IP helper policy를 제공합니다. `/api/bff/**` route 함수는 API path와 `clubSlug`를 검증한 뒤 shared helper와 route-local header 구성을 조합해 upstream trusted header를 만듭니다. browser가 보낸 내부 header를 신뢰값으로 전달하지 않는 정책은 shared helper와 route tests가 함께 지킵니다.
 
-Frontend runtime observability is a same-origin telemetry side path. The SPA sends only normalized route patterns, enum-like API groups, status classes, safe error codes, and optional short message hash prefixes to `/api/bff/observability/frontend-events`. The BFF forwards the batch to Spring with the BFF secret, and Spring records Micrometer metrics under `readmates.frontend.*`. Raw URLs, query strings, club slugs, UUIDs, emails, user/member identifiers, stack traces, request/response bodies, cookies, OAuth codes, and deployment identifiers are not sent or used as metric labels. Telemetry failure is fail-open and cannot block product flows. Local Vite development keeps the same browser path contract and exact-rewrites only this telemetry route to `/api/observability/frontend-events` before forwarding it to Spring. General `/api/bff/api/**` requests continue to use the existing `/api/**` rewrite, so local telemetry parity does not widen the BFF or authorization boundary.
+프런트 runtime telemetry는 같은 origin의 보조 경로입니다.
+
+- SPA는 정규화한 route pattern, API group, status class, 안전한 error code, 짧은 message hash prefix만 `/api/bff/observability/frontend-events`로 보냅니다.
+- BFF가 secret을 붙여 Spring에 전달하고, Spring(`observability` slice)은 `readmates.frontend.*` Micrometer metric으로 기록합니다.
+- Raw URL, query, club slug, UUID, email, 사용자 식별자, stack trace, body, cookie, OAuth code, 배포 식별자는 보내지 않고 label로도 쓰지 않습니다.
+- 실패해도 제품 흐름을 막지 않습니다(fail-open).
+- 로컬 Vite는 이 route만 `/api/observability/frontend-events`로 정확히 rewrite합니다. 나머지 `/api/bff/api/**`는 기존 `/api/**` rewrite를 그대로 씁니다.
 
 로컬 Vite dev server는 `front/vite.config.ts`의 proxy로 같은 구조를 흉내 냅니다. Cloudflare Pages Functions 코드는 production/preview 배포에서 실행되고, 로컬 개발에서는 Vite proxy가 `/api/bff/**`, `/oauth2/authorization/**`, `/login/oauth2/code/**`를 backend로 넘깁니다. 로컬 proxy도 browser-supplied club context header를 제거하고 `clubSlug` query에서 검증한 slug만 trusted header로 다시 붙입니다.
 
@@ -106,7 +112,7 @@ Platform admin의 domain 상태 확인은 `https://<hostname>/.well-known/readma
 
 클럽 context resolve 순서는 trusted `X-Readmates-Club-Slug`가 먼저이고, 없으면 trusted `X-Readmates-Club-Host`입니다. Spring은 BFF secret을 통과한 요청에서만 `X-Readmates-Club-Slug`와 `X-Readmates-Club-Host`를 신뢰합니다. browser가 직접 보낸 같은 이름의 header는 Pages Functions 또는 Vite proxy에서 제거되며, Spring API origin을 직접 호출하는 요청은 운영에서 BFF secret 검증을 통과할 수 없습니다.
 
-로그인 세션은 플랫폼 전체에서 공유합니다. OAuth start는 현재 Pages 또는 registered host에서 시작될 수 있지만, Google callback `redirect_uri`는 `READMATES_AUTH_BASE_URL`의 primary auth origin으로 모읍니다. 성공 후 `returnTo`가 signed return state로 검증되면 클럽 path 또는 등록 host로 되돌리고, 없으면 `/app` smart entry로 이동합니다. Frontend guarded route, loader, API 401 흐름은 같은 origin의 안전한 relative path만 `/login?returnTo=...`와 OAuth start로 전달하고, absolute URL, protocol-relative URL, login/reset/invite/OAuth/root path, backslash, control character가 포함된 값은 버립니다. Absolute return URL은 primary app host, `readmates.pages.dev`, 또는 `ACTIVE` club domain이면서 session cookie domain 정책으로 세션을 공유할 수 있는 host만 허용합니다.
+로그인 세션은 플랫폼 전체에서 공유합니다. OAuth start는 현재 Pages 또는 registered host에서 시작될 수 있지만, Google callback `redirect_uri`는 `READMATES_AUTH_BASE_URL`의 primary auth origin으로 모읍니다. 성공 후 `returnTo`가 signed return state로 검증되면 클럽 path 또는 등록 host로 되돌리고, 없으면 `/app` smart entry로 이동합니다. Frontend guarded route, loader, API 401 흐름은 같은 origin의 안전한 relative path만 `/login?returnTo=...`와 OAuth start로 전달하고, absolute URL, protocol-relative URL, login/reset/invite/OAuth/root path, backslash, control character가 포함된 값은 버립니다. Absolute return URL은 primary app host, Cloudflare Pages 프로젝트 기본 origin, 또는 `ACTIVE` club domain이면서 session cookie domain 정책으로 세션을 공유할 수 있는 host만 허용합니다.
 
 `멤버로 시작`은 일반 Google 로그인의 별칭이 아니라 명시적인 target-club join입니다. 브라우저는 먼저 same-origin JSON POST로 만료·1회용 join intent를 발급받고, 그 nonce와 `joinClub`을 OAuth start에 함께 전달합니다. 서버는 서명된 `returnTo`의 **exact raw** 경로가 `/clubs/{같은 canonical slug}/app` 또는 그 하위 경로이고 같은 session의 intent가 club·raw return path와 모두 일치할 때만 join context를 실제 provider OAuth `state`에 결합합니다. Callback은 해당 state의 context를 한 번만 소비하므로 crafted top-level GET, nonce 재사용, 다른 탭의 state 혼선, dot segment, percent-encoding, 대소문자 변형, 중복 separator, cross-club target은 join 권한을 만들지 않습니다. 한 탭의 성공 또는 실패 callback은 정상 redirect뿐 아니라 principal 해석이나 응답 작성 중 예상 밖 예외에서도 하나의 `finally` 경계로 소비한 state와 request-local context만 정리하고, Spring Security context를 제거한 뒤 servlet session ID를 정확히 한 번 회전합니다. 따라서 다른 탭의 pending authorization request/context는 보존됩니다. Provider 취소와 인지된 도메인 오류는 요청에 실린 기존 `readmates_session`이 여전히 유효하면 유지하며, 서버 검증에서 invalid/stale로 판명된 cookie만 명시적으로 만료합니다. 성공 시에도 target club이 `ACTIVE + PUBLIC`이고 정확한 `(user_id, club_id)` membership이 없을 때만 계정 이름·사용자 ID와 무관한 중립 표시 이름의 `VIEWER`를 생성합니다. 기존 `VIEWER`·`ACTIVE`는 보존하고 `LEFT`·`SUSPENDED`·`INACTIVE`·`INVITED`는 fail closed합니다. 같은 row의 동시 생성은 unique conflict 뒤 exact target을 다시 읽어 수렴합니다. raw `inviteToken` parameter가 존재하면 blank·malformed를 포함해 유효성 여부와 관계없이 guest join intent를 억제하며, 초대 수락 흐름이 항상 우선합니다. 초대 링크는 token만으로 전역 membership을 만들지 않고 초대가 속한 club context로 돌아오도록 return URL을 보존합니다.
 
@@ -134,7 +140,7 @@ adapter.in.web
   -> adapter.out.persistence
 ```
 
-현재 full port/outbound adapter chain을 따르는 범위는 `publication`, `archive`, `feedback`, `session`, `sessionclosing`, `note`, `auth`의 운영 API surface, `notification` 운영 slice, `club`의 platform-admin 운영 slice, `admin.audit`의 platform-admin 감사 read slice, `admin.health`의 ops read slice, `admin.operations`와 `aigen`의 workflow slice입니다. Disabled password/password-reset/dev-invitation accept endpoint는 `410 Gone` stub으로 남습니다. Auth의 OAuth filter, success handler, cookie/session 보안 구성은 `auth.infrastructure.security`와 `auth.adapter.in.security`에 따로 둡니다.
+현재 이 chain을 따르는 slice는 `publication`, `archive`, `browse`, `feedback`, `session`, `sessionclosing`, `sessionrecord`, `sessionimport`, `note`, `auth`, `notification`, `club`, `admin.audit`, `admin.analytics`, `admin.health`, `admin.operations`, `aigen`, `observability`입니다. 전체 목록과 유형은 `ServerArchitectureBoundaryTest`의 slice registry가 기준입니다. Disabled password/password-reset/dev-invitation accept endpoint는 `410 Gone` stub으로 남습니다. Auth의 OAuth filter, success handler, cookie/session 보안 구성은 `auth.infrastructure.security`와 `auth.adapter.in.security`에 따로 둡니다.
 
 Application authorization에는 Spring principal 자체가 아니라 capability-only 순수 Kotlin 값인 `ClubActor`와 `PlatformActor`를 사용합니다. 두 actor는 식별자와 capability 집합만 가지며 Spring, role/status enum, email, account name, display name, avatar 또는 profile data를 소유하지 않습니다. `CurrentMember`, `CurrentPlatformAdmin`, `CurrentUser`는 아직 다른 slice의 inbound carrier로 사용되므로 유지하고, 전환된 controller와 security boundary에서 필요한 actor로 변환합니다.
 
@@ -158,7 +164,7 @@ Platform admin 알림 운영은 `/api/admin/notifications/snapshot`, `/api/admin
 
 Confirm은 live filter를 다시 실행하거나 새 event/outbox row를 만들지 않습니다. Preview target 중 status, attempt count, failure code, `updated_at`, lease가 그대로인 delivery만 직접 `PENDING`으로 되돌리고 달라진 row는 skip합니다. Delivery reset, 단일 `ADMIN_NOTIFICATION_REPLAY_CONFIRMED` platform audit, immutable confirmation receipt, preview consume는 하나의 트랜잭션이며 같은 actor/hash 명령의 응답 유실 재시도는 저장된 receipt를 반환합니다. Flyway V48은 exact targets와 receipt를 추가하고, V35 legacy v1 preview는 확정 결과를 지어내지 않으며 새 preview가 필요합니다.
 
-Platform admin 감사 ledger는 `/api/admin/audit/events`와 `/admin/audit`에서 기존 `platform_audit_events`, `club_audit_events`, `ai_generation_audit_log`, `admin_notification_replay_previews`를 읽기 전용 cursor ledger로 통합합니다. Replay preview row는 v2 prepared/consumed 또는 v1 legacy evidence로만 투영하고, 확정 성공은 `platform_audit_events.ADMIN_NOTIFICATION_REPLAY_CONFIRMED` 한 건만 투영합니다. Persisted actor role과 optional club scope를 보존하며 source별 allowlist projection만 응답하므로 raw confirm reason, recipient/email, provider response, delivery ID list, raw metadata JSON, email body, transcript, generated result JSON은 노출하지 않습니다. S8 analytics와 호환되도록 date range, club scope, source slice, action category, actor role, outcome 필터 이름을 고정합니다.
+Platform admin 감사 ledger는 `/api/admin/audit/events`와 `/admin/audit`에서 기존 `platform_audit_events`, `club_audit_events`, `ai_generation_audit_log`, `admin_notification_replay_previews`를 읽기 전용 cursor ledger로 통합합니다. Replay preview row는 v2 prepared/consumed 또는 v1 legacy evidence로만 투영하고, 확정 성공은 `platform_audit_events.ADMIN_NOTIFICATION_REPLAY_CONFIRMED` 한 건만 투영합니다. Persisted actor role과 optional club scope를 보존하며 source별 allowlist projection만 응답하므로 raw confirm reason, recipient/email, provider response, delivery ID list, raw metadata JSON, email body, transcript, generated result JSON은 노출하지 않습니다. Analytics와 호환되도록 date range, club scope, source slice, action category, actor role, outcome 필터 이름을 고정합니다.
 
 ```text
 notification
@@ -180,6 +186,8 @@ notification
 | Closing read model | `sessionclosing.adapter.in.web`, `sessionclosing.application.*`, `sessionclosing.adapter.out.persistence` | 기존 세션·기록·피드백·알림·공개 기록 데이터를 조합해 host-safe 회차 클로징 상태를 계산하는 read-side slice |
 | Redis adapter | `auth.adapter.out.redis`, `publication.adapter.out.redis`, `note.adapter.out.redis`, `aigen.adapter.out.redis`, `shared.adapter.out.redis` | 선택적 Redis rate limit/cache/invalidation, AI generation job handoff/cost counter 구현. application service는 Redis adapter가 아니라 port에만 의존 |
 
+표는 대표 package입니다. `browse`, `sessionrecord`, `admin.analytics`도 같은 `adapter.in.web -> port.in -> service -> port.out -> adapter.out.*` 구조이고, `observability`는 outbound 없이 inbound web과 application만 둡니다.
+
 전환된 controller는 legacy repository, `JdbcTemplate`, persistence adapter를 직접 주입받지 않습니다. 인증된 사용자는 controller method에서 `CurrentMember`로 받으며, resolver가 `ResolveCurrentMemberUseCase`를 통해 멤버 정보를 조회합니다.
 
 새 기능이나 전환된 slice에서는 기존 repository를 controller에 다시 주입하지 않고, 필요한 경우 inbound port, application service, outbound port와 adapter를 먼저 둡니다.
@@ -190,30 +198,34 @@ Application package는 Spring Web/HTTP type, HTTP client, adapter 구현체에 �
 
 Outbound adapter(외부 HTTP/Redis)는 `shared.adapter.out.resilience.OutboundCircuitBreakers`를 통해 Resilience4j CircuitBreaker로 감싼다. CircuitBreaker 타입은 `adapter.out` 안에만 존재하며(application/domain 의존 금지, ArchUnit `application packages do not depend on resilience4j types`로 강제), 회로가 열리면 기존 fail-open 결과를 반환한다. 상태 전이는 `readmates.resilience.state_transition` / `readmates.resilience.short_circuited` Micrometer 카운터와 `/admin/health`의 `outbound-resilience` 카드로 관측한다.
 
+Notification scheduler는 inbound adapter입니다. Relay/delivery deadline, retry, failure 분류, backlog snapshot은 notification application이 소유하고, SMTP/Kafka transport 예외는 adapter에서 bounded application result로 바꿉니다.
+
 Notification Kafka transport도 방향별로 분리합니다. producer configuration은 `notification.adapter.out.kafka`에 남고, consumer factory, error handler, DLT recoverer, listener container와 consumer failure classification은 `notification.adapter.in.kafka`가 소유합니다. inbound consumer configuration은 producer configuration이나 outbound-owned properties alias를 경유하지 않습니다.
 
 아키텍처 경계는 `ServerArchitectureBoundaryTest`에서 강제합니다 (ADR-0002). 이 테스트의 all-inbound slice registry는 web, messaging/Kafka, scheduler, adapter security, auth servlet-security package와 `sessionimport` `WORKFLOW` slice를 포함한 전환 surface를 등록합니다. 등록된 inbound adapter가 legacy repository, `JdbcTemplate`, outbound persistence/Redis adapter, Spring Data Redis에 직접 의존하지 않는지, application package가 adapter, Spring JDBC, Spring DAO, Spring Data Redis, Spring Web/HTTP 세부사항에 의존하지 않는지 확인합니다. `admin.operations`에는 같은 application dependency 규칙을 직접 적용하고, `aigen.application`은 `CurrentMember` 같은 web/session carrier 대신 application-safe actor value를 사용해야 하며, domain package는 web/JDBC/persistence 세부사항에 의존하지 않습니다.
 
-`ServerArchitectureInventoryTest`는 승인된 39개 boundary identity를 current 0개와 retired 39개로, 승인된 41개 application feature dependency를 current 37개와 retired 4개로 정확히 분할합니다. 두 ledger는 목표 architecture가 아니라 제거 가능한 debt inventory이며, retired identity 삭제, approved seed 증가, 같은 크기의 identity 대체를 허용하지 않습니다. Session-family 전환에서 다음 네 boundary identity를 exact tombstone으로 옮겼습니다.
+`ServerArchitectureInventoryTest`(boundary/feature)와 `ServerQualityRatchetTest`(Detekt/ktlint)는 부채 ledger를 고정합니다. 목표 구조가 아니라 줄여 나갈 debt inventory입니다.
 
-- `sessionclosing/adapter/in/web/HostSessionClosingController.kt` → `session.adapter.in.web.parseHostSessionId`
-- `sessionimport/adapter/in/web/SessionImportErrorHandler.kt` → `sessionimport.application.service.InvalidSessionImportException`
-- `sessionrecord/adapter/out/persistence/JdbcHostSessionHistoryAdapter.kt` → `sessionrecord.application.service.typeSort`
-- `sessionrecord/adapter/out/persistence/JdbcSessionRecordAdapter.kt` → `sessionrecord.application.service.SessionRecordSnapshotCodec`
+| Ledger | current + retired = approved |
+| --- | --- |
+| Boundary import (`server/config/architecture/`) | `0 + 39 = 39` |
+| Application feature dependency | `37 + 4 = 41`, cyclic component 0개 |
+| Detekt baseline (`server/config/detekt/`) | `437 + 24 = 461` |
+| ktlint baseline (`server/config/ktlint/`) | `171 + 0 = 171` |
 
-Feature ledger에는 기존 `club|auth`와 함께 새 tombstone `sessionrecord|sessionimport`, `sessionrecord|session`, `aigen|session`이 있습니다. 순방향 `sessionimport|sessionrecord`와 `session|sessionrecord`는 current로 유지하고, feature graph의 cyclic component는 0개입니다. Session-record application은 자신이 소유한 `ReplaceSessionRecordContentPort`로 live replacement를 요청하고 `sessionimport`가 이를 구현합니다. `SessionRecordApplyService.apply`는 바깥 `@Transactional` 경계를 계속 소유해 live replacement, immutable revision, receipt, draft 삭제를 한 transaction으로 유지하고 cache invalidation은 after-commit입니다.
+- 부채를 없애면 같은 변경에서 current baseline의 identity를 지우고 retired ledger에 그대로 옮깁니다.
+- retired identity 삭제, approved seed 증가, 같은 크기 identity 바꿔치기, baseline 재생성은 허용하지 않습니다.
+- Detekt rule threshold(`server/config/detekt/detekt.yml`)는 v2.5.0에서 완화됐지만 baseline 파일과 위 partition은 그대로입니다.
+- Feature ledger의 retired edge는 `club|auth`, `sessionrecord|sessionimport`, `sessionrecord|session`, `aigen|session`입니다. 순방향 `sessionimport|sessionrecord`, `session|sessionrecord`는 current입니다.
 
-Snapshot encode/decode는 session-record output port `SessionRecordSnapshotCodec`와 Jackson outbound adapter가 소유하며 schema `readmates-session-record:v1`, deterministic JSON과 exact-byte SHA-256 계약을 유지합니다. History ordering은 record application model의 `HostSessionHistoryType.typeSort`가 소유합니다. `SessionRecordVisibility`와 history 전용 `InvalidHostSessionHistoryCursorException`도 session-record application model이 소유하고, 일반 host-session 목록은 기존 session-owned cursor failure를 유지합니다. 이 전환은 REST route, request/response JSON, status/error code, cursor tuple, revision/notification/cache 의미, BFF/frontend source, migration/schema, deploy 또는 production behavior를 바꾸지 않았습니다.
+Session-record 경계의 핵심 계약:
 
-Phase 2의 마지막 책임 분해는 다섯 개 대상 cluster를 다음 경계로 고정합니다.
+- Session-record application이 소유한 `ReplaceSessionRecordContentPort`를 `sessionimport`가 구현해 live content를 교체합니다.
+- `SessionRecordApplyService.apply`의 바깥 `@Transactional`이 live 교체, immutable revision, receipt, draft 삭제를 한 transaction으로 묶습니다. Cache invalidation은 after-commit입니다.
+- Snapshot codec은 output port `SessionRecordSnapshotCodec`와 Jackson adapter가 소유합니다. Schema `readmates-session-record:v1`, deterministic JSON, exact-byte SHA-256 계약을 유지합니다.
+- History 정렬(`HostSessionHistoryType.typeSort`), `SessionRecordVisibility`, `InvalidHostSessionHistoryCursorException`은 session-record application model이 소유합니다.
 
-- 수동 알림 persistence는 read query, audience/lock, preview store, confirm store, row mapping으로 나뉘고 `JdbcManualNotificationDispatchAdapter`가 기존 `ManualNotificationDispatchPort` bean과 confirm transaction을 유지합니다.
-- 호스트 세션 write는 draft, attendance, publication, lifecycle command와 공통 query, 순수 policy로 나뉩니다. `JdbcHostSessionWriteAdapter`가 기존 여섯 output port를 구현하고 삭제된 `HostSessionWriteOperations`의 consumer는 없습니다.
-- 플랫폼 관리자 알림은 read façade, transactional replay service, 순수 replay policy, JSON output port/Jackson adapter로 나뉩니다. 기존 use-case bean, role/error/receipt 계약과 replay atomicity를 유지합니다.
-- Redis AI job store는 payload, transition, commit lease, recovery, recovery index, context/keyspace 책임과 세 capability port로 나뉩니다. 단일 conditional façade, Redis key/TTL/hash, Lua byte와 key/argument order, unavailable 의미를 유지합니다.
-- 세션 기록 persistence는 read, apply, draft capability와 row assembly로 나뉩니다. `JdbcSessionRecordAdapter`만 Spring bean으로 남고 바깥 apply transaction, SQL/optimistic revision/receipt/draft 의미를 유지합니다.
-
-이 분해로 대상 class-level `LargeClass`·`TooManyFunctions` suppression은 제거됐고, 대상 24개 Detekt identity는 현행 baseline에서 retired ledger로 이동했습니다. Phase 2 완료 기준은 boundary `0 current + 39 retired = 39 approved`, feature dependency `37 + 4 = 41`과 cyclic component 0개, temporary architecture exception 0개, 위 다섯 책임 cluster의 분해와 대상 identity/suppression 제거입니다. 정적 분석 전체가 zero라는 뜻은 아닙니다. 비대상 legacy debt는 Detekt `437 current + 24 retired = 461 approved`, ktlint `171 current + 0 retired = 171 approved`로 계속 공개적으로 추적하며 baseline regeneration, approved-seed 증가, 같은 크기 identity 대체나 config 완화로 숨기지 않습니다.
+큰 persistence/service class는 책임별 협력 객체로 나뉘어 있습니다(수동 알림 persistence, 호스트 세션 write, 플랫폼 관리자 알림 replay, Redis AI job store, 세션 기록 persistence). 각 façade(`JdbcManualNotificationDispatchAdapter`, `JdbcHostSessionWriteAdapter`, `JdbcSessionRecordAdapter` 등)가 기존 port bean과 transaction 경계를 유지합니다.
 
 ## CQRS Read vs Write Package Split
 
@@ -226,12 +238,13 @@ ReadMates 서버는 도메인 패키지를 다음 두 형태로 운영합니다.
 - 트랜잭션 mutation을 수행
 
 ### Read-side (domain/ 없음)
-- `note`, `publication`, `archive`, `sessionclosing`, `admin.audit`
+- `note`, `publication`, `archive`, `browse`, `sessionclosing`, `admin.audit`, `admin.analytics`
 - `application/model/` 의 read DTO + `JdbcXxxAdapter` 직접 query
 - 도메인 엔티티 없이 query result 모델만 정의
-- `@ReadOnlyApplicationService` 마커로 식별 (`shared/architecture/`)
+- 순수 read-only service에는 `@ReadOnlyApplicationService`(`shared/architecture/`)를 붙입니다. 현재 `note`, `publication`, `archive`, `browse`, `admin.audit`, `admin.health`에 있습니다. 규칙은 이 marker가 붙은 service에 적용됩니다.
 
 ### Ops Read-side
+- `observability` — 프런트 telemetry batch를 받아 Micrometer metric으로 기록합니다. 영속 상태가 없습니다.
 - `admin.health` — 운영 상태 snapshot과 deploy ledger를 provider/adapter에서 읽어 aggregate card model로 반환합니다.
 - Mutation surface가 아니며, `@ReadOnlyApplicationService`인 application service는 provider 결과를 card-local failure로 격리합니다. `PlatformAdminHealthRefreshScheduler`는 `admin.health.adapter.in.scheduling`의 인바운드 어댑터이며 `RefreshPlatformAdminHealthUseCase`만 호출합니다. scheduler와 HTTP controller는 concrete service나 provider에 직접 의존하지 않습니다.
 
@@ -245,7 +258,7 @@ lazy 및 scheduled trigger는 CAS로 설치한 정확히 하나의 in-flight fut
 
 ### Mixed / Workflow-side
 - `admin.operations` — 네 운영 source의 allowlist signal을 case/event/source-freshness ledger로 조정하고, 낙관적 version을 가진 lifecycle mutation과 exact-source resolve 검증을 수행합니다. Application layer는 source adapter, JDBC, Micrometer, Spring Web detail이 아니라 outbound port에 의존합니다.
-- `feedback` — 문서 업로드 mutation + 조회를 함께 보유합니다.
+- `feedback` — 피드백 문서 조회, 호스트 미리보기·상태, template parser를 소유합니다. 별도 업로드 API는 없고 live 문서 교체는 session-record apply가 맡습니다. ArchUnit registry 유형은 `WORKFLOW`입니다.
 - `sessionrecord` — `/app/host/sessions` 장부와 editor/history API가 기본 정보·출석의 metadata-only audit, 공개 기록 공통 draft, immutable applied revision, restore-to-draft를 소유합니다. 적용 전 member/public live projection은 변경하지 않습니다.
 - `sessionimport` — 호스트 세션 편집기의 preview는 검증 전용 read path이고 commit은 공개 요약, 공개 범위, 하이라이트, 한줄평, 피드백 문서를 `sessionrecord` 공통 draft에 원자적으로 저장합니다. live 반영은 별도의 검토·알림 결정·apply 단계입니다.
 - `aigen` — 외부 LLM provider, Redis job handoff, Kafka worker, commit/recovery orchestration을 포함합니다. AI 결과 commit은 `sessionrecord` 공통 draft에 저장하고 live 반영을 수행하지 않습니다. Application layer는 provider SDK, Redis, JDBC, Kafka detail이 아니라 outbound port에 의존합니다.
@@ -271,10 +284,10 @@ lazy 및 scheduled trigger는 CAS로 설치한 정확히 하나의 in-flight fut
 1. 브라우저가 `/oauth2/authorization/google`로 이동합니다. 초대 수락처럼 원래 클럽으로 돌아와야 하는 흐름은 `returnTo`를 함께 보냅니다.
 2. Pages Functions가 Spring `/oauth2/authorization/google`로 proxy하고, 현재 host 또는 slug에서 계산한 club context header를 붙입니다.
 3. Spring Security가 Google OAuth flow를 시작합니다.
-4. callback은 `READMATES_AUTH_BASE_URL`이 가리키는 primary auth origin의 `/login/oauth2/code/google`로 돌아옵니다. Primary auth origin을 따로 두지 않은 preview 환경이나 무료 플랜 기본 운영 배포에서는 `https://readmates.pages.dev/login/oauth2/code/google`을 사용합니다.
+4. callback은 `READMATES_AUTH_BASE_URL`이 가리키는 primary auth origin의 `/login/oauth2/code/google`로 돌아옵니다. Primary auth origin을 따로 두지 않은 환경은 Cloudflare Pages 프로젝트 기본 origin(`https://<pages-origin>/login/oauth2/code/google`)을 씁니다.
 5. Pages Functions가 callback을 Spring으로 proxy합니다.
 6. Spring이 Google 사용자 정보를 확인하고 platform session을 복원하거나 생성합니다.
-7. `returnTo`가 검증된 signed return state로 저장되어 있으면 허용된 primary origin, `readmates.pages.dev` fallback, 또는 등록된 active club host로 redirect합니다. 없으면 `/app` smart entry로 redirect합니다.
+7. `returnTo`가 검증된 signed return state로 저장되어 있으면 허용된 primary origin, Pages 기본 origin fallback, 또는 등록된 active club host로 redirect합니다. 없으면 `/app` smart entry로 redirect합니다.
 
 `readmates_session` cookie는 `HttpOnly`, `SameSite=Lax`, production `Secure` posture를 사용합니다. 서버는 raw token을 저장하지 않고 hash를 `auth_sessions`에 저장합니다. API 요청마다 session cookie에서 현재 사용자를 복원하고, membership/role 상태를 기준으로 route와 API 접근을 제한합니다.
 
@@ -288,7 +301,7 @@ Mutating method인 `POST`, `PUT`, `PATCH`, `DELETE`는 `Origin` 또는 `Referer`
 
 Production은 `READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true`로 mutating `/api/host/**`에 현재 client contract를 추가로 요구합니다. 새 browser bundle은 `X-Readmates-Client-Contract: v2`를 선언하고 Pages Functions는 정확한 선언만 새 upstream header로 재생성합니다. BFF가 값을 무조건 부여하지 않으므로 구 browser + 새 BFF, 새 browser + 구 BFF, 구 browser + 구 BFF는 모두 새 backend에서 409로 fail closed하고 새 browser + 새 BFF만 통과합니다. 이 header는 인증이나 권한을 대신하지 않으며 BFF secret, same-origin 검증, session, club-scoped HOST 권한을 모두 통과해야 합니다.
 
-클럽 context header도 BFF 신뢰 경계 안에 있습니다. Spring은 `X-Readmates-Club-Slug`와 `X-Readmates-Club-Host`를 browser input으로 취급하지 않고, BFF secret을 통과한 요청에서만 context resolve 입력으로 사용합니다. 허용 origin은 primary auth/app origin, `https://readmates.pages.dev`, 등록된 active club host를 명시적으로 포함해야 하며 wildcard suffix로 넓게 열지 않습니다.
+클럽 context header도 BFF 신뢰 경계 안에 있습니다. Spring은 `X-Readmates-Club-Slug`와 `X-Readmates-Club-Host`를 browser input으로 취급하지 않고, BFF secret을 통과한 요청에서만 context resolve 입력으로 사용합니다. 허용 origin은 primary auth/app origin, Pages 기본 origin, 등록된 active club host를 명시적으로 포함해야 하며 wildcard suffix로 넓게 열지 않습니다.
 
 BFF secret audit은 `readmates.security.bff.audit-mode`로 조정합니다. 기본값 `rotation-only`는 `secondary`/`index_N`처럼 non-primary alias 사용만 비동기로 기록하므로 평상시 `bff_secret_rotation_audit` 적재량은 0에 수렴합니다. `all`은 짧은 incident window에서만 사용하고, `off`는 audit table이나 DB 압박이 있을 때의 임시 우회로 취급합니다. Cloudflare 진단 라우트 `GET /api/bff/__internal/secret-status`는 configured secret count, rotation stage, primary fingerprint 앞 6자만 반환하고 raw secret은 노출하지 않습니다.
 
@@ -466,9 +479,26 @@ GET /api/sessions/{sessionId}/feedback-document
 Readable response for active full member or host
 ```
 
-호스트는 더 이상 피드백 문서만 별도로 업로드하지 않습니다. AI 생성 또는 `readmates-session-import:v1` JSON import commit은 피드백 문서를 공통 staged draft에 저장하고 composer를 열지 않습니다. Member/public이 읽는 live 피드백 문서는 세션 기록 final apply가 성공할 때 함께 교체됩니다. Host preview route는 staged draft가 아니라 `session_feedback_documents`의 최신 live 문서를 읽으므로, `OPEN` 세션에서도 현재 live 문서가 있으면 피드백 알림 CTA와 manual composer가 사용할 수 있습니다.
+- 피드백 문서만 따로 올리는 경로는 없습니다. AI 생성 또는 `readmates-session-import:v1` JSON commit이 문서를 공통 staged draft에 저장합니다.
+- 멤버가 읽는 live 문서는 세션 기록 final apply가 성공할 때 함께 바뀝니다.
+- Host preview route는 staged draft가 아니라 `session_feedback_documents`의 최신 live 문서를 읽습니다. 그래서 `OPEN` 세션도 live 문서가 있으면 피드백 알림 CTA와 manual composer를 쓸 수 있습니다.
 
-프런트엔드에는 `/app/feedback/:sessionId/print` route와 browser print 기반 helper가 남아 있지만, 현재 `front/shared/config/readmates-feature-flags.ts`의 `feedbackDocumentPdfDownloadsEnabled`가 `false`라서 사용자는 `PDF로 저장` 또는 자동 print action을 보지 않습니다. 이 기능을 다시 켤 때는 archive, my page, feedback document route, E2E print smoke를 함께 검증합니다.
+### 문서 템플릿 (v1 / v2)
+
+`FeedbackDocumentParser`는 두 marker를 읽습니다 ([ADR-0072](adr/0072-feedback-document-template-v2.md)).
+
+| Marker | 내용 |
+| --- | --- |
+| `<!-- readmates-feedback:v1 -->` | 메타, 관찰자 노트, 참여자별 피드백의 필수 구조 |
+| `<!-- readmates-feedback:v2 -->` | v1 필수 구조 + 선택 섹션: 한눈에 보기, 오늘의 하이라이트, 모임 피드백, 모임의 흐름, 이어갈 질문, 참여자별 배지·변화 흐름·지난 과제에서 해낸 것·첫 기록 기준점·이번 모임의 발언 |
+
+- API 응답은 기존 필드를 유지하고 `templateVersion`과 선택 섹션 필드만 추가합니다. DB schema 변경은 없습니다.
+- 프런트는 선택 섹션이 있을 때만 새 영역을 그리고, 없으면 기존 화면을 씁니다.
+- 관리자 마감 위험 판정(`JdbcAdminClubOperationsAdapter`의 `FEEDBACK_DOCUMENT_MARKERS`)은 두 marker를 모두 유효하게 봅니다.
+- 외부 JSON import는 v1과 v2를 모두 받습니다. In-app AI 생성과 그 validator는 v1만 만들고 검사합니다.
+- 작성 형식은 [session-import-generator.md](session-import-generator.md#피드백-문서-구조)를 따릅니다.
+
+`/app/feedback/:sessionId/print` route와 print helper는 남아 있지만 `front/shared/config/readmates-feature-flags.ts`의 `feedbackDocumentPdfDownloadsEnabled`가 `false`라 사용자에게 `PDF로 저장`이 보이지 않습니다. 다시 켤 때는 archive, my page, feedback route, E2E print smoke를 함께 확인합니다.
 
 열람 경계는 다음과 같습니다.
 
@@ -587,5 +617,3 @@ COMMITTED -> four-payload cleanup; live record changes only on later apply
 - **Trace/privacy**: Spring MVC -> Kafka producer -> consumer/worker -> application provider observation -> Spring AI/provider span을 W3C context로 연결하고 OTLP로 internal Tempo에 비동기 export합니다. AI span/log/metric/baggage에는 prompt, completion, transcript, evidence, raw error, user/session/club identity를 넣지 않습니다. `requestId`는 별도 lookup ID입니다.
 - **운영 표면**: 기존 AI meter에 physical call/cost basis/gate rejection/circuit/exporter delivery 지표가 추가됩니다. Prometheus exemplar storage, Grafana Tempo datasource, seven-day Tempo retention을 사용합니다. 로컬 포트는 loopback, OCI Tempo/OTLP는 internal network only입니다.
 - **운영·권한 경계**: `readmates.aigen.enabled`와 `enabled-providers`가 실행 경계입니다. Provider key/live billable smoke/production deploy는 별도 승인 대상입니다. Platform admin은 content-free metadata만 보고 조작합니다. 상세 설정, rollback, 잔여 위험은 [living architecture](spring-ai-2-provider-architecture.md)와 [runbook](../operations/runbooks/ai-session-generation.md)을 따릅니다.
-
-- **Notification runtime boundary**: scheduler는 inbound adapter이고 relay/delivery deadline, retry, failure classification, last-success backlog snapshot은 notification application이 소유한다. SMTP/Kafka transport exception은 adapter에서 bounded application result로 변환하며 application package로 누출하지 않는다.

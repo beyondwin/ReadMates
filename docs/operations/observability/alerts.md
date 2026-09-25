@@ -1,16 +1,17 @@
-# 알림 룰 후보
+# 알림 룰
 
-> 운영 흐름으로 읽으려면 [Observability README](README.md)에서 시작하고, 배포 전후 검증은 [Deploy observability check](../runbooks/deploy-observability-check.md)를 기준으로 기록합니다.
+> 운영 흐름은 [Observability README](README.md)에서 시작합니다. 배포 전후 검증은 [Deploy observability check](../runbooks/deploy-observability-check.md)를 따릅니다.
 
-본 문서는 Prometheus alert rule 정의를 사람-읽기용으로 정리합니다. 모든 룰은 `ops/prometheus/alerts/{notification,http,jvm,security,redis,targets,aigen}-rules.yml`에 파일화되어 Prometheus가 실제로 로드하며, SSOT는 rules 디렉토리입니다(아래 "룰 (파일화 완료)" 참조). 실 배포 여부는 운영 환경에서 별도 확인합니다.
+이 문서는 Prometheus alert rule을 사람이 읽기 쉽게 정리한 것입니다. 기준(SSOT)은 `ops/prometheus/alerts/*-rules.yml`입니다. 문서와 파일이 다르면 파일이 맞습니다. 운영 Prometheus가 실제로 어떤 룰을 로드했는지는 Git이 아니라 운영 환경에서 확인합니다.
 
 ## 룰 작성 규약
 
-- severity: `critical` | `warning` 또는 `warn` | `info`. 기존 후보 룰은 `warning`, 파일화된 AI 세션 생성 룰은 현재 `warn` label을 씁니다.
-- `for:`로 일시적 spike 무시.
-- annotations에는 가능한 경우 `runbook_url`을 둔다. runbook이 없는 alert는 운영 알림으로 승격하기 전에 이 문서나 `docs/operations/runbooks/`에 triage 절차를 먼저 추가한다.
-- prod-only로 적용 가정. dev/staging은 룰 별도 set.
-- 메트릭 이름은 Prometheus exposition 형식 (Micrometer의 dot → underscore, counter에 `_total` 접미).
+- 새 alert는 rules 파일 PR로 추가하고, 같은 PR에서 이 문서를 맞춥니다.
+- 검증: `./scripts/validate-prometheus-rules.sh` (Docker의 promtool로 rule 문법과 `ops/prometheus/tests/*.test.yml` 단위 테스트 실행).
+- severity: `critical` | `warning` | `info`. AI 세션 생성 룰(`aigen-rules.yml`)은 `warn` label을 씁니다.
+- `for:`로 일시적 spike를 무시합니다.
+- 메트릭 이름은 Prometheus 형식입니다. Micrometer의 `.`은 `_`로 바뀌고, counter에는 `_total`이 붙습니다.
+- `runbook_url`은 현재 `NotificationOutboxBacklogHigh`와 `aigen-rules.yml`에만 있습니다. `${READMATES_REPO}`는 Prometheus가 치환하지 않으므로 링크는 참고용입니다.
 
 ## 알림 목록 (anchors)
 
@@ -26,6 +27,7 @@
 <a id="ratelimitdenied"></a>
 <a id="redisfallbackshigh"></a>
 <a id="redisoperationerrors"></a>
+<a id="scrapetargetdown"></a>
 <a id="aigenprovidererrorburst"></a>
 <a id="aigenschemafailurespike"></a>
 <a id="aigenbudgetexhaustion"></a>
@@ -44,223 +46,72 @@
 
 ## 파일화된 AI 세션 생성 룰
 
-`ops/prometheus/alerts/aigen-rules.yml`은 in-app AI 세션 생성 운영용으로 다음 alert를 정의합니다. 각 alert의 `runbook_url`은 [AI session generation runbook](../runbooks/ai-session-generation.md)의 anchor로 연결됩니다.
+`ops/prometheus/alerts/aigen-rules.yml`의 alert입니다. `runbook_url`은 [AI session generation runbook](../runbooks/ai-session-generation.md)의 anchor를 가리킵니다.
 
 | Alert | Severity | 기준 | Runbook anchor |
 | --- | --- | --- | --- |
-| `AiGenProviderErrorBurst` | warn | provider별 FAILED job ratio > 10% over 10m | `#provider-error-burst` |
-| `AiGenSchemaFailureSpike` | warn | `SCHEMA_INVALID` validation failure ratio > 20% over 1h | `#schema-failure-spike` |
-| `AiGenBudgetExhaustion` | info | aggregate 30d AI generation cost > $1000 | `#budget-exhaustion` |
-| `AiGenQueueLagHigh` | warn | authoritative/fresh probe에서 Redis processing backlog > 50 for 5m | `#queue-lag-high` |
-| `AiGenQueueProbeUnavailable` | warn | availability가 0 또는 series absent for 2m | `#queue-probe-unavailable` |
-| `AiGenQueueProbeStale` | warn | last-success가 absent/NaN 또는 sample interval 3배 이상 stale | `#queue-probe-unavailable` |
-| `AiGenRecoveryFailure` | warn | 10m 내 job recovery `failed`/`corrupt` 증가 또는 nonzero series 최초 관측 | `#recovery-failure` |
-| `AiGenRecoveryIndexRepairBlocked` | warn | repair `quarantined`/`over_cap`/`failed` 증가 또는 nonzero series 최초 관측 | `#recovery-index-repair` |
-| `AiGenRedisDown` | critical | `redis_up == 0` and HTTP 5xx rate elevated | `#redis-down` |
-| `AiGenProviderCircuitOpen` | warn | provider circuit open for 5m | `#provider-circuit-open` |
-| `AiGenEstimatedUnknownCostGrowth` | warn | 15m unknown-estimated reserved cost growth | `#estimated-unknown-cost` |
-| `AiGenPhysicalCallCapExhausted` | warn | maximum-three physical-call cap exhausted | `#physical-call-cap` |
-| `AiGenOtlpExporterDrops` | warn | OTLP export failure or bounded queue drop | `#otlp-exporter-drops` |
-| `TempoTargetDown` | critical | internal Tempo scrape target down for 2m | `#tempo-down` |
-| `TempoNotReady` | critical | active Tempo ingester absent for 2m | `#tempo-not-ready` |
+| `AiGenProviderErrorBurst` | warn | provider별 `FAILED` job 비율 > 10% (10m) | `#provider-error-burst` |
+| `AiGenSchemaFailureSpike` | warn | `SCHEMA_INVALID` validation failure 비율 > 20% (1h) | `#schema-failure-spike` |
+| `AiGenBudgetExhaustion` | info | 전체 30일 AI 비용 > $1000 | `#budget-exhaustion` |
+| `AiGenQueueLagHigh` | warn | probe가 authoritative/fresh일 때 processing backlog > 50 (5m) | `#queue-lag-high` |
+| `AiGenQueueProbeUnavailable` | warn | availability가 0이거나 series 없음 (2m) | `#queue-probe-unavailable` |
+| `AiGenQueueProbeStale` | warn | last-success가 없음/NaN 또는 sample interval 3배 이상 지남 (2m) | `#queue-probe-unavailable` |
+| `AiGenRecoveryFailure` | warn | 10m 내 recovery `failed`/`corrupt` 증가 또는 nonzero series 첫 관측 | `#recovery-failure` |
+| `AiGenRecoveryIndexRepairBlocked` | warn | repair `quarantined`/`over_cap`/`failed` 증가 또는 nonzero series 첫 관측 | `#recovery-index-repair` |
+| `AiGenRedisDown` | critical | `redis_up == 0` 이면서 HTTP 5xx > 1 req/s (1m) | `#redis-down` |
+| `AiGenProviderCircuitOpen` | warn | `resilience4j_circuitbreaker_state{state="open"}` 5m 유지 | `#provider-circuit-open` |
+| `AiGenEstimatedUnknownCostGrowth` | warn | 15m 동안 `ESTIMATED_UNKNOWN` 비용 증가 | `#estimated-unknown-cost` |
+| `AiGenPhysicalCallCapExhausted` | warn | 최대 3회 물리 호출 cap 소진 (10m) | `#physical-call-cap` |
+| `AiGenOtlpExporterDrops` | warn | OTLP export 실패 또는 bounded queue drop (10m) | `#otlp-exporter-drops` |
+| `TempoTargetDown` | critical | `up{job="tempo"} == 0` (2m) | `#tempo-down` |
+| `TempoNotReady` | critical | ACTIVE Tempo ingester 없음 (2m) | `#tempo-not-ready` |
 
-Per-club cost cap은 metric label에 `club_id`를 싣지 않는 정책 때문에 Prometheus alert가 아니라 application cap guard와 `ai_generation_audit_log` SQL drill-down으로 운영합니다.
+- Club별 비용 cap은 alert가 아닙니다. `club_id`를 metric label로 쓰지 않으므로 application cap guard와 `ai_generation_audit_log` SQL로 확인합니다.
+- `AiGenRedisDown`의 `redis_up`은 현재 repo의 scrape 대상(`readmates-server`, `prometheus-self`, `alertmanager`, `tempo`)이 내보내지 않습니다. Redis exporter를 붙이기 전에는 이 alert가 울리지 않는다고 보고, Redis 상태는 `RedisFallbacksHigh`/`RedisOperationErrors`와 `/admin/health`로 확인합니다.
+- Exporter 실패나 Tempo down은 product 장애와 같지 않습니다.
 
-신규 dead-target watch는 `ops/prometheus/alerts/targets-rules.yml`의 `ScrapeTargetDown` (`up == 0` for 5m) 으로 scrape target이 사라지면 critical alert를 띄웁니다. Tempo는 더 짧은 전용 target/readiness alert로 trace backend 장애를 분리합니다. Exporter failure나 Tempo down은 product failure와 동일시하지 않습니다.
+## 기타 룰 (파일화 완료)
 
-## 룰 (파일화 완료)
+| Alert | 파일 | Severity | 조건 | for |
+| --- | --- | --- | --- | --- |
+| `NotificationOutboxBacklogHigh` | `notification-rules.yml` | warning | `max(readmates_notifications_outbox_backlog{status="pending"}) > 100` | 10m |
+| `NotificationOutboxBacklogCritical` | `notification-rules.yml` | critical | 같은 식 `> 1000` | 5m |
+| `NotificationFailRateHigh` | `notification-rules.yml` | warning | failed / (sent + failed) > 5% (5m rate, 아래 참고) | 10m |
+| `NotificationDeadLetters` | `notification-rules.yml` | warning | `increase(readmates_notifications_dead_total[1h]) > 0` | 0m |
+| `NotificationOutboxRelayDead` | `notification-rules.yml` | warning | `max(readmates_notifications_outbox_backlog{status="dead"}) > 0` | 0m |
+| `NotificationDeliveryBacklogHigh` | `notification-rules.yml` | warning | `max(readmates_notifications_delivery_backlog{status=~"pending\|failed\|sending"}) > 100` | 10m |
+| `HttpErrorRateHigh` | `http-rules.yml` | critical | 전체 5xx 비율 > 1% (분모 `clamp_min(..., 1)`) | 5m |
+| `HttpLatencyP95High` | `http-rules.yml` | warning | `/api/.*` uri별 p95 > 0.5s | 10m |
+| `HikariConnectionPoolPending` | `jvm-rules.yml` | warning | `hikaricp_connections_pending > 0` | 2m |
+| `JvmHeapHigh` | `jvm-rules.yml` | warning | heap used / max > 85% | 10m |
+| `RateLimitDenied` | `security-rules.yml` | warning | `sum(rate(readmates_rate_limit_denied_total{sensitive="true"}[5m])) > 0.1` | 5m |
+| `RedisFallbacksHigh` | `redis-rules.yml` | warning | `sum(rate(readmates_redis_fallbacks_total[5m])) > 0.1` | 5m |
+| `RedisOperationErrors` | `redis-rules.yml` | warning | `sum(rate(readmates_redis_operation_errors_total[5m])) > 0.05` | 5m |
+| `ScrapeTargetDown` | `targets-rules.yml` | critical | `up == 0` | 5m |
 
-본 문서의 후보 룰들은 모두 `ops/prometheus/alerts/{notification,http,jvm,security,redis,targets}-rules.yml`에
-파일화되어 Prometheus가 실제로 로드한다. 본 문서는 사람-읽기용 참고이며 SSOT는 rules 디렉토리다.
-새 alert 추가는 항상 rules 디렉토리 파일 PR로 한다 — docs는 그 PR과 함께 동기화한다.
+해석 메모:
 
-```yaml
-groups:
-  - name: readmates.notification
-    interval: 30s
-    rules:
-      - alert: NotificationOutboxBacklogHigh
-        expr: max(readmates_notifications_outbox_backlog{status="pending"}) > 100
-        for: 10m
-        labels:
-          severity: warning
-          component: notification
-        annotations:
-          summary: "Notification pending backlog over 100 for 10 minutes"
-          description: "Event relay가 Kafka publish 속도를 따라가지 못했거나 멈췄을 가능성. publish result와 relay/Kafka evidence 확인."
-          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#notification-backlog"
+- `HttpLatencyP95High`는 `http_server_requests_seconds_bucket`이 필요합니다. 현재 `application.yml`에는 `http.server.requests` histogram 설정이 없어 bucket series가 없을 수 있습니다. 먼저 [메트릭 카탈로그의 HTTP 절](metrics-catalog.md#http)을 확인합니다.
+- Outbox 룰(`NotificationOutboxBacklog*`, `NotificationOutboxRelayDead`)은 event relay/Kafka 발행 경보입니다. Delivery 룰(`NotificationDeliveryBacklogHigh`, `NotificationDeadLetters`, `NotificationFailRateHigh`)은 SMTP 발송 경보입니다. 두 queue를 같은 것으로 보지 않습니다.
+- `NotificationFailRateHigh`는 `failed`/`sent`가 없으면 `or vector(0)`으로 0을 채우고, 분모에 `1e-9` floor를 둡니다. 저빈도 구간에서 실패 1건뿐이면 비율 1.0으로 alert가 유지됩니다. 성공만 있거나 series가 없으면 0입니다. Prometheus query 자체가 실패하면 별도 장애로 봅니다.
+- Backlog gauge가 첫 refresh 전 `NaN`이거나 refresh 결과가 `partial|failure`면 0건이 아닙니다. 마지막 성공 snapshot과 `readmates_notifications_backlog_refresh_total`을 먼저 봅니다.
 
-      - alert: NotificationOutboxBacklogCritical
-        expr: max(readmates_notifications_outbox_backlog{status="pending"}) > 1000
-        for: 5m
-        labels:
-          severity: critical
-          component: notification
-        annotations:
-          summary: "Notification pending backlog over 1000"
-          description: "Event relay 또는 Kafka publication이 중단됐을 가능성. delivery worker가 아니라 event outbox evidence를 즉시 조사."
+## DB 기반 점검 (Prometheus 외)
 
-      - alert: NotificationFailRateHigh
-        expr: |
-          (sum(rate(readmates_notifications_failed_total[5m])) or vector(0))
-            / clamp_min((sum(rate(readmates_notifications_sent_total[5m])) or vector(0))
-                       + (sum(rate(readmates_notifications_failed_total[5m])) or vector(0)), 1e-9) > 0.05
-        for: 10m
-        labels:
-          severity: warning
-          component: notification
-        annotations:
-          summary: "Notification 실패율 5% 초과 (10분)"
-          description: "Email delivery 실패가 지속. SMTP/provider 또는 delivery worker evidence 확인."
-
-      - alert: NotificationDeadLetters
-        expr: increase(readmates_notifications_dead_total[1h]) > 0
-        for: 0m
-        labels:
-          severity: warning
-          component: notification
-        annotations:
-          summary: "Notification dead-letter 발생 (1시간 내)"
-          description: "발송이 최종 포기된 알림. notification_deliveries.status='DEAD' 로우 조사."
-
-      - alert: NotificationOutboxRelayDead
-        expr: max(readmates_notifications_outbox_backlog{status="dead"}) > 0
-        for: 0m
-        labels:
-          severity: warning
-          component: notification
-        annotations:
-          summary: "Notification event outbox DEAD row detected"
-          description: "Delivery row 생성 전 relay가 missing payload, retry exhaustion 또는 deadline으로 종료됐다. outbox 상태와 publish result를 확인."
-
-      - alert: NotificationDeliveryBacklogHigh
-        expr: max(readmates_notifications_delivery_backlog{status=~"pending|failed|sending"}) > 100
-        for: 10m
-        labels:
-          severity: warning
-          component: notification
-        annotations:
-          summary: "Notification delivery backlog over 100 for 10 minutes"
-          description: "이 값은 event outbox가 아니라 delivery rows다. SMTP/provider 상태와 delivery worker를 확인."
-
-  - name: readmates.http
-    interval: 30s
-    rules:
-      - alert: HttpErrorRateHigh
-        expr: |
-          sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
-            / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 1) > 0.01
-        for: 5m
-        labels:
-          severity: critical
-          team: backend
-        annotations:
-          summary: "HTTP 5xx ratio over 1% for 5 minutes"
-          description: "에러 폭증. 최근 배포 / 외부 의존 의심."
-          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#http-error-or-latency"
-
-      - alert: HttpLatencyP95High
-        expr: |
-          histogram_quantile(0.95,
-            sum by (le, uri) (rate(http_server_requests_seconds_bucket{uri=~"/api/.*"}[5m])))
-            > 0.5
-        for: 10m
-        labels:
-          severity: warning
-          team: backend
-        annotations:
-          summary: "p95 latency over 500ms for 10 minutes"
-          description: "DB slow query, GC pause, Hikari 부족 등 의심. Service Health dashboard 확인."
-          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#http-error-or-latency"
-
-  - name: readmates.jvm
-    interval: 30s
-    rules:
-      - alert: HikariConnectionPoolPending
-        expr: hikaricp_connections_pending > 0
-        for: 2m
-        labels:
-          severity: warning
-          team: backend
-        annotations:
-          summary: "Hikari connection pool에 대기 요청 누적 (2분)"
-          description: "Pool size 부족 또는 long-running query. slow query log 확인."
-          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#jvm-and-db-pool"
-
-      - alert: JvmHeapHigh
-        expr: |
-          jvm_memory_used_bytes{area="heap"}
-            / jvm_memory_max_bytes{area="heap"} > 0.85
-        for: 10m
-        labels:
-          severity: warning
-          team: backend
-        annotations:
-          summary: "JVM heap 사용률 85% 초과 (10분)"
-          description: "Memory leak 또는 GC 비효율. heap dump 검토 후보."
-          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#jvm-and-db-pool"
-
-  - name: readmates.security
-    interval: 30s
-    rules:
-      - alert: RateLimitDenied
-        expr: sum(rate(readmates_rate_limit_denied_total{sensitive="true"}[5m])) > 0.1
-        for: 5m
-        labels:
-          severity: warning
-          team: backend
-        annotations:
-          summary: "민감 엔드포인트 rate-limit 차단 발생 (5m 평균 > 0.1/s)"
-          description: "지속적인 abuse 시도 가능. IP/계정 패턴 조사."
-          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#http-error-or-latency"
-
-  - name: readmates.redis
-    interval: 30s
-    rules:
-      - alert: RedisFallbacksHigh
-        expr: sum(rate(readmates_redis_fallbacks_total[5m])) > 0.1
-        for: 5m
-        labels:
-          severity: warning
-          team: backend
-        annotations:
-          summary: "Redis fallback 발생률 > 0.1/s (5분)"
-          description: "Redis 불안정 또는 연결 문제. Redis 자체 로그 + 노드 상태 확인."
-          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#redis-instability"
-
-      - alert: RedisOperationErrors
-        expr: sum(rate(readmates_redis_operation_errors_total[5m])) > 0.05
-        for: 5m
-        labels:
-          severity: warning
-          team: backend
-        annotations:
-          summary: "Redis 명령 실행 오류율 > 0.05/s (5분)"
-          description: "특정 어댑터/명령에서 오류 지속. 영향 범위 파악."
-          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#redis-instability"
-```
-
-## DB 기반 알림 (Prometheus 외)
-
-DEAD state notification delivery 외 별도 무결성 검증이 필요한 경우 cron + 쿼리로 감시:
+DEAD delivery를 DB에서 직접 확인할 때:
 
 ```sql
 SELECT count(*) FROM notification_deliveries
 WHERE status = 'DEAD' AND updated_at > NOW() - INTERVAL 24 HOUR;
 ```
 
-count > 0이면 운영자에게 알림 (이메일 또는 in-app).
+count > 0이면 조사합니다. 상태 컬럼은 `status`입니다(`state` 컬럼은 없음).
 
-> 참고: `notification_deliveries.status` 컬럼명을 사용 (메트릭 카탈로그와 동일). `notification_deliveries.state` 컬럼은 존재하지 않는다.
+## 알림 전달
+
+Alertmanager 설정은 `deploy/oci/alertmanager/alertmanager.yml`입니다. severity별로 묶어 단일 SMTP receiver(`ops-email`)로 보냅니다. SMTP 계정과 수신자는 환경 변수로 주입하며 Git에 두지 않습니다.
 
 ## 후속
 
-- Alertmanager receiver를 운영 SMTP 또는 팀 알림 채널에 연결한다.
-- 한 달치 production data가 쌓이면 false positive와 threshold를 조정한다.
-- `node-exporter`, `cadvisor`, `blackbox-exporter`는 production v1 이후 별도 계획으로 추가한다.
-
-NotificationOutboxBacklog/RelayDead는 event relay, NotificationDeliveryBacklog/DeadLetters는 SMTP delivery 경보다. event outbox와 delivery rows를 같은 queue로 해석하지 않는다.
-
-NotificationFailRateHigh는 lazy `failed`/`sent` aggregate를 각각 `or vector(0)`으로 채우고 per-second rate 분모에 `1e-9` floor를 사용합니다. 5분에 실패 한 건뿐인 저빈도 구간은 failure ratio 1.0으로 평가해 alert가 유지되고, success-only 또는 series가 전혀 없는 구간은 ratio 0으로 평가해 이 alert가 발생하지 않습니다. Prometheus query 자체가 unavailable이면 이 0-fill contract와 별도 운영 장애로 취급합니다.
-
-Backlog gauge가 첫 refresh 전 `NaN`이거나 refresh result가 `partial|failure`인 경우 0건으로 해석하지 않습니다. 마지막 성공 snapshot과 `readmates_notifications_backlog_refresh_total`을 먼저 확인합니다.
+- 운영 데이터가 한 달 이상 쌓이면 false positive와 threshold를 조정합니다.
+- `node-exporter`, `cadvisor`, `blackbox-exporter`, Redis exporter는 아직 없습니다.

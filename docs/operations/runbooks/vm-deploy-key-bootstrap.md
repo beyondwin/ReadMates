@@ -1,8 +1,11 @@
 # VM Deploy Key Bootstrap
 
-> **언제:** 신규 OCI VM에 GitHub Actions sync-config 워크플로를 처음 연결할 때 1회 수행.
-> **소요:** ~20분.
-> **선결 조건:** 기존 admin SSH 접근권한 보유 (`~/.ssh/readmates_oci` 등).
+> **언제:** 새 OCI VM에 GitHub Actions `sync-config` 워크플로를 처음 연결할 때 한 번.
+> **소요:** 약 20분.
+> **선결 조건:** 기존 admin SSH 접근 (`ubuntu` 계정과 admin 키).
+> **결과:** `deploy` 유저가 키 인증 + 포트 2222로 접속하고, 정해진 4개 명령만 sudo로 실행합니다.
+
+아래 `<vm-host>`는 VM 공인 IP 또는 호스트명입니다. 6단계 전까지는 기본 포트 22로 접속합니다.
 
 ## 절차
 
@@ -13,7 +16,7 @@ cd /tmp
 ssh-keygen -t ed25519 -C "github-actions-deploy@readmates" -f ./readmates-deploy -N ""
 ```
 
-생성된 `readmates-deploy` (private), `readmates-deploy.pub` (public) 두 파일.
+`readmates-deploy`(private)와 `readmates-deploy.pub`(public)가 생깁니다.
 
 ### 2. VM에 `deploy` 유저 생성 (없으면)
 
@@ -24,7 +27,7 @@ ssh ubuntu@<vm-host> "sudo adduser --disabled-password --gecos '' deploy"
 ### 3. pubkey를 deploy 유저 authorized_keys 에 등록
 
 ```bash
-cat /tmp/readmates-deploy.pub | ssh ubuntu@<vm-host> "sudo tee -a /home/deploy/.ssh/authorized_keys >/dev/null && sudo chown -R deploy:deploy /home/deploy/.ssh && sudo chmod 700 /home/deploy/.ssh && sudo chmod 600 /home/deploy/.ssh/authorized_keys"
+cat /tmp/readmates-deploy.pub | ssh ubuntu@<vm-host> "sudo install -d -o deploy -g deploy -m 700 /home/deploy/.ssh && sudo tee -a /home/deploy/.ssh/authorized_keys >/dev/null && sudo chown -R deploy:deploy /home/deploy/.ssh && sudo chmod 700 /home/deploy/.ssh && sudo chmod 600 /home/deploy/.ssh/authorized_keys"
 ```
 
 ### 4. `/etc/readmates/` 디렉토리 권한
@@ -34,6 +37,8 @@ ssh ubuntu@<vm-host> "sudo mkdir -p /etc/readmates && sudo chown deploy:deploy /
 ```
 
 ### 5. sudoers 작성 (4개 명령에만 NOPASSWD)
+
+`sync-config` 워크플로가 실행하는 명령과 정확히 같아야 합니다.
 
 ```bash
 ssh ubuntu@<vm-host> "sudo tee /etc/sudoers.d/readmates-deploy >/dev/null" <<'EOF'
@@ -45,7 +50,7 @@ EOF
 ssh ubuntu@<vm-host> "sudo chmod 440 /etc/sudoers.d/readmates-deploy && sudo visudo -c -f /etc/sudoers.d/readmates-deploy"
 ```
 
-마지막 `visudo -c` 가 `parsed OK` 출력하는지 확인.
+`visudo -c`가 `parsed OK`를 출력하면 됩니다.
 
 ### 6. sshd 비표준 포트 + 비밀번호 인증 비활성화
 
@@ -59,32 +64,34 @@ AllowUsers deploy ubuntu
 EOF
 ```
 
-**중요:** OCI security list에서 포트 2222 inbound (0.0.0.0/0) 먼저 허용. 그 후:
+**먼저** OCI security list에서 포트 2222 inbound를 허용합니다. 그다음 적용합니다.
 
 ```bash
 ssh ubuntu@<vm-host> "sudo sshd -t && sudo systemctl reload ssh"
 ```
 
-**검증 (기존 22 세션 유지한 채로 새 세션 열기):**
+**검증:** 기존 22번 세션을 닫지 말고 새 터미널에서 접속합니다.
 
 ```bash
 ssh -p 2222 -i /tmp/readmates-deploy deploy@<vm-host> 'whoami && id'
 # 기대 출력: deploy
 ```
 
-성공 확인 후 OCI security list에서 기존 포트 22 inbound 제거 (admin 키만 별도 IP 제한으로 유지하거나 같은 2222로 통일).
+성공하면 OCI security list에서 포트 22 inbound를 닫습니다. admin 접속도 2222로 옮기거나, 22는 admin IP로만 제한합니다. 이후 admin 명령은 `ssh -p 2222 ubuntu@<vm-host>`로 실행합니다.
 
 ### 7. fail2ban sshd jail 활성화 확인
 
 ```bash
-ssh -p 2222 -i /tmp/readmates-deploy deploy@<vm-host> "sudo systemctl status fail2ban && sudo fail2ban-client status sshd"
-```
-
-`jail list` 에 `sshd` 가 있고 `Currently failed: 0` 이면 OK.
-없으면:
+`deploy` 유저는 sudo 권한이 4개 명령뿐이므로 admin(`ubuntu`)으로 확인합니다.
 
 ```bash
-ssh ubuntu@<vm-host> "sudo apt-get install -y fail2ban && sudo systemctl enable --now fail2ban"
+ssh -p 2222 ubuntu@<vm-host> "sudo systemctl status fail2ban --no-pager && sudo fail2ban-client status sshd"
+```
+
+`sshd` jail이 보이면 됩니다. 없으면 설치합니다.
+
+```bash
+ssh -p 2222 ubuntu@<vm-host> "sudo apt-get install -y fail2ban && sudo systemctl enable --now fail2ban"
 ```
 
 ### 8. known_hosts 라인 수집
@@ -93,7 +100,7 @@ ssh ubuntu@<vm-host> "sudo apt-get install -y fail2ban && sudo systemctl enable 
 ssh-keyscan -p 2222 -t ed25519 <vm-host>
 ```
 
-출력 첫 줄을 클립보드에 복사.
+출력 줄을 복사합니다.
 
 ### 9. GitHub Repository Secrets/Variables 등록
 
@@ -105,9 +112,8 @@ GitHub Repo → **Settings → Secrets and variables → Actions**:
 
 **Variables (Variables 탭):**
 - `READMATES_VM_HOST` = `<vm-host>` (예: `api.example.com` 또는 public IP)
-- `READMATES_VM_USER` = `deploy`
-- `READMATES_VM_SSH_PORT` = `2222`
-- `READMATES_DEPLOY_ROOT` = `/opt/readmates`
+
+유저(`deploy`), 포트(`2222`), 배포 경로(`/opt/readmates`)는 워크플로에 고정돼 있어 등록하지 않습니다. 나머지 앱 Secrets/Variables는 [Secrets management](secrets-management.md#시크릿-인벤토리-현재)를 봅니다.
 
 ### 10. 로컬 임시 키 파일 안전 삭제
 
@@ -115,31 +121,32 @@ GitHub Repo → **Settings → Secrets and variables → Actions**:
 shred -u /tmp/readmates-deploy /tmp/readmates-deploy.pub
 ```
 
-(`shred` 없는 macOS에서는 `rm -P` 사용.)
+`shred`가 없는 macOS에서는 `rm -P`를 씁니다.
 
 ### 11. sync-config 워크플로 1회 실행해 readmates.env 초기 배포
 
-GitHub Actions 탭 → **sync-config** → Run workflow → input: `restart_api=true` → Run.
-
-`production` environment 승인 → 워크플로 성공 후:
+GitHub Actions → **sync-config** → Run workflow → `restart_api=true` → Run. `production` environment를 승인합니다. 성공 후 확인합니다.
 
 ```bash
-ssh -p 2222 -i ~/.ssh/<admin-key> ubuntu@<vm-host> "sudo ls -la /etc/readmates/readmates.env && sudo head -3 /etc/readmates/readmates.env"
+ssh -p 2222 -i ~/.ssh/<admin-key> ubuntu@<vm-host> "sudo ls -la /etc/readmates/readmates.env && sudo head -1 /etc/readmates/readmates.env"
 ```
 
-기대: `-rw------- 1 deploy deploy ...`, 첫 줄 `# generated by sync-config.yml run=... actor=... at=...`.
+기대: `-rw------- 1 deploy ...`, 첫 줄 `# generated by sync-config.yml run=... sha=... actor=... at=...`.
 
-`curl https://api.<domain>/actuator/health` → `{"status":"UP"}`.
+```bash
+curl -fsS https://api.example.com/internal/health
+# {"status":"UP","kind":"liveness"}
+```
 
 ## 비상 복구
 
-deploy 키 분실/손상 시:
-1. 새 ed25519 키 페어 생성
-2. VM에서 기존 `authorized_keys` 라인 제거 + 새 pubkey 추가
-3. GitHub `READMATES_DEPLOY_SSH_KEY` 시크릿 교체
+deploy 키를 잃었거나 유출됐을 때:
+1. 새 ed25519 키 페어를 만듭니다.
+2. VM의 `deploy` 유저 `authorized_keys`에서 이전 줄을 지우고 새 pubkey를 넣습니다.
+3. GitHub `READMATES_DEPLOY_SSH_KEY`를 교체합니다.
 
-sudoers 실수로 잠겼을 때:
-- ubuntu 유저로 ssh 접속해 `sudo visudo -f /etc/sudoers.d/readmates-deploy` 수정.
+sudoers를 잘못 고쳤을 때:
+- `ubuntu`로 접속해 `sudo visudo -f /etc/sudoers.d/readmates-deploy`로 고칩니다.
 
 ## 보안 체크리스트
 

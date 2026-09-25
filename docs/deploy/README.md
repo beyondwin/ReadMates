@@ -1,51 +1,44 @@
 # ReadMates 배포 문서
 
-검토일: 2026-08-03
+검토일: 2026-09-25 (기준: `main` = `v2.5.1`)
 
-이 디렉터리는 ReadMates의 공개 안전 배포 문서 허브입니다. 운영 환경의 목표 구조, 신뢰 경계, secret 보관 원칙, 공개 릴리즈 후보 검증 흐름을 설명하되 계정별 값과 private deployment state는 Git에 두지 않습니다.
-
-운영 사이트 URL: [https://readmates.pages.dev](https://readmates.pages.dev)
+ReadMates 배포 문서의 시작점입니다. 운영 구조, 신뢰 경계, secret 원칙, 릴리즈 흐름을 공개해도 안전한 형태로 설명합니다.
 
 ## 배포 문서 사용 기준
 
-배포 문서는 운영자가 안전하게 재현할 수 있는 공개 runbook이어야 합니다. 실제 배포를 완료했다고 보려면 frontend Pages 배포, Spring API health, BFF/OAuth smoke, public release safety check가 변경 범위에 맞게 확인되어야 합니다.
+- 이 디렉터리에는 placeholder만 씁니다. 실제 domain, IP, OCID, token, OAuth secret, DB password, smoke 결과 전문은 Git 밖 운영 채널에서만 다룹니다.
+- 예시의 `https://app.example.com`은 브라우저가 접속하는 Pages 운영 origin, `https://api.example.com`은 Caddy가 받는 직접 API origin입니다.
+- 배포가 끝났다고 보려면 변경 범위에 맞게 frontend Pages 배포, Spring API health, BFF/OAuth smoke, 공개 릴리즈 안전 검사를 확인해야 합니다.
+- 저장소 설정은 "운영이 지금 이렇게 돌고 있다"는 증거가 아닙니다. 운영 상태는 운영 채널에서 따로 확인합니다.
+- Cloudflare, OCI, Google Cloud, GitHub의 UI·가격·한도는 바뀔 수 있습니다. 계정 설정이나 비용 결정 전에는 현재 콘솔이나 공식 문서로 다시 확인합니다.
 
-Cloudflare, OCI, Google Cloud, GitHub의 UI, 가격, 한도, 권한 모델은 바뀔 수 있습니다. 계정 설정이나 비용 결정을 실행하기 전에는 현재 provider 콘솔 또는 공식 문서로 재확인하고, 재확인하지 않은 내용을 현재 사실처럼 단정하지 않습니다.
-
-실제 운영 domain 목록, IP, OCID, provider token, OAuth secret, DB password, smoke 결과 전문은 이 디렉터리에 기록하지 않습니다. 그런 값이 필요한 작업은 Git 밖의 운영 채널에서 처리합니다.
-
-관련 상위 문서:
-
-- [루트 README](../../README.md)
-- [개발자 문서 허브](../development/README.md). clean 공개 릴리즈 후보에는 루트 `README.md`와 `PRODUCT.md`, `docs/deploy` 배포 문서 subset, `docs/development` 개발 문서 subset이 포함됩니다.
+관련 문서: [루트 README](../../README.md), [개발자 문서 허브](../development/README.md). 과거 배포 사후 보고서는 [`docs/reports`](../reports/README.md)에 있습니다.
 
 ## 문서 지도
 
-| 목적 | 문서 |
+| 하고 싶은 일 | 문서 |
 | --- | --- |
-| Cloudflare Pages, Pages Functions, SPA fallback, OAuth proxy 배포 | [cloudflare-pages.md](cloudflare-pages.md) |
-| 새 버전 발행, GitHub Actions 배포 확인, OCI promotion | [release-publish-runbook.md](release-publish-runbook.md) |
-| 멀티 클럽 domain alias와 OAuth origin 운영 | [multi-club-domains.md](multi-club-domains.md) |
-| 최종 OCI backend Docker Compose stack 운영 | [compose-stack.md](compose-stack.md) |
-| Spring Boot API와 OCI backend 운영 기준 | [oci-backend.md](oci-backend.md) |
-| OCI MySQL HeatWave와 백업 참고 | [oci-mysql-heatwave.md](oci-mysql-heatwave.md) |
-| 공개 저장소 보안과 공개 릴리즈 후보 검증 | [security-public-repo.md](security-public-repo.md) |
-
-과거 배포 사후 보고서는 [`docs/reports`](../reports/README.md)로 이동했습니다 — 2026-04-25 프론트/서버 배포 불일치, 2026-04-30 OCI Compose cutover/BFF secret 처리 보고서가 그곳에 있습니다.
+| 새 버전 발행과 운영 배포 (처음 볼 문서) | [release-publish-runbook.md](release-publish-runbook.md) |
+| Cloudflare Pages, Pages Functions, OAuth proxy | [cloudflare-pages.md](cloudflare-pages.md) |
+| OCI backend Docker Compose stack 배포·rollback | [compose-stack.md](compose-stack.md) |
+| Spring 운영 환경 변수, 알림, BFF secret rotation | [oci-backend.md](oci-backend.md) |
+| 멀티 클럽 domain alias와 OAuth origin | [multi-club-domains.md](multi-club-domains.md) |
+| MySQL HeatWave, 백업, 복구 rehearsal | [oci-mysql-heatwave.md](oci-mysql-heatwave.md) |
+| 공개 저장소 보안, 공개 릴리즈 후보 검사 | [security-public-repo.md](security-public-repo.md) |
 
 ## 배포 형태
 
 | 계층 | Runtime | 설명 |
 | --- | --- | --- |
-| Frontend SPA | Cloudflare Pages | Vite 앱을 빌드한 `front/dist`를 서빙합니다. |
-| BFF와 OAuth proxy | Cloudflare Pages Functions | `front/functions`의 함수가 같은 origin API 경계를 제공하고, multi-secret BFF rotation 중에는 primary secret을 Spring에 전달합니다. |
-| Backend stack | OCI Compute 또는 동등한 VM | 최종 OCI runtime은 Caddy, Spring API, Redis, Redpanda를 Docker Compose stack으로 실행합니다. |
-| Reverse proxy | Caddy | Compose stack 안에서 직접 API origin의 HTTPS를 종료하고 Spring API container로 전달합니다. |
-| Database | MySQL 8 compatible service | 문서화된 운영 대상은 OCI MySQL HeatWave입니다. |
-| Cache/broker | Redis, Redpanda | Compose internal network에서 cache/rate-limit와 Kafka-compatible notification fan-out에 사용하며 MySQL source of truth를 대체하지 않습니다. |
-| Migrations | Flyway | Spring 시작 시 migration을 적용합니다. |
+| Frontend SPA | Cloudflare Pages | `front/dist`를 서빙합니다. |
+| BFF와 OAuth proxy | Cloudflare Pages Functions | `front/functions`가 같은 origin API 경계를 만들고 Spring에 BFF secret을 붙여 전달합니다. |
+| Backend stack | OCI Compute VM | Docker Compose로 Caddy, Spring API, Redis, Redpanda를 실행합니다. |
+| Reverse proxy | Caddy (compose 안) | 직접 API origin의 HTTPS를 종료하고 `readmates-api:8080`으로 넘깁니다. |
+| Database | MySQL 8 호환 | 운영 대상은 OCI MySQL HeatWave입니다. |
+| Cache/broker | Redis, Redpanda | compose 내부 network 전용입니다. MySQL source of truth를 대체하지 않습니다. |
+| Migration | Flyway | Spring 시작 시 적용합니다. |
 
-프로덕션 secret 실제 값은 Git 밖에 둡니다. 공개 문서는 환경 변수 이름과 placeholder만 사용합니다. 실제 값은 Cloudflare Pages secret, 서버 런타임 환경 파일, Google Cloud, OCI 콘솔, 또는 운영자가 관리하는 ignored 파일에만 저장합니다.
+실제 secret 값은 Cloudflare Pages secret, VM의 `/etc/readmates/readmates.env`, GitHub Secrets, Google Cloud/OCI 콘솔에만 둡니다.
 
 ## BFF 신뢰 경계
 
@@ -61,43 +54,34 @@ Cloudflare Pages Functions
 Spring Boot /api/**
 ```
 
-브라우저가 신뢰하는 공개 경계는 직접 Spring API origin이 아니라 Cloudflare Pages입니다. 브라우저는 같은 origin의 `/api/bff/**`를 호출하고, Pages Functions가 Spring으로 전달하면서 `X-Readmates-Bff-Secret`을 붙입니다. Spring은 API 요청에서 이 header를 검증하며, 운영에서는 `READMATES_BFF_SECRET`과 `READMATES_BFF_SECRETS`가 모두 비어 있으면 시작 실패가 맞습니다.
-
-BFF secret은 `VITE_*`, `NEXT_PUBLIC_*`, 정적 asset, 브라우저 로그, screenshot, 공개 문서에 노출하면 안 됩니다.
-
-변경 요청은 허용된 앱 origin의 `Origin` 또는 `Referer`도 확인합니다.
+- 브라우저는 Spring origin이 아니라 같은 origin의 `/api/bff/**`만 호출합니다.
+- Pages Functions가 Spring으로 넘길 때 `X-Readmates-Bff-Secret`을 붙이고, Spring이 검증합니다.
+- 운영에서 `READMATES_BFF_SECRET`과 `READMATES_BFF_SECRETS`가 모두 비어 있으면 Spring은 시작에 실패합니다. 정상 동작입니다.
+- 변경 요청은 허용된 앱 origin의 `Origin` 또는 `Referer`도 확인합니다.
+- BFF secret은 `VITE_*` 변수, 정적 asset, 브라우저 로그, screenshot, 공개 문서에 넣지 않습니다.
 
 ## 세션 Cookie 기준
 
-Google OAuth 로그인 성공 후 Spring은 `readmates_session` cookie를 발급합니다.
+Google OAuth 로그인에 성공하면 Spring이 `readmates_session` cookie를 발급합니다.
 
-- `HttpOnly`: 브라우저 JavaScript가 token을 읽지 못합니다.
-- `SameSite=Lax`: 일반 로그인과 탐색을 유지하면서 cross-site request 위험을 줄입니다.
-- 운영 `Secure`: `READMATES_AUTH_SESSION_COOKIE_SECURE=true`로 HTTPS에서만 cookie가 전송되게 합니다.
-- 세션 token 원문은 저장하지 않고 `auth_sessions`의 hash 기록과 대조합니다.
+- `HttpOnly`: JavaScript가 token을 읽지 못합니다.
+- `SameSite=Lax`: 일반 탐색은 유지하고 cross-site 요청 위험을 줄입니다.
+- 운영 `Secure`: `READMATES_AUTH_SESSION_COOKIE_SECURE=true`.
+- DB에는 token 원문이 아니라 hash만 저장합니다(`auth_sessions`).
 
-프런트엔드 route guard, loader, API 401 처리는 같은 origin의 안전한 relative `returnTo`만 `/login`과 OAuth start로 전달합니다. Absolute URL, protocol-relative URL, login/reset/invite/OAuth/root path, backslash, control character가 포함된 값은 버리고, 서버는 signed return state와 허용 origin/host 정책으로 다시 검증합니다.
+`returnTo`는 같은 origin의 안전한 relative path만 씁니다. 서버는 signed return state와 허용 origin/host 정책으로 다시 검증합니다.
 
-OAuth start/callback의 HTML navigation이 invalid route, upstream 4xx/5xx 또는 network failure를 만나면 Pages Functions는 upstream 오류 body를 브라우저에 직접 노출하지 않고 `Cache-Control: no-store`인 `/auth/error?kind=...`로 전환합니다. 오류 kind는 고정 allowlist이고 `returnTo`는 안전한 relative path만 유지합니다. `fetch` 같은 non-HTML 요청은 public-safe JSON status contract를 그대로 사용하므로 운영 smoke는 document navigation과 API 응답을 구분해 확인합니다.
+OAuth start/callback의 HTML navigation이 실패하면 Pages Functions는 upstream 오류 body를 보여주지 않고 `Cache-Control: no-store`인 `/auth/error?kind=...`로 보냅니다. `fetch` 같은 non-HTML 요청은 JSON status를 그대로 받습니다. 그래서 smoke는 document navigation과 API 응답을 나눠 확인합니다.
 
 ## 멤버십과 권한
 
-ReadMates는 제품 수준에서 invite-only 흐름을 사용합니다.
+배포 확인에 필요한 권한 경계만 요약합니다. 자세한 기준은 [architecture.md](../development/architecture.md)를 따릅니다.
 
-- 게스트는 공개 홈과 공개 기록만 볼 수 있습니다.
-- 초대 없이 Google로 로그인한 사용자는 둘러보기 멤버가 될 수 있고, 멤버 공개 예정 세션 같은 읽기 전용 멤버 화면 일부를 볼 수 있습니다.
-- 호스트는 둘러보기 멤버를 정식 멤버로 전환하거나, 정식 멤버를 현재 세션에서 제외/복구/비활성화/삭제하고 같은 클럽 멤버의 표시 이름을 정리할 수 있습니다.
-- 호스트는 여러 `DRAFT` 예정 세션을 준비하고 `HOST_ONLY`, `MEMBER`, `PUBLIC` 공개 범위를 지정할 수 있지만, 같은 클럽에서 현재 `OPEN` 세션은 하나만 시작할 수 있습니다. 진행이 끝난 세션은 `CLOSED`로 닫고, 공개 요약과 `MEMBER` 또는 `PUBLIC` 범위가 준비된 닫힌 기록만 `PUBLISHED`로 발행합니다.
-- 호스트는 세션 편집기에서 `readmates-session-import:v1` JSON을 preview한 뒤 저장할 수 있습니다. 저장은 기존 공개 요약, 하이라이트, 한줄평, 피드백 문서를 교체하며, `HOST_ONLY` 범위에서는 commit이 거절됩니다.
-- 호스트는 `/app/host/notifications`에서 notification event publication row와 channel delivery row를 보고, pending/failed email delivery 처리, `DEAD` delivery 복구, redesigned template helper 기반 테스트 메일 audit 확인을 수행할 수 있습니다.
-- 이메일 알림은 서버 application model의 템플릿 helper에서 subject, plain text, HTML, CTA/deep link를 함께 렌더링하고, SMTP는 HTML이 있으면 plain text fallback을 포함한 MIME 메시지로 발송합니다. 호스트 알림 상세 API는 raw plain/HTML body를 노출하지 않습니다.
-- 호스트 API는 활성 `host` role을 요구합니다.
-- 멤버 API는 허용된 `member` 상태를 요구하며, 현재 세션 쓰기는 해당 세션 참여 상태도 확인합니다. `/api/sessions/upcoming`은 `DRAFT`이면서 `MEMBER` 또는 `PUBLIC`인 세션만 반환합니다.
-- 멤버 알림 설정은 기존 운영 알림을 기본 켜짐으로, 서평 공개 알림을 기본 꺼짐으로 시작합니다. 멤버 알림함은 `/app/notifications`에서 unread count, 개별 읽음, 전체 읽음 처리를 제공합니다.
-- 본인 프로필 수정은 인증된 멤버 앱 읽기 가능 상태에서만 허용하고, 같은 클럽 안의 표시 이름 중복과 예약어는 서버에서 막습니다.
-- Public API는 `sessions.state=PUBLISHED`이고 `public_session_publications.visibility=PUBLIC`인 공개 기록만 반환합니다.
-- 피드백 문서는 권한과 참석 여부를 통과한 정식 멤버 또는 호스트에게만 노출합니다.
-- Platform admin은 club 생성과 domain alias 상태 확인을 관리하는 별도 권한입니다. Platform `OPERATOR`라도 특정 클럽의 호스트 도구를 쓰려면 해당 club membership의 `HOST` 권한을 별도로 가져야 합니다.
+- 게스트: 공개 홈과 공개 기록만 봅니다. Public API는 `PUBLISHED`이면서 `PUBLIC`인 기록만 반환합니다.
+- 초대 없이 Google로 로그인한 사용자: 둘러보기 멤버로 읽기 전용 화면 일부를 봅니다.
+- 정식 멤버: 멤버 API를 쓰고, 현재 세션 쓰기는 참여 상태도 확인합니다. 피드백 문서는 권한과 참석을 통과한 정식 멤버 또는 호스트만 봅니다.
+- 호스트: 활성 `host` role이 필요합니다. 세션 준비·공개, 멤버 관리, `/app/host/notifications` 알림 운영을 합니다.
+- Platform admin: club 생성과 domain alias 상태 확인을 관리합니다. 특정 클럽의 호스트 도구를 쓰려면 그 클럽의 `HOST` membership이 따로 필요합니다.
 
 ## 환경 변수
 
@@ -112,19 +96,19 @@ READMATES_BFF_SECRETS=<new-secret>,<old-secret>
 BFF_SECRET_ROTATION_STAGE=stable
 ```
 
-Spring:
+Spring (핵심만, 전체 목록은 [oci-backend.md](oci-backend.md#운영-환경-변수)):
 
 ```text
 SPRING_PROFILES_ACTIVE=prod
 SPRING_DATASOURCE_URL=<jdbc-mysql-url>
 SPRING_DATASOURCE_USERNAME=<db-user>
 SPRING_DATASOURCE_PASSWORD=<db-password>
-READMATES_APP_BASE_URL=https://readmates.pages.dev
-READMATES_AUTH_BASE_URL=https://readmates.pages.dev
+READMATES_APP_BASE_URL=https://app.example.com
+READMATES_AUTH_BASE_URL=https://app.example.com
 READMATES_AUTH_RETURN_STATE_SECRET={return-state-signing-secret}
-READMATES_ALLOWED_ORIGINS=https://readmates.pages.dev
+READMATES_ALLOWED_ORIGINS=https://app.example.com
 READMATES_BFF_SECRET=<shared-bff-secret>
-# 무중단 rotation 중에만 설정. READMATES_BFF_SECRETS가 있으면 READMATES_BFF_SECRET보다 우선합니다.
+# 무중단 rotation 중에만 설정. 있으면 READMATES_BFF_SECRET보다 우선합니다.
 READMATES_BFF_SECRETS=<new-secret>,<old-secret>
 READMATES_BFF_SECRET_REQUIRED=true
 READMATES_SECURITY_BFF_AUDIT_MODE=rotation-only
@@ -135,19 +119,13 @@ SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET=<google-oauth-cl
 SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_SCOPE=openid,email,profile
 ```
 
-직접 API origin 예시는 공개 문서에서 `https://api.example.com` 같은 placeholder만 사용합니다. 실제 운영 secret, DB password, OAuth secret, OCI OCID, private IP, DB dump는 문서와 Git에 넣지 않습니다.
-
-배포 후 공개 연동 최소 smoke는 `./scripts/smoke-production-integrations.sh`로 실행합니다. 이 script는 Cloudflare Pages marker와 Google OAuth `redirect_uri`를 확인하지만, 실제 운영 결과나 domain 목록은 Git에 기록하지 않습니다. Registered club host의 `ACTIVE` 전환은 Platform admin 상태 확인 action이 `/.well-known/readmates-domain-check.json` marker를 확인한 뒤에만 진행합니다.
+운영 Spring env 파일은 GitHub Actions `sync-config` workflow가 GitHub Secrets/Variables로 렌더링해 VM에 올립니다. 절차는 [secrets management runbook](../operations/runbooks/secrets-management.md)을 따릅니다.
 
 ## Redis Feature Flags
 
-Redis는 선택 계층입니다. 최종 OCI Compose stack에서는 compose가 `READMATES_REDIS_URL=redis://redis:6379`를 container 환경으로 주입합니다. Compose가 아닌 runtime에서만 관리형 Redis URL을 placeholder-safe 값으로 설정합니다.
+Redis는 선택 계층입니다. Compose stack은 `READMATES_REDIS_URL=redis://redis:6379`를 container에 주입합니다.
 
-```text
-READMATES_REDIS_URL=redis://redis:6379
-```
-
-권장 순서:
+켜는 순서:
 
 1. `READMATES_REDIS_ENABLED=true`
 2. `READMATES_RATE_LIMIT_ENABLED=true`
@@ -155,86 +133,88 @@ READMATES_REDIS_URL=redis://redis:6379
 4. `READMATES_PUBLIC_CACHE_ENABLED=true`
 5. `READMATES_NOTES_CACHE_ENABLED=true`
 
-Redis-backed 동작을 되돌릴 때는 MySQL 데이터를 바꾸지 않고 영향을 받은 기능 flag만 `false`로 내립니다. Rate limit은 필요할 때만 `READMATES_RATE_LIMIT_FAIL_CLOSED_SENSITIVE=true`로 민감 요청 장애 정책을 강화합니다.
+되돌릴 때는 MySQL 데이터는 건드리지 않고 문제 된 flag만 `false`로 내립니다. 민감 요청의 rate limit 장애를 막아야 할 때만 `READMATES_RATE_LIMIT_FAIL_CLOSED_SENSITIVE=true`를 씁니다.
 
 ## 배포 절차 요약
 
-새 제품 버전을 발행할 때는 먼저 [새 버전 발행과 운영 배포 Runbook](release-publish-runbook.md)을 기준으로 `CHANGELOG.md`, release tag, GitHub Release, Cloudflare Pages 배포, GHCR server image, OCI Compose promotion이 같은 `vMAJOR.MINOR.PATCH`를 가리키는지 맞춥니다.
+전체 절차는 [release-publish-runbook.md](release-publish-runbook.md)가 기준입니다. 한 줄 요약:
 
-Cloudflare Pages:
+```text
+검증 → annotated tag push(vX.Y.Z) → Deploy Server Image(GHCR scan/promote)
+→ (필요 시) sync-config → OCI compose promotion(05 script) → health/BFF 확인
+→ Deploy Front(release_tag=vX.Y.Z) → smoke → GitHub Release
+```
 
-1. Root directory를 `front`로 설정합니다.
-2. Install command를 `pnpm install --frozen-lockfile`로 설정합니다.
-3. Build command를 `pnpm build`로 설정합니다.
-4. Output directory를 `dist`로 설정합니다.
-5. Pages Functions secret으로 `READMATES_API_BASE_URL`과 `READMATES_BFF_SECRETS` 또는 fallback `READMATES_BFF_SECRET`을 설정합니다.
-
-OCI backend Compose stack:
+릴리즈 전 로컬 검증 예시:
 
 ```bash
 ./scripts/server-ci-check.sh
 ./server/gradlew -p server integrationTest
-READMATES_SERVER_IMAGE='ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z' VM_PUBLIC_IP='<vm-public-ip>' CADDY_SITE=api.example.com ./deploy/oci/05-deploy-compose-stack.sh
-```
-
-자세한 절차와 rollback은 [compose-stack.md](compose-stack.md)를 기준으로 합니다.
-
-Legacy JAR path는 compose 전환 검증과 rollback 전용입니다.
-
-```bash
-./server/gradlew -p server bootJar
-VM_PUBLIC_IP='<vm-public-ip>' ./deploy/oci/03-deploy.sh
-```
-
-OCI helper script는 placeholder 기반이며 운영자가 값을 주입하는 전제를 둡니다. script와 문서에는 실제 tenancy ID, API key, database password, private IP, 배포 상태 값을 넣지 않습니다.
-
-백엔드 release image 생성은 GitHub Actions `Deploy Server Image` workflow가 담당합니다. 실제 OCI compose stack promotion은 여전히 운영자가 `deploy/oci/05-deploy-compose-stack.sh`를 실행하는 수동 절차이며, VM 접속 credential이나 self-hosted runner가 GitHub Actions에 구성되어 있다고 가정하지 않습니다.
-
-DB migration이 포함된 릴리즈는 같은 tag의 backend를 먼저 올리고 Spring startup Flyway와 health를 확인한 뒤에만 frontend를 배포합니다. 현재 `v2.4.1` 릴리즈는 V47 schema 위에 V48의 versioned admin notification replay target/confirmation ledger를 additive하게 적용합니다. Notification·AI recovery runtime rendering도 바뀌므로 backend promotion 전에 `sync-config(restart_api=false, dry_run=false)`를 성공시킵니다. 실패 시 migration을 되돌리거나 이미 발행한 tag를 이동하지 않고 schema를 보존한 호환 image 또는 새 forward-fix tag로 복구합니다.
-
-Server workflow의 tag checkout, exact semver, annotated-tag/HEAD 일치, same-digest scan/promote 계약은 배포 전에 repository checker로 검증합니다.
-
-```bash
-python3 -B scripts/check-deploy-workflow-contract.py --self-test
 python3 -B scripts/check-deploy-workflow-contract.py
 ```
 
+OCI backend promotion:
+
+```bash
+READMATES_SERVER_IMAGE='ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z' \
+VM_PUBLIC_IP='<vm-public-ip>' \
+CADDY_SITE=api.example.com \
+READMATES_APP_BASE_URL=https://app.example.com \
+./deploy/oci/05-deploy-compose-stack.sh
+```
+
+Frontend 배포:
+
+```bash
+gh workflow run "Deploy Front" --ref main -f release_tag=vX.Y.Z
+```
+
+알아둘 점:
+
+- `main` push는 production 배포를 시작하지 않습니다. tag push는 `Deploy Server Image`만 시작합니다.
+- OCI promotion은 운영자가 로컬에서 직접 실행합니다. GitHub Actions에는 VM 배포 job이 없습니다(설정 파일 동기화용 `sync-config`만 VM에 접속합니다).
+- DB migration이 있으면 같은 tag의 backend를 먼저 올리고 Flyway와 health를 확인한 뒤 frontend를 배포합니다. 실패하면 migration을 되돌리거나 tag를 옮기지 않고, schema를 보존한 호환 image나 새 forward-fix tag로 복구합니다.
+- Legacy JAR 경로(`03-deploy.sh`)는 compose 전환 검증과 rollback 전용입니다. [compose-stack.md](compose-stack.md#rollback)를 봅니다.
+
 ## Smoke Check
 
-운영 사이트 배포는 운영 origin으로 확인합니다.
+브라우저가 접속하는 운영 origin으로 확인합니다.
 
 ```bash
+APP_ORIGIN='https://app.example.com'
 CLUB_SLUG='{club-slug}'
-curl -sS -o /dev/null -w '%{http_code}\n' https://readmates.pages.dev/app
-curl -sS https://readmates.pages.dev/api/bff/api/auth/me
-curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' https://readmates.pages.dev/oauth2/authorization/google
-curl -sS "https://readmates.pages.dev/api/bff/api/public/clubs/${CLUB_SLUG}"
+curl -sS -o /dev/null -w '%{http_code}\n' "$APP_ORIGIN/app"
+curl -sS "$APP_ORIGIN/api/bff/api/auth/me"
+curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' "$APP_ORIGIN/oauth2/authorization/google"
+curl -sS "$APP_ORIGIN/api/bff/api/public/clubs/${CLUB_SLUG}"
+READMATES_SMOKE_BASE_URL="$APP_ORIGIN" \
+READMATES_SMOKE_AUTH_BASE_URL="$APP_ORIGIN" \
+./scripts/smoke-production-integrations.sh
 ```
 
-직접 API 확인 예시는 공개 문서에서 placeholder만 사용합니다.
+확인:
 
-```bash
-curl -sS https://api.example.com/internal/health
-```
+- `/app`은 `200`입니다.
+- `/api/bff/api/auth/me`는 Spring까지 도달합니다. 로그아웃 상태여도 anonymous 응답 `200`일 수 있습니다.
+- OAuth start는 Google로 redirect되고, smoke script가 `redirect_uri`를 검사합니다.
+
+smoke 결과 전문이나 운영 domain 목록은 Git에 남기지 않습니다.
 
 ## 비용 기준
 
-별도 유료 전환 결정이 없다면 아래 free 또는 low-cost 호환 범위를 기준으로 문서화합니다.
+별도 유료 전환 결정이 없으면 아래 free 또는 저비용 범위를 기준으로 합니다.
 
-- Cloudflare Pages와 Workers-compatible free usage
-- OCI A1 Compute free-tier 범위
-- OCI boot/block volume free-tier 범위
+- Cloudflare Pages와 Workers 호환 free usage
+- OCI A1 Compute, boot/block volume free-tier
 - OCI MySQL HeatWave `MySQL.Free`가 가능한 region
-
-프로덕션 배포 credential을 GitHub Actions에 추가하는 일은 자동화된 백엔드 배포를 별도로 승인한 뒤에만 검토합니다.
 
 ## 공개 릴리즈 후보 점검
 
-공개 저장소로 내보내기 전에는 clean 공개 릴리즈 후보를 만들고 검사합니다.
+공개 저장소로 내보내기 전에는 clean 후보를 만들고 검사합니다. 자세한 기준은 [security-public-repo.md](security-public-repo.md)입니다.
 
 ```bash
 ./scripts/build-public-release-candidate.sh
 ./scripts/public-release-check.sh .tmp/public-release-candidate
 ```
 
-공개 릴리즈 후보에는 local env files, provider state, database dump, key material, generated design artifacts, private planning docs, 실제 데이터가 담긴 screenshot, private deployment state가 없어야 합니다.
+후보에는 local env 파일, provider state, DB dump, key material, private 문서, 실제 데이터 screenshot, 배포 상태가 없어야 합니다.

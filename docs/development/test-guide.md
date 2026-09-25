@@ -1,12 +1,24 @@
 # 테스트 가이드
 
-ReadMates의 테스트는 frontend lint/unit/build, Playwright E2E, backend Gradle test, 공개 릴리즈 후보 점검, 배포 연동 smoke로 나뉩니다.
+ReadMates 테스트는 frontend lint/unit/build, Playwright E2E, backend Gradle lane, 공개 릴리즈 후보 점검, 배포 smoke로 나뉩니다.
 
-GitHub Actions CI는 frontend job에서 Node.js 24와 `pnpm@11.13.1`을 사용해 lint, coverage 포함 unit test, build, Zod fixture freshness check를 실행하고, design-system job에서 `pnpm design:check`를 실행합니다. Backend job은 JDK 25로 `./scripts/server-ci-check.sh`를 실행하며, wrapper의 `check` 안에서 unit test, architectureTest, ktlint, detekt, JaCoCo가 함께 실행됩니다. Testcontainers 기반 integration suite는 별도 `backend-integration` job의 `./gradlew integrationTest`로 병렬 실행합니다. E2E job은 MySQL service를 띄운 뒤 Playwright suite를 3개 shard로 나눠 실행합니다.
+`.github/workflows/ci.yml`의 주요 job:
 
-검증은 변경 surface와 위험도에 맞춰 고릅니다. 완료 보고에는 실행한 명령, 실패 또는 스킵한 명령과 이유, 남은 리스크를 함께 남깁니다. 실패한 검증을 무시하고 완료로 표시하지 않습니다.
+| Job | 내용 |
+| --- | --- |
+| `scripts` | agent guidance, deploy workflow contract, Flyway 불변성, ShellCheck, AI PII/설정, Prometheus/Tempo/Grafana 검증 |
+| `public-release` | 공개 후보 build + scanner |
+| `frontend` | Node.js 24 + `pnpm@11.13.1`로 lint, `test:coverage`, build, Zod fixture freshness |
+| `frontend-visual-regression` | `pnpm test:ct:docker` |
+| `design-system` | `pnpm design:check` |
+| `backend` | JDK 25로 `./scripts/server-ci-check.sh` (unit, architecture, ktlint, detekt, JaCoCo) |
+| `backend-integration` | `./gradlew integrationTest` (Testcontainers) |
+| E2E | MySQL service + Playwright 3개 shard |
 
-외부 배포 smoke는 실제 운영 상태를 볼 수 있으므로 결과 전문, 운영 domain 목록, provider 응답 본문을 공개 문서나 Git에 붙이지 않습니다.
+- 검증은 변경 surface와 위험도에 맞춰 고릅니다.
+- 완료 보고에는 실행한 명령, 실패·스킵한 명령과 이유, 남은 리스크를 남깁니다. 실패한 검증을 완료로 적지 않습니다.
+- 배포 smoke 결과는 운영 상태일 수 있으니 결과 전문, 운영 domain, provider 응답을 문서나 Git에 붙이지 않습니다.
+- 로컬 `pnpm` 버전이 다르거나 CI parity가 필요하면 `corepack pnpm --dir front ...`로 실행합니다. `corepack`이 PATH에 없으면 `npx --yes corepack@0.35.0 pnpm --dir front ...`를 씁니다.
 
 ## Pre-Push Aggregate
 
@@ -16,9 +28,9 @@ CI에서 자주 실패하는 게이트를 로컬에서 먼저 묶어 확인할 �
 ./scripts/pre-push-check.sh
 ```
 
-기본 모드는 `git diff --check`, frontend lint, coverage 포함 unit test, frontend build, Zod fixture freshness, backend `check`를 실행합니다. `docs/`, `scripts/`, `deploy/`, `.github/`, `README.md`처럼 공개 후보에 영향을 주는 경로가 바뀌면 clean public release candidate를 만들고 scanner도 실행합니다.
+기본 모드는 agent guidance·deploy workflow contract 검사, `git diff --check`, frontend lint·coverage unit test·build, Zod fixture freshness, `./scripts/server-ci-check.sh`, production AI config 검증을 실행합니다. `.github/`, `deploy/`, `docs/`, `scripts/`, `AGENTS.md`, `README.md`, `.env.example`, `.gitleaks.toml`이 바뀌면 공개 후보 build와 scanner도 실행합니다.
 
-릴리즈 또는 태그 배포 직전에는 integration/E2E까지 포함합니다.
+릴리즈나 태그 배포 직전에는 integration, E2E, observability 설정 검증까지 포함합니다.
 
 ```bash
 ./scripts/pre-push-check.sh --full --release
@@ -31,10 +43,10 @@ CI에서 자주 실패하는 게이트를 로컬에서 먼저 묶어 확인할 �
 의존성 설치:
 
 ```bash
-pnpm install --frozen-lockfile
+corepack pnpm install --frozen-lockfile
 ```
 
-루트 pnpm workspace가 `front`, `design/system`, `design/docs`를 함께 관리합니다. Frontend-only 명령은 계속 `pnpm --dir front ...`로 실행합니다.
+루트 pnpm workspace가 `front`, `design/system`, `design/docs`를 함께 관리합니다. Frontend 명령은 `pnpm --dir front ...` 형태입니다.
 
 Lint:
 
@@ -58,7 +70,7 @@ Coverage 게이트:
 pnpm --dir front test:coverage
 ```
 
-`@vitest/coverage-v8`로 측정하며, threshold는 현재 baseline에서 정수 -2pp floor로 고정합니다(lines 80, statements 79, functions 80, branches 75). vitest 4의 v8 coverage는 AST 기반 리매핑이 기본이라 v3 대비 측정치가 더 보수적으로 낮아져 baseline을 재보정했습니다. CI front job은 `pnpm test:coverage`로 게이트를 강제하고 `front-coverage` 아티팩트를 always upload(14일 보존)합니다. Threshold를 올릴 때는 안정적으로 통과하는 측정치 -2pp(정수 floor)를 기준으로 갱신합니다.
+`@vitest/coverage-v8` threshold는 lines 80, statements 79, functions 80, branches 75입니다(`front/vitest.config.ts`). CI frontend job이 이 게이트를 강제하고 `front-coverage` artifact를 올립니다. 올릴 때는 안정 측정치에서 2pp를 뺀 정수로 정합니다.
 
 Frontend unit suite에는 `front/tests/unit/frontend-boundaries.test.ts`도 포함됩니다. 이 테스트는 route-first 구조의 shared/feature/model/route/ui import 경계, `shared/ui`의 `src/app` import 금지, 제거된 `shared/api/readmates` compatibility import, `ui`가 있는 feature의 `components` public import 금지, route-owned action type 노출 여부를 확인합니다. Legacy boundary exception 목록은 비어 있어야 합니다.
 
@@ -89,22 +101,22 @@ pnpm --dir front build
 
 ## Lighthouse Diagnostic
 
-The local Lighthouse diagnostic is a non-gating quality baseline for public, member, host, and platform-admin dev-seed routes. It writes artifacts under `.tmp/lighthouse/` and separates route entry failures from Lighthouse findings.
+Lighthouse 진단은 CI gate가 아닌 품질 기준선입니다. Public, member, host, platform-admin dev-seed route를 검사하고 `.tmp/lighthouse/`에 결과를 남깁니다. Route 진입 실패와 Lighthouse finding을 구분합니다.
 
-Run a small smoke first:
+작은 smoke부터 실행합니다.
 
 ```bash
 pnpm --dir front lighthouse:diagnose -- --group public --limit 2
 pnpm --dir front lighthouse:diagnose -- --group member --limit 1
 ```
 
-Run the full desktop baseline after the local MySQL, Spring dev profile, and Vite server path used by Playwright E2E is healthy:
+Playwright E2E와 같은 로컬 MySQL, Spring dev profile, Vite 경로가 정상이면 전체 desktop baseline을 실행합니다.
 
 ```bash
 pnpm --dir front lighthouse:diagnose
 ```
 
-Do not treat the first baseline as a CI gate. Use `summary.md` and `findings.json` to create scoped follow-up goals.
+결과의 `summary.md`, `findings.json`으로 후속 작업 범위를 정합니다.
 
 ## Playwright E2E
 
@@ -148,7 +160,7 @@ READMATES_E2E_DB_NAME='<e2e-db-name>' \
 pnpm --dir front test:e2e
 ```
 
-예정 세션 흐름을 확인하는 `front/tests/e2e/dev-login-session-flow.spec.ts`는 호스트가 `DRAFT` 세션을 만들고, `MEMBER` 공개로 바꾼 뒤, 멤버 홈의 `/api/sessions/upcoming` 표시와 `OPEN` 전환을 함께 검증합니다. `CLOSED`/`PUBLISHED` 기록 lifecycle은 현재 backend DB test와 frontend unit test에서 더 촘촘히 검증합니다.
+`front/tests/e2e/dev-login-session-flow.spec.ts`는 호스트가 `DRAFT` 세션을 만들고 게스트 접근을 `GUEST_READABLE`로 바꾼 뒤(`/access-scope`), 멤버 홈 표시와 `OPEN` 전환을 검증합니다. `CLOSED`/`PUBLISHED` lifecycle은 backend DB test와 frontend unit test가 더 촘촘히 봅니다.
 
 Member/host reading-loop route smoke:
 
@@ -160,7 +172,7 @@ pnpm --dir front test:e2e -- tests/e2e/dev-login-session-flow.spec.ts
 
 ```bash
 pnpm --dir front exec vitest run features/host/model/session-import-model.test.ts
-./server/gradlew -p server test --tests com.readmates.sessionimport.api.HostSessionImportControllerDbTest
+./server/gradlew -p server integrationTest --tests com.readmates.sessionimport.api.HostSessionImportControllerDbTest
 ```
 
 멤버 표시 이름과 권한 경계만 빠르게 확인하려면 관련 E2E spec을 직접 지정할 수 있습니다.
@@ -169,28 +181,21 @@ pnpm --dir front exec vitest run features/host/model/session-import-model.test.t
 pnpm --dir front test:e2e -- member-profile-permissions
 ```
 
-플랫폼 admin 첫 화면의 today operations ledger만 빠르게 확인하려면 아래 spec을 지정합니다. 이 spec은 public-safe BFF 응답을 route mock으로 고정해 OWNER가 queue/brief를 보는 흐름과 SUPPORT가 mutation CTA를 실행할 수 없는 흐름을 검증합니다.
+플랫폼 admin today 화면만 확인하려면 아래 spec을 씁니다. Public-safe route mock으로 OWNER의 queue 흐름과 SUPPORT의 mutation 차단을 검증합니다.
 
 ```bash
 pnpm --dir front test:e2e -- tests/e2e/admin-today.spec.ts
 ```
 
-Admin analytics visual evidence:
+화면 증거(desktop/mobile screenshot)가 필요할 때:
 
 ```bash
 pnpm --dir front test:e2e -- tests/e2e/admin-analytics.spec.ts
-```
-
-The spec captures desktop and mobile screenshots into Playwright `test-results` using public-safe mocked analytics data. Generated screenshots are evidence artifacts only and are not committed.
-
-Host/member visual evidence:
-
-```bash
 pnpm --dir front test:e2e -- tests/e2e/host-club-operations.spec.ts
 pnpm --dir front test:e2e -- tests/e2e/member-reading-momentum.spec.ts
 ```
 
-These specs capture desktop and mobile screenshots into Playwright `test-results` using public-safe route mocks or dev fixtures. Generated screenshots are evidence artifacts only and are not committed.
+Public-safe mock이나 dev fixture로 Playwright `test-results`에 screenshot을 남깁니다. 이 파일은 증거용이며 커밋하지 않습니다.
 
 ## 시각 회귀 (컴포넌트 하니스)
 
@@ -202,7 +207,7 @@ These specs capture desktop and mobile screenshots into Playwright `test-results
 
 **테스트 위치:** `front/shared/ui/**/*.ct.tsx`로 source 옆에 co-locate합니다. `.ct.tsx` 확장자라 Vitest `*.test.{ts,tsx}`나 E2E `tests/e2e/**`와 충돌하지 않습니다.
 
-**스냅샷 경로:** baseline은 `front/__screenshots__/shared/ui/` 또는 `front/__screenshots__/features/` 아래에 생성되며 커밋 대상입니다(`testDir="."`). Shared primitive 초기 커버리지는 ReadmatesBrandMark, BookCover(이미지 없는 fallback), AvatarChip이고, feature-level baseline은 host/admin/public route-critical UI 조각으로 확장합니다.
+**스냅샷 경로:** baseline은 `front/__screenshots__/shared/ui/` 또는 `front/__screenshots__/features/` 아래에 생성되며 커밋 대상입니다(`testDir="."`). Shared primitive는 ReadmatesBrandMark, BookCover, AvatarChip, MobileHeader, TopNav 등을 덮고, feature-level baseline은 host/admin/public route-critical UI 조각을 덮습니다.
 
 **명령:**
 
@@ -242,7 +247,7 @@ docker volume rm readmates-ct-root-node-modules readmates-ct-front-node-modules 
 
 ## Backend
 
-Backend tests are expected to run on JDK 25. `server/build.gradle.kts` pins the Gradle `Test` JVM to the Java 25 toolchain so local shells using a different current JVM do not change test runtime behavior. If Gradle cannot find a JDK 25 toolchain locally, install one or set `JAVA_HOME` to a JDK 25 installation before running backend tests.
+Backend test는 JDK 25에서 돕니다. `server/build.gradle.kts`가 Gradle `Test` JVM을 Java 25 toolchain으로 고정하므로, 로컬 JDK를 찾지 못하면 JDK 25를 설치하거나 `JAVA_HOME`을 맞춥니다.
 
 Backend PR-level gate와 full Testcontainers lane:
 
@@ -251,7 +256,7 @@ Backend PR-level gate와 full Testcontainers lane:
 ./server/gradlew -p server integrationTest
 ```
 
-기본 Gradle `test` task는 태그 필터가 없어 `unitTest`, `integrationTest`, `architectureTest`와 같은 테스트를 중복 선택하므로 비활성화되어 있습니다. 따라서 `./server/gradlew -p server clean test`만 실행하는 것은 의미 있는 검증 근거가 아닙니다. Wrapper의 `check`는 `unitTest + architectureTest + detekt + JaCoCo`를 의존성으로 한 번씩만 실행하며, integration은 Docker가 필요해 명시적으로 호출할 때만 돕니다.
+기본 Gradle `test` task는 비활성화되어 있습니다(`enabled = false`). 태그 필터 없이 모든 테스트를 중복 실행하기 때문입니다. 그래서 `test`나 `test --tests ...`는 아무것도 실행하지 않습니다. 개별 테스트는 태그에 맞는 lane(`unitTest`, `integrationTest`, `architectureTest`)에 `--tests`를 붙여 실행합니다. `check`는 `unitTest`, `architectureTest`, ktlint, detekt, JaCoCo를 한 번씩 실행하고, integration은 Docker가 필요해 따로 호출합니다.
 
 Backend fast lanes:
 
@@ -261,9 +266,15 @@ Backend fast lanes:
 ./server/gradlew -p server architectureTest
 ```
 
-이 fast lane은 개발 중 빠른 피드백용이며 release baseline을 대체하지 않습니다. `unitTest`는 `integration`, `container`, `architecture` tag를 제외하고, `integrationTest`는 Spring/Testcontainers 성격 tag를 포함하며, `architectureTest`는 ArchUnit boundary와 품질 baseline·architecture inventory contract를 실행합니다. Backend 변경을 ship하기 전에는 PR-level wrapper를 실행하고, Testcontainers evidence가 필요한 변경에서는 integration lane도 별도로 실행합니다.
+| Lane | 대상 |
+| --- | --- |
+| `unitTest` | `integration`, `container`, `architecture` tag가 없는 테스트 |
+| `integrationTest` | `integration` 또는 `container` tag (`@SpringBootTest`, Testcontainers) |
+| `architectureTest` | `architecture` tag (ArchUnit 경계, baseline·inventory contract) |
 
-For release-risk review that touches SQL plans, API contracts, or query budgets, run the targeted integration lane explicitly:
+Fast lane은 개발 중 피드백용이며 PR-level wrapper를 대체하지 않습니다.
+
+SQL plan, API contract, query budget을 건드리는 release-risk 검토에서는 아래 lane을 명시적으로 실행합니다.
 
 ```bash
 ./server/gradlew -p server integrationTest \
@@ -282,19 +293,17 @@ PR-level quality gate는 단일 `check` task로 통합되어 있습니다.
 
 `check`는 다음 게이트를 한 번에 검증합니다.
 
-- **production compiler warning gate**: production `compileKotlin`은 `allWarningsAsErrors`를 사용해 신규 Kotlin warning을 build error로 처리합니다. Test source warning은 별도 inventory이며 Phase 0 hard gate는 아닙니다.
-- **ktlint baseline gate**: `org.jlleitschuh.gradle.ktlint` 12.1.1 + ktlint tool 1.7.1. `server/config/ktlint/baseline.xml`은 최대 171건이며 현재 identity와 retired identity가 승인된 Phase 0 seed를 겹침 없이 정확히 분할해야 합니다. Auto-format은 `./server/gradlew -p server ktlintFormat`로 적용합니다.
-- **detekt baseline gate**: detekt 2.0.0-alpha.5 + `server/config/detekt/detekt.yml`. `server/config/detekt/baseline.xml`은 최대 461건이며 현재 identity와 retired identity가 승인된 Phase 0 seed를 겹침 없이 정확히 분할해야 합니다. detekt 1.23.x는 Java 25 daemon에서 동작하지 않아 Java 25/Kotlin 2.4/Gradle 9.x 검증 범위에 있는 detekt 2.x line으로 올렸고, baseline은 detekt 2 rule id 기준으로 재생성했습니다.
-- **JaCoCo line coverage gate**: `unitTest`의 `JacocoTaskExtension`이 `build/jacoco/unitTest.exec`를 생성하고, `jacocoTestCoverageVerification`이 LINE `COVEREDRATIO` 최소 0.43을 강제합니다. 현재 rule은 안정 측정치에서 약 2 percentage points를 뺀 floor입니다. `Application`/`dto`/`config`는 report에서 제외합니다. Threshold를 올릴 때도 이 baseline rule을 유지합니다.
-- **architecture no-growth gate**: `server/config/architecture/boundary-import-baseline.txt`는 최대 39개 import, `server/config/architecture/feature-dependency-baseline.txt`는 최대 41개 application feature edge를 허용하며 두 파일 모두 현재 source inventory와 정확히 일치해야 합니다. 각 current baseline과 retired ledger는 승인된 Phase 0 seed를 겹침 없이 정확히 분할합니다. 네 seed 파일은 늘리거나 줄이지 않는 control data이며 목표 아키텍처가 아닙니다.
+- **Compiler warning**: production `compileKotlin`은 `allWarningsAsErrors`입니다. Test source warning은 gate가 아닙니다.
+- **ktlint**: plugin 12.1.1 + ktlint 1.7.1. `server/config/ktlint/baseline.xml` current 171건. 자동 정리는 `./server/gradlew -p server ktlintFormat`.
+- **detekt**: 2.0.0-alpha.5 + `server/config/detekt/detekt.yml`. `baseline.xml` current 437건 + retired 24건 = approved 461건. v2.5.0에서 rule threshold를 완화했지만(`LongMethod` 100, `LargeClass` 1000 등) baseline은 바꾸지 않았습니다.
+- **JaCoCo**: `unitTest`가 만든 `build/jacoco/unitTest.exec`로 LINE `COVEREDRATIO` 최소 0.43을 강제합니다.
+- **Architecture no-growth**: `server/config/architecture/boundary-import-baseline.txt`(current 0)와 `feature-dependency-baseline.txt`(current 37)는 현재 source inventory와 정확히 같아야 합니다. current + retired는 approved seed(39, 41)를 겹침 없이 나눕니다.
 
-품질 또는 아키텍처 debt 제거는 (1) source debt를 제거하고, (2) 같은 변경에서 current baseline의 정확히 일치하는 identity를 삭제하고, (3) 그 identity를 matching retired ledger에 그대로 추가합니다. Retired identity는 삭제하지 않고 approved seed는 늘리지 않습니다.
+Debt를 없앨 때는 source를 고치고, 같은 변경에서 current baseline의 identity를 지우고, retired ledger에 그대로 옮깁니다. Retired identity 삭제와 approved seed 증가는 허용하지 않습니다.
 
-CI backend job은 `./scripts/server-ci-check.sh` 단일 호출로 구성되어 있습니다 — wrapper가 실행하는 `check`는 `:unitTest + :architectureTest + :detekt + :jacoco*`를 모두 의존하므로 별도 architectureTest step은 불필요합니다. ktlint/detekt/JaCoCo report 아티팩트는 `if: always()`로 항상 업로드합니다(실패시 `backend-reports` 별도 업로드 유지).
+CI backend job은 `./scripts/server-ci-check.sh` 한 번만 호출하고 report artifact는 항상 올립니다.
 
-Backend test suite에는 MySQL 기반 persistence adapter/controller 검증이 포함되어 있습니다. `server/build.gradle.kts`는 `org.testcontainers:testcontainers-mysql`을 사용하고, Docker가 필요합니다. Colima를 쓰는 로컬 환경에서는 기본 Docker socket env가 비어 있고 Colima socket이 있으면 Gradle test task가 `DOCKER_HOST`와 `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`를 설정합니다.
-
-Backend `integrationTest`는 Testcontainers가 필요한 MySQL lifecycle을 직접 관리합니다. 로컬 `compose.yml`의 MySQL은 서버를 수동으로 띄우거나 Playwright E2E database를 준비할 때 쓰며, integration lane을 실행하기 전에 `docker compose up`을 먼저 실행할 필요는 없습니다.
+`integrationTest`는 Testcontainers로 MySQL/Redis/Kafka를 직접 띄우므로 Docker가 필요하고, `docker compose up`을 먼저 할 필요는 없습니다. Colima socket이 있고 Docker env가 비어 있으면 Gradle이 `DOCKER_HOST`와 `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`를 설정합니다.
 
 ### Flyway migration 불변성
 
@@ -312,7 +321,7 @@ python3 -B scripts/check-flyway-migration-immutability.py \
 
 CI의 scripts job만 `fetch-depth: 0`을 사용합니다. Pull request는 `github.event.pull_request.base.sha`, `main` push는 `github.event.before`를 immutable base로 선택합니다. Push before가 all-zero이면 local `HEAD^`가 실제로 resolve될 때만 fallback하고, 빈 값·unresolved base·missing merge base·shallow history는 검사 생략이 아니라 실패입니다. 실패 증거는 violation category, repository-relative path, exact merge-base와 다음 허용 version으로 제한하며 SQL 본문과 로컬 절대 경로는 출력하지 않습니다.
 
-Runtime evidence는 synthetic checksum fixture와 production migration suite를 같은 active `integrationTest` lane에서 실행합니다. `MySqlFlywayMigrationTest`는 41개 production migration의 clean install과 populated V42/V44 schema에서 현재 V48까지의 지원 upgrade를 보존합니다.
+Runtime evidence는 `integrationTest` lane에서 봅니다. `MySqlFlywayMigrationTest`는 41개 production migration(`V1`, `V9`~`V48`)의 clean install과 populated V42/V44 schema의 upgrade를 검증합니다.
 
 ```bash
 ./server/gradlew -p server integrationTest \
@@ -359,16 +368,14 @@ echo "testcontainers.reuse.enable=true" >> ~/.testcontainers.properties
 docker rm -f $(docker ps -a --filter "label=org.testcontainers.session-id" -q)
 ```
 
-Refs: `docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md` §4.5.
-
 ## Notification Operations
 
 알림 event outbox, Kafka relay/consumer, OCI Email Delivery adapter 설정, retry delay 설정, 운영 metrics, host dashboard/notification operations UI, 멤버 알림 설정과 알림함을 바꿨다면 아래 targeted command를 먼저 실행합니다. Kafka notification integration test는 Testcontainers Kafka를 사용하므로 Docker 또는 Colima가 실행 중이어야 합니다.
 
 ```bash
-./server/gradlew -p server test --tests 'com.readmates.notification.kafka.*'
-./server/gradlew -p server test --tests 'com.readmates.notification.*'
-./server/gradlew -p server test --tests com.readmates.archive.api.MemberArchiveReviewControllerTest
+./server/gradlew -p server unitTest --tests 'com.readmates.notification.*'
+./server/gradlew -p server integrationTest --tests 'com.readmates.notification.*'
+./server/gradlew -p server integrationTest --tests com.readmates.archive.api.MemberArchiveReviewControllerTest
 ./scripts/server-ci-check.sh
 ./server/gradlew -p server integrationTest
 pnpm --dir front exec vitest run tests/unit/host-dashboard.test.tsx
@@ -397,7 +404,7 @@ pnpm --dir front test:e2e
 
 Targeted Redis adapter test는 Testcontainers Redis를 직접 띄우므로 수동 Redis server가 필요하지 않습니다. Testcontainers가 로컬 `localhost`를 반환하면 test helper는 Redis URL host를 `127.0.0.1`로 정규화해 IPv6 localhost에서 다른 로컬 서비스와 port가 겹치는 flake를 피합니다. Rate limit, auth session cache, public cache, notes cache, read-cache invalidation을 바꾸면 관련 `Redis*AdapterTest`, application cache test, `ServerArchitectureBoundaryTest`를 함께 확인합니다.
 
-Backend test suite에는 ArchUnit 기반 아키텍처 경계 테스트도 포함됩니다. `ServerArchitectureBoundaryTest`의 slice registry는 web, messaging/Kafka, scheduler, adapter security, auth servlet-security inbound package를 등록하고, 등록된 inbound adapter가 legacy repository, `JdbcTemplate`, outbound persistence adapter에 직접 의존하지 않는지 확인합니다. `ServerArchitectureInventoryTest`는 39개 boundary import와 41개 application feature edge의 no-growth baseline을 현재 source와 대조합니다. 전환된 application package가 adapter, Spring JDBC, Spring DAO, Spring Web/HTTP 세부사항에 의존하지 않는지도 확인합니다. Application service에서 `ResponseStatusException`, `HttpStatus`, Spring Web type을 쓰지 말고 feature application error를 `adapter.in.web`에서 HTTP response로 매핑합니다. 세션/노트 쓰기 흐름을 수정했다면 아래 focused command로 경계 테스트와 관련 controller/service test를 먼저 확인할 수 있습니다.
+`ServerArchitectureBoundaryTest`는 inbound adapter가 legacy repository, `JdbcTemplate`, outbound adapter에 직접 의존하지 않는지, application package가 adapter·Spring JDBC/DAO·Spring Web/HTTP에 의존하지 않는지 확인합니다. `ServerArchitectureInventoryTest`는 boundary/feature baseline을 현재 source와 대조합니다. Application service에서는 `ResponseStatusException`, `HttpStatus` 대신 feature error를 던지고 `adapter.in.web`에서 매핑합니다. 세션/노트 쓰기 흐름을 바꿨다면 아래를 먼저 실행합니다.
 
 ```bash
 ./server/gradlew -p server architectureTest \
@@ -414,8 +421,7 @@ Backend test suite에는 ArchUnit 기반 아키텍처 경계 테스트도 포함
 
 목록 조회, archive/notes/host/public detail query, 또는 cursor pagination SQL을 수정했다면 query budget과 EXPLAIN guardrail을 먼저 확인합니다. `ServerQueryBudgetTest`는 주요 HTTP flow의 query 수가 관찰된 budget을 넘지 않는지 확인하고, `MySqlQueryPlanTest`는 핵심 목록/detail SQL이 의도한 index plan을 유지하는지 확인합니다.
 
-Large-fixture notes feed confidence uses synthetic public-safe rows in `LargeReadPathFixture`.
-It is not a benchmark score; it catches accidental N+1 queries, lost indexes, and severe first-page regressions.
+Notes feed 대용량 검증은 `LargeReadPathFixture`의 합성 데이터를 씁니다. 성능 점수가 아니라 N+1, index 유실, 첫 page 급격한 회귀를 잡는 용도입니다.
 
 ```bash
 ./server/gradlew -p server integrationTest \
@@ -423,15 +429,9 @@ It is not a benchmark score; it catches accidental N+1 queries, lost indexes, an
   --tests com.readmates.performance.MySqlQueryPlanTest
 ```
 
-Admin analytics overview도 query budget 대상입니다. `/api/admin/analytics/overview?window=30d`는 admin session validation과 운영 분석 aggregate/bucket query를 함께 지나는 authenticated request입니다. `ServerQueryBudgetTest`가 bounded query count를 핀해 accidental N+1 회귀를 막습니다.
+`ServerQueryBudgetTest`는 admin analytics overview(`/api/admin/analytics/overview?window=30d`)의 query 수도 고정합니다.
 
-```bash
-./server/gradlew -p server integrationTest --tests com.readmates.performance.ServerQueryBudgetTest
-```
-
-Host closing board confidence:
-
-`/api/host/sessions/{sessionId}/closing-status`, `sessionclosing`, host closing board UI, or admin closing-risk repair links changed면 query budget, EXPLAIN guard, and component visual baseline을 함께 확인합니다. 이 lane은 host closing board가 커질 때 accidental N+1, lost index, and layout/copy regression을 잡기 위한 좁은 confidence gate입니다.
+Host closing board(`/api/host/sessions/{sessionId}/closing-status`, `sessionclosing`, closing board UI, admin closing-risk link)를 바꿨다면 query budget, EXPLAIN, CT baseline을 함께 확인합니다.
 
 ```bash
 ./server/gradlew -p server integrationTest \
@@ -440,18 +440,12 @@ Host closing board confidence:
 pnpm --dir front test:ct
 ```
 
-`front/test-results/**`의 E2E screenshot은 release evidence artifact이고 commit하지 않습니다. `front/__screenshots__/features/host/ui/session-closing-board.ct.tsx/host-closing-board-blocked.png` 같은 CT baseline은 Docker renderer로 생성한 뒤 commit하는 regression gate입니다.
-
-```bash
-./server/gradlew -p server test \
-  --tests com.readmates.performance.ServerQueryBudgetTest \
-  --tests com.readmates.performance.MySqlQueryPlanTest
-```
+`front/test-results/**`의 E2E screenshot은 커밋하지 않습니다. `front/__screenshots__/**`의 CT baseline은 Docker renderer로 만든 뒤 커밋하는 regression gate입니다.
 
 멤버 프로필이나 표시 이름 검증을 수정했다면 아래 focused command로 controller, application, migration 경계를 먼저 확인할 수 있습니다.
 
 ```bash
-./server/gradlew -p server test \
+./server/gradlew -p server integrationTest \
   --tests com.readmates.auth.api.MemberProfileControllerTest \
   --tests com.readmates.auth.api.HostMemberApprovalControllerTest \
   --tests com.readmates.support.MySqlFlywayMigrationTest
@@ -460,8 +454,9 @@ pnpm --dir front test:ct
 세션 공개 범위, 예정 세션, `OPEN -> CLOSED -> PUBLISHED` lifecycle, 공개 기록 노출을 수정했다면 아래 focused command가 가장 빠른 1차 확인입니다.
 
 ```bash
-./server/gradlew -p server test \
-  --tests com.readmates.session.application.service.HostSessionServicesTest \
+./server/gradlew -p server unitTest \
+  --tests com.readmates.session.application.service.HostSessionServicesTest
+./server/gradlew -p server integrationTest \
   --tests com.readmates.session.api.HostSessionControllerDbTest \
   --tests com.readmates.session.api.HostSessionBffSecurityTest \
   --tests com.readmates.session.api.HostDashboardControllerTest \
@@ -475,7 +470,7 @@ pnpm --dir front test:ct
 알림 이메일 템플릿 copy, subject, club name 렌더링, HTML preview를 수정했다면 아래 focused command로 순수 템플릿 테스트와 preview report 생성을 먼저 확인합니다. Report는 테스트 산출물이며 Git에 커밋하지 않습니다.
 
 ```bash
-./server/gradlew -p server test \
+./server/gradlew -p server unitTest \
   --tests com.readmates.notification.application.model.NotificationEmailTemplatesTest \
   --tests com.readmates.notification.application.model.NotificationEmailTemplatePreviewTest
 ```
@@ -488,6 +483,7 @@ pnpm --dir front test:ct
 ./scripts/build-public-release-candidate.sh
 ./scripts/public-release-check.sh .tmp/public-release-candidate
 ```
+
 현재 private working tree를 직접 검사할 수도 있습니다.
 
 ```bash
@@ -504,18 +500,18 @@ Release helper script의 scanner pattern을 바꿨다면 fixture 검증도 실�
 
 ## 배포 연동 Smoke
 
-배포 후 Cloudflare Pages marker와 OAuth start redirect URI는 공개 릴리즈 후보 검사와 별개로 실제 배포 origin에 대해 확인합니다. 이 스크립트는 secret을 요구하지 않지만, 결과는 운영 상태일 수 있으므로 공개 문서나 Git에 붙이지 않습니다.
+배포 후 Cloudflare Pages marker와 OAuth start redirect URI를 실제 배포 origin에 대해 확인합니다. Secret은 필요 없지만 결과는 운영 상태이므로 문서나 Git에 붙이지 않습니다.
 
 ```bash
-READMATES_SMOKE_BASE_URL=https://readmates.pages.dev \
-READMATES_SMOKE_AUTH_BASE_URL=https://readmates.pages.dev \
+READMATES_SMOKE_BASE_URL=https://<pages-origin> \
+READMATES_SMOKE_AUTH_BASE_URL=https://<pages-origin> \
 ./scripts/smoke-production-integrations.sh
 ```
 
-Primary auth domain이나 registered club host를 함께 확인할 때는 placeholder를 운영 값으로 바꿔 실행합니다.
+Primary auth domain이나 registered club host도 확인할 때:
 
 ```bash
-READMATES_SMOKE_BASE_URL=https://readmates.pages.dev \
+READMATES_SMOKE_BASE_URL=https://<pages-origin> \
 READMATES_SMOKE_AUTH_BASE_URL=https://<primary-domain> \
 READMATES_SMOKE_CLUB_HOST=https://<registered-club-host> \
 ./scripts/smoke-production-integrations.sh
@@ -570,7 +566,7 @@ pnpm --dir front build
 배포 후 OAuth/domain 연동 점검:
 
 ```bash
-READMATES_SMOKE_BASE_URL=https://readmates.pages.dev \
-READMATES_SMOKE_AUTH_BASE_URL=https://readmates.pages.dev \
+READMATES_SMOKE_BASE_URL=https://<pages-origin> \
+READMATES_SMOKE_AUTH_BASE_URL=https://<pages-origin> \
 ./scripts/smoke-production-integrations.sh
 ```

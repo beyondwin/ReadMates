@@ -1,10 +1,13 @@
 # Post-deploy Watch
 
-Post-deploy watch는 backend compose 배포 직후 5-10분 동안 health, BFF/OAuth smoke, recent log error를 묶어 확인하는 절차입니다. 실패 시 자동 rollback하지 않고 운영자가 판단합니다.
+backend compose 배포 직후 health, BFF/OAuth smoke, 최근 ERROR 로그를 한 번에 확인하는 절차입니다. 실패해도 자동 rollback은 없습니다. 운영자가 판단합니다.
 
-## 배포 script 통합
+## 언제 쓰나
 
-`deploy/oci/05-deploy-compose-stack.sh`는 기본적으로 post-deploy watch를 실행합니다. 장애 대응 중 watch를 별도로 수행해야 하면 아래처럼 배포 script의 자동 watch만 끕니다.
+- `deploy/oci/05-deploy-compose-stack.sh`는 기본으로 watch를 실행합니다(`READMATES_RUN_POST_DEPLOY_WATCH=true`). 보통은 따로 할 일이 없습니다.
+- 장애 대응 중 watch를 따로 돌려야 하면 배포 스크립트의 자동 watch만 끄고, 같은 release 작업 안에서 수동으로 실행합니다.
+
+## 1. 자동 watch 끄고 배포 (선택)
 
 ```bash
 READMATES_RUN_POST_DEPLOY_WATCH=false \
@@ -14,59 +17,48 @@ CADDY_SITE=api.example.com \
 ./deploy/oci/05-deploy-compose-stack.sh
 ```
 
-watch를 끈 경우 같은 release 작업 안에서 `deploy/oci/watch-compose-post-deploy.sh`를 수동 실행합니다.
+## 2. 수동 실행
 
 ```bash
-READMATES_SMOKE_BASE_URL=https://readmates.pages.dev \
-READMATES_SMOKE_AUTH_BASE_URL=https://readmates.pages.dev \
+READMATES_SMOKE_BASE_URL=https://app.example.com \
+READMATES_SMOKE_AUTH_BASE_URL=https://app.example.com \
 VM_PUBLIC_IP='<vm-public-ip>' \
 SSH_KEY='<path-to-ssh-key>' \
 REMOTE_USER='<remote-user>' \
 ./deploy/oci/watch-compose-post-deploy.sh
 ```
 
-## 기본 실행
-
-```bash
-READMATES_SMOKE_BASE_URL=https://readmates.pages.dev \
-READMATES_SMOKE_AUTH_BASE_URL=https://readmates.pages.dev \
-VM_PUBLIC_IP='<vm-public-ip>' \
-CADDY_SITE=api.example.com \
-./deploy/oci/watch-compose-post-deploy.sh
-```
-
-Registered club host를 함께 확인할 때만 아래 값을 추가합니다.
-
-```bash
-READMATES_SMOKE_CLUB_HOST=https://<registered-club-host>
-```
+- `SSH_KEY`, `REMOTE_USER`를 생략하면 스크립트 기본값을 씁니다.
+- 등록된 club host도 확인하려면 `READMATES_SMOKE_CLUB_HOST=https://<registered-club-host>`를 추가합니다.
+- 배포 스크립트 안에서 실행되면 부모 `attemptId`를 이어받습니다. 수동 실행 때 같은 attempt로 묶으려면 `READMATES_DEPLOY_ATTEMPT_ID=<attempt-id>`를 넘깁니다.
 
 ## 확인 항목
 
-1. VM에서 `readmates-stack` systemd 상태 확인.
-2. `/opt/readmates/compose.yml` 기준 `docker compose ps` 확인.
-3. `readmates-api` container 내부 `/internal/health` 확인.
-4. Cloudflare BFF `/api/bff/api/auth/me` smoke 확인. BFF 시크릿 rotation 의심 시 `GET /api/bff/__internal/secret-status`로 configured secret count, rotation stage, primary fingerprint(SHA-256 첫 6자)를 확인합니다(raw secret 미노출).
-5. `scripts/smoke-production-integrations.sh`로 Pages marker와 OAuth redirect URI 확인.
-6. 최근 로그에서 `ERROR`, `Exception`, `Caused by` 패턴 확인.
+스크립트는 아래 순서로 확인하고 단계마다 [deploy ledger](deploy-attempts.md)에 event를 남깁니다.
+
+1. VM의 `readmates-stack` systemd 상태와 `/opt/readmates/compose.yml` 기준 `docker compose ps`.
+2. `readmates-api` 컨테이너 안에서 `/internal/health`.
+3. Cloudflare BFF `GET /api/bff/api/auth/me`.
+4. `scripts/smoke-production-integrations.sh`로 Pages marker와 OAuth `redirect_uri`.
+5. 최근 10분 `readmates-api` 로그에서 `ERROR` 줄 grep.
 
 ## 실패 판정
 
-- health endpoint가 timeout 또는 non-2xx를 반환한다.
-- BFF auth smoke가 network 또는 5xx로 실패한다.
-- OAuth redirect smoke에서 기대 auth base URL과 다른 `redirect_uri`가 나온다.
-- 새 배포 이후 반복적인 `ERROR` 또는 exception chain이 발생한다.
+- health가 timeout이거나 2xx가 아니다.
+- BFF auth smoke가 network 오류나 5xx로 실패한다.
+- OAuth smoke의 `redirect_uri`가 기대한 auth base URL과 다르다.
+- 최근 10분 로그에 `ERROR` 줄이 있다 (ledger: `CHECK_FAILED reason=error-grep`).
 
-## 실패 시 행동
+## 실패하면
 
 1. 같은 watch를 자동 재시도하지 않습니다.
-2. `docs/operations/runbooks/deploy-attempts.md`의 실패 stage 기준으로 분류합니다.
-3. `deploy/oci/readmates-collect.sh`로 read-only snapshot을 수집합니다.
-4. 이전 image rollback 또는 runtime env 조사를 운영자가 선택합니다.
+2. [Deploy attempts](deploy-attempts.md#실패-stage별-1차-확인)의 stage 표로 분류합니다.
+3. `deploy/oci/readmates-collect.sh`로 읽기 전용 snapshot을 모읍니다([Read-only diagnostics](read-only-diagnostics.md)).
+4. 이전 image rollback 또는 runtime env 조사를 운영자가 고릅니다. Rollback 명령은 [OCI Compose Stack](../../deploy/compose-stack.md#rollback)을 따릅니다.
 
-## 결과 기록
+## 기록
 
-공개 문서에는 summary만 남깁니다.
+공개 문서에는 요약만 남깁니다.
 
 ```text
 Post-deploy watch: health/BFF/OAuth smoke 통과, recent ERROR 없음. 운영 출력 전문은 Git 밖에 보관.

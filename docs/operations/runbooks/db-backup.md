@@ -1,47 +1,48 @@
 # DB Backup & Restore
 
-Readmates production MySQL backup은 OCI MySQL HeatWave에서 `mysqldump`로 추출한 `*.sql.gz`를 OCI Object Storage private bucket에 업로드합니다. 본 runbook은 (1) 자동 일일 백업 운용, (2) 릴리스 전 수동 백업, (3) 객체 검증, (4) 복구 (restore) 절차를 다룹니다.
+production MySQL(OCI MySQL HeatWave)을 `mysqldump`로 떠서 `*.sql.gz`와 `.sha256`을 OCI Object Storage private bucket에 올립니다. 이 문서는 (1) 일일 자동 백업, (2) 릴리스 전 수동 백업, (3) 객체 검증, (4) 복구를 다룹니다.
+
+- 백업 스크립트: `deploy/oci/backup-mysql-to-object-storage.sh` (내부에서 `deploy/oci/export-mysql.sh` 호출)
+- systemd: `deploy/oci/backup-mysql.service`, `deploy/oci/backup-mysql.timer`
+- 초기 설정(IAM, defaults file, OCI CLI): [OCI MySQL HeatWave](../../deploy/oci-mysql-heatwave.md)
+
+아래 명령의 `<deploy-ssh-key>`, `<vm-public-ip>`, `<object-storage-namespace>`, `<backup-bucket>`은 placeholder입니다.
 
 ## 환경 변수와 bucket
 
-자동 백업은 `/etc/readmates/backup-mysql.env`(chmod 600, root:root)에서 환경 변수를 읽습니다. systemd unit 파일(`deploy/oci/backup-mysql.service`)이 `EnvironmentFile=` 지시자로 로드합니다.
+자동 백업은 `/etc/readmates/backup-mysql.env`(`chmod 600`, `root:root`)를 `EnvironmentFile=`로 읽습니다.
 
-필수:
-- `READMATES_EXPORT_BUCKET` — 예: `readmates-db-exports`
-- `OCI_NAMESPACE` — 예: `ax5hfpscso8v`
-- `READMATES_DB_HOST` — HeatWave private endpoint hostname
+| 변수 | 필수 | 기본값 |
+| --- | --- | --- |
+| `READMATES_EXPORT_BUCKET` | 예 | — (private bucket 이름) |
+| `OCI_NAMESPACE` | 예 | — (Object Storage namespace) |
+| `READMATES_DB_HOST` | 예 | — (HeatWave private endpoint) |
+| `READMATES_DB_NAME` | | `readmates` |
+| `READMATES_DB_USER` | | `readmates` |
+| `READMATES_EXPORT_DIR` | | `/var/backups/readmates/mysql` |
+| `READMATES_MYSQL_DEFAULTS_FILE` | | `/etc/readmates/mysql-backup.cnf` (반드시 `0600`) |
+| `READMATES_BACKUP_OBJECT_PREFIX` | | `mysql` |
 
-선택:
-- `READMATES_DB_NAME` (기본 `readmates`)
-- `READMATES_DB_USER` (기본 `readmates`)
-- `READMATES_EXPORT_DIR` (기본 `/var/backups/readmates/mysql`)
-- `READMATES_MYSQL_DEFAULTS_FILE` (기본 `/etc/readmates/mysql-backup.cnf`, chmod 600)
-- `READMATES_BACKUP_OBJECT_PREFIX` (기본 `mysql`)
-
-OCI CLI는 root 권한으로 실행되며 `/root/.oci/config`의 자격을 사용합니다. 인스턴스 principal 인증으로 전환할 경우 환경 변수 `OCI_CLI_AUTH=instance_principal`을 같은 env 파일에 추가합니다.
+- OCI CLI는 root로 실행되고 `/root/.oci/config`를 씁니다. instance principal을 쓰려면 같은 env 파일에 `OCI_CLI_AUTH=instance_principal`을 넣습니다.
+- 스크립트는 VM의 `/opt/readmates/deploy/oci/`에 있어야 합니다. `05-deploy-compose-stack.sh`는 이 스크립트를 복사하지 않으므로 처음 한 번 직접 올립니다.
 
 ## 보관 정책 (retention)
 
-OCI Object Storage Lifecycle Policy로 관리합니다.
+보관 기간은 저장소가 아니라 **OCI Console → Bucket → Lifecycle Policy Rules**에서 운영자가 정합니다. Git에서는 실제 설정을 확인할 수 없습니다.
 
-- 일일 백업: 최근 **30일**까지 보관 후 자동 삭제
-- 주간 백업 (매주 일요일 04:15 UTC 실행): 최근 **6주**까지 archive tier로 이동 후 삭제
-- 월간 백업 (매월 1일 04:15 UTC 실행): 최근 **1개월**(1회 분량)을 archive tier에 영구 보관
-
-릴리스 직전 수동 업로드 객체(`readmates-pre-v*.sql.gz`)는 prefix 기반 lifecycle rule에서 제외되며 영구 보관됩니다. 모든 객체는 SSE-S3 (server-side encryption with managed keys) 기본값을 사용합니다.
-
-> Lifecycle rule은 OCI Console → Bucket → Lifecycle Policy Rules에서 prefix 기준으로 구성합니다. CLI 자동화는 `oci os object-lifecycle-policy put`을 사용합니다.
+- 권장: 일일 백업(`mysql/readmates-<UTC timestamp>.sql.gz`)은 14–30일 후 만료.
+- 릴리스 전 수동 백업(`mysql/readmates-pre-vX.Y.Z-...`)은 prefix로 구분해 일일 만료 규칙에서 빼 둡니다.
+- 규칙을 바꾸면 `oci os object-lifecycle-policy get --namespace-name <object-storage-namespace> --bucket-name <backup-bucket>`으로 결과를 확인합니다.
 
 ## 일일 자동 백업
 
-`deploy/oci/backup-mysql.service` + `deploy/oci/backup-mysql.timer`가 매일 **04:15 UTC** (KST 13:15)에 실행됩니다. Timer는 `RandomizedDelaySec=300`으로 0~5분 jitter를 추가합니다.
+timer가 매일 **04:15 UTC**(KST 13:15)에 실행합니다. `RandomizedDelaySec=300`(0–5분 지연), `Persistent=true`(VM이 꺼져 놓친 실행은 켜진 뒤 한 번 실행)입니다.
 
-### 설치 (idempotent)
+### 설치 (다시 실행해도 안전)
 
 ```bash
-scp -i ~/.ssh/readmates_oci deploy/oci/backup-mysql.service ubuntu@<VM_IP>:/tmp/
-scp -i ~/.ssh/readmates_oci deploy/oci/backup-mysql.timer   ubuntu@<VM_IP>:/tmp/
-ssh -i ~/.ssh/readmates_oci ubuntu@<VM_IP> '
+scp -i <deploy-ssh-key> deploy/oci/backup-mysql.service deploy/oci/backup-mysql.timer ubuntu@<vm-public-ip>:/tmp/
+ssh -i <deploy-ssh-key> ubuntu@<vm-public-ip> '
   sudo install -m 0644 /tmp/backup-mysql.service /etc/systemd/system/backup-mysql.service
   sudo install -m 0644 /tmp/backup-mysql.timer   /etc/systemd/system/backup-mysql.timer
   sudo systemctl daemon-reload
@@ -52,108 +53,74 @@ ssh -i ~/.ssh/readmates_oci ubuntu@<VM_IP> '
 ### 상태 확인
 
 ```bash
-ssh -i ~/.ssh/readmates_oci ubuntu@<VM_IP> '
+ssh -i <deploy-ssh-key> ubuntu@<vm-public-ip> '
   systemctl is-enabled backup-mysql.timer
   systemctl list-timers backup-mysql.timer
-  journalctl -u backup-mysql.service -n 50 --no-pager
+  sudo journalctl -u backup-mysql.service -n 50 --no-pager
 '
 ```
+
+성공하면 로그에 `UPLOADED: mysql/readmates-<timestamp>.sql.gz`와 `.sha256` 두 줄이 보입니다.
 
 ## 릴리스 전 수동 백업과 일일 timer 사이의 관계
 
-릴리스 직전 manual backup은 일일 timer와 충돌하지 않습니다. 이유:
+두 백업은 충돌하지 않습니다. timer를 멈출 필요도 없습니다.
 
-1. 객체 이름이 timestamp + tag로 unique 합니다 (`readmates-pre-vX.Y.Z-<UTC timestamp>.sql.gz`).
-2. Timer는 `mysql/readmates-<UTC timestamp>.sql.gz`(태그 없음) 패턴으로만 객체를 생성합니다.
-3. Lifecycle rule이 `pre-v` prefix를 예외 처리하므로 일일 retention이 manual backup을 삭제하지 않습니다.
+- timer와 스크립트는 항상 `readmates-<UTC timestamp>.sql.gz`로 만듭니다. 이름에 시각이 들어가 겹치지 않습니다.
+- 릴리스 태그를 붙인 이름(`readmates-pre-vX.Y.Z-<timestamp>.sql.gz`)은 운영자가 아래 "태그 이름으로 올리기"에서 직접 붙입니다.
 
-릴리스 직전에는 timer 실행을 잠시 비활성화하지 마세요. 동일 데이터에 대한 두 번의 dump는 idempotent 합니다.
-
-### 수동 업로드 (script가 새 dump를 생성하는 경로)
-
-VM에서 (READMATES_DB_*, OCI_NAMESPACE, READMATES_EXPORT_BUCKET 등 env가 export 되어 있어야 함):
+### 바로 한 번 백업 (timer와 같은 경로)
 
 ```bash
-ssh -i ~/.ssh/readmates_oci ubuntu@<VM_IP> '
-  set -a; source /etc/readmates/backup-mysql.env; set +a
-  sudo --preserve-env=READMATES_EXPORT_BUCKET,OCI_NAMESPACE,READMATES_DB_HOST,READMATES_DB_NAME,READMATES_DB_USER,READMATES_EXPORT_DIR,READMATES_MYSQL_DEFAULTS_FILE,READMATES_BACKUP_OBJECT_PREFIX \
-    /opt/readmates/deploy/oci/backup-mysql-to-object-storage.sh
-'
+ssh -i <deploy-ssh-key> ubuntu@<vm-public-ip> 'sudo systemctl start backup-mysql.service'
+ssh -i <deploy-ssh-key> ubuntu@<vm-public-ip> 'sudo journalctl -u backup-mysql.service -n 20 --no-pager'
 ```
 
-### 수동 업로드 (기존 dump를 그대로 올리는 경로)
+### 태그 이름으로 올리기 (선택)
 
-VM에 OCI CLI가 없거나 이미 dump 파일이 존재하는 경우, 로컬 워크스테이션에서 객체만 업로드합니다.
+방금 만든 dump를 릴리스 태그 이름으로 한 벌 더 올립니다. OCI CLI가 있는 곳(VM 또는 운영자 워크스테이션)에서 실행합니다. 워크스테이션에서 한다면 먼저 VM의 `/var/backups/readmates/mysql/`에서 dump와 `.sha256`을 가져옵니다.
 
 ```bash
-# 1. VM 에서 dump 파일을 staging.
-ssh -i ~/.ssh/readmates_oci ubuntu@<VM_IP> '
-  sudo cp /var/backups/readmates/mysql/readmates-pre-v1.X.Y-<TS>.sql.gz /tmp/dump.sql.gz
-  sudo cp /var/backups/readmates/mysql/readmates-pre-v1.X.Y-<TS>.sql.gz.sha256 /tmp/dump.sql.gz.sha256
-  sudo chown ubuntu:ubuntu /tmp/dump.sql.gz /tmp/dump.sql.gz.sha256
-'
+TS='<UTC timestamp>'          # 예: 20260925T041500Z
+TAG='vX.Y.Z'
+SRC="readmates-${TS}.sql.gz"
+DST="mysql/readmates-pre-${TAG}-${TS}.sql.gz"
 
-# 2. 로컬로 SCP.
-scp -i ~/.ssh/readmates_oci ubuntu@<VM_IP>:/tmp/dump.sql.gz \
-    ./readmates-pre-v1.X.Y-<TS>.sql.gz
-scp -i ~/.ssh/readmates_oci ubuntu@<VM_IP>:/tmp/dump.sql.gz.sha256 \
-    ./readmates-pre-v1.X.Y-<TS>.sql.gz.sha256
+sha256sum -c "${SRC}.sha256"   # macOS: shasum -a 256 -c
+SHA="$(awk '{print $1}' "${SRC}.sha256")"
 
-# 3. SHA256 sanity check.
-shasum -a 256 ./readmates-pre-v1.X.Y-<TS>.sql.gz
-cat ./readmates-pre-v1.X.Y-<TS>.sql.gz.sha256
-
-# 4. Object Storage 업로드 (sha256 + tag metadata 동봉).
-SHA="$(shasum -a 256 ./readmates-pre-v1.X.Y-<TS>.sql.gz | awk '{print $1}')"
-oci os object put \
-  --namespace-name ax5hfpscso8v \
-  --bucket-name readmates-db-exports \
-  --name "mysql/readmates-pre-v1.X.Y-<TS>.sql.gz" \
-  --file ./readmates-pre-v1.X.Y-<TS>.sql.gz \
-  --metadata "{\"sha256\":\"$SHA\",\"tag\":\"pre-v1.X.Y\"}" \
-  --force
-oci os object put \
-  --namespace-name ax5hfpscso8v \
-  --bucket-name readmates-db-exports \
-  --name "mysql/readmates-pre-v1.X.Y-<TS>.sql.gz.sha256" \
-  --file ./readmates-pre-v1.X.Y-<TS>.sql.gz.sha256 \
-  --force
+oci os object put --namespace-name <object-storage-namespace> --bucket-name <backup-bucket> \
+  --name "$DST" --file "$SRC" \
+  --metadata "{\"sha256\":\"$SHA\",\"tag\":\"pre-${TAG}\"}"
+oci os object put --namespace-name <object-storage-namespace> --bucket-name <backup-bucket> \
+  --name "${DST}.sha256" --file "${SRC}.sha256"
 ```
 
 ## 객체 검증
 
 ```bash
-oci os object list \
-  --namespace-name ax5hfpscso8v \
-  --bucket-name readmates-db-exports \
-  --prefix mysql/readmates- \
-  --query 'data[*].name' --output json
+oci os object list --namespace-name <object-storage-namespace> --bucket-name <backup-bucket> \
+  --prefix mysql/readmates- --query 'data[*].name' --output json
 
-oci os object head \
-  --namespace-name ax5hfpscso8v \
-  --bucket-name readmates-db-exports \
-  --name "mysql/readmates-pre-v1.X.Y-<TS>.sql.gz"
-# 응답의 opc-meta-sha256 값이 .sql.gz.sha256 파일의 hash와 일치하는지 확인.
+oci os object head --namespace-name <object-storage-namespace> --bucket-name <backup-bucket> \
+  --name "mysql/readmates-<timestamp>.sql.gz"
 ```
+
+- 같은 이름의 `.sha256` 객체가 함께 있어야 합니다.
+- 태그 이름으로 올린 객체는 `opc-meta-sha256` 값이 `.sha256` 파일의 hash와 같아야 합니다. 스크립트가 올린 일일 객체에는 이 metadata가 없습니다.
 
 ## Restore (복구) 절차
 
-> 운영 DB를 직접 덮어쓰기 전에 staging schema에서 dry-run을 먼저 수행합니다.
+> production을 덮어쓰기 전에 반드시 staging schema에서 먼저 복구해 봅니다. production 복구는 운영 책임자 승인 후에만 합니다.
 
 ### 1. 객체 다운로드
 
 ```bash
-oci os object get \
-  --namespace-name ax5hfpscso8v \
-  --bucket-name readmates-db-exports \
-  --name "mysql/readmates-pre-v1.X.Y-<TS>.sql.gz" \
-  --file ./restore.sql.gz
-
-oci os object get \
-  --namespace-name ax5hfpscso8v \
-  --bucket-name readmates-db-exports \
-  --name "mysql/readmates-pre-v1.X.Y-<TS>.sql.gz.sha256" \
-  --file ./restore.sql.gz.sha256
+OBJ='mysql/readmates-<timestamp>.sql.gz'
+oci os object get --namespace-name <object-storage-namespace> --bucket-name <backup-bucket> \
+  --name "$OBJ" --file ./restore.sql.gz
+oci os object get --namespace-name <object-storage-namespace> --bucket-name <backup-bucket> \
+  --name "${OBJ}.sha256" --file ./restore.sql.gz.sha256
 ```
 
 ### 2. 무결성 검증
@@ -164,66 +131,55 @@ ACTUAL="$(shasum -a 256 ./restore.sql.gz | awk '{print $1}')"
 [ "$EXPECTED" = "$ACTUAL" ] || { echo "SHA256 MISMATCH"; exit 1; }
 ```
 
-객체 metadata와도 교차 확인:
-
-```bash
-oci os object head \
-  --namespace-name ax5hfpscso8v \
-  --bucket-name readmates-db-exports \
-  --name "mysql/readmates-pre-v1.X.Y-<TS>.sql.gz" \
-  | jq -r '."opc-meta-sha256"'
-```
-
 ### 3. Staging schema로 dry-run
 
+DB에 닿는 곳(VM)에서 root로 실행합니다. 먼저 백업 env를 불러옵니다.
+
 ```bash
-gunzip -c ./restore.sql.gz | mysql \
-  --defaults-extra-file=/etc/readmates/mysql-backup.cnf \
-  --host="$READMATES_DB_HOST" \
-  --user="$READMATES_DB_USER" \
-  --execute "SOURCE /dev/stdin" readmates_restore_staging
+sudo -i
+set -a; . /etc/readmates/backup-mysql.env; set +a
+: "${READMATES_DB_USER:=readmates}"
+
+mysql --defaults-extra-file=/etc/readmates/mysql-backup.cnf --host="$READMATES_DB_HOST" --user="$READMATES_DB_USER" \
+  --execute "CREATE DATABASE IF NOT EXISTS readmates_restore_staging CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
+gunzip -c ./restore.sql.gz | mysql --defaults-extra-file=/etc/readmates/mysql-backup.cnf \
+  --host="$READMATES_DB_HOST" --user="$READMATES_DB_USER" readmates_restore_staging
 ```
 
-`readmates_restore_staging` schema에서 row count, 핵심 table 무결성, FK 제약을 검증합니다.
+`readmates_restore_staging`에서 주요 table row count, `flyway_schema_history` 최신 version, FK 제약을 확인합니다.
 
 ### 4. Production schema 복구 (운영자 승인 후)
 
+1. 쓰기를 멈춥니다: `sudo docker compose -f /opt/readmates/compose.yml stop readmates-api`
+2. 현재 상태를 한 번 더 백업합니다: `sudo systemctl start backup-mysql.service` 후 로그에서 `UPLOADED` 확인.
+3. schema를 다시 만들고 복구합니다.
+
 ```bash
-# (선택) 현 운영 DB를 한 번 더 덤프해 두기.
-ssh -i ~/.ssh/readmates_oci ubuntu@<VM_IP> '
-  sudo systemctl start backup-mysql.service
-'
-
-# 운영 schema를 drop & recreate.
-mysql --defaults-extra-file=/etc/readmates/mysql-backup.cnf \
-  --host="$READMATES_DB_HOST" \
-  --user="$READMATES_DB_USER" \
-  --execute "DROP DATABASE IF EXISTS readmates; CREATE DATABASE readmates CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-
-# Restore.
-gunzip -c ./restore.sql.gz | mysql \
-  --defaults-extra-file=/etc/readmates/mysql-backup.cnf \
-  --host="$READMATES_DB_HOST" \
-  --user="$READMATES_DB_USER" \
-  --execute "SOURCE /dev/stdin" readmates
+mysql --defaults-extra-file=/etc/readmates/mysql-backup.cnf --host="$READMATES_DB_HOST" --user="$READMATES_DB_USER" \
+  --execute "DROP DATABASE IF EXISTS readmates; CREATE DATABASE readmates CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
+gunzip -c ./restore.sql.gz | mysql --defaults-extra-file=/etc/readmates/mysql-backup.cnf \
+  --host="$READMATES_DB_HOST" --user="$READMATES_DB_USER" readmates
 ```
+
+4. 서버를 다시 올립니다: `sudo docker compose -f /opt/readmates/compose.yml up -d readmates-api`
 
 ### 5. 사후 검증
 
-- BFF `/api/health/db` 또는 `/api/internal/db-stats` endpoint로 row count smoke.
-- 운영 server 로그에 ledger event `DB_RESTORE_VERIFIED` 기록.
-- `docs/development/release-readiness-review.md`에 restore 이력 기재.
+- `sudo docker compose -f /opt/readmates/compose.yml ps`에서 `readmates-api`가 healthy인지 확인합니다.
+- 서버 로그에 Flyway 오류가 없는지 봅니다: `sudo docker compose -f /opt/readmates/compose.yml logs --since 10m readmates-api | grep -i flyway`
+- BFF smoke와 [Post-deploy watch](post-deploy-watch.md)를 실행합니다.
+- 복구 이력(시각, 사용한 객체 이름, 승인자)은 Git 밖 운영 기록에 남기고, 공개 기록에는 요약만 씁니다.
 
 ## Troubleshooting
 
-- **`oci: command not found` (VM)**: VM에 OCI CLI 미설치 상태. Bootstrap 절차는 별도 runbook `docs/deploy/oci-mysql-heatwave.md` 참조. Bootstrap 후 `systemctl restart backup-mysql.timer`.
-- **`MySQL defaults file must have 0600 permissions`**: `sudo chmod 600 /etc/readmates/mysql-backup.cnf && sudo chown root:root /etc/readmates/mysql-backup.cnf`.
-- **`NamespaceNotFound`**: `OCI_NAMESPACE` 오타이거나 OCI CLI 자격이 다른 tenancy를 가리킴. `oci os ns get`으로 확인.
-- **Timer가 등록되었지만 실행되지 않음**: `journalctl -u backup-mysql.service --since '24h ago'`로 실패 원인 확인. `systemctl status backup-mysql.timer`로 next trigger 시각 확인.
+- **`oci: command not found`**: VM에 OCI CLI가 없습니다. [OCI MySQL HeatWave](../../deploy/oci-mysql-heatwave.md)로 설치한 뒤 `sudo systemctl start backup-mysql.service`로 다시 실행합니다.
+- **`MySQL defaults file must have 0600 permissions`**: `sudo chmod 600 /etc/readmates/mysql-backup.cnf && sudo chown root:root /etc/readmates/mysql-backup.cnf`
+- **`NamespaceNotFound`**: `OCI_NAMESPACE` 오타이거나 OCI CLI 자격이 다른 tenancy를 가리킵니다. `oci os ns get`으로 확인합니다.
+- **timer는 있는데 실행 흔적이 없음**: `systemctl status backup-mysql.timer`로 다음 실행 시각을, `sudo journalctl -u backup-mysql.service --since '24h ago'`로 실패 원인을 봅니다.
 
 ## 관련 문서
 
-- `docs/deploy/oci-mysql-heatwave.md` — 초기 bootstrap, IAM policy, defaults-file 생성.
-- `docs/deploy/oci-backend.md` — VM provisioning + Docker compose 흐름.
-- `deploy/oci/backup-mysql-to-object-storage.sh` — 백업 script 원본.
-- `deploy/oci/export-mysql.sh` — mysqldump wrapper.
+- [OCI MySQL HeatWave](../../deploy/oci-mysql-heatwave.md) — 초기 bootstrap, IAM policy, defaults file.
+- [OCI backend](../../deploy/oci-backend.md) — VM과 Docker compose 흐름.
+- `deploy/oci/backup-mysql-to-object-storage.sh` — 백업과 업로드.
+- `deploy/oci/export-mysql.sh` — `mysqldump` wrapper.

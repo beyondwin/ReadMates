@@ -1,19 +1,18 @@
 # Cloudflare Pages 배포
 
-Cloudflare Pages는 Vite SPA와 같은 origin에서 동작하는 BFF/OAuth proxy 함수를 배포합니다.
+Cloudflare Pages는 Vite SPA와, 같은 origin에서 동작하는 BFF/OAuth proxy 함수(`front/functions`)를 함께 배포합니다.
 
-상위 배포 허브는 [README.md](README.md)입니다. 운영 사이트 URL은 `https://readmates.pages.dev`입니다. 멀티 클럽 도메인 운영 절차는 [multi-club-domains.md](multi-club-domains.md)를 함께 확인합니다.
+상위 문서는 [README.md](README.md), 멀티 클럽 도메인은 [multi-club-domains.md](multi-club-domains.md)입니다. 예시의 `https://app.example.com`은 Pages 운영 origin placeholder입니다.
 
-이 runbook은 Pages project 설정, Functions routing, Spring origin 설정, OAuth redirect URI가 서로 맞을 때 완료입니다. 배포 후에는 SPA deep route, `/api/bff/api/auth/me`, OAuth start redirect, domain marker, club-scoped public API를 확인합니다.
+완료 기준: Pages project 설정, Functions routing, Spring origin 설정, Google OAuth redirect URI가 서로 맞고, 배포 후 SPA deep route, `/api/bff/api/auth/me`, OAuth start redirect, domain marker, club public API가 확인됩니다.
 
-Cloudflare 계정 ID, API token, custom domain 목록, production secret 값은 문서에 쓰지 않습니다. Provider UI나 plan limit은 바뀔 수 있으므로 실제 설정 전에는 현재 Cloudflare 문서를 확인합니다.
+Cloudflare 계정 ID, API token, custom domain 목록, secret 값은 문서에 쓰지 않습니다. Cloudflare UI나 plan 한도는 바뀔 수 있으니 설정 전에 현재 문서를 확인합니다.
 
 ## 프로젝트 설정
 
 | 항목 | 값 |
 | --- | --- |
 | Project name | `readmates` |
-| Git provider | GitHub |
 | 운영 branch | `main` |
 | Framework preset | `Vite` 또는 `None` |
 | Root directory | `front` |
@@ -21,21 +20,23 @@ Cloudflare 계정 ID, API token, custom domain 목록, production secret 값은 
 | Build command | `pnpm build` |
 | Build output directory | `dist` |
 
-Cloudflare 프로젝트 root가 `front`이므로 Pages Functions는 `front/functions`에서 배포됩니다.
-
-`https://readmates.pages.dev`는 무료 플랜에서도 항상 유지하는 운영 origin이자 path fallback입니다. 클럽 공개 사이트는 기본적으로 `https://readmates.pages.dev/clubs/<club-slug>`로 접근할 수 있어야 하며, primary domain이나 등록된 club host를 추가해도 이 fallback을 제거하지 않습니다.
+- Production 배포는 `Deploy Front` workflow가 Wrangler로 직접 올립니다(`wrangler pages deploy dist --project-name readmates --branch main`). 위 build 설정은 Pages 쪽 build(deploy hook 등)를 쓸 때의 기준입니다.
+- Root가 `front`이므로 Pages Functions는 `front/functions`에서 배포됩니다.
+- Cloudflare Pages 기본 host는 무료 플랜에서도 유지되는 path fallback입니다. 모든 클럽은 `<pages-origin>/clubs/<club-slug>`로 접근할 수 있어야 하고, primary domain이나 club host를 추가해도 이 fallback을 없애지 않습니다.
 
 ## 현재 함수 라우트
 
 - `/api/bff/**`: 브라우저 API 호출을 Spring `/api/**`로 전달합니다.
 - `/oauth2/authorization/**`: Google OAuth 시작 요청을 Spring으로 전달합니다.
-- `/login/oauth2/code/**`: Google OAuth 콜백을 Spring으로 전달하고 upstream `Set-Cookie` 헤더를 보존합니다.
+- `/login/oauth2/code/**`: OAuth callback을 Spring으로 전달하고 upstream `Set-Cookie`를 보존합니다.
+- `/api/bff/__internal/secret-status`: BFF secret rotation 진단용 route입니다.
 
-Pages Functions는 browser가 보낸 `X-Readmates-Club-Slug`, `X-Readmates-Club-Host`를 그대로 신뢰하지 않습니다. `/clubs/<club-slug>` path fallback은 검증된 slug를 `clubSlug` query로 BFF에 전달하고, registered host alias는 request host를 Spring에 전달합니다.
+신뢰 규칙:
 
-Mutating `/api/host/**` 요청은 browser bundle이 `X-Readmates-Client-Contract: v2`를 선언해야 합니다. Pages Functions는 정확한 값만 trusted upstream header로 재생성하고 누락/불일치는 upstream 호출 전에 `409 HOST_CLIENT_UPGRADE_REQUIRED`로 거절합니다. 값을 무조건 주입하면 열린 구버전 탭이 새 backend contract를 잘못 호출할 수 있으므로 금지합니다.
+- 브라우저가 보낸 `X-Readmates-Club-Slug`, `X-Readmates-Club-Host`는 그대로 믿지 않습니다. `/clubs/<club-slug>` fallback은 검증된 slug를 `clubSlug` query로, registered host는 request host를 Spring에 넘깁니다.
+- 변경성 `/api/host/**` 요청은 browser bundle이 `X-Readmates-Client-Contract: v2`를 보내야 합니다. 정확한 값만 upstream으로 다시 만들고, 없거나 다르면 upstream 호출 전에 `409 HOST_CLIENT_UPGRADE_REQUIRED`로 거절합니다. 값을 무조건 주입하면 열려 있는 구버전 탭이 새 contract를 잘못 부를 수 있어 금지합니다.
 
-`front/public/_redirects`는 함수 pass-through 규칙을 SPA fallback보다 위에 둬야 합니다. Club path와 registered host alias deep link는 모두 SPA fallback으로 진입해야 합니다.
+`front/public/_redirects`는 함수 pass-through를 SPA fallback보다 위에 둡니다.
 
 ```text
 /api/bff/* /api/bff/:splat 200
@@ -44,77 +45,70 @@ Mutating `/api/host/**` 요청은 browser bundle이 `X-Readmates-Client-Contract
 /* /index.html 200
 ```
 
-`front/public/_headers`는 Vite build output으로 복사되어 public asset에 보안 헤더를 붙입니다. 현재 기준은 `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, `connect-src 'self'`를 포함한 제한적인 CSP입니다. 새 외부 asset이나 API origin을 추가할 때는 실제 runtime 필요성, BFF 경계, 공개 문서 placeholder 정책을 함께 검토합니다.
+`front/public/_headers`는 build output에 복사되어 보안 header를 붙입니다. CSP는 `connect-src 'self'`, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`를 포함합니다. 새 외부 asset이나 API origin을 추가할 때는 BFF 경계와 함께 검토합니다.
 
 ## 운영 환경 변수
 
-Cloudflare Pages 운영 환경에는 아래 값을 설정합니다.
-
 | 이름 | 설명 |
 | --- | --- |
-| `VITE_PUBLIC_PRIMARY_DOMAIN` | Public canonical URL을 만들 primary domain입니다. Primary domain이 없으면 비워두고, `readmates.pages.dev`는 `noindex` fallback으로만 사용합니다. |
-| `READMATES_API_BASE_URL` | OCI Spring API의 공개 HTTPS origin, 예: `https://api.example.com` |
-| `READMATES_BFF_SECRET` | Legacy fallback 공유 secret. `READMATES_BFF_SECRETS`가 없을 때 Spring으로 전달됩니다. |
-| `READMATES_BFF_SECRETS` | 무중단 rotation 중에 쓰는 comma-separated secret list입니다. 첫 non-blank 값이 Spring으로 전달되는 primary secret이며, 설정되면 `READMATES_BFF_SECRET`보다 우선합니다. |
-| `BFF_SECRET_ROTATION_STAGE` | 진단 라우트에 노출되는 rotation 단계입니다. 허용 값은 `stable` 또는 `staging`이며 기본값은 `stable`입니다. |
+| `VITE_PUBLIC_PRIMARY_DOMAIN` | public canonical URL용 primary domain. build-time 공개 값이며 secret이 아닙니다. 없으면 비워 두고, Pages 기본 host는 `noindex` fallback으로만 씁니다. |
+| `READMATES_API_BASE_URL` | Spring API의 HTTPS origin, 예: `https://api.example.com`. origin만 넣고 query/fragment는 붙이지 않습니다. |
+| `READMATES_BFF_SECRET` | 공유 secret(fallback). `READMATES_BFF_SECRETS`가 없을 때 씁니다. |
+| `READMATES_BFF_SECRETS` | rotation 중 쓰는 쉼표 구분 목록. 첫 non-blank 값이 Spring으로 보내는 primary이고, 설정되면 `READMATES_BFF_SECRET`보다 우선합니다. |
+| `BFF_SECRET_ROTATION_STAGE` | 진단 route에 보이는 rotation 단계. `stable`(기본) 또는 `staging`. |
 
-`READMATES_API_BASE_URL`에는 origin만 넣고 query string이나 fragment를 붙이지 않습니다. BFF secret은 URL에 포함하지 말고 `READMATES_BFF_SECRETS` 또는 fallback `READMATES_BFF_SECRET`으로만 전달합니다.
-
-`READMATES_BFF_SECRET`과 `READMATES_BFF_SECRETS`는 브라우저 번들에 들어가면 안 됩니다. `VITE_` 접두사를 붙이지 말고 Pages Functions 환경 변수 또는 secret으로만 설정합니다.
-
-`VITE_PUBLIC_PRIMARY_DOMAIN`은 Vite build-time public setting입니다. Secret이 아니며, `https://<club-slug>.<primary-domain>/...` canonical link를 Pages fallback route에서도 렌더링하려면 production build 환경에 설정해야 합니다. 실제 운영 primary domain은 공개 문서에 기록하지 않습니다.
-
-Preview 배포에는 운영 BFF secret을 넣지 않습니다. Preview에서 API 접근이 필요하면 별도 preview Spring 환경과 별도 secret을 사용합니다.
-
-프로덕션 secret 값은 Git에 기록하지 않습니다. Cloudflare Pages 환경 변수/secret 저장소와 Spring 운영 환경 파일에만 실제 값을 둡니다.
+- BFF secret에는 `VITE_` 접두사를 붙이지 않습니다. Pages Functions 환경 변수/secret으로만 설정합니다.
+- `VITE_PUBLIC_PRIMARY_DOMAIN`은 fallback route에서도 `https://<club-slug>.<primary-domain>/...` canonical을 그리려면 production build 환경에 있어야 합니다.
+- Preview 배포에는 운영 BFF secret을 넣지 않습니다. 필요하면 별도 preview Spring과 별도 secret을 씁니다.
 
 ## Cloudflare Pages GitHub Actions 배포
 
-프론트엔드 정상 배포 경로:
+정상 production 경로:
 
-1. GitHub `main`에 변경을 병합하고 필요한 검증을 끝냅니다.
-2. `vMAJOR.MINOR.PATCH` 형식의 release tag를 만들고 push해 server image를 build/scan/promote합니다.
-3. Server/API 변경이 있으면 OCI backend를 같은 image tag로 올리고 Flyway/health/BFF smoke를 확인합니다.
-4. `.github/workflows/deploy-front.yml`을 `release_tag=vMAJOR.MINOR.PATCH` 입력으로 수동 실행합니다.
-5. Workflow가 입력 tag와 checkout commit이 일치하는지 검증한 뒤 `front`를 빌드합니다.
-6. Wrangler가 `front/dist`와 `front/functions`를 Cloudflare Pages production으로 함께 배포합니다.
-7. [README.md](../../README.md)의 smoke check를 실행합니다.
+1. `main`에 변경을 병합하고 검증을 끝냅니다.
+2. annotated release tag `vX.Y.Z`를 push합니다. 이것은 server image만 build/scan/promote합니다.
+3. 서버/API 변경이 있으면 OCI backend를 같은 tag로 올리고 Flyway/health/BFF를 확인합니다.
+4. `Deploy Front`를 수동 실행합니다.
 
-`main` 또는 tag push만으로는 frontend production 배포가 실행되지 않습니다. `Deploy Front`의 수동 `release_tag` 입력이 정상 production 경로이며, server image workflow와 OCI promotion 뒤 실행합니다. 직접 업로드를 사용했다면 배포한 commit을 기록하고 GitHub `main`과 release tag가 가리키는 commit을 다시 맞춥니다.
+   ```bash
+   gh workflow run "Deploy Front" --ref main -f release_tag=vX.Y.Z
+   ```
 
-Major host-write contract release에서는 backend promotion 직후부터 frontend 배포 완료까지 구 Pages BFF의 host mutation이 409로 동결되는 것이 정상입니다. 같은 tag의 SPA와 Functions가 함께 배포되면 새 browser + 새 BFF handshake에서 쓰기가 재개됩니다. Frontend만 이전 tag로 rollback하면 읽기와 멤버 기능은 유지되지만 host write는 계속 동결되며, 복구하려면 호환 frontend 재배포 또는 backend image rollback/forward-fix가 필요합니다.
+5. workflow가 tag와 checkout commit이 같은지 확인하고, lint/test/build 후 `front/dist`와 `front/functions`를 production에 올립니다.
+6. [배포 확인](#배포-확인)을 실행합니다.
 
-이 절차는 Cloudflare Pages의 프론트엔드 배포 흐름입니다. Spring Boot release image는 별도 `Deploy Server Image` workflow가 GHCR에 scan/promote하지만, OCI compose stack promotion은 운영자가 `deploy/oci/05-deploy-compose-stack.sh`로 수행하는 별도 절차입니다.
+- `main` push나 tag push만으로는 frontend production 배포가 일어나지 않습니다.
+- Wrangler로 직접 업로드했다면 배포한 commit을 기록하고, `main`과 release tag가 같은 commit을 가리키게 맞춥니다.
+- Major host-write contract 릴리즈에서는 backend promotion부터 frontend 배포 완료까지 구 BFF의 host mutation이 409로 막히는 것이 정상입니다. 같은 tag의 SPA와 Functions가 배포되면 쓰기가 다시 됩니다. frontend만 이전 tag로 되돌리면 host write는 계속 막히므로, 호환 frontend를 다시 배포하거나 backend를 rollback/forward-fix합니다.
+
+실행 방법의 세부 사항은 [Cloudflare 프론트 배포 보조 절차](../../deploy/cloudflare/README.md)를 봅니다.
 
 ## Google OAuth 설정
 
-Google Cloud OAuth client의 승인된 redirect URI는 OAuth callback이 실제로 도착하는 auth origin마다 등록합니다. 기본 fallback만 운영할 때는 아래 URI가 필요합니다.
+Google Cloud OAuth client에는 callback이 실제로 도착하는 auth origin마다 redirect URI를 등록합니다.
 
 ```text
-https://readmates.pages.dev/login/oauth2/code/google
-```
-
-Primary auth domain을 별도로 쓰면 같은 path를 primary origin에도 추가합니다.
-
-```text
+https://app.example.com/login/oauth2/code/google
 https://<primary-domain>/login/oauth2/code/google
 ```
 
-ReadMates의 기본 전략은 OAuth start는 현재 Pages 또는 registered host에서 시작할 수 있게 두고, Google에 전달하는 callback `redirect_uri`는 `READMATES_AUTH_BASE_URL`의 primary auth origin으로 모으는 방식입니다. 프런트엔드는 같은 origin의 안전한 relative `returnTo`만 OAuth start에 붙이고, 성공 후에는 signed return state로 검증된 흐름만 원래 클럽 path나 registered club host로 복귀합니다. 일반 로그인은 `/app` smart entry로 이동합니다. 따라서 club별 registered host를 Google redirect URI에 모두 추가하지 않습니다. 단, 운영자가 OAuth callback 자체를 특정 registered host에서 받도록 바꾸는 경우에는 해당 host의 `/login/oauth2/code/google`도 Google Cloud에 등록해야 합니다.
+- OAuth start는 Pages나 registered host 어디서든 시작할 수 있습니다. Google에 보내는 `redirect_uri`는 `READMATES_AUTH_BASE_URL`의 primary auth origin으로 모읍니다.
+- 성공 후에는 signed return state로 검증된 경우에만 원래 클럽 path나 club host로 돌아갑니다. 일반 로그인은 `/app`으로 갑니다.
+- 그래서 club host를 Google redirect URI에 모두 추가하지 않습니다. callback 자체를 특정 host에서 받도록 바꿀 때만 그 host를 추가합니다.
 
-Pages Functions의 OAuth proxy는 HTML document navigation 실패를 public-safe한 `/auth/error?kind=...`로 전환하고 `Cache-Control: no-store`를 설정합니다. Invalid provider route, upstream HTTP failure와 network failure는 고정된 error kind로만 전달되며 upstream body, 내부 host, secret은 노출하지 않습니다. 안전한 relative `returnTo`만 오류 화면의 다음 행동에 사용할 수 있고 `/auth/error` 재귀 복귀는 거절합니다. Non-HTML 요청은 JSON status contract를 유지합니다.
+OAuth proxy는 HTML navigation 실패를 `/auth/error?kind=...`(`Cache-Control: no-store`)로 바꿉니다. upstream body, 내부 host, secret은 보여주지 않고, `/auth/error`로의 재귀 복귀는 거절합니다. Non-HTML 요청은 JSON status를 그대로 받습니다.
 
 ## Spring과 맞춰야 하는 값
 
-Cloudflare origin과 Spring 설정은 같은 browser-facing origin 집합을 바라봐야 합니다. Primary auth origin을 아직 쓰지 않는 배포에서는 `READMATES_AUTH_BASE_URL`을 `READMATES_APP_BASE_URL`과 같은 fallback origin으로 둡니다.
+Cloudflare origin과 Spring 설정은 같은 브라우저 origin 집합을 봐야 합니다. primary auth origin이 아직 없으면 `READMATES_AUTH_BASE_URL`을 `READMATES_APP_BASE_URL`과 같게 둡니다.
 
 ```bash
-READMATES_APP_BASE_URL=https://readmates.pages.dev
-READMATES_AUTH_BASE_URL=https://readmates.pages.dev
+READMATES_APP_BASE_URL=https://app.example.com
+READMATES_AUTH_BASE_URL=https://app.example.com
 READMATES_AUTH_RETURN_STATE_SECRET='{return-state-signing-secret}'
-READMATES_ALLOWED_ORIGINS=https://readmates.pages.dev,https://<primary-domain>,https://<registered-club-host>
+READMATES_ALLOWED_ORIGINS=https://app.example.com,https://<primary-domain>,https://<registered-club-host>
 READMATES_BFF_SECRET=<shared-bff-secret>
-# 무중단 rotation 중에만 설정. READMATES_BFF_SECRETS가 있으면 READMATES_BFF_SECRET보다 우선합니다.
+# 무중단 rotation 중에만 설정. 있으면 READMATES_BFF_SECRET보다 우선합니다.
 READMATES_BFF_SECRETS=<new-secret>,<old-secret>
 READMATES_BFF_SECRET_REQUIRED=true
 READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true
@@ -122,68 +116,73 @@ READMATES_IP_HASH_BASE_SECRET=<openssl rand -base64 32으로 생성>
 READMATES_AUTH_SESSION_COOKIE_SECURE=true
 ```
 
-`READMATES_ALLOWED_ORIGINS`에는 실제로 활성화한 primary origin과 registered club host만 넣습니다. 공개 문서나 설정 예시에는 실제 운영 domain, Cloudflare account id, zone id, API token을 적지 않습니다.
-
-`READMATES_API_BASE_URL`은 HTTPS여야 합니다. Cloudflare Pages가 사용자 cookie와 BFF secret을 upstream으로 전달하므로 운영에서 plaintext Spring listener를 직접 가리키지 않습니다. Caddy, Nginx, OCI Load Balancer, 또는 Cloudflare proxy 등으로 TLS를 종료한 뒤 `127.0.0.1:8080`의 Spring으로 넘깁니다.
+- `READMATES_ALLOWED_ORIGINS`에는 실제로 쓰는 origin만 넣습니다. `ACTIVE` club domain은 DB에서 자동으로 더해집니다([multi-club-domains.md](multi-club-domains.md#allowed-origins)).
+- `READMATES_API_BASE_URL`은 HTTPS여야 합니다. Pages가 cookie와 BFF secret을 upstream으로 보내므로 plaintext Spring listener를 직접 가리키지 않습니다. 운영에서는 compose 안의 Caddy가 TLS를 종료합니다.
 
 ## 배포 확인
 
 ```bash
+APP_ORIGIN='https://app.example.com'
 CLUB_SLUG='{club-slug}'
-curl -sS -o /dev/null -w '%{http_code}\n' https://readmates.pages.dev/app
-curl -sS -o /dev/null -w '%{http_code}\n' https://readmates.pages.dev/api/bff/api/auth/me
-curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' https://readmates.pages.dev/oauth2/authorization/google
-curl -sS https://readmates.pages.dev/.well-known/readmates-domain-check.json
-curl -sS "https://readmates.pages.dev/api/bff/api/public/clubs/${CLUB_SLUG}"
-READMATES_SMOKE_BASE_URL=https://readmates.pages.dev \
-READMATES_SMOKE_AUTH_BASE_URL=https://readmates.pages.dev \
+curl -sS -o /dev/null -w '%{http_code}\n' "$APP_ORIGIN/app"
+curl -sS -o /dev/null -w '%{http_code}\n' "$APP_ORIGIN/api/bff/api/auth/me"
+curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' "$APP_ORIGIN/oauth2/authorization/google"
+curl -sS "$APP_ORIGIN/.well-known/readmates-domain-check.json"
+curl -sS "$APP_ORIGIN/api/bff/api/public/clubs/${CLUB_SLUG}"
+READMATES_SMOKE_BASE_URL="$APP_ORIGIN" \
+READMATES_SMOKE_AUTH_BASE_URL="$APP_ORIGIN" \
 ./scripts/smoke-production-integrations.sh
 ```
 
 기대값:
 
-- `/app`은 `200`으로 SPA를 반환하고 로그인 후 가입 클럽이 하나면 해당 클럽으로, 여러 개면 클럽 선택 화면으로 이어집니다.
-- `/api/bff/api/auth/me`는 BFF를 통해 Spring에 도달합니다. 로그아웃 상태여도 anonymous auth state를 담은 `200`일 수 있습니다.
-- `/oauth2/authorization/google`은 Google 또는 Spring OAuth 흐름으로 redirect됩니다.
-- `/.well-known/readmates-domain-check.json`은 ReadMates Cloudflare Pages marker를 반환합니다.
-- `/api/bff/api/public/clubs/<club-slug>`은 해당 club의 공개 가능한 정보만 반환해야 합니다.
-- deep route와 legacy route인 `/clubs/<club-slug>/app/session/current`, `/clubs/<club-slug>/app/host`, `/clubs/<club-slug>/app/host/sessions/new`, `/clubs/<club-slug>/app/host/sessions/<session-id>/edit`, `/clubs/<club-slug>/app/host/members`, `/clubs/<club-slug>/invite/<token>`, `/invite/<token>`, `/reset-password/<token>`, `/app`은 Cloudflare 404가 아니라 SPA fallback으로 진입해야 합니다.
+- `/app`: `200`. 로그인 후 가입 클럽이 하나면 그 클럽, 여럿이면 클럽 선택 화면으로 갑니다.
+- `/api/bff/api/auth/me`: Spring까지 도달합니다. 로그아웃 상태여도 anonymous `200`일 수 있습니다.
+- `/oauth2/authorization/google`: Google OAuth로 redirect됩니다.
+- `/.well-known/readmates-domain-check.json`: ReadMates Pages marker를 반환합니다.
+- `/api/bff/api/public/clubs/<club-slug>`: 그 클럽의 공개 가능한 정보만 반환합니다.
+- `/clubs/<club-slug>/app/...`, `/clubs/<club-slug>/invite/<token>`, `/invite/<token>`, `/reset-password/<token>` 같은 deep route는 Cloudflare 404가 아니라 SPA로 들어갑니다.
 
 ## Registered Club Host 운영
 
-등록형 subdomain 또는 custom domain은 DB의 `club_domains.status` workflow state와 실제 Cloudflare Pages custom domain 연결 상태를 분리해서 관리합니다. Platform admin UI에서 domain을 만들면 초기 상태는 `ACTION_REQUIRED`이며, 운영자가 Cloudflare dashboard 또는 Wrangler에서 Pages custom domain을 연결해야 합니다. Cloudflare 연결과 인증서 상태가 확인되기 전까지 public fallback URL인 `/clubs/<club-slug>`를 사용자에게 안내합니다.
+등록형 subdomain이나 custom domain은 DB의 `club_domains.status`와 실제 Cloudflare 연결 상태를 따로 관리합니다.
 
-Pages 배포에는 `/.well-known/readmates-domain-check.json` marker가 포함됩니다. 운영자가 custom domain을 Pages project에 연결한 뒤 Platform admin UI에서 상태 확인을 실행하면 Spring이 해당 hostname의 marker를 HTTPS로 확인하고 `ACTIVE` 또는 `FAILED`로 갱신합니다. Checker는 redirect를 따르지 않고 private/link-local/loopback/multicast/IPv6 ULA address와 oversized marker response를 실패로 처리합니다.
+1. Platform admin UI에서 domain을 만들면 `ACTION_REQUIRED` 상태가 됩니다.
+2. 운영자가 Cloudflare dashboard나 Wrangler로 Pages custom domain을 연결합니다. 연결과 인증서가 확인될 때까지 사용자에게는 `/clubs/<club-slug>` fallback을 안내합니다.
+3. Admin UI에서 상태 확인을 실행하면 Spring이 그 host의 `/.well-known/readmates-domain-check.json`을 HTTPS로 확인해 `ACTIVE` 또는 `FAILED`로 바꿉니다. redirect는 따르지 않고, private/loopback 등 내부 주소나 너무 큰 응답은 실패로 처리합니다.
 
-`ACTION_REQUIRED`, `PROVISIONING`, `ACTIVE`, `FAILED`, `DISABLED` 상태의 의미와 처리 절차는 [multi-club-domains.md](multi-club-domains.md#cloudflare-pages-custom-domain-runbook)를 기준으로 운영합니다.
+상태별 의미와 처리는 [multi-club-domains.md](multi-club-domains.md#cloudflare-pages-custom-domain-runbook)를 따릅니다.
 
 ## 수동 검증 체크리스트
 
-curl smoke 외에 사용자 흐름까지 확인할 때 사용하는 체크리스트입니다.
+curl smoke 외에 사용자 흐름까지 볼 때 씁니다.
 
-1. `https://readmates.pages.dev`가 공개 홈을 렌더링하는지 확인합니다.
-2. `https://readmates.pages.dev/app` 같은 deep route가 404가 아니라 SPA를 렌더링하는지 확인합니다.
-3. Google login 클릭 시 `/oauth2/authorization/google` 흐름으로 나가는지 확인합니다.
-4. 정식 멤버는 로그인 후 `/app`으로 들어가는지 확인합니다.
-5. 초대 없이 들어온 새 Google 사용자는 로그인 성공 후 `/app`으로 redirect되고, 둘러보기 멤버 안내와 읽기 전용 멤버 화면을 볼 수 있는지 확인합니다. `/app/pending`은 둘러보기 멤버 안내용 호환 route로 남아 있어 직접 열어도 동작해야 합니다.
-6. 호스트가 `/app/host/members`에서 둘러보기 멤버를 정식 멤버로 전환하고 멤버 표시 이름을 수정할 수 있는지 확인합니다.
-7. 호스트가 `/app/host/sessions/new`에서 `DRAFT` 예정 세션을 만들고, `/app/host/sessions/:sessionId/edit`에서 공개 범위를 `MEMBER` 또는 `PUBLIC`으로 바꾼 뒤 현재 세션으로 시작할 수 있는지 확인합니다.
-8. 호스트가 진행 중인 `OPEN` 세션을 `CLOSED`로 닫고, 공개 요약을 저장한 뒤 `PUBLISHED` 기록으로 발행할 수 있는지 확인합니다.
-9. 정식 멤버가 `/app`을 reload해도 멤버 route에 접근할 수 있고, 멤버 공개 예정 세션이 있으면 홈에서 볼 수 있는지 확인합니다.
-10. 둘러보기 멤버가 피드백 문서 route에 접근할 수 없는지 확인합니다.
-11. 피드백 문서 `PDF로 저장` action이 숨겨져 있는지 확인합니다. 현재 `feedbackDocumentPdfDownloadsEnabled=false`라서 print route는 사용자-facing PDF 저장 흐름으로 쓰지 않습니다.
-12. `/.well-known/readmates-domain-check.json` marker가 fallback host와 registered host에서 ReadMates Cloudflare Pages marker를 반환하는지 확인합니다.
+1. 공개 홈이 렌더링됩니다.
+2. `/app` 같은 deep route가 404가 아니라 SPA를 렌더링합니다.
+3. Google login 클릭 시 `/oauth2/authorization/google`로 나갑니다.
+4. 정식 멤버는 로그인 후 `/app`으로 들어갑니다.
+5. 초대 없이 들어온 새 사용자는 `/app`으로 가서 둘러보기 멤버 안내와 읽기 전용 화면을 봅니다. `/app/pending`도 호환 route로 열립니다.
+6. 호스트가 `/app/host/members`에서 둘러보기 멤버를 정식 멤버로 바꾸고 표시 이름을 고칠 수 있습니다.
+7. 호스트가 `/app/host/sessions/new`에서 `DRAFT` 세션을 만들고, 편집 화면에서 공개 범위를 `MEMBER`/`PUBLIC`으로 바꾼 뒤 시작할 수 있습니다.
+8. 호스트가 `OPEN` 세션을 `CLOSED`로 닫고 공개 요약 저장 후 `PUBLISHED`로 발행할 수 있습니다.
+9. 정식 멤버가 `/app`을 reload해도 멤버 route에 머뭅니다.
+10. 둘러보기 멤버는 피드백 문서 route에 들어갈 수 없습니다.
+11. 피드백 문서의 `PDF로 저장` action은 숨겨져 있습니다(`feedbackDocumentPdfDownloadsEnabled=false`).
+12. domain marker가 fallback host와 registered host 모두에서 나옵니다.
 
-PDF 저장 흐름을 다시 켜는 경우에는 `front/shared/config/readmates-feature-flags.ts`를 변경한 뒤 `/app/feedback/:sessionId/print`가 데이터를 불러오고 browser print를 한 번 호출하는지 별도로 검증합니다.
+PDF 저장을 다시 켜려면 `front/shared/config/readmates-feature-flags.ts`를 바꾸고 `/app/feedback/:sessionId/print`가 데이터를 불러와 browser print를 한 번 호출하는지 따로 검증합니다.
 
 ## 문제 해결
 
-- Deep link가 404면 `_redirects`가 build output에 없거나 `/* /index.html 200` fallback이 function pass-through보다 위에 있을 가능성이 큽니다.
-- 변경 요청의 `/api/bff/**`가 403이면 same-origin 검증, browser origin, Spring `READMATES_ALLOWED_ORIGINS`를 확인합니다.
-- API 호출이 401이거나 세션이 유지되지 않으면 cookie 설정, `READMATES_AUTH_SESSION_COOKIE_SECURE`, BFF 우회 여부를 확인합니다.
-- `/api/bff/**`가 500이면 `READMATES_API_BASE_URL`이 없거나 Spring origin에 도달할 수 없는 상태일 수 있습니다.
-- OAuth redirect mismatch는 Google OAuth client, Spring `READMATES_AUTH_BASE_URL`, Cloudflare Pages public origin이 서로 다를 때 발생합니다.
+| 증상 | 먼저 볼 것 |
+| --- | --- |
+| deep link가 404 | `_redirects`가 build output에 있는지, `/* /index.html 200`이 함수 규칙보다 아래인지 |
+| 변경 요청 `/api/bff/**`가 403 | same-origin 검증, browser origin, Spring `READMATES_ALLOWED_ORIGINS` |
+| 401 또는 세션 유지 안 됨 | cookie 설정, `READMATES_AUTH_SESSION_COOKIE_SECURE`, BFF 우회 여부 |
+| `/api/bff/**`가 500 | `READMATES_API_BASE_URL` 누락 또는 Spring 도달 불가 |
+| OAuth redirect mismatch | Google OAuth client, `READMATES_AUTH_BASE_URL`, Pages origin 불일치 |
+| host 쓰기가 409 | frontend와 backend의 host-write contract 버전 차이 |
 
 ## 비용 상태 확인
 
-Wrangler로 Pages 프로젝트, 배포, secret 이름은 볼 수 있습니다. 계정 요금제 자체는 Cloudflare API Billing Read 권한이 필요할 수 있으므로 Cloudflare dashboard 또는 scoped API token으로 Free 호환 상태를 확인합니다.
+Wrangler로 Pages 프로젝트, 배포, secret 이름은 볼 수 있습니다. 요금제는 Billing Read 권한이 필요할 수 있으므로 Cloudflare dashboard나 권한을 좁힌 API token으로 확인합니다.

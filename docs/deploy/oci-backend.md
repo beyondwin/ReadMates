@@ -1,88 +1,85 @@
 # OCI 백엔드 배포
 
-백엔드의 최종 OCI Always Free runtime은 Docker Compose stack입니다. systemd가 compose stack을 관리하고, stack 안의 Caddy가 운영 HTTPS endpoint를 받아 internal Spring Boot API container로 reverse proxy합니다. 기존 Spring Boot JAR + host Caddy 경로는 compose cutover 전 단계와 rollback 전용으로 유지합니다.
+OCI backend는 Docker Compose stack으로 운영합니다. systemd(`readmates-stack`)가 compose를 관리하고, compose 안의 Caddy가 HTTPS를 받아 Spring API container로 넘깁니다. 예전 Spring Boot JAR + host Caddy 경로는 전환 검증과 rollback 전용입니다.
 
-상위 배포 허브는 [README.md](README.md)입니다. Cloudflare Pages와 Pages Functions 설정은 [cloudflare-pages.md](cloudflare-pages.md)를 함께 확인합니다. 멀티 클럽 domain alias와 OAuth origin 운영은 [multi-club-domains.md](multi-club-domains.md)를 기준으로 맞춥니다.
+관련 문서: [README.md](README.md), [compose-stack.md](compose-stack.md)(배포·rollback 절차), [cloudflare-pages.md](cloudflare-pages.md), [multi-club-domains.md](multi-club-domains.md). 2026-04-30 Compose 전환 사건 기록은 [OCI Compose Cutover 보고서](../reports/2026-04-30-oci-compose-cutover.md)에 있습니다.
 
-2026-04-30 Compose cutover와 BFF secret 처리 이슈의 사건 기록은 [OCI Compose Cutover 배포 보고서](../reports/2026-04-30-oci-compose-cutover.md)에 남겨 두며, 반복 가능한 현재 절차는 이 문서와 [compose-stack.md](compose-stack.md)를 기준으로 합니다.
+완료 기준: compose stack이 새 image로 뜨고, Flyway 결과, `/internal/health`, BFF smoke, OAuth start smoke가 변경 범위에 맞게 확인됩니다. migration, 알림, 메일, Object Storage backup을 건드렸다면 해당 섹션의 확인도 합니다.
 
-백엔드 배포는 compose stack이 새 image로 실행되고, Flyway 결과와 `/internal/health`, Cloudflare BFF smoke, OAuth start smoke가 변경 범위에 맞게 확인됐을 때 완료입니다. DB migration, notification pipeline, mail delivery, Object Storage backup을 건드린 경우에는 해당 섹션의 targeted smoke도 함께 확인합니다.
+운영 진단은 read-only diagnostics collector부터 씁니다: [Read-only Diagnostics](../operations/runbooks/read-only-diagnostics.md). 출력 전문은 Git에 넣지 않고 health/log/error count 같은 요약만 남깁니다.
 
-운영 진단이 필요하면 read-only diagnostics collector를 먼저 사용합니다. Collector 설치, 진단 전용 SSH key의 ForceCommand 제한, 출력 보관 규칙은 [Read-only Diagnostics](../operations/runbooks/read-only-diagnostics.md)를 기준으로 합니다. Collector 출력 전문은 Git에 저장하지 않고, post-mortem이나 release note에는 health/log/error count 같은 sanitized summary만 남깁니다.
-
-VM IP, SSH key path, private DB host, SMTP credential, OCI resource identifiers, 운영 smoke 결과 전문은 Git에 남기지 않습니다. 실제 provider 설정이나 비용 관련 판단은 현재 OCI/Cloudflare/Google 콘솔을 확인한 뒤 실행합니다.
+VM IP, SSH key 경로, DB host, SMTP credential, OCI resource id, smoke 결과 전문은 Git에 남기지 않습니다.
 
 ## Health check contract
 
-- liveness: `GET http://<server>:8080/internal/health` → `{ "status": "UP", "kind": "liveness" }`.
-  process up이면 항상 UP. systemd `ExecStartPost`/Caddy `health_uri`가 사용.
-- readiness: `GET http://<server>:8081/actuator/health/readiness` → DB/Redis/Kafka
-  health 종합. Pages Functions 또는 Caddy upstream 등록 시 readiness를 사용.
-- 8081 internal port는 firewall에서 외부 접근을 막는다(이미 v1에서 인지).
+| 종류 | 요청 | 쓰는 곳 |
+| --- | --- | --- |
+| liveness | `GET :8080/internal/health` → `{ "status": "UP", "kind": "liveness" }` | compose `readmates-api` healthcheck(`/app/bin/readmates-http-get 127.0.0.1 8080 /internal/health`), `05` script health 단계 |
+| readiness | `GET :8081/actuator/health/readiness` | 수동 진단용. DB/Redis 등 의존성 상태를 봅니다. |
+
+- liveness는 process가 살아 있으면 항상 UP입니다.
+- 8081 management port는 compose 안에서만 열리고 host에 publish하지 않습니다. Caddy도 8080만 proxy합니다.
 
 ## 런타임 기준
 
 | 항목 | 값 |
 | --- | --- |
-| 서비스 사용자 | `readmates` |
 | 작업 디렉터리 | `/opt/readmates` |
 | Compose 파일 | `/opt/readmates/compose.yml` |
-| Compose image env | `/opt/readmates/.env` |
+| Compose image env | `/opt/readmates/.env` (`READMATES_SERVER_IMAGE`) |
 | Spring 환경 파일 | `/etc/readmates/readmates.env` |
-| Caddy 환경 파일 | `/etc/readmates/caddy.env` |
+| Caddy 환경 파일 | `/etc/readmates/caddy.env` (`CADDY_SITE`) |
 | systemd 서비스 | `readmates-stack` |
 | Container 헬스체크 | `http://127.0.0.1:8080/internal/health` |
 | Legacy JAR 경로 | `/opt/readmates/readmates-server.jar` |
 
 ## Docker Compose Stack
 
-Caddy 포함 최종 backend runtime은 [compose-stack.md](compose-stack.md)를 기준으로 운영합니다. 기존 JAR + host Caddy 방식은 compose cutover 전 단계와 rollback 경로로 유지합니다.
+배포 절차는 [compose-stack.md](compose-stack.md)가 기준입니다.
 
-서버 이미지는 release tag와 같은 tag로 GHCR에 게시합니다. 운영 compose는 `ghcr.io/<owner>/<repo>/readmates-server:<git-tag>` 형태의 이미지를 pull해야 하며, 임의의 로컬 빌드 산출물을 운영 서버에서 다시 빌드하지 않습니다.
+- 운영 image는 release tag와 같은 tag로 GHCR에 게시합니다: `ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z`. 운영 VM에서 image를 다시 빌드하지 않습니다.
+- `server/Dockerfile.release`: `Deploy Server Image`가 `clean check bootJar`를 통과한 jar로 image를 만듭니다. scan한 digest가 CI에서 검증된 jar와 같게 하기 위해서입니다.
+- `server/Dockerfile`: 로컬에서 만든 `bootJar`를 포장합니다(전환 검증용).
+- 두 Dockerfile의 runtime 설정(Java 25, native access 허용 범위 등)은 서로 맞아야 합니다.
 
-`server/Dockerfile`은 로컬에서 이미 검증한 `bootJar` 산출물을 포장하는 image build용입니다. `server/Dockerfile.release`는 server image publish workflow가 `clean check bootJar`를 통과한 뒤 사용하며, scan되는 digest가 CI에서 검증된 jar와 정확히 일치하게 합니다. 두 파일의 runtime instruction은 계속 정렬되어 있어야 합니다. Java 25 runtime은 Netty가 포함된 classpath(`ALL-UNNAMED`)의 native access를 명시적으로 허용하고 그 밖의 module에서 발생하는 illegal native access를 거절하며, protobuf가 제거 예정인 `sun.misc.Unsafe` 메모리 접근 없이 fallback 경로로 실행되도록 고정합니다.
+배포 순서:
 
-운영 전환 순서:
-
-1. `04-install-docker.sh`로 VM Docker runtime을 준비합니다.
-2. server test를 통과시키고, 릴리즈 배포라면 `Deploy Server Image` workflow가 scan-candidate digest를 Trivy로 검사한 뒤 같은 digest를 release tag로 promote했는지 확인합니다.
-3. DB backup을 만들고 최근 48시간 이내 파일이 Git 밖의 운영 backup 위치에 있음을 확인합니다.
-4. Migration이 포함된 릴리즈는 `server/src/main/resources/db/mysql/migration` diff와 forward compatibility를 확인합니다. 별도 migration job 없이 application startup Flyway를 사용하므로 target image가 기대 migration까지 적용하고 health를 통과한 뒤에만 serving traffic으로 승격하며, Flyway 실패 상태의 container는 승격하지 않습니다.
-5. `05-deploy-compose-stack.sh`로 image, compose file, Caddyfile, systemd unit을 배포합니다. `READMATES_SERVER_IMAGE`가 `ghcr.io/`로 시작하면 VM에서 해당 이미지를 pull하고, 그 외 로컬 검증 tag는 script가 이미지를 빌드해 전송합니다. 이 script는 compose 시작 전에 legacy host `readmates-server`와 host `caddy`를 중지하고 disable합니다.
-6. Flyway history와 `/internal/health`, BFF auth smoke, OAuth redirect smoke를 확인합니다.
-7. Redis feature flag를 단계적으로 켭니다.
-8. Kafka/notification flag는 Redis 안정화 뒤 별도 smoke로 켭니다.
+1. `04-install-docker.sh`로 VM Docker를 준비합니다(최초 1회).
+2. 서버 테스트를 통과시키고, 릴리즈라면 `Deploy Server Image` 성공을 확인합니다.
+3. 최근 2일 안의 DB backup이 있는지 확인합니다.
+4. migration이 있으면 `server/src/main/resources/db/mysql/migration` diff와 호환성을 확인합니다. 별도 migration job은 없고 Spring 시작 시 Flyway가 적용합니다. Flyway가 실패한 container는 승격하지 않습니다.
+5. `05-deploy-compose-stack.sh`를 실행합니다. legacy host 서비스는 script가 중지합니다.
+6. Flyway history, `/internal/health`, BFF auth smoke, OAuth redirect smoke를 확인합니다.
+7. Redis flag를 단계적으로 켭니다. Kafka/알림 flag는 Redis가 안정된 뒤 따로 켭니다.
 
 ## 운영 환경 변수
 
-`/etc/readmates/readmates.env`에는 아래 값이 들어갑니다.
+`/etc/readmates/readmates.env`는 `sync-config` workflow가 GitHub Secrets/Variables로 렌더링합니다. 렌더링되는 키 목록과 추가/회전 절차는 [secrets management runbook](../operations/runbooks/secrets-management.md)이 기준입니다. 아래는 주요 키와 placeholder 예시입니다.
 
 ```bash
 SPRING_PROFILES_ACTIVE=prod
 SPRING_DATASOURCE_URL=jdbc:mysql://<mysql-private-host>:3306/readmates?useSSL=true&serverTimezone=UTC
 SPRING_DATASOURCE_USERNAME=readmates
 SPRING_DATASOURCE_PASSWORD=<db-password>
-READMATES_APP_BASE_URL=https://readmates.pages.dev
-READMATES_AUTH_BASE_URL=https://readmates.pages.dev
+READMATES_APP_BASE_URL=https://app.example.com
+READMATES_AUTH_BASE_URL=https://app.example.com
 READMATES_AUTH_RETURN_STATE_SECRET='{return-state-signing-secret}'
-READMATES_ALLOWED_ORIGINS=https://readmates.pages.dev
+READMATES_ALLOWED_ORIGINS=https://app.example.com
 READMATES_BFF_SECRET=<shared-bff-secret>
-READMATES_BFF_SECRET_REQUIRED=true
-READMATES_SECURITY_BFF_AUDIT_MODE=rotation-only
-# 무중단 rotation 중에만 설정. READMATES_BFF_SECRETS가 있으면 READMATES_BFF_SECRET보다 우선합니다.
+# 무중단 rotation 중에만 설정. 있으면 READMATES_BFF_SECRET보다 우선합니다.
 READMATES_BFF_SECRETS=<new-secret>,<old-secret>
+READMATES_BFF_SECRET_REQUIRED=true
+READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true
 READMATES_AUTH_SESSION_COOKIE_SECURE=true
+READMATES_IP_HASH_BASE_SECRET=<openssl rand -base64 32으로 생성>
 SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID=<google-oauth-client-id>
 SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET=<google-oauth-client-secret>
 SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_SCOPE=openid,email,profile
+# 알림
 READMATES_NOTIFICATIONS_ENABLED=true
 READMATES_NOTIFICATION_SENDER_NAME=ReadMates
 READMATES_NOTIFICATION_SENDER_EMAIL=no-reply@example.com
 READMATES_KAFKA_ENABLED=true
-READMATES_KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
-READMATES_KAFKA_NOTIFICATION_EVENTS_TOPIC=readmates.notification.events.v1
-READMATES_KAFKA_NOTIFICATION_DLQ_TOPIC=readmates.notification.events.dlq.v1
-READMATES_KAFKA_NOTIFICATION_CONSUMER_GROUP=readmates-notification-dispatcher
 READMATES_KAFKA_NOTIFICATION_RELAY_BATCH_SIZE=50
 READMATES_KAFKA_NOTIFICATION_MAX_PUBLISH_ATTEMPTS=5
 READMATES_KAFKA_NOTIFICATION_SEND_TIMEOUT=10s
@@ -96,6 +93,7 @@ READMATES_NOTIFICATION_BACKLOG_REFRESH_INTERVAL=60s
 READMATES_NOTIFICATION_BACKLOG_INITIAL_DELAY=5s
 READMATES_NOTIFICATION_ADMIN_REPLAY_PREVIEW_TTL=10m
 READMATES_NOTIFICATION_ADMIN_REPLAY_MAX_TARGETS=1000
+# 메일 (OCI Email Delivery)
 SPRING_MAIL_HOST=smtp.email.<oci-region>.oci.oraclecloud.com
 SPRING_MAIL_PORT=587
 SPRING_MAIL_USERNAME=<oci-smtp-username>
@@ -105,129 +103,99 @@ SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true
 SPRING_MAIL_PROPERTIES_MAIL_SMTP_CONNECTIONTIMEOUT=5000
 SPRING_MAIL_PROPERTIES_MAIL_SMTP_TIMEOUT=5000
 SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT=5000
-# Legacy host JAR rollback only. Compose stack overrides this to container-internal 0.0.0.0 and does not publish 8081.
-READMATES_MANAGEMENT_ADDRESS=127.0.0.1
-READMATES_MANAGEMENT_PORT=8081
-READMATES_IP_HASH_BASE_SECRET=<openssl rand -base64 32으로 생성, 1Password에 저장>
 ```
 
-Git에는 변수 이름과 placeholder만 둡니다. 프로덕션 secret 실제 값은 VM, Cloudflare, Google Cloud, OCI 콘솔, 또는 운영자가 관리하는 ignored 파일에만 둡니다. Compose stack은 `READMATES_REDIS_URL=redis://redis:6379`, `READMATES_KAFKA_BOOTSTRAP_SERVERS=redpanda:9092`, `READMATES_MANAGEMENT_ADDRESS=0.0.0.0`을 container 환경으로 주입합니다.
+- Compose가 container에 직접 주입하는 값: `READMATES_REDIS_URL=redis://redis:6379`, `READMATES_KAFKA_BOOTSTRAP_SERVERS=redpanda:9092`, `READMATES_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces`, `READMATES_MANAGEMENT_ADDRESS=0.0.0.0`, `READMATES_MANAGEMENT_PORT=8081`.
+- 알림 topic/consumer group은 기본값(`readmates.notification.events.v1`, `readmates.notification.events.dlq.v1`, `readmates-notification-dispatcher`)을 씁니다. 바꿀 때만 `READMATES_KAFKA_NOTIFICATION_*` 키를 추가합니다.
+- `READMATES_SECURITY_BFF_AUDIT_MODE`는 기본 `rotation-only`입니다([BFF Secret Audit Volume](#bff-secret-audit-volume)).
+- AI 세션 생성 키(`READMATES_AIGEN_*`)는 [AI session generation runbook](../operations/runbooks/ai-session-generation.md)을 따릅니다.
 
 ## Legacy Host VM 설정
 
-기존 JAR + host Caddy 배포를 유지하거나 rollback 기준을 만들 때 로컬에서 실행합니다.
+legacy JAR + host Caddy 경로를 유지하거나 rollback 기준을 만들 때만 씁니다. 새 VM은 [compose-stack.md](compose-stack.md#first-setup)를 따릅니다.
 
 ```bash
 ssh -i ~/.ssh/readmates_oci ubuntu@<vm-public-ip> 'bash -s' < deploy/oci/01-vm-setup.sh
 ```
 
-이 스크립트는 Ubuntu 패키지를 업데이트하고, Adoptium apt repository에서 Temurin Java 25 runtime과 Caddy를 설치하며, `readmates` 사용자와 `/opt/readmates`, `/etc/readmates` 디렉터리를 만듭니다. 신규 compose VM에서는 [compose-stack.md](compose-stack.md)의 Docker bootstrap을 우선합니다.
+패키지를 업데이트하고 Temurin Java 25 runtime, Caddy, `jq`를 설치하며 `readmates` 사용자와 `/opt/readmates`, `/etc/readmates`를 만듭니다.
 
 ## 운영 설정 적용
 
-VM 인프라(디렉터리, Caddy)는 `02-configure.sh`로 1회 세팅합니다.
+`02-configure.sh`는 legacy host Caddy용 VM 인프라를 1회 세팅합니다. 운영 secret은 만들지 않습니다.
 
 ```bash
 CADDY_SITE='api.example.com' \
 ssh -i ~/.ssh/readmates_oci ubuntu@<vm-public-ip> 'bash -s' < deploy/oci/02-configure.sh
 ```
 
-`CADDY_SITE`는 `https://api.example.com` 같은 직접 API origin에 대응하는 운영 HTTPS host여야 합니다. `:80`, `http://...`, plaintext Spring origin은 사용할 수 없습니다.
+하는 일:
 
-`02-configure.sh`가 수행하는 일:
+- `CADDY_SITE`가 `:80`, `http://...`면 거절합니다. HTTPS host여야 합니다.
+- `/etc/readmates`(권한 `750`)와 `/opt/readmates`를 만들고, `deploy` 사용자가 있으면 소유자로 둡니다.
+- `readmates.env`가 없으면 `sync-config`를 먼저 실행하라고 안내합니다.
+- host Caddy를 `${CADDY_SITE} -> 127.0.0.1:8080`으로 설정하고 재시작합니다.
 
-- `/etc/readmates` 디렉터리 생성 (deploy 사용자 소유, 권한 `750`)
-- `/opt/readmates` 디렉터리 생성
-- Caddy reverse proxy 설정, `${CADDY_SITE} -> 127.0.0.1:8080`
+파일별 책임:
 
-`sync-config` 워크플로는 GitHub Secrets/Variables로 `/etc/readmates/readmates.env`(Spring 운영 변수)만 렌더링해 scp로 배포합니다. `/etc/readmates/caddy.env`는 `05-deploy-compose-stack.sh`가 운영자 입력 `CADDY_SITE`로 만들고, 같은 script가 `READMATES_SERVER_IMAGE`를 `/opt/readmates/.env`에 기록합니다. 변수 inventory, 추가/회전 절차, 비상 복구 절차는 [secrets management runbook](../operations/runbooks/secrets-management.md), 초기 VM 배포키 부트스트랩은 [VM deploy key bootstrap](../operations/runbooks/vm-deploy-key-bootstrap.md)을 따릅니다.
+- `/etc/readmates/readmates.env`: `sync-config` workflow가 만듭니다. deploy key 준비는 [VM deploy key bootstrap](../operations/runbooks/vm-deploy-key-bootstrap.md)을 봅니다.
+- `/etc/readmates/caddy.env`, `/opt/readmates/.env`: `05-deploy-compose-stack.sh`가 만듭니다.
 
-알림 발송, AI 생성, BFF secret rotation처럼 위 환경 변수 블록의 `READMATES_NOTIFICATIONS_ENABLED`, `READMATES_KAFKA_*`, `READMATES_NOTIFICATION_SENDER_*`, `READMATES_NOTIFICATION_RETRY_DELAY_MINUTES`, `READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS`, `SPRING_MAIL_*`, `READMATES_AIGEN_*`, `READMATES_BFF_SECRETS` 값을 바꾸는 배포는 GitHub Secrets/Variables를 갱신한 뒤 `sync-config` 워크플로를 실행하고, 마지막에 compose stack의 `readmates-api`를 재시작합니다.
+알림, 메일, AI 생성, BFF secret 등 env 값을 바꾸는 배포:
+
+1. GitHub Secrets/Variables를 고칩니다.
+2. `sync-config`를 실행합니다. 바로 적용하려면 `restart_api=true`, 다음 image promotion 때 적용하려면 `restart_api=false`.
+3. `restart_api=false`였다면 promotion이나 수동 재시작 때 `readmates-api`가 새 값을 읽습니다.
 
 ## Redis and Kafka Rollout
 
-최종 OCI Always Free stack은 Redis와 Redpanda를 Spring Boot API와 같은 Docker Compose stack에서 실행합니다. Redis는 MySQL을 대체하지 않는 cache/rate-limit 계층이고, Redpanda는 Kafka-compatible 알림 event outbox fan-out 계층입니다. `deploy/oci/compose.infra.yml`은 legacy host JAR 옆에서 Redis/Redpanda만 띄우는 전환용 helper로 남겨둡니다.
+Redis(cache/rate limit)와 Redpanda(Kafka 호환 알림 fan-out)는 Spring API와 같은 compose stack에서 돕니다. MySQL을 대체하지 않습니다. `deploy/oci/compose.infra.yml`은 같은 Compose project에 붙는 보조 파일로, 전환용 Redis/Redpanda와 관측 서비스(Prometheus, Tempo, Alertmanager, Grafana)를 정의합니다. 관측 stack은 `06-deploy-observability-stack.sh`로 올립니다.
 
-Compose 내부 endpoint:
+- `6379`, `9092`는 host에 publish하지 않고, OCI security list나 firewall에서도 열지 않습니다.
+- 첫 전환이나 새 flag rollout 때는 모두 끈 상태로 Flyway와 기존 smoke를 먼저 통과시킵니다.
 
-```bash
-READMATES_REDIS_URL=redis://redis:6379
-READMATES_KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
-```
+  ```bash
+  READMATES_REDIS_ENABLED=false
+  READMATES_RATE_LIMIT_ENABLED=false
+  READMATES_AUTH_SESSION_CACHE_ENABLED=false
+  READMATES_PUBLIC_CACHE_ENABLED=false
+  READMATES_NOTES_CACHE_ENABLED=false
+  READMATES_NOTIFICATIONS_ENABLED=false
+  READMATES_KAFKA_ENABLED=false
+  ```
 
-OCI security list나 host firewall에서 `6379`, `9092`를 public internet에 열지 않습니다. 최종 compose stack에서는 두 포트를 host에 publish하지 않습니다.
-
-초기 compose cutover나 새 기능 flag rollout에서는 아래처럼 모두 끈 상태로 Flyway와 기존 앱 smoke를 먼저 통과시킵니다.
-
-```bash
-READMATES_REDIS_ENABLED=false
-READMATES_RATE_LIMIT_ENABLED=false
-READMATES_AUTH_SESSION_CACHE_ENABLED=false
-READMATES_PUBLIC_CACHE_ENABLED=false
-READMATES_NOTES_CACHE_ENABLED=false
-READMATES_NOTIFICATIONS_ENABLED=false
-READMATES_KAFKA_ENABLED=false
-```
-
-Redis를 켤 때는 endpoint 접근성을 먼저 확인한 뒤 기능 flag를 단계적으로 켭니다.
-
-```bash
-READMATES_REDIS_ENABLED=true
-READMATES_RATE_LIMIT_ENABLED=true
-READMATES_AUTH_SESSION_CACHE_ENABLED=true
-READMATES_PUBLIC_CACHE_ENABLED=true
-READMATES_NOTES_CACHE_ENABLED=true
-```
-
-문제가 생기면 해당 기능 flag만 끕니다. Redis 장애가 반복되면 `READMATES_REDIS_ENABLED=false`로 되돌리면 MySQL-only 동작으로 복귀합니다.
-
-Kafka 알림은 Redis와 별도 rollout로 켭니다. 알림 topic과 DLQ topic을 먼저 만들고, Spring runtime에는 아래 값이 필요합니다.
-
-```bash
-READMATES_NOTIFICATIONS_ENABLED=true
-READMATES_KAFKA_ENABLED=true
-READMATES_KAFKA_NOTIFICATION_EVENTS_TOPIC=readmates.notification.events.v1
-READMATES_KAFKA_NOTIFICATION_DLQ_TOPIC=readmates.notification.events.dlq.v1
-READMATES_KAFKA_NOTIFICATION_CONSUMER_GROUP=readmates-notification-dispatcher
-```
-
-`READMATES_NOTIFICATIONS_ENABLED=false` 또는 `READMATES_KAFKA_ENABLED=false`이면 Kafka relay/consumer가 뜨지 않습니다. 이 상태에서도 도메인 이벤트 row는 `notification_event_outbox`에 쌓일 수 있으므로, 알림을 실제 사용자 기능으로 열기 전에는 pending row 수를 확인하고 Kafka/SMTP를 켠 뒤 처리 결과를 봅니다.
-
-실제 이메일 발송까지 켤 때만 SMTP 값을 함께 설정합니다.
+- Redis는 [README.md](README.md#redis-feature-flags)의 순서대로 켭니다. 문제가 생기면 해당 flag만 끄고, 반복되면 `READMATES_REDIS_ENABLED=false`로 MySQL-only 동작으로 돌아갑니다.
+- Kafka 알림은 Redis와 따로 켭니다: `READMATES_NOTIFICATIONS_ENABLED=true`, `READMATES_KAFKA_ENABLED=true`.
+- 둘 중 하나라도 `false`면 relay/consumer가 뜨지 않습니다. 그래도 도메인 이벤트는 `notification_event_outbox`에 쌓일 수 있으니, 켜기 전에 pending row 수를 보고 켠 뒤 처리 결과를 확인합니다.
+- 실제 이메일 발송까지 켤 때만 SMTP 값을 넣습니다.
 
 ## Multi-club Origin and OAuth Settings
 
-Spring은 OAuth callback origin과 app return origin을 분리합니다.
-
 | 변수 | 운영 기준 |
 | --- | --- |
-| `READMATES_APP_BASE_URL` | 기본 app origin입니다. primary domain이 준비되지 않은 배포에서는 `https://readmates.pages.dev`를 사용합니다. |
-| `READMATES_AUTH_BASE_URL` | Google OAuth `redirect_uri`에 쓰는 primary auth origin입니다. fallback-only 배포에서는 `READMATES_APP_BASE_URL`과 같게 두고, primary domain을 쓰면 `https://<primary-domain>`으로 둡니다. |
-| `READMATES_AUTH_RETURN_STATE_SECRET` | OAuth return target 서명 secret입니다. 운영에서는 공개 기본값이나 짧은 샘플 문자열을 사용하지 않습니다. |
-| `READMATES_ALLOWED_ORIGINS` | mutating request의 `Origin`/`Referer` 허용 목록입니다. `https://readmates.pages.dev`, primary origin, active registered club host를 comma-separated로 명시합니다. |
-| `READMATES_AUTH_SESSION_COOKIE_DOMAIN` | subdomain 간 세션 공유가 필요한 경우에만 설정합니다. Cookie domain 밖의 external custom domain은 같은 platform session을 공유할 수 없으므로 OAuth return URL 허용 대상에서 제외될 수 있습니다. |
+| `READMATES_APP_BASE_URL` | 기본 앱 origin. primary domain이 없으면 Pages 운영 origin을 씁니다. |
+| `READMATES_AUTH_BASE_URL` | Google OAuth `redirect_uri`의 origin. fallback-only면 `READMATES_APP_BASE_URL`과 같게, primary domain이 있으면 `https://<primary-domain>`. |
+| `READMATES_AUTH_RETURN_STATE_SECRET` | OAuth return target 서명 secret. 짧은 샘플 값을 쓰지 않습니다. |
+| `READMATES_ALLOWED_ORIGINS` | 변경 요청 `Origin`/`Referer`의 정적 허용 목록. |
+| `READMATES_AUTH_SESSION_COOKIE_DOMAIN` | subdomain 간 세션 공유가 필요할 때만 설정합니다. |
 
-현재 allowlist는 DB-backed dynamic allowlist가 아니라 startup 시 읽는 정적 comma-separated 설정입니다. 새 club host를 `ACTIVE`로 운영하기 전에는 Spring env의 `READMATES_ALLOWED_ORIGINS`를 갱신하고 서비스를 재시작합니다. Wildcard origin이나 실제 운영 domain 목록은 공개 문서에 넣지 않습니다.
-
-Google Cloud OAuth client에는 `READMATES_AUTH_BASE_URL`의 `/login/oauth2/code/google` callback을 등록합니다. `https://readmates.pages.dev` fallback을 계속 운영하면 fallback callback도 유지합니다.
-
-Registered club host를 새로 추가한 뒤에는 Cloudflare Pages custom domain 연결, Spring `READMATES_ALLOWED_ORIGINS` 갱신과 재시작, Platform admin 상태 확인 action을 같은 rollout로 묶습니다. 마지막에는 `scripts/smoke-production-integrations.sh`로 Pages marker와 OAuth `redirect_uri`를 확인하고, 실제 운영 결과는 공개 문서나 Git에 붙이지 않습니다.
+- 허용 origin은 정적 목록 + DB의 `ACTIVE` club domain(60초 캐시)입니다. 새 club host는 `ACTIVE`가 되면 재시작 없이 1분 안에 반영됩니다. 정적 목록을 바꿀 때만 `sync-config`와 재시작이 필요합니다. 자세한 순서는 [multi-club-domains.md](multi-club-domains.md#allowed-origins)입니다.
+- Google OAuth client에는 `READMATES_AUTH_BASE_URL`의 `/login/oauth2/code/google`을 등록합니다. Pages fallback origin으로도 로그인을 받는다면 그 callback도 유지합니다.
+- 새 club host를 넣은 뒤에는 `scripts/smoke-production-integrations.sh`로 Pages marker와 `redirect_uri`를 확인합니다.
 
 ## Emergency support access flow
 
-플랫폼 관리자가 특정 클럽에 일시적으로 HOST 권한을 부여해야 할 때(고객 에스컬레이션 등) 아래 절차를 따릅니다.
+플랫폼 관리자가 특정 클럽에 임시로 호스트 지원 권한을 받아야 할 때(고객 에스컬레이션 등) 씁니다.
 
 ### 권한 생성
 
-플랫폼 관리자 대시보드(`/app/admin`) → "긴급 지원 접근 권한" 섹션에서 생성합니다.
+플랫폼 관리 화면 `/admin/support`에서 만듭니다.
 
-필수 입력:
-- **Club ID**: 대상 클럽의 UUID
-- **Grantee User ID**: 접근 권한을 받을 플랫폼 관리자 UUID
-- **사유(reason)**: 접근 이유 (예: "고객 에스컬레이션 티켓 #1234")
-- **만료 시각(expiresAt)**: datetime-local 형식, 기본값 현재 시각+1시간
+1. 이름 또는 이메일로 지원 대상을 검색하고 선택합니다.
+2. 위험 요약을 확인하고 사유(프리셋 또는 직접 입력)와 만료 시각을 넣습니다.
+3. `발급`을 누릅니다. 현재 역할에 발급 권한이 없으면 버튼이 막힙니다.
 
-또는 API 직접 호출:
+직접 API로 만들 때는 아래처럼 호출합니다.
 
 ```bash
 curl -X POST https://<api-origin>/api/admin/support-access-grants \
@@ -244,33 +212,28 @@ curl -X POST https://<api-origin>/api/admin/support-access-grants \
 
 ### 권한 취소
 
-만료 전에 수동으로 취소하려면:
-
 ```bash
 curl -X DELETE https://<api-origin>/api/admin/support-access-grants/<grant-uuid> \
   -b '<session-cookie>'
 ```
 
-또는 대시보드 → "권한 취소" 버튼 클릭.
+`/admin/support`의 grant ledger에서 `ACTIVE` 항목의 "권한 취소" 버튼으로도 취소합니다.
 
 ### 활성 권한 조회
 
 ```bash
 # club 기준
-curl https://<api-origin>/api/admin/support-access-grants?clubId=<club-uuid> \
-  -b '<session-cookie>'
+curl "https://<api-origin>/api/admin/support-access-grants?clubId=<club-uuid>" -b '<session-cookie>'
 
 # grantee 기준
-curl https://<api-origin>/api/admin/support-access-grants?granteeUserId=<user-uuid> \
-  -b '<session-cookie>'
+curl "https://<api-origin>/api/admin/support-access-grants?granteeUserId=<user-uuid>" -b '<session-cookie>'
 ```
 
 ### 감사 로그 확인
 
-모든 CREATE와 REVOKE 이벤트는 `platform_audit_events` 테이블에 기록됩니다.
+생성과 취소는 `platform_audit_events`에 기록됩니다.
 
 ```sql
--- 최근 지원 접근 이벤트 확인
 SELECT actor_user_id, actor_platform_role, target_user_id, event_type, metadata_json, created_at
 FROM platform_audit_events
 WHERE event_type IN ('SUPPORT_ACCESS_GRANT_CREATED', 'SUPPORT_ACCESS_GRANT_REVOKED')
@@ -280,84 +243,76 @@ LIMIT 20;
 
 ### 주의사항
 
-- 권한은 만료(`expires_at`) 또는 취소(`revoked_at`) 시 자동으로 비활성화됩니다.
-- 권한이 활성 상태인 동안 grantee 플랫폼 관리자는 해당 클럽의 HOST 역할 권한이 추가됩니다.
-- 불필요한 권한은 즉시 취소하고, 활성 권한 목록을 정기적으로 확인합니다.
+- 권한은 만료(`expires_at`)나 취소(`revoked_at`) 시 자동으로 꺼집니다.
+- 필요 없어진 권한은 바로 취소하고, 활성 목록을 정기적으로 확인합니다.
 
 ## Legacy JAR Rollback
+
+compose 전환 전 검증이나 rollback 전용입니다. 정상 배포는 `05-deploy-compose-stack.sh`입니다.
 
 ```bash
 ./server/gradlew -p server bootJar
 VM_PUBLIC_IP='<vm-public-ip>' ./deploy/oci/03-deploy.sh
 ```
 
-이 경로는 compose cutover 전 검증이나 rollback 전용입니다. 정상 운영 배포는 [compose-stack.md](compose-stack.md)의 `05-deploy-compose-stack.sh`를 사용합니다.
-
-기본 SSH key는 `~/.ssh/readmates_oci`입니다. 다른 key를 쓰려면 `SSH_KEY`를 지정합니다.
-
-```bash
-SSH_KEY='~/.ssh/other_key' VM_PUBLIC_IP='<vm-public-ip>' ./deploy/oci/03-deploy.sh
-```
-
-배포 스크립트는 `server/build/libs/readmates-server-0.0.1-SNAPSHOT.jar`를 VM의 `/tmp/readmates-server.jar`로 복사한 뒤 `/opt/readmates/readmates-server.jar`로 이동하고 `readmates-server`를 재시작합니다.
+- 기본 SSH key는 `~/.ssh/readmates_oci`이고 `SSH_KEY`로 바꿀 수 있습니다.
+- `server/build/libs/readmates-server-0.0.1-SNAPSHOT.jar`를 VM의 `/opt/readmates/readmates-server.jar`로 옮기고 `readmates-server`를 재시작합니다. 이 systemd unit은 저장소에 없으므로 VM에 남아 있어야 합니다.
+- 전체 되돌리기 순서는 [compose-stack.md](compose-stack.md#rollback)를 봅니다.
 
 ## Email Notification Operations
 
-ReadMates 알림은 먼저 MySQL `notification_event_outbox`에 저장됩니다. MySQL event outbox가 source of truth이고, relay scheduler가 publish 가능한 row를 Kafka topic `readmates.notification.events.v1`로 발행합니다. 같은 Spring Boot 모듈의 Kafka consumer가 이벤트별 수신자를 계산하고 멤버 선호도를 적용한 뒤 `notification_deliveries`와 `member_notifications`를 만듭니다. SMTP 발송은 `notification_deliveries`의 `EMAIL` row를 기준으로 재시도 가능한 side effect이고, in-app 알림은 `member_notifications`에 남습니다. 이메일 copy는 서버 application model의 템플릿 helper가 subject, plain text, HTML, CTA/deep link를 함께 렌더링하며, SMTP adapter는 HTML이 있으면 plain text fallback을 포함한 MIME 메시지를 보냅니다.
+### 흐름
 
-Kafka relay/consumer와 실제 SMTP 발송은 아래 조건이 모두 맞을 때 동작합니다.
+```text
+도메인 이벤트 → MySQL notification_event_outbox (source of truth)
+  → relay scheduler → Kafka topic readmates.notification.events.v1
+  → consumer: 수신자 계산 + 멤버 선호도 적용
+  → notification_deliveries (EMAIL, SMTP 재시도 대상) + member_notifications (in-app)
+```
 
-- `READMATES_NOTIFICATIONS_ENABLED=true`
-- `READMATES_KAFKA_ENABLED=true`
-- `READMATES_KAFKA_BOOTSTRAP_SERVERS`
-- `SPRING_MAIL_HOST`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`
-- `READMATES_NOTIFICATION_SENDER_EMAIL`
+이메일은 서버 템플릿 helper가 subject, plain text, HTML, CTA/deep link를 함께 만들고, SMTP adapter는 HTML이 있으면 plain text fallback을 포함한 MIME 메시지로 보냅니다.
 
-`READMATES_NOTIFICATIONS_ENABLED=false`이면 Kafka relay/consumer와 실제 SMTP 발송이 꺼집니다. 운영 rollout에서는 먼저 이 값을 `false`로 두고 `notification_event_outbox` row 생성을 확인한 뒤, Kafka bootstrap server와 OCI Email Delivery credential을 넣고 `READMATES_NOTIFICATIONS_ENABLED=true`, `READMATES_KAFKA_ENABLED=true`로 바꿉니다.
+동작 조건(모두 필요): `READMATES_NOTIFICATIONS_ENABLED=true`, `READMATES_KAFKA_ENABLED=true`, Kafka bootstrap server, `SPRING_MAIL_HOST`/`USERNAME`/`PASSWORD`, `READMATES_NOTIFICATION_SENDER_EMAIL`. 처음 켤 때는 `false`로 두고 outbox row 생성을 확인한 뒤 켭니다.
 
-알림 생성 시점:
+### 알림이 만들어지는 때
 
-- 다음 책 공개 범위 변경과 피드백 문서·세션 기록의 final live apply는 알림을 자동 생성하지 않습니다. final live apply만 현재 콘텐츠 revision을 가진 composer context를 반환합니다. 외부 JSON import와 AI commit은 draft만 저장하며 composer를 반환하거나 열지 않습니다.
-- 호스트가 `/app/host/notifications` 또는 콘텐츠 변경 직후 열린 composer에서 수동 발송을 확정하면 선택한 세션과 대상 그룹 기준으로 `NEXT_BOOK_PUBLISHED`, `SESSION_REMINDER_DUE`, `FEEDBACK_DOCUMENT_PUBLISHED`, `SESSION_RECORD_UPDATED` 이벤트를 만듭니다. 이 경우에도 최종 발송은 `notification_event_outbox` → Kafka relay/consumer → `notification_deliveries`/`member_notifications` 파이프라인을 사용합니다.
-- 클럽별 `sessionReminderEnabled` 정책을 호스트가 명시적으로 켠 경우에만 daily scheduler가 해당 날짜의 `SESSION_REMINDER_DUE` outbox row를 만듭니다. 정책 row가 없거나 꺼져 있으면 만들지 않으며 같은 날짜의 재실행은 dedupe됩니다.
-- 멤버가 발행된 공개 회차에 공개 서평을 저장하면 `REVIEW_PUBLISHED` 알림을 생성합니다. 이 알림은 멤버가 직접 켜야 하는 opt-in 알림입니다.
+- 호스트가 `/app/host/notifications` 또는 콘텐츠 변경 직후 열린 composer에서 발송을 확정할 때: `NEXT_BOOK_PUBLISHED`, `SESSION_REMINDER_DUE`, `FEEDBACK_DOCUMENT_PUBLISHED`, `SESSION_RECORD_UPDATED`.
+- 클럽의 `sessionReminderEnabled`를 호스트가 켰을 때만 daily scheduler가 `SESSION_REMINDER_DUE`를 만듭니다(기본 꺼짐, 같은 날짜 재실행은 dedupe).
+- 멤버가 발행된 공개 회차에 공개 서평을 저장할 때: `REVIEW_PUBLISHED`(멤버 opt-in).
+- 다음 책 공개 범위 변경, 피드백 문서·세션 기록의 final live apply, 외부 JSON import, AI commit은 알림을 자동으로 만들지 않습니다.
 
-멤버 알림 설정 기본값:
+멤버 선호도 기본값: 운영 알림 4종은 켜짐(`FEEDBACK_DOCUMENT_PUBLISHED`와 `SESSION_RECORD_UPDATED`는 같은 선호도 공유), `REVIEW_PUBLISHED`는 꺼짐.
 
-- 운영 알림 `NEXT_BOOK_PUBLISHED`, `SESSION_REMINDER_DUE`, `FEEDBACK_DOCUMENT_PUBLISHED`, `SESSION_RECORD_UPDATED`는 선호도 row가 없을 때 기본 켜짐입니다. `FEEDBACK_DOCUMENT_PUBLISHED`와 `SESSION_RECORD_UPDATED`는 같은 `feedback_document_published_enabled` 멤버 선호도를 공유합니다.
-- 서평 공개 알림(`REVIEW_PUBLISHED`)은 기본 꺼짐입니다.
+### 처리 기준
 
-Relay/consumer 처리 기준:
+| 단계 | 기본값 |
+| --- | --- |
+| relay 주기 | 30초(`READMATES_NOTIFICATION_WORKER_FIXED_DELAY_MS`), 한 번에 50건 |
+| relay 결과 | 성공 `PUBLISHED`, 실패 `FAILED` → 최대 5회 publish |
+| delivery 상태 | `PENDING`, `SENDING`, `SENT`, `FAILED`, `DEAD`, `SKIPPED`, 최대 5회 |
+| 재시도 간격 | 5, 15, 60, 240분 (relay와 delivery 공유) |
+| 최대 수명 | event 24h, delivery 24h (횟수와 수명 중 먼저 닿는 쪽에서 종료) |
 
-- relay scheduler는 기본 `READMATES_NOTIFICATION_WORKER_FIXED_DELAY_MS=30s`로 30초마다 `notification_event_outbox`의 `PENDING`/`FAILED` row를 처리합니다.
-- 한 번에 기본 `READMATES_KAFKA_NOTIFICATION_RELAY_BATCH_SIZE=50`건을 claim합니다.
-- Kafka publish 성공 시 event row는 `PUBLISHED`가 됩니다.
-- Kafka publish 실패 시 event row는 `FAILED`가 되고, 기본 최대 `READMATES_KAFKA_NOTIFICATION_MAX_PUBLISH_ATTEMPTS=5`회까지 재시도합니다.
-- consumer는 `READMATES_KAFKA_NOTIFICATION_CONSUMER_GROUP=readmates-notification-dispatcher`로 topic을 구독합니다.
-- consumer가 만드는 email delivery는 `PENDING`, `SENDING`, `SENT`, `FAILED`, `DEAD`, `SKIPPED` 상태를 사용하고, 기본 최대 `READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS=5`회까지 재시도합니다.
-- in-app delivery는 `member_notifications` row 생성 뒤 `SENT`로 기록됩니다.
+in-app delivery는 `member_notifications` row를 만든 뒤 `SENT`가 됩니다.
 
-`READMATES_NOTIFICATION_RETRY_DELAY_MINUTES`는 relay와 email delivery가 공유하는 runtime schedule이며 기본값은 5분, 15분, 60분, 240분입니다. Relay는 최대 publish 5회와 event max age 24시간, delivery는 최대 5회와 delivery max age 24시간 중 먼저 닿는 경계에서 종료됩니다. 두 단계의 상태와 metric은 아래 evidence-gated 절차로 분리해 확인합니다.
+### 수동 처리
 
-수동 처리:
+원칙: 원인을 먼저 없애고, 정확한 대상 evidence가 있을 때만 실행합니다. DB row를 직접 고치지 않습니다.
 
-- Relay 장애는 `readmates_outbox_publish_total` result와 event-outbox `pending|failed|dead|publishing`, backlog refresh result, `attempt_count`, `next_attempt_at`, `locked_at`, bounded `last_error`, `created_at`을 먼저 확인합니다. Event deadline은 `created_at + READMATES_NOTIFICATION_EVENT_MAX_AGE`의 현재 배포값으로 계산하며 equality부터 만료입니다. Relay 원인이 제거되기 전에는 delivery replay나 새 event 생성을 복구로 사용하지 않으며 DB row를 직접 수정하지 않습니다.
-- SMTP 장애는 delivery `pending|failed|dead|sending`, `attempt_count`, `next_attempt_at`, `locked_at`, bounded `last_error`, `created_at`과 provider/recipient acceptance evidence를 확인합니다. Delivery deadline은 `created_at + READMATES_NOTIFICATION_DELIVERY_MAX_AGE`, stale lease는 `locked_at + READMATES_NOTIFICATION_CLAIM_LEASE`의 현재 배포값으로 평가합니다. `next_attempt_at`은 deadline이 아닙니다.
-- Host dashboard의 알림 섹션에서 pending/failed/dead/sentLast24h를 확인하되, 이 host count가 relay와 delivery 어느 단계를 나타내는지 event/delivery ledger로 확정합니다.
-- 호스트 알림 운영 페이지는 `/app/host/notifications`입니다.
-- 호스트 알림 운영 페이지에서 현재 host club의 event outbox와 channel delivery ledger를 확인합니다. 원인이 교정되고 exact 대상·failure kind·deadline·lease가 확인된 한 건의 `DEAD` EMAIL delivery만 host가 `POST /api/host/notifications/items/{id}/restore`로 명시적으로 복구합니다. 이 endpoint는 해당 delivery를 `PENDING`으로 되돌리고 `next_attempt_at`을 현재 시각으로 설정하며 새 event를 만들지 않습니다. `AMBIGUOUS`는 provider/recipient evidence로 미수락이 확인되지 않으면 restore하지 않습니다.
-- 같은 페이지와 콘텐츠 변경 직후 열린 composer에서 세션, 템플릿, 대상 그룹, 채널을 선택한 뒤 preview와 confirm을 거쳐 알림 이벤트를 만들 수 있습니다. 이벤트별 기본 대상은 `NEXT_BOOK_PUBLISHED`·`SESSION_REMINDER_DUE`의 `ALL_ACTIVE_MEMBERS`, `FEEDBACK_DOCUMENT_PUBLISHED`·`SESSION_RECORD_UPDATED`의 `CONFIRMED_ATTENDEES`이고 기본 채널은 모두 `BOTH`입니다. 피드백 문서와 세션 기록은 전달 계획에서도 같은 `feedback_document_published_enabled` 멤버 선호도를 사용합니다. `SELECTED_MEMBERS`는 호스트가 명시적으로 선택해야 하며 현재 클럽의 중복 없는 활성 membership을 한 명 이상 요구합니다. Preview는 현재 `contentRevision`과 함께 10분 TTL로 저장되며, stale revision이나 같은 세션/템플릿/revision의 최근 수동 발송은 재-preview 또는 명시적 재발송 확인을 요구합니다.
-- Composer의 manual preview/confirm은 새 notification event를 만드는 발송 절차이며 기존 delivery restore나 event relay replay가 아닙니다. Platform admin replay는 OWNER/OPERATOR가 기본 최대 1,000개(설정 범위 `1..5000`)의 byte-exact `EMAIL` + `FAILED|DEAD` + `MAIL_RETRYABLE|MAIL_PERMANENT` delivery만 preview의 exact snapshot과 selection hash로 고정하는 별도 복구 경로입니다. Confirm은 snapshot 이후 status·attempt·failure code·`updated_at`이 달라지지 않고 active lease가 없는 exact delivery만 직접 `PENDING`으로 되돌리며, 달라진 대상은 skip하고 새 event/outbox row를 만들지 않습니다. Reset·audit·receipt·preview consume은 한 DB transaction이고 같은 actor/hash 명령 재시도는 저장된 receipt를 반환하며, legacy v1 preview는 새 preview가 필요합니다. `MAIL_AMBIGUOUS`는 provider/recipient evidence로 미수락이 확인되지 않으면 대상에 포함하지 않으며, SMTP 수락 후 `SENT` CAS/commit 전 중단은 lease reclaim 뒤 중복 발송될 수 있는 at-least-once 경계로 남습니다.
-- 같은 페이지의 리마인더 정책은 기본 꺼짐입니다. Host `GET/PUT /api/host/notifications/policy`가 `sessionReminderEnabled=true`를 저장한 클럽만 scheduler 자동 outbox 생성 대상입니다.
-- 호스트 알림 운영 페이지에서 redesigned template helper를 쓰는 테스트 메일을 보낼 수 있습니다. 테스트 메일 copy는 별도 문구를 사용하고 CTA/deep link는 포함하지 않습니다. 테스트 메일 audit은 masked recipient email과 hash만 저장하고 raw recipient email은 저장하지 않습니다.
-- Host dashboard의 수동 처리 action은 현재 host club의 pending/failed delivery만 처리합니다. Event relay DEAD 복구와 혼동하지 않습니다.
-- Kafka consumer retry를 기다리지 않는다는 이유만으로 수동 처리를 사용하지 않습니다. Root cause 제거와 exact 대상 evidence가 모두 있을 때만 실행합니다.
+- Relay 장애: `readmates_outbox_publish_total`, outbox `pending|failed|dead|publishing`, `attempt_count`, `next_attempt_at`, `locked_at`, `last_error`, `created_at`을 봅니다. event 만료는 `created_at + READMATES_NOTIFICATION_EVENT_MAX_AGE`(같으면 만료)입니다. relay 원인이 남아 있는 동안 delivery replay나 새 event로 복구하지 않습니다.
+- SMTP 장애: delivery `pending|failed|dead|sending`과 provider/recipient 수락 evidence를 봅니다. delivery 만료는 `created_at + READMATES_NOTIFICATION_DELIVERY_MAX_AGE`, 오래된 lease는 `locked_at + READMATES_NOTIFICATION_CLAIM_LEASE`로 판단합니다. `next_attempt_at`은 만료 시각이 아닙니다.
+- 호스트 대시보드의 pending/failed/dead/sentLast24h가 relay와 delivery 중 어느 단계인지 ledger로 확정합니다.
+- `DEAD` EMAIL delivery 한 건 복구: 호스트가 `/app/host/notifications`에서 `POST /api/host/notifications/items/{id}/restore`를 실행합니다. 해당 delivery를 `PENDING`으로 되돌리고 새 event는 만들지 않습니다. `AMBIGUOUS`는 미수락이 확인되지 않으면 복구하지 않습니다.
+- Composer preview/confirm은 새 event를 만드는 발송이지 복구가 아닙니다. 기본 대상은 `NEXT_BOOK_PUBLISHED`·`SESSION_REMINDER_DUE`는 `ALL_ACTIVE_MEMBERS`, `FEEDBACK_DOCUMENT_PUBLISHED`·`SESSION_RECORD_UPDATED`는 `CONFIRMED_ATTENDEES`, 채널은 `BOTH`입니다. preview는 `contentRevision`과 함께 10분 저장되고, stale revision이나 최근 같은 발송은 재확인을 요구합니다.
+- Platform admin replay(OWNER/OPERATOR): `EMAIL` + `FAILED|DEAD` + `MAIL_RETRYABLE|MAIL_PERMANENT` delivery만, preview snapshot과 selection hash로 고정해 최대 1,000건(설정 `1..5000`) 되돌립니다. confirm 시 snapshot 이후 바뀐 대상이나 lease가 있는 대상은 건너뛰고, 새 event는 만들지 않습니다. 같은 actor/hash 재시도는 저장된 receipt를 돌려줍니다. `MAIL_AMBIGUOUS`는 제외합니다.
+- SMTP 수락 뒤 `SENT` 기록 전에 중단되면 lease 회수 후 중복 발송될 수 있습니다(at-least-once).
+- 호스트 테스트 메일은 별도 문구를 쓰고 CTA가 없으며, audit에는 마스킹된 수신자와 hash만 남깁니다.
 
-Host 알림 detail API는 subject, masked recipient, deep link, allowlist metadata와 delivery 상태를 노출합니다. Plain/HTML 이메일 본문은 API 응답에 포함하지 않습니다. 수동 발송 감사 원장은 `notification_manual_dispatch_previews`와 `notification_manual_dispatches`를 사용하며, host-facing 응답에는 요청자 표시명, 대상 수, 예상 채널별 건수, 재발송 여부 같은 운영 metadata만 노출합니다.
+Host 알림 detail API는 subject, masked recipient, deep link, 상태만 보여주고 이메일 본문은 내보내지 않습니다. 수동 발송 원장은 `notification_manual_dispatch_previews`, `notification_manual_dispatches`입니다.
 
 ## 검증
 
-VM 내부:
+VM 안:
 
 ```bash
 sudo systemctl status readmates-stack --no-pager
@@ -370,29 +325,21 @@ sudo docker compose -f compose.yml exec -T readmates-api /app/bin/readmates-http
 Cloudflare 경유:
 
 ```bash
+APP_ORIGIN='https://app.example.com'
 CLUB_SLUG='{club-slug}'
-curl -sS https://readmates.pages.dev/api/bff/api/auth/me
-curl -sS "https://readmates.pages.dev/api/bff/api/public/clubs/${CLUB_SLUG}"
+curl -sS "$APP_ORIGIN/api/bff/api/auth/me"
+curl -sS "$APP_ORIGIN/api/bff/api/public/clubs/${CLUB_SLUG}"
+curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' "$APP_ORIGIN/oauth2/authorization/google"
 ```
 
-OAuth:
-
-```bash
-curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' https://readmates.pages.dev/oauth2/authorization/google
-```
-
-Metrics:
+Metrics(알림 처리 뒤에 `readmates_notifications` meter가 보입니다):
 
 ```bash
 cd /opt/readmates
 sudo docker compose -f compose.yml exec -T readmates-api /app/bin/readmates-http-get 127.0.0.1 8081 /actuator/prometheus | grep readmates_notifications
 ```
 
-`readmates_notifications` meter는 알림 처리 뒤 노출됩니다. 신규 배포 직후에는 먼저 compose 내부에서 `/app/bin/readmates-http-get 127.0.0.1 8081 /actuator/prometheus`로 endpoint reachability를 확인하고, 알림 처리 뒤 위 grep으로 counter 노출을 확인합니다.
-
-Compose stack에서는 management endpoint를 container 내부 `0.0.0.0:8081`에 바인딩하지만 host port로 publish하지 않습니다. Legacy host JAR rollback에서는 `READMATES_MANAGEMENT_ADDRESS=127.0.0.1`과 `READMATES_MANAGEMENT_PORT=8081`을 사용합니다.
-
-Operations pipeline live smoke:
+Operations pipeline live smoke(Object Storage 임시 object 업로드/삭제):
 
 ```bash
 READMATES_EXPORT_BUCKET=readmates-db-exports \
@@ -400,30 +347,26 @@ READMATES_OBJECT_STORAGE_SMOKE_WRITE=true \
 /opt/readmates/deploy/oci/verify-operations-pipeline-live.sh
 ```
 
-SMTP까지 실제 발송으로 확인할 때만 `SPRING_MAIL_HOST`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`, `READMATES_NOTIFICATION_SENDER_EMAIL`, `READMATES_SMTP_SMOKE_TO`를 운영 VM 환경에 주입해 같은 스크립트를 실행합니다. `READMATES_SMTP_SMOKE_TO`는 운영자가 관리하는 테스트 수신 주소만 사용합니다.
+실제 SMTP 발송까지 볼 때만 `SPRING_MAIL_HOST`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`, `READMATES_NOTIFICATION_SENDER_EMAIL`, `READMATES_SMTP_SMOKE_TO`를 넣어 같은 script를 실행합니다. `READMATES_SMTP_SMOKE_TO`는 운영자가 관리하는 테스트 주소만 씁니다.
 
 ## 운영 메모
 
-- Spring `prod` profile에서는 `READMATES_BFF_SECRET_REQUIRED=true`가 기본 운영 기준입니다. `READMATES_BFF_SECRETS` 후보 목록과 fallback `READMATES_BFF_SECRET`이 모두 비면 시작 실패가 맞습니다.
-- OCI Email Delivery SMTP credential과 sender 값은 `/etc/readmates/readmates.env`에만 둡니다. Git에는 `<oci-region>`, `<oci-smtp-username>`, `<oci-smtp-password>`, `no-reply@example.com` 같은 placeholder만 기록합니다.
-- DB migration은 Spring 시작 시 Flyway가 `db/mysql/migration`을 적용합니다.
-- 서버 시작 중 Flyway가 적용하는 운영 migration 위치는 `classpath:db/mysql/migration`입니다. 배포 전 migration diff를 확인할 때는 `server/src/main/resources/db/mysql/migration`만 기준으로 봅니다.
-- V42는 `session_record_apply_receipts`, `club_notification_policies`, 수동 dispatch의 nullable `content_revision`/`SELECTED_MEMBERS`를 추가한 과거 forward-only migration입니다. V39–V42 파일은 수정하지 않으며 schema downgrade를 지원하지 않습니다.
-- V43–V46 릴리즈는 backup → target image startup → Flyway V43/V44 membership avatar history → V45 guest exposure backfill → V46 최종 30-key avatar catalog 적용 → Flyway history와 health 확인 → serving traffic 승격 → 같은 tag frontend 배포 순서를 지킵니다. V45의 legacy exposure column dual-write는 한 릴리즈 호환 창 동안 유지하고, rollback은 V43–V46 schema와 변환된 데이터를 남긴 채 호환 image로 전환하거나 새 forward-fix tag를 발행합니다.
-- `readmates.host-action-confirmation.required`는 staged session-record capability 노출만 제어하고 알림 dispatch 여부는 제어하지 않습니다. 알림은 manual composer confirm 또는 클럽별 opt-in reminder policy에서만 생성합니다.
-- 백엔드 release image 생성은 GitHub Actions `Deploy Server Image` workflow가 담당합니다. 실제 OCI compose stack promotion은 운영자가 `deploy/oci/05-deploy-compose-stack.sh`를 실행하는 수동 절차입니다. VM 접속 credential이나 self-hosted runner가 GitHub Actions에 구성되어 있다고 가정하지 않습니다.
-- Compose Caddy 로그는 container stdout으로 확인합니다. Legacy host Caddy rollback에서는 `/var/log/caddy/readmates.log`를 확인합니다. Caddy access log 설정은 request URI와 `Authorization`, `Cookie`, `X-Readmates-Bff-Secret` request header를 기록하지 않아야 합니다.
+- `prod` profile에서는 `READMATES_BFF_SECRET_REQUIRED=true`가 기준입니다. BFF secret이 모두 비면 시작에 실패합니다.
+- SMTP credential과 sender 값은 `/etc/readmates/readmates.env`에만 둡니다.
+- Flyway는 Spring 시작 시 `classpath:db/mysql/migration`을 적용합니다. 배포 전 diff는 `server/src/main/resources/db/mysql/migration`만 봅니다.
+- 이미 적용된 migration 파일은 고치지 않습니다(forward-only, downgrade 없음). 호환이 깨지면 schema를 보존한 호환 image나 새 forward-fix tag로 복구합니다.
+- `readmates.host-action-confirmation.required`는 staged session-record 기능 노출만 제어하고, 알림 발송 여부는 제어하지 않습니다.
+- Release image는 `Deploy Server Image`가 만들고, OCI promotion은 운영자가 `05-deploy-compose-stack.sh`로 직접 합니다.
+- Compose Caddy 로그는 container stdout으로 봅니다(legacy host Caddy는 `/var/log/caddy/readmates.log`). 로그에는 request URI, `Authorization`, `Cookie`, `X-Readmates-Bff-Secret`을 남기지 않습니다.
 
 ### BFF Secret Rotation
 
-`READMATES_BFF_SECRETS`에 쉼표로 구분된 값을 설정하면 트래픽 중단 없이 BFF secret을 교체할 수 있습니다. Spring 후보 목록 갱신에는 서버 재시작이 필요하고, Cloudflare Pages primary 전환에는 Pages 재배포가 필요합니다. 서버는 목록의 모든 값을 timing-safe 방식으로 검증합니다.
+`READMATES_BFF_SECRETS`에 쉼표 구분 목록을 넣으면 중단 없이 BFF secret을 바꿀 수 있습니다. 서버는 목록의 모든 값을 timing-safe로 검증합니다. Spring 목록 변경에는 재시작, Pages primary 변경에는 Pages 재배포가 필요합니다.
 
-무중단 rotation 절차:
-
-1. GitHub Secrets `READMATES_BFF_SECRETS`에 `<new-secret>,<old-secret>` 값을 설정한 뒤 `sync-config` 워크플로(`.github/workflows/sync-config.yml`)를 실행해 `/etc/readmates/readmates.env`를 갱신하고 compose stack의 `readmates-api`를 재시작합니다. 세부 절차는 [secrets management runbook](../operations/runbooks/secrets-management.md)을 따릅니다.
-2. Cloudflare Pages 환경 변수에도 `READMATES_BFF_SECRETS=<new-secret>,<old-secret>`을 설정하고 배포합니다. (또는 BFF를 먼저 `<new-secret>`만으로 전환합니다.)
-3. BFF `/api/bff/api/auth/me` smoke로 정상 동작을 확인합니다.
-4. `bff_secret_rotation_audit` 테이블에서 old-secret alias 트래픽이 0으로 떨어졌는지 확인합니다. 기본 `rotation-only` audit mode에서는 rotation 확인에 필요한 non-primary alias 사용만 비동기로 기록합니다. old-secret alias의 최근 row가 없으면 모든 트래픽이 new-secret으로 전환된 것입니다.
+1. GitHub Secrets `READMATES_BFF_SECRETS`를 `<new-secret>,<old-secret>`으로 바꾸고 `sync-config`를 `restart_api=true`로 실행합니다. 자세한 절차는 [secrets management runbook](../operations/runbooks/secrets-management.md)입니다.
+2. Cloudflare Pages에도 `READMATES_BFF_SECRETS=<new-secret>,<old-secret>`을 설정하고 재배포합니다.
+3. `/api/bff/api/auth/me` smoke로 확인합니다.
+4. old-secret 트래픽이 0이 됐는지 봅니다. `/api/bff/__internal/secret-status`도 참고합니다.
 
    ```sql
    SELECT secret_alias, COUNT(*) AS cnt, MAX(used_at) AS last_seen
@@ -433,17 +376,21 @@ SMTP까지 실제 발송으로 확인할 때만 `SPRING_MAIL_HOST`, `SPRING_MAIL
    ORDER BY last_seen DESC;
    ```
 
-5. GitHub Secrets에서 `<old-secret>`을 제거해 `READMATES_BFF_SECRETS=<new-secret>` 또는 `READMATES_BFF_SECRET=<shared-bff-secret>`만 남기고 `sync-config` 워크플로를 다시 실행합니다.
+5. GitHub Secrets에서 old secret을 빼고(`READMATES_BFF_SECRETS=<new-secret>` 또는 `READMATES_BFF_SECRET`만) `sync-config`를 다시 실행합니다. Pages도 같은 값으로 맞춥니다.
 
-`READMATES_BFF_SECRETS`가 설정되면 `READMATES_BFF_SECRET`은 fallback으로만 쓰입니다.
+`READMATES_BFF_SECRETS`가 있으면 `READMATES_BFF_SECRET`은 fallback으로만 쓰입니다.
 
 ### BFF Secret Audit Volume
 
-`readmates.security.bff.audit-mode` (`READMATES_SECURITY_BFF_AUDIT_MODE`)는 성공한 BFF secret 요청을 audit table에 얼마나 기록할지 제어합니다.
-운영 기본값은 `rotation-only`입니다. 이 모드에서는 rotation 확인에 필요한 non-primary alias(`secondary`, `index_N`) 사용만 기록하므로 평상시 적재량은 0에 수렴합니다.
-`all`은 짧은 incident window에서만 사용하고, `off`는 audit table 또는 DB가 압박받고 요청 authorization은 다른 로그로 확인 가능한 상황에서만 임시로 사용합니다.
+`READMATES_SECURITY_BFF_AUDIT_MODE`(`readmates.security.bff.audit-mode`)는 성공한 BFF 요청을 audit table에 얼마나 남길지 정합니다.
 
-Retention can be handled with a scheduled database job:
+| 값 | 의미 |
+| --- | --- |
+| `rotation-only` (기본) | non-primary alias(`secondary`, `index_N`) 사용만 기록합니다. 평소 적재량은 거의 0입니다. |
+| `all` | 짧은 incident 기간에만 씁니다. |
+| `off` | DB 부담이 크고 다른 로그로 확인 가능할 때만 임시로 씁니다. |
+
+보관 기간은 DB 예약 작업으로 관리할 수 있습니다.
 
 ```sql
 delete from bff_secret_rotation_audit
@@ -452,12 +399,16 @@ where used_at < utc_timestamp() - interval 30 day;
 
 ### IP hash base secret
 
-`READMATES_IP_HASH_BASE_SECRET` 환경변수는 client IP hash의 주간 salt rotation에서 base secret 역할을 한다. 한 번 생성한 후 manual rotation 대상이 아니다.
-생성: `openssl rand -base64 32`. 값은 1Password에 저장하고, GitHub Secrets `READMATES_IP_HASH_BASE_SECRET`에 등록한 뒤 `sync-config` 워크플로로 `/etc/readmates/readmates.env`에 반영한다.
-운영 프로파일(`spring.profiles.active`가 비어 있거나 `production` 포함)에서 비어 있으면 startup이 명시적 메시지와 함께 실패한다(DEF-002). local/test 등 비운영 프로파일도 기본값은 실패이며, 빈 값을 허용하려면 `readmates.security.ip-hash.allow-empty-secret=true`를 명시해야 한다. 이 opt-in 설정일 때만 startup이 계속되고 WARN이 출력되며, 운영에서는 이 설정으로도 빈 값을 허용하지 않는다.
+`READMATES_IP_HASH_BASE_SECRET`은 client IP hash의 주간 salt rotation에 쓰는 base secret입니다. 한 번 만들면 수동 회전 대상이 아닙니다.
+
+1. `openssl rand -base64 32`로 만듭니다.
+2. Git 밖 비밀 저장소에 보관하고 GitHub Secrets `READMATES_IP_HASH_BASE_SECRET`에 등록합니다.
+3. `sync-config`로 `/etc/readmates/readmates.env`에 반영합니다.
+
+active profile이 없거나 `production`을 포함하는 production 계열 환경에서 값이 비면 시작에 실패합니다. 다른 profile도 기본은 실패이고, `readmates.security.ip-hash.allow-empty-secret=true`를 명시했을 때만 WARN과 함께 시작합니다.
 
 ## Notification runtime contract
 
-알림 환경은 Kafka send timeout `10s`, claim lease `15m`, event/delivery max age `24h`, SMTP connection/read/write timeout 각 `5s`를 함께 렌더링한다. 시작 시 모든 값·retry schedule을 검증하고, claim lease가 `24h`를 초과하거나 event/delivery max age보다 짧지 않거나 Kafka timeout 및 SMTP timeout 합계보다 길지 않으면 fail-fast한다.
-
-관리자 delivery replay preview는 `READMATES_NOTIFICATION_ADMIN_REPLAY_PREVIEW_TTL=10m`, `READMATES_NOTIFICATION_ADMIN_REPLAY_MAX_TARGETS=1000`을 기본으로 사용한다. TTL은 `1m..1h`의 whole-millisecond duration, 대상 상한은 `1..5000`만 허용하며 잘못된 값은 첫 요청이 아니라 서버 시작을 실패시킨다. 한도를 넘는 preview는 저장하지 않고 클럽 또는 delivery 상태로 범위를 좁혀 다시 요청해야 한다.
+- 기본값: Kafka send timeout `10s`, claim lease `15m`, event/delivery max age `24h`, SMTP connection/read/write timeout 각 `5s`.
+- 시작 시 모든 값과 retry schedule을 검증합니다. claim lease가 `24h`를 넘거나, event/delivery max age보다 짧지 않거나, Kafka timeout + SMTP timeout 합계보다 길지 않으면 시작에 실패합니다.
+- 관리자 replay: preview TTL `10m`(허용 `1m..1h`), 대상 상한 `1000`(허용 `1..5000`). 잘못된 값은 서버 시작을 실패시킵니다. 상한을 넘는 preview는 저장하지 않으니 범위를 좁혀 다시 요청합니다.

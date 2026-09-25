@@ -1,32 +1,29 @@
 # Multi-club Domains Runbook
 
-ReadMates는 모든 클럽에 path fallback URL을 보장하고, 운영자가 연결한 Cloudflare Pages custom domain 또는 subdomain alias를 선택적으로 붙입니다. 이 문서는 공개 저장소에 둘 수 있는 placeholder 기준만 설명합니다. 실제 domain 목록, Cloudflare account id, zone id, API token, OAuth secret, DB password, 운영 smoke 결과는 Git에 기록하지 않습니다.
+모든 클럽은 path fallback URL을 항상 가집니다. 운영자가 연결한 Cloudflare Pages custom domain이나 subdomain alias는 선택 사항입니다. 이 문서는 placeholder만 씁니다. 실제 domain 목록, Cloudflare account/zone id, token, secret, smoke 결과는 Git에 남기지 않습니다.
 
-Domain alias 작업은 fallback path가 계속 살아 있고, Spring allowed origins, OAuth return policy, Cloudflare marker, platform admin `ACTIVE` 상태가 같은 host를 가리킬 때 완료입니다. 어느 하나라도 확인되지 않으면 사용자 안내는 fallback URL을 유지합니다.
-
-Cloudflare custom domain 설정이나 Google OAuth redirect URI를 실제로 바꾸기 전에는 현재 provider 콘솔에서 상태와 한도를 확인합니다. 확인 결과에는 운영 domain이나 provider state가 포함될 수 있으므로 공개 문서에 붙이지 않습니다.
+완료 기준: fallback path가 계속 동작하고, Spring allowed origins, OAuth return 정책, Cloudflare marker, platform admin `ACTIVE` 상태가 같은 host를 가리킵니다. 하나라도 확인되지 않으면 사용자에게는 fallback URL을 안내합니다.
 
 ## URL Strategy
 
-항상 동작해야 하는 기본 URL은 아래 형태입니다.
+항상 동작해야 하는 기본 URL(`https://app.example.com`은 Pages 운영 origin placeholder):
 
 ```text
-https://readmates.pages.dev/clubs/<club-slug>
-https://readmates.pages.dev/clubs/<club-slug>/app
+https://app.example.com/clubs/<club-slug>
+https://app.example.com/clubs/<club-slug>/app
 ```
 
-`readmates.pages.dev`는 운영 origin이자 path fallback입니다. Public URL policy는 Pages host를 `noindex`로 표시하므로 검색 노출용 canonical origin으로 쓰지 않습니다.
+- Cloudflare Pages 기본 host는 `noindex`로 표시합니다. 검색용 canonical origin으로 쓰지 않습니다.
+- fallback route에서도 primary domain canonical을 그리려면 production build 환경에 `VITE_PUBLIC_PRIMARY_DOMAIN={primary-domain}`을 설정합니다. secret이 아닌 build-time 값입니다.
 
-Pages fallback route에서도 owned primary domain canonical link를 렌더링하려면 Cloudflare Pages production build 환경에 `VITE_PUBLIC_PRIMARY_DOMAIN={primary-domain}`을 설정합니다. 이 값은 public canonical host를 만들기 위한 build-time setting이며 secret이 아닙니다.
-
-Primary domain을 운영하면 같은 path fallback을 primary origin에도 둘 수 있습니다.
+primary domain을 운영하면 같은 path fallback을 primary origin에도 둘 수 있습니다.
 
 ```text
 https://<primary-domain>/clubs/<club-slug>
 https://<primary-domain>/clubs/<club-slug>/app
 ```
 
-등록형 subdomain alias는 Cloudflare Pages custom domain으로 연결합니다. Canonical URL policy는 공개 route를 아래 형태로 만들 수 있습니다.
+등록형 subdomain alias는 Pages custom domain으로 연결하며, canonical 공개 route는 아래 형태가 됩니다.
 
 ```text
 https://<club-slug>.<primary-domain>/
@@ -34,117 +31,122 @@ https://<club-slug>.<primary-domain>/records
 https://<club-slug>.<primary-domain>/sessions/<session-id>
 ```
 
-이 alias는 무료 플랜의 필수 조건이 아닙니다. 운영 중 alias가 준비되지 않았거나 상태가 불확실하면 사용자에게 fallback path URL을 안내합니다.
-
-Registered host를 `ACTIVE`로 전환하기 전에는 해당 host가 ReadMates Cloudflare Pages marker를 HTTPS로 서빙하고, public route가 의도한 club content를 렌더링하는지 확인합니다. 확인되지 않은 host는 canonical 후보로만 취급하고, 실제 사용자 안내는 `https://readmates.pages.dev/clubs/<club-slug>` fallback을 사용합니다.
+alias는 무료 플랜의 필수 조건이 아닙니다. 준비되지 않았거나 상태가 불확실하면 fallback path를 안내합니다. `ACTIVE`로 바꾸기 전에는 그 host가 HTTPS로 ReadMates marker를 서빙하고 의도한 클럽 화면을 보여주는지 확인합니다.
 
 ## OAuth and Shared Session
 
-로그인 세션은 platform 전체에서 공유합니다. Google OAuth start endpoint는 현재 Pages 또는 registered host에서 시작될 수 있지만, Google에 전달하는 callback `redirect_uri`는 primary auth origin으로 모읍니다. 초대 수락처럼 같은 origin의 안전한 relative `returnTo`를 함께 보낸 흐름만 성공 후 signed return state에 저장된 클럽 URL로 돌아가고, 일반 로그인은 `/app` smart entry로 이동합니다. Absolute URL, protocol-relative URL, login/reset/invite/OAuth/root path, backslash, control character가 포함된 return target은 프런트엔드에서 먼저 버리고 서버의 signed return state와 host/origin 정책으로 다시 제한합니다.
+로그인 세션은 platform 전체에서 공유합니다.
+
+- OAuth start는 Pages나 registered host 어디서든 시작할 수 있습니다.
+- Google에 보내는 callback `redirect_uri`는 primary auth origin(`READMATES_AUTH_BASE_URL`)으로 모읍니다.
+- 초대 수락처럼 안전한 relative `returnTo`를 보낸 흐름만 성공 후 signed return state의 클럽 URL로 돌아갑니다. 일반 로그인은 `/app`으로 갑니다.
+- absolute URL, protocol-relative URL, login/reset/invite/OAuth/root path, backslash, control character가 든 return target은 프론트엔드가 먼저 버리고, 서버가 signed state와 host/origin 정책으로 다시 막습니다.
 
 Spring 설정:
 
 ```text
-READMATES_APP_BASE_URL=https://readmates.pages.dev
+READMATES_APP_BASE_URL=https://app.example.com
 READMATES_AUTH_BASE_URL=https://<primary-domain>
 READMATES_AUTH_RETURN_STATE_SECRET='{return-state-signing-secret}'
-READMATES_ALLOWED_ORIGINS=https://readmates.pages.dev,https://<primary-domain>,https://<registered-club-host>
+READMATES_ALLOWED_ORIGINS=https://app.example.com,https://<primary-domain>,https://<registered-club-host>
 READMATES_AUTH_SESSION_COOKIE_DOMAIN=.<primary-domain>
 ```
 
-Primary domain을 아직 쓰지 않는 fallback-only 운영에서는 `READMATES_AUTH_BASE_URL`을 `https://readmates.pages.dev`로 둡니다. `READMATES_AUTH_SESSION_COOKIE_DOMAIN`은 subdomain 간 세션 공유가 필요할 때만 설정합니다. Cookie domain 밖의 external custom domain은 같은 browser cookie를 공유하지 못하므로 OAuth return URL 허용 대상에서 제외될 수 있습니다.
+- primary domain이 없는 fallback-only 운영에서는 `READMATES_AUTH_BASE_URL`을 Pages 운영 origin과 같게 둡니다.
+- `READMATES_AUTH_SESSION_COOKIE_DOMAIN`은 subdomain 간 세션 공유가 필요할 때만 설정합니다. cookie domain 밖의 external custom domain은 세션을 공유하지 못하므로 OAuth return 대상에서 빠질 수 있습니다.
+- `READMATES_AUTH_RETURN_STATE_SECRET`은 공개 기본값이나 짧은 샘플 문자열을 쓰지 않습니다.
 
-`READMATES_AUTH_RETURN_STATE_SECRET`은 OAuth return target 서명에 쓰는 운영 secret입니다. 공개 기본값이나 짧은 샘플 문자열을 production에 사용하지 않습니다.
-
-Google Cloud OAuth client의 redirect URI는 OAuth callback이 실제로 도착하는 auth origin마다 등록합니다.
+Google OAuth client redirect URI(callback이 도착하는 auth origin마다):
 
 ```text
-https://readmates.pages.dev/login/oauth2/code/google
+https://app.example.com/login/oauth2/code/google
 https://<primary-domain>/login/oauth2/code/google
 ```
 
-기본 전략에서는 club별 registered host를 Google redirect URI에 모두 추가하지 않습니다. Callback은 `READMATES_AUTH_BASE_URL`로 모으고, `returnTo` 검증이 통과한 club path 또는 active registered host로 복귀합니다.
+club별 host는 Google redirect URI에 모두 추가하지 않습니다.
 
-초대 링크는 club context를 보존해야 합니다. `https://readmates.pages.dev/clubs/<club-slug>/invite/<token>`로 들어온 사용자는 로그인 후 같은 club의 app 또는 초대 수락 결과 화면으로 돌아와야 합니다. Unscoped `/invite/<token>`은 호환 경로이지만, 새 초대 링크는 club-scoped route를 우선합니다.
+초대 링크는 club context를 유지해야 합니다. `/clubs/<club-slug>/invite/<token>`으로 들어온 사용자는 로그인 후 같은 클럽으로 돌아옵니다. `/invite/<token>`은 호환 경로이고, 새 초대 링크는 club-scoped route를 씁니다.
 
 ## Allowed Origins
 
-`READMATES_ALLOWED_ORIGINS`는 mutating request의 `Origin` 또는 `Referer` 검증에 쓰는 정적 comma-separated 목록입니다. DB의 `club_domains` 테이블에서 `status='ACTIVE'`인 hostname은 60초 TTL 캐시로 동적으로 allowlist에 반영됩니다. backend 재시작 없이 1분 내 allowlist에 반영됩니다.
+변경 요청의 `Origin`/`Referer`는 두 목록을 합쳐 검증합니다.
 
-새 registered host를 운영에 넣을 때는 아래 순서를 지킵니다.
+- 정적 목록: `READMATES_ALLOWED_ORIGINS`(쉼표 구분). 바꾸려면 `sync-config` 후 `readmates-api` 재시작이 필요합니다.
+- 동적 목록: DB `club_domains`에서 `status='ACTIVE'`인 hostname. 60초 캐시라서 재시작 없이 최대 1분 안에 반영됩니다.
 
-1. Cloudflare Pages custom domain 연결을 준비합니다.
-2. Admin UI에서 상태 확인을 실행해 host를 `ACTIVE`로 전환합니다.
-3. Host가 HTTPS로 Pages 앱을 서빙하고 BFF 요청이 통과하는지 smoke test합니다. 동적 allowlist 반영까지 최대 1분이 소요될 수 있습니다.
-4. 정적 목록에 추가하려면 `READMATES_ALLOWED_ORIGINS`에 origin을 추가하고 재시작합니다.
+새 registered host를 넣는 순서:
 
-Wildcard origin은 사용하지 않습니다. Placeholder 문서에는 실제 운영 domain 목록을 적지 않습니다.
+1. Cloudflare Pages custom domain을 연결합니다.
+2. Admin UI에서 상태 확인을 실행해 `ACTIVE`로 바꿉니다.
+3. 최대 1분 뒤, 그 host에서 HTTPS 앱과 BFF 요청이 통과하는지 smoke합니다.
+4. (선택) 정적 목록에도 넣으려면 `READMATES_ALLOWED_ORIGINS`를 고치고 재시작합니다.
+
+wildcard origin은 쓰지 않습니다.
 
 ## Cloudflare Pages Custom Domain Runbook
 
-Domain provisioning은 DB에 저장된 desired workflow와 실제 Cloudflare 연결 상태를 구분합니다. UI/API는 저장된 `status`, status에서 파생한 `desiredState`, `manualAction`, `errorCode`를 노출합니다. Platform admin의 상태 확인 action은 `https://<hostname>/.well-known/readmates-domain-check.json` marker를 확인해 실제 연결 결과를 `ACTIVE` 또는 `FAILED`로 저장합니다.
+DB에 저장한 workflow 상태와 실제 Cloudflare 연결 상태는 다릅니다. UI/API는 `status`, 파생값 `desiredState`, `manualAction`, `errorCode`를 보여줍니다. 상태 확인 action은 `https://<hostname>/.well-known/readmates-domain-check.json`을 확인해 결과를 `ACTIVE` 또는 `FAILED`로 저장합니다.
 
 | 상태 | 의미 |
 | --- | --- |
-| `REQUESTED` | 사용자가 domain alias를 요청했지만 운영 연결이 아직 시작되지 않았습니다. |
-| `ACTION_REQUIRED` | 운영자가 Cloudflare dashboard 또는 Wrangler에서 Pages custom domain 연결을 수행해야 합니다. |
-| `PROVISIONING` | 연결 또는 인증서 준비가 진행 중입니다. 현재 구현은 Cloudflare API poller가 아니라 admin-triggered marker check로 실제 연결을 확인합니다. |
-| `ACTIVE` | 상태 확인 action이 ReadMates Pages marker를 확인한 상태입니다. |
-| `FAILED` | 연결, 인증서, DNS, smoke test 중 하나가 실패했습니다. |
-| `DISABLED` | 더 이상 traffic을 받지 않는 domain alias입니다. |
+| `REQUESTED` | 요청만 되고 운영 연결은 시작 전입니다. |
+| `ACTION_REQUIRED` | 운영자가 Cloudflare에서 Pages custom domain을 연결해야 합니다. (admin 생성 시 초기 상태, manual action `CLOUDFLARE_PAGES_CUSTOM_DOMAIN`) |
+| `PROVISIONING` | 연결·인증서 준비 중입니다. Cloudflare API poller는 없고, admin이 실행하는 marker 확인으로 판정합니다. |
+| `ACTIVE` | marker 확인에 성공했습니다. |
+| `FAILED` | 연결, 인증서, DNS, marker 확인 중 하나가 실패했습니다. |
+| `DISABLED` | 더 이상 traffic을 받지 않습니다. |
 
-현재 platform admin create flow는 domain row를 `ACTION_REQUIRED`로 만듭니다. Admin UI와 API는 `status`, `desiredState`, `manualAction`, `errorCode`를 보여주며, `ACTION_REQUIRED`의 manual action은 `CLOUDFLARE_PAGES_CUSTOM_DOMAIN`입니다. 상태 확인 action이 marker를 찾지 못하면 `FAILED`와 `DOMAIN_CHECK_*` error code를 남깁니다. 실제 Cloudflare API provisioning, account id/zone id/token 저장, live status poller는 1차 구현 범위가 아닙니다.
+Cloudflare API로 자동 연결, account/zone id·token 저장, live status poller는 구현 범위가 아닙니다.
 
-Domain marker checker는 HTTPS `GET`만 사용하고 secret header를 보내지 않습니다. Redirect는 따르지 않으며, DNS가 private/link-local/loopback/multicast/IPv6 ULA address로 resolve되거나 marker body가 4KB를 넘으면 fail-closed로 처리합니다.
-
-대표 error code:
+marker checker는 secret header 없이 HTTPS `GET`만 합니다. redirect를 따르지 않고, DNS가 private/link-local/loopback/multicast/IPv6 ULA 주소로 풀리거나 응답이 4KB를 넘으면 실패로 처리합니다.
 
 | Error code | 의미 |
 | --- | --- |
-| `DOMAIN_CHECK_INVALID_HOSTNAME` | hostname으로 HTTPS marker URL을 만들 수 없습니다. |
-| `DOMAIN_CHECK_DNS_FAILED` | DNS resolve에 실패했습니다. |
-| `DOMAIN_CHECK_PRIVATE_ADDRESS` | DNS가 private, loopback, link-local, multicast, IPv6 ULA address로 resolve되었습니다. |
-| `DOMAIN_CHECK_UNREACHABLE` | HTTPS marker 요청이 timeout, TLS, network 오류 등으로 실패했습니다. |
-| `DOMAIN_CHECK_REDIRECT` | Marker endpoint가 3xx redirect를 반환했습니다. |
-| `DOMAIN_CHECK_RESPONSE_TOO_LARGE` | Marker 응답이 허용 크기를 넘었습니다. |
-| `DOMAIN_CHECK_HTTP_<status>` | Marker endpoint가 `200`이 아닌 HTTP status를 반환했습니다. |
-| `DOMAIN_CHECK_MARKER_MISMATCH` | Marker JSON이 ReadMates Cloudflare Pages marker가 아닙니다. |
-| `DOMAIN_CHECK_UNCONFIGURED` | 테스트 또는 fallback checker가 실제 확인 없이 실패 상태를 반환했습니다. 운영에서는 HTTP checker 설정을 확인합니다. |
+| `DOMAIN_CHECK_INVALID_HOSTNAME` | hostname으로 HTTPS URL을 만들 수 없습니다. |
+| `DOMAIN_CHECK_DNS_FAILED` | DNS resolve 실패 |
+| `DOMAIN_CHECK_PRIVATE_ADDRESS` | 내부 주소로 resolve됨 |
+| `DOMAIN_CHECK_UNREACHABLE` | timeout, TLS, network 오류 |
+| `DOMAIN_CHECK_REDIRECT` | marker endpoint가 3xx를 반환 |
+| `DOMAIN_CHECK_RESPONSE_TOO_LARGE` | 응답이 허용 크기 초과 |
+| `DOMAIN_CHECK_HTTP_<status>` | `200`이 아닌 HTTP status |
+| `DOMAIN_CHECK_MARKER_MISMATCH` | ReadMates marker가 아님 |
+| `DOMAIN_CHECK_UNCONFIGURED` | 테스트/fallback checker가 확인 없이 실패를 반환. 운영에서는 HTTP checker 설정을 확인합니다. |
 
 운영 절차:
 
-1. Platform admin이 `/admin`에서 club domain alias를 생성합니다.
-2. Admin UI에서 hostname, desired state, manual action을 확인합니다.
-3. 운영자가 Cloudflare Pages project에 custom domain을 연결합니다.
+1. Platform admin이 `/admin`에서 club domain alias를 만듭니다.
+2. hostname, desired state, manual action을 확인합니다.
+3. Cloudflare Pages project에 custom domain을 연결합니다.
 4. DNS와 인증서가 준비될 때까지 fallback URL을 안내합니다.
-5. Admin UI에서 상태 확인을 실행합니다. Spring은 `/.well-known/readmates-domain-check.json` marker를 확인해 `ACTIVE` 또는 `FAILED`로 갱신합니다.
-6. HTTPS, SPA fallback, `/api/bff/api/auth/me`, club-scoped public API, OAuth start redirect를 smoke test합니다.
-7. Public route가 의도한 club content를 렌더링하고 app/OAuth return flow가 같은 session cookie 범위에서 동작하는지 확인합니다.
-8. 실패하면 `FAILED`와 error code를 확인하고, 해결 전까지 fallback URL을 유지합니다.
+5. Admin UI에서 상태 확인을 실행합니다. 결과가 `ACTIVE` 또는 `FAILED`로 저장됩니다.
+6. HTTPS, SPA fallback, `/api/bff/api/auth/me`, club public API, OAuth start redirect를 smoke합니다.
+7. 공개 화면이 의도한 클럽을 보여주고, 로그인 복귀가 같은 cookie 범위에서 동작하는지 확인합니다.
+8. 실패하면 `FAILED`와 error code를 보고, 해결 전까지 fallback URL을 유지합니다.
 
 ## Public SEO Policy
 
-`readmates.pages.dev`와 `*.pages.dev` host는 `noindex` 대상입니다. Public canonical은 primary domain이 설정된 경우 `https://<club-slug>.<primary-domain>/...` 형태로 생성하고, `/clubs/<club-slug>` prefix를 canonical path에서 제거합니다.
+Cloudflare Pages 기본 host와 preview host는 `noindex`입니다. primary domain이 있으면 canonical은 `https://<club-slug>.<primary-domain>/...`이고 `/clubs/<club-slug>` prefix는 뺍니다. Sitemap은 구현 범위가 아닙니다.
 
-Canonical/noindex 정책을 검증할 때는 아래를 확인합니다. Sitemap generation은 현재 1차 구현 범위가 아닙니다.
+확인할 것:
 
-- Fallback path가 모든 클럽에 대해 200 또는 의도한 public API 상태를 반환합니다.
-- Pages preview host에는 `noindex`가 있습니다.
-- Canonical URL에는 token, email, private 운영 host, preview deployment id가 들어가지 않습니다.
-- `PUBLIC`으로 발행된 세션만 public route/API에 노출됩니다.
+- fallback path가 모든 클럽에서 200 또는 의도한 public API 상태를 반환합니다.
+- Pages preview host에 `noindex`가 있습니다.
+- canonical URL에 token, email, private 운영 host, preview deployment id가 없습니다.
+- `PUBLIC`으로 발행된 세션만 공개 route/API에 나옵니다.
 
 ## Smoke Checks
 
 Fallback path:
 
 ```bash
+APP_ORIGIN='https://app.example.com'
 CLUB_SLUG='{club-slug}'
-curl -sS "https://readmates.pages.dev/api/bff/api/public/clubs/${CLUB_SLUG}"
-curl -sS -o /dev/null -w '%{http_code}\n' "https://readmates.pages.dev/clubs/${CLUB_SLUG}"
-curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' https://readmates.pages.dev/oauth2/authorization/google
+curl -sS "$APP_ORIGIN/api/bff/api/public/clubs/${CLUB_SLUG}"
+curl -sS -o /dev/null -w '%{http_code}\n' "$APP_ORIGIN/clubs/${CLUB_SLUG}"
+curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' "$APP_ORIGIN/oauth2/authorization/google"
 ```
 
-Registered host after Cloudflare 연결:
+Cloudflare 연결 뒤 registered host:
 
 ```bash
 REGISTERED_CLUB_HOST='{registered-club-host}'
@@ -154,17 +156,17 @@ curl -sS "https://${REGISTERED_CLUB_HOST}/api/bff/api/auth/me"
 curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' "https://${REGISTERED_CLUB_HOST}/oauth2/authorization/google"
 ```
 
-자동화된 최소 smoke는 아래 script로 실행합니다. `READMATES_SMOKE_AUTH_BASE_URL`은 Google OAuth `redirect_uri`가 모이는 primary auth origin과 맞춥니다.
+자동 smoke. `READMATES_SMOKE_AUTH_BASE_URL`은 `redirect_uri`가 모이는 primary auth origin과 맞춥니다.
 
 ```bash
-READMATES_SMOKE_BASE_URL=https://readmates.pages.dev \
-READMATES_SMOKE_AUTH_BASE_URL=https://readmates.pages.dev \
+READMATES_SMOKE_BASE_URL=https://app.example.com \
+READMATES_SMOKE_AUTH_BASE_URL=https://app.example.com \
 ./scripts/smoke-production-integrations.sh
 
-READMATES_SMOKE_BASE_URL=https://readmates.pages.dev \
+READMATES_SMOKE_BASE_URL=https://app.example.com \
 READMATES_SMOKE_AUTH_BASE_URL=https://<primary-domain> \
 READMATES_SMOKE_CLUB_HOST=https://<registered-club-host> \
 ./scripts/smoke-production-integrations.sh
 ```
 
-HTTP status만으로 `ACTIVE` 전환을 판단하지 않습니다. Browser smoke로 rendered club name, canonical/noindex tag, 로그인 후 return URL, app switcher의 현재 club을 함께 확인합니다. Smoke output은 운영 상태일 수 있으므로 공개 문서에 붙이지 않습니다. 필요한 경우 내부 운영 기록에만 보관합니다.
+HTTP status만으로 `ACTIVE`를 판단하지 않습니다. 브라우저로 클럽 이름, canonical/noindex tag, 로그인 후 복귀 URL, app switcher의 현재 클럽을 함께 확인합니다. smoke 출력은 공개 문서에 붙이지 않습니다.

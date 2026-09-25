@@ -1,6 +1,6 @@
 # 버저닝
 
-ReadMates의 제품 릴리즈 버전은 Git tag와 `CHANGELOG.md`, GitHub Release가 source of truth입니다. 서버 Gradle `version = "0.0.1-SNAPSHOT"`과 `front/package.json`은 빌드 도구 metadata이며 제품 릴리즈 번호로 쓰지 않습니다.
+제품 릴리즈 버전의 기준은 Git tag, `CHANGELOG.md`, GitHub Release입니다. 서버 Gradle의 `version = "0.0.1-SNAPSHOT"`은 빌드 도구 metadata일 뿐 제품 버전이 아니고, `front/package.json`에는 version 필드가 없습니다. 별도 `VERSION` 파일도 만들지 않습니다.
 
 ## Source of Truth
 
@@ -11,7 +11,7 @@ ReadMates의 제품 릴리즈 버전은 Git tag와 `CHANGELOG.md`, GitHub Releas
 | GitHub Release | 공개 사용자와 운영자가 보는 tag별 릴리즈 노트 |
 | OCI compose image tag | 서버 배포 시 운영 VM에서 pull하는 container image 식별자. 제품 tag와 맞춰 `ghcr.io/<owner>/<repo>/readmates-server:vMAJOR.MINOR.PATCH`를 사용 |
 
-제품 버전은 하나만 올립니다. Server와 frontend를 각각 다른 semantic version으로 관리하지 않고, 같은 Git tag가 backend code, frontend code, Pages Functions, deployment scripts, docs를 함께 가리킵니다.
+제품 버전은 하나입니다. server와 frontend를 따로 버전 관리하지 않고, 같은 Git tag가 backend, frontend, Pages Functions, 배포 script, 문서를 함께 가리킵니다.
 
 ## Version Bump Rules
 
@@ -23,7 +23,7 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식을 사용합니다.
 | 사용자 기능 또는 운영 기능 추가 | 새 알림 템플릿, 새 호스트 운영 흐름, 새 배포 runtime | Minor |
 | 버그 수정, 문서 보강, 작은 UX 수정 | 배포 runbook 보강, regression fix, copy fix | Patch |
 
-하나의 릴리즈에 minor와 patch 성격이 섞이면 더 큰 bump를 선택합니다. DB migration이나 서버 API 변경이 있으면 `CHANGELOG.md`의 `Deployment Notes`에 서버 배포 순서와 Flyway 기대 상태를 남깁니다.
+minor와 patch 성격이 섞이면 큰 쪽을 고릅니다. DB migration이나 서버 API 변경이 있으면 `CHANGELOG.md`의 `Deployment Notes`에 서버 배포 순서와 Flyway 기대 상태를 적습니다.
 
 ## Release Flow
 
@@ -39,7 +39,7 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식을 사용합니다.
 10. GitHub Release를 생성하거나 갱신하고, body는 `CHANGELOG.md`의 해당 버전 섹션과 맞춥니다.
 11. `gh release view vX.Y.Z --json tagName,name,url,publishedAt`로 GitHub Release 객체가 실제로 존재하는지 확인합니다. tag만 있고 release가 없으면 GitHub의 릴리즈 노트 화면에는 아무것도 보이지 않습니다.
 
-`main` 또는 tag push만으로는 frontend production 배포가 시작되지 않습니다. Production frontend는 backend promotion 뒤 `Deploy Front` workflow에 검증할 release tag를 명시해 수동 dispatch합니다. 이 순서는 새 frontend가 구 backend의 미지원 API를 먼저 호출하는 배포 window를 막습니다.
+`main`이나 tag push만으로는 frontend 운영 배포가 시작되지 않습니다. backend promotion 뒤에 `Deploy Front` workflow를 release tag와 함께 수동 dispatch합니다. 그래야 새 frontend가 구 backend에 없는 API를 먼저 부르는 틈이 생기지 않습니다.
 
 Major host-write contract release는 `READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true`를 backend promotion 전에 동기화합니다. 새 backend는 구 browser/BFF의 mutating `/api/host/**`를 409로 잠시 동결하고, 같은 tag의 새 browser bundle과 Pages BFF가 함께 배포된 뒤에만 write를 재개합니다. Frontend-only rollback은 host write 동결을 유지하므로 호환 frontend 재배포 또는 backend rollback/forward-fix까지 운영 계획에 포함합니다.
 

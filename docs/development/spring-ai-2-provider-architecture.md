@@ -4,24 +4,7 @@
 
 ## Before / After
 
-전환 전에는 provider마다 generator, port, client, 직접 SDK 경로가 반복되었고 legacy/grounded pipeline 선택이 worker와 Redis record에 남아 있었습니다.
-
-```mermaid
-sequenceDiagram
-    participant API as API
-    participant K as Kafka
-    participant W as Worker
-    participant G as Provider-specific generator
-    participant P as Provider port/client
-    participant SDK as Direct SDK
-    API->>K: metadata job
-    K->>W: consume
-    W->>G: legacy or grounded branch
-    G->>P: provider-specific request
-    P->>SDK: SDK call and SDK retry policy
-    SDK-->>G: provider response
-    G-->>W: draft
-```
+전환 전에는 provider마다 generator, port, client, 직접 SDK 경로가 따로 있었고 legacy/grounded pipeline 선택이 남아 있었습니다. 지금은 grounded 경로 하나만 있습니다.
 
 현재는 application이 모든 호출 정책을 소유하고 Spring AI는 정확히 한 번의 outbound transport/structured-output 변환만 담당합니다.
 
@@ -69,7 +52,7 @@ sequenceDiagram
 - `SpringAiWholeTranscriptGroundedGenerator`, `SpringAiProviderOptionsFactory`, `GroundedStructuredOutputConverter`, `SpringAiUsageMapper`, and `SpringAiErrorMapper` are the only provider execution boundary. `validateSchema()` and Spring AI advisors that can retry are not used.
 - Disabled-by-default startup needs no provider key. When a provider is enabled, its allowlisted capability and key are mandatory; Google additionally requires the paid-tier retention confirmation flag.
 
-Spring AI modules are versioned only by `org.springframework.ai:spring-ai-bom:2.0.0`. Runtime inspection resolves all Spring AI modules to `2.0.0`, Spring Boot OpenTelemetry to `4.0.6`, Micrometer Tracing to `1.6.5`, and OpenTelemetry SDK/exporter to `1.55.0`. OpenAI, Anthropic and Google SDK artifacts remain only as transitive transports required by the Spring AI model modules; ReadMates has no direct SDK dependency declaration or direct source execution path.
+Spring AI module version은 `org.springframework.ai:spring-ai-bom:2.0.0` 하나로 관리합니다(`server/build.gradle.kts`). Tracing은 `spring-boot-starter-opentelemetry`를 씁니다. OpenAI, Anthropic, Google SDK는 Spring AI model module의 전이 의존성으로만 존재하고, ReadMates는 SDK를 직접 선언하거나 호출하지 않습니다.
 
 ## Removed Boundary Mapping
 
@@ -156,38 +139,11 @@ The legacy pipeline mode environment control and every runtime selector were rem
 
 The 16-minute Kafka maximum poll interval covers three 4-minute provider calls, at most two bounded 30-second delays, validation/persistence margin, and JVM scheduling variance. Startup validation rejects an interval smaller than the configured worst-case processing budget.
 
-## File Inventory
+## Verification
 
-The implementation range inventory (`git diff --name-status origin/main..HEAD -- server ops deploy scripts docs .github`) contains 199 paths: 53 added, 101 modified and 45 deleted before this living-document commit.
-
-| Status | Actual inventory summary |
-| --- | --- |
-| Added | Spring AI adapter/config files; provider call models/ports/policy/coordinator/gate/Redis scripts; Micrometer/OTLP privacy adapters; V38; provider, Redis, Kafka, architecture and observability tests; Tempo config/datasources/validator; approved spec/plan |
-| Modified | `server/build.gradle.kts`, application/config/model/worker/executor/audit/Redis/Kafka/DTO code and tests; `application.yml`, Logback; Prometheus/Grafana/Compose/deploy scripts; active architecture/operations/scripts docs and release checks |
-| Deleted | All three provider `*ApiClient`, `*ApiPort`, `*ContentGenerator`, `*ContentRegenerator`, `*WholeTranscriptGroundedGenerator`; legacy common LLM error/prompt/schema helpers; `SessionContentGenerator`/`SessionContentRegenerator`; corresponding direct-SDK/live/legacy tests and stubs |
-
-New production files are exactly the paths under `adapter/out/llm/springai/`, `ProviderRetryAfterExtractor`, the provider-call model/ports/policy/coordinator, resilience/Redis/observability adapters, `AiGenerationSpringAiConfig`, three shared observability classes, V38, `ops/tempo/tempo.yml`, two Tempo datasource files and `scripts/validate-tempo-config.sh`. Removed production files are enumerated in [Removed Boundary Mapping](#removed-boundary-mapping); the 24 removed legacy/direct-provider tests and stubs were replaced by the new Spring AI, policy, Redis, Kafka, architecture and privacy suites. The command above is the authoritative per-path inventory and prevents this narrative grouping from becoming a second stale manifest.
-
-## Verification Evidence
-
-Evidence below was run from the Task 15 working tree based on implementation commit `a0332bb6`. The final documentation commit is identified by `git log -1 --oneline` rather than embedded here because a Git commit cannot contain its own stable hash.
-
-| Command / proof | Result |
-| --- | --- |
-| Runtime dependency inventory | PASS — Spring AI 2.0.0 converged; no direct provider SDK declaration |
-| Static legacy/direct/privacy scans | PASS — no direct provider declaration or source path, no runtime legacy selector, and all 15 AI PII invariants passed |
-| `./scripts/server-ci-check.sh` | PASS — unit, architecture, Detekt, ktlint and coverage gates |
-| `./server/gradlew -p server integrationTest` | PASS — full Testcontainers integration suite in 2m03s |
-| `npx --yes corepack@0.35.0 pnpm --dir front test:e2e` | PASS — 74/74 Playwright tests in 59.4s after installing the pinned Chromium prerequisite |
-| Prometheus/Tempo/Grafana validators and local smoke | PASS — rules/config/dashboards validated; synthetic trace queried; exporter failure stayed bounded when Tempo stopped |
-| Public release candidate build/check | PASS — candidate built; path/content/Tempo contract checks and gitleaks reported no finding |
-| `scripts/validate-production-ai-config.sh` | PASS — internal OCI OTLP endpoint, unpublished Tempo, no legacy selector, and fail-closed Google confirmation sync contract |
-| Server release image and Trivy | PASS — arm64 release image built; Trivy 0.70.0 returned 0 for HIGH/CRITICAL with unfixed findings ignored |
-| `graphify update .` | PASS — 12,934 nodes, 25,107 edges and 756 communities; 24 data fixtures produced no code nodes and the graph exceeded only the optional HTML visualization limit |
-| OpenAI/Anthropic/Google live provider smoke | SKIPPED — requires provider key and billable external call; mock-wire contracts are CI proof |
-| Production deploy / secret changes | SKIPPED — outside this implementation and requires operator authorization |
-
-The first full integration attempt exposed that `server/src/test/resources/application.yml` shadowed the main Spring AI disable defaults and therefore attempted Google model auto-configuration without a key. The test profile now disables every Spring AI model category explicitly and a fresh full run passes. The first E2E attempt found no installed Playwright Chromium binary; installing the declared browser prerequisite changed no repository file and the fresh suite passes.
+- CI 증거는 provider mock-HTTP contract test(정확한 요청 수), Redis/Kafka/architecture/privacy test, `scripts/aigen-pii-check.sh`, `scripts/validate-production-ai-config.sh`, `scripts/validate-tempo-config.sh`입니다.
+- Live provider smoke(`scripts/aigen-smoke-*.sh`)는 provider key와 과금 호출이 필요하므로 opt-in이며 별도 승인 대상입니다.
+- 테스트 profile(`server/src/test/resources/application.yml`)은 모든 Spring AI model auto-configuration을 명시적으로 끕니다.
 
 ## Residual Risks
 

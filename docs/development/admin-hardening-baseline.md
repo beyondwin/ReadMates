@@ -1,9 +1,8 @@
 # Admin 하드닝 베이스라인 체크리스트
 
-이 문서는 Post–Admin vNext 고도화 엄브렐러의 H 슬라이스 산출물이며,
-A/M/P 슬라이스의 공통 게이트로 재사용된다.
+platform admin 라우트와 host dashboard를 바꿀 때 쓰는 공통 점검표입니다. 각 라우트는 아래를 만족해야 합니다.
 
-각 admin 라우트(+host dashboard)는 아래를 만족해야 한다.
+자동 검증 helper는 `front/shared/testing/accessibility-checks.ts`에 있습니다(예: `front/features/host/ui/host-dashboard.test.tsx`).
 
 ## 1. 접근성 (자동 검증 가능)
 - [ ] 라우트 본문에 heading이 1개 이상 존재한다 (`getAllByRole("heading")`).
@@ -14,7 +13,7 @@ A/M/P 슬라이스의 공통 게이트로 재사용된다.
 
 ## 2. 접근성 (수동 검증)
 - [ ] 키보드 Tab 순서가 시각 순서와 일치하고, 포커스 링이 보인다.
-- [ ] admin shell 진입 시 본문으로 건너뛰는 skip-link가 동작한다.
+- [ ] admin shell의 `본문으로 건너뛰기` skip-link가 `#admin-main`으로 포커스를 옮긴다.
 - [ ] 텍스트/배경 색 대비가 WCAG AA(본문 4.5:1, 큰 텍스트 3:1)를 만족한다.
 
 ## 3. 모바일 (수동 검증)
@@ -45,4 +44,4 @@ A/M/P 슬라이스의 공통 게이트로 재사용된다.
 - [ ] OWNER/OPERATOR lifecycle 성공과 SUPPORT read-only/direct mutation 거절을 함께 확인한다.
 
 ## 적용 대상 라우트
-today · health · clubs · clubs/:clubId · notifications · ai-ops · support · audit · analytics · (host dashboard)
+`/admin/` 아래 today · health · clubs · clubs/:clubId · notifications · ai-ops · support · audit · analytics, 그리고 host dashboard. 라우트 목록의 기준은 `front/features/platform-admin/model/admin-route-catalog.ts`입니다.

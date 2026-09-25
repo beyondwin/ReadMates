@@ -1,6 +1,6 @@
 # Observability
 
-ReadMates의 메트릭/로그/트레이스/대시보드/알림 가이드입니다.
+ReadMates의 메트릭, 로그, 트레이스, 대시보드, 알림 가이드입니다. 기준 파일은 코드와 `ops/`이고, 이 문서들은 해설입니다.
 
 ## 운영 진입점
 
@@ -10,20 +10,19 @@ ReadMates의 메트릭/로그/트레이스/대시보드/알림 가이드입니�
 | 단일 요청 추적 | [Correlation ID lookup runbook](../runbooks/correlation-id-lookup.md) + Grafana Tempo | 일반 로그는 `requestId`, API→Kafka→AI provider는 W3C trace/exemplar로 연결 |
 | 배포 전후 관측성 확인 | [Deploy observability check runbook](../runbooks/deploy-observability-check.md) | rule/dashboard/SLO/script가 깨지지 않았는지 확인하고 증거의 한계를 기록 |
 | 관측성 개념을 코드에 매핑 | [ReadMates observability operator guide](operator-guide.md) | Logback, MDC, Actuator, Prometheus, Grafana, alert, ELK 개념을 이 repo의 파일과 명령어로 이해 |
-| 운영자 health 화면 | `/admin/health` | DB / Redis / Kafka / AI provider / outbox / 알림 발송 성공률 / 최근 deploy attempt 카드를 aggregate로 확인 |
+| 운영자 health 화면 | `/admin/health` (platform admin 전용) | DB pool, Redis, Kafka consumer lag, AI provider, outbox backlog, 알림 발송 성공률, outbound resilience, 최근 deploy attempt 8개 카드 확인 |
 | 로컬 provisioning smoke | `./scripts/observability-local-smoke.sh` | Prometheus/Grafana/Tempo provisioning, trace query, Tempo-down product isolation을 공개-safe 로컬 stack으로 확인 |
 
-## 현재 상태
+## 현재 구성
 
-- Spring Boot Actuator + Micrometer + Prometheus registry가 server에 활성화되어 있습니다. Prometheus scrape endpoint는 management server의 `/actuator/prometheus`입니다.
-- Management server는 기본적으로 `127.0.0.1:8081`에 바인딩됩니다. 외부 공개 포트가 필요하면 reverse proxy나 방화벽 보호를 별도로 설계해야 합니다.
-- `RequestIdFilter`가 `X-Readmates-Request-Id`를 생성/수용하고 MDC `requestId`에 바인딩합니다. 같은 값은 응답 헤더와 에러 응답의 `traceId` lookup에도 쓰입니다.
-- Micrometer Tracing/OpenTelemetry가 W3C context를 Spring MVC, observed Kafka producer/consumer, AI provider/Spring AI 호출까지 연결합니다. `requestId`는 trace ID를 대체하지 않습니다.
-- OTLP span은 bounded asynchronous exporter로 internal Tempo에 전달됩니다. Sampling 기본값은 100%, Tempo retention은 7일이며 exporter/Tempo 실패는 product 요청을 실패시키지 않습니다.
-- 서버 로그는 `logback-spring.xml`의 `LogstashEncoder`로 JSON 출력되며 `requestId`, `clubSlug`, `sessionId`, `actorId`, `source`, `eventType` MDC field를 포함할 수 있습니다.
-- Custom 메트릭으로 notification, Redis/cache, AI generation, outbound resilience meter set이 export됩니다. 자세한 이름과 label 정책은 [메트릭 카탈로그](metrics-catalog.md)를 기준으로 합니다.
-- `ops/grafana/dashboards/`와 `ops/prometheus/alerts/`가 dashboard/rule source of truth입니다. 문서는 사람이 읽는 해설입니다.
-- 대시보드/알림 인프라 자체의 외부 배포 상태는 Git만으로 확인하지 않습니다. 로컬 smoke와 production health evidence를 구분해 기록합니다.
+- **메트릭**: Actuator + Micrometer + Prometheus registry. Scrape endpoint는 management server의 `/actuator/prometheus`이며 기본 바인딩은 `127.0.0.1:8081`입니다.
+- **Request ID**: `RequestIdFilter`가 `X-Readmates-Request-Id`를 만들거나 받아 MDC `requestId`에 넣습니다. 같은 값이 응답 헤더와 에러 응답의 `traceId` 필드에 들어갑니다.
+- **Trace**: Micrometer Tracing/OpenTelemetry가 W3C context를 Spring MVC, Kafka producer/consumer, AI provider 호출까지 잇습니다. `requestId`는 trace ID를 대신하지 않습니다.
+- **Tempo**: OTLP span을 bounded 비동기 exporter로 내부 Tempo에 보냅니다. Sampling 기본 100%, 보관 7일. Exporter나 Tempo가 실패해도 product 요청은 실패하지 않습니다.
+- **로그**: `logback-spring.xml`의 `LogstashEncoder`로 JSON을 stdout에 씁니다. MDC field 목록은 [operator guide](operator-guide.md#1-logback)에 있습니다.
+- **Custom 메트릭**: notification, Redis/cache, rate limit, AI generation, admin health/operations, frontend, outbound resilience, OTLP exporter. 이름과 label은 [메트릭 카탈로그](metrics-catalog.md)가 기준입니다.
+- **Dashboard/rule 기준**: `ops/grafana/dashboards/`, `ops/prometheus/alerts/`. OCI 배포는 `deploy/oci/compose.infra.yml`과 `deploy/oci/06-deploy-observability-stack.sh`가 이 디렉터리를 사용합니다.
+- 운영 환경에 무엇이 떠 있는지는 Git만으로 확인하지 않습니다. 로컬 smoke 결과와 운영 증거를 구분해 기록합니다.
 - AI trace/log/metric/span/baggage에는 prompt, completion, transcript, evidence, raw provider error, user/session/club identity를 넣지 않습니다. 상세 allowlist는 [Spring AI 2 provider architecture](../../development/spring-ai-2-provider-architecture.md)를 따릅니다.
 
 ## 문서
@@ -32,6 +31,7 @@ ReadMates의 메트릭/로그/트레이스/대시보드/알림 가이드입니�
 - [대시보드](dashboards.md) — 권장 패널과 PromQL 쿼리.
 - [알림 룰](alerts.md) — 파일화된 Prometheus alert rule과 임계 정책.
 - [SLO](slos.md) — 운영 목표와 측정 방법.
+- [Operator guide](operator-guide.md) — 개념을 이 repo의 파일과 명령어에 연결.
 
 ## 용어
 

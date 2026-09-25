@@ -39,9 +39,9 @@ ReadMates의 주요 기술 의사결정을 기록한다. 새 결정을 내릴 �
 
 ## ADR 후보 (follow-up)
 
-다음 결정들은 별도 ADR로 분리를 검토 중이다.
+아래는 별도 ADR로 분리를 검토 중인 후보다. 번호는 작성할 때 다음 빈 번호로 정한다(0011, 0012는 비어 있다).
 
-- ADR-0011: jOOQ write adapter migration (현재 JdbcTemplate 직접 사용 → 빌드 타임 타입 안전)
-- ADR-0012: Redis 정식 도입 (현재 optional 보조 계층 → 세션 캐시 필수 계층)
-- ADR-0017+: OCI Compute 선택 (Cloud Run 대비) — 0014 번호는 BFF secret rotation lifecycle (ADR-0014)로 사용됨; 향후 0017+로 재배정 예정
-- ADR-0017: Worker process 분리 운영 (web replica + notification worker)
+- jOOQ write adapter migration (현재 `JdbcTemplate` 직접 사용 → 빌드 타임 타입 안전)
+- Redis 정식 도입 (현재 optional 보조 계층 → 세션 캐시 필수 계층)
+- OCI Compute 선택 근거 (Cloud Run 대비)
+- Worker process 분리 운영 (web replica + notification worker)

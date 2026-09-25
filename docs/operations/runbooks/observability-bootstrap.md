@@ -1,12 +1,24 @@
 # Observability Bootstrap
 
-운영자가 OCI VM에서 Prometheus + Alertmanager + Grafana를 처음 띄울 때 따라가는 절차.
+OCI VM에 Tempo + Prometheus + Alertmanager + Grafana를 처음 올리는 절차와, 공통 알림이 울렸을 때의 1차 대응입니다.
+
+- 배포 스크립트: `deploy/oci/06-deploy-observability-stack.sh`
+- compose 파일: `deploy/oci/compose.infra.yml` (VM에서는 `/opt/readmates/deploy/oci/compose.infra.yml`, project `readmates`)
+- rule/dashboard 원본: `ops/prometheus/alerts/`, `ops/grafana/dashboards/`, `ops/tempo/tempo.yml`
+
+VM에서 쓰는 명령이 길어서 아래처럼 줄여 씁니다.
+
+```bash
+# VM에서
+INFRA='sudo docker compose -p readmates -f /opt/readmates/deploy/oci/compose.infra.yml'
+APP='sudo docker compose -f /opt/readmates/compose.yml'
+```
 
 ## 사전 준비
 
-Alertmanager까지 같이 띄울 때는 SMTP 환경변수 6개를 준비합니다:
+Alertmanager를 올릴 때는 SMTP 환경변수 6개가 필요합니다(값은 예시).
 
-```
+```bash
 READMATES_ALERT_SMTP_HOST=smtp.example.com
 READMATES_ALERT_SMTP_PORT=587
 READMATES_ALERT_SMTP_USER=example-user
@@ -15,16 +27,16 @@ READMATES_ALERT_SMTP_FROM=alerts@example.com
 READMATES_ALERT_EMAIL_TO=ops@example.com
 ```
 
-Grafana를 같이 띄울 때는 Git 밖 운영 채널에서 admin password를 정합니다:
+Grafana를 올릴 때는 admin password를 Git 밖에서 정합니다. user 기본값은 `readmates`입니다.
 
-```
+```bash
 READMATES_GRAFANA_ADMIN_USER=readmates
-READMATES_GRAFANA_ADMIN_PASSWORD=example-long-random-password
+READMATES_GRAFANA_ADMIN_PASSWORD=<long-random-password>
 ```
 
 ## 로컬 smoke
 
-운영 VM에 올리기 전에 로컬에서 dashboard/rule/provisioning이 깨지지 않았는지 확인합니다.
+VM에 올리기 전에 로컬에서 rule, dashboard, provisioning을 확인합니다.
 
 ```bash
 ./scripts/lint-grafana-dashboards.sh
@@ -32,109 +44,115 @@ READMATES_GRAFANA_ADMIN_PASSWORD=example-long-random-password
 ./scripts/observability-local-smoke.sh
 ```
 
-로컬 Spring Boot 서버가 `8081` management port를 열고 있으면 Prometheus target health까지 같이 확인합니다.
-서버가 떠 있지 않은 상태에서는 target presence까지만 확인하고 실제 scrape health는 운영 bring-up 단계에서 확인합니다.
+로컬 Spring 서버가 management port `8081`을 열고 있으면 target health까지 확인됩니다. 서버가 없으면 target 등록까지만 확인되고, 실제 scrape health는 VM bring-up에서 봅니다.
 
 ## Bring-up
 
-자동 배포 스크립트를 쓰는 경우:
+기본은 네 서비스(`tempo prometheus alertmanager grafana`)를 모두 올립니다. 스크립트는 로컬 검증 → 파일 전송 → `up -d` → smoke(Tempo ready, Prometheus ready, rule 로드, `readmates-server` target up) 순서로 진행합니다.
 
 ```bash
-: "${VM_PUBLIC_IP:?set VM_PUBLIC_IP in your shell}"
-: "${READMATES_GRAFANA_ADMIN_PASSWORD:?set READMATES_GRAFANA_ADMIN_PASSWORD in your shell}"
+: "${VM_PUBLIC_IP:?set VM_PUBLIC_IP}"
+: "${READMATES_GRAFANA_ADMIN_PASSWORD:?set READMATES_GRAFANA_ADMIN_PASSWORD}"
 ./deploy/oci/06-deploy-observability-stack.sh
 ```
 
-Prometheus + Grafana만 먼저 붙이고 email alert는 나중에 연결하려면:
+email 알림은 나중에 붙이려면 Alertmanager를 빼고 올립니다. 이때 스크립트는 `deploy/oci/prometheus/prometheus.no-alertmanager.yml`을 보냅니다.
 
 ```bash
-: "${VM_PUBLIC_IP:?set VM_PUBLIC_IP in your shell}"
-: "${READMATES_GRAFANA_ADMIN_PASSWORD:?set READMATES_GRAFANA_ADMIN_PASSWORD in your shell}"
-READMATES_OBSERVABILITY_SERVICES="prometheus grafana" \
+READMATES_OBSERVABILITY_SERVICES="tempo prometheus grafana" \
 ./deploy/oci/06-deploy-observability-stack.sh
 ```
 
-이 모드에서는 배포 스크립트가 `deploy/oci/prometheus/prometheus.no-alertmanager.yml`을 전송한다. Prometheus는 `readmates-api`와 `prometheus-self`만 target으로 잡고 Grafana dashboard를 볼 수 있다. Email alert까지 운영하려면 SMTP env를 채운 뒤 full stack으로 다시 실행한다.
+- 선택 env: `SSH_KEY`, `REMOTE_USER`(기본 `ubuntu`), `READMATES_SKIP_OBSERVABILITY_VALIDATE=true`(로컬 검증 생략).
+- email 알림을 붙일 때는 SMTP env를 채우고 기본값(전체)으로 다시 실행합니다.
 
-VM 안에서 직접 compose를 실행하는 경우:
-
-```bash
-cd /opt/readmates/deploy/oci
-docker compose -p readmates -f compose.infra.yml up -d prometheus alertmanager grafana
-```
-
-Grafana는 VM의 `127.0.0.1:3001`에만 바인딩한다. 운영자가 로컬 브라우저로 보려면 SSH 터널을 연다:
+VM에서 직접 올릴 때(파일이 이미 설치된 경우):
 
 ```bash
-: "${VM_PUBLIC_IP:?set VM_PUBLIC_IP in your shell}"
-ssh -i "$HOME/.ssh/readmates_oci" -L 13001:127.0.0.1:3001 ubuntu@"$VM_PUBLIC_IP"
+$INFRA up -d tempo prometheus alertmanager grafana
 ```
 
-그 다음 로컬 브라우저에서 `http://localhost:13001`을 연다.
+Grafana는 VM `127.0.0.1:3001`에만 바인딩됩니다. 보안그룹을 열지 말고 SSH 터널로 봅니다.
+
+```bash
+ssh -i <deploy-ssh-key> -L 13001:127.0.0.1:3001 ubuntu@<vm-public-ip>
+# 로컬 브라우저: http://localhost:13001
+```
 
 ## Smoke check
 
-1. Target healthy: `docker compose -p readmates -f compose.infra.yml exec -T prometheus wget -qO- http://localhost:9090/api/v1/targets | grep -c '"health":"up"'` — full stack 기준 3 이상이어야 (readmates-api, prometheus-self, alertmanager). Prometheus + Grafana만 먼저 올린 경우에는 2 이상이어야 하며 `alertmanager` target은 없어야 한다.
-2. Alertmanager ready: `docker compose -p readmates -f compose.infra.yml exec -T alertmanager wget -qO- http://localhost:9093/-/ready` — 200 OK.
-3. Grafana ready: `docker compose -p readmates -f compose.infra.yml exec -T grafana wget -qO- http://localhost:3000/api/health` — 200 OK.
-4. Rule load: `docker compose -p readmates -f compose.infra.yml exec -T prometheus wget -qO- http://localhost:9090/api/v1/rules | grep -c '"name"'` — 최소 6 그룹.
-5. Test alert: Prometheus expr 브라우저에서 `vector(1)`로 임시 룰 추가 또는 alertmanager API에 `amtool alert add` — 운영자 inbox 수신 확인. (구체 절차는 alertmanager 공식 docs 참조.)
+VM에서 확인합니다.
+
+1. Target: `$INFRA exec -T prometheus wget -qO- http://localhost:9090/api/v1/targets | grep -o '"health":"up"' | wc -l`
+   - 전체 stack: 4 (`readmates-server`, `prometheus-self`, `alertmanager`, `tempo`)
+   - Alertmanager 없이: 3
+2. Alertmanager: `$INFRA exec -T alertmanager wget -qO- http://localhost:9093/-/ready`
+3. Grafana: `$INFRA exec -T grafana wget -qO- http://localhost:3000/api/health`
+4. Tempo: `$INFRA exec -T prometheus wget -qO- http://tempo:3200/ready`
+5. Rule: `$INFRA exec -T prometheus wget -qO- http://localhost:9090/api/v1/rules | grep -o '"type":"alerting"' | wc -l`가 0보다 커야 합니다. rule group은 7개(`readmates.http`, `readmates.jvm`, `readmates.notification`, `readmates.security`, `readmates.targets`, `readmates.redis`, `aigen`)입니다.
+6. 알림 수신: Alertmanager API로 테스트 알림을 보내 운영자 inbox에 오는지 봅니다. 방법은 Alertmanager 공식 문서(`amtool alert add`)를 따릅니다.
 
 ## Trouble
 
-- `up{job="readmates-server"} == 0`: app container가 `READMATES_MANAGEMENT_ADDRESS=0.0.0.0` 설정인지, `readmates-api` service와 같은 compose project/network에 떠 있는지 확인.
-- SMTP 실패: `docker logs readmates-alertmanager | grep 'failed to send email'`. SMTP 자격증명 / smarthost 확인.
-- Grafana 접속 실패: VM 보안그룹을 열지 말고 SSH 터널 `-L 13001:127.0.0.1:3001`이 살아있는지, `docker compose -p readmates -f compose.infra.yml ps grafana`가 healthy인지 확인.
-- Notification backlog alert: §`notification-backlog` 참고 — outbox 직접 SQL drill-down.
+- `up{job="readmates-server"} == 0`: app 컨테이너에 `READMATES_MANAGEMENT_ADDRESS=0.0.0.0`이 있는지(`deploy/oci/compose.yml`), `readmates-api`가 같은 compose project/network에 있는지 확인합니다.
+- SMTP 실패: `$INFRA logs --tail=200 alertmanager | grep -i 'failed to send'`. SMTP 자격증명과 smarthost를 확인합니다.
+- Grafana 접속 실패: SSH 터널이 살아 있는지, `$INFRA ps grafana`가 healthy인지 봅니다.
 
 ## Target down
 
 `ScrapeTargetDown`은 Prometheus가 5분 동안 target을 scrape하지 못했다는 뜻입니다.
 
-1. `docker compose -p readmates -f compose.infra.yml ps`로 `readmates-api`, `prometheus`, `alertmanager`, `grafana` 상태를 확인합니다.
-2. `docker compose -p readmates -f compose.infra.yml logs --tail=120 prometheus`로 scrape error를 확인합니다.
-3. `readmates-server`만 down이면 app compose 쪽에서 `READMATES_MANAGEMENT_ADDRESS=0.0.0.0`, `READMATES_MANAGEMENT_PORT=8081`, `readmates-api` health를 확인합니다.
-4. 모든 target이 down이면 VM 또는 Docker daemon 장애 가능성이 높으므로 post-deploy watch와 read-only diagnostics runbook으로 이동합니다.
+1. `$INFRA ps`와 `$APP ps`로 `readmates-api`, `prometheus`, `alertmanager`, `grafana`, `tempo` 상태를 봅니다.
+2. `$INFRA logs --tail=120 prometheus`로 scrape 오류를 봅니다.
+3. `readmates-server`만 down이면 app 쪽 `READMATES_MANAGEMENT_ADDRESS=0.0.0.0`, `READMATES_MANAGEMENT_PORT=8081`, `readmates-api` health를 확인합니다.
+4. `tempo`만 down이면 [AI session generation runbook](ai-session-generation.md#tempo-down)을 봅니다.
+5. 모든 target이 down이면 VM이나 Docker daemon 장애일 가능성이 큽니다. [Post-deploy watch](post-deploy-watch.md)와 [Read-only diagnostics](read-only-diagnostics.md)로 넘어갑니다.
 
 ## HTTP error or latency
 
-`HttpErrorRateHigh`와 `HttpLatencyP95High`는 사용자-facing API가 실패하거나 느려졌다는 신호입니다.
+`HttpErrorRateHigh`(5xx 비율 1% 초과, 5분)와 `HttpLatencyP95High`(`/api/*` p95 500ms 초과, 10분)는 사용자 API가 실패하거나 느리다는 신호입니다.
 
-1. Grafana의 BFF/API latency와 Service Health dashboard에서 5xx ratio, p95 latency, route label을 확인합니다.
-2. 최근 배포 직후라면 `deploy-attempts`와 post-deploy watch 로그를 먼저 확인합니다.
-3. `requestId` 또는 시간대를 기준으로 [Correlation ID lookup](correlation-id-lookup.md)을 실행합니다.
-4. Hikari pending, JVM heap, Redis error, notification backlog 중 동시에 상승한 지표를 찾아 병목 surface를 좁힙니다.
-5. 원인이 최근 배포로 좁혀지고 사용자 영향이 지속되면 release runbook의 rollback 절차를 따릅니다.
+1. Prometheus에서 5xx 비율과 URI별 p95를 확인합니다. BFF 쪽은 Grafana `BFF -> API Latency`, 프론트는 `Frontend Runtime` dashboard를 봅니다.
+2. 배포 직후라면 [deploy ledger](deploy-attempts.md)와 post-deploy watch 결과를 먼저 봅니다.
+3. `requestId`나 시간대로 [Correlation ID lookup](correlation-id-lookup.md)을 실행합니다.
+4. Hikari pending, JVM heap, Redis error, notification backlog 중 함께 오른 지표를 찾아 병목을 좁힙니다.
+5. 원인이 최근 배포이고 영향이 계속되면 [OCI Compose Stack](../../deploy/compose-stack.md#rollback)의 rollback을 따릅니다.
 
 ## JVM and DB pool
 
-`HikariConnectionPoolPending`은 DB connection을 기다리는 요청이 있다는 뜻이고, `JvmHeapHigh`는 heap 사용률이 85%를 넘었다는 뜻입니다.
+`HikariConnectionPoolPending`(pending > 0, 2분)은 DB connection을 기다리는 요청이 있다는 뜻이고, `JvmHeapHigh`는 heap 사용률이 10분 동안 85%를 넘었다는 뜻입니다. 전용 dashboard는 없으므로 Prometheus에서 봅니다.
 
-1. Grafana에서 Hikari pending, active, idle, HTTP p95를 함께 봅니다.
-2. `docker compose -p readmates -f compose.yml logs --tail=200 readmates-api`로 timeout, slow query, GC 관련 로그를 확인합니다.
-3. pending이 지속되면 신규 배포, 배치 작업, notification relay 증가, DB 장애를 순서대로 분리합니다.
-4. heap alert는 즉시 heap dump를 Git에 남기지 않습니다. 운영 채널에서 덤프 보관 위치와 개인정보 취급을 먼저 결정합니다.
+1. `hikaricp_connections_pending`, `hikaricp_connections_active`, `hikaricp_connections_idle`, `jvm_memory_used_bytes{area="heap"}`와 HTTP p95를 함께 봅니다.
+2. `$APP logs --tail=200 readmates-api`로 timeout, slow query, GC 관련 로그를 봅니다.
+3. pending이 계속되면 신규 배포, 배치 작업, notification relay 증가, DB 장애를 차례로 분리합니다.
+4. heap dump는 Git에 남기지 않습니다. 보관 위치와 개인정보 취급을 운영 채널에서 먼저 정합니다.
 
 ## Redis instability
 
-`RedisFallbacksHigh`와 `RedisOperationErrors`는 Redis 선택 계층이 불안정하거나 명령 실패가 지속된다는 뜻입니다.
+`RedisFallbacksHigh`와 `RedisOperationErrors`는 Redis 계층이 불안정하거나 명령 실패가 계속된다는 뜻입니다.
 
-1. Grafana Redis Cache panel에서 feature와 operation label을 확인합니다.
-2. `docker compose -p readmates -f compose.yml ps redis`로 Redis container health를 확인합니다.
-3. `docker compose -p readmates -f compose.yml logs --tail=120 redis`로 restart, OOM, persistence error를 확인합니다.
-4. rate-limit 관련 오류면 민감 엔드포인트 보호가 약해질 수 있으므로 HTTP 429/5xx 지표도 같이 확인합니다.
-5. AI generation Redis alert는 [AI session generation runbook](ai-session-generation.md#redis-down)을 우선합니다.
+1. Prometheus에서 `readmates_redis_fallbacks_total`, `readmates_redis_operation_errors_total`을 feature/operation label별로 봅니다.
+2. `$APP ps redis`로 Redis 컨테이너 health를 봅니다.
+3. `$APP logs --tail=120 redis`로 restart, OOM, persistence 오류를 봅니다.
+4. rate-limit 관련 오류면 민감 엔드포인트 보호가 약해질 수 있으니 HTTP 429/5xx도 함께 봅니다.
+5. AI 생성 쪽 Redis 문제는 [AI session generation runbook](ai-session-generation.md#redis-down)을 먼저 봅니다.
 
 ## Notification backlog
 
-`NotificationOutboxBacklogHigh`, `NotificationOutboxBacklogCritical`, `NotificationFailRateHigh`, `NotificationDeadLetters`는 notification outbox 또는 delivery pipeline이 밀리거나 실패한다는 뜻입니다.
+`NotificationOutboxBacklogHigh`, `NotificationOutboxBacklogCritical`, `NotificationOutboxRelayDead`, `NotificationDeliveryBacklogHigh`, `NotificationFailRateHigh`, `NotificationDeadLetters`는 알림 outbox나 delivery가 밀리거나 실패한다는 뜻입니다.
 
-1. Grafana Notification Dispatch dashboard에서 pending, failed, dead, latency p95를 확인합니다.
-2. `docker compose -p readmates -f compose.yml logs --tail=200 readmates-api | grep -i notification`으로 relay/consumer 로그를 확인합니다.
-3. DB에서 source-of-truth 상태를 확인합니다: `SELECT status, count(*) FROM notification_deliveries GROUP BY status;`
-4. dead-letter가 있으면 `notification_deliveries.status='DEAD'` row의 event type, updated time, retry metadata를 확인합니다. 본문이나 수신자 개인정보를 ticket/chat/log에 복사하지 않습니다.
-5. 외부 email provider 장애가 의심되면 provider console과 Alertmanager SMTP 상태를 분리해서 봅니다.
+1. Grafana `Notification Dispatch` dashboard에서 event outbox/email delivery backlog, DEAD 수, publish 성공률을 봅니다.
+2. `$APP logs --tail=200 readmates-api | grep -i notification`으로 relay/consumer 로그를 봅니다.
+3. DB에서 실제 상태를 셉니다.
+
+   ```sql
+   SELECT status, count(*) FROM notification_event_outbox GROUP BY status;
+   SELECT status, count(*) FROM notification_deliveries GROUP BY status;
+   ```
+
+4. `DEAD`가 있으면 event type, `updated_at`, attempt/retry metadata만 봅니다. 본문이나 수신자 개인정보를 ticket/채팅/로그에 복사하지 않습니다. 복구 경로는 [Correlation ID lookup](correlation-id-lookup.md#delivery-복구-경로)을 봅니다.
+5. 외부 email provider 장애가 의심되면 provider console과 Alertmanager SMTP 상태를 따로 봅니다.
 
 ## 후속
 
-- 1주 후 첫 SLO 측정치는 `slo-monthly-report.md` 절차로 `docs/operations/slo-reports/2026-06.md`에 기록.
+- 매월 SLO 측정은 [SLO monthly report](slo-monthly-report.md)를 따릅니다.

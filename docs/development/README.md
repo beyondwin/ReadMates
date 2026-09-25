@@ -1,27 +1,30 @@
 # ReadMates 개발자 문서
 
-ReadMates를 로컬에서 실행하고, 테스트하고, 구조를 이해하기 위한 개발자 문서 허브입니다. 루트 `README.md`는 제품 개요와 핵심 설계 판단을 빠르게 파악하는 진입점으로 두고, 세부 실행 절차는 이 디렉터리에서 관리합니다.
+로컬 실행, 테스트, 구조 이해를 위한 개발자 문서 허브입니다. 루트 `README.md`는 제품 개요이고, 세부 절차는 이 디렉터리에 있습니다.
 
 ## 바로 가기
 
 | 목적 | 문서 |
 | --- | --- |
 | 프로젝트 지형과 변경 유형별 읽는 순서 | [project-map.md](project-map.md) |
-| 공통 작업 계약과 권한·local-runtime 경계 | [../agents/execution.md](../agents/execution.md) |
+| 신규 합류 개발자 온보딩 | [new-developer-onboarding-guide.md](new-developer-onboarding-guide.md) |
 | 변경 slice의 risk evidence 선택 | [acceptance-matrix.md](acceptance-matrix.md) |
 | 로컬 실행 | [local-setup.md](local-setup.md) |
 | 테스트, 공개 릴리즈, 배포 smoke 점검 | [test-guide.md](test-guide.md) |
-| Lighthouse 진단과 route-critical 시각 회귀 baseline | [test-guide.md#lighthouse-diagnostic](test-guide.md#lighthouse-diagnostic), [test-guide.md#시각-회귀-컴포넌트-하니스](test-guide.md#시각-회귀-컴포넌트-하니스) |
+| Lighthouse 진단과 시각 회귀 baseline | [test-guide.md#lighthouse-diagnostic](test-guide.md#lighthouse-diagnostic), [test-guide.md#시각-회귀-컴포넌트-하니스](test-guide.md#시각-회귀-컴포넌트-하니스) |
+| Frontend build 크기 예산 | [performance-budget.md](performance-budget.md) |
 | 제품/기술 구조와 frontend route-first 경계 | [architecture.md](architecture.md) |
-| 신규 합류 개발자 온보딩 가이드 | [new-developer-onboarding-guide.md](new-developer-onboarding-guide.md) |
 | Cross-surface vertical slice 체크리스트 | [vertical-slice-checklist.md](vertical-slice-checklist.md) |
-| 근거 기반 AI 세션 생성과 외부 JSON 가져오기 | [session-import-generator.md](session-import-generator.md) |
+| AI 세션 생성, JSON 가져오기, 피드백 문서 템플릿 | [session-import-generator.md](session-import-generator.md) |
 | Spring AI provider, 비용·복구, trace/privacy | [spring-ai-2-provider-architecture.md](spring-ai-2-provider-architecture.md) |
+| TanStack Query 이관 현황과 패턴 | [server-state-migration.md](server-state-migration.md) |
+| Admin 화면 하드닝 체크리스트 | [admin-hardening-baseline.md](admin-hardening-baseline.md) |
 | 디자인 시스템과 pattern catalog | [../../design/README.md](../../design/README.md) |
 | 주요 기술적 의사결정 | [technical-decisions.md](technical-decisions.md) |
 | Architecture Decision Records | [adr/README.md](adr/README.md) |
-| 버저닝 source of truth와 release tag 기준 | [versioning.md](versioning.md) |
+| 버저닝과 release tag 기준 | [versioning.md](versioning.md) |
 | 릴리즈 관리와 CHANGELOG | [release-management.md](release-management.md), [../../CHANGELOG.md](../../CHANGELOG.md) |
+| 릴리즈 준비와 잔여 위험 점검 | [release-readiness-review.md](release-readiness-review.md) |
 | 배포 문서 허브 | [../deploy/README.md](../deploy/README.md) |
 | Cloudflare Pages 배포 | [../deploy/cloudflare-pages.md](../deploy/cloudflare-pages.md) |
 | OCI Compose stack 배포 | [../deploy/compose-stack.md](../deploy/compose-stack.md) |
@@ -32,30 +35,27 @@ ReadMates를 로컬에서 실행하고, 테스트하고, 구조를 이해하기 
 
 ## 주요 구조 문서
 
-- 처음 작업 표면을 고르는 에이전트나 개발자는 [project-map.md](project-map.md)에서 source of truth 우선순위, 코드/문서 지형, 실행 가이드와 preflight를 포함한 변경 유형별 읽는 순서, 검증 선택표를 먼저 확인합니다.
-- 변경 slice의 상태와 실패 경로는 [acceptance-matrix.md](acceptance-matrix.md)로 선택하고, selected row와 adjacent high-risk exclusion을 handoff에 남깁니다.
-- 새로 합류했거나 처음 프로젝트를 맡는 개발자는 [new-developer-onboarding-guide.md](new-developer-onboarding-guide.md)에서 제품 표면, 저장소 구조, 프론트엔드/BFF/백엔드/DB/Redis/Kafka 흐름, 기술 선택 이유, 작업 순서를 먼저 확인합니다.
-- 프런트엔드 route-first 경계, feature `api/model/route/ui` 책임, legacy 예외 제거 기준은 [architecture.md](architecture.md)의 "프런트엔드 route-first 경계" 섹션을 기준으로 합니다.
-- Lighthouse diagnostic은 public/member/host/admin dev-seed route의 비차단 품질 baseline입니다. Route-critical component visual regression은 host closing board, platform admin support/audit 판단 패널, public records/session 카드처럼 props만으로 검증 가능한 UI 조각을 Docker renderer baseline으로 관리합니다. 명령과 macOS 제약은 [test-guide.md](test-guide.md)의 해당 섹션을 기준으로 합니다.
-- frontend, BFF, server API, auth, persistence, public-safety를 함께 건드리는 변경은 [vertical-slice-checklist.md](vertical-slice-checklist.md)로 surface, server, BFF/auth, frontend, test 범위를 먼저 확인합니다.
-- 서버 current member 해석, OAuth/login return 경계, optional Redis 계층, 멀티 클럽 context/domain model, 현재/예정 세션 조회, `DRAFT -> OPEN -> CLOSED -> PUBLISHED` lifecycle, 멤버 세션 쓰기, 호스트 세션 쓰기, 세션/기록 공개 범위, 세션 기록 JSON 가져오기와 in-app AI 세션 생성, 이메일 템플릿과 멤버 알림 설정/알림함, 호스트 알림 운영과 수동 발송, 멤버 프로필/표시 이름 경계는 [architecture.md](architecture.md)의 "멀티 클럽 context와 도메인 모델", "서버 내부 구조", "Optional Redis 계층", "세션 lifecycle과 공개 범위", "세션 기록 JSON 가져오기", "AI-assisted 콘텐츠 운영", "이메일 알림, 멤버 알림함, 호스트 운영", "멤버 프로필과 표시 이름" 섹션을 기준으로 합니다.
-- 핵심 기술 선택의 배경, trade-off, 관련 검증 명령은 [technical-decisions.md](technical-decisions.md)를 기준으로 합니다. 현재 accepted ADR 목록은 [adr/README.md](adr/README.md)에서 개별 결정 문서로 확인할 수 있습니다.
-- 제품 릴리즈 버전 source of truth, server/frontend 공통 tag 기준, OCI server image tag 기준은 [versioning.md](versioning.md)를 기준으로 합니다.
-- v1.3.0 이후 OCI Docker Compose cutover와 BFF secret handling incident는 [2026-04-30 배포 보고서](../reports/2026-04-30-oci-compose-cutover.md)를 참고하되, 현재 운영 절차는 [compose-stack.md](../deploy/compose-stack.md)와 [oci-backend.md](../deploy/oci-backend.md)를 우선합니다.
-- Full source checkout에 repository-local contributor guidance가 있으면 task별 공통 계약과 package-local 지침을 먼저 확인합니다. Clean public artifact에서는 이 문서와 실제 코드·테스트·scripts를 기준으로 표면과 검증을 선택합니다.
-- `docs/superpowers` 아래 문서는 과거 설계와 구현 계획의 기록입니다. 현재 동작의 source of truth는 이 디렉터리와 실제 코드, 테스트, 배포 스크립트입니다.
+- **처음 작업할 때**: [project-map.md](project-map.md)에서 source of truth 우선순위, 코드 지형, 변경 유형별 읽는 순서, 검증 선택표를 봅니다.
+- **새로 합류했을 때**: [new-developer-onboarding-guide.md](new-developer-onboarding-guide.md)에서 제품 표면, 저장소 구조, frontend/BFF/backend/DB/Redis/Kafka 흐름을 한 번에 봅니다.
+- **risk evidence 선택**: [acceptance-matrix.md](acceptance-matrix.md)에서 selected row와 인접 high-risk 제외 사유를 고르고 handoff에 남깁니다.
+- **여러 표면을 함께 바꿀 때**: frontend, BFF, server API, auth, persistence, public-safety가 겹치면 [vertical-slice-checklist.md](vertical-slice-checklist.md)로 범위를 먼저 정합니다.
+- **경계의 기준**: frontend route-first 경계, 멀티 클럽 context, 서버 내부 구조, Optional Redis 계층, 세션 lifecycle과 공개 범위, 피드백 문서 흐름, 세션 기록 JSON 가져오기, AI-assisted 콘텐츠 운영, 이메일 알림과 호스트 운영은 모두 [architecture.md](architecture.md)의 같은 이름 섹션이 기준입니다.
+- **UI 품질 증거**: Lighthouse diagnostic은 public/member/host/admin dev-seed route의 비차단 baseline입니다. 시각 회귀는 props만으로 검증할 수 있는 route-critical UI 조각을 Docker renderer baseline으로 관리합니다. 명령은 [test-guide.md](test-guide.md)에 있습니다.
+- **기술 선택 배경**: [technical-decisions.md](technical-decisions.md)와 [adr/README.md](adr/README.md)를 봅니다.
+- **버전**: 제품 버전은 Git tag `vMAJOR.MINOR.PATCH` 하나입니다. 기준은 [versioning.md](versioning.md)입니다.
+- **작업 규칙**: full source checkout에 repository-local contributor guidance가 있으면 먼저 확인합니다. 공개 artifact에서는 이 문서와 실제 코드·테스트·scripts로 표면과 검증을 고릅니다.
+- **과거 기록**: `docs/superpowers`와 `docs/reports`는 과거 기록입니다. 현재 동작 기준은 이 디렉터리와 코드, 테스트, 배포 스크립트입니다.
 
 ## 문서 경계
 
-- 개발 문서는 한국어 설명을 기본으로 합니다.
-- 명령어, 경로, 환경 변수, API path, 기술명은 코드와 같은 표기를 유지합니다.
-- 운영 secret, 실제 멤버 데이터, DB dump, private deployment state, 로컬 절대 경로는 문서에 넣지 않습니다.
-- 직접 backend/API origin 예시는 `https://api.example.com` 같은 placeholder만 사용합니다.
-- 배포 절차의 상세 runbook은 `docs/deploy`에 두고, 이 디렉터리에서는 개발자가 알아야 할 연결점만 다룹니다.
+- 개발 문서는 한국어가 기본입니다. 명령어, 경로, 환경 변수, API path, 기술명은 코드 표기를 그대로 씁니다.
+- 운영 secret, 실제 멤버 데이터, DB dump, 배포 상태, 로컬 절대 경로는 넣지 않습니다.
+- 직접 backend/API origin 예시는 `https://api.example.com` 같은 placeholder만 씁니다.
+- 배포 상세 runbook은 `docs/deploy`에 두고, 여기서는 개발자가 알아야 할 연결점만 다룹니다.
 
 ## 문서 업데이트 완료 기준
 
-- 코드, 설정, 테스트, 스크립트와 맞는 사실만 현재 동작으로 설명합니다.
-- `docs/superpowers`의 과거 계획은 맥락으로만 보고, 현재 동작의 기준으로 승격하지 않습니다.
-- 개발 문서가 배포, public release, secret handling을 설명하면 관련 `docs/deploy` 또는 `scripts/README.md`도 함께 확인합니다.
-- 변경한 문서에 대해 `git diff --check -- <changed-docs>`를 실행하고, public-safe 내용이면 targeted safety scan 또는 공개 릴리즈 후보 검사를 실행했는지 명시합니다.
+- 코드, 설정, 테스트, 스크립트와 맞는 사실만 현재 동작으로 씁니다.
+- `docs/superpowers`의 과거 계획은 맥락으로만 보고 현재 기준으로 올리지 않습니다.
+- 배포, public release, secret 처리를 설명하면 관련 `docs/deploy`와 `scripts/README.md`도 함께 확인합니다.
+- 바꾼 문서에 `git diff --check -- <changed-docs>`를 실행하고, targeted safety scan이나 공개 릴리즈 후보 점검을 했는지 적습니다.

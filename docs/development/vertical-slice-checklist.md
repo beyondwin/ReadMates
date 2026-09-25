@@ -44,7 +44,7 @@ Use this checklist when a change crosses frontend, BFF, server API, auth, persis
 ## 5. Tests
 
 - Server boundary change: run `./server/gradlew -p server architectureTest`.
-- Server behavior change: run the focused unit or integration test for the slice.
+- Server behavior change: run the focused test in its lane (`./server/gradlew -p server unitTest --tests ...` or `integrationTest --tests ...`). The plain `test` task is disabled and runs nothing.
 - Frontend boundary change: run `pnpm --dir front exec vitest run tests/unit/frontend-boundaries.test.ts`.
 - Frontend behavior change: run the focused Vitest file and the smallest relevant route/component test.
 - API, auth, BFF, or user-flow change: run `pnpm --dir front test:e2e`.

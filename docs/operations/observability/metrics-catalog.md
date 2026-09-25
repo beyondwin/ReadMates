@@ -1,14 +1,17 @@
 # 메트릭 카탈로그
 
-> 운영 흐름으로 읽으려면 [Observability README](README.md)에서 시작하고, 배포 전후 검증은 [Deploy observability check](../runbooks/deploy-observability-check.md)를 기준으로 기록합니다.
+> 운영 흐름은 [Observability README](README.md)에서 시작합니다. 배포 전후 검증은 [Deploy observability check](../runbooks/deploy-observability-check.md)를 따릅니다.
+
+이 표의 이름은 `server/src/main/kotlin`의 Micrometer meter 이름과 맞춥니다. 표와 코드가 다르면 코드가 맞습니다.
 
 ## 노출 endpoint
 
 `GET http://<server-host>:8081/actuator/prometheus` — Prometheus exposition 형식.
 
-관리 서버는 `READMATES_MANAGEMENT_ADDRESS`(기본값 `127.0.0.1`) 와 `READMATES_MANAGEMENT_PORT`(기본값 `8081`)로 바인딩된다. 기본 설정은 루프백 전용이므로 외부에서 직접 접근할 수 없다. 공개 포트가 필요한 경우 reverse proxy에서 별도 보호를 추가해야 한다. 설정 근원: `server/src/main/resources/application.yml` (`management.server.address`, `management.server.port`).
-
-모든 메트릭에는 공통 태그 `application=readmates-server`가 자동 부착된다 (`management.metrics.tags.application`).
+- 관리 서버 주소: `READMATES_MANAGEMENT_ADDRESS`(기본 `127.0.0.1`), 포트: `READMATES_MANAGEMENT_PORT`(기본 `8081`).
+- 기본값은 loopback 전용입니다. 외부에서 scrape하려면 reverse proxy나 private network 보호를 따로 둡니다.
+- 모든 메트릭에 공통 태그 `application=readmates-server`가 붙습니다(`management.metrics.tags.application`).
+- 설정 위치: `server/src/main/resources/application.yml`의 `management` 블록.
 
 ## Custom 메트릭
 
@@ -43,6 +46,9 @@
 | `readmates.admin.health.refresh.overlap` | counter | `trigger` (`LAZY` / `SCHEDULED`) | 건수 | 이미 설치된 single-flight refresh future에 join한 trigger 수. 새 wave 수가 아니다. | `server/.../admin/health/adapter/out/observability/MicrometerPlatformAdminHealthMetricsAdapter.kt` | — | — |
 | `readmates.admin.health.refresh.duration` | timer/histogram | `result` (`FRESH` / `STALE` / `UNAVAILABLE`) | 초 | 완료된 실제 refresh wave의 wall-clock duration. join한 caller는 기록하지 않는다. | `server/.../admin/health/adapter/out/observability/MicrometerPlatformAdminHealthMetricsAdapter.kt` | — | — |
 | `readmates.admin.health.snapshot.stale.age.seconds` | gauge | (없음) | 초 | 마지막 완전 성공 이후의 현재 stale age. 첫 성공 전과 음수 값은 0으로 노출한다. | `server/.../admin/health/adapter/out/observability/MicrometerPlatformAdminHealthMetricsAdapter.kt` | — | — |
+| `readmates.admin.operations.reconciliation` | counter | `source` (AdminOperationSourceType), `status` (AdminOperationSourceStatus) | 건수 | Admin operation source reconciliation 결과. | `server/.../admin/operations/adapter/out/observability/MicrometerAdminOperationMetricsAdapter.kt` | — | — |
+| `readmates.admin.operations.lifecycle` | counter | `action` (AdminOperationAction), `result` (AdminOperationLifecycleResult) | 건수 | Admin operation case lifecycle 결과. | `server/.../admin/operations/adapter/out/observability/MicrometerAdminOperationMetricsAdapter.kt` | — | — |
+| `readmates.admin.operations.case.age` | timer | `source`, `severity` (AdminOperationSeverity) | 초 | 조회 시 관측한 admin operation case의 나이. 음수는 0으로 기록한다. | `server/.../admin/operations/adapter/out/observability/MicrometerAdminOperationMetricsAdapter.kt` | — | — |
 | `bff.audit.shutdown.dropped` | counter | (없음) | 건수 | BFF audit 태스크가 executor 종료 또는 큐 포화로 폐기된 횟수. graceful shutdown 시 0이 정상. 지속 증가 시 audit 손실 신호. | `server/.../security/BffSecretAuditExecutorConfig.kt` | — | — |
 | `notification.dispatch.unknown_status` | counter | (없음) | 건수 | SMTP 발송 결과가 `UNKNOWN`이라 retryable로 처리한 이메일 deliveries 건수. 짧은 spike는 정상, 지속 증가 시 SMTP 응답 모호 또는 어댑터 상태 매핑 문제 신호. | `server/.../notification/application/service/NotificationDispatchService.kt` | dashboards.md#notification-pipeline | — |
 | `readmates.aigen.jobs` | counter | (없음) | 건수 | AI generation job accepted count. | `server/.../aigen/application/service/AiGenerationMetrics.kt` | dashboards.md#ai-session-generation | — |
@@ -84,7 +90,9 @@
 - `http_server_requests_seconds_max` (gauge, 같은 라벨)
 - `http_server_requests_seconds_bucket` (histogram bucket)
 
-라벨 `uri`는 Spring path template (예: `/api/sessions/current`). 정규화된 path를 사용하므로 cardinality 안전.
+라벨 `uri`는 Spring path template입니다(예: `/api/sessions/current`). 정규화된 path라 cardinality가 안전합니다.
+
+> 주의: `_bucket` series는 histogram을 켜야 생깁니다. 현재 `application.yml`에는 `management.metrics.distribution.percentiles-histogram` 설정이 없어 `http_server_requests_seconds_bucket`이 없을 수 있습니다. 그러면 p95 기반 alert(`HttpLatencyP95High`), SLO(`api_read_latency_p95`), 대시보드 패널은 빈 결과를 냅니다. 운영 Prometheus에서 series 존재부터 확인합니다.
 
 ### JVM
 
@@ -105,7 +113,7 @@
 
 ### Logback
 
-- `logback_events_total` (counter, by `level=ERROR/WARN/INFO/DEBUG/TRACE`)
+- `logback_events_total` (counter, by `level` = `error` / `warn` / `info` / `debug` / `trace`, 소문자)
 
 ## DB row 기반 측정 (메트릭 아님, 쿼리)
 
@@ -121,9 +129,18 @@
 
 > 참고: `bff_secret_rotation_audit`의 날짜 컬럼은 `used_at`(datetime). `notification_deliveries`와 `notification_event_outbox`의 상태 컬럼은 `status`. 확인 근원: `server/src/main/resources/db/mysql/migration/V26__bff_secret_rotation_audit.sql`, `V20__kafka_notification_pipeline.sql`.
 
+## 참조되지만 아직 내보내는 코드가 없는 메트릭
+
+아래 이름은 SLO나 대시보드가 참조하지만, 현재 server 코드에는 이 meter를 만드는 곳이 없습니다. 쿼리 결과가 비어도 장애로 해석하지 않습니다.
+
+| 이름 | 참조 위치 |
+|------|----------|
+| `readmates_login_total` | `slos.yaml`의 `login_success_ratio` |
+| `readmates_bff_api_latency_seconds_bucket` | `slos.yaml`의 `bff_api_p95`, `ops/grafana/dashboards/bff-api-latency.json` |
+| `readmates_bff_api_response_total` | `ops/grafana/dashboards/bff-api-latency.json` |
+
 ## 후속 메트릭 후보 (현재 없음)
 
-- `bff_request_total` (counter, by `route`, `host`) — Cloudflare Worker analytics 의존. BFF layer에서 별도 계측 필요.
-- External blackbox/synthetic checks for full script-load failure remain a future candidate. The in-app route-load metric starts only after the SPA executes enough JavaScript to emit telemetry.
-- `readmates.redis.operation.errors` 세분화 — 현재 `feature`/`operation` 2개 태그로 충분하나, 향후 Redis Cluster 도입 시 `node` 태그 추가 검토.
-- Kafka consumer group lag을 별도 Prometheus metric으로 노출할지 검토 — 현재 `readmates.aigen.queue.depth`는 Redis active job backlog 의미로 고정합니다.
+- BFF 요청 계측(`route`, `status` 등) — Cloudflare Pages Functions에서 별도 계측이 필요합니다.
+- 전체 script 로드 실패를 잡는 외부 blackbox/synthetic check. 앱 내부 route-load 메트릭은 SPA가 실행된 뒤에만 기록됩니다.
+- Kafka consumer group lag 전용 메트릭. `readmates.aigen.queue.depth`는 Redis processing backlog 의미로 고정합니다.

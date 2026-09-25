@@ -1,19 +1,19 @@
 # 로컬 개발 환경 설정
 
-이 문서는 ReadMates를 로컬에서 실행하기 위한 최소 절차를 정리합니다. 운영 배포 절차는 [배포 문서](../deploy/README.md)를 참고합니다.
+ReadMates를 로컬에서 실행하는 최소 절차입니다. 운영 배포는 [배포 문서](../deploy/README.md)를 봅니다.
 
-로컬 실행은 backend health check와 frontend dev server가 모두 응답하고, dev-login 또는 OAuth 흐름 중 작업 목적에 맞는 경로를 확인했을 때 완료로 봅니다. 운영 secret, private endpoint, 실제 멤버 데이터는 로컬 env 파일이나 shell history에만 두더라도 Git에 남기지 않습니다.
-
-문서의 placeholder를 실제 운영값으로 바꿔 커밋하려는 상황, `docker compose down -v`처럼 로컬 데이터를 삭제하는 작업, 또는 SMTP/Google OAuth 같은 외부 provider 설정이 현재 코드와 맞는지 확신할 수 없는 상황에서는 먼저 멈추고 범위를 확인합니다.
+- 완료 기준: backend health와 frontend dev server가 응답하고, 필요한 로그인 경로(dev-login 또는 Google OAuth)를 확인했습니다.
+- 운영 secret, private endpoint, 실제 멤버 데이터는 Git에 남기지 않습니다.
+- placeholder를 운영값으로 바꿔 커밋하거나, `docker compose down -v`처럼 데이터를 지우거나, 외부 provider 설정이 불확실하면 먼저 멈추고 확인합니다.
 
 ## 필수 도구
 
 - `JDK 25 LTS`
 - `Node.js 24` (`.node-version`과 CI 기준)
-- `pnpm@11.13.1` (Corepack으로 활성화)
+- `pnpm@11.13.1` (루트 `package.json`의 `packageManager`, Corepack으로 활성화)
 - `Docker Compose` 또는 `MySQL 8` compatible database
 
-프론트엔드와 디자인 시스템은 루트 `package.json` / `pnpm-workspace.yaml` 기준의 `pnpm@11.13.1` workspace를 사용합니다. CI와 로컬 검증은 `.node-version`과 같은 Node.js 24로 frontend lint/test/build와 design-system check를 실행합니다. 백엔드는 Gradle wrapper와 Java toolchain으로 `JDK 25 LTS`를 사용합니다.
+루트 pnpm workspace가 `front`, `design/system`, `design/docs`를 관리합니다. 백엔드는 Gradle wrapper와 Java 25 toolchain을 씁니다. 전역 Gradle 설치는 필요 없습니다.
 
 ## 의존성 설치
 
@@ -21,15 +21,13 @@
 corepack pnpm install --frozen-lockfile
 ```
 
-`corepack`이 `PATH`에 없으면 새 wrapper를 추가하지 않고 기존 fallback을 사용합니다.
+`corepack`이 `PATH`에 없으면 아래 fallback을 씁니다.
 
 ```bash
 npx --yes corepack@0.35.0 pnpm install --frozen-lockfile
 ```
 
-이 명령은 `front`, `design/system`, `design/docs` workspace 의존성을 루트 `pnpm-lock.yaml` 기준으로 설치합니다.
-
-백엔드는 Gradle wrapper가 필요한 의존성을 내려받습니다. 별도 전역 Gradle 설치는 필요하지 않습니다.
+이 문서의 `corepack pnpm ...` 명령은 같은 방식으로 `npx --yes corepack@0.35.0 pnpm ...`로 바꿔 실행할 수 있습니다.
 
 ## MySQL 준비
 
@@ -58,7 +56,7 @@ Root `.env`는 Git에서 무시됩니다. 기본값을 바꾸려면 `.env.exampl
 
 이미 별도 MySQL 8 compatible database를 사용한다면 같은 database를 만들고, backend 실행 시 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`를 해당 값으로 바꿉니다.
 
-이 Compose database는 로컬 backend 실행과 E2E 준비용입니다. Backend Gradle test는 Testcontainers가 테스트용 MySQL을 직접 띄우므로, 일반 backend test를 위해 이 컨테이너를 먼저 실행할 필요는 없습니다. Playwright E2E schema 준비, `CREATE DATABASE` 권한, Flyway checksum mismatch 대응은 [test-guide.md](test-guide.md#playwright-e2e)를 기준으로 합니다.
+이 database는 로컬 backend 실행과 E2E용입니다. Backend `integrationTest`는 Testcontainers가 MySQL을 직접 띄우므로 먼저 실행할 필요가 없습니다. E2E schema, `CREATE DATABASE` 권한, Flyway checksum mismatch는 [test-guide.md](test-guide.md#playwright-e2e)를 봅니다.
 
 ## Optional Redis
 
@@ -93,13 +91,13 @@ docker compose up -d mysql kafka
 
 Redpanda healthcheck가 통과했는지는 `docker compose ps kafka`의 `healthy` 상태로 확인합니다.
 
-로컬 기본 bootstrap server는 `localhost:9092`입니다. Kafka/Testcontainers integration test만 실행하려면 backend를 `bootRun`으로 띄우거나 `READMATES_NOTIFICATIONS_ENABLED=true`를 설정하지 않습니다. Testcontainers가 테스트용 Kafka를 직접 띄우고 test configuration이 mail sender를 대체하므로 SMTP 환경 변수도 필요하지 않습니다.
+로컬 bootstrap server는 `localhost:9092`입니다. Kafka integration test만 돌릴 때는 backend를 띄우거나 SMTP를 설정할 필요가 없습니다. Testcontainers가 Kafka를 띄우고 test configuration이 mail sender를 대체합니다.
 
 ```bash
-./server/gradlew -p server test --tests 'com.readmates.notification.kafka.*'
+./server/gradlew -p server integrationTest --tests 'com.readmates.notification.kafka.*'
 ```
 
-로컬 backend에서 Kafka relay/consumer와 실제 이메일 delivery까지 함께 켜서 실행할 때는 backend env에 현재 코드의 Kafka property와 Spring mail property를 모두 넣습니다. `READMATES_NOTIFICATIONS_ENABLED=true`는 `SmtpMailDeliveryAdapter`를 선택하므로 `JavaMailSender`가 생성될 수 있게 `SPRING_MAIL_HOST` 같은 mail 설정이 필요합니다. 알림 이메일은 plain text fallback과 HTML body를 함께 담은 MIME 메시지로 발송되며, host detail API와 audit row에는 raw 이메일 본문을 노출하지 않습니다.
+로컬 backend에서 relay/consumer와 실제 이메일 발송까지 켤 때는 Kafka와 Spring mail property를 함께 넣습니다. `READMATES_NOTIFICATIONS_ENABLED=true`는 `SmtpMailDeliveryAdapter`를 선택하므로 `SPRING_MAIL_HOST` 같은 mail 설정이 필요합니다.
 
 ```bash
 READMATES_NOTIFICATIONS_ENABLED=true \
@@ -132,7 +130,7 @@ cp .env.example .env  # READMATES_LOCAL_MYSQL_ROOT_PASSWORD 등 편집
 docker compose -f deploy/oci/compose.yml -f deploy/local/compose.override.yml --env-file .env up
 ```
 
-override는 `readmates-api` container를 `dev` profile로 띄우고 8080/3306/6379 포트를 host에 노출합니다. 운영 VM에서는 이 override를 사용하지 않습니다 (운영은 `compose.yml` + sync-config가 배포한 env_file 조합으로만 동작).
+override는 `readmates-api`를 `dev` profile로 띄우고 8080/3306/6379 포트를 host에 엽니다. 운영 VM에서는 쓰지 않습니다.
 
 ## Backend 실행
 
@@ -166,8 +164,8 @@ READMATES_AUTH_SESSION_COOKIE_SECURE=false \
 | `READMATES_AUTH_RETURN_STATE_SECRET` | OAuth `returnTo` target 서명 secret입니다. 로컬에서도 placeholder-safe 값을 명시하면 production return-state 경계를 더 가깝게 확인할 수 있습니다. |
 | `READMATES_ALLOWED_ORIGINS` | mutating API 요청의 `Origin` 또는 `Referer` 허용 origin입니다. 쉼표로 여러 값을 줄 수 있습니다. |
 | `READMATES_BFF_SECRET` | BFF가 Spring API로 전달하는 공유 secret입니다. 로컬에서도 frontend proxy와 같은 값을 쓰면 production boundary를 비슷하게 테스트할 수 있습니다. |
-| `READMATES_BFF_SECRET_REQUIRED` | 기본 `true`입니다. `application-dev.yml`에서는 `false`로 완화되어 있지만, `READMATES_BFF_SECRET`을 설정하면 `/api/**` 요청은 `X-Readmates-Bff-Secret`이 필요합니다. |
-| `READMATES_IP_HASH_BASE_SECRET` | rate limit/client IP hash salt의 base secret입니다. `dev` 같은 비운영 profile에서도 빈 값은 기본 실패이므로 로컬 bootRun에는 placeholder-safe 값을 명시합니다. 빈 값을 허용해야 하는 특수 로컬 실행만 `readmates.security.ip-hash.allow-empty-secret=true`를 별도로 사용합니다. |
+| `READMATES_BFF_SECRET_REQUIRED` | 기본 `true`, `application-dev.yml`은 `false`입니다. 그래도 `READMATES_BFF_SECRET`을 설정하면 `/api/**`는 `X-Readmates-Bff-Secret`을 요구합니다. |
+| `READMATES_IP_HASH_BASE_SECRET` | rate limit/client IP hash의 base secret입니다. 빈 값은 `dev`에서도 startup 실패이므로 placeholder 값을 넣습니다. 특수한 경우에만 `readmates.security.ip-hash.allow-empty-secret=true`를 씁니다. |
 | `READMATES_AUTH_SESSION_COOKIE_SECURE` | 로컬 HTTP에서 `readmates_session` cookie를 테스트하려면 `false`로 둡니다. |
 | `READMATES_FLYWAY_LOCATIONS` | Flyway migration 위치입니다. 기본은 `classpath:db/mysql/migration`이고, `dev` profile은 `classpath:db/mysql/dev`를 추가합니다. |
 | `READMATES_NOTIFICATIONS_ENABLED` | 알림 relay/consumer bean을 켜는 상위 flag입니다. 기본은 `false`입니다. |
@@ -229,7 +227,7 @@ READMATES_LOCAL_GOOGLE_OAUTH_OPEN_BROWSER=false \
 3. `chooseAccount=true` 시작 URL로 동일 계정 재선택 흐름을 확인합니다.
 4. `Ctrl+C` 종료 후 기존 서비스와 기존 포트가 유지되는지 확인합니다.
 
-수동 확인은 localhost 5174 callback이 Google Cloud에 등록된 경우에만 수행합니다. 다른 프론트 포트는 Login/redirect contract 자동 검증으로만 제한합니다.
+수동 확인은 5174 callback을 Google Cloud에 등록한 경우에만 합니다. 다른 포트는 자동 redirect 검증만 합니다.
 
 ### Troubleshooting
 
@@ -237,7 +235,7 @@ READMATES_LOCAL_GOOGLE_OAUTH_OPEN_BROWSER=false \
 | --- | --- |
 | Keychain 누락/포맷 오류 | `security find-generic-password -a "$USER" -s readmates.local.google-oauth.client-id -w`로 존재 여부를 점검하고, 필요하면 대화형 `security add-generic-password ... -w`로 재등록합니다. |
 | `invalid_client` | client ID를 교체하지 말고, Google Cloud 승인 callback과 현재 localhost callback을 동일하게 등록했는지 확인합니다. |
-| `redirect_uri_mismatch` | `http://localhost:5174/login/oauth2/code/google` (or 5173 flow callback) 정확히 일치하는지 확인하고 다른 callback를 허용하지 않습니다. |
+| `redirect_uri_mismatch` | 등록한 callback(`http://localhost:5174/login/oauth2/code/google` 또는 5173)과 정확히 일치하는지 확인합니다. |
 | 포트 충돌 | `lsof -nP -iTCP:5174 -sTCP:LISTEN`로 listener만 조회해 현재 충돌 포트를 파악하고 오버라이드 포트를 설정해 다시 실행합니다. 기존 서비스는 종료하지 않습니다. |
 | readiness timeout | `READMATES_LOCAL_GOOGLE_OAUTH_STARTUP_TIMEOUT_SECONDS`를 조정하고 management health + `/login` 응답을 확인해 선행 실패 원인을 좁힙니다. |
 
@@ -245,7 +243,7 @@ READMATES_LOCAL_GOOGLE_OAUTH_OPEN_BROWSER=false \
 
 ### 기존 방식(고급 사용)
 
-고급자가 직접 backend/frontend를 분리 실행해야 할 때만 아래 순서를 사용합니다.
+backend와 frontend를 따로 띄워야 할 때만 씁니다.
 
 ```bash
 ./scripts/run-local-google-oauth.sh
@@ -256,7 +254,7 @@ VITE_ENABLE_GOOGLE_LOGIN=true corepack pnpm --dir front dev
 
 운영 migration은 `server/src/main/resources/db/mysql/migration`에만 추가합니다. `server/src/main/resources/db/migration`은 사용하지 않으며, 새 파일을 그 위치에 만들면 운영 Flyway가 읽지 않습니다.
 
-Server 로그는 JSON 형식이므로 `./server/gradlew bootRun 2>&1 | jq '.'`로 보기 좋게 볼 수 있습니다.
+Server 로그는 JSON이므로 `./server/gradlew -p server bootRun 2>&1 | jq '.'`로 볼 수 있습니다.
 
 ## Frontend 실행
 
@@ -266,7 +264,7 @@ Vite 개발 서버는 `front/vite.config.ts`의 proxy를 사용합니다. 로컬
 READMATES_API_BASE_URL=http://localhost:8080 \
 READMATES_BFF_SECRET='<local-bff-secret>' \
 VITE_ENABLE_DEV_LOGIN=true \
-pnpm --dir front dev
+corepack pnpm --dir front dev
 ```
 
 브라우저에서 `http://localhost:5173`을 엽니다.
@@ -291,7 +289,7 @@ Dev-login은 로컬 개발과 E2E fixture를 위한 흐름입니다. production 
 - Frontend login 화면은 production build에서는 dev-login 버튼을 숨깁니다.
 - Fixture 계정은 `host@example.com`, `member1@example.com` 같은 `example.com` 주소를 사용합니다.
 - Dev seed는 기존 account alias인 `users.short_name`과 현재 표시 이름 저장소인 `memberships.short_name`을 모두 채웁니다. 화면 표시와 프로필 수정 API는 `displayName` 필드를 주고받고 membership 단위 `memberships.short_name`을 갱신하므로, `/app/me`와 `/app/host/members`에서 표시 이름 변경 흐름을 로컬로 확인할 수 있습니다.
-- Dev seed와 E2E fixture는 현재 `OPEN` 세션, `CLOSED`/`PUBLISHED` 기록, 호스트가 새로 만드는 `DRAFT` 예정 세션 흐름을 검증할 수 있게 구성되어 있습니다. 호스트는 `/app/host`에서 예정 세션 공개 범위를 `HOST_ONLY`, `MEMBER`, `PUBLIC`으로 바꾸고, `DRAFT`를 현재 `OPEN` 세션으로 시작한 뒤 `/app/host/sessions/:sessionId/edit`에서 세션 닫기와 기록 발행 흐름을 확인할 수 있습니다.
+- Dev seed와 E2E fixture에는 `OPEN` 세션, `CLOSED`/`PUBLISHED` 기록, 새 `DRAFT` 예정 세션 흐름이 있습니다. 호스트는 `/app/host`에서 예정 세션의 게스트 접근(`HOST_ONLY` ↔ `GUEST_READABLE`)을 바꾸고 `DRAFT`를 `OPEN`으로 시작한 뒤, `/app/host/sessions/:sessionId/edit`에서 닫기와 기록 발행을 확인할 수 있습니다.
 
 운영 로그인은 Google OAuth 흐름입니다. 브라우저는 `/oauth2/authorization/google`로 시작하고, callback은 `/login/oauth2/code/google`로 돌아오며, Spring은 성공 시 `readmates_session` cookie를 발급합니다. 로컬 route guard, loader, API 401 흐름도 같은 origin의 안전한 relative `returnTo`만 `/login?returnTo=...`와 OAuth start에 전달하므로, 복귀 경로를 확인할 때 absolute URL이나 login/reset/invite/OAuth path를 fixture로 쓰지 않습니다.
 

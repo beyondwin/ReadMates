@@ -1,8 +1,19 @@
 # 권장 대시보드
 
-> 운영 흐름으로 읽으려면 [Observability README](README.md)에서 시작하고, 배포 전후 검증은 [Deploy observability check](../runbooks/deploy-observability-check.md)를 기준으로 기록합니다.
+> 운영 흐름은 [Observability README](README.md)에서 시작합니다. 배포 전후 검증은 [Deploy observability check](../runbooks/deploy-observability-check.md)를 따릅니다.
 
-본 문서는 Grafana(또는 호환 도구)에서 구성할 패널과 PromQL 쿼리를 정리합니다. 일부 대시보드는 이미 JSON으로 커밋되어 있으며(`ops/grafana/dashboards/`: `aigen.json`=AI Session Generation, `notification-dispatch.json`=Notification Dispatch, `bff-api-latency.json`=BFF → API Latency, `frontend-runtime.json`=Frontend Runtime), 나머지 패널은 도구 도입 후 export 권장. 커밋된 JSON은 `scripts/lint-grafana-dashboards.sh`로 검증한다.
+Grafana 패널과 PromQL을 정리한 문서입니다. 기준은 `ops/grafana/dashboards/*.json`이며, 검증은 `./scripts/lint-grafana-dashboards.sh`로 합니다.
+
+커밋된 대시보드:
+
+| 파일 | Title | 비고 |
+| --- | --- | --- |
+| `aigen.json` | AI Session Generation | [Dashboard 6](#ai-session-generation) |
+| `notification-dispatch.json` | Notification Dispatch | [Dashboard 2](#notification-pipeline) |
+| `frontend-runtime.json` | Frontend Runtime | [Dashboard 4](#frontend-runtime) |
+| `bff-api-latency.json` | BFF -> API Latency | `readmates_bff_api_*` 메트릭을 쓰지만 현재 이를 내보내는 코드가 없어 빈 패널입니다. |
+
+Service Health, Database, Redis Cache 절은 JSON이 없는 **권장 패널**입니다. Grafana Explore에서 쿼리를 직접 붙여 넣어 씁니다.
 
 ## Dashboard 1 — Service Health
 <a id="service-health"></a>
@@ -28,7 +39,7 @@
 
 ### Panel: HTTP latency p50/p95/p99 (by route)
 - 목적: 엔드포인트별 응답 지연 분포 추적.
-- 메트릭: `http_server_requests_seconds_bucket`
+- 메트릭: `http_server_requests_seconds_bucket` (histogram 설정이 없으면 비어 있음 — [메트릭 카탈로그 HTTP](metrics-catalog.md#http) 참고)
 - PromQL:
   ```promql
   histogram_quantile(0.99,
@@ -69,7 +80,9 @@
 ## Dashboard 2 — Notification Pipeline
 <a id="notification-pipeline"></a>
 
-실제 dashboard JSON은 `ops/grafana/dashboards/notification-dispatch.json`(title: "Notification Dispatch")입니다.
+`notification-dispatch.json`에는 4개 패널이 있습니다: publish success ratio, event outbox DEAD count, event outbox backlog by status, email delivery backlog by status. 그 아래 send/failure/dead rate, Logback ERROR, SQL 패널은 권장 패널입니다.
+
+읽는 순서: delivery backlog가 0이어도 relay가 정상이라는 뜻은 아닙니다. outbox backlog와 publish result를 먼저 보고, backlog refresh가 `partial|failure`면 마지막 성공 snapshot 시각을 확인합니다.
 
 ### Panel: Relay publish success ratio
 - 목적: 모든 fixed publish result 중 `success` 비율을 5분 rate로 표시합니다.
@@ -78,7 +91,7 @@
   (sum(rate(readmates_outbox_publish_total{result="success"}[5m])) or vector(0))
     / clamp_min((sum(rate(readmates_outbox_publish_total[5m])) or vector(0)), 1e-9)
   ```
-- 해석: failure-only는 0, success-only는 1, 아직 어떤 result series도 없으면 0입니다. Prometheus datasource/query 자체가 unavailable인 상태는 이 0-fill 결과와 구분해 unavailable로 표시합니다.
+- 해석: 실패만 있으면 0, 성공만 있으면 1, series가 아직 없으면 0입니다. Prometheus query 자체가 실패한 상태는 이 0과 구분합니다.
 
 ### Panel: Event outbox backlog (status별)
 - 목적: `notification_event_outbox`의 relay/Kafka publication 적체를 `pending|failed|dead|publishing`으로 분리합니다.
@@ -97,7 +110,7 @@
   ```promql
   readmates_notifications_outbox_backlog{status="dead"}
   ```
-- 임계 (참고): `pending` > 100이 5분 이상 지속, 또는 `dead` > 0 지속 시 조사.
+- 임계 (참고): alert 기준은 `pending` > 100 (10m), > 1000 (5m, critical), `dead` > 0입니다.
 
 ### Panel: Email delivery backlog (status별)
 - 목적: `notification_deliveries`의 worker/SMTP 적체를 `pending|failed|dead|sending`으로 분리합니다.
@@ -153,7 +166,7 @@
 - 임계 (참고): `dead` 행 존재 시 즉시 조사.
 
 ### Panel: DEAD state 발생 추이
-- 목적: dead-letter 누적 추이 확인. 전용 Grafana alert 기반으로 활용.
+- 목적: dead-letter 누적 추이 확인. `NotificationDeadLetters` alert와 같은 식입니다.
 - 메트릭: `readmates_notifications_dead_total`
 - PromQL:
   ```promql
@@ -186,7 +199,7 @@
 ## Dashboard 4 — Frontend Runtime
 <a id="frontend-runtime"></a>
 
-실제 dashboard JSON은 `ops/grafana/dashboards/frontend-runtime.json`(title: "Frontend Runtime")입니다.
+`frontend-runtime.json`의 4개 패널과 같습니다.
 
 ### Panel: Frontend route load p95
 - 목적: Browser SPA route transition latency를 route pattern별로 확인한다.
@@ -286,7 +299,7 @@
 ## Dashboard 6 — AI Session Generation
 <a id="ai-session-generation"></a>
 
-실제 dashboard JSON은 `ops/grafana/dashboards/aigen.json`입니다. 패널은 `readmates_aigen_*` meter와 audit-log drill-down 안내를 함께 보여줍니다.
+`aigen.json`(uid `aigen-overview`)의 패널입니다. `$provider`, `$model` 변수로 필터합니다.
 
 | Panel | 메트릭 / 근거 | 목적 |
 | --- | --- | --- |
@@ -305,7 +318,9 @@
 | Gate rejections / circuit state | provider gate meter + `resilience4j_circuitbreaker_state` | pre-transport rejection, provider 장애, concurrency 포화 구분 |
 | Exporter and Tempo health | OTLP export/drop meter + Tempo scrape meter | product 상태와 trace delivery 장애를 분리 |
 
-Latency histogram exemplar는 Grafana의 `readmates-tempo` datasource로 이동합니다. Trace에는 prompt/completion/transcript/evidence/raw error와 user/session/club identity가 없으며, row-level business audit은 MySQL V38을 사용합니다. Tempo는 7일 retention이므로 장기 incident 증거가 필요하면 content-free 집계만 별도 보존합니다.
+- Latency histogram exemplar를 누르면 Grafana `readmates-tempo` datasource로 이동합니다.
+- Trace에는 prompt, completion, transcript, evidence, raw error, user/session/club identity가 없습니다. 행 단위 감사는 MySQL `ai_generation_audit_log`와 provider attempt audit(V38)을 봅니다.
+- Tempo 보관 기간은 7일(`block_retention: 168h`)입니다. 오래 남길 증거는 content-free 집계만 따로 보존합니다.
 
 ## 패널 작성 규약
 
@@ -313,5 +328,4 @@ Latency histogram exemplar는 Grafana의 `readmates-tempo` datasource로 이동�
 - PromQL은 *복사-붙여넣기 가능*하게 단일 쿼리.
 - 도구 종속 (Grafana variables 등)은 일반화된 PromQL 위주로.
 - Micrometer 네이밍 규칙: `.`은 `_`으로 변환, counter는 `_total` suffix 자동 부착. 예: `readmates.notifications.sent` → `readmates_notifications_sent_total`.
-
-Notification Dispatch dashboard는 `readmates_outbox_publish_total` success ratio, event outbox backlog(`pending|failed|dead|publishing`), delivery backlog(`pending|failed|dead|sending`)를 분리합니다. delivery가 0이어도 relay가 정상이라는 뜻이 아니므로 outbox와 publish result를 먼저 보고, backlog refresh `partial|failure`이면 last-success snapshot의 시각을 확인합니다.
+- 대시보드 JSON을 바꾸면 `./scripts/lint-grafana-dashboards.sh`를 실행합니다.

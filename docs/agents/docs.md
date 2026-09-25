@@ -50,6 +50,12 @@ For agent-routing or public-safety documentation, also run a targeted scan over 
 rg -n "(^|[^A-Za-z0-9_])([o]cid1\\.|/[U]sers/|/[Hh]ome/[^[:space:]]+|[s]k-[A-Za-z0-9]|[g]hp_[A-Za-z0-9]|[g]ithub_pat_|BEGIN (RSA|OPENSSH|PRIVATE) [K]EY)" <changed-docs>
 ```
 
+For agent instruction changes, also run:
+
+```bash
+python3 -B scripts/check-agent-guidance.py
+```
+
 For deploy, public repository, release-candidate, or scanner documentation, also run targeted link and public-safety scans over the changed docs. When building a clean public release candidate, run:
 
 ```bash

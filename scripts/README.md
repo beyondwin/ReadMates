@@ -1,74 +1,83 @@
-# 공개 릴리즈 보조 스크립트
+# ReadMates 스크립트
 
-이 디렉터리의 스크립트는 private ReadMates 작업 tree에서 공개 가능한 릴리즈 후보를 만들고 검사합니다. 이 스크립트들은 GitHub에 게시하지 않고, 저장소 공개 설정을 바꾸지 않고, secret을 교체하지 않고, commit을 만들지 않습니다.
+이 디렉터리에는 공개 릴리즈 후보 생성·검사, 로컬/CI 점검, 로컬 OAuth 실행, 관측 설정 검증, 배포 후 smoke 스크립트가 있습니다. 명령은 모두 저장소 루트에서 실행하는 기준입니다.
 
-공개 저장소 전환과 secret 관리 기준은 [공개 저장소 보안](../docs/deploy/security-public-repo.md)을 함께 확인합니다.
+이 스크립트들은 GitHub에 게시하지 않고, 저장소 공개 설정을 바꾸지 않고, secret을 교체하지 않고, commit을 만들지 않습니다. 공개 저장소 기준은 [공개 저장소 보안](../docs/deploy/security-public-repo.md)을 봅니다.
 
-스크립트 작업은 후보 생성 또는 검사 결과가 명확히 출력되고, 발견된 finding을 공개 가능/수정 필요/active secret 가능성으로 분류했을 때 완료입니다. 실패한 scanner 결과를 단순 경고처럼 취급하지 않습니다.
+- scanner 실패는 경고가 아니라 실패입니다. finding은 공개 가능 / 수정 필요 / active secret 가능성으로 분류합니다.
+- `gitleaks` 미설치 fallback처럼 검증이 약해진 경우는 결과에 그 한계를 적습니다.
+- 스크립트 통과만으로 secret rotation, 공개 전환, branch protection, production 배포가 끝났다고 보지 않습니다.
 
-`gitleaks` 미설치 fallback이나 current-tree historical finding처럼 검증 강도가 낮거나 해석이 필요한 경우에는 그 한계를 결과에 남깁니다. 이 스크립트 통과만으로 secret rotation, GitHub 공개 전환, branch protection 설정, production 배포가 끝났다고 판단하지 않습니다.
+## 한눈에 보기
+
+| 목적 | 스크립트 |
+| --- | --- |
+| 서버 PR 수준 점검 | `server-ci-check.sh` |
+| 푸시 전 CI 점검 | `pre-push-check.sh` |
+| 배포 workflow 계약 검사 | `check-deploy-workflow-contract.py` |
+| Flyway migration 불변성 검사 | `check-flyway-migration-immutability.py` |
+| 공개 릴리즈 후보 생성·검사 | `build-public-release-candidate.sh`, `public-release-check.sh`, `verify-public-release-fixtures.sh` |
+| 배포 후 공개 연동 smoke | `smoke-production-integrations.sh` |
+| 로컬 Google OAuth | `run-local-google-oauth.sh`, `run-local-google-oauth-stack.sh`, `verify-local-google-oauth-*.sh`, `check-local-google-oauth-redirect.py` |
+| 관측 설정 검증 | `validate-prometheus-*.sh`, `validate-tempo-config.sh`, `validate-alertmanager-config.sh`, `lint-grafana-dashboards.sh`, `observability-local-smoke.sh` |
+| 운영 AI 설정 검증 | `validate-production-ai-config.sh`, `verify-production-ai-config-fixtures.sh` |
+| AI 생성 PII/라이브 smoke | `aigen-pii-check.sh`, `aigen-smoke-{claude,openai,gemini}.sh` |
+| 월간 SLO 보고서 초안 | `generate-slo-report.py` |
+| 운영 env → GitHub Secrets/Variables 일괄 등록 | `sync-config/import-from-prod-env.sh` (기본 dry-run, `--apply`로 실제 반영) |
+| 빌드/테스트 시간 측정 | [`bench/`](bench/README.md) |
 
 ## Source-checkout contributor guidance
 
-A full source checkout can provide repository-local contributor routing, preflight, and guidance checks. Use those tools when they are present in that checkout; they are read-only planning support and do not replace the canonical checks below.
+전체 source checkout에는 저장소 전용 contributor 라우팅·사전 점검·안내 검사 도구가 있을 수 있습니다. 있으면 계획 보조용으로 쓰되, 아래 표준 점검을 대신하지 않습니다.
 
-The clean public release candidate intentionally omits contributor-only guidance. Its shipped release helpers are self-contained and do not require a particular local agent tool.
+clean 공개 릴리즈 후보에는 contributor 전용 안내가 의도적으로 빠져 있습니다. 후보에 포함된 release helper는 특정 로컬 agent 도구 없이 동작합니다.
 
 ## `check-deploy-workflow-contract.py`
 
-`Deploy Server Image` workflow가 exact release semver의 annotated tag를 checkout하고, tag commit과 `HEAD`를 일치시킨 뒤, Trivy가 검사한 digest와 같은 digest만 release tag로 promote하는지 fail closed로 검사합니다. CI와 `pre-push-check.sh`, public release candidate가 같은 checker를 사용합니다.
+`Deploy Server Image` workflow가 아래 계약을 지키는지 fail closed로 검사합니다. CI, `pre-push-check.sh`, 공개 후보가 같은 checker를 씁니다.
+
+- exact release semver의 annotated tag를 checkout합니다.
+- tag commit과 `HEAD`가 같습니다.
+- Trivy가 검사한 digest와 같은 digest만 release tag로 promote합니다.
 
 ```bash
 python3 -B scripts/check-deploy-workflow-contract.py --self-test
 python3 -B scripts/check-deploy-workflow-contract.py
 ```
 
-다른 candidate나 fixture의 workflow를 검사할 때만 `--workflow <path>`를 사용합니다. 이 검사는 workflow를 실행하거나 image를 publish하지 않습니다.
+다른 workflow 파일을 검사할 때만 `--workflow <path>`를 씁니다. workflow를 실행하거나 image를 publish하지는 않습니다.
 
 ## `check-flyway-migration-immutability.py`
 
-기준 commit에 존재하는 production Flyway migration을 현재 worktree와 비교해 과거 SQL의 수정, 삭제,
-rename, 이동을 차단합니다. 비교 대상은
-`server/src/main/resources/db/mysql/migration/`이며 기준 migration은 Git index와 filesystem 상태를
-독립적으로 비교합니다. 따라서 staged, unstaged, index/worktree가 다른 상태, 삭제, untracked 파일을
-모두 검사합니다. Filesystem 내용은 `core.autocrlf` 같은 Git의 기본 text/EOL 정규화를 적용한 object
-identity로 비교하므로 clean checkout의 플랫폼별 줄바꿈은 변경으로 오인하지 않지만, 실제 SQL 내용
-변경은 계속 차단합니다. Production migration에 활성 `filter` attribute가 있으면 외부 clean filter를
-실행하기 전에 fail closed로 거부합니다. 모든 indexed migration은 cached attribute를, 모든 current
-migration은 worktree attribute를 각각 검사하므로 새 staged/untracked migration과
-`.gitattributes`의 index/worktree 차이도 우회할 수 없습니다. `filter`가 unset 또는 unspecified인
-경우에는 기본 정규화만 사용합니다. 기준 ref는 신뢰할 수 있는 로컬 commit 또는 ref를 명시해야 합니다.
+기준 commit에 있던 production migration(`server/src/main/resources/db/mysql/migration/`)이 수정·삭제·rename·이동되지 않았는지 검사합니다.
 
 ```bash
 python3 -B scripts/check-flyway-migration-immutability.py --self-test
 python3 -B scripts/check-flyway-migration-immutability.py --base-ref <trusted-base-ref>
 ```
 
-검사기는 완전한 로컬 Git history에서 merge base를 해석하고 exact object ID, migration 수, 다음 허용
-version을 출력합니다. shallow/incomplete history, 해석할 수 없는 base, 공통 조상이 없는 history,
-잘못된 파일명이나 위치, 숫자로 같은 중복 version, migration 또는 상위 디렉터리 symlink와 읽을 수
-없는 파일은 fail closed로 거부합니다. Git object 조회는 lazy fetch를 비활성화하므로 promisor remote에
-누락 object를 요청하지 않습니다. SQL 본문, Git 오류 전문, 로컬 절대 경로는 출력하지 않습니다.
+- staged, unstaged, untracked, index/worktree 차이를 모두 봅니다. Git 기본 줄바꿈 정규화는 적용하므로 플랫폼별 줄바꿈은 변경으로 보지 않습니다.
+- migration에 활성 `filter` attribute가 있으면 외부 filter를 실행하기 전에 거부합니다.
+- shallow history, 해석할 수 없는 base, 공통 조상 없음, 잘못된 파일명·위치, 중복 version, symlink, 읽을 수 없는 파일은 거부합니다. lazy fetch는 하지 않습니다.
+- 출력은 merge base object ID, migration 수, 다음 허용 version입니다. SQL 본문, Git 오류 전문, 로컬 절대 경로는 출력하지 않습니다.
 
-실패 시 과거 migration을 수정하거나 삭제하거나 `flyway repair`로 우회하지 않습니다. 검사기가 안내한
-base maximum보다 큰 `V{N}__lower_snake_case_description.sql` 파일을 새 forward-only migration으로
-추가해 보정합니다. 기존 intentional version gap을 채우는 낮은 version도 허용되지 않습니다.
+실패하면 과거 migration을 고치거나 `flyway repair`로 우회하지 않습니다. 안내된 최대 version보다 큰 `V{N}__lower_snake_case_description.sql`을 새로 추가합니다. 기존 version 빈칸을 채우는 낮은 번호도 허용되지 않습니다.
 
 ## `run-local-google-oauth.sh`
 
-macOS 로컬 Google OAuth credential을 Git이나 `.env`에 저장하지 않고 Keychain에서 Spring backend 프로세스로만 주입합니다. 운영 OAuth client와 분리된 localhost 전용 Web client를 사용하고, 등록과 frontend 비민감 switch 절차는 [로컬 개발 환경](../docs/development/local-setup.md#macos-keychain으로-로컬-google-oauth-실행)을 따릅니다.
+macOS Keychain에서 로컬 Google OAuth credential을 읽어 Spring backend 프로세스에만 주입합니다. Git이나 `.env`에는 저장하지 않습니다. 운영과 분리된 localhost 전용 Web client를 쓰고, 등록 절차는 [로컬 개발 환경](../docs/development/local-setup.md#macos-keychain으로-로컬-google-oauth-실행)을 따릅니다.
 
 ```bash
 ./scripts/run-local-google-oauth.sh
 ```
 
-실행기는 client ID 형식과 client secret의 누락·대표 placeholder를 fail closed로 거부하고 값 자체는 출력하지 않습니다. 실제 backend를 띄우지 않고 Keychain 조회와 형식만 확인할 때는 다음 dry-run을 사용합니다.
+client ID 형식, secret 누락, 대표 placeholder를 거부하고 값은 출력하지 않습니다. backend를 띄우지 않고 Keychain 조회와 형식만 볼 때:
 
 ```bash
 READMATES_LOCAL_GOOGLE_OAUTH_DRY_RUN=true ./scripts/run-local-google-oauth.sh
 ```
 
-공개 fixture 검증은 mock Keychain 응답으로 누락·placeholder·성공 경계를 확인하며 실제 Keychain이나 Google 공급자를 호출하지 않습니다.
+mock Keychain으로 경계를 검증하는 fixture(실제 Keychain·Google 호출 없음):
 
 ```bash
 ./scripts/verify-local-google-oauth-keychain-fixtures.sh
@@ -76,13 +85,13 @@ READMATES_LOCAL_GOOGLE_OAUTH_DRY_RUN=true ./scripts/run-local-google-oauth.sh
 
 ## `run-local-google-oauth-stack.sh`
 
-두 터미널 없이 frontend + backend를 한 번에 띄우고 포트 충돌/health readiness/정리 동작을 한 번에 검증하는 supervisor입니다.
+frontend와 backend를 한 번에 띄우고 포트 충돌, health 준비, 종료 정리를 관리합니다.
 
 ```bash
 ./scripts/run-local-google-oauth-stack.sh
 ```
 
-필요 시 포트를 override하고 로그/열기 동작을 제어할 수 있습니다.
+포트와 동작을 바꿀 때:
 
 ```bash
 READMATES_LOCAL_GOOGLE_OAUTH_FRONTEND_PORT=5174 \
@@ -93,49 +102,33 @@ READMATES_LOCAL_GOOGLE_OAUTH_OPEN_BROWSER=false \
 ./scripts/run-local-google-oauth-stack.sh
 ```
 
-실행 성공 시 frontend/login 경로와 backend health가 준비되면 `Ctrl+C`로 종료할 수 있으며, 종료 시 시작한 frontend/backend만 정리합니다.
-`run-local-google-oauth-stack.sh`는 임시 런타임 로그를 운영체제 temp에 두고, 시작한 자식 프로세스 그룹만 종료합니다.
+준비되면 `Ctrl+C`로 끝냅니다. 자기가 시작한 프로세스 그룹만 정리하고, 임시 로그는 OS temp에 둡니다.
 
 ## `verify-local-google-oauth-stack.sh`
 
-실행 중인 stack에 대해 OAuth redirect contract를 비밀 노출 없이 검증합니다.
+실행 중인 stack의 OAuth redirect contract를 secret 노출 없이 검사합니다. provider redirect URL은 출력하지 않고, 실제 Google 로그인 완료는 확인 대상이 아닙니다.
 
 ```bash
 ./scripts/verify-local-google-oauth-stack.sh
 ```
 
-필요 시 포트 오버라이드:
-
-```bash
-READMATES_LOCAL_GOOGLE_OAUTH_FRONTEND_PORT=5174 \
-READMATES_LOCAL_GOOGLE_OAUTH_BACKEND_PORT=28080 \
-READMATES_LOCAL_GOOGLE_OAUTH_MANAGEMENT_PORT=28081 \
-./scripts/verify-local-google-oauth-stack.sh
-```
-
-공개 fixture는 runner 없이도 redirect contract 경계를 포트 충돌/timeout/정리/redaction으로 검증합니다.
+포트는 위와 같은 `READMATES_LOCAL_GOOGLE_OAUTH_*_PORT` 변수로 바꿉니다. runner 없이 경계(포트 충돌, timeout, 정리, redaction)를 검증하는 fixture:
 
 ```bash
 ./scripts/verify-local-google-oauth-stack-fixtures.sh
 ```
 
-Smoke verifier는 provider redirect URL을 터미널에 출력하지 않고 redirect contract만 검사합니다. 실제 Google 로그인 완료 또는 callback 코드는 확인 대상이 아닙니다.
-
 ## `server-ci-check.sh`
 
-서버 코드를 수정한 뒤 GitHub Actions Backend job과 같은 품질 게이트를 로컬에서 먼저 확인합니다.
+서버 코드를 고친 뒤 GitHub Actions backend job과 같은 품질 게이트를 로컬에서 돌립니다.
 
 ```bash
 ./scripts/server-ci-check.sh
 ```
 
-실행 순서는 다음과 같습니다.
+실행 명령: `./server/gradlew -p server --no-build-cache --rerun-tasks check`. `check`에는 `unitTest`, `architectureTest`, ktlint, detekt, JaCoCo 검증이 들어갑니다. Docker가 필요한 `integrationTest`는 별도로 실행합니다.
 
-- `./server/gradlew -p server --no-build-cache --rerun-tasks check`
-
-`check`는 `unitTest`, `architectureTest`, ktlint, detekt, JaCoCo verification을 함께 실행합니다. Docker/Testcontainers가 필요한 `integrationTest`는 의도적으로 별도 lane으로 유지합니다.
-
-스크립트 자체나 문서 변경만 빠르게 검증할 때는 dry-run으로 실행 명령만 확인할 수 있습니다.
+실행 명령만 확인할 때:
 
 ```bash
 READMATES_SERVER_CI_CHECK_DRY_RUN=true ./scripts/server-ci-check.sh
@@ -143,116 +136,98 @@ READMATES_SERVER_CI_CHECK_DRY_RUN=true ./scripts/server-ci-check.sh
 
 ## `pre-push-check.sh`
 
-푸시 전에 CI에서 자주 실패하던 게이트를 로컬에서 먼저 실행합니다.
+푸시 전에 CI에서 자주 실패하던 게이트를 로컬에서 먼저 돌립니다.
 
 ```bash
 ./scripts/pre-push-check.sh
 ```
 
-Repository-local planning support, when available in a full source checkout, does not replace `pre-push-check.sh`.
+옵션: `--full`, `--release` / `--no-release`, `--dry-run`, `--no-changelog-check`, `-h`.
 
-기본 실행 범위는 다음과 같습니다.
+기본 실행 순서:
 
-- Full source checkout에 contributor-guidance checker가 있으면 해당 계약 검사
-- `git diff --check`
-- `corepack pnpm --dir front lint`
-- `npx --yes corepack@0.35.0 pnpm --dir front lint` (`corepack`이 PATH에 없을 때)
-- `corepack pnpm --dir front test:coverage`
-- `corepack pnpm --dir front build`
-- `corepack pnpm --dir front zod:export-fixtures`
-- `git diff --exit-code front/tests/unit/__fixtures__/zod-schemas/`
-- `./scripts/server-ci-check.sh`
+1. (release 모드일 때) CHANGELOG Unreleased 가드
+2. contributor 안내 검사 (full source checkout에 도구가 있을 때만)
+3. 배포 workflow 계약 검사 (`check-deploy-workflow-contract.py`)
+4. 루트 `packageManager`의 pnpm을 Corepack으로 활성화
+5. `git diff --check` (기준: `READMATES_PRE_PUSH_BASE`, 기본 `origin/main`. `docs/superpowers/`는 제외)
+6. frontend `lint` → `test:coverage` → `build` → `zod:export-fixtures` → Zod fixture 변경 없음 확인
+7. `./scripts/server-ci-check.sh`
+8. `validate-production-ai-config.sh`, `verify-production-ai-config-fixtures.sh`
+9. 공개 릴리즈 검사: `verify-public-release-fixtures.sh` + `public-release-check.sh .tmp/public-release-candidate`
 
-`pre-push-check.sh`는 루트 `package.json`의 `packageManager`를 읽고 해당 pnpm을 Corepack으로 활성화한 뒤, 해석된 Corepack launcher로 frontend checks를 실행합니다. 로컬 Node 설치가 `corepack`을 PATH에 노출하지 않으면 스크립트는 `npx --yes corepack@0.35.0`을 사용합니다. 다른 major version의 globally installed pnpm으로 우회하지 않습니다.
+frontend 명령은 `corepack pnpm ...`으로 실행하고, `corepack`이 PATH에 없으면 `npx --yes corepack@0.35.0 pnpm ...`을 씁니다. 전역 설치된 다른 버전 pnpm으로 우회하지 않습니다.
 
-`docs/`, `scripts/`, `deploy/`, `.github/`, 공개 release 설정 파일처럼 공개 후보에 영향을 주는 경로가 바뀌면 fixture 검증과 함께 clean 후보를 만들고 public-release scanner도 실행합니다. Historical 작업 기록인 `docs/superpowers/` 하위 문서는 현재 동작의 source of truth가 아니므로 whitespace gate에서 제외합니다.
+공개 릴리즈 검사(9)는 `.github/`, `deploy/`, `docs/`, `scripts/`, 루트 안내 파일, `README.md`, `.env.example`, `.gitleaks.toml`이 바뀌었을 때 자동으로 돕니다. `--release`는 항상, `--no-release`는 건너뜁니다.
 
-```bash
-./scripts/verify-public-release-fixtures.sh
-./scripts/public-release-check.sh .tmp/public-release-candidate
-```
-
-릴리즈 또는 태그 배포 직전에는 더 무거운 검증까지 포함합니다.
+`--full`은 추가로 `./server/gradlew -p server integrationTest`, `pnpm --dir front test:e2e`(Corepack 경유), 관측 설정 검증(Prometheus rules/config, Tempo, Grafana dashboard, Alertmanager)을 실행합니다. Docker, MySQL client, Playwright browser가 필요하므로 보통 릴리즈 직전에 수동으로 씁니다.
 
 ```bash
 ./scripts/pre-push-check.sh --full --release
 ```
 
-`--full`은 `./server/gradlew -p server integrationTest`, Corepack launcher를 통한 `pnpm --dir front test:e2e`, 그리고 관측 설정 검증(Prometheus rules/config, Tempo config, Grafana dashboard lint, Alertmanager config)을 추가로 실행합니다. Docker, MySQL client, Playwright browser 의존성이 준비되지 않은 환경에서는 기본 pre-push hook보다 수동 릴리즈 점검으로 실행합니다.
-
 ### Release-mode CHANGELOG guard
 
-`--release`(또는 환경 변수 `READMATES_PRE_PUSH_RELEASE=true`)로 release 모드를 강제하면 `CHANGELOG.md`의 `## Unreleased` 섹션이 placeholder 상태인지 확인하는 가드가 먼저 실행됩니다. v1.11.0에서 `Unreleased` 섹션이 수동 정리에 의존했던 회귀를 막기 위한 안전장치입니다.
+`--release` 또는 `READMATES_PRE_PUSH_RELEASE=true`면 `CHANGELOG.md`의 `## Unreleased`가 비어 있는지(placeholder 상태인지) 먼저 검사합니다.
 
-- 차단 조건: `### Added`, `### Changed`, `### Fixed`, `### Engineering`, `### Engineering Proof Portfolio`, `### Deployment Notes`, `### Verification`, `### Removed`, `### Security` 같은 구체적 카테고리 헤더가 남아 있거나, bullet이 두 개 이상이거나, bullet에 markdown bold(`**`) 마커가 포함된 경우.
-- 통과 조건: 비어 있는 placeholder (`_No unreleased changes._`, `<!-- placeholder -->`) 또는 ReadMates의 기존 convention인 `### Highlights` 아래 단일 meta-placeholder bullet (예: `다음 릴리즈 후보 변경을 이 섹션에 기록합니다.`).
-- Emergency override: `--no-changelog-check`로 가드를 건너뛸 수 있습니다. 이 경우 release-management `Branch protection bypass policy` 절에 따라 bypass 사유를 ledger에 기록해야 합니다.
+- 실패: `### Added|Changed|Fixed|Engineering|Engineering Proof Portfolio|Deployment Notes|Verification|Removed|Security` 헤더가 있음, bullet이 2개 이상, bullet에 `**`가 있음, `## Unreleased` 섹션이 없거나 비어 있음.
+- 통과: `_No unreleased changes._` 같은 placeholder 문장, 또는 `### Highlights` 아래 meta-placeholder bullet 하나(예: `다음 릴리즈 후보 변경을 이 섹션에 기록합니다.`).
+- 우회: `--no-changelog-check`. emergency에만 쓰고 [release-management.md](../docs/development/release-management.md#branch-protection-bypass-policy)에 따라 bypass 사유를 ledger에 남깁니다.
 
 ```bash
 # Release tag push 직전 표준 실행
 ./scripts/pre-push-check.sh --release
 
-# CI 또는 자동화 컨텍스트에서 환경 변수로 release 모드 강제
+# 환경 변수로 release 모드 강제
 READMATES_PRE_PUSH_RELEASE=true ./scripts/pre-push-check.sh
 
-# CHANGELOG 경로를 override해서 fixture로 테스트
-READMATES_PRE_PUSH_CHANGELOG=/tmp/test-changelog-stale.md \
-  ./scripts/pre-push-check.sh --release
+# 다른 CHANGELOG 파일로 가드만 시험
+READMATES_PRE_PUSH_CHANGELOG=<fixture-changelog-path> ./scripts/pre-push-check.sh --release
 
 # Emergency 우회 (사유 ledger 기록 필수)
 ./scripts/pre-push-check.sh --release --no-changelog-check
 ```
 
-Branch protection bypass 정책 전반은 [release-management.md#branch-protection-bypass-policy](../docs/development/release-management.md#branch-protection-bypass-policy)를 참조합니다.
-
-로컬 Git hook은 `.git/hooks/pre-push`에서 이 스크립트를 호출하도록 설치할 수 있습니다. Hook은 로컬 설정이므로 `--no-verify`로 우회할 수 있고 다른 clone에는 자동 전파되지 않습니다.
+로컬 Git hook(`.git/hooks/pre-push`)에서 이 스크립트를 부르게 할 수 있습니다. hook은 로컬 설정이라 `--no-verify`로 우회되고 다른 clone에는 전파되지 않습니다.
 
 ## `lint-grafana-dashboards.sh`
 
-`ops/grafana/dashboards/*.json` JSON 유효성과 필수 필드(`title`, `schemaVersion`, `panels`)를 검사합니다. CI backend job에서 실행됩니다.
+`ops/grafana/dashboards/*.json`의 JSON 유효성, 필수 필드(`title`, `schemaVersion`, `panels`), AI panel, Tempo datasource/exemplar 계약을 검사합니다. CI `scripts` job에서 실행됩니다.
 
 ```bash
 ./scripts/lint-grafana-dashboards.sh
 ```
-
-배포 전후 어떤 증거로 해석해야 하는지는 [Deploy observability check runbook](../docs/operations/runbooks/deploy-observability-check.md)을 기준으로 기록합니다.
 
 ## Prometheus / Tempo / Grafana / Alertmanager validators
 
-관측 설정 파일의 구조 유효성을 Docker 기반 `promtool`/`amtool`로 검사합니다. 로컬에 promtool/amtool을 설치하지 않아도 되도록 컨테이너 이미지(`prom/prometheus`, `prom/alertmanager`)로 실행하며, `pre-push-check.sh --full`이 릴리즈 직전에 함께 실행합니다.
+관측 설정의 구조를 Docker 기반 `promtool`/`amtool`(`prom/prometheus`, `prom/alertmanager` image)로 검사합니다. 로컬 설치가 필요 없습니다. CI `scripts` job은 Alertmanager를 뺀 나머지를, `pre-push-check.sh --full`은 AI 설정 검증을 뺀 관측 검증을 실행합니다(AI 설정 검증은 기본 pre-push에 포함).
 
 ```bash
-./scripts/validate-prometheus-rules.sh    # ops/prometheus/alerts/*.yml rule 검사
-./scripts/validate-prometheus-config.sh   # deploy/oci/prometheus/prometheus.yml 검사
-bash ./scripts/validate-tempo-config.sh   # Tempo 7일 retention/internal-port/config 검사
-./scripts/validate-production-ai-config.sh # OCI internal OTLP, legacy 제거, Google retention sync 검사
-./scripts/verify-production-ai-config-fixtures.sh # active case study의 legacy selector 회귀 fixture 검사
-./scripts/lint-grafana-dashboards.sh      # JSON, AI panels, Tempo datasource/exemplar contract
-./scripts/validate-alertmanager-config.sh # deploy/oci/alertmanager/alertmanager.yml 구조 검사
+./scripts/validate-prometheus-rules.sh    # ops/prometheus/alerts/*.yml
+./scripts/validate-prometheus-config.sh   # deploy/oci/prometheus/prometheus.yml
+bash ./scripts/validate-tempo-config.sh   # Tempo 7일 retention, 내부 port
+./scripts/validate-alertmanager-config.sh # deploy/oci/alertmanager/alertmanager.yml
+./scripts/validate-production-ai-config.sh # 내부 OTLP, legacy 제거, Google retention sync
+./scripts/verify-production-ai-config-fixtures.sh # legacy selector 회귀 fixture
 ```
 
-배포 전후 어떤 증거로 해석해야 하는지는 [Deploy observability check runbook](../docs/operations/runbooks/deploy-observability-check.md)을 기준으로 기록합니다.
+`validate-alertmanager-config.sh`는 `${READMATES_ALERT_*}`를 dummy 값으로 바꾼 임시 파일(`.tmp` 아래, 종료 시 삭제)을 검사하므로 실제 SMTP credential이 필요 없습니다.
 
-`validate-alertmanager-config.sh`는 `${READMATES_ALERT_*}` 환경 placeholder를 dummy 값으로 치환한 임시 파일을 lint하므로 실제 SMTP credential 없이 구조만 검증합니다. 치환 결과는 `.tmp` 아래 임시 디렉터리에 만들고 종료 시 삭제합니다.
+배포 전후 결과를 어떤 증거로 볼지는 [Deploy observability check runbook](../docs/operations/runbooks/deploy-observability-check.md)을 따릅니다.
 
 ## `observability-local-smoke.sh`
 
-격리된 MySQL과 Spring server, Prometheus/Grafana/Tempo stack을 띄워 synthetic OTLP trace query, `readmates-server`/Tempo target, 두 Grafana datasource와 AI dashboard, exported-span metric을 확인합니다. 이어 Tempo를 정지하고 server health가 유지되며 bounded failure metric이 증가하는지 검증합니다. 실제 운영 domain, receiver, credential은 사용하지 않습니다.
+격리된 MySQL, Spring server, Prometheus/Grafana/Tempo를 띄워 합성 OTLP trace 조회, scrape target, Grafana datasource와 AI dashboard, span metric을 확인합니다. 이어서 Tempo를 멈춰도 server health가 유지되고 실패 metric이 늘어나는지 봅니다. 실제 운영 domain이나 credential은 쓰지 않습니다.
 
 ```bash
-./scripts/lint-grafana-dashboards.sh
-./scripts/validate-prometheus-rules.sh
-bash ./scripts/validate-tempo-config.sh
 bash ./scripts/observability-local-smoke.sh
 ```
 
-배포 전후 어떤 증거로 해석해야 하는지는 [Deploy observability check runbook](../docs/operations/runbooks/deploy-observability-check.md)을 기준으로 기록합니다.
-
-Smoke가 management port 8081을 직접 사용하므로 이미 실행 중인 server가 있으면 중지하거나 스크립트가 안내하는 충돌을 해결합니다. Docker, curl, jq, Python이 필수입니다.
+management port 8081을 직접 쓰므로 이미 떠 있는 server가 있으면 충돌을 먼저 해결합니다. Docker, curl, jq, Python이 필요합니다.
 
 ## `generate-slo-report.py`
 
-`server/src/main/resources/slo/slos.yaml`의 6개 Prometheus query를 실행해 월간 SLO markdown 초안을 출력합니다. 운영자는 승인된 tunnel 또는 port-forward로 Prometheus를 로컬 주소에 열고, `CHECK` 행을 incident/deploy 맥락과 함께 검토합니다.
+`server/src/main/resources/slo/slos.yaml`의 Prometheus query를 실행해 월간 SLO markdown 초안을 출력합니다. 승인된 tunnel이나 port-forward로 Prometheus를 로컬에 연 뒤 실행하고, `CHECK` 행은 incident/deploy 맥락과 함께 검토합니다.
 
 ```bash
 python3 scripts/generate-slo-report.py \
@@ -260,21 +235,21 @@ python3 scripts/generate-slo-report.py \
   --month 2026-06 > docs/operations/slo-reports/2026-06.md
 ```
 
-보고서에는 실제 운영 도메인, 수신자 이메일, 토큰, private endpoint를 쓰지 않습니다.
+보고서에는 운영 도메인, 수신자 이메일, token, private endpoint를 쓰지 않습니다.
 
 ## `aigen-pii-check.sh`
 
-In-app AI 세션 생성 경로가 transcript, parsed turns, result, evidence/excerpt, member/display name을 durable store, Kafka message, metric tag, Flyway content column, metadata hash, log/exception으로 흘리지 않는지 확인합니다. 콘텐츠는 job-store adapter가 관리하는 Redis `:transcript`, `:turns`, `:result`, `:evidence` 네 short-lived payload key에서만 허용됩니다.
+앱 안 AI 세션 생성 경로가 transcript, parsed turns, 결과, evidence, 멤버 이름을 DB, Kafka message, metric tag, migration column, metadata hash, log/exception으로 흘리지 않는지 검사합니다. 콘텐츠는 job-store adapter가 관리하는 Redis short-lived key(`:transcript`, `:turns`, `:result`, `:evidence`)에서만 허용됩니다.
 
 ```bash
 bash scripts/aigen-pii-check.sh
 ```
 
-CI `scripts` job이 PR마다 실행합니다. 현재 self-test fixture와 15개 invariant가 Redis TTL/삭제/attempt ledger, Kafka routing metadata와 header allowlist, content-free migration/audit, Spring AI observation 설정, metric/span/baggage/log allowlist를 확인합니다. 실패하면 출력의 `checkN` 메시지와 [AI session generation runbook](../docs/operations/runbooks/ai-session-generation.md#pii-regression)을 기준으로 어느 invariant가 깨졌는지 확인합니다.
+CI `scripts` job이 PR마다 실행합니다. 실패하면 출력의 `checkN` 메시지와 [AI session generation runbook](../docs/operations/runbooks/ai-session-generation.md#pii-regression)으로 어떤 invariant가 깨졌는지 봅니다.
 
 ## `aigen-smoke-{claude,openai,gemini}.sh`
 
-Provider별 라이브 API key가 있는 검토된 환경에서 AI generation multipart start/polling smoke를 수동 확인합니다. 스크립트는 public-safe 합성 회원과 대본만 사용하도록 제한되며, private transcript를 입력으로 받지 않습니다. Live provider 호출은 retention 조건과 별도 승인이 필요하므로 공개 CI에서는 `bash -n` 문법 검사만 수행합니다.
+provider 라이브 API key가 있는 검토된 환경에서 AI 생성 multipart start/polling을 수동 확인합니다. 공개해도 되는 합성 회원과 대본만 쓰고 private transcript는 받지 않습니다. 라이브 호출은 retention 조건과 별도 승인이 필요하므로 CI는 `bash -n` 문법 검사만 합니다.
 
 ```bash
 ./scripts/aigen-smoke-claude.sh
@@ -282,72 +257,43 @@ Provider별 라이브 API key가 있는 검토된 환경에서 AI generation mul
 ./scripts/aigen-smoke-gemini.sh
 ```
 
-Provider key, transcript, 응답 전문, 운영 domain은 Git에 남기지 않습니다. 모델 capability/allowlist, grounded rollout, cap, key 회전, kill switch 절차는 [AI session generation runbook](../docs/operations/runbooks/ai-session-generation.md)을 기준으로 합니다.
+key, transcript, 응답 전문, 운영 domain은 Git에 남기지 않습니다. 모델 허용 목록, cap, key 회전, kill switch는 [AI session generation runbook](../docs/operations/runbooks/ai-session-generation.md)을 따릅니다.
 
 ## `build-public-release-candidate.sh`
-
-아래 명령은 저장소 루트에서 실행하는 것을 기준으로 합니다. 스크립트 자체는 저장소 내부 어디에서든 실행할 수 있지만, 이 문서의 `./scripts/...` 경로는 저장소 루트에서 그대로 복사해 실행할 수 있습니다.
 
 ```bash
 ./scripts/build-public-release-candidate.sh
 ```
 
-출력 위치는 `.tmp/public-release-candidate`로 고정되어 있습니다. 임의 destination 인자는 지원하지 않습니다.
+1. 출력 위치는 `.tmp/public-release-candidate`로 고정입니다. `.tmp`가 저장소 안의 실제 디렉터리인지 먼저 확인합니다.
+2. 복사 전에 승인된 source root의 `.envrc*` 파일과 symlink를 거부합니다.
+3. `.tmp/public-release-candidate.staging.*`에 후보를 만들고 검증합니다.
+4. 검증을 통과해야 기존 후보를 교체합니다. 실패하면 이전 후보가 그대로 남습니다.
+5. 성공하면 후보 경로와 다음 확인 명령을 출력합니다.
 
-스크립트는 먼저 `.tmp`가 저장소 안의 `.tmp`로 해석되는지 확인합니다. 그 다음 `.tmp/public-release-candidate.staging.*` 아래에 staging tree를 만들고, 검증을 통과한 뒤에만 기존 `.tmp/public-release-candidate`를 교체합니다. 빌드가 실패하면 이전에 성공한 후보는 그대로 남습니다.
+포함 범위의 정확한 목록은 스크립트의 `copy_manifest()`가 기준입니다. 요약은 [공개 저장소 보안](../docs/deploy/security-public-repo.md#공개-방식)에 있습니다.
 
-복사 전 preflight에서는 승인된 source root의 `.envrc*` loader 파일과 symlink를 거부합니다. `.envrc`는 secret을 직접 담지 않더라도 로컬 환경을 자동으로 불러올 수 있으므로 공개 후보 manifest에 포함하지 않습니다.
-
-공개 릴리즈 후보 manifest는 명시적으로 관리합니다. 주요 포함 범위는 다음과 같습니다.
-
-- `.github/workflows/ci.yml`
-- `.github/workflows/deploy-front.yml`
-- `.github/workflows/deploy-server.yml`
-- `.github/CODEOWNERS`, 파일이 있을 때만 포함
-- `.gitignore`
-- `.gitleaks.toml`, 파일이 있을 때만 포함
-- `.env.example`
-- `.node-version`
-- `README.md`, `PRODUCT.md`
-- `compose.yml`
-- `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`
-- `design/`: frontend가 참조하는 design-system package와 CI에서 검증하는 static catalog를 포함합니다.
-- `front/`
-- `server/`
-- `deploy/oci/`: compose 배포 script, read-only diagnostics collector, post-deploy watch helper를 포함합니다. 공개 후보 scanner 대상이므로 운영 출력, deploy state, secret-bearing env, provider state를 넣지 않습니다.
-- `docs/development/`
-- `docs/deploy/`
-- `docs/operations/README.md`와 `docs/operations/runbooks/`
-- 공개 릴리즈 보조 스크립트와 운영 증거 helper: `scripts/build-public-release-candidate.sh`, `scripts/README.md`, `scripts/generate-slo-report.py`, `scripts/lint-grafana-dashboards.sh`, `scripts/observability-local-smoke.sh`, `scripts/public-release-check.sh`, `scripts/validate-prometheus-rules.sh`, `scripts/verify-public-release-fixtures.sh`
-- 서버 CI 사전 점검 스크립트: `scripts/server-ci-check.sh`
-- 푸시 전 CI 사전 점검 스크립트: `scripts/pre-push-check.sh`
-- 배포 후 공개 연동 smoke script: `scripts/smoke-production-integrations.sh`
-
-디렉터리를 복사할 때 `copy_dir` 공통 exclude는 `.env*`, `*.env`, key material, dump, `.DS_Store`, 모든 깊이의 `.tmp` 디렉터리를 제외합니다. manifest별 exclude는 `design/standalone`, `design/*/node_modules`, `design/*/dist`, `front/output`, `front/node_modules`, `front/dist`, `front/test-results`, `front/playwright/.cache`, `front/playwright-report`, `front/coverage`, `front/.nyc_output`, `server/build`, `server/.gradle`, `server/.kotlin`, `deploy/oci/.deploy-state`, `deploy/oci/*.state`를 복사하지 않습니다. `docs/superpowers/` 하위 문서는 private historical 작업 기록으로 간주해 공개 후보에 포함하지 않습니다. provider state, screenshot, `.gstack`, `.superpowers`, `.idea`, `.playwright-cli`, `.tmp`, `recode`처럼 공개 후보 금지 경로로 분류되는 항목은 복사 중 조용히 제외된다고 가정하지 않고, staging 후보 검증에서 발견되면 거부되어 빌드가 실패합니다.
-
-루트 `.env.example`만 의도적으로 포함되는 environment file입니다. 필수 파일과 디렉터리 root는 symlink일 수 없고, 승인된 source root 안에서 발견되는 symlink도 복사 전에 거부합니다. staging 후보 검증 단계에서도 승인된 manifest 밖의 경로, 금지 경로, `.envrc*`, symlink가 남아 있으면 실패합니다.
-
-성공하면 후보 경로와 후속 확인 명령을 출력합니다. 루트 `.gitleaks.toml`이 있으면 후보에 함께 포함되어, 공개 전 같은 custom scanner rule을 사용할 수 있습니다.
-
-`.github/CODEOWNERS`가 후보에 포함되더라도 Code Owner review enforcement는 GitHub branch protection 설정과 protected base branch에 병합된 CODEOWNERS 파일이 함께 있어야 적용됩니다. 후보 검증은 파일 포함과 scanner 통과를 확인하고, GitHub 설정은 별도 API나 Settings 화면에서 확인합니다.
+- 디렉터리 복사 시 `.env*`, `*.env`, key material, dump, `.DS_Store`, 모든 깊이의 `.tmp`, 도구 상태, contributor 안내 파일, 하위 `CHANGELOG.md`를 빼고, manifest별로 build/test 산출물과 deploy state를 뺍니다.
+- staging 검증은 denylist 기준입니다. 금지 경로(provider state, screenshot, `.gstack`, `.superpowers`, `.idea`, `.playwright-cli`, `.tmp`, `recode`, `docs/superpowers` 등)나 symlink가 남아 있으면 빌드가 실패합니다. 조용히 빠진다고 가정하지 않습니다.
+- 루트 `.env.example`만 의도적으로 포함되는 env 파일입니다. `.gitleaks.toml`이 있으면 함께 포함되어 같은 scanner 규칙을 씁니다.
+- `.github/CODEOWNERS`가 들어가도 review 강제는 GitHub branch protection 설정이 따로 필요합니다.
 
 ## `public-release-check.sh`
 
-clean 공개 릴리즈 후보를 검사합니다.
-
 ```bash
+# 후보 검사
 ./scripts/public-release-check.sh .tmp/public-release-candidate
-```
 
-인자 없이 실행하면 현재 private 작업 tree를 검사합니다.
-
-```bash
+# 현재 private tree 검사
 ./scripts/public-release-check.sh
 ```
 
-현재 tree 모드는 `git ls-files`를 기준으로 tracked 금지 경로와 tracked symlink를 확인합니다. 후보 모드는 전달한 디렉터리를 `find`로 순회하며, 후보 안의 모든 symlink와 금지 경로를 거부합니다.
+- 현재 tree 모드: `git ls-files` 기준 tracked 금지 경로와 symlink.
+- 후보 모드: `find`로 후보 전체의 금지 경로와 symlink. 후보의 shipped 안내가 빠진 contributor 전용 경로를 요구하는지도 봅니다.
+- 차단 항목: private key, OCI OCID, GitHub token, API key 형태 token, 실제처럼 보이는 DB/BFF/OAuth secret 할당, Gmail 주소, private club domain, 로컬 workstation 경로, 금지 경로.
+- `gitleaks`가 있으면 `.gitleaks.toml`로 `gitleaks dir <path>`를 실행합니다(구버전은 `gitleaks detect --source <path>`로 대체하고 그 사실을 출력). 없으면 targeted 검사만 하며, 이것은 완전한 secret scan이 아닙니다.
 
-no-argument current-tree mode는 private 작업 tree의 ignored 파일까지 `gitleaks dir .`로 읽을 수 있습니다. `.server-config/`, `.wrangler/`, `.gstack/`, `.tmp/`, `docs/private/`, `.claude/`, `.orchestrator/`처럼 ignored local 운영/도구 파일을 일부러 검증 범위에서 제외하는 작업에서는 current-tree mode를 pass/fail gate로 삼지 말고, clean 후보와 tracked archive를 검사합니다.
+current-tree 모드는 ignored 파일까지 `gitleaks dir .`로 읽을 수 있습니다. `.server-config/`, `.wrangler/`, `.gstack/`, `.tmp/`, `.claude/`, `.orchestrator/` 같은 ignored 로컬 파일을 범위에서 빼야 하면 current-tree 모드를 pass/fail 기준으로 쓰지 말고 후보와 tracked archive를 검사합니다.
 
 ```bash
 ./scripts/build-public-release-candidate.sh
@@ -359,49 +305,29 @@ gitleaks dir "$tmp" --config "$tmp/.gitleaks.toml" --no-banner --redact=100 --ve
 rm -rf "$tmp"
 ```
 
-`docs/superpowers/`는 private historical 작업 기록으로 간주해 공개 후보에 포함하지 않습니다. 현재 동작이나 운영 절차로 승격된 내용은 `docs/development/`, `docs/deploy/`, `docs/operations/` 중 적절한 source-of-truth 문서로 옮긴 뒤 공개 후보 scanner 대상에 둡니다.
-
-checker가 차단하는 주요 항목은 다음과 같습니다.
-
-- private keys
-- OCI OCIDs
-- GitHub tokens
-- OpenAI/API-key-shaped tokens
-- 실제처럼 보이는 DB/BFF/OAuth secret assignment
-- Gmail addresses
-- private club domains
-- local workstation paths
-- private 또는 generated path로 분류된 금지 경로
-
-`gitleaks`가 설치되어 있으면 repository의 `.gitleaks.toml` 설정으로 `gitleaks dir <path>`를 실행합니다. 설치된 `gitleaks`가 `dir` subcommand를 지원하지 않는 구버전이면 `gitleaks detect --source <path>`로 compatibility fallback을 실행하고, 그 사실을 출력합니다.
-
-현재 filesystem을 보는 `gitleaks dir`와 달리 `gitleaks detect --source .`는 Git history까지 검사합니다. 과거 commit의 redacted example이나 fixture finding은 active secret 여부와 별도로 분류하고, active 또는 active 가능 secret이 확인되지 않으면 history rewrite와 force-push를 기본 처리로 삼지 않습니다.
-
-`gitleaks`가 없더라도 targeted path/content check는 계속 실행합니다. 다만 fallback check는 좁은 guardrail입니다. 통과했다고 해서 전문적이거나 완전한 secret scan을 통과한 것은 아니며, 공개 전 명백한 실수를 줄이기 위한 로컬 안전장치로 봐야 합니다.
+`gitleaks detect --source .`는 Git history까지 검사합니다. 과거 commit의 redacted 예시나 fixture finding은 active secret 여부와 따로 분류하고, active secret이 아니면 history rewrite나 force-push를 기본 처리로 삼지 않습니다.
 
 ## `verify-public-release-fixtures.sh`
 
-scanner pattern을 바꾼 뒤 fixture 검증을 실행합니다.
+scanner pattern을 바꾼 뒤 실행합니다. 후보를 한 번 만들고 `.tmp/public-release-fixtures` 아래 fixture로 `public-release-check.sh`를 호출합니다.
 
 ```bash
 ./scripts/verify-public-release-fixtures.sh
 ```
 
-이 스크립트는 고유한 nested `front/.tmp` source fixture를 만든 상태에서 공개 후보를 한 번 생성하고, fixture 디렉터리를 `.tmp/public-release-fixtures` 아래에 만들어 `public-release-check.sh`를 호출합니다. 생성한 source fixture는 종료 시 제거하며 기존 `front/.tmp` 내용은 건드리지 않습니다. 검증 범위는 다음과 같습니다.
+확인 항목:
 
-- dollar 문자가 포함된 DB password assignment가 차단되는지 확인합니다.
-- comment에 placeholder를 적어도 실제처럼 보이는 secret value가 allowlist되지 않는지 확인합니다.
-- 문서화된 placeholder와 environment variable indirection은 통과하는지 확인합니다.
-- builder가 nested source `.tmp`를 후보에서 제외하고 checker가 root 또는 nested `.tmp`를 공개 후보 금지 경로로 거부하는지 확인합니다.
-- `.tmp` parent가 symlink이면 실행을 거부합니다. 이 기준은 공개 릴리즈 후보 builder의 cleanup guard와 맞춥니다.
-- 후보의 top-level manifest와 루트 pnpm 계약, `front`, `design/system`, `design/docs` package manifest가 모두 포함되는지 확인합니다.
-- 후보 안의 shipped instruction이 제외된 contributor-only 경로를 요구하지 않는지 확인합니다.
-
-fixture 검증도 GitHub 게시, 저장소 공개 설정 변경, secret rotation, commit 생성을 수행하지 않습니다.
+- `$`가 들어간 DB password 할당을 차단합니다.
+- comment에 placeholder가 있어도 실제처럼 보이는 secret은 통과시키지 않습니다.
+- 문서화된 placeholder와 환경 변수 간접 참조는 통과합니다.
+- builder가 nested source `.tmp`를 빼고, checker가 root/nested `.tmp`를 거부합니다(임시 `front/.tmp` fixture는 종료 시 제거).
+- `.tmp` parent가 symlink면 실행을 거부합니다.
+- 후보에 top-level manifest, 루트 pnpm 계약, `front`·`design/system`·`design/docs` package manifest가 있습니다.
+- 후보의 shipped 안내가 빠진 contributor 전용 경로를 요구하지 않습니다.
 
 ## `smoke-production-integrations.sh`
 
-배포 후 Cloudflare Pages marker와 Google OAuth start redirect를 확인합니다. Secret을 요구하지 않으며, 실제 운영 결과는 공개 문서나 Git에 붙이지 않습니다.
+배포 후 Pages marker와 Google OAuth start redirect를 확인합니다. secret이 필요 없고, 결과는 공개 문서나 Git에 붙이지 않습니다.
 
 ```bash
 READMATES_SMOKE_BASE_URL=https://app.example.com \
@@ -409,7 +335,7 @@ READMATES_SMOKE_AUTH_BASE_URL=https://app.example.com \
 ./scripts/smoke-production-integrations.sh
 ```
 
-등록된 club host까지 확인할 때는 `READMATES_SMOKE_CLUB_HOST`를 추가합니다.
+등록된 club host까지 볼 때:
 
 ```bash
 READMATES_SMOKE_BASE_URL=https://app.example.com \
@@ -418,10 +344,15 @@ READMATES_SMOKE_CLUB_HOST=https://<registered-club-host> \
 ./scripts/smoke-production-integrations.sh
 ```
 
+| 변수 | 설명 |
+| --- | --- |
+| `READMATES_SMOKE_BASE_URL` | 검사할 Pages origin. 생략하면 스크립트 기본값을 쓰므로 명시를 권장합니다. |
+| `READMATES_SMOKE_AUTH_BASE_URL` | `redirect_uri` 기준 origin. 기본은 `READMATES_SMOKE_BASE_URL` |
+| `READMATES_SMOKE_CLUB_HOST` | 선택. 등록된 club host |
+| `READMATES_SMOKE_STRICT_GOOGLE` | `true`면 Google 응답에서 `redirect_uri_mismatch`도 찾아봅니다. Google 화면은 지역·계정·bot 방어에 따라 바뀌므로 기본은 `false`입니다. |
+
 검사 항목:
 
-- `/.well-known/readmates-domain-check.json`이 ReadMates Cloudflare Pages marker를 반환합니다.
-- `/oauth2/authorization/google?returnTo=/app`이 Google OAuth endpoint로 redirect됩니다.
-- Google에 전달되는 `redirect_uri`가 `READMATES_SMOKE_AUTH_BASE_URL/login/oauth2/code/google`와 일치합니다.
-
-`READMATES_SMOKE_STRICT_GOOGLE=true`를 추가하면 Google 응답 본문에서 `redirect_uri_mismatch`를 탐지하려고 시도합니다. Google 로그인 화면은 지역, 계정 상태, bot 방어에 따라 응답이 바뀔 수 있으므로 기본 검사는 ReadMates가 생성하는 provider redirect URL을 기준으로 합니다.
+- `/.well-known/readmates-domain-check.json`이 ReadMates marker를 반환합니다.
+- `/oauth2/authorization/google?returnTo=/app`이 Google OAuth로 redirect됩니다.
+- Google에 보내는 `redirect_uri`가 `READMATES_SMOKE_AUTH_BASE_URL/login/oauth2/code/google`과 같습니다.

@@ -10,6 +10,10 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+### Documentation
+
+- README, 개발·배포·운영 문서, 스크립트 문서, 에이전트 가이드를 현재 코드 기준으로 최신화하고 짧게 정리했습니다(서버 단위 테스트 `unitTest`, Deploy Front 수동 실행, 없는 엔드포인트·명령 정리, 실제 운영 주소를 placeholder로 교체).
+
 ## v2.5.1 - 2026-09-25
 
 ### Security

@@ -1,13 +1,13 @@
 # Operations
 
-ReadMates 운영 관련 문서를 모은 진입점입니다. 배포 절차는 `docs/deploy/`, 개발 절차는 `docs/development/`를 참조하세요.
+ReadMates 운영 문서의 진입점입니다. 배포 절차는 `docs/deploy/`, 개발 절차는 `docs/development/`를 봅니다.
 
 ## 하위 문서
 
-- [Runbooks](runbooks/README.md) — 반복 운영 절차, 배포 attempt, 읽기 전용 진단, 배포 후 관찰.
-- [Post-mortems](postmortems/README.md) — 발생한 incident의 회고 기록.
-- [Observability](observability/README.md) — 메트릭, 대시보드, 알림 룰, SLO. Prometheus + Alertmanager 첫 bring-up은 [observability bootstrap runbook](runbooks/observability-bootstrap.md)을 따른다.
+- [Runbooks](runbooks/README.md) — 배포, 진단, 장애 대응처럼 반복하는 운영 절차.
+- [Post-mortems](postmortems/README.md) — 지난 incident 회고.
+- [Observability](observability/README.md) — 메트릭, 대시보드, 알림 룰, SLO. 처음 올릴 때는 [observability bootstrap runbook](runbooks/observability-bootstrap.md)을 따릅니다.
 
 ## Request correlation
 
-ReadMates는 모든 요청에 `X-Readmates-Request-Id`를 BFF에서 생성/수용해 Spring 로그, outbox row, Kafka header, consumer 로그까지 동일 값으로 전파합니다. 조회 절차는 [correlation id lookup runbook](runbooks/correlation-id-lookup.md)을 참고합니다.
+BFF는 모든 요청에 `X-Readmates-Request-Id`를 만들거나 그대로 전달합니다. 같은 값이 Spring 로그, notification outbox row, Kafka header, consumer 로그까지 이어집니다. 조회 방법은 [correlation id lookup runbook](runbooks/correlation-id-lookup.md)을 봅니다.

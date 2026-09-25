@@ -1,6 +1,6 @@
 # ReadMates Observability Operator Guide
 
-이 문서는 로그/메트릭/Actuator/Prometheus/Grafana/ELK 개념을 ReadMates 코드와 운영 흐름 기준으로 설명합니다.
+로그, 메트릭, Actuator, Prometheus, Grafana, Tempo, ELK 개념을 ReadMates 코드와 명령어에 연결해 설명합니다.
 
 ## 한 줄 구분
 
@@ -11,7 +11,7 @@
 | 어떤 요청에서 왜 실패했나? | JSON log의 `requestId`와 correlation lookup runbook |
 | API→Kafka→AI provider 호출이 한 흐름인가? | Grafana exemplar 또는 trace ID로 internal Tempo 조회 |
 | 알림/AI/Redis 같은 비동기 또는 선택 계층 상태는? | metrics catalog, alert rules, `/admin/health`, source-of-truth DB row |
-| 중앙 로그 검색 도구가 있나? | 이 phase에서는 도입하지 않음. JSON stdout log는 후속 OCI Logs/Loki/ELK/OpenSearch 연동 후보 |
+| 중앙 로그 검색 도구가 있나? | 없음. JSON stdout log를 `docker compose logs`와 `jq`로 봅니다. |
 
 ## 1. Logback
 
@@ -26,13 +26,14 @@ sed -n '1,120p' server/src/main/resources/logback-spring.xml
 볼 것:
 
 - `net.logstash.logback.encoder.LogstashEncoder`
-- `requestId`, `clubSlug`, `sessionId`, `actorId`, `source`, `eventType` MDC field
-- `ts`, `msg`, `logger`, `thread` field 이름
+- MDC field: `requestId`, `traceId`, `spanId`, `jobId`, `provider`, `stage`, `attempt`, `clubSlug`, `sessionId`, `actorId`, `source`, `eventType`
+- field 이름: `ts`, `msg`, `logger`, `thread`
 
-디버깅할 때는 사람이 읽는 plain text 로그를 기대하지 말고 JSON 한 줄을 `jq`로 필터링합니다.
+로그는 JSON 한 줄씩 나옵니다. VM의 compose 디렉터리에서 `jq`로 거릅니다.
 
 ```bash
-journalctl -u readmates-server --since "10 min ago" | jq 'select(.requestId == "<request-id>")'
+sudo docker compose -f compose.yml logs --no-log-prefix --since 10m readmates-api \
+  | jq -cR 'fromjson? | select(.requestId == "<request-id>")'
 ```
 
 초보자가 자주 헷갈리는 점: JSON 로그를 쓴다고 자동으로 Kibana가 생기지는 않습니다. JSON은 수집기가 이해하기 쉬운 출력 형식이고, 검색 UI는 별도 운영 구성입니다.
@@ -54,7 +55,7 @@ sed -n '1,120p' server/src/main/kotlin/com/readmates/shared/observability/Reques
 - 요청이 끝난 뒤 `MDC.remove`
 - 응답 header에 같은 request id 반환
 
-디버깅할 때 사용자는 오류 신고에 request id를 줄 수 있고, 운영자는 같은 id로 서버 로그와 일부 outbox/Kafka 흐름을 따라갑니다.
+사용자가 오류 신고에 request id를 주면, 운영자는 같은 id로 서버 로그와 일부 outbox/Kafka 흐름을 따라갑니다. 절차는 [Correlation ID lookup runbook](../runbooks/correlation-id-lookup.md)입니다.
 
 초보자가 자주 헷갈리는 점: `requestId`는 인증 토큰이나 사용자 식별자가 아닙니다. 한 요청을 찾기 위한 public-safe lookup key입니다.
 
@@ -94,7 +95,10 @@ sed -n '1,120p' ops/observability/local/prometheus.yml
 - `scrape_interval`
 - `metrics_path: /actuator/prometheus`
 - `job_name: readmates-server`
-- `target: host.docker.internal:8081`
+- `targets: ["host.docker.internal:8081"]`
+- `job_name: tempo` (Tempo 자체 메트릭)
+
+운영(OCI) 설정은 `deploy/oci/prometheus/prometheus.yml`이며 `alertmanager` job과 Alertmanager 연결이 추가됩니다.
 
 대표 metric은 [metrics-catalog.md](metrics-catalog.md)를 기준으로 봅니다. HTTP, JVM, HikariCP, Logback, notification, Redis/cache, AI generation, outbound resilience metric이 핵심입니다.
 
@@ -121,7 +125,7 @@ ls ops/grafana/dashboards
 
 ### Tempo와 exemplar
 
-Tempo는 content-free span metadata를 7일 보관합니다. 로컬 query/OTLP port는 loopback에만 bind되고 OCI Tempo/OTLP는 Compose internal network에만 있습니다. Prometheus exemplar가 있는 histogram에서 trace로 이동하거나 Grafana Explore의 Tempo datasource에 32자 trace ID를 사용합니다.
+Tempo는 content-free span metadata를 7일 보관합니다(`ops/tempo/tempo.yml`의 `block_retention: 168h`). Sampling 기본값은 100%(`READMATES_TRACING_SAMPLING_PROBABILITY`, 기본 `1.0`)입니다. 로컬 query/OTLP port(3200/4318)는 loopback에만 bind되고, OCI Tempo는 Compose 내부 network에서만 접근합니다. Prometheus exemplar가 있는 histogram에서 trace로 이동하거나 Grafana Explore의 Tempo datasource에 32자 trace ID를 사용합니다.
 
 ```bash
 bash scripts/validate-tempo-config.sh
@@ -162,15 +166,9 @@ sed -n '1,160p' docs/operations/observability/slos.md
 
 ## 8. ELK/Kibana
 
-ELK는 로그를 중앙 수집, 저장, 검색, 시각화하는 스택입니다.
+ELK는 로그를 중앙 수집, 저장, 검색, 시각화하는 스택입니다. ReadMates는 아직 도입하지 않았습니다. 서버는 JSON stdout log와 `requestId`를 제공하므로, 나중에 OCI Logs, Loki, ELK, OpenSearch 중 하나를 붙일 수 있습니다.
 
-ReadMates의 현재 결정:
-
-- 이 phase에서는 ELK/Kibana를 도입하지 않습니다.
-- 서버는 JSON stdout log와 `requestId`를 이미 제공합니다.
-- 후속으로 OCI Logs, Loki, ELK, OpenSearch 중 하나를 선택할 수 있습니다.
-
-후속 도입 전에 결정할 것:
+도입 전에 결정할 것:
 
 - 로그 보관 기간
 - 운영자 접근 권한

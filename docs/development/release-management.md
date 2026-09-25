@@ -1,6 +1,10 @@
 # 릴리즈 관리
 
-ReadMates는 Git tag, GitHub Releases, `CHANGELOG.md`를 함께 사용합니다. GitHub Releases는 사용자와 공개 방문자가 보는 태그별 릴리즈 노트이고, `CHANGELOG.md`는 저장소 안에 남는 같은 내용의 장기 기록입니다. 제품 버전 source of truth와 server/frontend 공통 tag 기준은 [versioning.md](versioning.md)를 우선합니다.
+ReadMates는 Git tag, GitHub Releases, `CHANGELOG.md`를 함께 씁니다.
+
+- GitHub Release: 태그별 공개 릴리즈 노트
+- `CHANGELOG.md`: 저장소에 남는 같은 내용의 기록
+- 제품 버전 기준(`vMAJOR.MINOR.PATCH` tag, server/frontend 공통)은 [versioning.md](versioning.md)를 따릅니다.
 
 ## 원칙
 
@@ -10,9 +14,9 @@ ReadMates는 Git tag, GitHub Releases, `CHANGELOG.md`를 함께 사용합니다.
 - GitHub 자동 생성 노트는 초안으로만 사용하고, 최종 노트는 사람이 읽기 좋게 정리합니다.
 - 서버 API나 DB migration이 포함된 릴리즈는 `Deployment Notes`를 반드시 둡니다.
 
-릴리즈 문서가 완료되려면 변경 범위, 배포 순서, DB migration 여부, 실행한 검증, 공개 릴리즈 후보 검사 결과가 서로 맞아야 합니다. 실행하지 못한 검증은 `Verification`에 성공처럼 쓰지 않고 스킵 사유와 남은 리스크를 적습니다.
-
-Tag push, GitHub Release 생성, production 배포, secret rotation은 문서 편집보다 영향이 큰 운영 작업입니다. 사용자가 명시적으로 요청하지 않았으면 절차를 문서화하거나 준비만 하고 실행하지 않습니다.
+- 변경 범위, 배포 순서, DB migration 여부, 실행한 검증, 공개 후보 검사 결과가 서로 맞아야 합니다.
+- 실행하지 못한 검증은 성공처럼 쓰지 않고 스킵 사유와 남은 리스크를 적습니다.
+- Tag push, GitHub Release 생성, production 배포, secret rotation은 명시적 요청이 있을 때만 실행합니다.
 
 ## 버전 규칙
 
@@ -20,15 +24,14 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
 
 | 변경 종류 | 예시 | 버전 |
 | --- | --- | --- |
-| 첫 공개 기준선 | 공개 사이트, 멤버 앱, 호스트 앱, OAuth, BFF, MySQL 운영 기준선 | `v1.0.0` |
-| 사용자 기능 추가 | 예정 세션, 세션 공개 범위, 세션 닫기/기록 발행 lifecycle, 새 호스트 운영 흐름 | `v1.2.0` |
-| 버그 수정 또는 문서 보강 | 배포 불일치 리포트, stale copy 수정, 작은 UX 수정 | `v1.2.1` |
-| 호환성 깨지는 변경 | auth model, URL 구조, API contract, DB 운영 구조 대규모 변경 | `v2.0.0` |
+| 사용자 기능 추가 | 피드백 문서 템플릿 v2 같은 새 기능 | MINOR (예: `v2.4.1` → `v2.5.0`) |
+| 버그 수정, 보안 patch, 문서 보강 | 취약 의존성 고정, stale copy 수정 | PATCH (예: `v2.4.0` → `v2.4.1`) |
+| 호환성 깨지는 변경 | 운영자가 배포 순서, DB, API client, URL을 다시 맞춰야 하는 변경 | MAJOR |
 
 ## 릴리즈 노트 구조
 
 ```markdown
-## v1.2.0 - YYYY-MM-DD
+## vX.Y.Z - YYYY-MM-DD
 
 ### Highlights
 
@@ -57,7 +60,7 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
 - 실행한 검증 명령
 ```
 
-`v1.0.0`처럼 첫 기준선인 경우에는 `Added`보다 `Core Features`가 더 읽기 좋습니다.
+빈 섹션은 뺍니다. 현재 `CHANGELOG.md`처럼 `Highlights`에 기능 설명을 모으고 `Changed`, `Fixed`, `Deployment Notes`, `Verification`을 필요한 만큼 둬도 됩니다.
 
 ## 릴리즈 절차
 
@@ -75,7 +78,7 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
    git diff --name-only <previous-tag>..HEAD -- server/src/main/resources/db/mysql/migration server/src/main/kotlin
    ```
 
-3. `CHANGELOG.md`에 새 버전 섹션을 추가합니다.
+3. `CHANGELOG.md`의 `## Unreleased` 내용을 새 버전 섹션으로 옮깁니다.
 
 4. 필요한 검증을 실행합니다.
 
@@ -107,34 +110,33 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
    ./scripts/public-release-check.sh .tmp/public-release-candidate
    ```
 
-5. 릴리즈 문서 변경을 커밋합니다.
+5. 릴리즈 노트를 커밋합니다.
 
    ```bash
-   git add CHANGELOG.md docs/development/release-management.md
-   git commit -m "docs: add v1.2.0 release notes"
+   git add CHANGELOG.md
+   git commit -m "chore(release): prepare vX.Y.Z"
    ```
 
 6. 태그를 만듭니다.
 
    ```bash
-   git tag -a v1.2.0 -m "ReadMates v1.2.0"
+   git tag -a vX.Y.Z -m "ReadMates vX.Y.Z"
    ```
 
 7. `main`과 release tag를 push합니다.
 
    ```bash
    git push origin main
-   git push origin v1.2.0
+   git push origin vX.Y.Z
    ```
 
-   `main` push는 CI만 실행하고 production 배포를 시작하지 않습니다. `v*` release tag push는 GHCR server image scan/promote workflow만 시작합니다. 새 frontend가 구 backend API를 먼저 호출하지 않도록 Cloudflare Pages production 배포는 backend OCI promotion과 health 확인 뒤 같은 release tag를 입력해 수동 실행합니다.
-
-   새 버전 발행과 운영 배포를 한 번에 진행할 때는 [새 버전 발행과 운영 배포 Runbook](../deploy/release-publish-runbook.md)을 함께 사용합니다. 이 runbook은 tag push 뒤 `Deploy Server Image`, OCI Compose promotion, `Deploy Front(release_tag)`, GitHub Release, smoke 확인이 같은 제품 tag를 바라보는지 점검하는 순서를 정리합니다.
-
-   서버 변경이 포함된 release tag는 `Deploy Server Image` workflow가 scan-candidate digest를 Trivy로 검사한 뒤 같은 digest를 release tag로 promote했는지 확인합니다. 수동 실행할 때는 release tag/ref에서 실행하고 workflow input `image_tag`에도 같은 release tag를 넣습니다. OCI backend는 그 release artifact를 같은 제품 버전 image tag로 배포합니다.
+   - `main` push는 CI만 실행합니다. production 배포는 시작하지 않습니다.
+   - `v*` tag push는 `Deploy Server Image`(GHCR image scan/promote)만 시작합니다. Trivy가 scan한 digest를 같은 tag로 promote했는지 확인합니다. 수동 실행 시 release tag/ref에서 실행하고 input `image_tag`에도 같은 tag를 넣습니다.
+   - Cloudflare Pages 배포는 backend promotion과 health 확인 뒤 같은 tag로 수동 실행합니다. 새 frontend가 구 backend를 먼저 호출하지 않게 하기 위해서입니다.
+   - 발행과 배포를 한 번에 할 때는 [새 버전 발행과 운영 배포 Runbook](../deploy/release-publish-runbook.md)을 따릅니다.
 
    ```bash
-   READMATES_SERVER_IMAGE='ghcr.io/<owner>/<repo>/readmates-server:v1.2.0' \
+   READMATES_SERVER_IMAGE='ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z' \
    VM_PUBLIC_IP='<vm-public-ip>' \
    CADDY_SITE=api.example.com \
    ./deploy/oci/05-deploy-compose-stack.sh
@@ -142,17 +144,17 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
 
    Backend health와 BFF contract를 확인한 다음 frontend를 같은 tag에서 배포합니다.
 
-   Major host-write contract release는 backend promotion 전에 `sync-config`가 `READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true`를 렌더링했는지 확인합니다. Backend-first 구간에는 구 browser/BFF의 host mutation이 409로 동결되고, 같은 tag의 browser bundle과 Pages Functions가 함께 올라온 뒤에만 쓰기가 재개됩니다. Frontend rollback만으로는 쓰기가 복구되지 않습니다.
+   Host-write client contract를 바꾸는 release는 backend promotion 전에 `sync-config`가 `READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true`를 렌더링했는지 확인합니다. Backend가 먼저 올라간 동안 구 browser/BFF의 host mutation은 409로 멈추고, 같은 tag의 frontend가 올라와야 풀립니다. Frontend rollback만으로는 복구되지 않습니다.
 
    ```bash
-   gh workflow run "Deploy Front" --ref main -f release_tag=v1.2.0
+   gh workflow run "Deploy Front" --ref main -f release_tag=vX.Y.Z
    ```
 
 8. GitHub Release를 만듭니다.
 
    ```bash
-   gh release create v1.2.0 \
-     --title "ReadMates v1.2.0" \
+   gh release create vX.Y.Z \
+     --title "ReadMates vX.Y.Z" \
      --notes-file <release-note-file>
    ```
 
@@ -161,24 +163,24 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
    Release 작업이 끝났는지는 tag 존재만으로 판단하지 않습니다. 아래 명령이 release URL을 출력해야 GitHub의 릴리즈 노트가 공개 화면에서 보입니다.
 
    ```bash
-   gh release view v1.2.0 --json tagName,name,url,publishedAt
+   gh release view vX.Y.Z --json tagName,name,url,publishedAt
    ```
 
-   tag는 이미 push됐지만 release가 없으면 `CHANGELOG.md`의 해당 버전 섹션을 파일로 추출한 뒤 release만 생성합니다.
+   tag는 이미 push됐지만 release가 없으면 `CHANGELOG.md`의 해당 버전 섹션을 파일로 추출한 뒤 release만 생성합니다. `X`, `Y`, `Z`는 실제 숫자로 바꿉니다.
 
    ```bash
    awk '
-     /^## v1[.]2[.]0 - / { capture=1; next }
+     /^## vX[.]Y[.]Z - / { capture=1; next }
      capture && /^## / { exit }
      capture { print }
-   ' CHANGELOG.md > .tmp/release-notes-v1.2.0.md
+   ' CHANGELOG.md > .tmp/release-notes-vX.Y.Z.md
 
-   gh release create v1.2.0 \
-     --title "ReadMates v1.2.0" \
-     --notes-file .tmp/release-notes-v1.2.0.md
+   gh release create vX.Y.Z \
+     --title "ReadMates vX.Y.Z" \
+     --notes-file .tmp/release-notes-vX.Y.Z.md
    ```
 
-   release body를 고친 뒤에는 `gh release view v1.2.0 --json body`로 공개 본문이 `CHANGELOG.md`의 같은 버전 섹션과 맞는지 확인합니다.
+   release body를 고친 뒤에는 `gh release view vX.Y.Z --json body`로 공개 본문이 `CHANGELOG.md`의 같은 버전 섹션과 맞는지 확인합니다.
 
 ## Branch protection bypass policy
 
@@ -268,7 +270,7 @@ GitHub Releases는 태그별 public-facing 기록입니다.
 
 ReadMates에서는 아래 방식으로 관리합니다.
 
-- release title은 제품명과 tag를 함께 둡니다. 예: `ReadMates v1.2.0`
+- release title은 제품명과 tag를 함께 둡니다. 예: `ReadMates vX.Y.Z`
 - release body는 `CHANGELOG.md`의 해당 버전 섹션과 같은 내용을 사용합니다.
 - GitHub의 자동 생성 `What's Changed`는 참고만 하고, 최종 body에는 사용자/운영자 관점 요약을 넣습니다.
 - dependency-only 변경이 많은 프로젝트처럼 PR 목록만 나열하지 않습니다.
@@ -277,10 +279,4 @@ ReadMates에서는 아래 방식으로 관리합니다.
 
 ## 다음 버전 판단
 
-현재 태그 이후의 문서 보강이나 배포 리포트는 patch release 후보입니다.
-
-예시:
-
-- `v1.2.1`: 운영 배포 불일치 리포트, 릴리즈 관리 문서, 작은 문서/테스트 수정
-- `v1.3.0`: 사용자가 체감하는 새 기능 추가
-- `v2.0.0`: 기존 운영자가 배포 순서, DB, API client, URL을 다시 맞춰야 하는 변경
+[버전 규칙](#버전-규칙) 표를 따릅니다. 문서 보강과 배포 리포트만 있으면 PATCH 후보입니다.

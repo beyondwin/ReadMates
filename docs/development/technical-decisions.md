@@ -3,20 +3,19 @@
 
 # 주요 기술적 의사결정
 
-이 문서는 ReadMates의 현재 구조에서 반복해서 참고해야 하는 기술 선택과 그 배경을 정리합니다. 상세 구현 경계는 [architecture.md](architecture.md)를, 로컬 실행과 운영 변수는 [local-setup.md](local-setup.md)와 [../deploy/README.md](../deploy/README.md)를 기준으로 합니다.
+반복해서 참고하는 기술 선택과 배경을 모읍니다. 구현 경계는 [architecture.md](architecture.md), 로컬 실행과 운영 변수는 [local-setup.md](local-setup.md)와 [../deploy/README.md](../deploy/README.md)가 기준입니다.
 
 ## 결정 문서의 범위
 
-- 현재 코드, 테스트, 배포 문서와 맞는 결정만 기록합니다.
-- 과거 계획 문서의 맥락은 참고할 수 있지만 현재 동작의 기준으로 삼지 않습니다.
-- 운영 secret, 실제 멤버 데이터, private deployment state, DB dump, 로컬 절대 경로, OCI OCID는 예시에 넣지 않습니다.
-- 각 결정은 "무엇을 선택했는가", "왜 선택했는가", "어떤 trade-off를 감수했는가"를 함께 남깁니다.
-- 새 결정을 추가하거나 기존 결정을 바꾸면 관련 문서와 검증 명령도 함께 갱신합니다.
-- Cloudflare, OCI, Google, GitHub처럼 외부 서비스의 한도, 가격, UI, API 동작은 바뀔 수 있으므로 운영 판단 전에 현재 공식 문서나 콘솔에서 재확인합니다.
+- 현재 코드, 테스트, 배포 문서와 맞는 결정만 적습니다. 과거 계획은 맥락일 뿐 기준이 아닙니다.
+- 각 결정은 결정, 이유, trade-off를 함께 남깁니다. 결정을 바꾸면 관련 문서와 검증 명령도 고칩니다.
+- 새 결정은 이 문서가 아니라 ADR로 추가합니다.
+- 운영 secret, 실제 멤버 데이터, 배포 상태, DB dump, 로컬 절대 경로, OCI OCID는 예시에 넣지 않습니다.
+- Cloudflare, OCI, Google, GitHub 같은 외부 서비스의 한도·가격·API 동작은 바뀔 수 있으니 운영 판단 전에 공식 문서로 다시 확인합니다.
 
 ## 결정 인덱스
 
-아래 결정들은 `docs/development/adr/`에 개별 ADR로 이관되었습니다. 상세 컨텍스트, 근거, 대안, 결과는 각 ADR을 참고합니다. 번호가 건너뛰는 항목은 아직 후보로 남겨 둔 결정입니다.
+아래 결정은 개별 ADR로 옮겼습니다. 컨텍스트, 근거, 대안, 결과는 각 ADR에 있습니다. 빠진 번호(0011, 0012, 0017~)는 [ADR 인덱스](adr/README.md#adr-후보-follow-up)의 후보입니다.
 
 | ADR | 제목 | 상태 |
 |-----|------|------|
@@ -34,10 +33,11 @@
 | [ADR-0014](adr/0014-bff-secret-rotation-lifecycle.md) | BFF secret rotation lifecycle | Accepted |
 | [ADR-0015](adr/0015-notification-outbox-dedupe-policy.md) | Notification outbox dedupe policy | Accepted |
 | [ADR-0016](adr/0016-deploy-ledger-event-schema.md) | Deploy ledger event schema | Accepted |
+| [ADR-0072](adr/0072-feedback-document-template-v2.md) | Feedback document template v2 | Accepted |
 
 ## 보완 메모 (ADR 이관 예정/적용 외)
 
-아래 결정들은 현재 ADR에 별도 항목으로 포함되지 않은 사항입니다. 향후 별도 ADR로 이관 예정이거나 현재 산문 수준의 컨텍스트로 보존됩니다.
+아직 별도 ADR이 없는 결정입니다. 나중에 ADR로 옮길 수 있습니다.
 
 ---
 
@@ -67,11 +67,11 @@
 
 ### 세션 lifecycle과 공개 범위를 서버에서 확정한다
 
-**결정:** `sessions.state`는 `DRAFT`, `OPEN`, `CLOSED`, `PUBLISHED` 운영 단계를 구분하고, `sessions.visibility`는 `HOST_ONLY`, `MEMBER`, `PUBLIC` 공개 범위의 DB source of truth입니다.
+**결정:** `sessions.state`는 `DRAFT`, `OPEN`, `CLOSED`, `PUBLISHED` 운영 단계를 구분합니다. 공개 범위는 두 축으로 나눕니다. 앱 열람은 `sessions.access_scope`(`HOST_ONLY | GUEST_READABLE`), 공개 사이트 배치는 `public_session_publications.site_visibility`(`HIDDEN | PUBLIC_RECORD`)가 기준입니다. 기존 `sessions.visibility`와 `is_public`은 rolling deploy 호환을 위한 dual-write 컬럼입니다.
 
-**이유:** 정기 독서모임 운영에는 예정 세션, 현재 참여 세션, 닫힌 기록, 발행된 공개 기록이 동시에 존재합니다. 상태와 공개 범위를 분리해야 호스트가 여러 예정 세션을 준비하면서도 클럽당 하나의 현재 `OPEN` 세션만 유지하고, 닫힌 기록을 검토한 뒤 발행할 수 있습니다.
+**이유:** 예정 세션, 현재 세션, 닫힌 기록, 발행된 공개 기록이 동시에 존재합니다. 상태와 공개 범위를 나눠야 여러 예정 세션을 준비하면서도 클럽당 `OPEN` 세션을 하나로 유지하고, 닫힌 기록을 검토한 뒤 발행할 수 있습니다. 게스트 앱 열람과 공개 사이트 노출도 서로 독립적으로 정할 수 있습니다.
 
-**Trade-off:** route별 조회 조건이 복잡해집니다. Public surface, member archive, notes feed, upcoming sessions가 각각 다른 상태와 공개 범위를 사용하므로 서버 contract와 프론트엔드 모델을 같이 맞춰야 합니다.
+**Trade-off:** route별 조회 조건이 복잡해집니다. 공개 사이트, 게스트 앱, member archive, notes, 예정 세션이 서로 다른 상태·범위 조합을 쓰므로 서버 contract와 frontend 모델을 함께 맞춰야 합니다.
 
 **관련 문서와 검증:** [architecture.md](architecture.md#세션-lifecycle과-공개-범위), `pnpm --dir front test`, `./scripts/server-ci-check.sh`, `./server/gradlew -p server integrationTest`
 
@@ -79,11 +79,11 @@
 
 ### 역할 기반 권한과 문서 접근 제어를 분리한다
 
-**결정:** `게스트`, `둘러보기 멤버`, `정식 멤버`, `호스트`의 route/API 권한을 분리하고, 피드백 문서는 active 정식 멤버와 host 권한을 기준으로 검증합니다.
+**결정:** `게스트`, `둘러보기 멤버`, `정식 멤버`, `호스트`의 route/API 권한을 나누고, 피드백 문서는 같은 클럽의 active 정식 멤버와 호스트만 읽게 합니다.
 
-**이유:** 초대 없이 Google로 로그인한 사용자는 일부 멤버 공개 정보를 읽을 수 있지만 피드백 문서 열람은 제한되어야 합니다. 피드백 문서는 공개 기록보다 민감하므로 viewer, suspended, inactive 상태에는 열지 않고, 같은 클럽의 active 정식 멤버에게만 제공합니다.
+**이유:** 초대 없이 로그인한 사용자도 일부 기록은 읽을 수 있지만, 피드백 문서는 공개 기록보다 민감합니다. 그래서 viewer, suspended, inactive 상태에는 열지 않습니다.
 
-**Trade-off:** 같은 화면에서도 read-only, locked, unavailable state를 구분해야 합니다. API authorization과 UI guard가 엇갈리면 사용자는 버튼을 보지만 서버에서 거절당하는 경험을 하므로 route loader와 server test를 함께 관리합니다.
+**Trade-off:** 같은 화면에서도 read-only, locked, unavailable 상태를 구분해야 합니다. API 권한과 UI guard가 엇갈리면 버튼은 보이는데 서버가 거절하므로 route loader와 server test를 함께 관리합니다.
 
 **관련 문서와 검증:** [architecture.md](architecture.md#멤버십과-역할-모델), [architecture.md](architecture.md#피드백-문서-흐름), `pnpm --dir front test:e2e`
 
@@ -93,9 +93,9 @@
 
 **결정:** Prometheus metric tag 값은 `NotificationEventType`처럼 enum 또는 `pending`/`failed` 같은 고정 문자열만 사용합니다. `club_id`, `user_id`, `membership_id`, `recipient_email`, `event_id`, `delivery_id`, `session_id` 같은 row-level identifier는 tag로 넣지 않습니다.
 
-**이유:** Prometheus는 tag 값 조합마다 별도 time series를 만듭니다. row-level ID를 tag로 사용하면 운영 데이터가 늘어날수록 time series 수가 무한히 증가해 무료 Prometheus storage를 빠르게 소진하고, scrape/query 지연을 일으킵니다.
+**이유:** Prometheus는 tag 값 조합마다 time series를 만듭니다. row-level ID를 tag로 쓰면 series 수가 끝없이 늘어 storage를 소진하고 scrape/query가 느려집니다.
 
-**Trade-off:** metric만으로 "특정 사용자의 알림 전송 내역"을 Grafana에서 직접 조회할 수 없습니다. row-level 조회가 필요하면 `notification_deliveries` audit table에 JOIN 쿼리를 사용하거나, Grafana table panel에 DB datasource를 직접 연결합니다.
+**Trade-off:** metric만으로 특정 사용자의 알림 내역은 볼 수 없습니다. row-level 조회는 `notification_deliveries` audit table이나 admin 알림 ledger를 씁니다.
 
 **관련 문서와 검증:** `server/src/main/kotlin/com/readmates/notification/application/service/ReadmatesOperationalMetrics.kt` KDoc 참고
 
@@ -103,20 +103,13 @@
 
 ### Kafka relay/consumer worker process를 단일 jar로 분리 운영한다
 
-**결정:** 현재 single Spring Boot process에서 web + scheduler + Kafka listener가 함께
-boot하므로, process 1개 죽으면 web과 notification 발송이 함께 정지한다.
-`readmates.notifications.worker.enabled=false/true` flag를 두고 systemd service를
-2개(web replica, worker instance)로 분리하면 infra cost 없이 failure isolation이 가능하다.
+**현재 상태:** web, scheduler, Kafka listener가 한 Spring Boot process에서 함께 뜹니다. 그래서 process가 죽으면 web과 알림 발송이 함께 멈춥니다. 2-service 분리 운영은 아직 하지 않으며 [ADR-0017 후보](adr/README.md#adr-후보-follow-up)로 남아 있습니다.
 
-**이유:** 단일 jar 재사용으로 infra cost 0. Gradle multi-module 분리(선택지 B)는
-2 instance 이상 운영하게 됐을 때 재검토한다.
+**준비된 것:** `readmates.notifications.worker.enabled`(`READMATES_NOTIFICATIONS_WORKER_ENABLED`, 기본 `true`)가 `false`면 `notificationWorkerRuntime` bean이 등록되지 않아 relay/backlog scheduler가 뜨지 않습니다. Kafka listener와 relay는 별도로 `readmates.notifications.enabled`와 `readmates.notifications.kafka.enabled`로 켭니다.
 
-**Trade-off:** web replica와 worker instance가 같은 jar를 쓰므로 classpath isolation은
-없다. Kafka listener class는 web instance에서도 로드된다
-(`@ConditionalOnProperty`로 bean만 skip).
+**방향과 trade-off:** 같은 jar를 web 인스턴스와 worker 인스턴스로 나눠 띄우면 추가 인프라 비용 없이 장애를 분리할 수 있습니다. 대신 classpath 분리는 없고 bean 등록만 조건부로 건너뜁니다. Gradle multi-module 분리는 인스턴스를 2개 이상 운영할 때 다시 봅니다.
 
-**관련 문서와 검증:** v1 TASK-075 보강. `readmates.notifications.worker.enabled=false`로
-boot 시 Kafka listener bean이 등록되지 않는지 log 확인.
+**관련 문서와 검증:** `server/src/main/kotlin/com/readmates/notification/application/config/NotificationWorkerConfiguration.kt`, `NotificationEventRelaySchedulerTest`
 
 ---
 
@@ -128,12 +121,12 @@ boot 시 Kafka listener bean이 등록되지 않는지 log 확인.
 
 **Trade-off:** token bucket이 주 경계에서 reset되는 의도된 부작용이 있습니다. 율 제한은 단기(분~시간 단위) 정책이므로 실질적인 영향은 없습니다. 토큰·세션 ID 해시에는 여전히 `stableHash`(salt 없음)를 사용해 주 경계 영향을 받지 않습니다.
 
-**관련 문서와 검증:** `./server/gradlew -p server test --tests '*ClientIpHashing*'`
+**관련 문서와 검증:** `./server/gradlew -p server unitTest --tests '*ClientIpHashing*'`
 
 ## Transaction Boundary Policy
 
-Application services own business transaction boundaries. Controllers parse HTTP and call use cases; persistence adapters execute SQL and mapping. When an application service coordinates more than one write port, the service method owns the transaction so cache invalidation, notification event recording, and state mutation share one visible boundary.
+- **서비스가 소유합니다.** 업무 트랜잭션 경계는 application service가 가집니다. controller는 HTTP를 해석해 use case를 부르고, persistence adapter는 SQL과 mapping만 합니다. 서비스가 쓰기 port를 여럿 조합하면 그 메서드가 트랜잭션을 가져서 상태 변경, cache invalidation, 알림 event 기록이 한 경계를 공유합니다.
+- **Adapter `@Transactional`은 예외입니다.** scheduler, Kafka listener처럼 서비스 트랜잭션을 거치지 않는 경로에서 부를 때만 둡니다. 서비스와 adapter 둘 다 붙어 있으면 서비스 경계가 기준이고, 테스트로 동작을 고정한 뒤 adapter 쪽을 좁게 정리합니다.
+- **Isolation은 필요한 곳에만 지정합니다.** claim이나 read-modify-write처럼 기본값보다 강한 보장이 필요한 경우만입니다(예: 세션/로그인 복원, 알림 delivery claim). 새로 지정하면 서비스 코드나 결정 기록에 이유를 남깁니다.
 
-Adapter-level `@Transactional` is allowed only when the adapter is called by an inbound scheduler, Kafka listener, or other path that does not already pass through an application service transaction. If both service and adapter carry `@Transactional`, the service boundary is treated as the authoritative boundary and the adapter annotation should be removed in a narrow cleanup once tests pin the behavior.
-
-Isolation is specified only where the operation depends on claim/read-modify-write behavior that needs a non-default guarantee. Existing examples include session/login restoration and notification delivery claiming. New isolation choices must be explained in the service or adjacent decision record.
+검증은 `./scripts/server-ci-check.sh`(detekt, `unitTest`, `architectureTest`)와 필요 시 `./server/gradlew -p server integrationTest`로 합니다.

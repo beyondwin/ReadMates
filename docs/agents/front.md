@@ -40,13 +40,13 @@ Do not add Next/React Server Component directives such as `"use client"` to Vite
 
 Server state는 TanStack Query v5로 점진 이관 중입니다. 앱 루트(`front/src/main.tsx`)에 단일 `QueryClient`를 주입하고, `front/src/app/router.tsx`의 `createReadmatesRouter()`가 `{router, queryClient}`를 반환해 loader와 컴포넌트가 같은 cache를 공유합니다. 새 server state는 `features/<name>/queries/<area>-queries.ts`에 `queryOptions` + `useXxxMutation`을 두고, mutation은 `onSuccess`에서 `invalidateQueries({ queryKey: keys.all })`로 정리합니다. 진행 상황은 [docs/development/server-state-migration.md](../development/server-state-migration.md)를 참고합니다.
 
-`front/src/app/router.tsx`는 composition root입니다. Route 정의는 `front/src/app/routes/{public,auth,member,host}.tsx`에 variant별로 분리되어 있으니, 새 route는 해당 variant 모듈에 추가합니다.
+`front/src/app/router.tsx`는 composition root입니다. Route 정의는 `front/src/app/routes/{public,auth,member,host,admin}.tsx`에 variant별로 분리되어 있으니, 새 route는 해당 variant 모듈에 추가합니다.
 
 신규 단위 테스트는 source 옆에 `*.test.{ts,tsx}`로 co-locate합니다(`front/AGENTS.md` 참조). 기존 `front/tests/unit/`는 server testcontainer fixture 공유를 위해 이동하지 않습니다.
 
 When validating club slugs in browser proxy or Pages Functions code, reuse `front/shared/security/club-slug.ts` so local Vite and Cloudflare behavior stay aligned.
 
-When touching a migrated feature, prefer `api`, `model`, `route`, `ui` placement over adding to legacy `components`. If a feature has `ui`, that directory is the public presentation surface; do not expose `components` as a new public import surface.
+Place new feature code in `api`, `queries`, `model`, `route`, or `ui`; do not reintroduce a feature-level `components` directory.
 
 Read another guide when the frontend task crosses surfaces:
 
@@ -63,6 +63,8 @@ pnpm --dir front lint
 pnpm --dir front test
 pnpm --dir front build
 ```
+
+When local `pnpm` differs from the pinned `packageManager`, run the same commands through Corepack as described in the root `AGENTS.md` and report the exact command.
 
 For route/auth/BFF/user-flow changes, also run:
 
