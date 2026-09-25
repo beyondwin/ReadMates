@@ -10,6 +10,21 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+## v2.5.1 - 2026-09-25
+
+### Security
+
+- **서버 런타임 의존성 보안 패치:** `v2.5.0` 서버 이미지가 Trivy 스캔에서 CRITICAL CVE로 막혀 Tomcat을 `11.0.22`에서 `11.0.26`으로(CVE-2026-65182, CVE-2026-65905, CVE-2026-68525), Netty를 `4.2.16.Final`에서 `4.2.18.Final`로(CVE-2026-75595) 올렸습니다. 기능 변경은 없고, `v2.5.0`의 피드백 문서 템플릿 v2와 Detekt 조정을 그대로 포함합니다.
+
+### Deployment Notes
+
+- `v2.5.0` 태그는 서버 이미지 스캔 단계에서 실패해 이미지가 promote되지 않았고 운영에 배포되지 않았습니다. `v2.5.1`이 `v2.4.1` 다음 운영 배포입니다.
+- 배포 순서와 확인 항목은 `v2.5.0` Deployment Notes와 같습니다. DB migration, 새 환경 변수가 없어 `sync-config`는 필요하지 않습니다.
+
+### Verification
+
+- `./scripts/server-ci-check.sh` 통과, `runtimeClasspath`에서 `tomcat-embed-core:11.0.26`, `netty-handler:4.2.18.Final` 해석을 확인했습니다.
+
 ## v2.5.0 - 2026-09-25
 
 ### Highlights

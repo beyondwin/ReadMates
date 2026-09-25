@@ -12,9 +12,9 @@ plugins {
 group = "com.readmates"
 version = "0.0.1-SNAPSHOT"
 
-extra["netty.version"] = "4.2.16.Final"
+extra["netty.version"] = "4.2.18.Final"
 extra["spring-kafka.version"] = "4.0.6"
-extra["tomcat.version"] = "11.0.22"
+extra["tomcat.version"] = "11.0.26"
 
 java {
     toolchain {
@@ -95,8 +95,8 @@ dependencies {
         implementation("tools.jackson.core:jackson-databind:3.1.4") {
             because("Trivy flags CVE-2026-54512 and CVE-2026-54513 in tools.jackson databind 3.1.2.")
         }
-        implementation("io.netty:netty-codec-dns:4.2.16.Final") {
-            because("Trivy flags fixed HIGH Netty codec CVEs before 4.2.16.Final.")
+        implementation("io.netty:netty-codec-dns:4.2.18.Final") {
+            because("Trivy flags CRITICAL Netty CVE-2026-75595 before 4.2.17.Final.")
         }
         implementation("org.springframework.kafka:spring-kafka:4.0.6") {
             because("Trivy flags CVE-2026-41731 in spring-kafka 4.0.5.")
