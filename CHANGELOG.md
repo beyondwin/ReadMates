@@ -17,6 +17,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - Frontend TypeScript 오류 238건을 해소하고 `typecheck`를 CI, Deploy Front, pre-push 필수 게이트에 추가했습니다. React/Router/Vitest/CT 타입과 실제 API·read-view 계약, 테스트 fixture를 함께 맞췄습니다.
 - 프로필 편집에서 club slug가 없는 초기 상태의 null 접근 오류를 고치고, 알 수 없는 API 오류도 기존 복구 메시지로 안내하도록 정리했습니다.
 - Docker CT 설치를 `--frozen-lockfile`로 고정해 검증 중 lockfile 변경을 막고, Playwright CT가 제공하는 React plugin의 중복 설정을 제거했습니다.
+- E2E의 모바일 카드 높이 측정을 애니메이션 좌표에서 실제 레이아웃 크기로 바꾸고, 기록 화면은 필수 API 응답 완료 후 활성 상태를 검증합니다. 지연된 마지막 응답을 재현하는 회귀 테스트를 추가했습니다.
 
 ### Documentation
 

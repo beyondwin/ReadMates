@@ -3,6 +3,7 @@ import {
   mockMemberParticipationProfile,
   mockMyReadingShelfJourney,
   mockRecentReadingSessionDetail,
+  waitForArchiveListResponses,
 } from "./my-reading-shelf-fixtures";
 import {
   loginWithGoogleFixture,
@@ -423,9 +424,10 @@ test("club-scoped account and notification routes preserve navigation current st
   await expect(page.getByText("최근 함께 읽은 책").first()).toBeVisible();
 
   await page.goto(`${scopedAppPath}/me`);
-  await page.getByRole("link", {
-    name: "전체 보기",
-  }).click();
+  await Promise.all([
+    waitForArchiveListResponses(page, "reading-sai"),
+    page.getByRole("link", { name: "전체 보기" }).click(),
+  ]);
   await expect(page).toHaveURL(
     new RegExp(`${scopedAppPath}/archive\\?view=sessions$`),
   );
@@ -495,4 +497,47 @@ test("club-scoped account and notification routes preserve navigation current st
   }).getByRole("link", {
     name: "받은 알림",
   })).toHaveAttribute("aria-current", "page");
+});
+
+test("archive navigation waits for every list response before asserting its active view", async ({ page }) => {
+  await mockMyReadingShelfJourney(page, "three-recent-readings");
+  await loginWithGoogleFixture(page, memberEmail);
+  await page.goto(`${scopedAppPath}/me`);
+  await expect(page.getByRole("link", { name: "전체 보기" })).toBeVisible();
+
+  const feedbackRequest = Promise.withResolvers<void>();
+  const releaseFeedback = Promise.withResolvers<void>();
+  await page.route((url) => url.pathname === "/api/bff/api/feedback-documents/me", async (route) => {
+    feedbackRequest.resolve();
+    await releaseFeedback.promise;
+    await route.continue();
+  });
+  const otherResponses = Promise.all([
+    "/api/bff/api/archive/sessions",
+    "/api/bff/api/archive/me/questions",
+    "/api/bff/api/archive/me/reviews",
+  ].map(async (pathname) => {
+    const response = await page.waitForResponse((candidate) => new URL(candidate.url()).pathname === pathname);
+    expect(response.ok()).toBe(true);
+    expect(await response.finished()).toBeNull();
+  }));
+  let archiveReady = false;
+  const archiveResponses = waitForArchiveListResponses(page, "reading-sai").then(() => {
+    archiveReady = true;
+  });
+
+  try {
+    await page.getByRole("link", { name: "전체 보기" }).click();
+    await feedbackRequest.promise;
+    await otherResponses;
+    await expect(page).toHaveURL(new RegExp(`${scopedAppPath}/archive\\?view=sessions$`));
+    await expect(page.getByText("멤버 공간을 불러오는 중", { exact: true })).toBeVisible();
+    expect(archiveReady).toBe(false);
+    await expect(page.getByRole("button", { name: "세션" })).toHaveCount(0);
+  } finally {
+    releaseFeedback.resolve();
+  }
+
+  await archiveResponses;
+  await expect(page.getByRole("button", { name: "세션" })).toHaveAttribute("aria-pressed", "true");
 });

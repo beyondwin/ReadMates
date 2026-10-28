@@ -537,7 +537,11 @@ test("member-home shortcuts keep the desktop divider inset and mobile cards divi
       return {
         columnCount: getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).length,
         pseudoContents: cards.map((card) => getComputedStyle(card, "::before").content),
-        cardHeights: boxes.map((box) => box.height),
+        // A translating ancestor can round DOMRect height below the layout minimum.
+        cardSizes: cards.map((card) => ({
+          height: card.offsetHeight,
+          minHeight: Number.parseFloat(getComputedStyle(card).minHeight),
+        })),
         sameRow: boxes.length === 2 && Math.abs(boxes[0].top - boxes[1].top) <= 1,
         nonOverlapping: boxes.length === 2 && boxes[0].right <= boxes[1].left,
         noOverflow: element.scrollWidth <= element.clientWidth + 1,
@@ -546,7 +550,8 @@ test("member-home shortcuts keep the desktop divider inset and mobile cards divi
 
     expect(mobileGeometry.columnCount).toBe(2);
     expect(mobileGeometry.pseudoContents).toEqual(["none", "none"]);
-    mobileGeometry.cardHeights.forEach((height, index) => {
+    mobileGeometry.cardSizes.forEach(({ height, minHeight }, index) => {
+      expect(minHeight, `${viewport.width}px shortcut card ${index + 1} minimum height`).toBeGreaterThanOrEqual(110);
       expect(height, `${viewport.width}px shortcut card ${index + 1} height`).toBeGreaterThanOrEqual(110);
     });
     expect(mobileGeometry.sameRow).toBe(true);

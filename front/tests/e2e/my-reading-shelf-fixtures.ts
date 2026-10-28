@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import type { MyPageResponse } from "@/features/archive/api/archive-contracts";
 import { archiveSessionDetailContractFixture } from "../unit/api-contract-fixtures";
 
@@ -310,4 +310,24 @@ export async function mockMyReadingShelfJourney(page: Page, mode: JourneyFixture
 
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(firstPage) });
   });
+}
+
+export async function waitForArchiveListResponses(page: Page, clubSlug: string): Promise<void> {
+  // Native archive links reload the document. Its URL settles before the scoped
+  // loader has received every page required to render the archive view.
+  await Promise.all([
+    "/api/bff/api/archive/sessions",
+    "/api/bff/api/archive/me/questions",
+    "/api/bff/api/archive/me/reviews",
+    "/api/bff/api/feedback-documents/me",
+  ].map(async (pathname) => {
+    const response = await page.waitForResponse((candidate) => {
+      const url = new URL(candidate.url());
+      return candidate.request().method() === "GET"
+        && url.pathname === pathname
+        && url.searchParams.get("clubSlug") === clubSlug;
+    });
+    expect(response.ok(), `${pathname} should succeed before archive rendering`).toBe(true);
+    expect(await response.finished(), `${pathname} response body should finish`).toBeNull();
+  }));
 }

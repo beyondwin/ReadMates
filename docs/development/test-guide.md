@@ -134,6 +134,10 @@ pnpm --dir front test:e2e
 
 `front/playwright.config.ts`는 E2E 실행 중 backend와 frontend dev server를 함께 띄웁니다.
 
+화면 준비와 URL 변경을 구분합니다. 네이티브 링크로 문서를 다시 여는 archive 탐색은 URL이 바뀐 뒤에도 loader의 네 API 응답을 기다리므로, `waitForArchiveListResponses`를 클릭 전에 등록하고 성공 응답의 본문 수신까지 확인한 뒤 활성 탭을 검증합니다. 응답을 보류하는 회귀 테스트가 이 순서를 고정합니다. `translateY` 애니메이션 중 최소 카드 높이는 소수점 오차가 있는 `getBoundingClientRect().height` 대신 CSS `min-height`와 `offsetHeight`로 확인하고, 위치·겹침은 계속 실제 화면 좌표로 검증합니다.
+
+로컬 전체 E2E는 호스트가 깨어 있는 동안 실행합니다. 제한 시간이 30초인 테스트가 수분 뒤 종료된다면 OS 절전 기록부터 확인하고, 절전이 섞인 실행은 완료 근거로 사용하지 않습니다. 실패 추적이 필요하면 `--retries=0 --trace=retain-on-failure`로 다시 실행해 실제 요청과 화면 전환을 확인합니다.
+
 - 기본 frontend port는 `PLAYWRIGHT_PORT`가 없으면 `3100`입니다.
 - 기본 backend origin은 `READMATES_API_BASE_URL`이 없으면 `http://127.0.0.1:18080`입니다.
 - `READMATES_E2E_DB_NAME`이 없으면 E2E database 이름은 현재 운영 migration과 dev seed SQL 내용의 fingerprint를 붙인 `readmates_e2e_<hash>` 형태로 정합니다. migration 파일이 바뀌면 기본 schema 이름도 바뀌므로 오래된 로컬 `readmates_e2e` schema의 Flyway checksum history가 기본 명령을 막지 않습니다.
