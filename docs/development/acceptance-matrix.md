@@ -2,7 +2,7 @@
 
 Use this matrix to select risk evidence for the touched slice. Select only relevant rows, record why each was selected, and state why adjacent high-risk rows do not apply.
 
-Related guidance: [architecture](architecture.md), [vertical-slice checklist](vertical-slice-checklist.md), and the [frontend](../agents/front.md), [server](../agents/server.md), [design](../agents/design.md), and [documentation](../agents/docs.md) surface guides.
+Related guidance: [architecture](architecture.md) and the [vertical-slice checklist](vertical-slice-checklist.md). In a full source checkout, also read the repository-local frontend, server, design, and documentation contributor guides. Contributor-only guidance is omitted from public release candidates.
 
 | Trigger | Minimum states or failures to consider | Evidence direction |
 | --- | --- | --- |

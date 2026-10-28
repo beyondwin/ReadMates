@@ -326,7 +326,7 @@ describe("SessionRecordWorkspace", () => {
 
     function Harness() {
       const [source, setSource] = useState<HostSessionDraftSource>("manual");
-      const [snapshot, setSnapshot] = useState(draftSnapshot);
+      const [snapshot, setSnapshot] = useState<SessionRecordWorkspaceProps["draft"]["snapshot"]>(draftSnapshot);
       return (
         <SessionRecordWorkspace
           {...props({

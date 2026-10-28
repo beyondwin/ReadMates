@@ -18,7 +18,7 @@ export type AttendanceStatus = "UNKNOWN" | "ATTENDED" | "ABSENT";
 export type SessionParticipationStatus = "ACTIVE" | "REMOVED";
 export type CurrentSessionMemberRole = "HOST" | "MEMBER";
 
-export type { CurrentSessionReadView as CurrentSession };
+export type CurrentSession = CurrentSessionReadView;
 
 export type CurrentSessionPageData = {
   currentSession: CurrentSession | null;

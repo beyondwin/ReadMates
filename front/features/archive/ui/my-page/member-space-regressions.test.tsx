@@ -27,7 +27,7 @@ const save = vi.fn(async (editable) => ({ ...editable, accountName: profile.acco
 describe("member-space unaffected presentation", () => {
   it("places the profile before achievements inside the overview", () => {
     const { container } = render(<MemberSpaceOverview><MemberProfileSummary profile={profile} viewModel={viewModel} canEditProfile onSaveProfile={save} /><ReadingAchievementSummary viewModel={viewModel} /></MemberSpaceOverview>);
-    const overview = container.querySelector(".rm-member-space__overview")!;
+    const overview = container.querySelector<HTMLElement>(".rm-member-space__overview")!;
     const profileSection = within(overview).getByRole("region", { name: "멤버1" });
     const achievement = within(overview).getByRole("region", { name: viewModel.achievementHeading });
     expect(profileSection.compareDocumentPosition(achievement) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -35,7 +35,7 @@ describe("member-space unaffected presentation", () => {
 
   it("keeps utility links between overview and reading records", () => {
     const { container } = render(<MyReadingShelf profile={profile} viewModel={viewModel} recentReadings={recentReadings} canEditProfile notificationsHref="/notifications" settingsHref="/settings" archiveSessionsHref="/archive" onSaveProfile={save} />);
-    const overview = container.querySelector(".rm-member-space__overview")!;
+    const overview = container.querySelector<HTMLElement>(".rm-member-space__overview")!;
     const utilities = screen.getByRole("region", { name: "내 공간 관리" });
     const records = screen.getByText("나의 독서 기록");
     expect(overview.compareDocumentPosition(utilities) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

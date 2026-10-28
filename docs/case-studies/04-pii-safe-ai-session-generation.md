@@ -189,4 +189,4 @@ Platform admin은 job ID, status, revision, safe error, `cleanupPending` 같은 
 - Host workflow and external JSON fallback: [`docs/development/session-import-generator.md`](../development/session-import-generator.md)
 - Operations: [`docs/operations/runbooks/ai-session-generation.md`](../operations/runbooks/ai-session-generation.md)
 - Release notes: [`CHANGELOG.md`](../../CHANGELOG.md#v200---2026-07-25)
-- Historical design record: [`docs/superpowers/specs/2026-07-14-readmates-grounded-whole-transcript-ai-session-generation-design.md`](../superpowers/specs/2026-07-14-readmates-grounded-whole-transcript-ai-session-generation-design.md)
+- 과거 설계 기록 (Git 이력): `docs/superpowers/specs/2026-07-14-readmates-grounded-whole-transcript-ai-session-generation-design.md`

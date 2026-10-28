@@ -1,6 +1,6 @@
 # 테스트 가이드
 
-ReadMates 테스트는 frontend lint/unit/build, Playwright E2E, backend Gradle lane, 공개 릴리즈 후보 점검, 배포 smoke로 나뉩니다.
+ReadMates 테스트는 frontend lint/typecheck/unit/build, Playwright E2E, backend Gradle lane, 공개 릴리즈 후보 점검, 배포 smoke로 나뉩니다.
 
 `.github/workflows/ci.yml`의 주요 job:
 
@@ -8,7 +8,7 @@ ReadMates 테스트는 frontend lint/unit/build, Playwright E2E, backend Gradle 
 | --- | --- |
 | `scripts` | agent guidance, deploy workflow contract, Flyway 불변성, ShellCheck, AI PII/설정, Prometheus/Tempo/Grafana 검증 |
 | `public-release` | 공개 후보 build + scanner |
-| `frontend` | Node.js 24 + `pnpm@11.13.1`로 lint, `test:coverage`, build, Zod fixture freshness |
+| `frontend` | Node.js 24 + `pnpm@11.13.1`로 lint, typecheck, `test:coverage`, build, Zod fixture freshness |
 | `frontend-visual-regression` | `pnpm test:ct:docker` |
 | `design-system` | `pnpm design:check` |
 | `backend` | JDK 25로 `./scripts/server-ci-check.sh` (unit, architecture, ktlint, detekt, JaCoCo) |
@@ -28,7 +28,7 @@ CI에서 자주 실패하는 게이트를 로컬에서 먼저 묶어 확인할 �
 ./scripts/pre-push-check.sh
 ```
 
-기본 모드는 agent guidance·deploy workflow contract 검사, `git diff --check`, frontend lint·coverage unit test·build, Zod fixture freshness, `./scripts/server-ci-check.sh`, production AI config 검증을 실행합니다. `.github/`, `deploy/`, `docs/`, `scripts/`, `AGENTS.md`, `README.md`, `.env.example`, `.gitleaks.toml`이 바뀌면 공개 후보 build와 scanner도 실행합니다.
+기본 모드는 agent guidance·deploy workflow contract 검사, `git diff --check`, frontend lint·typecheck·coverage unit test·build, Zod fixture freshness, `./scripts/server-ci-check.sh`, production AI config 검증을 실행합니다. `.github/`, `deploy/`, `docs/`, `scripts/`, `AGENTS.md`, `README.md`, `.env.example`, `.gitleaks.toml`이 바뀌면 공개 후보 build와 scanner도 실행합니다.
 
 릴리즈나 태그 배포 직전에는 integration, E2E, observability 설정 검증까지 포함합니다.
 
@@ -98,6 +98,14 @@ Production build:
 ```bash
 pnpm --dir front build
 ```
+
+`build`는 `vite build`로 배포 번들을 생성합니다. 전체 TypeScript 검사는 별도 `typecheck` 스크립트(`tsc --noEmit --incremental false`)가 담당합니다. lint·Vitest·build 성공만으로 타입 검사 성공을 대신하지 않습니다.
+
+```bash
+pnpm --dir front typecheck
+```
+
+`typecheck`는 CI frontend job, `Deploy Front`, `pre-push-check.sh`의 필수 게이트입니다. 2026-10-28 정리에서 기존 238건(74파일)의 타입 오류를 0건으로 해소했습니다. 주요 수정은 React 19 JSX·ref, Router 8 loader 인자, Vitest mock·CT locator/plugin 타입 정합성, 실제 API/read-view 계약과 fixture의 필수 필드, Workers 모듈 타입과 nullable 상태 좁히기입니다. 검사 제외나 광범위한 cast 없이 코드·테스트 계약을 맞췄습니다.
 
 ## Lighthouse Diagnostic
 
@@ -283,7 +291,7 @@ SQL plan, API contract, query budget을 건드리는 release-risk 검토에서�
   --tests com.readmates.performance.MySqlQueryPlanTest
 ```
 
-`:unitTest`는 JUnit5 클래스 단위 병렬 + Gradle `maxParallelForks=availableProcessors()/2`(기본)로 실행합니다. CI에서는 `READMATES_TEST_FORKS` env로 fork 수를 명시할 수 있고, sweep harness(`scripts/bench/sweep-forks.sh`)로 머신별 최적값을 측정할 수 있습니다. Backend `Test` JVM heap은 기본 `1536m`이며, 로컬/CI 메모리 상황에 따라 `-PtestMaxHeap=2g` 또는 `READMATES_TEST_MAX_HEAP=2g`로 조정할 수 있습니다.
+`:unitTest`는 JUnit5 클래스 단위 병렬 + Gradle `maxParallelForks=availableProcessors()/2`(최소 1, 기본)로 실행합니다. `-PmaxForks=N`이 `READMATES_TEST_FORKS` env보다 우선합니다. Backend `Test` JVM heap은 기본 `1536m`이며, 로컬/CI 메모리 상황에 따라 `-PtestMaxHeap=2g` 또는 `READMATES_TEST_MAX_HEAP=2g`로 조정할 수 있습니다.
 
 PR-level quality gate는 단일 `check` task로 통합되어 있습니다.
 
@@ -352,7 +360,18 @@ corepack pnpm --dir front exec playwright test tests/e2e/admin-health.spec.ts
 
 회귀 matrix는 executor 생성 전 invalid typed property의 startup failure, 실제 read timeout, caller-runs 없는 bounded-queue rejection, lazy/scheduled single-flight, timeout/error/rejection, stale last-known-good, initial unavailable와 recovery, bounded metric label, scheduler-to-input-port 방향, additive metadata/UI state를 포함해야 합니다. ship 전에는 `./scripts/server-ci-check.sh`, `./server/gradlew -p server integrationTest`, full frontend lint/test/build/E2E lane, 변경 scope에 맞는 public-release candidate check를 실행합니다.
 
-로컬 image 재현성 검증은 `./server/gradlew -p server bootJar` 후 `docker build -t readmates-server:local server`를 사용하며, 이 명령은 `server/Dockerfile`을 사용합니다. Release workflow는 CI가 jar를 빌드한 뒤 `server/Dockerfile.release`로 이미지를 만들고, 같은 digest를 scan한 다음 promote합니다. Java 25 test JVM은 Netty가 포함된 classpath(`ALL-UNNAMED`)의 native access를 명시적으로 허용하고 그 밖의 module에서 발생하는 illegal native access를 거절하며, `ProtobufJava25CompatibilityTest`가 제거 예정인 `sun.misc.Unsafe` 메모리 접근 없이 OTLP payload를 직렬화하는 fallback을 고정합니다.
+로컬 image 재현성 검증은 `./server/gradlew -p server bootJar` 후 `docker build -t readmates-server:local server`를 사용합니다. Release workflow도 같은 `server/Dockerfile`을 사용하되 CI가 검증한 jar로 이미지를 만들고, 같은 digest를 scan한 다음 promote합니다. Java 25 test JVM은 Netty가 포함된 classpath(`ALL-UNNAMED`)의 native access를 명시적으로 허용하고 그 밖의 module에서 발생하는 illegal native access를 거절하며, `ProtobufJava25CompatibilityTest`가 제거 예정인 `sun.misc.Unsafe` 메모리 접근 없이 OTLP payload를 직렬화하는 fallback을 고정합니다.
+
+### Fork 수와 실행 시간 비교
+
+같은 checkout과 JDK에서 fork 수를 바꿔 `unitTest` 시간을 비교할 수 있습니다.
+
+```bash
+time ./server/gradlew -p server unitTest --rerun-tasks --no-build-cache -PmaxForks=1
+time ./server/gradlew -p server unitTest --rerun-tasks --no-build-cache -PmaxForks=2
+```
+
+각 설정의 첫 실행은 예열로 제외하고, 이후 3회 이상 실행한 중앙값과 범위를 비교합니다. 테스트 성공 여부, JDK, CPU, 메모리와 함께 기록하고 다른 빌드와 동시에 측정하지 않습니다. 이 명령은 task 재실행과 build-cache 사용 여부를 제어하며, 의존성·OS cache까지 비우는 완전한 cold 측정은 아닙니다. 기존 daemon이나 사용자 공용 Gradle cache를 삭제할 필요는 없습니다. 로컬 측정 로그는 무시되는 `.tmp/` 아래에 둡니다.
 
 ### Testcontainers 재사용 (로컬 전용)
 

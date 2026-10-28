@@ -88,7 +88,7 @@ for (const viewport of [
     await expect(interfaceHeading).not.toHaveClass(/reading-editorial/);
 
     const publicCopyMetrics = await Promise.all(
-      [["title", title], ["summary", summary]].map(async ([name, locator]) => ({
+      ([["title", title], ["summary", summary]] as const).map(async ([name, locator]) => ({
         name,
         ...(await locator.evaluate((element) => {
           const node = element as HTMLElement;

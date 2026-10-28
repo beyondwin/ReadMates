@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 import type { MyPageProfile } from "@/features/archive/model/archive-model";
 import {
   clubDisplayName,

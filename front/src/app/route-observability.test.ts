@@ -23,18 +23,18 @@ afterEach(() => {
 describe("route observability wiring", () => {
   it("records route load when router navigation returns to idle", () => {
     const recordSpy = vi.spyOn(frontendTelemetry, "recordFrontendRouteLoad").mockImplementation(() => undefined);
-    let listener: ((state: TestRouterState) => void) | null = null;
+    const listener: { current?: (state: TestRouterState) => void } = {};
     const router = {
       state: { location: { pathname: "/app" }, navigation: { state: "idle" }, historyAction: "POP" },
-      subscribe(callback: typeof listener) {
-        listener = callback;
+      subscribe(callback: (state: TestRouterState) => void) {
+        listener.current = callback;
         return () => undefined;
       },
     };
 
     const detach = attachRouteObservability(router);
-    listener?.({ location: { pathname: "/app/session/current" }, navigation: { state: "loading" }, historyAction: "PUSH" });
-    listener?.({ location: { pathname: "/app/session/current" }, navigation: { state: "idle" }, historyAction: "PUSH" });
+    listener.current?.({ location: { pathname: "/app/session/current" }, navigation: { state: "loading" }, historyAction: "PUSH" });
+    listener.current?.({ location: { pathname: "/app/session/current" }, navigation: { state: "idle" }, historyAction: "PUSH" });
     detach();
 
     expect(recordSpy).toHaveBeenCalledWith(
@@ -48,12 +48,12 @@ describe("route observability wiring", () => {
 
   it("records unhandled rejections without leaking raw stack", () => {
     const recordSpy = vi.spyOn(frontendTelemetry, "recordFrontendRuntimeError").mockImplementation(() => undefined);
-    let rejectionHandler: EventListener | null = null;
+    const rejectionHandler: { current?: EventListener } = {};
     vi.stubGlobal(
       "addEventListener",
       vi.fn((type: string, listener: EventListener) => {
         if (type === "unhandledrejection") {
-          rejectionHandler = listener;
+          rejectionHandler.current = listener;
         }
       }),
     );
@@ -61,7 +61,7 @@ describe("route observability wiring", () => {
 
     const remove = installGlobalRuntimeErrorObservers();
 
-    rejectionHandler?.(promiseRejection(new Error("private token message")));
+    rejectionHandler.current?.(promiseRejection(new Error("private token message")));
     remove();
 
     expect(recordSpy).toHaveBeenCalledWith(

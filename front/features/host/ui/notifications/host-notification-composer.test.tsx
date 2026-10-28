@@ -20,7 +20,7 @@ const member = {
   role: "MEMBER",
   membershipStatus: "ACTIVE",
   sessionParticipationStatus: "ACTIVE",
-  attendanceStatus: "CONFIRMED",
+  attendanceStatus: "ATTENDED",
   emailEligibility: "ELIGIBLE",
   inAppEligibility: "ELIGIBLE",
 } as const;

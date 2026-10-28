@@ -6,7 +6,7 @@ import type {
 } from "./session-exposure-model";
 
 export type { CurrentSessionResponse } from "@/shared/model/current-session-contracts";
-export type { AttendanceStatus } from "@/shared/model/readmates-types";
+export type { AttendanceStatus, RsvpStatus } from "@/shared/model/readmates-types";
 
 export type MemberRole = "HOST" | "MEMBER";
 export type MembershipStatus = "INVITED" | "VIEWER" | "ACTIVE" | "SUSPENDED" | "LEFT" | "INACTIVE";

@@ -1,3 +1,9 @@
+import {
+  archiveSessionPageContractFixture,
+  myArchiveQuestionPageContractFixture,
+  myArchiveReviewPageContractFixture,
+  feedbackDocumentListPageContractFixture,
+} from "@/tests/unit/api-contract-fixtures";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MemberArchiveSessionDetailResponse } from "@/features/archive/api/archive-contracts";
 
@@ -12,7 +18,7 @@ const archiveApi = vi.hoisted(() => ({
 
 vi.mock("@/features/archive/api/archive-api", () => archiveApi);
 
-import { combineArchiveListPages, fetchMemberArchiveSessionQueryData } from "./archive-queries";
+import { combineArchiveListPages, fetchMemberArchiveSessionQueryData, type ArchiveListQueryData } from "./archive-queries";
 
 const session: MemberArchiveSessionDetailResponse = {
   sessionId: "session-7",
@@ -46,14 +52,14 @@ beforeEach(() => {
 
 describe("combineArchiveListPages", () => {
   it("appends next-page items per archive surface and keeps the trailing cursor", () => {
-    const current = {
-      sessions: { items: [{ sessionId: "s1" }], nextCursor: "s2" },
-      questions: { items: [{ id: "q1" }], nextCursor: null },
-      reviews: { items: [{ id: "r1" }], nextCursor: null },
-      reports: { items: [{ sessionId: "f1" }], nextCursor: null },
+    const current: ArchiveListQueryData = {
+      sessions: { items: [{ ...archiveSessionPageContractFixture.items[0], sessionId: "s1" }], nextCursor: "s2" },
+      questions: myArchiveQuestionPageContractFixture,
+      reviews: myArchiveReviewPageContractFixture,
+      reports: feedbackDocumentListPageContractFixture,
     };
-    const next = {
-      sessions: { items: [{ sessionId: "s2" }], nextCursor: null },
+    const next: ArchiveListQueryData = {
+      sessions: { items: [{ ...archiveSessionPageContractFixture.items[0], sessionId: "s2" }], nextCursor: null },
       questions: { items: [], nextCursor: null },
       reviews: { items: [], nextCursor: null },
       reports: { items: [], nextCursor: null },
@@ -63,6 +69,9 @@ describe("combineArchiveListPages", () => {
 
     expect(combined.sessions.items.map((item) => item.sessionId)).toEqual(["s1", "s2"]);
     expect(combined.sessions.nextCursor).toBeNull();
+    expect(combined.questions).toEqual(current.questions);
+    expect(combined.reviews).toEqual(current.reviews);
+    expect(combined.reports).toEqual(current.reports);
   });
 });
 

@@ -1,8 +1,9 @@
+import type { CurrentSessionReadView } from "@/shared/model/current-session-read-view";
+import { MEMBER_READ_SURFACE_CAPABILITIES } from "@/shared/model/read-surface-capabilities";
 import { describe, expect, it } from "vitest";
 import {
   getMemberHomeNextReadingAction,
   getMemberHomeRecentRecordEntry,
-  type MemberHomeCurrentSessionView,
   type MemberHomeNoteFeedItemView,
 } from "./member-home-view-model";
 
@@ -52,7 +53,8 @@ const session = {
     longReviews: [],
   },
   attendees: [],
-} satisfies NonNullable<MemberHomeCurrentSessionView["currentSession"]>;
+  capabilities: MEMBER_READ_SURFACE_CAPABILITIES,
+} satisfies CurrentSessionReadView;
 
 const noteFeedItems: MemberHomeNoteFeedItemView[] = [
   {

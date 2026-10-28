@@ -1,3 +1,4 @@
+import { MEMBER_READ_SURFACE_CAPABILITIES } from "@/shared/model/read-surface-capabilities";
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { MemberHomeRecentRecordEntry } from "@/features/member-home/model/member-home-view-model";
@@ -248,15 +249,16 @@ describe("member home record reflection cards", () => {
             myOneLineReview: null,
             myLongReview: null,
             board: { questions: [], longReviews: [] },
+            capabilities: MEMBER_READ_SURFACE_CAPABILITIES,
             attendees: [
               {
-                membershipId: "membership-1",
+                renderKey: "membership-1",
                 avatarKey: "cloud-green-book",
                 displayName: "응답 전 멤버",
-                accountName: "member@example.com",
                 role: "MEMBER",
                 rsvpStatus: "NO_RESPONSE",
                 attendanceStatus: "UNKNOWN",
+                participationStatus: "ACTIVE",
               },
             ],
           },

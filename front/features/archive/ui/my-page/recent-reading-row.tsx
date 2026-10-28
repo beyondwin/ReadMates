@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type JSX } from "react";
 import { RecentReadingChevron } from "./recent-reading-chevron";
 import type { RecentReadingListItem } from "./recent-reading-list";
 

@@ -20,7 +20,7 @@ const result: AdminSupportSearchResult = {
 function renderWorkbench(overrides: Partial<ComponentProps<typeof AdminSupportWorkbench>> = {}) {
   return render(
     <AdminSupportWorkbench
-      clubs={[{ clubId: "club-1", slug: "reading-sai", name: "읽는사이", tagline: "", about: "", status: "ACTIVE", publicVisibility: "PUBLIC", domainCount: 0, domainActionRequiredCount: 0, firstHostOnboardingState: "ASSIGNED" }]}
+      clubs={[{ clubId: "club-1", name: "읽는사이" }]}
       selectedClubId="club-1"
       query=""
       results={[]}

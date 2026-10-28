@@ -153,7 +153,7 @@ export function AdminTodayRoute() {
     if (key === "severity") filter.severities = value ? [value.toUpperCase() as AdminOperationSeverity] : undefined;
     if (key === "source") filter.sources = value ? [value.toUpperCase() as AdminOperationSourceType] : undefined;
     if (key === "assignee") filter.assignee = value === "me" ? "ME" : undefined;
-    setSearchParams(serializeAdminOperationsSearch({ caseId: view.selectedCaseId, filter }));
+    setSearchParams(serializeAdminOperationsSearch({ caseId: selectedCaseId, filter }));
   }
 
   const permissionDenied = mutationPermissionDenied || hasHttpStatus(detailQuery.error, 403);

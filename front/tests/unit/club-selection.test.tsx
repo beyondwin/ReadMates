@@ -1,3 +1,5 @@
+import { authMeContractFixture } from "./api-contract-fixtures";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { render, screen } from "@testing-library/react";
 import { Link, MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
@@ -19,8 +21,8 @@ const singleClubAuth = {
   ],
 };
 
-const multiClubAuth = {
-  authenticated: true,
+const multiClubAuth: AuthMeResponse = {
+  ...authMeContractFixture,
   joinedClubs: [
     {
       clubId: "club-1",

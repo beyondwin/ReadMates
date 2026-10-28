@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 import type { RecentReadingPreviewItem } from "@/features/archive/model/my-reading-shelf-model";
 import { RecentReadingRow } from "./recent-reading-row";
 

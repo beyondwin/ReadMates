@@ -22,13 +22,13 @@ type BoundaryRuleId =
   | "readmates-api-compat"
   | "feature-components-public";
 
-const legacyBoundaryExceptions = [] satisfies Array<{
+const legacyBoundaryExceptions: Array<{
   sourcePath: string;
   importPath: string;
   ruleId: BoundaryRuleId;
   reason: string;
   removeWhen: string;
-}>;
+}> = [];
 
 type SourceFile = {
   absolutePath: string;

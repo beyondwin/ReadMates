@@ -24,13 +24,14 @@
 | AI 생성 PII/라이브 smoke | `aigen-pii-check.sh`, `aigen-smoke-{claude,openai,gemini}.sh` |
 | 월간 SLO 보고서 초안 | `generate-slo-report.py` |
 | 운영 env → GitHub Secrets/Variables 일괄 등록 | `sync-config/import-from-prod-env.sh` (기본 dry-run, `--apply`로 실제 반영) |
-| 빌드/테스트 시간 측정 | [`bench/`](bench/README.md) |
 
 ## Source-checkout contributor guidance
 
 전체 source checkout에는 저장소 전용 contributor 라우팅·사전 점검·안내 검사 도구가 있을 수 있습니다. 있으면 계획 보조용으로 쓰되, 아래 표준 점검을 대신하지 않습니다.
 
 clean 공개 릴리즈 후보에는 contributor 전용 안내가 의도적으로 빠져 있습니다. 후보에 포함된 release helper는 특정 로컬 agent 도구 없이 동작합니다.
+
+기존 `bench/`의 일회성 측정 스크립트는 제거했습니다. 삭제된 계획 문서 경로에 고정 날짜로 결과를 쓰고, cold 측정 때 사용자 공용 Gradle cache와 실행 중인 daemon까지 정리하던 도구입니다. 현재 테스트 lane과 cache를 삭제하지 않는 fork 비교 명령은 [테스트 가이드](../docs/development/test-guide.md#fork-수와-실행-시간-비교)에 있습니다.
 
 ## `check-deploy-workflow-contract.py`
 
@@ -151,7 +152,7 @@ READMATES_SERVER_CI_CHECK_DRY_RUN=true ./scripts/server-ci-check.sh
 3. 배포 workflow 계약 검사 (`check-deploy-workflow-contract.py`)
 4. 루트 `packageManager`의 pnpm을 Corepack으로 활성화
 5. `git diff --check` (기준: `READMATES_PRE_PUSH_BASE`, 기본 `origin/main`. `docs/superpowers/`는 제외)
-6. frontend `lint` → `test:coverage` → `build` → `zod:export-fixtures` → Zod fixture 변경 없음 확인
+6. frontend `lint` → `typecheck` → `test:coverage` → `build` → `zod:export-fixtures` → Zod fixture 변경 없음 확인
 7. `./scripts/server-ci-check.sh`
 8. `validate-production-ai-config.sh`, `verify-production-ai-config-fixtures.sh`
 9. 공개 릴리즈 검사: `verify-public-release-fixtures.sh` + `public-release-check.sh .tmp/public-release-candidate`
@@ -275,7 +276,8 @@ key, transcript, 응답 전문, 운영 domain은 Git에 남기지 않습니다. 
 
 - 디렉터리 복사 시 `.env*`, `*.env`, key material, dump, `.DS_Store`, 모든 깊이의 `.tmp`, 도구 상태, contributor 안내 파일, 하위 `CHANGELOG.md`를 빼고, manifest별로 build/test 산출물과 deploy state를 뺍니다.
 - staging 검증은 denylist 기준입니다. 금지 경로(provider state, screenshot, `.gstack`, `.superpowers`, `.idea`, `.playwright-cli`, `.tmp`, `recode`, `docs/superpowers` 등)나 symlink가 남아 있으면 빌드가 실패합니다. 조용히 빠진다고 가정하지 않습니다.
-- 루트 `.env.example`만 의도적으로 포함되는 env 파일입니다. `.gitleaks.toml`이 있으면 함께 포함되어 같은 scanner 규칙을 씁니다.
+- 루트 `.env.example`과 `deploy/cloudflare/.deploy-hook.env.example`은 placeholder만 있는 설정 예시로 명시적으로 포함합니다. 실제 `.env`와 `.deploy-hook.env`는 제외합니다. `.gitleaks.toml`이 있으면 함께 포함되어 같은 scanner 규칙을 씁니다.
+- 문서 허브, showcase, 관측 문서의 인덱스, sanitized postmortem과 Cloudflare 배포 보조 파일도 포함합니다. contributor 전용 안내와 `docs/reports/`는 full source checkout에서만 확인합니다. 제거된 `docs/superpowers/` 디렉터리가 없어도 후보 생성은 동작합니다.
 - `.github/CODEOWNERS`가 들어가도 review 강제는 GitHub branch protection 설정이 따로 필요합니다.
 
 ## `public-release-check.sh`

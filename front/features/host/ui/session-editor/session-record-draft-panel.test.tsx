@@ -38,6 +38,7 @@ function editor(snapshot = draftSnapshot, draftRevision = 4) {
   return {
     sessionId: "session-1",
     liveRevision: 3,
+    liveSessionUpdatedAt: "2026-07-23T10:00:00+09:00",
     liveSnapshot,
     draft: {
       sessionId: "session-1",
@@ -566,7 +567,6 @@ describe("SessionRecordDraftPanelBody", () => {
         onRebaseDraft={onRebaseDraft}
         rebasePending={false}
         rebaseError={null}
-        onReviewDraft={vi.fn()}
       />,
     );
 

@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
 import { createMemoryRouter } from "react-router";
 import { RouterProvider } from "react-router/dom";
-import type { LoaderFunctionArgs } from "react-router";
+import { createLoaderArgs } from "./helpers/router-test-args";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { hostNotificationsLoaderFactory } from "@/features/host/route/host-notifications-data";
 import { HostNotificationsRoute } from "@/features/host/route/host-notifications-route";
@@ -83,6 +84,7 @@ const manualOptionsFixture: ManualNotificationOptionsResponse = {
   templates: [
     {
       eventType: "SESSION_REMINDER_DUE",
+      contentRevision: "revision-1",
       label: "모임 전날 리마인더",
       enabled: true,
       disabledReason: null,
@@ -92,6 +94,7 @@ const manualOptionsFixture: ManualNotificationOptionsResponse = {
     },
     {
       eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
+      contentRevision: "revision-1",
       label: "피드백 문서 등록",
       enabled: false,
       disabledReason: "닫힌 세션의 피드백 문서가 등록된 뒤 발송할 수 있습니다.",
@@ -104,7 +107,13 @@ const manualOptionsFixture: ManualNotificationOptionsResponse = {
   recentDispatches: [],
 };
 
-const hostSessionOpen = {
+const hostSessionOpen: HostSessionListItem = {
+  recordStatus: "NOT_STARTED",
+  needsAttention: false,
+  hasDraft: false,
+  liveRevision: 0,
+  draftRevision: null,
+  lastModifiedAt: null,
   sessionId: "session-open",
   sessionNumber: 9,
   title: "9회차 모임",
@@ -158,7 +167,7 @@ const manualDispatch = {
   createdAt: "2026-05-13T10:10:00Z",
 } as const;
 
-type ActionMock = ReturnType<typeof vi.fn>;
+type HostNotificationsPageProps = ComponentProps<typeof HostNotificationsPage>;
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -188,7 +197,7 @@ function renderPage({
   onRetry = vi.fn().mockResolvedValue(undefined),
   onRestore = vi.fn().mockResolvedValue(undefined),
   onSendTestMail = vi.fn().mockResolvedValue(undefined),
-  onPreviewManual = vi.fn().mockResolvedValue(undefined),
+  onPreviewManual = vi.fn<HostNotificationsPageProps["onPreviewManual"]>().mockRejectedValue(new Error("Preview response not configured")),
   onConfirmManual = vi.fn().mockResolvedValue(undefined),
   onLoadManualOptions = vi.fn().mockResolvedValue(manualOptions),
   onLoadMoreManualMembers = vi.fn().mockResolvedValue(manualOptions),
@@ -205,11 +214,11 @@ function renderPage({
     sessionId: string | null;
     eventType: ManualNotificationOptionsResponse["templates"][number]["eventType"] | null;
   };
-  onProcess?: ActionMock;
-  onRetry?: ActionMock;
-  onRestore?: ActionMock;
-  onSendTestMail?: ActionMock;
-  onPreviewManual?: (request: ManualNotificationPreviewRequest) => Promise<unknown>;
+  onProcess?: HostNotificationsPageProps["onProcess"];
+  onRetry?: HostNotificationsPageProps["onRetry"];
+  onRestore?: HostNotificationsPageProps["onRestore"];
+  onSendTestMail?: HostNotificationsPageProps["onSendTestMail"];
+  onPreviewManual?: HostNotificationsPageProps["onPreviewManual"];
   onConfirmManual?: (request: ManualNotificationConfirmRequest) => Promise<unknown>;
   onLoadManualOptions?: (sessionId?: string, search?: string) => Promise<ManualNotificationOptionsResponse>;
   onLoadMoreManualMembers?: () => Promise<ManualNotificationOptionsResponse>;
@@ -375,10 +384,11 @@ describe("hostNotificationsLoader", () => {
 
     const client = testQueryClient();
     const loader = hostNotificationsLoaderFactory(client);
-    await expect(loader({
+    await expect(loader(createLoaderArgs({
+      pattern: "/clubs/:clubSlug/app/host/notifications",
       params: { clubSlug: "reading-sai" },
       request: new Request("https://readmates.test/clubs/reading-sai/app/host/notifications"),
-    } as LoaderFunctionArgs)).resolves.toMatchObject({
+    }))).resolves.toMatchObject({
       initialManualSelection: { sessionId: "session-open", eventType: null },
     });
 
@@ -433,10 +443,11 @@ describe("hostNotificationsLoader", () => {
 
     const client = testQueryClient();
     const loader = hostNotificationsLoaderFactory(client);
-    await loader({
+    await loader(createLoaderArgs({
+      pattern: "/clubs/:clubSlug/app/host/notifications",
       params: { clubSlug: "reading-sai" },
       request: new Request("https://readmates.test/clubs/reading-sai/app/host/notifications"),
-    } as LoaderFunctionArgs);
+    }));
 
     const { hostSessionListQuery } = await import("@/features/host/queries/host-session-queries");
     expect(client.getQueryData(hostSessionListQuery({ limit: 50 }, { clubSlug: "reading-sai" }).queryKey))
@@ -479,10 +490,11 @@ describe("hostNotificationsLoader", () => {
 
     const client = testQueryClient();
     const loader = hostNotificationsLoaderFactory(client);
-    await loader({
+    await loader(createLoaderArgs({
+      pattern: "/clubs/:clubSlug/app/host/notifications",
       params: { clubSlug: "reading-sai" },
       request: new Request("https://readmates.test/clubs/reading-sai/app/host/notifications?sessionId=missing"),
-    } as LoaderFunctionArgs);
+    }));
 
     expect(fetchMock).not.toHaveBeenCalledWith(
       expect.stringContaining("sessionId=missing"),
@@ -551,7 +563,7 @@ describe("HostNotificationsRoute", () => {
     "$direction 저장 실패를 서버 확정값으로 복원하고 같은 목표로 다시 시도한다",
     async ({ initialEnabled, targetEnabled }) => {
       const client = testQueryClient();
-      let serverTruth = {
+      let serverTruth: HostNotificationPolicyResponse = {
         sessionReminderEnabled: initialEnabled,
         updatedAt: null,
       };
@@ -799,7 +811,15 @@ describe("HostNotificationsRoute", () => {
 
     resolveManualOptionsForDraft!({
       ...manualOptionsFixture,
-      session: { ...manualOptionsFixture.session, sessionId: "session-draft" },
+      session: {
+        sessionId: "session-draft",
+        sessionNumber: hostSessionDraft.sessionNumber,
+        bookTitle: hostSessionDraft.bookTitle,
+        date: hostSessionDraft.date,
+        state: hostSessionDraft.state,
+        visibility: hostSessionDraft.visibility,
+        feedbackDocumentUploaded: false,
+      },
     });
 
     await waitFor(() => {
@@ -1159,7 +1179,7 @@ describe("HostNotificationsPage", () => {
 
   it("previews and confirms a manual notification with resend confirmation", async () => {
     const user = userEvent.setup();
-    const onPreviewManual = vi.fn<[ManualNotificationPreviewRequest], Promise<ManualNotificationPreviewResponse>>().mockResolvedValue({
+    const onPreviewManual = vi.fn<(request: ManualNotificationPreviewRequest) => Promise<ManualNotificationPreviewResponse>>().mockResolvedValue({
       previewId: "preview-1",
       expiresAt: "2026-05-13T09:10:00Z",
       template: {
@@ -1197,7 +1217,7 @@ describe("HostNotificationsPage", () => {
       },
       warnings: [{ code: "EMAIL_PREFERENCE_SKIPS", message: "이메일 알림 설정 때문에 1명에게는 이메일이 가지 않습니다." }],
     });
-    const onConfirmManual = vi.fn<[ManualNotificationConfirmRequest], Promise<void>>().mockResolvedValue(undefined);
+    const onConfirmManual = vi.fn<(request: ManualNotificationConfirmRequest) => Promise<void>>().mockResolvedValue(undefined);
 
     renderPage({ onPreviewManual, onConfirmManual, manualOptions: manualOptionsFixture });
 
@@ -1281,7 +1301,7 @@ describe("HostNotificationsPage", () => {
 
   it("does not render a disabled process action in a healthy state", () => {
     renderPage({
-      summaryData: { pending: 0, failed: 0, dead: 0, sentLast24h: 0 },
+      summaryData: { pending: 0, failed: 0, dead: 0, sentLast24h: 0, latestFailures: [] },
       events: [],
       deliveries: [],
     });
@@ -1470,7 +1490,7 @@ describe("HostNotificationsPage", () => {
       },
       warnings: [],
     };
-    const onPreviewManual = vi.fn<[ManualNotificationPreviewRequest], Promise<ManualNotificationPreviewResponse>>()
+    const onPreviewManual = vi.fn<(request: ManualNotificationPreviewRequest) => Promise<ManualNotificationPreviewResponse>>()
       .mockResolvedValue(preview);
     const { rerender } = render(
       <HostNotificationsPage

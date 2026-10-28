@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AdminOperationsView } from "@/features/platform-admin/model/platform-admin-operations-model";
+import type { AdminOperationCaseView, AdminOperationsView } from "@/features/platform-admin/model/platform-admin-operations-model";
 import { AdminTodayLedger } from "./admin-today-ledger";
 
 const emptyView: AdminOperationsView = {
@@ -55,7 +55,7 @@ describe("AdminTodayLedger", () => {
   it("keeps partial-source cases interactive and retries only an unavailable source once", async () => {
     const user = userEvent.setup();
     const onRetrySource = vi.fn();
-    const selectedCase = {
+    const selectedCase: AdminOperationCaseView = {
       id: "case-notification",
       sourceType: "NOTIFICATION" as const,
       clubId: null,
@@ -71,7 +71,7 @@ describe("AdminTodayLedger", () => {
       version: 3,
       impactCount: 2,
       detailHref: "/admin/notifications?focus=delivery",
-      allowedActions: ["ACKNOWLEDGE", "SNOOZE", "RESOLVE"] as const,
+      allowedActions: ["ACKNOWLEDGE", "SNOOZE", "RESOLVE"],
       source: {
         sourceType: "NOTIFICATION" as const,
         status: "PARTIAL" as const,
@@ -175,7 +175,7 @@ describe("AdminTodayLedger", () => {
       removeEventListener: vi.fn(),
     })));
 
-    const selectedCase = {
+    const selectedCase: AdminOperationCaseView = {
       id: "case-notification",
       sourceType: "NOTIFICATION" as const,
       clubId: null,
@@ -191,7 +191,7 @@ describe("AdminTodayLedger", () => {
       version: 3,
       impactCount: 2,
       detailHref: "/admin/notifications?focus=delivery",
-      allowedActions: ["ACKNOWLEDGE"] as const,
+      allowedActions: ["ACKNOWLEDGE"],
       source: {
         sourceType: "NOTIFICATION" as const,
         status: "AVAILABLE" as const,

@@ -19,8 +19,8 @@ Active(또는 active 가능) secret이 발견되면 문서 수정으로 끝내�
 | --- | --- |
 | 루트 설정 | `.github/workflows/{ci,deploy-front,deploy-server,sync-config}.yml`, `.github/CODEOWNERS`(있을 때), `.gitignore`, `.gitleaks.toml`(있을 때), `.env.example`, `.node-version`, `README.md`, `PRODUCT.md`, `CHANGELOG.md`, `compose.yml`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml` |
 | 제품 소스 | `design/`, `front/`, `server/` (build 산출물 제외) |
-| 배포 | `deploy/oci/` (deploy state 제외) |
-| 문서 | `docs/deploy/`, `docs/development/`, `docs/case-studies/`, `docs/operations/README.md`, `docs/operations/observability/`의 공개 문서, `docs/operations/runbooks/` |
+| 배포 | `deploy/oci/` (deploy state 제외), `deploy/cloudflare/README.md`, `deploy-front.sh`, `.deploy-hook.env.example` (placeholder만 포함) |
+| 문서 | `docs/README.md`, `docs/deploy/`, `docs/development/`, `docs/case-studies/`, `docs/showcase/`, `docs/operations/README.md`, `docs/operations/observability/`의 공개 문서와 인덱스, `docs/operations/runbooks/`, sanitized `docs/operations/postmortems/` |
 | 관측 설정 | `ops/grafana/dashboards`, `ops/observability/local`, `ops/prometheus/{alerts,tests}`, `ops/tempo` |
 | 스크립트 | 공개 릴리즈 helper, 서버/푸시 전 점검, 관측 설정 검증, 배포 후 smoke, `scripts/sync-config/`, `scripts/fixtures/public-release-candidate-coverage.txt` |
 
@@ -30,7 +30,7 @@ Active(또는 active 가능) secret이 발견되면 문서 수정으로 끝내�
 - build/test 산출물: `node_modules`, `front/dist`, `front/test-results`, `front/coverage`, `server/build`, `design/*/dist`, `design/standalone`, 모든 깊이의 `.tmp`
 - 도구·agent 상태: `.claude`, `.cursor`, `.windsurf`, `.orchestrator`, `.gstack`, `.superpowers`, `.idea`, `.playwright-cli`, `.wrangler`, `.cloudflare`, `.vercel`
 - contributor 전용 안내 파일(`AGENTS.md`, `CLAUDE.md` 등), 하위 디렉터리의 `CHANGELOG.md`, `*.local.md`
-- `docs/superpowers/`(historical 기록), `private` 하위 트리, `recode`, screenshot 디렉터리, `deploy/oci/.deploy-state`
+- `docs/reports/`(full source checkout의 시점별 기록), `docs/superpowers/`(제거된 historical 경로), `private` 하위 트리, `recode`, screenshot 디렉터리, `deploy/oci/.deploy-state`
 
 ## 커밋 금지
 

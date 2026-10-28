@@ -8,7 +8,7 @@ import { AdminComingSoon } from "./admin-coming-soon";
 const descriptor: AdminRouteDescriptor = {
   path: "health",
   label: "헬스",
-  group: "today",
+  group: "command",
   groupLabel: "오늘/헬스",
   slice: "S2",
   status: "coming_soon",

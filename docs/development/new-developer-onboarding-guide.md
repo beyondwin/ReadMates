@@ -77,7 +77,7 @@ Zod는 개발 모드에서 API 응답 모양을 검증하고, fixture export로 
 - `shared`는 app/page/feature code를 import하지 않습니다.
 - `VITE_*`, `NEXT_PUBLIC_*` 같은 browser-exposed env에 BFF secret이나 server secret을 넣지 않습니다.
 - 제거된 `shared/api/readmates` compatibility surface를 되살리지 않습니다.
-- UI, layout, copy를 바꾸면 [design agent guide](../agents/design.md)도 함께 확인합니다.
+- UI, layout, copy를 바꾸면 full source checkout의 디자인 작업 지침도 함께 확인합니다. 기여자 전용 지침은 공개 후보에 포함하지 않습니다.
 
 ## BFF와 OAuth Proxy
 
@@ -239,9 +239,10 @@ Host route/action
   -> BFF API
   -> Spring command service
   -> MySQL transaction
-  -> cache invalidation
-  -> optional notification outbox event
+  -> cache invalidation after commit
 ```
+
+콘텐츠 저장·세션 발행 자체는 알림을 만들지 않습니다. 알림은 호스트가 별도로 대상과 채널을 고르고 preview → confirm을 마친 뒤 outbox에 적재합니다.
 
 확인 파일: `front/features/host`, `server/src/main/kotlin/com/readmates/session`, `server/src/main/kotlin/com/readmates/publication`, `server/src/main/kotlin/com/readmates/notification`.
 
@@ -300,11 +301,7 @@ host transcript upload
 
 ## 기능을 추가할 때 보는 순서
 
-1. 어떤 surface인지 먼저 고릅니다.
-   - frontend route/state/API: [front agent guide](../agents/front.md)
-   - server API/auth/persistence/migration: [server agent guide](../agents/server.md)
-   - UI/layout/copy: [design agent guide](../agents/design.md)
-   - documentation: [docs agent guide](../agents/docs.md)
+1. frontend route/state/API, server API/auth/persistence/migration, UI/layout/copy, documentation 중 작업 표면을 고릅니다. [프로젝트 지도](project-map.md)에서 읽을 문서와 검증을 좁히고, full source checkout에서는 해당 표면의 저장소별 기여 지침도 확인합니다. 이 전용 지침은 공개 후보에 포함하지 않습니다.
 2. API contract를 바꾸면 frontend `api`/Zod schema와 server response/test를 같이 봅니다.
 3. DB schema를 바꾸면 Flyway migration, persistence adapter SQL, integration test를 같이 봅니다.
 4. 권한을 바꾸면 BFF trust boundary, Spring authorization, route guard, E2E를 같이 봅니다.
@@ -317,7 +314,7 @@ host transcript upload
 
 | 변경 표면 | 명령 |
 | --- | --- |
-| Frontend | `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build` |
+| Frontend | `pnpm --dir front lint`, `pnpm --dir front typecheck`, `pnpm --dir front test`, `pnpm --dir front build` |
 | PR-level backend quality | `./scripts/server-ci-check.sh` |
 | Server full Testcontainers | `./server/gradlew -p server integrationTest` |
 | API/auth/BFF/user-flow | `pnpm --dir front test:e2e` |

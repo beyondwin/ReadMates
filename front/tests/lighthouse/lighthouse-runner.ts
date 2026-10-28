@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { summarizeLhr } from "./finding-classifier";
 import type { LighthouseRouteDefinition, NormalizedLighthouseResult } from "./types";
 
@@ -16,7 +16,9 @@ export type LighthouseAdapter = (
 
 export type RouteDiagnosticContext = {
   baseUrl: string;
-  page: Pick<Page, "goto" | "waitForLoadState" | "getByText">;
+  page: Pick<Page, "goto" | "waitForLoadState"> & {
+    getByText: (...args: Parameters<Page["getByText"]>) => { first: () => Pick<Locator, "waitFor"> };
+  };
   lighthouse: LighthouseAdapter;
   outputDir: string;
 };

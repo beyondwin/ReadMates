@@ -33,7 +33,6 @@ const session: HostDashboardCurrentSession = {
   attendees: [{ rsvpStatus: "NO_RESPONSE" }, { rsvpStatus: "GOING" }],
   board: {
     questions: [{ priority: 1 }, { priority: 2 }],
-    oneLineReviews: [{ authorName: "안멤버1" }],
   },
 };
 

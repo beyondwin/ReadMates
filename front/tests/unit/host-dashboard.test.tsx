@@ -19,6 +19,7 @@ import type {
   HostSessionListItem,
 } from "@/features/host/api/host-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import { createLoaderArgs } from "./helpers/router-test-args";
 import { hostSessionDetailContractFixture } from "./api-contract-fixtures";
 
 afterEach(() => {
@@ -183,6 +184,12 @@ const noCurrent: CurrentSessionResponse = {
 
 const hostSessions = [
   {
+    recordStatus: "NOT_STARTED",
+    needsAttention: false,
+    hasDraft: false,
+    liveRevision: 0,
+    draftRevision: null,
+    lastModifiedAt: null,
     sessionId: "session-7",
     sessionNumber: 7,
     title: "7회차 · 테스트 책",
@@ -197,6 +204,12 @@ const hostSessions = [
     visibility: "MEMBER",
   },
   {
+    recordStatus: "NOT_STARTED",
+    needsAttention: false,
+    hasDraft: false,
+    liveRevision: 0,
+    draftRevision: null,
+    lastModifiedAt: null,
     sessionId: "session-8",
     sessionNumber: 8,
     title: "8회차 · 다음 책",
@@ -214,6 +227,12 @@ const hostSessions = [
 
 const twoDraftHostSessions = [
   {
+    recordStatus: "NOT_STARTED",
+    needsAttention: false,
+    hasDraft: false,
+    liveRevision: 0,
+    draftRevision: null,
+    lastModifiedAt: null,
     sessionId: "session-8",
     sessionNumber: 8,
     title: "8회차 · 다음 책",
@@ -228,6 +247,12 @@ const twoDraftHostSessions = [
     visibility: "HOST_ONLY",
   },
   {
+    recordStatus: "NOT_STARTED",
+    needsAttention: false,
+    hasDraft: false,
+    liveRevision: 0,
+    draftRevision: null,
+    lastModifiedAt: null,
     sessionId: "session-9",
     sessionNumber: 9,
     title: "9회차 · 그 다음 책",
@@ -338,10 +363,11 @@ function hostDashboardLoaderForTest(args?: LoaderFunctionArgs) {
 }
 
 function hostSessionEditorLoaderForTest() {
-  return hostSessionEditorLoaderFactory(createTestQueryClient())({
+  return hostSessionEditorLoaderFactory(createTestQueryClient())(createLoaderArgs({
+    pattern: "/app/host/sessions/:sessionId/edit",
     params: { sessionId: "session-7" },
     request: new Request("https://readmates.test/app/host/sessions/session-7/edit"),
-  } as LoaderFunctionArgs);
+  }));
 }
 
 const hostLoaderCases: Array<[string, () => Promise<unknown>, string]> = [
@@ -530,10 +556,11 @@ describe("HostDashboard", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      clubScopedHostDashboardLoader({
+      clubScopedHostDashboardLoader(createLoaderArgs({
+        pattern: "/clubs/:clubSlug/app/host",
         params: { clubSlug: "reading-sai" },
         request: new Request("https://readmates.test/clubs/reading-sai/app/host"),
-      } as LoaderFunctionArgs),
+      })),
     ).resolves.toEqual({
       current,
       data: dashboard,
@@ -585,10 +612,11 @@ describe("HostDashboard", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await hostDashboardLoaderFactory(client)({
+    await hostDashboardLoaderFactory(client)(createLoaderArgs({
+      pattern: "/clubs/:clubSlug/app/host",
       params: { clubSlug: "reading-sai" },
       request: new Request("https://readmates.test/clubs/reading-sai/app/host"),
-    } as LoaderFunctionArgs);
+    }));
 
     const { hostCurrentSessionQuery, hostDashboardQuery, hostSessionListQuery } = await import(
       "@/features/host/queries/host-session-queries"
@@ -652,10 +680,11 @@ describe("HostDashboard", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await hostSessionEditorLoaderFactory(client)({
+    await hostSessionEditorLoaderFactory(client)(createLoaderArgs({
+      pattern: "/clubs/:clubSlug/app/host/sessions/:sessionId/edit",
       params: { clubSlug: "reading-sai", sessionId: "session-7" },
       request: new Request("https://readmates.test/clubs/reading-sai/app/host/sessions/session-7/edit"),
-    } as LoaderFunctionArgs);
+    }));
 
     const { hostSessionDetailQuery, hostSessionManualDispatchesQuery } = await import(
       "@/features/host/queries/host-session-queries"
@@ -730,7 +759,7 @@ describe("HostDashboard", () => {
     const props = {
       data: dashboard,
       notifications: notificationSummary,
-    } as HostDashboardProps & { notifications: typeof notificationSummary };
+    };
     const { container } = render(<HostDashboardForTest {...props} />);
     const desktop = getDesktopView(container);
     const mobile = getMobileView(container);
@@ -806,8 +835,8 @@ describe("HostDashboard", () => {
     expect(within(desktopUpcomingRow as HTMLElement).getByText("호스트 전용")).toBeInTheDocument();
     expect(within(desktopUpcomingRow as HTMLElement).getByRole("button", { name: /게스트 공개/ })).toHaveTextContent("게스트 공개");
     expect(desktop.getByRole("button", { name: /현재로 시작/ })).toBeInTheDocument();
-    expect(mobile.getByRole("heading", { name: "예정 세션", exact: true })).toBeInTheDocument();
-    expect(mobile.getByRole("heading", { name: "운영 흐름", exact: true })).toBeInTheDocument();
+    expect(mobile.getByRole("heading", { name: "예정 세션" })).toBeInTheDocument();
+    expect(mobile.getByRole("heading", { name: "운영 흐름" })).toBeInTheDocument();
     expect(mobile.getByText("다음 책")).toBeInTheDocument();
     const mobileUpcomingCard = mobile.getByText("다음 책").closest(".m-card-quiet");
     expect(mobileUpcomingCard).not.toBeNull();
@@ -1085,7 +1114,7 @@ describe("HostDashboard", () => {
     const desktop = getDesktopView(container);
     const mobile = getMobileView(container);
     const desktopUpcoming = desktop.getByRole("heading", { name: "앞으로 읽을 세션" }).closest("section");
-    const mobileUpcoming = mobile.getByRole("heading", { name: "예정 세션", exact: true }).closest("section");
+    const mobileUpcoming = mobile.getByRole("heading", { name: "예정 세션" }).closest("section");
 
     expect(desktop.queryByRole("button", { name: /현재 세션 있음/ })).not.toBeInTheDocument();
     expect(mobile.queryByRole("button", { name: /현재 세션 있음/ })).not.toBeInTheDocument();
@@ -1201,8 +1230,8 @@ describe("HostDashboard", () => {
     expect(desktop.getByText("책, 일정, 장소를 등록하면 멤버의 RSVP와 질문 작성 흐름이 열립니다.")).toBeInTheDocument();
     expect(mobile.getByText("책, 일정, 장소를 등록하면 멤버의 RSVP와 질문 작성 흐름이 열립니다.")).toBeInTheDocument();
     expect(desktop.getByRole("heading", { name: "다음 세션과 운영 흐름" })).toBeInTheDocument();
-    expect(mobile.getByRole("heading", { name: "예정 세션", exact: true })).toBeInTheDocument();
-    expect(mobile.getByRole("heading", { name: "운영 흐름", exact: true })).toBeInTheDocument();
+    expect(mobile.getByRole("heading", { name: "예정 세션" })).toBeInTheDocument();
+    expect(mobile.getByRole("heading", { name: "운영 흐름" })).toBeInTheDocument();
   });
 
   it("keeps host dashboard CTAs inside the scoped app route", () => {
@@ -1257,8 +1286,8 @@ describe("HostDashboard", () => {
     expect(mobile.getByText("모임 운영")).toBeInTheDocument();
     expect(mobile.getByRole("heading", { name: "지금 처리할 일" })).toBeInTheDocument();
     expect(mobile.getByText("확인할 운영 항목")).toBeInTheDocument();
-    expect(mobile.getByRole("heading", { name: "예정 세션", exact: true })).toBeInTheDocument();
-    expect(mobile.getByRole("heading", { name: "운영 흐름", exact: true })).toBeInTheDocument();
+    expect(mobile.getByRole("heading", { name: "예정 세션" })).toBeInTheDocument();
+    expect(mobile.getByRole("heading", { name: "운영 흐름" })).toBeInTheDocument();
     expect(mobile.getByText("운영 도구")).toBeInTheDocument();
     expect(desktop.getByText("RSVP 미응답")).toBeInTheDocument();
     expect(desktop.getByText("RSVP 미응답")).not.toHaveClass("ledger-number");

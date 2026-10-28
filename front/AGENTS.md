@@ -18,6 +18,7 @@ Default checks:
 
 ```bash
 pnpm --dir front lint
+pnpm --dir front typecheck
 pnpm --dir front test
 pnpm --dir front build
 ```

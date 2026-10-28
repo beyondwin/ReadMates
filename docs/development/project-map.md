@@ -21,8 +21,8 @@
 | 2 | `docs/development/architecture.md` | 제품/기술 경계와 active architecture 기준입니다. |
 | 3 | Full source checkout의 repository-local contributor guidance(있는 경우) | 작업 전 표면별 규칙을 확인합니다. 공개 artifact에는 없어도 됩니다. |
 | 4 | `docs/development/*`, `docs/deploy/*`, `docs/operations/*` | 개발, 배포, 운영 절차의 active docs입니다. |
-| 5 | `docs/reports/*` | 작성 시점 snapshot입니다. 현재 근거로 쓰기 전에 다시 확인합니다. |
-| 6 | `docs/superpowers/*` | 과거 spec/plan 기록입니다. 현재 동작 기준이 아닙니다. |
+| 5 | Full source checkout의 `docs/reports/*` | 공개 후보에서 제외되는 작성 시점 snapshot입니다. 현재 근거로 쓰기 전에 다시 확인합니다. |
+| 6 | Git 이력의 과거 spec/plan | 제거된 `docs/superpowers/` 기록을 포함합니다. 현재 동작 기준이 아닙니다. |
 
 ## 현재 프로젝트 표면
 
@@ -49,13 +49,13 @@
 | `docs/development/` | active 개발자 문서, architecture, ADR | `docs/development/README.md`, `docs/development/architecture.md` |
 | `docs/deploy/` | public-safe 배포 runbook | `docs/deploy/README.md` |
 | `docs/operations/` | 운영 runbook, observability, postmortems | `docs/operations/README.md` |
-| `docs/superpowers/` | 과거 spec/plan 기록 | 필요한 파일만 열고 현재 코드로 다시 확인합니다. |
+| `docs/reports/` (full source checkout 전용) | 시점별 분석·진단·사후 보고; 공개 후보 제외 | `docs/reports/README.md`; 현재 코드로 다시 확인합니다. |
 
 ## 변경 유형별 읽는 순서
 
 | 변경 유형 | 읽는 순서 | 검증 선택 기준 |
 | --- | --- | --- |
-| UI/frontend | repository-local contributor guidance(있는 경우) -> `docs/development/architecture.md` -> route/state/tests -> 필요 시 design docs | `docs/development/acceptance-matrix.md`와 함께 `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build` 중 영향 표면에 맞게 선택합니다. |
+| UI/frontend | repository-local contributor guidance(있는 경우) -> `docs/development/architecture.md` -> route/state/tests -> 필요 시 design docs | `docs/development/acceptance-matrix.md`와 함께 `pnpm --dir front lint`, `pnpm --dir front typecheck`, `pnpm --dir front test`, `pnpm --dir front build` 중 영향 표면에 맞게 선택합니다. |
 | BFF/auth/API | repository-local contributor guidance(있는 경우) -> `docs/development/architecture.md` -> BFF/server contract/tests | acceptance matrix의 auth, club-context, header, cookie, redirect 상태와 BFF/server tests, 필요 시 `pnpm --dir front test:e2e`를 선택합니다. |
 | Server/persistence/migration | repository-local contributor guidance(있는 경우) -> `docs/development/architecture.md` -> migration/test docs | acceptance matrix와 `./scripts/server-ci-check.sh`를 선택하고, MySQL/Flyway evidence가 필요할 때 별도 `integrationTest` 범위를 판단합니다. |
 | Deploy/public-release/security | repository-local contributor guidance(있는 경우) -> deploy docs -> scripts/workflows 직접 확인 | public release candidate checks와 targeted safety scans를 우선합니다. |
@@ -87,7 +87,7 @@ Executor 이름, 개인 skill 경로, model, auth, MCP 상태는 plan의 source 
 
 | 표면 | 대표 명령 |
 | --- | --- |
-| Frontend | `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build` |
+| Frontend | `pnpm --dir front lint`, `pnpm --dir front typecheck`, `pnpm --dir front test`, `pnpm --dir front build` |
 | Server PR-level | `./scripts/server-ci-check.sh` |
 | Server full Testcontainers | `./server/gradlew -p server integrationTest` |
 | E2E/auth/BFF | `pnpm --dir front test:e2e` |
@@ -106,7 +106,7 @@ Executor 이름, 개인 skill 경로, model, auth, MCP 상태는 plan의 source 
 | 관련 파일에 미커밋 변경이 있다 | 누구의 변경인지 확인하고 덮어쓰지 않습니다. |
 | 작업 요청이 private data, secret, 실제 운영 도메인, 로컬 절대 경로를 문서화하려 한다 | 공개 가능한 placeholder로 바꾸거나 질문합니다. |
 | 코드와 active docs가 다르다 | 코드, 테스트, migrations, scripts를 먼저 확인하고 active docs를 함께 고칩니다. |
-| `docs/superpowers/**`나 `docs/reports/**`만 근거로 현재 동작을 설명하려 한다 | 현재 코드와 active docs로 다시 확인한 뒤 씁니다. |
+| Git 이력의 과거 계획이나 `docs/reports/**`만 근거로 현재 동작을 설명하려 한다 | 현재 코드와 active docs로 다시 확인한 뒤 씁니다. |
 | release readiness나 residual risk를 닫으려 한다 | branch diff와 `docs/development/release-readiness-review.md`를 함께 봅니다. |
 
 ## 검증 기록 방식
@@ -122,7 +122,7 @@ Executor 이름, 개인 skill 경로, model, auth, MCP 상태는 plan의 source 
 
 ## 역사 문서 경계
 
-- `docs/superpowers/**`: 기능별 spec과 plan의 시계열 기록입니다. 당시 의도를 보여 줄 뿐 현재 동작 기준이 아닙니다.
-- `docs/reports/**`: 작성 시점의 분석·진단·사후 보고입니다. 현재 상태를 말할 때는 코드, 테스트, scripts, active docs를 다시 확인합니다.
+- 제거된 `docs/superpowers/**`의 spec과 plan은 Git 이력에 남아 있습니다. 이 경로는 Git에서 제외되므로 새 checkout에서 읽을 수 있다고 가정하지 않습니다. 당시 의도를 보여 줄 뿐 현재 동작 기준이 아닙니다.
+- `docs/reports/**`: full source checkout에 있는 작성 시점의 분석·진단·사후 보고이며 공개 후보에는 포함하지 않습니다. 현재 상태를 말할 때는 코드, 테스트, scripts, active docs를 다시 확인합니다.
 
 과거 문서의 아이디어는 가져와도 되지만, 그대로 현재 사실로 쓰면 안 됩니다.

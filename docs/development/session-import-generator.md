@@ -29,7 +29,7 @@
 | 외부 JSON 업로드 | 호스트가 로컬에서 정리한 `readmates-session-import:v1` JSON | 앱 외부 | 항상 사용 가능 | preview 뒤 공통 작업 중 초안으로 가져오기 |
 | In-app AI 생성 | UTF-8/BOM TXT(≤ 1 MiB, ≤ 3시간) + 서버가 제공한 모델 ID | 서버 측 Spring AI adapter (Claude/OpenAI/Gemini) | kill switch + provider allowlist + provider key + provider retention 확인 | 검토 완료 commit 뒤 공통 작업 중 초안으로 가져오기 |
 
-AI와 JSON commit은 같은 validation과 `SaveValidatedSessionRecordDraftUseCase.saveValidated(...)` 경계를 사용해 검토 완료 snapshot을 공통 `session_record_drafts`에 저장합니다. 직접 작성도 이 초안을 계속 편집합니다. 초안을 만드는 일은 live 기록을 바꾸지 않으며, 별도 `반영 검토`와 확인이 draft revision/hash 및 live revision을 검증한 뒤 immutable revision과 live 콘텐츠를 갱신합니다. 현재 동작은 [architecture.md의 In-app AI 세션 생성 컴포넌트](architecture.md#in-app-ai-세션-생성-컴포넌트), 운영 rollout과 장애 대응은 [AI session generation runbook](../operations/runbooks/ai-session-generation.md)을 기준으로 합니다. `docs/superpowers/**`의 spec과 plan은 설계 이력이며 현재 동작의 source of truth가 아닙니다.
+AI와 JSON commit은 같은 validation과 `SaveValidatedSessionRecordDraftUseCase.saveValidated(...)` 경계를 사용해 검토 완료 snapshot을 공통 `session_record_drafts`에 저장합니다. 직접 작성도 이 초안을 계속 편집합니다. 초안을 만드는 일은 live 기록을 바꾸지 않으며, 별도 `반영 검토`와 확인이 draft revision/hash 및 live revision을 검증한 뒤 immutable revision과 live 콘텐츠를 갱신합니다. 현재 동작은 [architecture.md의 In-app AI 세션 생성 컴포넌트](architecture.md#in-app-ai-세션-생성-컴포넌트), 운영 rollout과 장애 대응은 [AI session generation runbook](../operations/runbooks/ai-session-generation.md)을 기준으로 합니다. 제거된 `docs/superpowers/**`의 spec과 plan은 Git 이력에서 확인할 수 있으며 현재 동작의 source of truth가 아닙니다.
 
 ## In-app 근거 기반 AI 생성
 

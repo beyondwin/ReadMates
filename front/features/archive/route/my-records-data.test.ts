@@ -1,5 +1,5 @@
+import { createLoaderArgs } from "@/tests/unit/helpers/router-test-args";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { LoaderFunctionArgs } from "react-router";
 import type { MyJourneyPage } from "@/features/archive/api/archive-contracts";
 import { emptyMyJourneyPage } from "@/features/archive/model/my-reading-shelf-model";
 import { myRecordsLoader } from "./my-records-data";
@@ -63,10 +63,11 @@ describe("myRecordsLoader", () => {
   });
 
   it("loads twelve personal journey rows in the current club", async () => {
-    await expect(myRecordsLoader({
+    await expect(myRecordsLoader(createLoaderArgs({
+      pattern: "/clubs/:clubSlug/app/me/records",
       params: { clubSlug: "reading-sai" },
       request: new Request("https://readmates.test/clubs/reading-sai/app/me/records"),
-    } as LoaderFunctionArgs)).resolves.toEqual(journey);
+    }))).resolves.toEqual(journey);
 
     expect(api.fetchMyJourney).toHaveBeenCalledWith(
       { clubSlug: "reading-sai" },

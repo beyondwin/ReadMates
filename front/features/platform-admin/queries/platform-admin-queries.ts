@@ -167,9 +167,10 @@ export function useCommitPlatformAdminOnboardingMutation() {
       setRetainedQueryData(queryClient, platformAdminKeys.clubs(), (clubs: PlatformAdminClubListResponse | undefined) =>
         prependClub(clubs ?? clubsSnapshot, result.club),
       );
-      if (result.domain) {
+      const domain = result.domain;
+      if (domain) {
         setRetainedQueryData(queryClient, platformAdminKeys.summary(), (summary: PlatformAdminSummaryResponse | undefined) =>
-          summaryWithUpdatedDomain(summary ?? summarySnapshot, result.domain),
+          summaryWithUpdatedDomain(summary ?? summarySnapshot, domain),
         );
       }
       void queryClient.invalidateQueries({ queryKey: platformAdminKeys.summary() });

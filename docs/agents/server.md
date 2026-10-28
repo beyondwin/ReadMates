@@ -35,7 +35,7 @@ Application services must not throw Spring web/http exceptions. Use feature appl
 
 Persistence adapters own JDBC SQL, DB rows, and column mapping. New persistence work should inject the required `JdbcTemplate` directly and fail fast if database wiring is missing.
 
-Operational Flyway migrations live only under `server/src/main/resources/db/mysql/migration`; `server/src/main/resources/db/dev` holds the repeatable local dev seed only. Do not add production migrations anywhere else.
+Operational Flyway migrations live only under `server/src/main/resources/db/mysql/migration`; `server/src/main/resources/db/mysql/dev` holds the repeatable local dev seed only. Do not add production migrations anywhere else.
 
 CQRS read/write package split: write-side feature(`auth`, `club`, `session`, `notification`)는 entity와 도메인 invariant를 갖는 `domain/` 패키지와 트랜잭션 mutation을 수행하는 application service를 둡니다. Read-side feature(`note`, `publication`, `archive`, `browse` 등)는 `domain/` 없이 `application/model/`의 read DTO와 `JdbcXxxAdapter` 직접 query만 두고, application service에 `@ReadOnlyApplicationService` 마커(`com.readmates.shared.architecture`)를 부착합니다. `feedback`은 조회 API만 두고 live 문서 교체는 session-record apply가 맡으며, `sessionimport`는 preview read path와 commit write path를 함께 가진 mixed slice입니다. 둘 다 read-only marker 미부착입니다. Read-only service는 mutation port(`*SavePort`/`*UpdatePort`/`*DeletePort`/`*WriterPort`/`*StorePort`/`*WritePort` suffix in `*.port.out.*`)와 `@Transactional`을 모두 금지합니다 — `ServerArchitectureBoundaryTest`가 강제합니다. 자세한 컨벤션은 [docs/development/architecture.md](../development/architecture.md)의 "CQRS Read vs Write Package Split" 섹션을 참고합니다.
 

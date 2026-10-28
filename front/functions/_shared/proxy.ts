@@ -133,7 +133,7 @@ export function forwardedOAuthRequestHeaders(
   return headers;
 }
 
-export function safeRouteSegment(value: string | string[] | undefined) {
+export function safeRouteSegment(value: string | string[] | undefined): string | null {
   if (Array.isArray(value)) {
     return value.length === 1 ? safeRouteSegment(value[0]) : null;
   }

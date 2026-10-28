@@ -1,3 +1,4 @@
+import { createLoaderArgs } from "@/tests/unit/helpers/router-test-args";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadClubAppAudience, scopedGuestRouteLoader } from "./club-app-audience-loader";
 import { guestArchiveLoader, guestCurrentSessionLoader, guestHomeLoader, guestNotesLoader } from "./guest-route-data";
@@ -8,6 +9,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
+
+function guestArgs() {
+  return createLoaderArgs({
+    request: new Request("https://readmates.test/clubs/alpha/app"),
+    params: { clubSlug: "alpha" },
+    pattern: "/clubs/:clubSlug/app",
+  });
+}
 
 const shell = {
   clubName: "읽는 모임",
@@ -97,7 +106,7 @@ describe("guest route loaders", () => {
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("location", { assign, hash: "", pathname: "/clubs/alpha/app", search: "" });
 
-    await expect(loadClubAppAudience({ params: { clubSlug: "alpha" } })).resolves.toMatchObject({ audience: "GUEST", club: shell });
+    await expect(loadClubAppAudience(guestArgs())).resolves.toMatchObject({ audience: "GUEST", club: shell });
 
     expect(fetchMock.mock.calls.map(([path]) => path)).toEqual([
       "/api/bff/api/auth/me?clubSlug=alpha",
@@ -113,7 +122,7 @@ describe("guest route loaders", () => {
       .mockResolvedValueOnce(jsonResponse(shell));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(loadClubAppAudience({ params: { clubSlug: "alpha" } })).resolves.toMatchObject({
+    await expect(loadClubAppAudience(guestArgs())).resolves.toMatchObject({
       audience: "GUEST",
       auth: inactiveAuth,
       club: shell,
@@ -134,7 +143,7 @@ describe("guest route loaders", () => {
 
     const loader = scopedGuestRouteLoader(importProtectedLoader);
 
-    await expect(loader({ params: { clubSlug: "alpha" } } as never)).resolves.toEqual({ guestRoute: true });
+    await expect(loader(guestArgs())).resolves.toEqual({ guestRoute: true });
     expect(importProtectedLoader).not.toHaveBeenCalled();
   });
 
@@ -147,7 +156,7 @@ describe("guest route loaders", () => {
     const protectedLoader = vi.fn(async () => async () => ({ member: true }));
     const guestLoader = vi.fn(async () => { throw new Response("busy", { status: 429 }); });
 
-    await expect(scopedGuestRouteLoader(protectedLoader, guestLoader)({ params: { clubSlug: "alpha" } } as never)).resolves.toEqual({ guestRoute: true, guestFailure: { status: 429 } });
+    await expect(scopedGuestRouteLoader(protectedLoader, guestLoader)(guestArgs())).resolves.toEqual({ guestRoute: true, guestFailure: { status: 429 } });
     expect(protectedLoader).not.toHaveBeenCalled();
   });
 
@@ -156,7 +165,7 @@ describe("guest route loaders", () => {
     for (const failure of [new Response("missing", { status: 404 }), new Error("programming failure")]) {
       const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(anonymousAuth)).mockResolvedValueOnce(jsonResponse(shell));
       vi.stubGlobal("fetch", fetchMock);
-      await expect(scopedGuestRouteLoader(protectedLoader, async () => { throw failure; })({ params: { clubSlug: "alpha" } } as never)).rejects.toBe(failure);
+      await expect(scopedGuestRouteLoader(protectedLoader, async () => { throw failure; })(guestArgs())).rejects.toBe(failure);
       vi.unstubAllGlobals();
     }
   });
@@ -169,19 +178,19 @@ describe("guest route loaders", () => {
     ] as const) {
       const shellFailure = vi.fn().mockResolvedValueOnce(jsonResponse(anonymousAuth)).mockResolvedValueOnce(new Response("unavailable", { status, headers }));
       vi.stubGlobal("fetch", shellFailure);
-      await expect(scopedGuestRouteLoader(protectedLoader)({ params: { clubSlug: "alpha" } } as never)).resolves.toEqual({ guestRoute: true, guestFailure: expected });
+      await expect(scopedGuestRouteLoader(protectedLoader)(guestArgs())).resolves.toEqual({ guestRoute: true, guestFailure: expected });
       vi.unstubAllGlobals();
     }
 
     vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(new Response("auth", { status: 503 })));
-    await expect(scopedGuestRouteLoader(protectedLoader)({ params: { clubSlug: "alpha" } } as never)).rejects.toBeInstanceOf(ReadmatesApiError);
+    await expect(scopedGuestRouteLoader(protectedLoader)(guestArgs())).rejects.toBeInstanceOf(ReadmatesApiError);
   });
 
   it("rethrows a guest shell 404 instead of converting it into public retry data", async () => {
     const shellNotFound = new Response("missing", { status: 404 });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jsonResponse(anonymousAuth)).mockResolvedValueOnce(shellNotFound));
 
-    await expect(scopedGuestRouteLoader(async () => async () => ({ member: true }))({ params: { clubSlug: "alpha" } } as never)).rejects.toMatchObject({ status: 404 });
+    await expect(scopedGuestRouteLoader(async () => async () => ({ member: true }))(guestArgs())).rejects.toMatchObject({ status: 404 });
   });
 
   it("keeps an active member on the protected loader branch", async () => {
@@ -189,7 +198,7 @@ describe("guest route loaders", () => {
     vi.stubGlobal("fetch", fetchMock);
     const protectedLoader = vi.fn(async () => async () => ({ member: true }));
 
-    await expect(scopedGuestRouteLoader(protectedLoader)({ params: { clubSlug: "alpha" } } as never)).resolves.toEqual({ member: true });
+    await expect(scopedGuestRouteLoader(protectedLoader)(guestArgs())).resolves.toEqual({ member: true });
     expect(protectedLoader).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -216,7 +225,7 @@ describe("guest route loaders", () => {
       Promise.resolve(jsonResponse(path.endsWith("/sessions/current") ? currentSession : { items: [], nextCursor: null })),
     );
     vi.stubGlobal("fetch", fetchMock);
-    const args = { params: { clubSlug: "alpha" } };
+    const args = guestArgs();
 
     await Promise.all([guestCurrentSessionLoader(args), guestNotesLoader(args), guestArchiveLoader(args)]);
 

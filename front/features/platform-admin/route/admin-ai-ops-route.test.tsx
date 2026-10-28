@@ -36,10 +36,10 @@ function renderRoute(initialEntry = "/admin/ai-ops") {
       availability: "NOT_ENOUGH_DATA",
     },
   });
-  queryClient.setQueryData(platformAdminAiOpsJobsQuery().queryKey, { items: [] });
+  queryClient.setQueryData(platformAdminAiOpsJobsQuery().queryKey, { items: [], nextCursor: null });
   queryClient.setQueryData(
     platformAdminAiOpsJobsQuery({ errorCode: "PROVIDER_RATE_LIMITED" }).queryKey,
-    { items: [] },
+    { items: [], nextCursor: null },
   );
   return render(
     <QueryClientProvider client={queryClient}>

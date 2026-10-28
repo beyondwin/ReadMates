@@ -1,6 +1,6 @@
 # ReadMates Release Readiness Review
 
-현재 branch의 release risk를 검토하는 checklist입니다. 2026-07-11 이전 기록은 [`docs/reports/2026-07-11-release-readiness-history.md`](../reports/2026-07-11-release-readiness-history.md)에 있으며 현재 절차의 기준이 아닙니다.
+현재 branch의 release risk를 검토하는 checklist입니다. 2026-07-11 이전 기록은 full source checkout의 `docs/reports/2026-07-11-release-readiness-history.md`에 있으며 공개 후보에서 제외됩니다. 과거 기록은 현재 절차의 기준이 아닙니다.
 
 ## 기본 범위
 
@@ -75,6 +75,7 @@ Frontend route, BFF proxy, user-flow 변경이 있으면 frontend check와 E2E�
 
 ```bash
 pnpm --dir front lint
+pnpm --dir front typecheck
 pnpm --dir front test
 pnpm --dir front build
 pnpm --dir front test:e2e
@@ -101,7 +102,7 @@ findings를 우선순위별로 보고합니다.
 
 ## 릴리스 증거 보관
 
-버전별 검토와 배포 결과는 `docs/reports`의 날짜가 붙은 evidence 문서에 보관하고, 이 체크리스트 본문에는 쌓지 않습니다.
+버전별 검토와 배포 결과는 full source checkout의 `docs/reports`에 날짜가 붙은 evidence 문서로 보관하고, 이 체크리스트 본문에는 쌓지 않습니다. 이 보고서들은 공개 후보에 포함하지 않습니다.
 
-- 최근 evidence 문서: [2026-08-17 v2.4.1](../reports/2026-08-17-release-readiness-v2.4.1.md), [2026-08-09 v2.3.0](../reports/2026-08-09-release-readiness-v2.3.0.md)
+- 최근 evidence 문서(full source checkout): `docs/reports/2026-08-17-release-readiness-v2.4.1.md`, `docs/reports/2026-08-09-release-readiness-v2.3.0.md`
 - `v2.5.0`·`v2.5.1`은 별도 evidence 문서 없이 `CHANGELOG.md`의 각 버전 `Verification`/`Deployment Notes`에 기록되어 있습니다. `v2.5.0` 서버 이미지는 Trivy gate에서 막혀 배포되지 않았고, `v2.5.1`이 운영 배포입니다.

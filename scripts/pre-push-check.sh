@@ -226,6 +226,7 @@ run_step "Deploy workflow contract" python3 -B scripts/check-deploy-workflow-con
 run_step "Activate repo package manager" activate_repo_pnpm
 run_step "Git whitespace check" check_whitespace
 run_step "Frontend lint" "${pnpm_cmd[@]}" --dir front lint
+run_step "Frontend typecheck" "${pnpm_cmd[@]}" --dir front typecheck
 run_step "Frontend unit tests with coverage" "${pnpm_cmd[@]}" --dir front test:coverage
 run_step "Frontend build" "${pnpm_cmd[@]}" --dir front build
 run_step "Export Zod fixtures" "${pnpm_cmd[@]}" --dir front zod:export-fixtures

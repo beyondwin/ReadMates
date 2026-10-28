@@ -1,3 +1,4 @@
+import { createLoaderArgs } from "@/tests/unit/helpers/router-test-args";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, Link, MemoryRouter, useLocation } from "react-router";
@@ -146,10 +147,11 @@ describe("MemberNotificationsPage", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      memberNotificationsLoader({
+      memberNotificationsLoader(createLoaderArgs({
+        pattern: "/clubs/:clubSlug/app/notifications",
         params: { clubSlug: "reading-sai" },
         request: new Request("https://readmates.test/clubs/reading-sai/app/notifications"),
-      } as Parameters<typeof memberNotificationsLoader>[0]),
+      })),
     ).resolves.toEqual(notificationData);
 
     expect(fetchMock).toHaveBeenCalledWith(

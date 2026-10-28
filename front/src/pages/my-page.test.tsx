@@ -1,6 +1,7 @@
+import type { MyPageRoute } from "@/features/archive/route/my-page-route";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AuthMeResponse, MembershipStatus } from "@/shared/auth/auth-contracts";
+import type { ApprovalState, AuthMeResponse, MembershipStatus } from "@/shared/auth/auth-contracts";
 import MyRoutePage from "./my-page";
 
 const auth = vi.hoisted(() => ({
@@ -9,7 +10,7 @@ const auth = vi.hoisted(() => ({
   canEditOwnProfile: vi.fn(),
   clubAppAccess: undefined as { auth: AuthMeResponse; allowed: boolean } | undefined,
 }));
-const route = vi.hoisted(() => ({ MyPageRoute: vi.fn(() => null) }));
+const route = vi.hoisted(() => ({ MyPageRoute: vi.fn<(props: Parameters<typeof MyPageRoute>[0]) => null>(() => null) }));
 
 vi.mock("@/src/app/auth-state", () => ({
   useAuth: () => auth.state,
@@ -23,7 +24,7 @@ vi.mock("react-router", () => ({
 }));
 vi.mock("@/features/archive/route/my-page-route", () => route);
 
-function memberAuth(membershipStatus: MembershipStatus): AuthMeResponse {
+function memberAuth(membershipStatus: MembershipStatus & ApprovalState): AuthMeResponse {
   return {
     authenticated: true,
     userId: `${membershipStatus.toLowerCase()}-user`,
@@ -49,11 +50,7 @@ function memberAuth(membershipStatus: MembershipStatus): AuthMeResponse {
 }
 
 function latestRouteProps() {
-  return route.MyPageRoute.mock.calls.at(-1)?.[0] as {
-    canEditProfile: boolean;
-    clubSlug: string | null;
-    onProfileUpdated: () => Promise<void>;
-  };
+  return route.MyPageRoute.mock.calls.at(-1)?.[0];
 }
 
 describe("MyRoutePage", () => {

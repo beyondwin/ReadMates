@@ -164,7 +164,7 @@ export function getMemberHomeNextReadingAction({
   const state = deriveReadingLoopState({
     hasCurrentSession: session !== null,
     memberCanWrite: canWrite,
-    memberRsvpStatus: session?.myRsvpStatus,
+    memberRsvpStatus: session?.myRsvpStatus ?? undefined,
     memberHasCheckin: session ? session.myCheckin !== null : undefined,
     memberQuestionCount: session?.myQuestions.length,
     minimumQuestionCount: 2,

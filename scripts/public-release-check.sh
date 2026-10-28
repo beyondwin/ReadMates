@@ -434,6 +434,7 @@ check_omitted_contributor_instruction_references() {
 
   local instruction_files=(
     "README.md"
+    "docs/README.md"
     "docs/development/README.md"
     "docs/development/project-map.md"
     "scripts/README.md"

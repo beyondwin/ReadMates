@@ -226,7 +226,7 @@ describe("AdminTodayRoute", () => {
 
     expect(await screen.findAllByText("현재 상태 · 확인됨")).toHaveLength(2);
     expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "4시간 보류", exact: true }));
+    await user.click(screen.getByRole("button", { name: "4시간 보류" }));
 
     await waitFor(() => {
       expect(operationsApi.snooze).toHaveBeenCalledWith(

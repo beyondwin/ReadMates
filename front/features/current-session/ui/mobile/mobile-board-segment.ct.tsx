@@ -1,3 +1,4 @@
+import { MEMBER_READ_SURFACE_CAPABILITIES } from "@/shared/model/read-surface-capabilities";
 import { expect, test } from "@playwright/experimental-ct-react";
 import type { CurrentSession } from "@/features/current-session/ui/current-session-types";
 import { MobileBoardSegment } from "./mobile-board-segment";
@@ -46,6 +47,7 @@ const session = {
     ],
   },
   attendees: [],
+  capabilities: MEMBER_READ_SURFACE_CAPABILITIES,
 } satisfies CurrentSession;
 
 test("MobileBoardSegment keeps question and long-review prose at body rhythm at 320px", async ({ mount, page }) => {

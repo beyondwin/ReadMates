@@ -11,7 +11,7 @@ const memberOne: ManualNotificationMemberOption = {
   role: "MEMBER",
   membershipStatus: "ACTIVE",
   sessionParticipationStatus: "ACTIVE",
-  attendanceStatus: "CONFIRMED",
+  attendanceStatus: "ATTENDED",
   emailEligibility: "ELIGIBLE",
   inAppEligibility: "ELIGIBLE",
 };

@@ -4,6 +4,10 @@ import { requireHostLoaderAuth } from "./host-loader-auth";
 
 const hostAuth: AuthMeResponse = {
   authenticated: true,
+  userId: "user-host",
+  membershipId: "membership-host",
+  clubId: "club-alpha",
+  accountName: "Host",
   email: "host@example.test",
   displayName: "Host",
   role: "HOST",

@@ -10,6 +10,24 @@ export type EditableMemberProfile = {
 
 export type ProfileFailureField = "displayName" | "avatarKey" | "form";
 
+export function memberProfileErrorCode(code: string | null): MemberProfileErrorCode | null {
+  switch (code) {
+    case "DISPLAY_NAME_DUPLICATE":
+    case "DISPLAY_NAME_REQUIRED":
+    case "DISPLAY_NAME_TOO_LONG":
+    case "DISPLAY_NAME_INVALID":
+    case "DISPLAY_NAME_RESERVED":
+    case "AVATAR_KEY_REQUIRED":
+    case "AVATAR_KEY_INVALID":
+    case "AUTHENTICATION_REQUIRED":
+    case "MEMBER_NOT_FOUND":
+    case "MEMBERSHIP_NOT_ALLOWED":
+      return code;
+    default:
+      return null;
+  }
+}
+
 export class ProfileUpdateFailure extends Error {
   constructor(
     message: string,

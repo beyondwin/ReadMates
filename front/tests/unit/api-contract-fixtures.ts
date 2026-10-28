@@ -427,6 +427,7 @@ export const hostNotificationEventListContractFixture = {
       updatedAt: "2026-04-29T00:01:00Z",
     },
   ],
+  nextCursor: null,
 } satisfies HostNotificationEventListResponse;
 
 export const hostNotificationDeliveryListContractFixture = {
@@ -450,6 +451,7 @@ export const hostNotificationDeliveryListContractFixture = {
       updatedAt: "2026-04-29T00:02:00Z",
     },
   ],
+  nextCursor: null,
 } satisfies HostNotificationDeliveryListResponse;
 
 export const feedbackDocumentContractFixture = {

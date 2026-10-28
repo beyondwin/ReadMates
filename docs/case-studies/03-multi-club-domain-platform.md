@@ -32,48 +32,21 @@ ReadMates는 단일 배포로 여러 독서모임(club)을 호스팅합니다. �
 
 **선택: `X-Readmates-Club-Slug` (명시) > `X-Readmates-Club-Host` (DB lookup) > unscoped 우선순위**
 
-BFF가 두 헤더를 상황에 따라 부착하고, backend는 slug 헤더를 먼저, 없으면 host 헤더를 사용합니다. ADR-0013 이후 backend는 `ClubContextSource`로 slug miss와 host fallback miss를 구분합니다.
+BFF가 두 헤더를 상황에 따라 부착하고, backend는 slug 헤더를 먼저, 없으면 host 헤더를 사용합니다. 현재 backend는 `AuthClubContextSource`로 slug miss와 host fallback miss를 구분하며 ADR-0013의 정책을 유지합니다.
 
 ## 구현
 
-### backend — ClubContextResolver
+### backend — AuthClubContextResolver
 
-`server/src/main/kotlin/com/readmates/club/adapter/in/web/ClubContextResolver.kt`는 `HttpServletRequest`의 확장 함수로 구현됩니다. 우선순위 로직이 단일 파일에 응집되어 있습니다.
+현재 auth boundary의 [`AuthClubContextResolver.kt`](../../server/src/main/kotlin/com/readmates/auth/adapter/in/security/AuthClubContextResolver.kt)는 `HttpServletRequest.resolveAuthClubContext(...)` 확장 함수에서 trusted header를 읽고 `ResolveClubContextUseCase`에 조회를 위임합니다. 예전 `club/adapter/in/web/ClubContextResolver.kt`의 책임을 auth inbound adapter가 소유합니다.
 
-```kotlin
-// server/.../club/adapter/in/web/ClubContextResolver.kt
-fun HttpServletRequest.resolveClubContext(resolveClubContextUseCase: ResolveClubContextUseCase): RequestedClubContext {
-    val slug = getHeader(ClubContextHeader.CLUB_SLUG)
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() }
-    if (slug != null) {
-        return RequestedClubContext(
-            supplied = true,
-            source = ClubContextSource.SLUG,
-            context = resolveClubContextUseCase.resolveBySlug(slug),
-        )
-    }
+| 입력 | `RequestedAuthClubContext.source` | 조회 |
+| --- | --- | --- |
+| non-blank slug | `AuthClubContextSource.SLUG` | `resolveBySlug(slug)`; host가 함께 와도 slug 우선 |
+| slug 없음 + non-blank host | `AuthClubContextSource.HOST_FALLBACK` | `resolveByHost(host)` |
+| 둘 다 없음 | `AuthClubContextSource.NONE` | 조회 없음, `supplied=false`, `context=null` |
 
-    val host = getHeader(ClubContextHeader.CLUB_HOST)
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() }
-    if (host != null) {
-        return RequestedClubContext(
-            supplied = true,
-            source = ClubContextSource.HOST_FALLBACK,
-            context = resolveClubContextUseCase.resolveByHost(host),
-        )
-    }
-
-    return RequestedClubContext(
-        supplied = false,
-        source = ClubContextSource.NONE,
-        context = null,
-    )
-}
-```
-
-반환 타입 `RequestedClubContext`의 `source` 필드가 중요합니다. `source = SLUG && context = null`은 잘못된 slug이고, `source = HOST_FALLBACK && context = null`은 등록되지 않은 host fallback입니다. ADR-0013 전에는 이 두 경우가 모두 `supplied = true && context = null`로만 표현되어 incident의 트리거가 됐습니다.
+반환 타입의 `source` 필드가 중요합니다. `source = SLUG && context = null`은 잘못된 slug이고, `source = HOST_FALLBACK && context = null`은 등록되지 않은 host fallback입니다. ADR-0013 전에는 이 두 경우가 모두 `supplied = true && context = null`로만 표현되어 incident의 트리거가 됐습니다.
 
 ### backend — JdbcClubContextAdapter
 
@@ -126,17 +99,18 @@ proxy.on("proxyReq", (proxyReq) => {
 });
 ```
 
-**dev/prod parity 차이**: dev는 host 헤더를 전송하지 않으므로 backend `requestedClubContext.source`가 `NONE`입니다. prod는 host 헤더를 항상 전송하므로 shared fallback miss에서 `HOST_FALLBACK`입니다. ADR-0013 전에는 이 차이가 production-only bug 클래스의 원인이 됐고, 현재는 `AuthMeController`가 host fallback miss를 unscoped session profile로 처리합니다.
+**slug가 없는 요청의 dev/prod 차이**: dev는 host 헤더를 전송하지 않으므로 backend `requestedClubContext.source`가 `NONE`입니다. prod는 host 헤더를 항상 전송하므로 shared fallback miss에서 `HOST_FALLBACK`입니다. slug가 있으면 두 환경 모두 `SLUG`가 우선합니다. ADR-0013 전에는 이 차이가 production-only bug 클래스의 원인이 됐고, 현재는 `AuthMeController`가 host fallback miss를 unscoped session profile로 처리합니다.
 
 ## 검증
 
-**unit test**
+**단위·통합 테스트**
 
 ```bash
-./server/gradlew -p server test --tests "*ClubContext*"
+./server/gradlew -p server unitTest --tests '*AuthClubContextResolverTest'
+./server/gradlew -p server integrationTest --tests 'com.readmates.club.api.ClubContextResolverTest'
 ```
 
-`ClubContextResolver`의 slug-first / host-fallback / unscoped 세 경로와, `JdbcClubContextAdapter`의 `loadByHostname`이 `club_domains.status = 'ACTIVE'` 조건만 통과함을 검증합니다.
+단위 테스트는 `AuthClubContextResolver`의 slug-first / host-fallback / unscoped 세 경로를 검증합니다. Docker가 필요한 통합 테스트는 실제 MySQL에서 active hostname을 조회하고 disabled hostname을 거절하는지 확인합니다. 기본 `test` task는 비활성화되어 있으므로 사용하지 않습니다.
 
 **E2E (Playwright)**
 
@@ -195,7 +169,7 @@ const refresh = () => {
 
 React Router가 이미 URL 파라미터의 단일 출처를 소유하고 있습니다. 초기 loader가 `args.params`로 받는 것과 같은 출처를 refresh에도 연결하는 것이 올바른 형태입니다.
 
-설계 근거 및 기각된 대안은 spec `docs/superpowers/specs/2026-05-11-current-session-refresh-club-context-design.md`에 상세 기록되어 있습니다.
+당시 설계 근거와 기각된 대안은 Git 이력의 `docs/superpowers/specs/2026-05-11-current-session-refresh-club-context-design.md`에 남아 있습니다. 유지 중인 incident 기록은 [postmortem](../operations/postmortems/2026-05-11-current-session-refresh-club-context.md)을 봅니다.
 
 ### 대응 타임라인
 
@@ -211,7 +185,7 @@ spec 작성부터 구현·테스트 완료까지 약 6분. 재현 조건 확정(
 
 ### 후속 결정
 
-즉시 수정은 frontend refresh handler가 `useParams()`를 명시 전달하는 방식이었고, 후속 안전망은 ADR-0013에서 server-side로 닫았습니다. `ClubContextResolver`가 `ClubContextSource.SLUG` / `HOST_FALLBACK` / `NONE`을 반환하고, `AuthMeController`는 slug supplied + lookup miss만 `CLUB_NOT_FOUND` 404로 처리합니다. Host fallback + lookup miss는 unscoped session profile로 다뤄 dev에서 host 헤더가 없는 경우와 같은 응답을 반환합니다. BFF는 여전히 host 헤더를 전송하지만, server가 shared fallback miss를 멤버십 없음으로 오해하지 않습니다.
+즉시 수정은 frontend refresh handler가 `useParams()`를 명시 전달하는 방식이었고, 후속 안전망은 ADR-0013에서 server-side로 닫았습니다. 현재 `AuthClubContextResolver`가 `AuthClubContextSource.SLUG` / `HOST_FALLBACK` / `NONE`을 반환하고, `AuthMeController`는 slug supplied + lookup miss만 `CLUB_NOT_FOUND` 404로 처리합니다. Host fallback + lookup miss는 unscoped session profile로 다뤄 dev에서 host 헤더가 없는 경우와 같은 응답을 반환합니다. BFF는 여전히 host 헤더를 전송하지만, server가 shared fallback miss를 멤버십 없음으로 오해하지 않습니다.
 
 ## Trade-off와 한계
 
@@ -229,7 +203,7 @@ club context host lookup은 요청마다 DB를 확인합니다. 반면 mutating 
 
 **`supplied = true && context = null` 의미론**
 
-이 상태는 과거에 두 가지를 동시에 표현했습니다: "명시적 slug가 왔지만 클럽을 못 찾음"과 "등록되지 않은 host fallback". ADR-0013 이후에는 `ClubContextSource`가 두 경우를 분리합니다. 잘못된 slug는 `CLUB_NOT_FOUND`로 드러나고, 등록되지 않은 host fallback은 unscoped auth로 처리합니다.
+이 상태는 과거에 두 가지를 동시에 표현했습니다: "명시적 slug가 왔지만 클럽을 못 찾음"과 "등록되지 않은 host fallback". ADR-0013 이후 두 경우를 구분하며 현재 타입은 `AuthClubContextSource`입니다. 잘못된 slug는 `CLUB_NOT_FOUND`로 드러나고, 등록되지 않은 host fallback은 unscoped auth로 처리합니다.
 
 ## 다시 한다면
 
@@ -249,7 +223,7 @@ ADR-0013은 BFF가 항상 host 헤더를 보내는 구조를 유지하되, serve
 
 - **ADR-0008** — multi-club domain with host resolution 결정 기록.
 - **ADR-0013** — BFF host header policy 후속 안전망.
-- **spec** — `docs/superpowers/specs/2026-04-30-readmates-multi-club-domain-platform-design.md`.
-- **incident spec** — `docs/superpowers/specs/2026-05-11-current-session-refresh-club-context-design.md` (BFF divergence 분석, 수정 설계, 기각된 대안 포함).
-- **incident plan** — `docs/superpowers/plans/2026-05-11-current-session-refresh-club-context-implementation-plan.md` (구현 단계).
+- **과거 spec (Git 이력)** — `docs/superpowers/specs/2026-04-30-readmates-multi-club-domain-platform-design.md`.
+- **과거 incident spec (Git 이력)** — `docs/superpowers/specs/2026-05-11-current-session-refresh-club-context-design.md` (BFF divergence 분석, 수정 설계, 기각된 대안 포함).
+- **과거 incident plan (Git 이력)** — `docs/superpowers/plans/2026-05-11-current-session-refresh-club-context-implementation-plan.md` (구현 단계).
 - **post-mortem** — `docs/operations/postmortems/2026-05-11-current-session-refresh-club-context.md` (post-mortem case study에서 작성).

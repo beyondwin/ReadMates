@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 # scripts/aigen-pii-check.sh — PII regression check for aigen
-# Spec: docs/superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md §11
-# Plan: docs/superpowers/plans/2026-05-16-readmates-in-app-ai-session-generation-implementation-plan.md task 6.4
+# Architecture: docs/development/spring-ai-2-provider-architecture.md
 # Runbook: docs/operations/runbooks/ai-session-generation.md#pii-regression
 #
 # Run by CI on every PR (.github/workflows/ci.yml :: scripts job).
 # Operators can also run manually: `bash scripts/aigen-pii-check.sh`.
 #
-# Invariants enforced (spec §5.7, §11.1, current Redis handoff design):
+# Invariants enforced (current Redis handoff and durable-data boundaries):
 #   1. Durable transcript-body-like column or property names MUST NOT exist in
 #      server/src/main/ Kotlin sources.
 #   2. Kafka producers MUST NOT send arguments named `transcript` (we forward

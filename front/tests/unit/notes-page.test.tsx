@@ -1,3 +1,4 @@
+import { createLoaderArgs } from "@/tests/unit/helpers/router-test-args";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter } from "react-router";
 import { RouterProvider } from "react-router/dom";
@@ -229,10 +230,11 @@ describe("NotesPage", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     try {
-      await notesFeedLoader({
+      await notesFeedLoader(createLoaderArgs({
+        pattern: "/clubs/:clubSlug/app/notes",
         params: { clubSlug: "reading-sai" },
         request: new Request("https://app.readmates.example/clubs/reading-sai/app/notes?sessionId=session-6&from=email"),
-      } as Parameters<typeof notesFeedLoader>[0]);
+      }));
       throw new Error("Expected redirect");
     } catch (error) {
       expect(error).toBeInstanceOf(Response);

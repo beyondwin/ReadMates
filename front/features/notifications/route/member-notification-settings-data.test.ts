@@ -1,3 +1,4 @@
+import { createLoaderArgs } from "@/tests/unit/helpers/router-test-args";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NotificationPreferences } from "../model/notification-preferences-model";
 import { memberNotificationSettingsLoader } from "./member-notification-settings-data";
@@ -50,10 +51,11 @@ const viewerAccess = {
   },
 };
 
-const scopedArgs = {
+const scopedArgs = createLoaderArgs({
+  pattern: "/clubs/:clubSlug/app/notifications/settings",
   params: { clubSlug: "reading-sai" },
   request: new Request("https://readmates.test/clubs/reading-sai/app/notifications/settings"),
-} as Parameters<typeof memberNotificationSettingsLoader>[0];
+});
 
 describe("memberNotificationSettingsLoader", () => {
   beforeEach(() => {

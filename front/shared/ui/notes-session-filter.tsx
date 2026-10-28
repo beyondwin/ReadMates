@@ -14,8 +14,11 @@ import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 import { noteSessionIsSelected } from "@/shared/model/notes-read-primitives";
 
 const mobileSessionCardWidth = "156px";
-export type NotesLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & { to: string; children: ReactNode };
-function DefaultNotesLink({ to, children, ...props }: NotesLinkProps) { return <a {...props} href={to}>{children}</a>; }
+export type NotesLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & { to: string; children: ReactNode; viewTransition?: boolean };
+function DefaultNotesLink({ to, children, viewTransition: _viewTransition, ...props }: NotesLinkProps) {
+  void _viewTransition;
+  return <a {...props} href={to}>{children}</a>;
+}
 const NotesLinkContext = createContext<ComponentType<NotesLinkProps>>(DefaultNotesLink);
 export function NotesLinkProvider({ LinkComponent, children }: { LinkComponent?: ComponentType<NotesLinkProps>; children: ReactNode }) { return <NotesLinkContext.Provider value={LinkComponent ?? DefaultNotesLink}>{children}</NotesLinkContext.Provider>; }
 function Link(props: NotesLinkProps) { return createElement(useContext(NotesLinkContext), props); }

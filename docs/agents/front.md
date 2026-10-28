@@ -38,7 +38,7 @@ Do not add new imports from removed `shared/api/readmates`. Use feature-owned AP
 
 Do not add Next/React Server Component directives such as `"use client"` to Vite source files.
 
-Server state는 TanStack Query v5로 점진 이관 중입니다. 앱 루트(`front/src/main.tsx`)에 단일 `QueryClient`를 주입하고, `front/src/app/router.tsx`의 `createReadmatesRouter()`가 `{router, queryClient}`를 반환해 loader와 컴포넌트가 같은 cache를 공유합니다. 새 server state는 `features/<name>/queries/<area>-queries.ts`에 `queryOptions` + `useXxxMutation`을 두고, mutation은 `onSuccess`에서 `invalidateQueries({ queryKey: keys.all })`로 정리합니다. 진행 상황은 [docs/development/server-state-migration.md](../development/server-state-migration.md)를 참고합니다.
+Server state는 TanStack Query v5로 관리합니다. 앱 루트(`front/src/main.tsx`)에 단일 `QueryClient`를 주입하고, `front/src/app/router.tsx`의 `createReadmatesRouter()`가 `{router, queryClient}`를 반환해 loader와 컴포넌트가 같은 cache를 공유합니다. 새 server state는 `features/<name>/queries/<area>-queries.ts`에 `queryOptions` + `useXxxMutation`을 두고, mutation은 `onSuccess`에서 `invalidateQueries({ queryKey: keys.all })`로 정리합니다. 적용 현황과 패턴은 [docs/development/server-state-migration.md](../development/server-state-migration.md)를 참고합니다.
 
 `front/src/app/router.tsx`는 composition root입니다. Route 정의는 `front/src/app/routes/{public,auth,member,host,admin}.tsx`에 variant별로 분리되어 있으니, 새 route는 해당 variant 모듈에 추가합니다.
 
@@ -60,6 +60,7 @@ Checks:
 
 ```bash
 pnpm --dir front lint
+pnpm --dir front typecheck
 pnpm --dir front test
 pnpm --dir front build
 ```

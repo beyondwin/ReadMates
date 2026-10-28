@@ -44,7 +44,7 @@
 - **기술 선택 배경**: [technical-decisions.md](technical-decisions.md)와 [adr/README.md](adr/README.md)를 봅니다.
 - **버전**: 제품 버전은 Git tag `vMAJOR.MINOR.PATCH` 하나입니다. 기준은 [versioning.md](versioning.md)입니다.
 - **작업 규칙**: full source checkout에 repository-local contributor guidance가 있으면 먼저 확인합니다. 공개 artifact에서는 이 문서와 실제 코드·테스트·scripts로 표면과 검증을 고릅니다.
-- **과거 기록**: `docs/superpowers`와 `docs/reports`는 과거 기록입니다. 현재 동작 기준은 이 디렉터리와 코드, 테스트, 배포 스크립트입니다.
+- **과거 기록**: full source checkout의 `docs/reports/README.md`는 작성 시점 snapshot을 안내하며 공개 후보에는 포함하지 않습니다. 제거된 `docs/superpowers/`의 spec과 plan은 Git 이력에서 확인합니다. 현재 동작 기준은 이 디렉터리와 코드, 테스트, 배포 스크립트입니다.
 
 ## 문서 경계
 
@@ -56,6 +56,6 @@
 ## 문서 업데이트 완료 기준
 
 - 코드, 설정, 테스트, 스크립트와 맞는 사실만 현재 동작으로 씁니다.
-- `docs/superpowers`의 과거 계획은 맥락으로만 보고 현재 기준으로 올리지 않습니다.
+- Git 이력의 과거 계획은 맥락으로만 봅니다. 새 checkout에 없는 경로를 현재 문서처럼 연결하지 않습니다.
 - 배포, public release, secret 처리를 설명하면 관련 `docs/deploy`와 `scripts/README.md`도 함께 확인합니다.
 - 바꾼 문서에 `git diff --check -- <changed-docs>`를 실행하고, targeted safety scan이나 공개 릴리즈 후보 점검을 했는지 적습니다.

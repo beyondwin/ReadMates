@@ -2,7 +2,7 @@
 
 OCI backend는 Docker Compose stack으로 운영합니다. systemd(`readmates-stack`)가 compose를 관리하고, compose 안의 Caddy가 HTTPS를 받아 Spring API container로 넘깁니다. 예전 Spring Boot JAR + host Caddy 경로는 전환 검증과 rollback 전용입니다.
 
-관련 문서: [README.md](README.md), [compose-stack.md](compose-stack.md)(배포·rollback 절차), [cloudflare-pages.md](cloudflare-pages.md), [multi-club-domains.md](multi-club-domains.md). 2026-04-30 Compose 전환 사건 기록은 [OCI Compose Cutover 보고서](../reports/2026-04-30-oci-compose-cutover.md)에 있습니다.
+관련 문서: [README.md](README.md), [compose-stack.md](compose-stack.md)(배포·rollback 절차), [cloudflare-pages.md](cloudflare-pages.md), [multi-club-domains.md](multi-club-domains.md). 2026-04-30 Compose 전환 사건 기록은 full source checkout의 `docs/reports/2026-04-30-oci-compose-cutover.md`에 있으며 공개 후보에는 포함하지 않습니다.
 
 완료 기준: compose stack이 새 image로 뜨고, Flyway 결과, `/internal/health`, BFF smoke, OAuth start smoke가 변경 범위에 맞게 확인됩니다. migration, 알림, 메일, Object Storage backup을 건드렸다면 해당 섹션의 확인도 합니다.
 
@@ -38,9 +38,8 @@ VM IP, SSH key 경로, DB host, SMTP credential, OCI resource id, smoke 결과 �
 배포 절차는 [compose-stack.md](compose-stack.md)가 기준입니다.
 
 - 운영 image는 release tag와 같은 tag로 GHCR에 게시합니다: `ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z`. 운영 VM에서 image를 다시 빌드하지 않습니다.
-- `server/Dockerfile.release`: `Deploy Server Image`가 `clean check bootJar`를 통과한 jar로 image를 만듭니다. scan한 digest가 CI에서 검증된 jar와 같게 하기 위해서입니다.
-- `server/Dockerfile`: 로컬에서 만든 `bootJar`를 포장합니다(전환 검증용).
-- 두 Dockerfile의 runtime 설정(Java 25, native access 허용 범위 등)은 서로 맞아야 합니다.
+- `server/Dockerfile`: 로컬과 `Deploy Server Image`가 함께 쓰는 image 정의입니다. workflow는 `clean check bootJar`를 통과한 jar를 포장하고, scan한 digest만 release tag로 promote합니다.
+- 같은 Dockerfile을 사용하므로 Java 25, native access, non-root user, layer 구성은 한곳에서 관리합니다. 로컬에서는 먼저 `./server/gradlew -p server bootJar`로 jar를 만듭니다.
 
 배포 순서:
 

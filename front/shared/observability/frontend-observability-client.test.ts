@@ -9,7 +9,7 @@ describe("frontend observability client", () => {
   });
 
   it("flushes sanitized batches with sendBeacon", async () => {
-    const sendBeacon = vi.fn(() => true);
+    const sendBeacon = vi.fn<Navigator["sendBeacon"]>(() => true);
     const client = createFrontendObservabilityClient({
       sendBeacon,
       fetchImpl: vi.fn(),
@@ -28,8 +28,9 @@ describe("frontend observability client", () => {
     const [url, body] = sendBeacon.mock.calls[0];
     expect(url).toBe(FRONTEND_OBSERVABILITY_BROWSER_PATH);
     expect(body).toBeInstanceOf(Blob);
-    expect((body as Blob).type).toBe("application/json");
-    expect(JSON.parse(await (body as Blob).text())).toEqual({
+    if (!(body instanceof Blob)) throw new Error("Expected a telemetry Blob");
+    expect(body.type).toBe("application/json");
+    expect(JSON.parse(await body.text())).toEqual({
       events: [
         {
           type: "ROUTE_LOAD",

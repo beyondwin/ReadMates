@@ -28,7 +28,7 @@ Workflow가 하는 일:
 
 - `release_tag`가 `vMAJOR.MINOR.PATCH` 형식인지 검사합니다.
 - 그 tag를 checkout하고, checkout commit이 tag commit과 같은지 확인합니다.
-- `pnpm install --frozen-lockfile` → `lint` → `test` → `build` → Zod fixture 최신 여부를 확인합니다.
+- `pnpm install --frozen-lockfile` → `lint` → `typecheck` → `test` → `build` → Zod fixture 최신 여부를 확인합니다.
 - Wrangler로 `front/dist`와 `front/functions`를 Pages project `readmates`의 `main` branch(production)에 올립니다.
 
 ## 로컬에서 deploy hook으로 배포 (보조 경로)

@@ -35,6 +35,7 @@ README는 첫 진입점입니다. 실제 작업은 아래 문서를 기준으로
 
 | 필요한 것 | 문서 |
 | --- | --- |
+| 전체 문서 탐색 | [문서 허브](docs/README.md) |
 | 프로젝트 지형, 작업 표면, 멈춤 조건 | [프로젝트 지도](docs/development/project-map.md) |
 | 변경 slice의 risk evidence | [acceptance matrix](docs/development/acceptance-matrix.md) |
 | 현재 동작과 경계 | 코드, 테스트, [아키텍처 문서](docs/development/architecture.md) |
@@ -124,9 +125,9 @@ Spring Boot API
 
 상세: [AI 생성 사용 흐름](docs/development/session-import-generator.md#in-app-근거-기반-ai-생성), [Spring AI 2 provider architecture](docs/development/spring-ai-2-provider-architecture.md), [AI generation runbook](docs/operations/runbooks/ai-session-generation.md)
 
-## 개발 계획과 스펙 기록
+## 설계 결정과 이력
 
-기능 설계 과정의 [Plans](docs/superpowers/plans)와 [Specs](docs/superpowers/specs)를 함께 보관합니다. 과거 기록일 뿐 현재 동작의 기준은 코드와 [아키텍처 문서](docs/development/architecture.md)입니다.
+현재 설계 결정은 [ADR](docs/development/adr/README.md)에서 확인합니다. 시점별 분석 보고서는 full source checkout의 `docs/reports/README.md`에서 찾으며 공개 후보에는 포함하지 않습니다. 제거된 `docs/superpowers/`의 spec과 plan은 Git 이력에 남아 있으며 현재 문서 탐색 경로에 포함하지 않습니다. 현재 동작은 코드와 [아키텍처 문서](docs/development/architecture.md)가 기준입니다.
 
 ## 기술 스택
 
@@ -158,6 +159,7 @@ Spring Boot API
 
 ```bash
 pnpm --dir front lint
+pnpm --dir front typecheck
 pnpm --dir front test
 pnpm --dir front build
 pnpm --dir front test:e2e
@@ -216,32 +218,4 @@ pnpm --dir front dev
 
 브라우저에서 `http://localhost:5173`을 엽니다. `dev` profile은 로컬 전용 sample seed와 dev-login을 제공합니다.
 
-## 문서 링크
-
-| 목적 | 문서 |
-| --- | --- |
-| 개발자 문서 허브 | [docs/development/README.md](docs/development/README.md) |
-| 프로젝트 지도 | [docs/development/project-map.md](docs/development/project-map.md) |
-| 로컬 실행 | [docs/development/local-setup.md](docs/development/local-setup.md) |
-| 아키텍처 상세 | [docs/development/architecture.md](docs/development/architecture.md) |
-| 테스트 가이드 | [docs/development/test-guide.md](docs/development/test-guide.md) |
-| 변경 acceptance matrix | [docs/development/acceptance-matrix.md](docs/development/acceptance-matrix.md) |
-| Cross-surface 작업 체크리스트 | [docs/development/vertical-slice-checklist.md](docs/development/vertical-slice-checklist.md) |
-| AI 세션 기록 생성과 JSON 가져오기 | [docs/development/session-import-generator.md](docs/development/session-import-generator.md) |
-| Spring AI provider, 비용, trace | [docs/development/spring-ai-2-provider-architecture.md](docs/development/spring-ai-2-provider-architecture.md) |
-| AI 생성 운영 절차 | [docs/operations/runbooks/ai-session-generation.md](docs/operations/runbooks/ai-session-generation.md) |
-| 디자인 시스템 | [design/README.md](design/README.md) |
-| 기술적 의사결정, ADR | [docs/development/technical-decisions.md](docs/development/technical-decisions.md), [docs/development/adr/README.md](docs/development/adr/README.md) |
-| 버저닝 | [docs/development/versioning.md](docs/development/versioning.md) |
-| 릴리즈 관리와 CHANGELOG | [docs/development/release-management.md](docs/development/release-management.md), [CHANGELOG.md](CHANGELOG.md) |
-| 배포 문서 허브 | [docs/deploy/README.md](docs/deploy/README.md) |
-| 새 버전 발행과 운영 배포 | [docs/deploy/release-publish-runbook.md](docs/deploy/release-publish-runbook.md) |
-| Cloudflare Pages, SPA fallback, OAuth proxy | [docs/deploy/cloudflare-pages.md](docs/deploy/cloudflare-pages.md) |
-| Multi-club domains | [docs/deploy/multi-club-domains.md](docs/deploy/multi-club-domains.md) |
-| OCI Compose stack | [docs/deploy/compose-stack.md](docs/deploy/compose-stack.md) |
-| OCI backend | [docs/deploy/oci-backend.md](docs/deploy/oci-backend.md) |
-| OCI MySQL HeatWave | [docs/deploy/oci-mysql-heatwave.md](docs/deploy/oci-mysql-heatwave.md) |
-| 공개 저장소 보안과 release safety | [docs/deploy/security-public-repo.md](docs/deploy/security-public-repo.md) |
-| 운영 runbook, observability, postmortem | [docs/operations/README.md](docs/operations/README.md) |
-| DB 백업·복구, secret/VM deploy key bootstrap | [docs/operations/runbooks/README.md](docs/operations/runbooks/README.md) |
-| Release helper scripts | [scripts/README.md](scripts/README.md) |
+전체 문서 목록과 목적별 탐색은 [문서 허브](docs/README.md)에서 확인합니다.

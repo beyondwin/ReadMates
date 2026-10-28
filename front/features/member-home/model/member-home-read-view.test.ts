@@ -70,11 +70,13 @@ const guestHome = {
     ],
     nextCursor: null,
   },
-} satisfies GuestMemberHomeReadSource & Record<string, unknown>;
+};
+
+const guestSource: GuestMemberHomeReadSource = guestHome;
 
 describe("member home read view adapters", () => {
   it("projects guest public home data without private or personal state", () => {
-    const view = guestMemberHomeReadView(guestHome);
+    const view = guestMemberHomeReadView(guestSource);
 
     expect(view).toMatchObject({
       displayName: null,

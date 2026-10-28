@@ -155,7 +155,7 @@ tasks.named<org.gradle.jvm.tasks.Jar>("jar") {
 // integration, container, and architecture test exactly the way the explicit
 // :unitTest / :integrationTest / :architectureTest tasks already do. Disabling
 // it makes `./gradlew check` run each tagged group exactly once.
-// Refs: docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md §4.1
+// Lane selection and commands: docs/development/test-guide.md.
 tasks.named<Test>("test") {
     enabled = false
 }
@@ -218,15 +218,14 @@ tasks.withType<Test>().configureEach {
 tasks.register<Test>("unitTest") {
     description = "Runs ReadMates unit tests without Spring/Testcontainers integration tags."
     group = "verification"
-    configureReadmatesTestRuntime()
     useReadmatesTestClasses()
     useJUnitPlatform {
         excludeTags("integration", "container", "architecture")
     }
     // Adjustable parallelism for unitTest (no shared state across classes).
-    // Override priority: -PmaxForks=N (sweep harness) > READMATES_TEST_FORKS
+    // Override priority: -PmaxForks=N > READMATES_TEST_FORKS
     // env (CI workflow) > availableProcessors()/2 default (min 1).
-    // Refs: docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md §4.3
+    // Measurement commands: docs/development/test-guide.md.
     val requestedForks =
         (project.findProperty("maxForks") as String?)?.toIntOrNull()
             ?: System.getenv("READMATES_TEST_FORKS")?.toIntOrNull()
@@ -239,9 +238,7 @@ tasks.register<Test>("unitTest") {
     // also affect :integrationTest and :architectureTest, both of which
     // share Testcontainers fixtures and need sequential class execution).
     // Methods inside a class stay on the same thread (default), classes
-    // run concurrently. Audit (docs/superpowers/reports/2026-05-16-stateful-audit.md)
-    // found 0 unit-tagged tests with @DirtiesContext / @MockBean / @SpyBean.
-    // Refs: docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md §4.4
+    // run concurrently. Spring/Testcontainers tests belong in integrationTest.
     systemProperty("junit.jupiter.execution.parallel.enabled", "true")
     systemProperty("junit.jupiter.execution.parallel.mode.default", "same_thread")
     systemProperty("junit.jupiter.execution.parallel.mode.classes.default", "concurrent")
@@ -252,7 +249,6 @@ tasks.register<Test>("unitTest") {
 tasks.register<Test>("integrationTest") {
     description = "Runs ReadMates Spring Boot and Testcontainers integration tests."
     group = "verification"
-    configureReadmatesTestRuntime()
     useReadmatesTestClasses()
     shouldRunAfter("unitTest")
     useJUnitPlatform {
@@ -263,7 +259,6 @@ tasks.register<Test>("integrationTest") {
 tasks.register<Test>("architectureTest") {
     description = "Runs ReadMates ArchUnit architecture boundary tests."
     group = "verification"
-    configureReadmatesTestRuntime()
     useReadmatesTestClasses()
     shouldRunAfter("unitTest")
     useJUnitPlatform {

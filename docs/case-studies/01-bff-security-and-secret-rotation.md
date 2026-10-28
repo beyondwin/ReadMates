@@ -38,7 +38,7 @@ single secret으로 BFF→Spring 신뢰를 검증할 때, secret을 교체하려
 
 **선택: `_shared/proxy.ts` 단일 헬퍼 응집 + multi-secret rotation**
 
-핵심 통찰은 두 가지입니다. 첫째, 보안 규칙을 응집하면 route별 drift가 구조적으로 불가능해집니다. 둘째, Spring이 모든 secret candidates를 동시에 받아들이는 동안 BFF는 primary를 전송하므로, 두 배포의 순서가 상관없어집니다.
+핵심 통찰은 두 가지입니다. 첫째, 보안 규칙을 응집하면 route별 drift가 구조적으로 불가능해집니다. 둘째, Spring이 새 secret 후보를 먼저 받아들이게 한 뒤 BFF primary를 전환하면 전환 중에도 요청을 받을 수 있습니다. 구 secret 제거는 전환 확인 뒤에 하므로 배포 순서를 지켜야 합니다.
 
 ## 구현
 
@@ -57,6 +57,7 @@ export function copyUpstreamHeaders(headers: Headers) {
   const copiedHeaders = new Headers(headers);
   copiedHeaders.delete("set-cookie");
   copiedHeaders.delete("x-readmates-bff-secret");
+  copiedHeaders.delete("x-readmates-client-contract");
   copiedHeaders.delete("x-readmates-client-ip");
   copiedHeaders.delete("x-readmates-club-host");
   copiedHeaders.delete("x-readmates-club-slug");
@@ -156,7 +157,7 @@ create table bff_secret_rotation_audit (
 );
 ```
 
-`secret_alias`가 `primary`/`secondary` 형태로 저장되므로 secret 값이 DB에 기록되지 않습니다. `client_ip_hash`는 raw IP가 아닌 해시값이어서 개인정보 처리에 안전합니다.
+`secret_alias`가 `primary`/`secondary` 형태로 저장되므로 secret 값이 DB에 기록되지 않습니다. `client_ip_hash`에는 raw IP 대신 해시값을 저장합니다.
 
 rotation 진행 상황은 alias 분포로 확인합니다: 기본 `rotation-only` 모드에서 `secondary` 또는 `index_N`의 최근 row가 없으면 구 secret traffic이 사라진 것입니다.
 
@@ -175,7 +176,7 @@ rotation 진행 상황은 alias 분포로 확인합니다: 기본 `rotation-only
 
 **운영 감사**
 
-`bff_secret_rotation_audit` row count와 `secret_alias` 분포를 통해 회전 이력을 추적합니다. 특정 alias가 더 이상 사용되지 않으면 해당 secret을 환경 변수에서 제거해도 안전합니다.
+`bff_secret_rotation_audit` row count와 `secret_alias` 분포를 통해 회전 이력을 추적합니다. 구 secret 제거 시점은 이 증거와 [rotation runbook](../deploy/security-public-repo.md#공개-전-secret-rotation)의 전환·검증 절차를 함께 확인합니다.
 
 ## Trade-off와 한계
 
@@ -197,4 +198,4 @@ rotation 진행 상황은 alias 분포로 확인합니다: 기본 `rotation-only
 - ADR-0005 — BFF shared secret + multi-secret rotation (`docs/development/adr/0005-bff-shared-secret-with-rotation.md`)
 - ADR-0014 — BFF secret rotation lifecycle (`docs/development/adr/0014-bff-secret-rotation-lifecycle.md`)
 - ADR-0006 — Server-side hashed session cookie (`docs/development/adr/0006-server-side-hashed-session-cookie.md`)
-- Spec: [`docs/superpowers/specs/2026-04-21-readmates-cloudflare-spa-google-auth-migration-design.md`](../superpowers/specs/2026-04-21-readmates-cloudflare-spa-google-auth-migration-design.md)
+- 과거 spec (Git 이력): `docs/superpowers/specs/2026-04-21-readmates-cloudflare-spa-google-auth-migration-design.md`

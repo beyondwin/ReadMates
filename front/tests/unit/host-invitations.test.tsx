@@ -38,7 +38,7 @@ const invitations: HostInvitationListItem[] = [
   },
 ];
 
-const hostInvitationsTestActions = {
+const hostInvitationsTestActions: HostInvitationsActions = {
   listInvitations: () => fetch("/api/bff/api/host/invitations", { cache: "no-store" }),
   createInvitation: (request) =>
     fetch("/api/bff/api/host/invitations", {

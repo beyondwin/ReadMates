@@ -131,7 +131,7 @@ const activeHostAuth: AuthMeResponse = {
 };
 
 const noopHostMembersActions = {
-  loadMembers: vi.fn(async () => []),
+  loadMembers: vi.fn(async () => ({ items: [], nextCursor: null })),
   refreshMembers: vi.fn(async () => ({ items: [], nextCursor: null })),
   submitLifecycle: vi.fn(async () => lifecycleResponse(members[0])),
   submitViewerAction: vi.fn(async () => members[0]),

@@ -1,3 +1,4 @@
+import { MEMBER_READ_SURFACE_CAPABILITIES } from "@/shared/model/read-surface-capabilities";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import {
@@ -36,6 +37,7 @@ const session: NonNullable<CurrentSessionReadPageData["currentSession"]> = {
   myLongReview: null,
   board: { questions: [], longReviews: [] },
   attendees: [],
+  capabilities: MEMBER_READ_SURFACE_CAPABILITIES,
 };
 
 describe("MemberHomeNextActionPace", () => {

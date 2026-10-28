@@ -64,6 +64,7 @@ describe("CT Docker command helpers", () => {
     expect(command.args).toContain(`${CT_FRONT_NODE_MODULES_VOLUME}:/work/front/node_modules`);
     expect(command.args).toContain(`${CT_PNPM_STORE_VOLUME}:/pnpm-store`);
     expect(command.args.join(" ")).toContain('corepack prepare "$READMATES_CT_PACKAGE_MANAGER" --activate');
+    expect(command.args.at(-1)?.split("\n")).toContain("pnpm install --frozen-lockfile");
     expect(command.args.join(" ")).toContain("pnpm exec playwright test --config=playwright-ct.config.ts");
     expect(command.args.join(" ")).not.toContain("--update-snapshots");
   });

@@ -167,6 +167,19 @@ LINK_CHECK_PATHS = tuple(
     if relative.endswith(".md")
     and relative != "docs/reports/2026-07-11-release-readiness-history.md"
 )
+DOCUMENTATION_ENTRYPOINTS = (
+    "docs/README.md",
+    "docs/reports/README.md",
+    "design/README.md",
+)
+ACTIVE_DOCUMENTATION_ROOTS = (
+    "docs/development",
+    "docs/deploy",
+    "docs/operations",
+    "docs/case-studies",
+    "docs/showcase",
+)
+
 def write(root: Path, relative: str, content: str) -> None:
     path = root / relative
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -265,7 +278,10 @@ def check_required_paths(root: Path) -> list[str]:
 def check_markdown_links(root: Path) -> list[str]:
     errors: list[str] = []
     repository_root = root.resolve()
-    for relative in LINK_CHECK_PATHS:
+    paths = set(LINK_CHECK_PATHS + DOCUMENTATION_ENTRYPOINTS)
+    for directory in ACTIVE_DOCUMENTATION_ROOTS:
+        paths.update(path.relative_to(root).as_posix() for path in (root / directory).rglob("*.md"))
+    for relative in sorted(paths):
         source = root / relative
         if not source.is_file() or source.suffix != ".md":
             continue
@@ -595,6 +611,37 @@ class GuidanceCheckerTests(unittest.TestCase):
             lambda root: write(root, "docs/development/local-setup.md", "[missing](missing.md)\n")
         )
         self.assertTrue(any("broken link" in error for error in errors), errors)
+
+    def test_documentation_entrypoint_links_are_checked(self) -> None:
+        for relative in (
+            "docs/README.md",
+            "docs/development/README.md",
+            "docs/reports/README.md",
+            "docs/case-studies/README.md",
+            "docs/showcase/README.md",
+            "design/README.md",
+        ):
+            with self.subTest(relative=relative):
+                errors = self.check_fixture(
+                    lambda root: write(root, relative, "[missing](missing.md)\n")
+                )
+                self.assertTrue(any("broken link" in error for error in errors), errors)
+
+    def test_new_active_documents_are_checked_without_an_allowlist_update(self) -> None:
+        for directory in ("development", "deploy", "operations", "case-studies", "showcase"):
+            with self.subTest(directory=directory):
+                errors = self.check_fixture(
+                    lambda root: write(root, f"docs/{directory}/nested/new.md", "[missing](missing.md)\n")
+                )
+                self.assertTrue(any("broken link" in error for error in errors), errors)
+
+    def test_historical_and_private_documents_do_not_define_active_links(self) -> None:
+        for directory in ("reports", "superpowers", "private"):
+            with self.subTest(directory=directory):
+                errors = self.check_fixture(
+                    lambda root: write(root, f"docs/{directory}/snapshot.md", "[historical](missing.md)\n")
+                )
+                self.assertEqual([], errors)
 
     def test_link_outside_repository_fails(self) -> None:
         with tempfile.TemporaryDirectory(prefix="readmates-guidance-link-test-") as raw:

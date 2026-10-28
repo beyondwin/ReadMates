@@ -66,7 +66,7 @@ export function fetchHostDashboard(context?: ReadmatesApiContext) {
   return readmatesFetch<HostDashboardResponse>("/api/host/dashboard", undefined, context);
 }
 
-export function fetchHostClubOperations(context: { clubSlug: string | undefined }) {
+export function fetchHostClubOperations(context: ReadmatesApiContext) {
   return readmatesFetch<HostClubOperationsResponse>("/api/host/club-operations", undefined, context);
 }
 

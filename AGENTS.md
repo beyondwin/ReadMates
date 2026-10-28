@@ -51,7 +51,7 @@ Release tags in `vMAJOR.MINOR.PATCH` format remain the authoritative product ver
 
 Run the smallest relevant checks before finishing:
 
-- Frontend: `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build`
+- Frontend: `pnpm --dir front lint`, `pnpm --dir front typecheck`, `pnpm --dir front test`, `pnpm --dir front build`
 - Server PR-level: `./scripts/server-ci-check.sh` (Gradle `check`: ktlint, detekt, `unitTest`, `architectureTest`, JaCoCo; the default `test` task is disabled)
 - Server full Testcontainers: `./server/gradlew -p server integrationTest`
 - End-to-end or auth/BFF changes: `pnpm --dir front test:e2e`

@@ -39,7 +39,7 @@ export function PlatformAdminClubDetail({ club, onUpdateClub }: Props) {
   }
 
   async function setVisibility(publicVisibility: "PRIVATE" | "PUBLIC") {
-    if (onUpdateClub == null) {
+    if (club == null || onUpdateClub == null) {
       return;
     }
     setSaving(true);

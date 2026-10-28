@@ -473,6 +473,7 @@ describe("commitGeneration", () => {
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const parsed = JSON.parse(init.body as string) as {
       result: { sessionNumber: number };
+      expectedDraftRevision: number;
     };
     expect(parsed.result.sessionNumber).toBe(3);
     expect(parsed.expectedDraftRevision).toBe(5);

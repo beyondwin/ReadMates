@@ -10,7 +10,7 @@ const TestLink: HostDashboardLinkComponent = ({ to, state: _state, children, ...
 };
 
 const actions = (canOpenSession: boolean): UpcomingActionHandlers => ({
-  updateVisibility: vi.fn(async () => undefined),
+  updateAccessScope: vi.fn(async () => undefined),
   openSession: vi.fn(async () => undefined),
   isPending: () => false,
   isBusy: false,

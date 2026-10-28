@@ -91,6 +91,27 @@ describe("useProfileUpdateController", () => {
     });
   });
 
+  it("renders and saves an unscoped profile without a saved override", async () => {
+    mutations.updateMyProfile.mockResolvedValue(saved);
+    const { result } = renderHook(() => useProfileUpdateController({
+      sourceProfile: profile,
+      canEditProfile: true,
+      onProfileUpdated: async () => {},
+      onRevalidate: vi.fn(),
+    }));
+
+    expect(result.current.profile).toEqual(profile);
+    await act(async () => {
+      await result.current.saveProfile({ displayName: saved.displayName, avatarKey: "cloud-green-book" });
+    });
+
+    expect(result.current.profile).toMatchObject({
+      ...profile,
+      displayName: saved.displayName,
+      avatarKey: saved.avatarKey,
+    });
+  });
+
   it("retains the saved profile across stale, authoritative, then stale loader snapshots", async () => {
     mutations.updateMyProfile.mockResolvedValue(saved);
     const { result, rerender } = renderController();
@@ -186,6 +207,20 @@ describe("useProfileUpdateController", () => {
 
     await expect(result.current.saveProfile({ displayName: "새 이름", avatarKey: "cloud-green-book" }))
       .rejects.toMatchObject({ code: "AVATAR_KEY_INVALID", field: "avatarKey", cause: apiError });
+    expect(onProfileUpdated).not.toHaveBeenCalled();
+    expect(onRevalidate).not.toHaveBeenCalled();
+  });
+
+  it("keeps unknown API failures at form scope without inventing a profile error code", async () => {
+    const apiError = new ReadmatesApiError(
+      { code: "DISPLAY_NAME_UPSTREAM_UNAVAILABLE", message: "unavailable", status: 503, fallback: false },
+      new Response(null, { status: 503 }),
+    );
+    mutations.updateMyProfile.mockRejectedValue(apiError);
+    const { result, onProfileUpdated, onRevalidate } = renderController();
+
+    await expect(result.current.saveProfile({ displayName: "새 이름", avatarKey: "cloud-green-book" }))
+      .rejects.toMatchObject({ code: null, field: "form", cause: apiError });
     expect(onProfileUpdated).not.toHaveBeenCalled();
     expect(onRevalidate).not.toHaveBeenCalled();
   });

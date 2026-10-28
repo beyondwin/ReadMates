@@ -101,7 +101,7 @@ describe("router route order", () => {
       } as never),
     ).toBe(true);
 
-    const unscopedNotesModule = await unscopedNotes?.lazy?.();
+    const unscopedNotesModule = typeof unscopedNotes?.lazy === "function" ? await unscopedNotes.lazy() : undefined;
     expect(scopedNotes?.shouldRevalidate).toBe(unscopedNotesModule?.shouldRevalidate);
   });
 

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ManualNotificationSelectionRequest } from "./host-contracts";
 import {
   closeHostSession,
   commitHostSessionImport,
@@ -169,7 +170,7 @@ describe("host api wrappers", () => {
     });
     await fetchManualNotificationDispatches(context, {
       sessionId: "session 7",
-      eventType: "SESSION_REMINDER",
+      eventType: "SESSION_REMINDER_DUE",
       page: { limit: 5, cursor: "c1" },
     });
     await fetchHostNotificationTestMailAudit(context, { limit: 3 });
@@ -186,7 +187,7 @@ describe("host api wrappers", () => {
       "/api/bff/api/host/notifications/items?status=FAILED&limit=20&cursor=next+page&clubSlug=reading-sai",
       "/api/bff/api/host/notifications/events?limit=10&clubSlug=reading-sai",
       "/api/bff/api/host/notifications/manual/options?sessionId=session+7&search=alice&limit=5&cursor=c1&clubSlug=reading-sai",
-      "/api/bff/api/host/notifications/manual/dispatches?sessionId=session+7&eventType=SESSION_REMINDER&limit=5&cursor=c1&clubSlug=reading-sai",
+      "/api/bff/api/host/notifications/manual/dispatches?sessionId=session+7&eventType=SESSION_REMINDER_DUE&limit=5&cursor=c1&clubSlug=reading-sai",
       "/api/bff/api/host/notifications/test-mail/audit?limit=3&clubSlug=reading-sai",
       "/api/bff/api/host/sessions?limit=50&clubSlug=reading-sai",
       "/api/bff/api/host/members?limit=25&cursor=m2&clubSlug=reading-sai",
@@ -215,12 +216,23 @@ describe("host api wrappers", () => {
       { sessionReminderEnabled: true },
       { clubSlug: "reading-sai" },
     );
-    await previewManualNotification({ templateKey: "SESSION_REMINDER", sessionId });
-    await confirmManualNotification({ previewId: "preview-1" });
+    const manualSelection: ManualNotificationSelectionRequest = {
+      sessionId,
+      eventType: "SESSION_REMINDER_DUE",
+      contentRevision: "revision-1",
+      audience: "ALL_ACTIVE_MEMBERS",
+      requestedChannels: "BOTH",
+      selectedMembershipIds: [],
+      excludedMembershipIds: [],
+      includedMembershipIds: [],
+      sendMode: "NOW",
+    };
+    await previewManualNotification(manualSelection);
+    await confirmManualNotification({ ...manualSelection, previewId: "preview-1", resendConfirmed: false });
     await fetchHostNotificationDetail("item/1");
     await retryHostNotification("item/1");
     await restoreHostNotification("item/1");
-    await sendHostNotificationTestMail({ toEmail: "host@example.com" });
+    await sendHostNotificationTestMail({ recipientEmail: "host@example.com" });
     await createHostSession({} as never);
     await updateHostSession(sessionId, {} as never);
     await deleteHostSession(sessionId);
@@ -230,7 +242,16 @@ describe("host api wrappers", () => {
     await openHostSession(sessionId);
     await closeHostSession(sessionId);
     await publishHostSession(sessionId);
-    await commitHostSessionImport(sessionId, { payload: "{}" });
+    await commitHostSessionImport(sessionId, {
+      format: "readmates-session-import:v1",
+      session: { number: 7, bookTitle: "모비 딕", meetingDate: "2026-07-23" },
+      publication: { summary: "함께 읽은 기록" },
+      highlights: [],
+      oneLineReviews: [],
+      feedbackDocument: { fileName: "session-7.md", markdown: "# 기록" },
+      recordVisibility: "MEMBER",
+      expectedDraftRevision: null,
+    });
     await submitHostMemberLifecycle(membershipId, "/current-session/remove", { currentSessionPolicy: "NEXT_SESSION" });
     await submitHostViewerAction(membershipId, "activate");
     await submitHostMemberProfile(membershipId, "Alice");
@@ -270,7 +291,7 @@ describe("host api wrappers", () => {
       ["POST", "/api/bff/api/host/invitations/invite%2F1/revoke"],
     ]);
     expect(calls[1].body).toBe(JSON.stringify({ sessionReminderEnabled: true }));
-    expect(calls[2].body).toBe(JSON.stringify({ templateKey: "SESSION_REMINDER", sessionId }));
+    expect(calls[2].body).toBe(JSON.stringify(manualSelection));
     expect(calls[18].body).toBe(JSON.stringify({ currentSessionPolicy: "NEXT_SESSION" }));
     expect(calls[20].body).toBe(JSON.stringify({ displayName: "Alice" }));
   });

@@ -59,11 +59,11 @@ test("PublicSession keeps long public copy within the body scale", async ({ moun
   await page.setViewportSize({ width: 1200, height: 900 });
   const component = await mount(<PublicSession session={publicSessionView} />);
   const longCopyMetrics = await Promise.all(
-    [
+    ([
       ["session summary", component.locator(".public-session-summary-text")],
       ["highlight quote", component.locator(".public-note-highlight-row__quote")],
       ["one-liner quote", component.locator(".public-note-oneliner-card__quote")],
-    ].map(async ([name, locator]) => ({
+    ] as const).map(async ([name, locator]) => ({
       name,
       ...(await locator.evaluate((element) => {
         const node = element as HTMLElement;
@@ -120,12 +120,12 @@ for (const viewport of [
       };
     });
     const publicCopyMetrics = await Promise.all(
-      [
+      ([
         ["latest title", latestTitle],
         ["latest excerpt", latestExcerpt],
         ["archive title", archiveTitle],
         ["summary quotation", summaryQuotation],
-      ].map(async ([name, locator]) => ({
+      ] as const).map(async ([name, locator]) => ({
         name,
         ...(await locator.evaluate((element) => {
           const node = element as HTMLElement;

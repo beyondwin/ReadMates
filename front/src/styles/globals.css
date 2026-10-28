@@ -10,10 +10,6 @@
   --bg-softer: var(--bg-sub);
 }
 
-.rm-app-shell {
-  min-height: 100vh;
-}
-
 .rm-sr-only {
   position: absolute;
   width: 1px;
@@ -1477,8 +1473,6 @@ a.rm-recent-record__destination:hover {
   align-items: start;
 }
 
-.platform-admin-work-queue,
-.platform-admin-brief,
 .platform-admin-publish-checklist,
 .platform-admin-support-grants,
 .platform-admin-ai-ops {
@@ -1584,29 +1578,6 @@ a.rm-recent-record__destination:hover {
   font-weight: 700;
 }
 
-.platform-admin-work-queue__row {
-  grid-template-columns: minmax(0, 1fr) auto;
-  border: 1px solid var(--line);
-}
-
-.platform-admin-work-queue__row[aria-pressed="true"] {
-  border-color: var(--text);
-  background: var(--bg-sub);
-}
-
-.platform-admin-work-queue__row[data-severity="blocked"] {
-  border-left: 4px solid var(--danger);
-}
-
-.platform-admin-work-queue__row[data-severity="attention"] {
-  border-left: 4px solid var(--accent);
-}
-
-.platform-admin-work-queue__row[data-severity="ready"] {
-  border-left: 4px solid var(--success);
-}
-
-.platform-admin-work-queue__badges,
 .platform-admin-publish-checklist__items {
   display: flex;
   flex-wrap: wrap;
@@ -5425,14 +5396,6 @@ a.rm-recent-record__destination:hover {
 
   .platform-admin-ai-ops__job {
     display: grid;
-  }
-
-  .platform-admin-work-queue__row {
-    grid-template-columns: 1fr;
-  }
-
-  .platform-admin-work-queue__badges {
-    justify-content: flex-start;
   }
 
   .admin-today-ledger__header {

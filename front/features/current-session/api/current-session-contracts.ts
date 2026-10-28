@@ -1,3 +1,5 @@
+import type { RsvpStatus } from "@/shared/model/current-session-contracts";
+
 export type {
   AttendanceStatus,
   CurrentSessionMemberRole,

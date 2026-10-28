@@ -15,7 +15,7 @@ Current source-of-truth order:
 - `docs/deploy/`: public-safe deployment runbooks and release-safety policy.
 - `scripts/README.md`: public release helper behavior and scanner expectations.
 - `AGENTS.md`, package-local `AGENTS.md` files, and `docs/agents/*.md`: agent routing and task-specific editing rules. The shared execution contract is `docs/agents/execution.md`; use `docs/development/acceptance-matrix.md` to select risk evidence.
-- `docs/superpowers/`: historical design and implementation records. Do not treat these as current behavior unless the user explicitly asks to update historical planning notes.
+- `docs/reports/`: dated analysis and retrospective snapshots. Removed `docs/superpowers/` plans and specs remain in Git history; the ignored local directory is not a maintained documentation surface.
 
 Documentation rules:
 
@@ -36,7 +36,7 @@ Stop rules:
 
 - Ask before editing if the user asks to publish private deployment details, real member data, secrets, OCIDs, token-like examples, or local absolute paths.
 - Ask or narrow scope when the requested doc update conflicts with current code, scripts, or `docs/development/architecture.md`.
-- Do not update historical `docs/superpowers/` planning notes unless the user explicitly asks for historical records to change.
+- Do not restore removed historical planning notes or rewrite retained historical reports unless the user explicitly asks for those records to change. Fix active navigation without treating an ignored local directory as tracked documentation.
 
 Checks:
 
@@ -50,11 +50,13 @@ For agent-routing or public-safety documentation, also run a targeted scan over 
 rg -n "(^|[^A-Za-z0-9_])([o]cid1\\.|/[U]sers/|/[Hh]ome/[^[:space:]]+|[s]k-[A-Za-z0-9]|[g]hp_[A-Za-z0-9]|[g]ithub_pat_|BEGIN (RSA|OPENSSH|PRIVATE) [K]EY)" <changed-docs>
 ```
 
-For agent instruction changes, also run:
+For documentation navigation or agent instruction changes, also run:
 
 ```bash
 python3 -B scripts/check-agent-guidance.py
 ```
+
+This check validates local Markdown link targets in active development, deploy, operations, case-study, showcase, and documentation hub pages. It does not check external URLs or fragment anchors, and dated report contents are historical snapshots outside this link check.
 
 For deploy, public repository, release-candidate, or scanner documentation, also run targeted link and public-safety scans over the changed docs. When building a clean public release candidate, run:
 
@@ -63,6 +65,6 @@ For deploy, public repository, release-candidate, or scanner documentation, also
 ./scripts/public-release-check.sh .tmp/public-release-candidate
 ```
 
-The private working tree may intentionally contain tracked historical planning notes under `docs/superpowers`; do not treat current-tree public-release scanner findings from that historical directory as a docs update regression unless the changed files introduced them.
+A local checkout may contain ignored historical planning notes under `docs/superpowers/`. These are not tracked documentation and remain excluded from public release candidates; do not add active links that depend on their presence.
 
 Done when changed docs match current source files or explicitly note uncertainty, public-safety constraints are preserved, `git diff --check -- <changed-docs>` has run or is reported as skipped, and the final response names any targeted safety or link scans performed.

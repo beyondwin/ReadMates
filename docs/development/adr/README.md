@@ -6,7 +6,7 @@ ReadMates의 주요 기술 의사결정을 기록한다. 새 결정을 내릴 �
 
 - **한 ADR = 한 결정.** 여러 결정을 묶는 ADR은 만들지 않는다. 인덱스가 ADR 그룹화 역할을 한다.
 - **Superseded never deleted.** 결정이 뒤집히면 새 ADR을 만들고 기존 ADR의 상태를 `Superseded by ADR-NNNN`으로 갱신한다. 본문은 수정하지 않는다(당시 맥락 보존).
-- **사실만 기록.** 미정 의견, 토론 중 사항, 향후 가설은 들어가지 않는다. 그건 `docs/superpowers/specs/`, `docs/superpowers/plans/`의 영역이다.
+- **근거와 상태를 구분한다.** 구현을 제약하는 결정은 코드 반영 전에 `Proposed`로 기록하고, 코드·테스트·현재 아키텍처가 일치한 뒤 `Accepted`로 바꾼다. 토론 중 의견이나 검증 전 가설을 확정된 사실로 쓰지 않는다. 제거된 `docs/superpowers/`의 spec과 plan은 Git 이력에서 확인한다.
 - **코드 인용은 `path:line`.** 인용한 라인은 작성 시점의 commit에서 검증되어야 한다. 심볼 이름을 함께 적어 라인 drift 후에도 의미 추적이 가능하게 한다.
 - **Public-repo safety.** 실제 secret, OCI OCID, 실명 회원 정보, 내부 호스트는 ADR에 적지 않는다. `.gitleaks.toml`이 통과해야 한다. 예시 URL은 `https://api.example.com` 같은 placeholder를 사용한다.
 
@@ -30,6 +30,8 @@ ReadMates의 주요 기술 의사결정을 기록한다. 새 결정을 내릴 �
 | [0016](0016-deploy-ledger-event-schema.md) | Deploy ledger NDJSON 스키마 | Accepted | 2026-05-12 | ops |
 | [0072](0072-feedback-document-template-v2.md) | 피드백 문서 템플릿 v2 — 모임 단위 섹션과 회차 누적 흐름 선택 섹션 | Accepted | 2026-09-25 | server, front |
 
+ADR 본문의 경로·명령·검증 결과는 결정 당시 기록입니다. 현재 실행 명령은 [테스트 가이드](../test-guide.md)를 따릅니다. 특히 서버의 기본 `test` task는 비활성화되어 있으므로 `unitTest`, `integrationTest`, `architectureTest` 중 맞는 lane을 선택합니다.
+
 ## 상태 범례
 
 - **Accepted** — 현재 코드/운영의 기준.
@@ -39,7 +41,7 @@ ReadMates의 주요 기술 의사결정을 기록한다. 새 결정을 내릴 �
 
 ## ADR 후보 (follow-up)
 
-아래는 별도 ADR로 분리를 검토 중인 후보다. 번호는 작성할 때 다음 빈 번호로 정한다(0011, 0012는 비어 있다).
+아래는 별도 ADR로 분리를 검토 중인 후보다. 작성 시 인덱스와 파일 목록을 확인해 중복되지 않는 다음 번호를 정한다.
 
 - jOOQ write adapter migration (현재 `JdbcTemplate` 직접 사용 → 빌드 타임 타입 안전)
 - Redis 정식 도입 (현재 optional 보조 계층 → 세션 캐시 필수 계층)

@@ -15,6 +15,9 @@ import {
 } from "../../_shared/cache";
 import { normalizedClubSlug } from "../../../shared/security/club-slug";
 
+// Pages exposes a default edge cache; keep its type local to this Worker module.
+declare const caches: { readonly default: Cache };
+
 type Env = {
   READMATES_API_BASE_URL: string;
   READMATES_BFF_SECRET?: string;    // legacy fallback

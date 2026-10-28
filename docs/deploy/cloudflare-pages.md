@@ -74,7 +74,7 @@ Cloudflare 계정 ID, API token, custom domain 목록, secret 값은 문서에 �
    gh workflow run "Deploy Front" --ref main -f release_tag=vX.Y.Z
    ```
 
-5. workflow가 tag와 checkout commit이 같은지 확인하고, lint/test/build 후 `front/dist`와 `front/functions`를 production에 올립니다.
+5. workflow가 tag와 checkout commit이 같은지 확인하고, lint/typecheck/test/build 후 `front/dist`와 `front/functions`를 production에 올립니다.
 6. [배포 확인](#배포-확인)을 실행합니다.
 
 - `main` push나 tag push만으로는 frontend production 배포가 일어나지 않습니다.

@@ -14,6 +14,7 @@ vi.mock("@/features/host/api/host-session-record-api", () => ({
 }));
 
 import {
+  type HostSessionRecordDraft,
   HostSessionRecordApplyPreviewResponseSchema,
   HostSessionRecordApplyResultResponseSchema,
 } from "@/features/host/api/host-session-record-contracts";
@@ -57,7 +58,7 @@ function cacheState(client: QueryClient) {
   }));
 }
 
-function draft() {
+function draft(): HostSessionRecordDraft {
   return {
     sessionId: "session-28",
     baseLiveRevision: 2,

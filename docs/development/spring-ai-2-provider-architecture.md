@@ -1,6 +1,6 @@
 # Spring AI 2 Provider And Trace Architecture
 
-이 문서는 ReadMates의 현재 AI provider 호출, 비용 정산, 복구, privacy, 분산 추적 구조의 living source of truth입니다. 승인 설계 기록은 `docs/superpowers/`에 보존하지만 현재 사실은 코드, 설정, migration, 테스트와 이 문서를 기준으로 판단합니다.
+이 문서는 ReadMates의 현재 AI provider 호출, 비용 정산, 복구, privacy, 분산 추적 구조의 living source of truth입니다. 제거된 `docs/superpowers/`의 설계 기록은 Git 이력에서 확인하며, 현재 사실은 코드, 설정, migration, 테스트와 이 문서를 기준으로 판단합니다.
 
 ## Before / After
 

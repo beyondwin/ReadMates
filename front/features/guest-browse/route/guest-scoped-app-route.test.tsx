@@ -11,7 +11,7 @@ import { GuestArchiveRoute, GuestNotesRoute, GuestScopedAppRoute, type GuestArch
 const LinkComponent = ({ to, children, ...props }: { to: string; children: React.ReactNode; className?: string; style?: React.CSSProperties }) => <a {...props} href={to}>{children}</a>;
 const anonymousAuth = { authenticated: false, userId: null, membershipId: null, clubId: null, email: null, displayName: null, accountName: null, role: null, membershipStatus: null, approvalState: "ANONYMOUS" };
 const guestShell = { clubName: "읽는 모임", tagline: "함께 읽습니다", navigation: { home: "OPEN", current: "OPEN", notes: "OPEN", archive: "OPEN", sessionDetail: "OPEN", personalSpace: "PREVIEW", personalRecords: "PREVIEW", settings: "LOCKED", notifications: "LOCKED", feedback: "LOCKED", host: "DENY" } };
-const notes = (text = "처음") => ({
+const notes = (text = "처음"): Parameters<typeof GuestNotesRoute>[0]["initialData"] => ({
   sessions: { items: [{ sessionId: "s1", sessionNumber: 1, bookTitle: "책", date: "2026-08-02", questionCount: 0, oneLinerCount: 0, longReviewCount: 0, highlightCount: 1, totalCount: 1 }], nextCursor: null },
   feed: { items: [{ sessionId: "s1", sessionNumber: 1, bookTitle: "책", date: "2026-08-02", authorName: "이름", authorShortName: "이", avatarKey: "book", kind: "HIGHLIGHT" as const, text }], nextCursor: "cursor-1" },
   capabilities: { canWrite: false as const },
@@ -85,7 +85,7 @@ describe("guest notes route pagination", () => {
   it("uses one fetch and one append for rapid load-more clicks", async () => {
     const user = userEvent.setup();
     let resolve!: (value: Response) => void;
-    const fetchMock = vi.fn(() => new Promise<Response>((done) => { resolve = done; }));
+    const fetchMock = vi.fn<typeof fetch>(() => new Promise<Response>((done) => { resolve = done; }));
     vi.stubGlobal("fetch", fetchMock);
     mount();
     await user.dblClick(screen.getByRole("button", { name: "더 보기" }));
@@ -114,7 +114,7 @@ describe("guest notes route pagination", () => {
 
   it("deduplicates and appends the note-session next page through the QueryClient controller", async () => {
     let resolve!: (value: Response) => void;
-    const fetchMock = vi.fn(() => new Promise<Response>((done) => { resolve = done; }));
+    const fetchMock = vi.fn<typeof fetch>(() => new Promise<Response>((done) => { resolve = done; }));
     vi.stubGlobal("fetch", fetchMock);
     mount({ ...notes(), sessions: { ...notes().sessions, nextCursor: "session-cursor" }, feed: { ...notes().feed, nextCursor: null } });
     const loadMore = screen.getAllByRole("button", { name: "더 보기" })[0];
@@ -287,7 +287,7 @@ describe("guest archive route pagination", () => {
 
   it("deduplicates rapid clicks and maps one successful appended page", async () => {
     let resolve!: (value: Response) => void;
-    const fetchMock = vi.fn(() => new Promise<Response>((done) => { resolve = done; }));
+    const fetchMock = vi.fn<typeof fetch>(() => new Promise<Response>((done) => { resolve = done; }));
     vi.stubGlobal("fetch", fetchMock);
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<MemoryRouter initialEntries={["/clubs/alpha/app/archive"]}><QueryClientProvider client={client}><GuestArchiveRoute initialData={archivePage()} clubSlug="alpha" appBasePath="/clubs/alpha/app" LinkComponent={LinkComponent} GuestArchiveContent={TestGuestArchiveContent} /></QueryClientProvider></MemoryRouter>);

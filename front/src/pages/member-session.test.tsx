@@ -1,3 +1,4 @@
+import type { MemberSessionDetailRoute } from "@/features/archive/route/member-session-detail-route";
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import MemberSessionRoutePage from "./member-session";
@@ -8,7 +9,7 @@ const query = vi.hoisted(() => ({
     queryKey: ["guest-browse", clubSlug, "archive-detail", sessionId],
   })),
 }));
-const route = vi.hoisted(() => ({ MemberSessionDetailRoute: vi.fn(() => null) }));
+const route = vi.hoisted(() => ({ MemberSessionDetailRoute: vi.fn<(props: Parameters<typeof MemberSessionDetailRoute>[0]) => null>(() => null) }));
 
 vi.mock("@tanstack/react-query", () => ({ useQuery: query.useQuery }));
 vi.mock("react-router", () => ({
@@ -52,6 +53,7 @@ describe("MemberSessionRoutePage", () => {
     expect(query.guestArchiveDetailQuery).toHaveBeenCalledWith("reader-club", "closed-session");
     const publicLongReviews = route.MemberSessionDetailRoute.mock.calls.at(-1)?.[0]?.publicLongReviews;
     expect(publicLongReviews).toHaveLength(61);
+    if (!publicLongReviews) throw new Error("Expected public long reviews");
     expect(publicLongReviews.at(-1)).toMatchObject({ body: "페이지 없는 공개 서평 61" });
   });
 });

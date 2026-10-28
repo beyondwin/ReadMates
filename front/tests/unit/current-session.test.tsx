@@ -1,3 +1,5 @@
+import { memberCurrentSessionReadPage } from "@/shared/model/current-session-read-view";
+import { readSurfaceCapabilitiesForAuth } from "@/shared/model/read-surface-capabilities";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -12,7 +14,6 @@ import { CurrentSessionPage, type CurrentSessionSaveActions } from "@/features/c
 import type {
   CurrentSessionAuth,
   CurrentSessionInternalLinkProps,
-  CurrentSessionPageData,
 } from "@/features/current-session/ui/current-session-types";
 import { CurrentSessionRoute, currentSessionLoader, currentSessionLoaderFactory } from "@/features/current-session";
 import type { CurrentSessionResponse } from "@/features/current-session/api/current-session-contracts";
@@ -109,13 +110,13 @@ function CurrentSession({
   onSaveSuccess,
 }: {
   auth?: CurrentSessionAuth;
-  data: CurrentSessionPageData;
+  data: CurrentSessionResponse;
   onSaveSuccess?: () => void;
 }) {
   return (
     <CurrentSessionPage
       auth={auth}
-      data={data}
+      data={memberCurrentSessionReadPage(data, readSurfaceCapabilitiesForAuth(auth ?? activeMemberAuthFixture))}
       actions={currentSessionTestActions}
       internalLinkComponent={TestInternalLink}
       onSaveSuccess={onSaveSuccess}

@@ -335,7 +335,7 @@ export function FeedbackDocumentUnavailablePage({
               <div className="eyebrow">열람 규칙</div>
               <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
                 {presentation === "hostPreview"
-                  ? copy.rule
+                  ? hostPreviewCopy.rule
                   : reason === "forbidden"
                     ? "active 정식 멤버로 확인된 계정만 문서 본문을 열람할 수 있습니다."
                     : "문서가 등록되지 않은 회차는 본문을 표시하지 않습니다."}

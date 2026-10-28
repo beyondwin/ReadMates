@@ -546,7 +546,9 @@ test("member-home shortcuts keep the desktop divider inset and mobile cards divi
 
     expect(mobileGeometry.columnCount).toBe(2);
     expect(mobileGeometry.pseudoContents).toEqual(["none", "none"]);
-    expect(mobileGeometry.cardHeights.every((height) => height >= 110)).toBe(true);
+    mobileGeometry.cardHeights.forEach((height, index) => {
+      expect(height, `${viewport.width}px shortcut card ${index + 1} height`).toBeGreaterThanOrEqual(110);
+    });
     expect(mobileGeometry.sameRow).toBe(true);
     expect(mobileGeometry.nonOverlapping).toBe(true);
     expect(mobileGeometry.noOverflow).toBe(true);

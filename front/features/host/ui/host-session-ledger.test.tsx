@@ -144,7 +144,6 @@ describe("HostSessionLedger", () => {
     }));
     const { container, rerender } = render(<HostSessionAttentionSummary page={{
       items: attentionItems,
-      nextCursor: "more",
       summary: {
         needsAttentionCount: 7,
         incompletePublishedCount: 4,

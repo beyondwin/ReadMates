@@ -271,6 +271,13 @@ if ./scripts/public-release-check.sh "$instruction_reference_fixture" > "$instru
 fi
 assert_file_contains "$instruction_reference_fixture.err" "artifact instruction references omitted contributor path: docs/development/project-map.md:1: Run AGENTS.md before editing."
 
+cp "$candidate_dir/docs/development/project-map.md" "$instruction_reference_fixture/docs/development/project-map.md"
+printf 'Run AGENTS.md before editing.\n' > "$instruction_reference_fixture/docs/README.md"
+if ./scripts/public-release-check.sh "$instruction_reference_fixture" > "$instruction_reference_fixture.out" 2> "$instruction_reference_fixture.err"; then
+  fail "public release check should reject a documentation hub that requires omitted contributor guidance"
+fi
+assert_file_contains "$instruction_reference_fixture.err" "artifact instruction references omitted contributor path: docs/README.md:1: Run AGENTS.md before editing."
+
 guidance_checker_reference_fixture="$fixture_root/omitted-guidance-checker-reference"
 mkdir -p "$guidance_checker_reference_fixture"
 cp -R "$candidate_dir/." "$guidance_checker_reference_fixture"
@@ -306,6 +313,17 @@ for required_workspace_file in \
   "front/package.json" \
   "design/system/package.json" \
   "design/docs/package.json" \
+  "server/Dockerfile" \
+  "docs/README.md" \
+  "docs/showcase/README.md" \
+  "docs/showcase/guest-mode-walkthrough.md" \
+  "docs/showcase/architecture-evidence.md" \
+  "docs/showcase/engineering-confidence.md" \
+  "docs/showcase/operational-proof.md" \
+  "deploy/cloudflare/README.md" \
+  "deploy/cloudflare/deploy-front.sh" \
+  "deploy/cloudflare/.deploy-hook.env.example" \
+  "scripts/aigen-pii-check.sh" \
   "scripts/check-deploy-workflow-contract.py" \
   "scripts/check-flyway-migration-immutability.py" \
   "scripts/fixtures/public-release-candidate-coverage.txt"
@@ -317,6 +335,10 @@ done
 
 for required_operating_evidence in \
   "CHANGELOG.md" \
+  "docs/operations/observability/README.md" \
+  "docs/operations/postmortems/README.md" \
+  "docs/operations/postmortems/template.md" \
+  "docs/operations/postmortems/2026-05-11-current-session-refresh-club-context.md" \
   "docs/operations/observability/metrics-catalog.md" \
   "docs/operations/observability/dashboards.md" \
   "docs/operations/observability/alerts.md" \
@@ -344,6 +366,16 @@ then
   sed 's/^/  /' "$fixture_root/flyway-checker-self-test.out" >&2
   sed 's/^/  /' "$fixture_root/flyway-checker-self-test.err" >&2
   fail "public release candidate Flyway checker self-test failed without Git metadata"
+fi
+
+if ! (
+  cd "$candidate_dir"
+  bash scripts/aigen-pii-check.sh
+) > "$fixture_root/aigen-pii-check.out" 2> "$fixture_root/aigen-pii-check.err"
+then
+  sed 's/^/  /' "$fixture_root/aigen-pii-check.out" >&2
+  sed 's/^/  /' "$fixture_root/aigen-pii-check.err" >&2
+  fail "public release candidate AI PII regression check failed"
 fi
 
 for required_oauth_file in \

@@ -138,7 +138,7 @@ const importRequest: SessionImportRequest = {
   recordVisibility: "MEMBER",
 };
 
-function visibilityResult() {
+function visibilityResult(): Awaited<ReturnType<typeof saveHostSessionVisibility>> {
   return {
     session: {
       sessionId: "session-7",

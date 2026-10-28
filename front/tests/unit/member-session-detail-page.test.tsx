@@ -1,3 +1,4 @@
+import { createLoaderArgs } from "@/tests/unit/helpers/router-test-args";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -274,10 +275,11 @@ describe("MemberSessionDetailPage", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     try {
-      await memberSessionDetailLoaderFactory(createTestQueryClient())({
+      await memberSessionDetailLoaderFactory(createTestQueryClient())(createLoaderArgs({
+        pattern: "/clubs/:clubSlug/app/sessions/:sessionId",
         params: { clubSlug: "reading-sai", sessionId: "session-6" },
         request: new Request("https://app.readmates.example/clubs/reading-sai/app/sessions/session-6?from=email"),
-      } as Parameters<ReturnType<typeof memberSessionDetailLoaderFactory>>[0]);
+      }));
       throw new Error("Expected redirect");
     } catch (error) {
       expect(error).toBeInstanceOf(Response);

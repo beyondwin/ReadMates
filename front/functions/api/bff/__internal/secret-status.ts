@@ -10,7 +10,9 @@ interface Env {
   BFF_SECRET_ROTATION_STAGE?: string;
 }
 
-export const onRequestGet: PagesFunction<Env> = async (context) => {
+type Context = { request: Request; env: Env };
+
+export async function onRequestGet(context: Context): Promise<Response> {
   const secrets = getConfiguredBffSecrets(context.env);
   const primary = secrets[0];
   const body = {
@@ -24,4 +26,4 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       "cache-control": "no-store",
     },
   });
-};
+}

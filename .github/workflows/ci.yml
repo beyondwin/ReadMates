@@ -225,6 +225,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Typecheck
+        run: pnpm typecheck
+
       - name: Front unit tests with coverage
         run: pnpm test:coverage
 
@@ -353,7 +356,7 @@ jobs:
       # ubuntu-latest is 4 vCPU; matches the build.gradle.kts default of
       # availableProcessors()/2. Set explicitly so the value is auditable
       # and survives any future runner-spec change.
-      # Refs: docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md §4.3
+      # See docs/development/test-guide.md for test lanes and fork overrides.
       READMATES_TEST_FORKS: "2"
     steps:
       - name: Configure Git defaults
@@ -398,13 +401,8 @@ jobs:
   backend-integration:
     name: Backend Integration
     runs-on: ubuntu-latest
-    # Spec §7.3 followup option 2: move Testcontainers-backed integration
-    # tests out of the `backend` critical path. This job runs in parallel
-    # with `backend` (and `e2e`), so PR wall-clock is max(backend,
-    # backend-integration, e2e) ≈ unchanged, but the metric job (C1
-    # backend) drops to unit + arch + detekt + jacoco only.
-    # Both jobs are required for PR green status — integration coverage
-    # is preserved (spec §A6).
+    # Testcontainers tests run separately from the backend unit/architecture
+    # gate. Both lanes remain part of CI; see docs/development/test-guide.md.
     steps:
       - name: Configure Git defaults
         run: git config --global init.defaultBranch main

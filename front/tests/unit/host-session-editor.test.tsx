@@ -100,7 +100,7 @@ const hostSessionEditorTestActions = {
       body: JSON.stringify(attendance),
       cache: "no-store",
     }),
-  previewSessionImport: async (_sessionId, request: SessionImportRequest) => ({
+  previewSessionImport: async (_sessionId, request: SessionImportRequest): Promise<SessionImportPreviewResponse> => ({
     valid: true,
     session: { sessionNumber: request.session.number, bookTitle: request.session.bookTitle, meetingDate: request.session.meetingDate },
     publication: { summary: request.publication.summary },

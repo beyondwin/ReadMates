@@ -170,11 +170,14 @@ plain text와 HTML body를 `NotificationEmailTemplates.eventCopy()` 단일 호�
 
 ## 검증
 
-**통합 테스트**
+**단위·통합 테스트**
 
 ```bash
-./server/gradlew -p server test --tests "*Notification*"
+./server/gradlew -p server unitTest --tests 'com.readmates.notification.*'
+./server/gradlew -p server integrationTest --tests 'com.readmates.notification.*'
 ```
+
+기본 `test` task는 비활성화되어 있습니다. `integrationTest`는 Docker/Testcontainers가 필요합니다.
 
 `NotificationKafkaPipelineIntegrationTest`는 `KafkaTestContainer`를 사용해 실제 Kafka 브로커에서 publish → consume 흐름을 검증합니다. `NotificationRelayServiceTest`, `NotificationDeliveryEngineTest`, `NotificationDispatchServiceTest`는 각 계층의 단위 테스트를 제공합니다.
 
@@ -221,7 +224,7 @@ SMTP provider가 메시지를 수락한 뒤 `markDeliverySent` CAS/DB commit 전
 - **backlog 모니터링 필수**: event outbox backlog 증가는 relay/Kafka, delivery backlog 증가는 worker/SMTP 신호입니다. 첫 refresh 전 `NaN`과 last-success snapshot을 0으로 해석하지 않습니다. 실제 Alertmanager routing은 운영 환경의 별도 확인 대상입니다.
 - **DEAD recovery 분리**: event-outbox `DEAD`에는 이 slice의 범용 replay action이 없으므로 원인 제거와 forward recovery를 분리하고 DB를 직접 수정하지 않습니다. Manual preview/confirm은 새 event를 만드는 forward action입니다. Delivery `DEAD`는 exact 대상과 failure/deadline/lease evidence를 확인한 뒤 host가 한 건씩 복구하거나, OWNER/OPERATOR가 bounded admin preview/confirm으로 allowlisted exact delivery 묶음만 원자적으로 `PENDING` 복구합니다. Admin replay는 새 outbox/event를 만들지 않고 changed/leased target을 skip하며, `AMBIGUOUS`는 미수락 evidence 없이 restore/blind resend하지 않습니다.
 - **consumer single instance**: `NotificationEventKafkaListener`는 단일 인스턴스로 실행됩니다. 처리량이 늘면 Kafka partition 수와 consumer 인스턴스를 맞춰 scale-out해야 하지만 현재 구성에서는 single consumer입니다.
-- **relay polling 지연**: `NotificationEventRelayScheduler`는 30초 고정 지연으로 실행되므로, commit → relay → Kafka publish 사이에 최대 30초 지연이 발생할 수 있습니다.
+- **relay polling 지연**: `NotificationEventRelayScheduler`는 설정 가능한 fixed delay(기본 30초)로 실행됩니다. 이전 실행의 처리 시간과 backlog가 더해지므로 commit → Kafka publish 지연의 상한이 30초로 보장되지는 않습니다.
 
 ## 다시 한다면
 
@@ -232,7 +235,7 @@ SMTP provider가 메시지를 수락한 뒤 `markDeliverySent` CAS/DB commit 전
 
 ## 관련
 
-- ADR-0004 — transactional outbox + Kafka relay 도입 결정
-- ADR-0009 — notification payload schema 검증 (Kafka 메시지 계약)
-- 설계 문서: `docs/superpowers/specs/2026-04-29-readmates-kafka-notification-pipeline-design.md`
-- 구현 계획: `docs/superpowers/plans/2026-04-29-readmates-kafka-notification-pipeline-implementation-plan.md`
+- [ADR-0004](../development/adr/0004-transactional-outbox-with-kafka-relay.md) — transactional outbox + Kafka relay 도입 결정
+- [ADR-0015](../development/adr/0015-notification-outbox-dedupe-policy.md) — notification outbox dedupeKey 정책
+- 과거 설계 문서 (Git 이력): `docs/superpowers/specs/2026-04-29-readmates-kafka-notification-pipeline-design.md`
+- 과거 구현 계획 (Git 이력): `docs/superpowers/plans/2026-04-29-readmates-kafka-notification-pipeline-implementation-plan.md`

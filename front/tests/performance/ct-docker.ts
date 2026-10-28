@@ -56,7 +56,7 @@ export function buildCtDockerCommand(input: CtDockerCommandInput): CtDockerComma
     "  exit 1",
     "fi",
     "pnpm config set store-dir /pnpm-store",
-    "pnpm install --frozen-lockfile=false",
+    "pnpm install --frozen-lockfile",
     playwrightArgs.map(shellEscapeDoubleQuoted).join(" "),
   ].join("\n");
 

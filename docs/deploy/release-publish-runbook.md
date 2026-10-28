@@ -59,6 +59,7 @@ git diff --name-only <previous-tag>..HEAD -- server/src/main/resources/db/mysql/
 
 ```bash
 pnpm --dir front lint
+pnpm --dir front typecheck
 pnpm --dir front test
 pnpm --dir front build
 ./scripts/server-ci-check.sh
@@ -117,7 +118,7 @@ gh run watch <deploy-server-run-id> --exit-status
 
 1. tag를 checkout하고 exact `vMAJOR.MINOR.PATCH`, annotated tag, tag commit = `HEAD`를 확인합니다.
 2. `./server/gradlew -p server clean check bootJar`를 실행합니다.
-3. `server/Dockerfile.release`로 `linux/arm64` scan 후보 image를 push합니다.
+3. 로컬 빌드와 공통인 `server/Dockerfile`로 `linux/arm64` scan 후보 image를 push합니다.
 4. Trivy로 HIGH/CRITICAL 취약점을 검사합니다(수정 가능한 것만, 발견 시 실패).
 5. 검사한 digest 그대로 `ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z`로 promote하고 digest를 step summary에 남깁니다.
 
@@ -197,7 +198,7 @@ gh run list --workflow "Deploy Front" --event workflow_dispatch --limit 5
 gh run watch <deploy-front-run-id> --exit-status
 ```
 
-`Deploy Front`는 tag 형식과 checkout commit을 검사하고, lint/test/build 뒤 `front/dist`와 `front/functions`를 Cloudflare Pages production에 올립니다. 자세한 내용은 [Cloudflare 프론트 배포 보조 절차](../../deploy/cloudflare/README.md)입니다.
+`Deploy Front`는 tag 형식과 checkout commit을 검사하고, lint/typecheck/test/build 뒤 `front/dist`와 `front/functions`를 Cloudflare Pages production에 올립니다. 자세한 내용은 [Cloudflare 프론트 배포 보조 절차](../../deploy/cloudflare/README.md)입니다.
 
 ## Frontend Smoke
 

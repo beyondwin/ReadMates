@@ -3,6 +3,7 @@ import type { MemberProfileResponse, MyPageResponse } from "@/features/archive/a
 import { profileSaveErrorMessage } from "@/features/archive/model/archive-model";
 import {
   type EditableMemberProfile,
+  memberProfileErrorCode,
   profileFailureField,
   ProfileUpdateFailure,
 } from "@/features/archive/model/profile-update";
@@ -55,7 +56,7 @@ export function useProfileUpdateController({
     override: SavedProfileOverride;
   } | null>(null);
   const latestRequestGeneration = useRef(0);
-  const savedOverride = savedState?.clubSlug === clubSlug ? savedState.override : null;
+  const savedOverride = savedState && savedState.clubSlug === clubSlug ? savedState.override : null;
   const source = editableProfile(sourceProfile);
 
   const sourceIsAuthoritative = savedOverride !== null && profilesEqual(source, savedOverride.saved);
@@ -79,11 +80,11 @@ export function useProfileUpdateController({
     try {
       const updated = await updateMyProfile(editable);
       if (requestGeneration !== latestRequestGeneration.current) return updated;
-      const saved = editableProfile(updated as MyPageResponse);
+      const saved = editableProfile(updated);
       await onProfileUpdated();
       if (requestGeneration !== latestRequestGeneration.current) return updated;
       setSavedState((currentState) => {
-        const current = currentState?.clubSlug === clubSlug ? currentState.override : null;
+        const current = currentState && currentState.clubSlug === clubSlug ? currentState.override : null;
         return {
           clubSlug,
           override: {
@@ -100,7 +101,7 @@ export function useProfileUpdateController({
       return updated;
     } catch (error) {
       if (error instanceof ProfileUpdateFailure) throw error;
-      const errorCode = isReadmatesApiError(error) ? error.code : null;
+      const errorCode = memberProfileErrorCode(isReadmatesApiError(error) ? error.code : null);
       throw new ProfileUpdateFailure(
         profileSaveErrorMessage(errorCode),
         errorCode,

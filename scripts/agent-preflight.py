@@ -105,14 +105,14 @@ PATH_RULES = (
         ("frontend", "bff-auth"),
         ("front/AGENTS.md", "front/functions/AGENTS.md", "docs/agents/front.md", "docs/agents/server.md", "docs/agents/execution.md", "docs/development/acceptance-matrix.md"),
         ("auth", "club-context", "trusted-headers", "redirects", "browser-error-contract"),
-        ("pnpm --dir front lint", "pnpm --dir front test", "pnpm --dir front build", "pnpm --dir front test:e2e"),
+        ("pnpm --dir front lint", "pnpm --dir front typecheck", "pnpm --dir front test", "pnpm --dir front build", "pnpm --dir front test:e2e"),
     ),
     PathRule(
         ("front/",),
         ("frontend",),
         ("front/AGENTS.md", "docs/agents/front.md", "docs/agents/execution.md"),
         ("route-state", "responsive-ui"),
-        ("pnpm --dir front lint", "pnpm --dir front test", "pnpm --dir front build"),
+        ("pnpm --dir front lint", "pnpm --dir front typecheck", "pnpm --dir front test", "pnpm --dir front build"),
     ),
     PathRule(
         ("server/src/main/resources/db/mysql/migration/",),
@@ -236,6 +236,7 @@ class AgentPreflightTests(unittest.TestCase):
         self.assertIn("docs/agents/front.md", result.required_guides)
         self.assertIn("docs/agents/server.md", result.required_guides)
         self.assertIn("pnpm --dir front test:e2e", result.recommended_checks)
+        self.assertIn("pnpm --dir front typecheck", result.recommended_checks)
 
     def test_migration_selects_integration_evidence(self) -> None:
         result = classify_paths(
@@ -259,6 +260,7 @@ class AgentPreflightTests(unittest.TestCase):
 
     def test_text_and_json_share_the_same_model(self) -> None:
         result = classify_paths(("front/src/app/router.tsx",), "change")
+        self.assertIn("pnpm --dir front typecheck", result.recommended_checks)
         encoded = json.loads(json.dumps(asdict(result), sort_keys=True))
         self.assertEqual(list(result.surfaces), encoded["surfaces"])
 

@@ -27,8 +27,8 @@ const viewModel: MemberSpaceViewModel = {
   profileMetaLabel: "샘플 독서모임 · 멤버 · 2024.11부터 함께",
   achievementHeading: "읽고, 묻고, 기록해 온 시간",
   journeyStats: [
-    { kind: "sessions", label: "함께한 모임", value: "9", unit: "회" },
-    { kind: "completed", label: "함께 완독한 책", value: "7", unit: "권" },
+    { kind: "sessions", label: "참여한 모임", value: "9", unit: "회" },
+    { kind: "completed", label: "완독한 책", value: "7", unit: "권" },
   ],
   recordTraces: [
     { kind: "questions", label: "대화를 연 질문", description: "책에서 시작된 생각의 기록", value: "0", unit: "개" },

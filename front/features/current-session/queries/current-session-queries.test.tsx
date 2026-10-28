@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { RECOVER_READ_SESSION_EXPIRY } from "@/shared/api/client";
+import { RECOVER_READ_SESSION_EXPIRY, type ReadmatesApiContext } from "@/shared/api/client";
 
 vi.mock("@/features/current-session/api/current-session-api", () => ({
   getCurrentSession: vi.fn(),
@@ -119,90 +119,53 @@ describe("current session query keys", () => {
   });
 });
 
+function mutationCase<T>(
+  name: string,
+  useMutation: () => { mutateAsync: (payload: T) => Promise<void> },
+  api: (payload: T, context?: ReadmatesApiContext) => Promise<Response>,
+  payload: T,
+) {
+  return {
+    name,
+    useRun() {
+      const mutation = useMutation();
+      return () => mutation.mutateAsync(payload);
+    },
+    respond(response: Response) { vi.mocked(api).mockResolvedValue(response); },
+    expectSaved() { expect(api).toHaveBeenCalledWith(payload, { clubSlug: "reading-sai" }); },
+  };
+}
+
+const mutationCases = [
+  mutationCase("rsvp", () => useUpdateCurrentSessionRsvpMutation({ clubSlug: "reading-sai" }), updateCurrentSessionRsvp, "GOING"),
+  mutationCase("checkin", () => useSaveCurrentSessionCheckinMutation({ clubSlug: "reading-sai" }), saveCurrentSessionCheckin, 72),
+  mutationCase("questions", () => useSaveCurrentSessionQuestionsMutation({ clubSlug: "reading-sai" }), saveCurrentSessionQuestions, [{ priority: 1, text: "토론 질문" }]),
+  mutationCase("long review", () => useSaveCurrentSessionLongReviewMutation({ clubSlug: "reading-sai" }), saveCurrentSessionLongReview, "긴 서평"),
+  mutationCase("one-line review", () => useSaveCurrentSessionOneLineReviewMutation({ clubSlug: "reading-sai" }), saveCurrentSessionOneLineReview, "한줄평"),
+];
+
 describe("current session mutation hooks", () => {
-  it.each([
-    [
-      "rsvp",
-      () => useUpdateCurrentSessionRsvpMutation({ clubSlug: "reading-sai" }),
-      updateCurrentSessionRsvp,
-      "GOING" as const,
-    ],
-    [
-      "checkin",
-      () => useSaveCurrentSessionCheckinMutation({ clubSlug: "reading-sai" }),
-      saveCurrentSessionCheckin,
-      72,
-    ],
-    [
-      "questions",
-      () => useSaveCurrentSessionQuestionsMutation({ clubSlug: "reading-sai" }),
-      saveCurrentSessionQuestions,
-      [{ priority: 1, text: "토론 질문" }],
-    ],
-    [
-      "long review",
-      () => useSaveCurrentSessionLongReviewMutation({ clubSlug: "reading-sai" }),
-      saveCurrentSessionLongReview,
-      "긴 서평",
-    ],
-    [
-      "one-line review",
-      () => useSaveCurrentSessionOneLineReviewMutation({ clubSlug: "reading-sai" }),
-      saveCurrentSessionOneLineReview,
-      "한줄평",
-    ],
-  ] as const)("invalidates the scoped cache and preserves its value after successful %s save", async (_name, hook, apiFn, payload) => {
-    vi.mocked(apiFn).mockResolvedValue(new Response("{}", { status: 200 }) as never);
+  it.each(mutationCases)("invalidates the scoped cache and preserves its value after successful $name save", async ({ useRun, respond, expectSaved }) => {
+    respond(new Response("{}", { status: 200 }));
     const { client, Wrapper } = createWrapper();
     const selectedKey = currentSessionKeys.current({ clubSlug: "reading-sai" });
     const otherKey = currentSessionKeys.current({ clubSlug: "other-club" });
     client.setQueryData(selectedKey, { currentSession: { sessionId: "session-7" } });
     client.setQueryData(otherKey, { currentSession: { sessionId: "session-9" } });
-    const { result } = renderHook(hook, { wrapper: Wrapper });
+    const { result } = renderHook(useRun, { wrapper: Wrapper });
 
     await act(async () => {
-      await result.current.mutateAsync(payload as never);
+      await result.current();
     });
 
-    expect(apiFn).toHaveBeenCalledWith(payload, { clubSlug: "reading-sai" });
+    expectSaved();
     expect(client.getQueryState(selectedKey)?.isInvalidated).toBe(true);
     expect(client.getQueryState(otherKey)?.isInvalidated).toBe(false);
     expect(client.getQueryData(selectedKey)).toEqual({ currentSession: { sessionId: "session-7" } });
   });
 
-  it.each([
-    [
-      "rsvp",
-      () => useUpdateCurrentSessionRsvpMutation({ clubSlug: "reading-sai" }),
-      updateCurrentSessionRsvp,
-      "GOING" as const,
-    ],
-    [
-      "checkin",
-      () => useSaveCurrentSessionCheckinMutation({ clubSlug: "reading-sai" }),
-      saveCurrentSessionCheckin,
-      72,
-    ],
-    [
-      "questions",
-      () => useSaveCurrentSessionQuestionsMutation({ clubSlug: "reading-sai" }),
-      saveCurrentSessionQuestions,
-      [{ priority: 1, text: "토론 질문" }],
-    ],
-    [
-      "long review",
-      () => useSaveCurrentSessionLongReviewMutation({ clubSlug: "reading-sai" }),
-      saveCurrentSessionLongReview,
-      "긴 서평",
-    ],
-    [
-      "one-line review",
-      () => useSaveCurrentSessionOneLineReviewMutation({ clubSlug: "reading-sai" }),
-      saveCurrentSessionOneLineReview,
-      "한줄평",
-    ],
-  ] as const)("leaves every cached scope unchanged when %s save fails", async (_name, hook, apiFn, payload) => {
-    vi.mocked(apiFn).mockResolvedValue(new Response("bad request", { status: 400 }) as never);
+  it.each(mutationCases)("leaves every cached scope unchanged when $name save fails", async ({ useRun, respond }) => {
+    respond(new Response("bad request", { status: 400 }));
     const { client, Wrapper } = createWrapper();
     client.setQueryData(
       currentSessionKeys.current({ clubSlug: "reading-sai" }),
@@ -213,9 +176,9 @@ describe("current session mutation hooks", () => {
       { currentSession: { sessionId: "session-9" } },
     );
     const before = cacheState(client);
-    const { result } = renderHook(hook, { wrapper: Wrapper });
+    const { result } = renderHook(useRun, { wrapper: Wrapper });
 
-    await expect(result.current.mutateAsync(payload as never)).rejects.toThrow("Current session save failed");
+    await expect(result.current()).rejects.toThrow("Current session save failed");
     expect(cacheState(client)).toEqual(before);
   });
 });

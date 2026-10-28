@@ -8,6 +8,7 @@
   },
   "scripts": {
     "front:lint": "pnpm --dir front lint",
+    "front:typecheck": "pnpm --dir front typecheck",
     "front:test": "pnpm --dir front test",
     "front:build": "pnpm --dir front build",
     "front:performance-budget": "pnpm --dir front performance:budget",

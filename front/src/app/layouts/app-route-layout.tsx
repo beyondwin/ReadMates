@@ -269,7 +269,7 @@ export function AppRouteLayout({
   const showHostEntry = Boolean(isActiveHost && !isHostWorkspace);
   const memberName = auth?.displayName ?? null;
   const memberAvatarKey = auth?.currentMembership?.avatarKey ?? auth?.avatarKey ?? null;
-  const activeHostKey = isActiveHost && mobileWorkspace === "host" ? auth.membershipId : null;
+  const activeHostKey = isActiveHost && auth && mobileWorkspace === "host" ? auth.membershipId : null;
   const currentSessionQuery = useQuery({
     ...hostCurrentSessionQuery(clubSlug ? { clubSlug } : undefined),
     enabled: activeHostKey !== null,
@@ -313,7 +313,7 @@ export function AppRouteLayout({
 
   const sessionExpiry =
     !isGuestAudience && state.status === "session_expired" && state.cause
-      ? state
+      ? { ...state, cause: state.cause }
       : null;
   const guestReadableExpiry = Boolean(
     sessionExpiry?.cause === "read"
@@ -474,7 +474,6 @@ export function AppRouteLayout({
           currentSessionStatus={currentSessionStatus}
           onRetryCurrentSession={retryCurrentSession}
           appBasePath={basePath}
-          appPath={appPath}
           LinkComponent={AppLinkComponent}
         />
       </div>

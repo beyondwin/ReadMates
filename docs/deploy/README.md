@@ -12,7 +12,7 @@ ReadMates 배포 문서의 시작점입니다. 운영 구조, 신뢰 경계, sec
 - 저장소 설정은 "운영이 지금 이렇게 돌고 있다"는 증거가 아닙니다. 운영 상태는 운영 채널에서 따로 확인합니다.
 - Cloudflare, OCI, Google Cloud, GitHub의 UI·가격·한도는 바뀔 수 있습니다. 계정 설정이나 비용 결정 전에는 현재 콘솔이나 공식 문서로 다시 확인합니다.
 
-관련 문서: [루트 README](../../README.md), [개발자 문서 허브](../development/README.md). 과거 배포 사후 보고서는 [`docs/reports`](../reports/README.md)에 있습니다.
+관련 문서: [루트 README](../../README.md), [개발자 문서 허브](../development/README.md). 과거 배포 사후 보고서는 full source checkout의 `docs/reports/README.md`에서 확인하며 공개 후보에는 포함하지 않습니다.
 
 ## 문서 지도
 

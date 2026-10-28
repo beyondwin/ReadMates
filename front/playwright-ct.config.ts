@@ -1,5 +1,4 @@
 import { defineConfig, devices } from "@playwright/experimental-ct-react";
-import react from "@vitejs/plugin-react";
 import path from "node:path";
 
 const frontRoot = path.resolve(__dirname);
@@ -13,14 +12,12 @@ export default defineConfig({
   retries: 0,
   reporter: "list",
   use: {
-    ctViewport: { width: 480, height: 360 },
     ctTemplateDir: "playwright",
-    ctVitePort: 3110,
+    ctPort: 3110,
     ctViteConfig: {
       resolve: {
         alias: { "@": frontRoot },
       },
-      plugins: [react()],
     },
     trace: "on-first-retry",
   },
